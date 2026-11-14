@@ -93,9 +93,6 @@ public class ExchangeResolveService {
   /** Stands in for an empty text-key list; no catalogue key is empty. */
   private static final String NO_TEXT = "";
 
-  /** The longest display name the published item reference carries. */
-  private static final int MAX_NAME = 200;
-
   private final BlueprintProducts blueprintProductService;
   private final BlueprintImports blueprintImportService;
   private final ProductKeys productKeys;
@@ -398,7 +395,7 @@ public class ExchangeResolveService {
               orElse(uexIds, NO_UEX_ID),
               orElse(names, NO_TEXT),
               orElse(locKeys, NO_TEXT))) {
-        Entry entry = new Entry(row.id().toString(), row.name());
+        Entry entry = new Entry(row.id().toString(), ExchangeNames.cut(row.name()));
         add(byId, row.id(), entry);
         add(byScRecord, lower(row.className()), entry);
         add(byScGuid, row.externalUuid(), entry);
@@ -600,7 +597,7 @@ public class ExchangeResolveService {
     return new Entry(
         ProductKeys.guidOf(productKey),
         ExchangeBlueprintFeedService.keyOf(productKey),
-        productName.length() > MAX_NAME ? productName.substring(0, MAX_NAME) : productName);
+        ExchangeNames.cut(productName));
   }
 
   /**
@@ -629,22 +626,22 @@ public class ExchangeResolveService {
    * Maps a material to its entry.
    *
    * @param material the material
-   * @return the entry keyed by the material id
+   * @return the entry keyed by the material id, its name cut to the published limit
    */
   @NotNull
   private static Entry toEntry(@NotNull Material material) {
-    return new Entry(material.getId().toString(), material.getName());
+    return new Entry(material.getId().toString(), ExchangeNames.cut(material.getName()));
   }
 
   /**
    * Maps a ship type to its entry.
    *
    * @param shipType the ship type
-   * @return the entry keyed by the ship type id
+   * @return the entry keyed by the ship type id, its name cut to the published limit
    */
   @NotNull
   private static Entry toEntry(@NotNull ShipType shipType) {
-    return new Entry(shipType.getId().toString(), shipType.getName());
+    return new Entry(shipType.getId().toString(), ExchangeNames.cut(shipType.getName()));
   }
 
   /**

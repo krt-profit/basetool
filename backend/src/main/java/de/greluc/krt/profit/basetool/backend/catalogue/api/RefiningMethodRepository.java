@@ -48,4 +48,13 @@ public interface RefiningMethodRepository extends JpaRepository<RefiningMethod, 
    * @return every refining method with that code
    */
   List<RefiningMethod> findAllByCode(String code);
+
+  /**
+   * Finds the refining methods whose name starts with a prefix, for an exchange write that names a
+   * method by the name the exchange cut its longer name to (REQ-XCH-026).
+   *
+   * @param prefix the start of the name, compared exactly
+   * @return every such refining method
+   */
+  List<RefiningMethod> findAllByNameStartingWith(String prefix);
 }

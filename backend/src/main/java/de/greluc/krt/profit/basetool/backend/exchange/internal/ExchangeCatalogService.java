@@ -45,7 +45,7 @@ public class ExchangeCatalogService {
   /**
    * Lists the Lager's non-hidden locations with their UEX place and starmap GUID, in one query.
    *
-   * @return the locations, ordered by name
+   * @return the locations, ordered by name, each name cut to the published limit
    */
   @NotNull
   @Transactional(readOnly = true)
@@ -60,12 +60,14 @@ public class ExchangeCatalogService {
    * Maps one row.
    *
    * @param row the row
-   * @return the DTO
+   * @return the DTO, its name cut to the published limit
    */
   @NotNull
   private static ExchangeLocationDto toDto(@NotNull ExchangeLocationRow row) {
     return new ExchangeLocationDto(
-        row.getName(), uex(row.getUexCityId(), row.getUexSpaceStationId()), row.getGuid());
+        ExchangeNames.cut(row.getName()),
+        uex(row.getUexCityId(), row.getUexSpaceStationId()),
+        row.getGuid());
   }
 
   /**

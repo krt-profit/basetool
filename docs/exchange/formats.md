@@ -60,9 +60,12 @@ send 0 when the quality is not known. An item has none and is stored at 0.
 
 A warehouse location, by `guid`, by `uex: {kind: CITY | SPACE_STATION, id}`, by exact `name`, or
 any of them; `guid` is tried first, then the UEX link, then the name, and a value that matches no
-location falls through to the next. `guid` is the lower-case DataForge GUID of the starmap object
-the location stands for: its own, else its city's, else its space station's. The feeds send it
-beside `uex`, which stays; a location linked to no starmap object has none. The **warehouse** is
+location falls through to the next. A `name` the server cut to 200 characters in a read finds the
+location it came from when no location bears that name exactly and only one location's name cuts
+to it; send it back as you received it. `guid` is the lower-case DataForge GUID of the starmap
+object the location stands for: its own, else its city's, else its space station's. The feeds
+send it beside `uex`, which stays; a location linked to no starmap object has none. The
+**warehouse** is
 the Basetool's record of the org's stock, the *Inventory* area of the web app; its locations are
 the places stock and ships can be recorded at. `GET /exchange/v1/catalog/locations` lists them.
 A place without a warehouse location is `LOCATION_UNKNOWN`; it is never created.

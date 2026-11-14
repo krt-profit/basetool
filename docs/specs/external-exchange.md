@@ -849,7 +849,8 @@ several is the answer, so an ambiguous `scRecord` still yields to a name that re
 lists at most ten candidates as `{bt, name}`; fuzzy suggestions are always `ambiguous`, even when
 there is only one, because they are never taken without the member. `LOC_KEY_UNRESOLVED` points at
 `/refs/<i>/locKey` of every reference that carries a `locKey` and whose keys, `locKey` included, did
-not resolve; a response carries at most 50 warnings. Per catalogue:
+not resolve; a response carries at most 50 warnings. The `name` of every entry, resolved or a
+candidate, is cut to the 200 characters `item-ref` allows (REQ-XCH-026). Per catalogue:
 
 | `kind` | `bt` | `scRecord` | `scGuid` | `uexId` | `locKey` | `name` |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1203,8 +1204,9 @@ refused `400` (`ExchangeStockChangeSetValidationTest`, `ExchangeStockWriteContro
 The backend applies a change set at `POST /api/v1/exchange/me/stock/changes`
 (`exchange.stock.write`) in one transaction. Each op resolves its material — a material first, an
 item otherwise — and its place, its starmap `guid` first, then the UEX link, then the exact name of
-a non-hidden location, a value that matches nothing falling through to the next
-(`LOCATION_UNKNOWN`; REQ-XCH-018), checks both units against the material's (`UNIT_MISMATCH`);
+a non-hidden location, then the name the exchange cut its longer name to (REQ-XCH-026), a value
+that matches nothing falling through to the next (`LOCATION_UNKNOWN`; REQ-XCH-018), checks both
+units against the material's (`UNIT_MISMATCH`);
 then every lot the batch names is locked before any op compares `expectedQuantity` (`VERSION_CONFLICT`): first a
 transaction-scoped advisory lock per member and lot key, all of them in ascending order of the
 lock key, then the lots' rows in the order of the lots' keys, each lot's rows in id order
@@ -1326,7 +1328,7 @@ per-order breakdown and no low-count suppression; a client may cache it for up t
 approved for `exchange.demand.details` adds a per-order breakdown for the member's Logistician
 units (REQ-XCH-047, ADR-0257); without it the answer is exactly as described here.
 `GET /exchange/v1/catalog/locations` lists the non-hidden `location` rows with their UEX link and
-their starmap `guid`.
+their starmap `guid`, each `name` cut to the 200 characters `location` allows (REQ-XCH-026).
 
 The backend serves the location list as `GET /api/v1/exchange/catalog/locations` (any exchange
 scope), one query, a city link winning over a space-station link.
@@ -1340,9 +1342,10 @@ place does: the location list and the `location` of the stock, org-stock and shi
 {kind, id}` stays and is not deprecated. The name a place carries is `location.name`, the curated
 name, never the P4K name of the starmap object, which is a game text (ADR-0344). The write resolver
 (`ExchangeLocationResolver`, REQ-XCH-016, REQ-XCH-017, REQ-XCH-042) tries `guid`, then `uex`, then
-the exact name, always among the non-hidden, non-reference-only places; a value that matches
-nothing falls through to the next, and among several places with one `guid` a place linked to the
-object itself wins, then the name decides.
+the exact name, then the name the exchange cut a longer name to (REQ-XCH-026), always among the
+non-hidden, non-reference-only places; a value that matches nothing falls through to the next, and
+among several places with one `guid` a place linked to the object itself wins, then the name
+decides.
 
 **A change of what a place's reference serialises to re-announces the entries that carry it.**
 When the `name`, `uex` or `guid` of a place changes — its curated name, its city or space station,
@@ -2023,6 +2026,28 @@ Change-set sanitization removes every undeclared field independently of the fift
 reporting cap. Unknown fields in later operations are removed too. The pointer-length check
 examines all undeclared fields before relay, including fields beyond the warning cap.
 
+**No answer carries a string longer than its v1 schema allows.** A schema is never widened to fit
+what the database stores; the backend cuts the value instead. Every display name of a place or a
+catalogue entry — a location, an item, a material, a ship type, a blueprint product, a refining
+method — and of a holder, a mission earmark or a client is cut to the 200 characters `location`,
+`item-ref` and the other v1 schemas allow, never inside a surrogate pair (`ExchangeNames.cut`), in
+the location list, the resolver, every feed and the patch-change read. The database stores those
+names with up to 255 characters, and one longer name would otherwise fail the whole answer at the
+gateway with `502 BACKEND_RELAY_FAILED`. Every other bounded string an answer carries is stored with
+at most its schema's length.
+
+**A cut name a client sends back finds the entry it was cut from.** Where a read gives a client a
+cut name as the only key it can write back — a place without starmap `guid` or `uex` link, a
+refining method without `code` — a write tries the exact name first and then, for a name of 200
+characters (199 where the cut stopped before a surrogate pair), the one entry whose longer name cuts
+to it (`ExchangeNames.cutTo`; `ExchangeLocationResolver`, `ExchangeRefineryOrderReferences`). When
+several entries cut to the name, the step finds none: a place answers `LOCATION_UNKNOWN` and a
+method `AMBIGUOUS`, their resolvers' answers for an unknown place and for several methods; when no
+entry does, `LOCATION_UNKNOWN` and `UNMATCHED` as before. No other write resolves a name the reads
+cut: every item, material, ship-type and blueprint reference a read sends carries its `bt` (and a
+blueprint its `guid`), which the resolver tries before the name, and missions, holders and org
+units are written by id or `ref`.
+
 **The release baseline is mandatory in CI.** The *Fetch the previous release's exchange schemas*
 step of `ci.yml` copies the newest `vX.Y.Z` tag's v1 schemas to `ingest/build/exchange-baseline/`,
 which `ingest/build.gradle.kts` passes to the tests as `-Dexchange.baseline`. The step fails the job
@@ -2042,6 +2067,16 @@ reason to skip. A local build fetches no baseline, and the comparison skips.
 - [x] A narrowing the owner accepts as a correction is listed by its exact comparison message, with
   its reason, in `ExchangeContractTest.ACCEPTED_NARROWINGS`; any other narrowing still fails, and the
   entry is proven to match exactly what the comparison reports for it.
+- [x] A location, item, material or ship-type name of 255 characters reaches the client cut to 200
+  from the location list and from `catalog/resolve`, and the answer matches its published schema;
+  the cut never splits a surrogate pair. *`ExchangeCatalogControllerTest`,
+  `ExchangeResolveControllerTest`, `ExchangeNamesTest`; `ExchangeControllerTest` relays a location
+  list at the bound and refuses one beyond it with `502 BACKEND_RELAY_FAILED`.*
+- [x] A write that names a place without `guid` or `uex` link, or a refining method without code,
+  by the cut name of its longer name reaches that entry; two entries cutting to one name are
+  refused, a place with `LOCATION_UNKNOWN` and a method with `AMBIGUOUS`; an exact name wins.
+  *`ExchangeStockWriteControllerTest`, `ExchangeRefineryOrderWriteControllerTest`,
+  `ExchangeNamesTest`.*
 
 > [!note] 2026-10-03 — `refinery-draft` requires at least one order
 > `refinery-draft.schema.json` gains `"minItems": 1` on `orders`, and the fixture
@@ -2061,8 +2096,8 @@ reason to skip. A local build fetches no baseline, and the comparison skips.
 > `ACCEPTED_NARROWINGS`.
 
 **Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest`, the
-*Fetch the previous release's exchange schemas* step of `ci.yml` · **Status:** implemented —
-WP 0.2 (#2080)
+*Fetch the previous release's exchange schemas* step of `ci.yml`, `ExchangeNamesTest` ·
+**Status:** implemented — WP 0.2 (#2080)
 
 ### REQ-XCH-027 — Approved clients meet the client security requirements
 
@@ -3466,9 +3501,10 @@ web.
   set refused is `PRECEDING_OP_REJECTED`. A key whose order is gone may be used again: the new order
   takes it over, and the removed order's tombstone keeps naming it (REQ-XCH-051).
 - **References.** The location, the refining method and a good's material are `ref`s resolved
-  **exactly**, as the stock ops resolve theirs (REQ-XCH-016): a location by starmap `guid`, UEX id or
-  exact name, a method by its code or exact name, a material by `bt`, `scGuid`, `uexId` or exact
-  name. Nothing is matched fuzzily, because no member reviews a direct write: an unknown reference is
+  **exactly**, as the stock ops resolve theirs (REQ-XCH-016): a location by starmap `guid`, UEX id,
+  exact name or the name the exchange cut its longer name to, a method by its code, exact name or
+  cut name (REQ-XCH-026), a material by `bt`, `scGuid`, `uexId` or exact name. Nothing is matched
+  fuzzily, because no member reviews a direct write: an unknown reference is
   `UNMATCHED`, one naming several entries `AMBIGUOUS`, a place without a location
   `LOCATION_UNKNOWN`. The location must be a refinery the web's picker offers (REQ-REFINERY-020),
   else `NOT_A_REFINERY`; a good's input material must be `RAW` or manual-raw, else

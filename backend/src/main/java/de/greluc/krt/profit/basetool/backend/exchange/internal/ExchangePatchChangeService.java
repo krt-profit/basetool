@@ -132,9 +132,7 @@ public class ExchangePatchChangeService {
                     new ExchangePatchChangeDto.ExceptionEntry(
                         new ExchangeItemRefDto(
                             exception.id().toString(),
-                            exception.name() == null
-                                ? null
-                                : ExchangeStockFeedService.cut(exception.name())),
+                            exception.name() == null ? null : ExchangeNames.cut(exception.name())),
                         exception.target().name(),
                         exception.mode().name()))
                 .toList(),
@@ -157,8 +155,7 @@ public class ExchangePatchChangeService {
     return new ExchangePatchChangeDto.Preview(
         place == null
             ? null
-            : new ExchangeLocationDto(
-                ExchangeStockFeedService.cut(place.name()), linked.uex(), linked.guid()),
+            : new ExchangeLocationDto(ExchangeNames.cut(place.name()), linked.uex(), linked.guid()),
         entry.rows(),
         entry.pools().stream()
             .map(pool ->
