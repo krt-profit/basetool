@@ -32,8 +32,9 @@ import de.greluc.krt.profit.basetool.backend.identity.internal.MemberHomeLocatio
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
-import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationChoiceRefusedException;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationChoiceRefusedException.Reason;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.RelocationPendingException;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
@@ -230,7 +231,9 @@ class HomeLocationRelocationIntegrationTest {
     assertThat(done.chosen()).isNotNull().extracting(HomeLocationOptionDto::id).isEqualTo(home);
 
     assertThatThrownBy(() -> relocations.relocate(member, home, RelocationChooser.SELF))
-        .isInstanceOf(BusinessConflictException.class)
+        .isInstanceOfSatisfying(
+            HomeLocationChoiceRefusedException.class,
+            refused -> assertThat(refused.getReason()).isEqualTo(Reason.ALREADY_CHOSEN))
         .hasMessage("error.patch_change.already_relocated");
     assertThat(versionOf("inventory_item", own)).isEqualTo(1L);
   }
@@ -242,7 +245,9 @@ class HomeLocationRelocationIntegrationTest {
     assertThat(phases.mustChoose(newcomer)).isFalse();
     assertThat(prompts.promptFor(newcomer).state()).isEqualTo(MemberRelocationState.NOT_ASKED);
     assertThatThrownBy(() -> relocations.relocate(newcomer, home, RelocationChooser.SELF))
-        .isInstanceOf(BusinessConflictException.class);
+        .isInstanceOfSatisfying(
+            HomeLocationChoiceRefusedException.class,
+            refused -> assertThat(refused.getReason()).isEqualTo(Reason.NOT_ASKED));
   }
 
   @Test
@@ -250,7 +255,9 @@ class HomeLocationRelocationIntegrationTest {
     trigger("0.1", LIVE_AT);
 
     assertThatThrownBy(() -> relocations.relocate(member, port, RelocationChooser.SELF))
-        .isInstanceOf(BadRequestException.class)
+        .isInstanceOfSatisfying(
+            HomeLocationChoiceRefusedException.class,
+            refused -> assertThat(refused.getReason()).isEqualTo(Reason.NOT_OFFERED))
         .hasMessageContaining("home_location_not_offered");
     assertThat(phases.mustChoose(member)).isTrue();
     assertThat(preferences.homeLocationOf(member).homeLocationId()).isNull();

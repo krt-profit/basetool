@@ -504,6 +504,12 @@ class ExchangeGoldenAnswerTest {
                 "change-set--refineryOrderChangeSet/valid/create-then-update-by-client-key.json")));
     routes.put("route-get-org-demand", get("/me/org-demand"));
     routes.put("route-get-org-units", get("/me/org-units"));
+    routes.put("route-get-patch-change", get("/me/patch-change"));
+    routes.put(
+        "route-post-patch-change-home-location",
+        post(
+            "/me/patch-change/home-location",
+            fixture("patch-change--homeLocationChoice/valid/choice.json")));
     routes.put("route-get-org-stock", get("/org-stock"));
     routes.put(
         "route-post-org-stock-changes",
@@ -583,6 +589,9 @@ class ExchangeGoldenAnswerTest {
             fixture("change-result/valid/refinery-orders.json");
         case "GET /api/v1/exchange/me/org-demand" -> fixture("org-demand/valid/both-lists.json");
         case "GET /api/v1/exchange/me/org-units" -> fixture("org-unit-list/valid/all-kinds.json");
+        case "GET /api/v1/exchange/me/patch-change" -> fixture("patch-change/valid/pending.json");
+        case "POST /api/v1/exchange/me/patch-change/home-location" ->
+            fixture("patch-change--homeLocationChosen/valid/chosen.json");
         case "GET /api/v1/exchange/org-stock" -> fixture("page--orgStockPage/valid/snapshot.json");
         case "GET /api/v1/exchange/org-stock/members" ->
             fixture("org-stock-members/valid/roster.json");

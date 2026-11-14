@@ -14,6 +14,25 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   of those lots or ships answers `409 RELOCATION_PENDING` and writes nothing, from the member's own
   client and from another member's client on a pool lot the member holds; reads and new stock still
   work ([errors](errors.md#request-errors)). No schema changes.
+- **New: the patch-change resource.** `GET /exchange/v1/me/patch-change` (scope
+  `exchange.patch.read`) answers the latest patch change with its `id`, label, kind, live time and
+  options: every wipe group with the keys of its catalogue types and whether it was wiped, the
+  exceptions, the refinery option, the currency wipe and the home-location prompt. Beside it the
+  member's state in the latest home-location phase, the chosen home location and when, the home
+  locations on offer and, while the member is pending, what would move from each current location
+  ([patch change](resources/patch-change.md)). New: `patch-change.schema.json`.
+- **New: the home-location choice.** `POST /exchange/v1/me/patch-change/home-location` (scope
+  `exchange.patch.write`, granted only with `exchange.patch.read`) makes the member's choice with the
+  web's rules and relocates the member in the same request; it counts one write. A second choice
+  answers `409 HOME_LOCATION_ALREADY_CHOSEN`, a choice without an open phase asking the member
+  `409 HOME_LOCATION_NOT_ASKED`, a location not on offer `400 HOME_LOCATION_NOT_OFFERED`
+  ([choosing](resources/patch-change.md#choosing-the-home-location--post-exchangev1mepatch-changehome-location)).
+  New: `#/$defs/homeLocationChoice` and `#/$defs/homeLocationChosen`.
+- **New: `results[].patchChange` on `REMOVED_ELSEWHERE`.** A stock op against a lot a patch change
+  emptied is refused `REMOVED_ELSEWHERE` whatever its `expectedQuantity`, and a ship `upsert` of a
+  ship a patch change wiped likewise; the result item names the patch change `{id, label}`
+  ([pushing against what a patch change removed](resources/patch-change.md#pushing-against-what-a-patch-change-removed)).
+  New in `change-result.schema.json`: the optional `results[].patchChange`.
 
 ## 2026-11-13
 

@@ -36,7 +36,16 @@ public enum PatchChangeProblemCode implements ProblemCode {
   HOME_LOCATION_REQUIRED(HttpStatus.FORBIDDEN),
 
   /** The write changes stock or ships a pending relocation locks (REQ-PATCH-023). */
-  RELOCATION_PENDING(HttpStatus.CONFLICT);
+  RELOCATION_PENDING(HttpStatus.CONFLICT),
+
+  /** No open home-location phase asks the member for a choice (REQ-PATCH-022). */
+  HOME_LOCATION_NOT_ASKED(HttpStatus.CONFLICT),
+
+  /** The member has chosen a home location in the open phase already (REQ-PATCH-022). */
+  HOME_LOCATION_ALREADY_CHOSEN(HttpStatus.CONFLICT),
+
+  /** The chosen location is no curated home location on offer (REQ-PATCH-021). */
+  HOME_LOCATION_NOT_OFFERED(HttpStatus.BAD_REQUEST);
 
   /** The status the code is answered with. */
   private final HttpStatus status;

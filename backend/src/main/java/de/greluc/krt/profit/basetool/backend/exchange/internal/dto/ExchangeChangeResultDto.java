@@ -63,6 +63,8 @@ public record ExchangeChangeResultDto(
    * @param result {@code unchanged}, {@code unmatched}, {@code ambiguous} or {@code rejected}
    * @param reason the error-registry code of a refusal, or {@code null}
    * @param id the existing order an {@code ALREADY_EXISTS} refusal names, or {@code null}
+   * @param patchChange the patch change that removed the lot or ship a {@code REMOVED_ELSEWHERE}
+   *     refusal names, or {@code null} (REQ-PATCH-053)
    */
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record OpResult(
@@ -70,7 +72,8 @@ public record ExchangeChangeResultDto(
       @Nullable String opId,
       @NotNull String result,
       @Nullable String reason,
-      @Nullable String id) {}
+      @Nullable String id,
+      @Nullable ExchangePatchChangeRefDto patchChange) {}
 
   /**
    * The order one applied refinery-order op wrote (REQ-XCH-052).

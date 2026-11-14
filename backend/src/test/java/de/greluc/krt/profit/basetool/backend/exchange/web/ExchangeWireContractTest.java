@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankQ
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeHomeLocationChosenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
@@ -52,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgSt
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockTargetsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipPageDto;
@@ -165,6 +167,12 @@ class ExchangeWireContractTest {
   private static final Set<String> BANK_WRITES =
       Set.of("/bank/requests", "/bank/requests/{id}/correction", "/bank/requests/{id}/cancel");
 
+  /**
+   * The home-location choice, which answers only while a home-location phase asks the member;
+   * {@code ExchangePatchChangeControllerTest} sends it on one.
+   */
+  private static final String HOME_LOCATION_CHOICE = "/me/patch-change/home-location";
+
   /** The backend's answer type of every published answer schema it produces. */
   private static final Map<String, Class<?>> ANSWER_TYPES =
       Map.ofEntries(
@@ -187,6 +195,8 @@ class ExchangeWireContractTest {
           Map.entry("org-stock-members", ExchangeOrgStockMembersDto.class),
           Map.entry("org-stock-targets", ExchangeOrgStockTargetsDto.class),
           Map.entry("org-unit-list", ExchangeOrgUnitListDto.class),
+          Map.entry("patch-change", ExchangePatchChangeDto.class),
+          Map.entry("patch-change--homeLocationChosen", ExchangeHomeLocationChosenDto.class),
           Map.entry("store-choice-receivers", ExchangeStoreChoiceReceiversDto.class),
           Map.entry("store-choice-job-orders", ExchangeStoreChoiceJobOrdersDto.class));
 
@@ -273,7 +283,9 @@ class ExchangeWireContractTest {
   void everyPublishedRequestFixtureIsAcceptedAndEveryAnswerMatchesItsSchema() throws Exception {
     int sent = 0;
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
-      if (operation.requestSchema() == null || BANK_WRITES.contains(operation.relayPath())) {
+      if (operation.requestSchema() == null
+          || BANK_WRITES.contains(operation.relayPath())
+          || HOME_LOCATION_CHOICE.equals(operation.relayPath())) {
         continue;
       }
       String folder = folderOf(operation.requestSchema());

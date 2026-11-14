@@ -33,6 +33,9 @@ is public, case by case, and for the capabilities a client actually needs.
   other people's bank data (accounts, bookings, balance series and the staff queue) is kept in
   memory only, for at most 7 days; the member's own requests may persist
   ([bank](resources/bank.md#retention)). The approval names this criterion.
+- For `exchange.patch.write`: the client sends a home-location choice only after the member picked
+  the location in the client, never on its own, and does not relocate synced lots or ships itself
+  ([patch change](resources/patch-change.md)). The approval names this criterion.
 - Code signing of releases is recommended, not required.
 - Trying the client against the [sandbox](sandbox.md) before applying is recommended, not required.
 

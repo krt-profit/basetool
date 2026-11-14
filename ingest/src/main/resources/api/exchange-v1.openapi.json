@@ -1180,6 +1180,107 @@
         ]
       }
     },
+    "/exchange/v1/me/patch-change": {
+      "get": {
+        "operationId": "patch_change_read",
+        "summary": "The latest patch change with its options, and the member's home-location prompt.",
+        "tags": [
+          "patch"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.patch.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/patch-change.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "The latest patch change with its kind, live time and options: every wipe group with the keys of its catalogue types, the exceptions, the refinery option, the currency wipe and the home-location prompt. Beside it the member's state in the latest home-location phase, the chosen home location and when, the curated home locations on offer and, while the member is pending, what the relocation would move from each current location.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/patch-change/home-location": {
+      "post": {
+        "operationId": "patch_home_location_choose",
+        "summary": "Choose the member's new home location and relocate the member.",
+        "tags": [
+          "patch"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.patch.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/patch-change.schema.json#/$defs/homeLocationChosen"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "The web's rules: only a curated home location on offer, once per member and phase, final. The Basetool relocates the member in this request. No open phase asking the member answers 409 HOME_LOCATION_NOT_ASKED, a second choice 409 HOME_LOCATION_ALREADY_CHOSEN, a location not on offer 400 HOME_LOCATION_NOT_OFFERED. Counts one unit of the daily write quota.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/patch-change.schema.json#/$defs/homeLocationChoice"
+              }
+            }
+          }
+        }
+      }
+    },
     "/exchange/v1/org-stock": {
       "get": {
         "operationId": "orgstock_read",
