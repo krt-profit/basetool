@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * One of the member's own ships in the exchange feed; purchase data is never sent, only the coarse
- * origin (REQ-XCH-017, REQ-XCH-057, ADR-0379). Absent optional fields are left out.
+ * origin (REQ-XCH-017, REQ-XCH-057, ADR-0386). Absent optional fields are left out.
  *
  * @param shipId the opaque ship id
  * @param externalId the calling installation's id for the ship, or {@code null} until it links one
