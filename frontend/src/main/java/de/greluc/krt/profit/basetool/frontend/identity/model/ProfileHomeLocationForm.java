@@ -29,4 +29,14 @@ import java.util.UUID;
  * @param version the setting's own optimistic-lock version, echoed back so a concurrent change, a
  *     relocation's included, surfaces as a 409 rather than a silent overwrite
  */
-public record ProfileHomeLocationForm(@NotNull UUID homeLocationId, Long version) {}
+public record ProfileHomeLocationForm(@NotNull UUID homeLocationId, Long version) {
+
+  /**
+   * Builds the backend body from the form.
+   *
+   * @return the body, with a missing version read as a first choice
+   */
+  public MyHomeLocationRequest toRequest() {
+    return new MyHomeLocationRequest(homeLocationId, version == null ? 0L : version);
+  }
+}

@@ -745,8 +745,8 @@ It **only sets that default and moves nothing**; new members set it there.
 `PersonalDataExportCatalogueTest`, `DataExportEndStateTest`, `GdprParticipantCoverageTest` ·
 **Code:** `MemberHomeLocation`, `MemberHomeLocationRepository`, `MemberHomeLocationService`,
 `MyHomeLocationController`, `IdentityExportSections`, `IdentityUserReassignment`,
-`ProfileHomeLocationController`, `HomeLocationPreferenceReader`, `templates/identity/profile.html`,
-`static/js/identity/profile.js`
+`ProfileHomeLocationController`, `ProfileHomeLocationProxyController`,
+`HomeLocationPreferenceReader`, `templates/identity/profile.html`, `static/js/identity/profile.js`
 
 ### REQ-PATCH-031 — The latest home-location choice overwrites the setting
 
