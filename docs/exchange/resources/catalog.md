@@ -55,6 +55,10 @@ The answer is a [`resolve-response`](../schemas/) with one result per reference,
 | `ambiguous` | `candidates`, at most ten `{guid, bt, name}` | Let the member pick. A fuzzy suggestion is always `ambiguous`, even alone. |
 | `unmatched` | nothing | Show it to the member; do not send it in a change set. |
 
+Every `name` in `ref` and `candidates` holds at most 200 characters, the length `item-ref` allows;
+a longer catalogue name is cut to it. Refer to the entry again by `guid` or `bt`, not by that
+`name`.
+
 `warnings[]` holds at most 50 `{pointer, code}`: `LOC_KEY_UNRESOLVED` at `/refs/<i>/locKey` for a
 reference with a `locKey` whose key fields did not resolve, and `UNKNOWN_FIELD` for a field the
 schema does not declare.
@@ -69,7 +73,8 @@ material matches, as an `ITEM`.
 No parameters. The answer is a [`location-list`](../schemas/): the warehouse's non-hidden locations,
 ordered by name, each with its UEX city or space station when it is linked to one (a city link wins)
 and with `guid`, the DataForge GUID of its starmap object, when it is linked to one: its own, else
-its city's, else its space station's. `name` is the warehouse's own name for the place.
+its city's, else its space station's. `name` is the warehouse's own name for the place, cut to the
+200 characters `location` allows.
 
 ```json
 {
@@ -85,10 +90,11 @@ its city's, else its space station's. `name` is the warehouse's own name for the
 ```
 
 These are the only places a stock lot or a ship can be at. A `location` in a change set resolves by
-its `guid` first, then by its `uex` link, then by the exact `name` of a non-hidden location; a
-value that matches nothing falls through to the next, and a place none of them matches is
-refused per op as `LOCATION_UNKNOWN` and is never created. Offer the member a place from this list
-instead. The list changes rarely; reading it once per session is enough.
+its `guid` first, then by its `uex` link, then by the exact `name` of a non-hidden location, then
+by the cut `name` this list answered for a longer one; a value that matches nothing falls through to
+the next, and a place none of them matches is refused per op as `LOCATION_UNKNOWN` and is never
+created. So is a cut `name` that several locations' names cut to. Offer the member a place from
+this list instead. The list changes rarely; reading it once per session is enough.
 
 ## Errors
 

@@ -5,6 +5,16 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-14
 
+- **Fixed: a long catalogue name no longer fails a read.** `catalog/locations` and
+  `catalog/resolve` cut a location's, item's, material's or ship type's `name` to the 200 characters
+  `location` and `item-ref` allow, as the feeds already did. A longer name failed the whole answer
+  with `502 BACKEND_RELAY_FAILED` ([catalogue](resources/catalog.md)). No schema changes.
+- **Fixed: a cut name finds its place or method again.** A write that names a location, or a
+  refinery order's refining method, by the `name` a read cut to 200 characters now reaches the entry
+  it came from when no entry bears that name exactly and only one entry's name cuts to it. Several
+  such entries answer `LOCATION_UNKNOWN` for a place and `AMBIGUOUS` for a method
+  ([formats](formats.md#place--location-ref), [refinery orders](resources/refinery-orders.md)).
+  No schema changes.
 - **Changed: home locations carry their full name.** In the patch-change read and the
   home-location choice's answer, a home location's `name` and `system` take up to 255 characters,
   the length the catalogue stores, so a long curated name no longer fails the read. A preview's

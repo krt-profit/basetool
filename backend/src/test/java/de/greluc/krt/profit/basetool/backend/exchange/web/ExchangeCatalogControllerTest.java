@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangePublishedSchemas;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCatalogService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
@@ -81,6 +82,12 @@ class ExchangeCatalogControllerTest {
   private static final String PATH = "/api/v1/exchange/catalog/locations";
   private static final UUID MEMBER = UUID.fromString("44444444-4444-4444-4444-4444444440a1");
   private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";
+
+  /** The longest name the catalogue stores for a location. */
+  private static final int STORED_NAME = 255;
+
+  /** The longest name the published {@code location} schema allows. */
+  private static final int PUBLISHED_NAME = 200;
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
@@ -205,6 +212,36 @@ class ExchangeCatalogControllerTest {
         .andExpect(jsonPath("$.items[?(@.name == 'Xch Node Station')].uex").doesNotExist())
         .andExpect(jsonPath("$.items[?(@.name == 'Xch Visible Station')].guid").doesNotExist())
         .andExpect(jsonPath("$.items[?(@.name =~ /Xch Starmap.*/)]").doesNotExist());
+  }
+
+  @Test
+  void aLocationNameLongerThanTheContractAllowsIsCutToItsLength() throws Exception {
+    City place = new City();
+    place.setIdCity(990_463);
+    place.setName("Xch Longest City");
+    place.setHasRefineryTerminal(false);
+    cityRepository.saveAndFlush(place);
+    String prefix = "Xch Longest Station ";
+    Location longest = new Location();
+    longest.setName(prefix + "x".repeat(STORED_NAME - prefix.length()));
+    longest.setHidden(false);
+    longest.setCity(place);
+    locationRepository.saveAndFlush(longest);
+
+    String answer =
+        mockMvc
+            .perform(relayed("exchange.connect"))
+            .andExpect(status().isOk())
+            .andExpect(
+                jsonPath(
+                        "$.items[?(@.name == '%s')]",
+                        longest.getName().substring(0, PUBLISHED_NAME))
+                    .exists())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    ExchangePublishedSchemas.assertMatches("location-list.schema.json", answer, "location list");
   }
 
   @Test

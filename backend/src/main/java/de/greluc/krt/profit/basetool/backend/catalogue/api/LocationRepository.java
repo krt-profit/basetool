@@ -298,6 +298,15 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
    */
   Optional<Location> findFirstByNameAndHiddenFalseAndReferenceOnlyFalseOrderByIdAsc(String name);
 
+  /**
+   * Finds the non-hidden storage places whose name starts with a prefix, for an exchange write that
+   * names a place by the name the exchange cut its longer name to (REQ-XCH-026).
+   *
+   * @param prefix the start of the name, compared exactly
+   * @return every such place
+   */
+  List<Location> findAllByNameStartingWithAndHiddenFalseAndReferenceOnlyFalse(String prefix);
+
   /** One non-hidden location as the exchange catalogue reads it from the database. */
   interface ExchangeLocationRow {
 
