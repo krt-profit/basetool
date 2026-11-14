@@ -769,7 +769,8 @@ document.addEventListener('krt:swapped', (event) => {
     const invalid =
         document.getElementById('order-head-meta')?.dataset.responsibilityInvalid === 'true';
     if (!invalid) return;
-    document.querySelectorAll('#order-dialogs-results dialog[open]').forEach((dialog) => {
+    const editDialogs = '#order-dialogs-results dialog[open]:not(#transfer-responsibility-modal)';
+    document.querySelectorAll(editDialogs).forEach((dialog) => {
         krtModal.close(/** @type {HTMLDialogElement} */ (dialog));
     });
 });

@@ -321,31 +321,33 @@ krtEvents.on('submit', 'od-transfer-responsibility', async (el, event) => {
     const target = /** @type {HTMLSelectElement | null} */ (
         form.querySelector('[name="responsibleOrgUnitId"]')
     );
-    const { orderId, version } = form.dataset;
+    const { orderId } = form.dataset;
+    const version = document.getElementById('order-head-meta')?.dataset.responsibilityVersion;
     if (!orderId || !version || !target?.value || !joborderHooks.writeOrder) return;
     await joborderHooks.writeOrder({
         method: 'PATCH',
         url: `/orders/${encodeURIComponent(orderId)}/responsible-org-unit`,
         payload: { responsibleOrgUnitId: target.value, version: Number(version) },
         sectionKey: 'header',
-        refresh: [
-            'header',
-            'actions',
-            'participations',
-            'dialogs',
-            'kpi',
-            'money',
-            'materials',
-            'aggregated',
-            'items',
-            'handovers',
-            'item-handovers',
-            'blueprint-owners',
-            'assignees',
-        ],
         toast: false,
         errorMessage: form.dataset.error || '',
-        onSuccess() {
+        async onSuccess() {
+            krtModal.close('transfer-responsibility-modal');
+            await joborderHooks.refreshOrderSection?.([
+                'header',
+                'actions',
+                'participations',
+                'dialogs',
+                'kpi',
+                'money',
+                'materials',
+                'aggregated',
+                'items',
+                'handovers',
+                'item-handovers',
+                'blueprint-owners',
+                'assignees',
+            ]);
             _publishOrdersQueue();
         },
     });
