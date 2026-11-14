@@ -38,11 +38,15 @@ change asks could keep using the tool for up to a minute while every backend cal
    read it. The identity domain implements `TermsGate`, the patch-change domain `HomeLocationGate`.
 3. **A gate leaves open what an earlier gate needs.** On both sides a gate never holds a member on
    its own page or endpoints nor on those of a gate ordered before it, so each step stays reachable
-   while an earlier one holds the member. The approval waiting page is open to every gate. A gate's
-   page renders the layout, whose reads the backend gate refuses, so on a gate's own page a gate
-   refusal is never handed off again: `SessionGateFilter` marks the request (`GatePageRequest`), a
-   page section falls back, and the error handler shows a direct refusal instead of redirecting to
-   the page the browser is on.
+   while an earlier one holds the member. The approval waiting page is open to every gate, and so
+   are the legal pages and the open-source licences (REQ-UI-021). A gate's page and a legal page
+   render the layout, whose reads the backend gate refuses, so on them a gate refusal is never
+   handed off: `SessionGateFilter` marks the request (`GatePageRequest`), a page section falls back,
+   the layout marks the page for the scripts (decision 8), and on a gate's own page the error
+   handler shows a direct refusal instead of redirecting to the page the browser is on. Every
+   layout-chrome read degrades on its own as well, wherever it renders: the layout context with the
+   capabilities, the org units and the notification badge, the squadron list, the navigation
+   preferences and the supply and purchasing switches.
 4. **Every gate refusal is marked, and the frontend tells it by the mark.**
    `SessionGateAccessFilter` adds the problem property `sessionGate: true` to every gate's `403`;
    the body only grows. The frontend kernel parses a marked refusal into a
@@ -65,8 +69,8 @@ change asks could keep using the tool for up to a minute while every backend cal
    other arm, with an allowance only for the notification stream's arms, which call no backend.
    The reauthentication-only guard `SectionFallback#rethrowIfReauthenticationRequired` stays with
    the code where a gate's refusal must not propagate: the servlet filters, a gate's own status
-   read, the error handler and the layout chrome, the navigation preferences included, which
-   renders on the pages a gate leaves open and so degrades.
+   read, the error handler and the layout chrome of decision 3, which renders on the pages a gate
+   leaves open and so degrades.
 6. **The browser half stays a list of its own.** `krt-fetch.js` and `notifications.js` keep the
    gates' headers and events as constants, and `SessionGateClientParityTest` pins them against the
    gate beans of the running context.
@@ -79,7 +83,8 @@ change asks could keep using the tool for up to a minute while every backend cal
    to a caller with `ROLE_ADMIN`, so an admin the gate holds can still repair what the step
    depends on; everyone else stays held there, and a later gate also leaves an earlier gate's
    admin endpoints open. For an admin such a page counts as a gate's page (decision 3). The layout
-   marks a gate's page (`data-session-gate-page`), and on a marked page `krt-fetch.js` takes a
+   marks a gate's page and a legal page (`data-session-gate-page`), and on a marked page
+   `krt-fetch.js` takes a
    gate's hand-off of a background call, stream or socket as handled without navigating, so the
    page the server rendered keeps the browser. The home-location gate leaves the phase's recovery
    open: the admin's patch-change page with the phase end and the location curation
@@ -99,6 +104,8 @@ labels stay as they were for both gates.
   instead of after the cache expires.
 - A new catch arm in a domain package that answers a gate's refusal with a toast, an empty section
   or its own JSON fails the build until it hands the refusal off or catches more narrowly.
+- A member a gate holds can read the legal pages and the licences: the chrome there degrades and
+  the page's background calls do not navigate away.
 - Opening a live-sync socket costs one status read per gate, also with a fresh cached verdict.
 
 ## Alternatives considered

@@ -77,8 +77,9 @@ Beyond roles there are three mechanisms that are easy to miss:
   frontend kernel tells it by that mark, never by a code, and hands it off also when a page
   section, a handler's fallback or own catch arm, or the AJAX relay `BackendErrorResponses` meets
   it (`SectionFallback#rethrowHandOff`; `SessionGateHandOffArmTest` fails the build on a domain
-  catch arm that answers it itself), except on a gate's own page, which renders the layout the
-  gate refuses and so falls back instead of redirecting to itself; the layout chrome degrades. The
+  catch arm that answers it itself), except on a gate's own page or a legal page, which render the
+  layout the gate refuses and so fall back and keep the browser; the layout chrome degrades
+  everywhere (`GateExemptPageChromeMvcTest`). The
   scripts' header and event lists are pinned against the gate beans. A gate may leave its repair
   open to an admin it holds (`adminExemptPaths`, `adminPages`); for the admin such a page is a gate
   page, and the browser is never handed off from a page the layout marks as one (REQ-PATCH-063).
