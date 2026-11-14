@@ -186,6 +186,7 @@ class PatchChangeCurrencyWipeIntegrationTest {
     List<PatchCountDto> expected =
         List.of(
             new PatchCountDto(PatchCount.BANK_RESET_TOTAL, 0),
+            new PatchCountDto(PatchCount.BANK_ACCOUNTS_CLAMPED, 0),
             new PatchCountDto(PatchCount.BANK_REQUESTS_CANCELED, 0),
             new PatchCountDto(PatchCount.AUEC_SHORTAGES, 2),
             new PatchCountDto(PatchCount.AUEC_SHORTAGE_TOTAL, 5_000_000),

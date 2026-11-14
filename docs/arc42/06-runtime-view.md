@@ -362,9 +362,9 @@ See [the aUEC order contract](../specs/orders-auec.md) for settlement and correc
    hierarchy guard, cancel the waiting Bank attempts with their Bank requests, book the holdings
    of the live time as real shortages and end the earlier commitments; then the Bank cancels the
    remaining earlier requests, locks every account and books one reset of the balances as of the
-   live time ([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)).
-   An effect that refuses, a reset that would overdraw an account among them, rolls the whole
-   patch change back.
+   live time, each offset stopping at zero rather than overdrawing an account
+   ([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)). An effect
+   that refuses rolls the whole patch change back.
 4. The record keeps the effects' counts; `PATCH_CHANGE_TRIGGERED` and each area's summary event
    commit with it. After the commit the refinery, order and Bank pages and every open
    patch-change page refresh in place, and the exchange feeds show the changes with the `patch`

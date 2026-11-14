@@ -26,8 +26,9 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Follows a currency wipe of the game in the Kartellbank (REQ-PATCH-041, REQ-PATCH-042, ADR-0384):
- * the pending requests submitted before the live time are cancelled, and one wipe reset offsets
- * exactly the balances as of the live time, so the bookings made after it stay.
+ * the pending requests submitted before the live time are cancelled, and one wipe reset offsets the
+ * balances as of the live time, so the bookings made after it stay. An offset that would take an
+ * account or a holder below zero stops at zero.
  *
  * <p>A request linked to an order payment attempt is left to its owner, which cancels it through
  * {@link BankLinkedPayments#cancelForCurrencyWipe}.
@@ -38,9 +39,8 @@ public interface BankCurrencyWipe {
    * Counts what {@link #apply} would do now, without writing.
    *
    * @param liveAt the live time of the patch
-   * @return the requests it would cancel and the total it would reset
-   * @throws BankConflictException with {@code BANK_OVERDRAFT} when the reset would overdraw an
-   *     account whose later debits exceed its later credits
+   * @return the requests it would cancel, the total it would reset and the accounts it would stop
+   *     at zero
    */
   @NotNull
   Effect preview(@NotNull Instant liveAt);
@@ -52,9 +52,7 @@ public interface BankCurrencyWipe {
    *
    * @param liveAt the live time of the patch
    * @param patchChangeId the patch change, kept as each cancelled request's reason
-   * @return the requests cancelled and the total reset
-   * @throws BankConflictException with {@code BANK_OVERDRAFT} when the reset would overdraw an
-   *     account whose later debits exceed its later credits
+   * @return the requests cancelled, the total reset and the accounts stopped at zero
    * @throws org.springframework.transaction.IllegalTransactionStateException when no transaction is
    *     active
    */
@@ -65,7 +63,9 @@ public interface BankCurrencyWipe {
    * What the currency wipe does in the Kartellbank.
    *
    * @param requestsCancelled the pending requests submitted before the live time
-   * @param resetTotal the sum of the account balances as of the live time, in whole aUEC
+   * @param resetTotal the sum offset from the accounts, in whole aUEC
+   * @param accountsClamped the accounts whose offset stopped at zero because more was booked out of
+   *     them than into them since the live time
    */
-  record Effect(long requestsCancelled, @NotNull BigDecimal resetTotal) {}
+  record Effect(long requestsCancelled, @NotNull BigDecimal resetTotal, long accountsClamped) {}
 }

@@ -102,6 +102,20 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
   List<BankHolderAmount> holderAmountsBefore(@Param("before") Instant before);
 
   /**
+   * The current global custody of the given holders in one grouped statement, which a currency
+   * wipe's reset must not take below zero (REQ-PATCH-041). Holders without a leg produce no row.
+   *
+   * @param holderIds the holders
+   * @return one total per holder with a leg
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderAmount(p.holder.id, SUM(p.amount))
+      FROM BankHolderPosting p WHERE p.holder.id IN :holderIds GROUP BY p.holder.id
+      """)
+  List<BankHolderAmount> holderAmountsOf(@Param("holderIds") Collection<UUID> holderIds);
+
+  /**
    * Probes whether a holder appears on any holder-ledger leg — used by surfaces that must know
    * whether a holder has ledger history.
    *
