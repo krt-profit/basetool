@@ -87,7 +87,8 @@ public interface SessionGate {
   }
 
   /**
-   * Discards the session's cached verdict, so the next request asks the backend again.
+   * Discards the session's cached verdict, so the next request asks the backend again; {@link
+   * SessionGateFilter} calls it before asking about a WebSocket handshake.
    *
    * @param request the current request, whose session holds the cached verdict
    */
