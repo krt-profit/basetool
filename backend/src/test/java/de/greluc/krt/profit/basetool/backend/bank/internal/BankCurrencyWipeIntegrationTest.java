@@ -20,9 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankCurrencyWipe;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -141,28 +139,37 @@ class BankCurrencyWipeIntegrationTest {
                 + patchChange
                 + " liveAt="
                 + LIVE_AT
-                + " accounts=2 stashes=2 totalZeroed=1300 cancelledRequests=1");
+                + " accounts=2 stashes=2 totalZeroed=1300 clampedAccounts=0 clampedStashes=0"
+                + " cancelledRequests=1");
   }
 
   @Test
-  void aResetThatWouldOverdrawAnAccountRefusesTheWipe() {
+  void aResetThatWouldOverdrawAnAccountStopsItAtZero() {
     backdate(deposit(account, holder, "1000"));
     ledger.bookWithdrawal(
         new BankWithdrawalRequest(account.getId(), holder.getId(), new BigDecimal("800"), null));
-    UUID before = pendingRequest(account, BEFORE);
     BigDecimal balance = postingRepository.accountBalance(account.getId());
+    BigDecimal custody = holderPostingRepository.holderTotal(holder.getId());
 
-    assertThatThrownBy(() -> transactions.execute(_ -> wipe.preview(LIVE_AT)))
-        .isInstanceOf(BankConflictException.class)
-        .extracting(refused -> ((BankConflictException) refused).getCode())
-        .isEqualTo(BankConflictException.CODE_BANK_OVERDRAFT);
-    assertThatThrownBy(() -> transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange)))
-        .isInstanceOf(BankConflictException.class)
-        .extracting(refused -> ((BankConflictException) refused).getCode())
-        .isEqualTo(BankConflictException.CODE_BANK_OVERDRAFT);
-    assertThat(balance).isLessThan(new BigDecimal("1000"));
-    assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo(balance);
-    assertThat(statusOf(before)).isEqualTo("PENDING");
+    BankCurrencyWipe.Effect preview = transactions.execute(_ -> wipe.preview(LIVE_AT));
+    BankCurrencyWipe.Effect applied = transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange));
+
+    assertThat(balance).isLessThan(new BigDecimal("1000")).isPositive();
+    assertThat(custody).isLessThan(new BigDecimal("1000"));
+    assertThat(Objects.requireNonNull(preview).accountsClamped()).isEqualTo(1);
+    assertThat(preview.resetTotal()).isEqualByComparingTo(balance);
+    assertThat(Objects.requireNonNull(applied).accountsClamped()).isEqualTo(1);
+    assertThat(applied.resetTotal()).isEqualByComparingTo(balance);
+    assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("0");
+    assertThat(holderPostingRepository.holderTotal(holder.getId()))
+        .isEqualByComparingTo(custody.min(BigDecimal.ZERO));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT details FROM bank_audit_event WHERE event_type = 'WIPE_RESET_EXECUTED'"
+                    + " AND details LIKE ?",
+                String.class,
+                "patchChange=" + patchChange + "%"))
+        .contains(" clampedAccounts=1 clampedStashes=1 ");
   }
 
   /**

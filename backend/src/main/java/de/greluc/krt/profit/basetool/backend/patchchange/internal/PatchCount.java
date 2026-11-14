@@ -40,6 +40,8 @@ public enum PatchCount {
   DONATIONS_WITHDRAWN,
   /** The sum of the Kartellbank's account balances as of the live time, in whole aUEC. */
   BANK_RESET_TOTAL,
+  /** Kartellbank accounts whose reset stops at zero instead of overdrawing them. */
+  BANK_ACCOUNTS_CLAMPED,
   /** Pending Kartellbank requests submitted before the live time that end as cancelled. */
   BANK_REQUESTS_CANCELED,
   /** Holdings of aUEC orders that existed at the live time and are booked as a real shortage. */

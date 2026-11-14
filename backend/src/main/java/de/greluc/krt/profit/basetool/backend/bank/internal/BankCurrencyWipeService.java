@@ -40,11 +40,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The Kartellbank's part of a currency wipe (REQ-PATCH-041, REQ-PATCH-042, ADR-0384): it cancels
- * the pending requests submitted before the live time, then offsets exactly the balances as of the
- * live time in one wipe reset, so every later booking stays.
+ * the pending requests submitted before the live time, then offsets the balances as of the live
+ * time in one wipe reset, so every later booking stays.
  *
- * <p>An account whose later debits exceed its later credits would be overdrawn by that offset; the
- * no-overdraft rule (REQ-BANK-006) then refuses the wipe as a whole. The request locks come before
+ * <p>An account or holder whose later debits exceed its later credits would go below zero by that
+ * offset; its offset then stops at zero ({@link BankWipeOffsets}). The request locks come before
  * the account locks, as in a request's confirmation.
  */
 @Service
@@ -57,7 +57,6 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   private final BankAccountRepository accounts;
   private final BankPostingRepository postings;
   private final BankHolderPostingRepository holderPostings;
-  private final BankBookingGuards guards;
   private final BankWipeResetBooking resetBooking;
   private final BankCurrencyWipeRequests requests;
   private final BankAuditService auditService;
@@ -66,11 +65,9 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   @Override
   @Transactional(readOnly = true)
   public @NotNull Effect preview(@NotNull Instant liveAt) {
-    Map<UUID, BigDecimal> atLiveTime = accountBalancesBefore(liveAt);
-    accounts
-        .findAllById(atLiveTime.keySet())
-        .forEach(account -> requireCoverage(account, atLiveTime));
-    return new Effect(requests.countUnlinkedBefore(liveAt), sum(atLiveTime));
+    BankWipeOffsets accountOffsets = accountOffsets(liveAt);
+    return new Effect(
+        requests.countUnlinkedBefore(liveAt), accountOffsets.total(), accountOffsets.clamped());
   }
 
   @Override
@@ -78,12 +75,10 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   public @NotNull Effect apply(@NotNull Instant liveAt, @NotNull UUID patchChangeId) {
     int cancelled = requests.cancelUnlinkedBefore(liveAt, patchChangeId);
     List<BankAccount> locked = accounts.findAllForUpdateOrderById();
-    Map<UUID, BigDecimal> atLiveTime = accountBalancesBefore(liveAt);
-    locked.forEach(account -> requireCoverage(account, atLiveTime));
-    Map<UUID, BigDecimal> holderBalances =
-        holderPostings.holderAmountsBefore(liveAt).stream()
-            .collect(Collectors.toMap(BankHolderAmount::holderId, BankHolderAmount::amount));
-    BankWipeResetBooking.Booked booked = resetBooking.book(locked, atLiveTime, holderBalances);
+    BankWipeOffsets accountOffsets = accountOffsets(liveAt);
+    BankWipeOffsets holderOffsets = holderOffsets(liveAt);
+    BankWipeResetBooking.Booked booked =
+        resetBooking.book(locked, accountOffsets.offsets(), holderOffsets.offsets());
     auditService.record(
         BankAuditEventType.WIPE_RESET_EXECUTED,
         null,
@@ -94,38 +89,64 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
             .with("accounts", booked.accounts())
             .with("stashes", booked.stashes())
             .with("totalZeroed", plain(booked.total()))
+            .with("clampedAccounts", accountOffsets.clamped())
+            .with("clampedStashes", holderOffsets.clamped())
             .with("cancelledRequests", cancelled));
     if (booked.transactionId() != null) {
-      announce(locked, atLiveTime);
+      announce(locked, accountOffsets.offsets());
     }
-    return new Effect(cancelled, booked.total());
+    return new Effect(cancelled, booked.total(), accountOffsets.clamped());
   }
 
   /**
-   * Reads every account's balance as of the live time.
+   * Derives every account's offset from its balance as of the live time and its current balance.
    *
    * @param liveAt the live time
-   * @return the balance by account id; an account without an earlier posting is absent
+   * @return the offsets by account id
    */
-  private @NotNull Map<UUID, BigDecimal> accountBalancesBefore(@NotNull Instant liveAt) {
-    return postings.accountBalancesBefore(liveAt).stream()
+  private @NotNull BankWipeOffsets accountOffsets(@NotNull Instant liveAt) {
+    Map<UUID, BigDecimal> atLiveTime = balances(postings.accountBalancesBefore(liveAt));
+    Map<UUID, BigDecimal> current =
+        atLiveTime.isEmpty() ? Map.of() : balances(postings.accountBalances(atLiveTime.keySet()));
+    return BankWipeOffsets.of(atLiveTime, current);
+  }
+
+  /**
+   * Derives every holder's offset from its custody as of the live time and its current custody.
+   *
+   * @param liveAt the live time
+   * @return the offsets by holder id
+   */
+  private @NotNull BankWipeOffsets holderOffsets(@NotNull Instant liveAt) {
+    Map<UUID, BigDecimal> atLiveTime = amounts(holderPostings.holderAmountsBefore(liveAt));
+    Map<UUID, BigDecimal> current =
+        atLiveTime.isEmpty()
+            ? Map.of()
+            : amounts(holderPostings.holderAmountsOf(atLiveTime.keySet()));
+    return BankWipeOffsets.of(atLiveTime, current);
+  }
+
+  /**
+   * Keys account balances by account.
+   *
+   * @param balances the grouped balances
+   * @return the balance by account id
+   */
+  private static @NotNull Map<UUID, BigDecimal> balances(
+      @NotNull List<BankAccountBalance> balances) {
+    return balances.stream()
         .collect(Collectors.toMap(BankAccountBalance::accountId, BankAccountBalance::balance));
   }
 
   /**
-   * Refuses the wipe when the account's current balance cannot cover its offset.
+   * Keys holder amounts by holder.
    *
-   * @param account the account
-   * @param atLiveTime the balances as of the live time
-   * @throws de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException with {@code
-   *     BANK_OVERDRAFT} when the offset would overdraw the account
+   * @param amounts the grouped amounts
+   * @return the amount by holder id
    */
-  private void requireCoverage(
-      @NotNull BankAccount account, @NotNull Map<UUID, BigDecimal> atLiveTime) {
-    BigDecimal offset = atLiveTime.get(account.getId());
-    if (offset != null && offset.signum() > 0) {
-      guards.requireAccountCoverage(account, offset);
-    }
+  private static @NotNull Map<UUID, BigDecimal> amounts(@NotNull List<BankHolderAmount> amounts) {
+    return amounts.stream()
+        .collect(Collectors.toMap(BankHolderAmount::holderId, BankHolderAmount::amount));
   }
 
   /**
@@ -133,29 +154,18 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
    * booked on.
    *
    * @param locked the locked accounts
-   * @param atLiveTime the offset balances
+   * @param offsets the offsets by account id
    */
-  private void announce(
-      @NotNull List<BankAccount> locked, @NotNull Map<UUID, BigDecimal> atLiveTime) {
+  private void announce(@NotNull List<BankAccount> locked, @NotNull Map<UUID, BigDecimal> offsets) {
     liveSync.publishAfterCommit(
         LiveSyncTopic.global(LiveSyncTopicClass.BANK_STAFF), List.of("grid"));
     liveSync.publishAfterCommit(
         LiveSyncTopic.global(LiveSyncTopicClass.ORGUNIT_BANK), List.of("orgUnitBank"));
     locked.stream()
-        .filter(account -> atLiveTime.getOrDefault(account.getId(), BigDecimal.ZERO).signum() != 0)
+        .filter(account -> offsets.getOrDefault(account.getId(), BigDecimal.ZERO).signum() != 0)
         .forEach(account ->
             liveSync.publishAfterCommit(
                 LiveSyncTopic.of(LiveSyncTopicClass.BANK_ACCOUNT, account.getId()),
                 ACCOUNT_SECTIONS));
-  }
-
-  /**
-   * Sums the balances.
-   *
-   * @param balances the balances by id
-   * @return their sum
-   */
-  private static @NotNull BigDecimal sum(@NotNull Map<UUID, BigDecimal> balances) {
-    return balances.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 }

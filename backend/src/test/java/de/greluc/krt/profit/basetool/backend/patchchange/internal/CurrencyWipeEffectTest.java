@@ -28,7 +28,6 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankCurrencyWipe;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCurrencyWipe;
-import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
@@ -43,8 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * The currency wipe's effect (REQ-PATCH-040, -046): it runs only with its option, the orders before
- * the Bank, reports one tile per count, and turns the Bank's overdraft into the patch change's own
- * refusal.
+ * the Bank, and reports one tile per count.
  */
 @ExtendWith(MockitoExtension.class)
 class CurrencyWipeEffectTest {
@@ -79,7 +77,7 @@ class CurrencyWipeEffectTest {
     when(orders.apply(LIVE_AT, RUN.patchChangeId(), "4.4"))
         .thenReturn(new JobOrderCurrencyWipe.Effect(3, new BigDecimal("7000000"), 2, 1));
     when(bank.apply(LIVE_AT, RUN.patchChangeId()))
-        .thenReturn(new BankCurrencyWipe.Effect(4, new BigDecimal("1250000.0000")));
+        .thenReturn(new BankCurrencyWipe.Effect(4, new BigDecimal("1250000.0000"), 2));
 
     PatchCounts counts = effect.apply(RUN);
 
@@ -89,6 +87,7 @@ class CurrencyWipeEffectTest {
     assertThat(counts.asMap())
         .containsExactly(
             Map.entry(PatchCount.BANK_RESET_TOTAL, 1_250_000L),
+            Map.entry(PatchCount.BANK_ACCOUNTS_CLAMPED, 2L),
             Map.entry(PatchCount.BANK_REQUESTS_CANCELED, 4L),
             Map.entry(PatchCount.AUEC_SHORTAGES, 3L),
             Map.entry(PatchCount.AUEC_SHORTAGE_TOTAL, 7_000_000L),
@@ -97,22 +96,7 @@ class CurrencyWipeEffectTest {
   }
 
   @Test
-  void anOverdraftOfTheResetRefusesThePatchChangeWithItsOwnReason() {
-    when(orders.preview(LIVE_AT))
-        .thenReturn(new JobOrderCurrencyWipe.Effect(0, BigDecimal.ZERO, 0, 0));
-    when(bank.preview(LIVE_AT))
-        .thenThrow(
-            new BankConflictException(
-                BankConflictException.CODE_BANK_OVERDRAFT,
-                "The booking would overdraw the account"));
-
-    assertThatThrownBy(() -> effect.preview(WIPING))
-        .isInstanceOf(BusinessConflictException.class)
-        .hasMessage(CurrencyWipeEffect.OVERDRAFT);
-  }
-
-  @Test
-  void anotherBankConflictPassesThrough() {
+  void aBankRefusalPassesThrough() {
     when(orders.apply(LIVE_AT, RUN.patchChangeId(), "4.4"))
         .thenReturn(new JobOrderCurrencyWipe.Effect(0, BigDecimal.ZERO, 0, 0));
     BankConflictException closed =

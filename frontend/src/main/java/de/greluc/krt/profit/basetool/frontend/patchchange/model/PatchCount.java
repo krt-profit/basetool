@@ -53,6 +53,8 @@ public enum PatchCount {
 
   /** The Bank balances as of the live time the currency wipe resets (REQ-PATCH-041). */
   BANK_RESET_TOTAL,
+  /** The Bank accounts whose reset the currency wipe stops at zero (REQ-PATCH-041). */
+  BANK_ACCOUNTS_CLAMPED,
   /** The pending Kartellbank requests the currency wipe cancels (REQ-PATCH-042). */
   BANK_REQUESTS_CANCELED,
   /** The aUEC order holdings the currency wipe books as a real shortage (REQ-PATCH-044). */

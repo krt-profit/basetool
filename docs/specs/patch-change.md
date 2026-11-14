@@ -734,25 +734,31 @@ because a patch change is a game fact. Nobody is notified.
 
 ### REQ-PATCH-041 — The Bank reset offsets the balances as of the live time
 
-One `WIPE_RESET` transaction offsets exactly the balances **as of the live time** on both
-ledgers (ADR-0384): a negative account leg per account and a negative holder leg per holder whose
-balance from the postings before the live time is not zero. Every booking after the live time
-stays. When the offset would overdraw an account (REQ-BANK-006), because more was booked out of
-it than into it since the live time, the patch change is refused with
-`error.patch_change.currency_wipe_overdraft`, in the preview as well; the admin corrects those
-bookings or chooses a later live time. The standalone reset button of
-[REQ-BANK-013](bank.md#req-bank-013--admin-wipe-reset) keeps its behaviour, and both share one
-booking. The staff grid, the org-unit Bank view and every account detail the reset booked on
-refresh in place.
+One `WIPE_RESET` transaction offsets the balances **as of the live time** on both ledgers
+(ADR-0384): a negative account leg per account and a negative holder leg per holder whose balance
+from the postings before the live time is not zero. Every booking after the live time stays.
+
+When an offset would take an account or a holder below zero, because more was booked out of it
+than into it since the live time, the offset **stops at zero**: the account or holder ends at
+zero, and a holder that is already below zero keeps its balance. The no-overdraft rule
+(REQ-BANK-006) therefore holds, and the patch change always goes through. A negative holder
+balance of the live time is offset exactly. The preview and the record count the accounts whose
+offset stopped at zero; the Bank's summary event counts the stopped accounts and holders.
+
+The standalone reset button of [REQ-BANK-013](bank.md#req-bank-013--admin-wipe-reset) keeps its
+behaviour, and both share one booking. The staff grid, the org-unit Bank view and every account
+detail the reset booked on refresh in place.
 
 **Acceptance**
 
 - [x] After the reset the accounts and holders hold exactly what was booked after the live time.
-- [x] A reset that would overdraw an account refuses, and nothing changes.
+- [x] An account whose later debits exceed its later credits ends at zero, and the clamp is
+  counted.
 
-**Enforced by:** `BankCurrencyWipeIntegrationTest`, `CurrencyWipeEffectTest`,
-`BankLedgerServiceTest` · **Code:** `BankCurrencyWipeService`, `BankWipeResetBooking`,
-`BankPostingRepository#accountBalancesBefore`, `BankHolderPostingRepository#holderAmountsBefore`
+**Enforced by:** `BankWipeOffsetsTest`, `BankCurrencyWipeIntegrationTest`,
+`CurrencyWipeEffectTest`, `BankLedgerServiceTest` · **Code:** `BankCurrencyWipeService`,
+`BankWipeOffsets`, `BankWipeResetBooking`, `BankPostingRepository#accountBalancesBefore`,
+`BankHolderPostingRepository#holderAmountsBefore`, `#holderAmountsOf`
 
 ### REQ-PATCH-042 — Pending Bank requests from before the live time are cancelled
 
@@ -834,23 +840,24 @@ after the live time stays.
 
 ### REQ-PATCH-046 — Preview, audit and live update of the currency wipe
 
-The preview and the record count six kinds: the Bank reset total (`BANK_RESET_TOTAL`, aUEC), the
-Bank requests cancelled, the aUEC holdings booked as shortage and their total
-(`AUEC_SHORTAGE_TOTAL`, aUEC), the order Bank attempts cancelled and the commitments ended. The
-preview counts exactly what the trigger then does.
+The preview and the record count seven kinds: the Bank reset total (`BANK_RESET_TOTAL`, aUEC),
+the accounts whose reset stopped at zero (`BANK_ACCOUNTS_CLAMPED`), the Bank requests cancelled,
+the aUEC holdings booked as shortage and their total (`AUEC_SHORTAGE_TOTAL`, aUEC), the order Bank
+attempts cancelled and the commitments ended. The preview counts exactly what the trigger then
+does.
 
 The trigger records one summary event in each affected trail: the job orders'
 `JOB_ORDER_MONEY_CURRENCY_WIPED` (subject the patch change with its label; details `orders`,
 `holdings`, `shortageTotal`, `attemptsCancelled`, `commitmentsEnded`, `patchChange`) and the
 Bank's own `WIPE_RESET_EXECUTED` (details `patchChange`, `liveAt`, `accounts`, `stashes`,
-`totalZeroed`, `cancelledRequests`). Single shortages, attempts, requests and commitments are not
-audited one by one. Open order pages refresh their money and participation sections and the order
+`totalZeroed`, `clampedAccounts`, `clampedStashes`, `cancelledRequests`; counts only, no amount
+per account). Single shortages, attempts, requests and commitments are not audited one by one. Open order pages refresh their money and participation sections and the order
 queue; the Bank's staff queue and grid, the org-unit Bank view and the touched account details
 refresh in place.
 
 **Acceptance**
 
-- [x] Preview and record carry the same six counts.
+- [x] Preview and record carry the same seven counts.
 - [x] A trigger records one `JOB_ORDER_MONEY_CURRENCY_WIPED` and one `WIPE_RESET_EXECUTED` naming
   the patch change.
 
