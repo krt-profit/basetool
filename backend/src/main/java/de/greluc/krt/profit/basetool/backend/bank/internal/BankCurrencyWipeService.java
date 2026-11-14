@@ -44,8 +44,9 @@ import org.springframework.transaction.annotation.Transactional;
  * time in one wipe reset, so every later booking stays.
  *
  * <p>An account or holder whose later debits exceed its later credits would go below zero by that
- * offset; its offset then stops at zero ({@link BankWipeOffsets}). The request locks come before
- * the account locks, as in a request's confirmation, and every holder is locked after the accounts
+ * offset; its offset then stops at zero ({@link BankWipeOffsets}). The owners of purpose-bound
+ * requests are locked before the requests, the request locks come before the account locks, as in
+ * a request's confirmation, and every holder is locked after the accounts
  * before a balance is read, so no custody move lands between the read and the reset.
  */
 @Service

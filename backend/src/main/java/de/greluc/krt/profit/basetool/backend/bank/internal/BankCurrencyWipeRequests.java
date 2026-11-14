@@ -20,11 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedAttempt;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -59,17 +63,26 @@ class BankCurrencyWipeRequests {
   }
 
   /**
-   * Cancels every pending request submitted before the live time that no order attempt owns.
+   * Cancels every pending request submitted before the live time that no order attempt owns. The
+   * owners of their purposes are locked first and the requests second, as an owner's own
+   * cancellation locks them (REQ-BANK-063).
    *
    * @param liveAt the live time of the patch
    * @param patchChangeId the patch change, kept as each request's reason
    * @return the number of requests cancelled
+   * @throws BusinessConflictException when a purpose-bound request turned up after its owners were
+   *     locked
    */
   @Transactional(propagation = Propagation.MANDATORY)
   int cancelUnlinkedBefore(@NotNull Instant liveAt, @NotNull UUID patchChangeId) {
+    Set<BankPurpose> owners =
+        Set.copyOf(
+            requests.findUnlinkedPurposesCreatedBefore(BankBookingRequestStatus.PENDING, liveAt));
+    purposeObservers.beforeDecisions(owners);
     List<BankBookingRequest> pending =
         requests.lockUnlinkedCreatedBefore(BankBookingRequestStatus.PENDING, liveAt);
     for (BankBookingRequest request : pending) {
+      requireOwnerLocked(request, owners);
       cancel(request, patchChangeId);
       purposeObservers.notify(
           request, (observer, ref) -> observer.onCancelled(request.getId(), ref));
@@ -95,6 +108,25 @@ class BankCurrencyWipeRequests {
       throw new NotFoundException("Booking request not found");
     }
     cancel(request, patchChangeId);
+  }
+
+  /**
+   * Refuses a purpose-bound request whose owner was not locked before the request locks: one that
+   * turned up between the owner read and the request lock would otherwise take its owner's lock
+   * after its own.
+   *
+   * @param request the locked request
+   * @param owners the purposes whose owners are locked
+   * @throws BusinessConflictException when the request's owner is not among them
+   */
+  private static void requireOwnerLocked(
+      @NotNull BankBookingRequest request, @NotNull Set<BankPurpose> owners) {
+    BankPurposeKind kind = request.getPurposeKind();
+    UUID ref = request.getPurposeRef();
+    if (kind != null && ref != null && !owners.contains(new BankPurpose(kind, ref))) {
+      throw new BusinessConflictException(
+          "A Bank request arrived while the currency wipe ran; trigger the patch change again");
+    }
   }
 
   /**

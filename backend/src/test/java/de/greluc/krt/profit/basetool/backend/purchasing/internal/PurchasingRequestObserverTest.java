@@ -44,6 +44,7 @@ class PurchasingRequestObserverTest {
 
   @Mock private PurchasingDealTrancheRepository trancheRepository;
   @Mock private PurchasingDealSettlementRepository settlementRepository;
+  @Mock private PurchasingDealService dealService;
   @Mock private PurchasingTrancheService trancheService;
   @Mock private PurchasingSettlementService settlementService;
 
@@ -55,7 +56,7 @@ class PurchasingRequestObserverTest {
   void setUp() {
     observer =
         new PurchasingRequestObserver(
-            trancheRepository, settlementRepository, trancheService, settlementService);
+            trancheRepository, settlementRepository, dealService, trancheService, settlementService);
     tranche = new PurchasingDealTranche();
     tranche.setId(UUID.randomUUID());
     settlement = new PurchasingDealSettlement();
@@ -65,6 +66,14 @@ class PurchasingRequestObserverTest {
   @Test
   void theObserverOwnsThePurchasingDealKind() {
     assertThat(observer.kind()).isEqualTo(BankPurposeKind.PURCHASING_DEAL);
+  }
+
+  @Test
+  void beforeABankDecisionTheDealIsLocked() {
+    observer.beforeDecision(DEAL);
+
+    verify(dealService).lock(DEAL);
+    verifyNoInteractions(trancheRepository, settlementRepository, trancheService);
   }
 
   @Test
