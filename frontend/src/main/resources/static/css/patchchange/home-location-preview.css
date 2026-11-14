@@ -8,4 +8,7 @@
     .hl-preview [data-hl-stays] {
         margin-left: var(--space-2);
     }
+    .hl-preview [data-hl-stays][hidden] {
+        display: none;
+    }
 }
