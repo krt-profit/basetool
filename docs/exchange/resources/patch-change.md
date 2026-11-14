@@ -133,12 +133,14 @@ phase open.
 - `patchChange` and `liveAt` name the asking patch change; both are absent when none ever asked.
 - `locations` are the curated home locations on offer, by name, each with the `id` a choice sends.
   A location carries its `name`, its star `system`, its `uex` place and its starmap `guid` as the
-  [catalogue](catalog.md) describes them, so you can match it to your own places. The list is empty
-  while an admin has curated none; do not offer a choice then.
-- `preview` is filled only while the member is `PENDING`: per current location, the stock `rows`
-  from before the live time, own and pool rows together, the share held for each org unit's
-  `pools`, and the `ships`. An entry without `location` counts ships that have none. What already
-  lies at the location the member chooses stays there and does not count as moved.
+  [catalogue](catalog.md) describes them, so you can match it to your own places; `name` and
+  `system` come in full, up to 255 characters. The list is empty while an admin has curated none;
+  do not offer a choice then. `chosen` and the choice's answer name a home location the same way.
+- `preview` is filled only while the member is `PENDING`: per current location, named as the
+  [stock](stock.md) feed names a lot's `location`, the stock `rows` from before the live time, own
+  and pool rows together, the share held for each org unit's `pools`, and the `ships`. An entry
+  without `location` counts ships that have none. What already lies at the location the member
+  chooses stays there and does not count as moved.
 - `chosen` is absent before the choice, and once the chosen location was deleted.
 
 While the member is `PENDING`, pause your own relocation and the sync of those lots and ships, show

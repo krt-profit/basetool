@@ -102,6 +102,12 @@ class ExchangePatchChangeControllerTest {
   private static final Instant LIVE_AT = Instant.parse("2000-01-01T00:00:00Z");
   private static final Instant BEFORE = Instant.parse("1999-06-01T00:00:00Z");
 
+  /** The longest location, star-system and material name the catalogue stores. */
+  private static final int CATALOGUE_NAME = 255;
+
+  /** The longest name {@code location.schema.json} and {@code item-ref.schema.json} carry. */
+  private static final int FEED_NAME = 200;
+
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
@@ -265,6 +271,41 @@ class ExchangePatchChangeControllerTest {
         .andExpect(
             jsonPath("$.homeLocation.preview[0].pools[0].orgUnit.id").value(squadron.toString()))
         .andExpect(jsonPath("$.homeLocation.preview[0].pools[0].rows").value(1));
+  }
+
+  @Test
+  void aHomeLocationKeepsItsFullNameAndAPreviewPlaceAndAnExceptionAreNamedAsTheStockFeedDoes()
+      throws Exception {
+    String homeName = longest("Patch home " + home);
+    String system = longest("Patch system ");
+    String portName = longest("Patch port " + port);
+    String materialName = longest("Patch ore " + material);
+    jdbc.update("UPDATE location SET name = ? WHERE id = ?", homeName, home);
+    jdbc.update("UPDATE location SET name = ? WHERE id = ?", portName, port);
+    jdbc.update(
+        "UPDATE city SET star_system_name = ?"
+            + " WHERE id = (SELECT city_id FROM location WHERE id = ?)",
+        system,
+        home);
+    jdbc.update("UPDATE material SET name = ? WHERE id = ?", materialName, material);
+    row(port, null);
+    trigger();
+
+    mockMvc
+        .perform(relayed(get(PATH), READ))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.homeLocation.locations[?(@.id == '%s')].name", home).value(homeName))
+        .andExpect(jsonPath("$.homeLocation.locations[?(@.id == '%s')].system", home).value(system))
+        .andExpect(
+            jsonPath("$.homeLocation.preview[0].location.name")
+                .value(portName.substring(0, FEED_NAME)))
+        .andExpect(
+            jsonPath("$.patchChange.options.wipeExceptions[0].entry.name")
+                .value(materialName.substring(0, FEED_NAME)));
+    choose(home)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.location.name").value(homeName))
+        .andExpect(jsonPath("$.location.system").value(system));
   }
 
   @Test
@@ -586,6 +627,16 @@ class ExchangePatchChangeControllerTest {
     jdbc.update("UPDATE location SET is_home_location = ? WHERE id = ?", curatedHome, id);
     locations.add(id);
     return id;
+  }
+
+  /**
+   * Pads a name to the longest the catalogue stores.
+   *
+   * @param start the name's start, unique where the catalogue requires it
+   * @return the name, {@value #CATALOGUE_NAME} characters long
+   */
+  private static @NotNull String longest(@NotNull String start) {
+    return start + "x".repeat(CATALOGUE_NAME - start.length());
   }
 
   /**
