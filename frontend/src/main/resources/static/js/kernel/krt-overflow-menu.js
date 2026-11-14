@@ -77,9 +77,13 @@ function boundsOf(menu) {
     return { top, bottom };
 }
 
+/** Space kept between a shifted panel and the viewport's right edge, in CSS pixels. */
+const VIEWPORT_GAP = 8;
+
 /**
- * Opens the panel upwards when it does not fit below its toggle and there is more room above, and
- * aligns it to the toggle's left edge when right-aligned it would leave the viewport.
+ * Opens the panel upwards when it does not fit below its toggle and there is more room above,
+ * aligns it to the toggle's left edge when right-aligned it would leave the viewport, and shifts it
+ * left when it overruns the right edge in that alignment too.
  *
  * @param {HTMLElement} menu the menu being opened
  * @param {HTMLElement} toggle the menu's toggle
@@ -87,7 +91,14 @@ function boundsOf(menu) {
  */
 function place(menu, toggle, panel) {
     panel.classList.remove('overflow-menu__panel--up', 'overflow-menu__panel--start');
+    panel.style.removeProperty('--overflow-menu-shift');
     if (panel.getBoundingClientRect().left < 0) panel.classList.add('overflow-menu__panel--start');
+    const overrun =
+        panel.getBoundingClientRect().right - (document.documentElement.clientWidth - VIEWPORT_GAP);
+    if (overrun > 0) {
+        const shift = Math.min(overrun, panel.getBoundingClientRect().left);
+        panel.style.setProperty('--overflow-menu-shift', `${-shift}px`);
+    }
     const { top, bottom } = boundsOf(menu);
     const anchor = toggle.getBoundingClientRect();
     const height = panel.getBoundingClientRect().height;
