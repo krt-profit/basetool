@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogPages.Comple
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronForm;
 import jakarta.validation.Valid;
@@ -100,6 +101,7 @@ public class AdminSquadronsPageController {
       model.addAttribute("squadrons", catalog.items());
       model.addAttribute("squadronsTruncated", catalog.truncated());
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Error loading squadrons", e);
       model.addAttribute("error", "error.admin.mission.data.load");
     }
@@ -161,6 +163,7 @@ public class AdminSquadronsPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Create Squadron failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.squadron");
@@ -202,6 +205,7 @@ public class AdminSquadronsPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update Squadron failed", e);
       if (e.getStatusCode() == 409) {
         if ("concurrency-conflict".equals(e.getProblemType())) {
@@ -232,6 +236,7 @@ public class AdminSquadronsPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Delete Squadron failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.squadron.in_use");

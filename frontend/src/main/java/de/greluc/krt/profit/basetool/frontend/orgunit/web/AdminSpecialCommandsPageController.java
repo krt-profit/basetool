@@ -182,6 +182,7 @@ public class AdminSpecialCommandsPageController {
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Create SpecialCommand failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.specialcommand");
@@ -227,6 +228,7 @@ public class AdminSpecialCommandsPageController {
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update SpecialCommand failed", e);
       if (e.getStatusCode() == 409) {
         if ("concurrency-conflict".equals(e.getProblemType())) {
@@ -261,6 +263,7 @@ public class AdminSpecialCommandsPageController {
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Delete SpecialCommand failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.specialcommand.in_use");
@@ -335,6 +338,7 @@ public class AdminSpecialCommandsPageController {
           id, userId, new MembershipLeadToggleRequest(isLead, version));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Toggle SpecialCommand member lead failed", e);
       if (BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER.equals(
           e.getProblemCode())) {

@@ -135,6 +135,7 @@ public class InventoryWriteController {
       inventoryClient.create(request);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.add");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "addInventoryItem", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.add.failed");
       redirectAttributes.addFlashAttribute("inventoryForm", form);
@@ -186,6 +187,7 @@ public class InventoryWriteController {
       inventoryClient.create(request);
       return ResponseEntity.ok(Map.of("targetUrl", inventorySourceTarget(form.getSource())));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Failed to add inventory item (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     }
@@ -430,6 +432,7 @@ public class InventoryWriteController {
       inventoryClient.bookOut(id, request);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.bookout");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "bookOutInventoryItem", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.bookout.failed");
     } catch (Exception e) {
@@ -498,6 +501,7 @@ public class InventoryWriteController {
       }
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Failed to transfer inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
@@ -520,6 +524,7 @@ public class InventoryWriteController {
       InventoryItemDto result = inventoryClient.personalRebook(id, dto);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Failed to rebook inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
@@ -543,6 +548,7 @@ public class InventoryWriteController {
       inventoryClient.bulkCheckout(request);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Failed to bulk-checkout inventory items (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     }
@@ -570,6 +576,7 @@ public class InventoryWriteController {
       BulkRebookResultDto result = inventoryClient.bulkRebook(request);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Failed to bulk-rebook inventory items (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     }
@@ -591,6 +598,7 @@ public class InventoryWriteController {
       InventoryItemDto updated = inventoryClient.addAllocation(id, dto);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Failed to add inventory allocation: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
@@ -613,6 +621,7 @@ public class InventoryWriteController {
       InventoryItemDto updated = inventoryClient.changeAllocation(id, dto);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Failed to change inventory allocation: status={}, {}",
           e.getStatusCode(),
@@ -637,6 +646,7 @@ public class InventoryWriteController {
       InventoryItemDto updated = inventoryClient.removeAllocation(id, dto);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Failed to remove inventory allocation: status={}, {}",
           e.getStatusCode(),
@@ -659,6 +669,7 @@ public class InventoryWriteController {
       InventoryItemDto updated = inventoryClient.updateNote(id, request);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Failed to update inventory item note: status={}, {}", e.getStatusCode(), e.getMessage());
       return ResponseEntity.status(e.getStatusCode()).build();
@@ -678,6 +689,7 @@ public class InventoryWriteController {
       InventoryItemDto updated = inventoryClient.updateDelivered(id, request);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Failed to update delivered status: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);

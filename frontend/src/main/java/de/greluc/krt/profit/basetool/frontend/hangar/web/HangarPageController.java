@@ -556,6 +556,7 @@ public class HangarPageController {
       hangarClient.createShip(request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_add");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "POST /api/v1/hangar/ships", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.add");
       redirectAttributes.addFlashAttribute("shipForm", form);
@@ -609,6 +610,7 @@ public class HangarPageController {
       hangarClient.updateShip(id, request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_update");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "PUT /api/v1/hangar/ships", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.update");
     } catch (Exception e) {
@@ -633,6 +635,7 @@ public class HangarPageController {
       hangarClient.deleteShip(id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "DELETE /api/v1/hangar/ships", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.delete");
     } catch (Exception e) {

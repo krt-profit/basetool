@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.BulkStolenMarkResu
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -76,6 +77,7 @@ public class InventoryStolenMarkProxyController {
       InventoryItemDto result = inventoryClient.markStolen(id, dto);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Failed to change the stolen marker of an inventory item: status={}, {}",
           e.getStatusCode(),
@@ -103,6 +105,7 @@ public class InventoryStolenMarkProxyController {
       BulkStolenMarkResultDto result = inventoryClient.bulkMarkStolen(request);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Failed to bulk-change the stolen marker: {}", e.getMessage());
       return propagateBackendError(e);
     }

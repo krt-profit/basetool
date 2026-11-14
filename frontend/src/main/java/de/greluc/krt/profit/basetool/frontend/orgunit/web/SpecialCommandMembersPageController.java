@@ -132,6 +132,7 @@ public class SpecialCommandMembersPageController {
       model.addAttribute("specialCommand", sc);
       model.addAttribute("members", fetchMembers(id));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       if (e.getStatusCode() == HttpStatus.FORBIDDEN.value()) {
         throw new AccessDeniedException(
             "The backend refused the Spezialkommando member page: the caller is neither an admin"
@@ -170,6 +171,7 @@ public class SpecialCommandMembersPageController {
       orgUnitClient.addSpecialCommandMember(id, userId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Add SpecialCommand member failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.specialcommand.member.duplicate");
@@ -234,6 +236,7 @@ public class SpecialCommandMembersPageController {
       orgUnitClient.patchSpecialCommandMemberFlags(id, userId, flagsBody(form));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Patch SpecialCommand member flags failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");

@@ -661,6 +661,7 @@ public class MissionPageController {
       List<MissionParticipantDto> result = missionClient.unassignedParticipants(id);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Get unassigned participants (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),

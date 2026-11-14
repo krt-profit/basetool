@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddCustomFrequencyRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddFrequencyRequest;
@@ -77,6 +78,7 @@ public class MissionFrequencyWriteController {
       missionClient.putFrequency(id, new AddFrequencyRequest(frequencyTypeId, value));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Add or update frequency failed", e);
       return "redirect:/missions/" + id + "?error=error.mission.frequency.update";
     }
@@ -99,6 +101,7 @@ public class MissionFrequencyWriteController {
       missionClient.deleteFrequency(id, frequencyId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Delete frequency failed", e);
       return "redirect:/missions/" + id + "?error=error.mission.frequency.delete";
     }

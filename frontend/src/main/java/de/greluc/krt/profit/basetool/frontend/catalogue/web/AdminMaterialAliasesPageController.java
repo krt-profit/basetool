@@ -143,6 +143,7 @@ public class AdminMaterialAliasesPageController {
       catalogueClient.createMaterialAlias(body);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "POST /api/v1/material-external-aliases", e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
     } catch (Exception e) {
@@ -195,6 +196,7 @@ public class AdminMaterialAliasesPageController {
       catalogueClient.updateMaterialAlias(id, body);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "PUT /api/v1/material-external-aliases", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
     } catch (Exception e) {
@@ -219,6 +221,7 @@ public class AdminMaterialAliasesPageController {
       catalogueClient.deleteMaterialAlias(id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "DELETE /api/v1/material-external-aliases", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
     } catch (Exception e) {

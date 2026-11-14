@@ -577,6 +577,7 @@ public class RefineryOrderPageController {
         model.addAttribute("importRowsSkipped", draft.rowsSkipped());
       }
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       String detail = e.getProblemDetail();
       if (detail != null && !detail.isBlank()) {
         model.addAttribute("importErrorText", detail);

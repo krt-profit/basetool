@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionActualTimeUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
@@ -115,6 +116,7 @@ public class MissionWriteController {
       MissionDto refreshed = missionClient.reloadMission(id);
       return ResponseEntity.ok(refreshed);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update actual time failed with status {}: {}", e.getStatusCode(), e.getMessage());
       HttpStatus status;
       switch (e.getStatusCode()) {
@@ -149,6 +151,7 @@ public class MissionWriteController {
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
       return "redirect:" + target;
     } catch (BackendServiceException | JacksonException | IllegalArgumentException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Create mission failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.create");
       redirectAttributes.addFlashAttribute("missionForm", form);
@@ -178,6 +181,7 @@ public class MissionWriteController {
       liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException | IllegalArgumentException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Update mission failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.update");
       redirectAttributes.addFlashAttribute("missionForm", form);
@@ -318,6 +322,7 @@ public class MissionWriteController {
       liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.mission_delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Delete mission failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.delete");
       return "redirect:/missions/" + id;

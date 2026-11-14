@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveOrgUnitRestore;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.ActiveOrgUnitChoiceResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -91,6 +92,7 @@ public class MeFrontendController {
       applyPin(session, stored != null ? stored.orgUnitId() : orgUnitId);
       redirectAttributes.addFlashAttribute(SUCCESS_TOAST, switchedToastKey(orgUnitId));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       if (e.getStatusCode() == HttpStatus.BAD_REQUEST.value()) {
         log.debug("The backend refused the org-unit choice", e);
         redirectAttributes.addFlashAttribute(ERROR_TOAST, "orgUnit.switcher.rejected");

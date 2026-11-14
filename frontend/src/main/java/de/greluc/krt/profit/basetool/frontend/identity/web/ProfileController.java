@@ -328,6 +328,7 @@ public class ProfileController {
               form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -372,6 +373,7 @@ public class ProfileController {
               form.displayName() == null ? "" : form.displayName(),
               form.version() == null ? 0L : form.version()));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("AJAX profile description update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -419,6 +421,7 @@ public class ProfileController {
               form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -467,6 +470,7 @@ public class ProfileController {
               new MyPayoutPreferenceRequest(
                   preference, form.version() == null ? 0L : form.version()));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("AJAX payout-preference update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -510,6 +514,7 @@ public class ProfileController {
               form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -554,6 +559,7 @@ public class ProfileController {
               new MyBlueprintSharingRequest(
                   form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("AJAX blueprint-sharing update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -597,6 +603,7 @@ public class ProfileController {
               form.withholdName(), form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Name-withholding update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -641,6 +648,7 @@ public class ProfileController {
               form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("RSI handle update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");

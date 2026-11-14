@@ -31,6 +31,8 @@ import de.greluc.krt.profit.basetool.frontend.kernel.security.BackendRoleSyncFil
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateRead;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+import de.greluc.krt.profit.basetool.frontend.navigation.web.NavigationPreferencesLoader;
+import de.greluc.krt.profit.basetool.frontend.navigation.web.NavigationPreferencesReader;
 import de.greluc.krt.profit.basetool.frontend.supply.web.SupplyFeatureState;
 import java.util.Set;
 import java.util.TreeSet;
@@ -60,7 +62,9 @@ class SessionLossOnlyGuardConfinementTest {
               GlobalExceptionHandler.class,
               LayoutContextLoader.class,
               OrgUnitContextAdvice.class,
-              SupplyFeatureState.class)
+              SupplyFeatureState.class,
+              NavigationPreferencesLoader.class,
+              NavigationPreferencesReader.class)
           .map(Class::getName)
           .collect(Collectors.toCollection(TreeSet::new));
 

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPoolChangeDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,7 @@ public class InventoryPoolChangeProxyController {
       InventoryItemDto result = inventoryClient.changePool(id, dto);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Failed to move inventory item into another pool: status={}, {}",
           e.getStatusCode(),
@@ -98,6 +100,7 @@ public class InventoryPoolChangeProxyController {
       List<OrgUnitReferenceDto> targets = inventoryClient.poolTargets(id);
       return ResponseEntity.ok(Objects.requireNonNullElse(targets, List.of()));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Failed to list pool targets: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     }
