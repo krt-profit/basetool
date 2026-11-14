@@ -20,6 +20,12 @@ and fast-forwards it to the design system's `main` (ADR-0259); without that hook
 surface. Never treat an empty directory as "no design system applies". Details (the hook, the
 offline fallback, the pin): [`docs/agents/frontend-design-system.md`](../docs/agents/frontend-design-system.md).
 
+**Look at a UI change before you call it done.** `./gradlew :frontend:previewStackUp` starts this
+checkout's seeded E2E stack and leaves it running at `https://localhost:18081` with throwaway
+accounts; `:frontend:previewStackDown` stops it (REQ-OPS-057). One stack per machine: never tear
+down another checkout's. Report which screens and device classes you actually saw:
+[`docs/agents/ui-preview.md`](../docs/agents/ui-preview.md).
+
 ## Templates, CSS, scripts and dialogs (binding)
 
 Read [`docs/agents/frontend-templates-and-assets.md`](../docs/agents/frontend-templates-and-assets.md)

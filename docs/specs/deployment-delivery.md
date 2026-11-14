@@ -3594,6 +3594,44 @@ competes with the next attempt for the Docker VM or its log.
 **Enforced by:** `OwnedProcessTreeTest` (`:test-support:test`) · **Runbook:**
 [`docs/e2e-test/README.md`](../e2e-test/README.md) · **Related:** REQ-OPS-041
 
+### REQ-OPS-057 — A UI change can be looked at on a running, seeded stack of the checkout
+
+An agent or a developer can look at a UI change in a real browser before calling it done, signed in
+and on data, without hand-made credentials or realm files.
+
+- **One bring-up.** `:frontend:previewStackUp` starts the stack `E2eStackExtension` starts for
+  `:frontend:e2eTest`, with the same images built from the checkout, the same synthetic realm, the
+  same throwaway credentials and the same seeding, and leaves it running. `ServedBuildCheck` proves
+  that the stack serves this checkout's assets. It also stacks `docker-compose.preview.yml`, which
+  moves the issuer to `keycloak.localhost`, so a browser on the host signs in on a loopback name
+  while Keycloak stays published on `127.0.0.1`; `check-keycloak-issuer.py` holds the apps to
+  that issuer.
+- **It fits the workstation.** Outside the prebuilt CI mode, the four images built from the checkout
+  are built one after another before `up`, because four in-image Gradle builds at once exhaust a
+  4 GiB Docker VM. `up --build` then reads the BuildKit cache.
+- **It says how to get in.** After a successful start, the task prints the frontend URL and every
+  throwaway account with its password and roles.
+- **Every port is checked.** Before compose starts, the pre-flight checks every host port the dev
+  profile publishes and fails naming the container of another checkout that holds one. This
+  checkout's own containers do not count, so a running stack can be brought up again in place
+  after an edit.
+- **It goes away.** `:frontend:previewStackDown` removes the containers and volumes and keeps the
+  logs under `frontend/build/e2e/`. A start that fails after compose came up tears itself down.
+- **It is documented for every agent.** [`docs/agents/ui-preview.md`](../agents/ui-preview.md)
+  carries the workflow, the rule that another checkout's stack is never torn down unasked, and what
+  to report. `frontend/AGENTS.md` points to it, and Claude Code's `.claude/launch.json` names the
+  running frontend `preview-stack`.
+
+**Acceptance**
+
+- [x] `E2eStackPortsParityTest` keeps the checked ports equal to the loopback ports of
+  `docker-compose.yml`.
+- [x] JUnit and the preview task share `E2eStackExtension.bringUpAndSeed`; only the teardown
+  registrar differs.
+
+**Enforced by:** `E2eStackPortsParityTest` (`:frontend:test`) · **Runbook:**
+[`docs/agents/ui-preview.md`](../agents/ui-preview.md) · **Related:** REQ-OPS-055, REQ-OPS-056
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

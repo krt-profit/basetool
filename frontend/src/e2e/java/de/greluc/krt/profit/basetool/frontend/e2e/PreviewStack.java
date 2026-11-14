@@ -50,7 +50,7 @@ public final class PreviewStack {
    * @throws Exception if the stack cannot be brought up or seeded; a failed bring-up is torn down
    */
   public static void main(String[] args) throws Exception {
-    E2eStackExtension stack = new E2eStackExtension();
+    E2eStackExtension stack = E2eStackExtension.forHostBrowser();
     switch (parse(args)) {
       case UP -> up(stack);
       case DOWN -> stack.tearDown();

@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -154,6 +155,39 @@ public final class E2eStackExtension implements BeforeAllCallback {
           "docker-compose.e2e.yml");
 
   /**
+   * The override that moves the issuer to {@code keycloak.localhost}, which a browser on the host
+   * resolves to the loopback without the host-resolver rule the E2E browsers carry.
+   */
+  private static final String HOST_BROWSER_OVERRIDE = "docker-compose.preview.yml";
+
+  /** The compose files this instance stacks, {@link #COMPOSE_FILES} plus optional overrides. */
+  private final List<String> composeFiles;
+
+  /** Creates the extension for the E2E suites, which stack {@link #COMPOSE_FILES}. */
+  public E2eStackExtension() {
+    this(COMPOSE_FILES);
+  }
+
+  /**
+   * Creates an extension that stacks the given compose files.
+   *
+   * @param composeFiles the compose files, in precedence order
+   */
+  private E2eStackExtension(@NotNull List<String> composeFiles) {
+    this.composeFiles = composeFiles;
+  }
+
+  /**
+   * Creates the stack for a browser on the host: the E2E stack plus {@link #HOST_BROWSER_OVERRIDE}.
+   *
+   * @return the extension the preview stack starts and stops
+   */
+  static @NotNull E2eStackExtension forHostBrowser() {
+    return new E2eStackExtension(
+        Stream.concat(COMPOSE_FILES.stream(), Stream.of(HOST_BROWSER_OVERRIDE)).toList());
+  }
+
+  /**
    * Every dev-profile service: the two databases, the sandbox Keycloak, Redis, the backend, the
    * frontend and the ingest gateway (ADR-0225); the edge and its ACME client are prod-profile only.
    */
@@ -181,6 +215,14 @@ public final class E2eStackExtension implements BeforeAllCallback {
    */
   private static final List<String> PULLED_SERVICES =
       List.of("db-backend-dev", "db-keycloak-dev", "redis-dev");
+
+  /**
+   * The services whose images are built from this checkout. Each build runs Gradle with a 2 GiB
+   * heap inside the Docker VM, so they are built one at a time before {@code up}; four at once
+   * exhaust a 4 GiB VM.
+   */
+  private static final List<String> BUILT_SERVICES =
+      List.of("backend-dev", "frontend-dev", "ingest-dev", "keycloak-dev");
 
   /**
    * The throwaway client secret of {@code basetool-ingest-gateway} in {@code
@@ -286,10 +328,12 @@ public final class E2eStackExtension implements BeforeAllCallback {
   void bringUpAndSeed(@NotNull Consumer<AutoCloseable> registerTeardown) throws Exception {
     Path root = repoRoot();
     stageRealm(root);
+    requireStackPortsFree(root);
     if (prebuilt()) {
       requirePrebuiltImages(root);
+    } else {
+      buildImagesOneByOne(root);
     }
-    requireStackPortsFree(root);
     prePullImages(root);
     composeUp(root);
     registerTeardown.accept(this::tearDown);
@@ -446,6 +490,40 @@ public final class E2eStackExtension implements BeforeAllCallback {
             : Path.of(configured))
         .toAbsolutePath()
         .normalize();
+  }
+
+  /**
+   * Builds the images of {@link #BUILT_SERVICES} one after another, so the {@code --build} of
+   * {@link #composeUp} only reads the BuildKit cache; each build is retried up to {@link
+   * #COMPOSE_UP_ATTEMPTS} times for a transient dependency download failure.
+   *
+   * @param root the repository root the compose files live in
+   * @throws Exception if every attempt of one build exits non-zero or times out
+   */
+  private void buildImagesOneByOne(Path root) throws Exception {
+    for (String service : BUILT_SERVICES) {
+      for (int attempt = 1; ; attempt++) {
+        try {
+          runProcess(
+              root,
+              "compose-build-" + service + attemptSuffix(attempt),
+              composeCommand("build", service),
+              throwawayEnv(),
+              UP_TIMEOUT);
+          break;
+        } catch (InterruptedException interrupted) {
+          throw interrupted;
+        } catch (Exception build) {
+          if (attempt >= COMPOSE_UP_ATTEMPTS || OwnedProcessTree.leftProcessesAlive(build)) {
+            throw build;
+          }
+          System.out.printf(
+              "[E2E] building %s failed (attempt %d of %d); retrying.%n%s%n",
+              service, attempt, COMPOSE_UP_ATTEMPTS, build.getMessage());
+          sleepBackoff(attempt);
+        }
+      }
+    }
   }
 
   /**
@@ -638,7 +716,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
       cmd.add("--env-file");
       cmd.add(environmentFile);
     }
-    for (String file : COMPOSE_FILES) {
+    for (String file : composeFiles) {
       cmd.add("-f");
       cmd.add(file);
     }

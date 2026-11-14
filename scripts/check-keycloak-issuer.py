@@ -76,6 +76,7 @@ TEST = "docker-compose.test.yml"
 BUILD = "docker-compose.build.yml"
 E2E = "docker-compose.e2e.yml"
 LOCALTEST = "docker-compose.localtest.yml"
+PREVIEW = "docker-compose.preview.yml"
 MONITORING = "docker-compose.monitoring.yml"
 PROMETHEUS = "monitoring/prometheus/prometheus.yml"
 
@@ -172,6 +173,14 @@ SCENARIOS = [
         {},
         None,
         "the local-run variant of the E2E stack",
+    ),
+    Scenario(
+        "preview-stack",
+        [BASE, TEST, BUILD, E2E, PREVIEW],
+        "dev",
+        {},
+        "http://keycloak.localhost:18080/auth/realms/" + REALM,
+        "the preview stack a host browser signs in to (REQ-OPS-057)",
     ),
 ]
 

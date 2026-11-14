@@ -42,6 +42,7 @@ import java.security.cert.Certificate;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
@@ -232,16 +233,30 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates a job-order-pickable material via {@code POST /api/v1/materials} and returns its id, so
-   * the job-order create form's material dropdown (filtered to {@code isJobOrder=true}) has an
-   * entry to select. {@code categoryId} is optional and omitted.
+   * Get-or-creates a job-order-pickable material, so the job-order create form's material dropdown
+   * (filtered to {@code isJobOrder=true}) has an entry to select; a stack seeded again keeps the
+   * material it already has.
+   *
+   * @param username the Keycloak username of the (admin) test user
+   * @param password the Keycloak password of the test user
+   * @param name the material name
+   * @return the existing or freshly created material's id
+   */
+  public String ensureJobOrderMaterial(String username, String password, String name) {
+    String existing = findMaterialIdByName(username, password, name);
+    return existing != null ? existing : createJobOrderMaterial(username, password, name);
+  }
+
+  /**
+   * Creates a job-order-pickable material via {@code POST /api/v1/materials}; {@code categoryId} is
+   * optional and omitted.
    *
    * @param username the Keycloak username of the (admin) test user
    * @param password the Keycloak password of the test user
    * @param name the material name to create
    * @return the created material's id
    */
-  public String ensureJobOrderMaterial(String username, String password, String name) {
+  private String createJobOrderMaterial(String username, String password, String name) {
     try {
       String token = passwordGrant(username, password);
       String body =
@@ -2119,11 +2134,12 @@ public final class BackendSeeder {
 
   /**
    * Seeds an orderable item over JDBC: a {@code game_item} plus an active {@code blueprint}
-   * outputting it with one RESOURCE ingredient resolved to the given material. Local-stack only.
+   * outputting it with one RESOURCE ingredient resolved to the given material. An item of that name
+   * is kept as it is, so a stack seeded again does not grow a second one. Local-stack only.
    *
    * @param gameItemName the display name of the orderable item (shown in the picker)
    * @param materialId the id of an existing material used as the blueprint's RESOURCE ingredient
-   * @return the created game item's id
+   * @return the existing or created game item's id
    */
   public String seedOrderableItem(String gameItemName, String materialId) {
     UUID gameItemId = UUID.randomUUID();
@@ -2131,6 +2147,15 @@ public final class BackendSeeder {
     UUID ingredientId = UUID.randomUUID();
     UUID scwikiUuid = UUID.randomUUID();
     try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD)) {
+      try (PreparedStatement ps =
+          connection.prepareStatement("SELECT id FROM game_item WHERE name = ? LIMIT 1")) {
+        ps.setString(1, gameItemName);
+        try (ResultSet existing = ps.executeQuery()) {
+          if (existing.next()) {
+            return existing.getObject(1, UUID.class).toString();
+          }
+        }
+      }
       try (PreparedStatement ps =
           connection.prepareStatement(
               "INSERT INTO game_item (id, name, kind) VALUES (?, ?, 'GENERIC')"
