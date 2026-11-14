@@ -33,6 +33,8 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileBlueprintSharingForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileDescriptionForm;
+import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileHomeLocationForm;
+import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileHomeLocationSection;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileRsiHandleForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDescriptionRequest;
@@ -75,8 +77,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Controller of the user profile page ({@code /profile}) and its editable fields: description,
- * display name, default payout preference, blueprint sharing and the name withholding from
- * connected applications.
+ * display name, default payout preference, blueprint sharing, the name withholding from connected
+ * applications and, saved by {@link ProfileHomeLocationController}, the home location.
  *
  * <p>Renders from token claims overlaid with {@code /api/v1/users/me}, and still renders from the
  * token alone when the backend is unreachable.
@@ -96,6 +98,9 @@ public class ProfileController {
 
   /** Reads and writes the member's name withholding from connected applications. */
   private final ExchangeBackendClient exchangeClient;
+
+  /** Reads the member's home-location setting and the curated home locations. */
+  private final HomeLocationPreferenceReader homeLocationReader;
 
   private final MessageSource messageSource;
 
@@ -207,18 +212,7 @@ public class ProfileController {
     }
 
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
-
-    AdminDeletionRequestDto deletionRequest = null;
-    boolean deletionRequestUnavailable = false;
-    try {
-      deletionRequest = identityClient.myDeletionRequest();
-    } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
-      log.debug("Could not load the member's deletion request; the card says so", e);
-      deletionRequestUnavailable = true;
-    }
-    model.addAttribute("deletionRequest", deletionRequest);
-    model.addAttribute("deletionRequestUnavailable", deletionRequestUnavailable);
+    addDeletionRequest(model);
 
     model.addAttribute(
         "initials",
@@ -260,7 +254,41 @@ public class ProfileController {
           new ProfileRsiHandleForm(rsiHandle, version != null ? version : 0L));
     }
 
+    addHomeLocationSection(model);
     return "identity/profile";
+  }
+
+  /**
+   * Adds the member's erasure request to the deletion card, or the flag that it cannot be read.
+   *
+   * @param model the profile model
+   */
+  private void addDeletionRequest(@NotNull Model model) {
+    AdminDeletionRequestDto deletionRequest = null;
+    boolean deletionRequestUnavailable = false;
+    try {
+      deletionRequest = identityClient.myDeletionRequest();
+    } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
+      log.debug("Could not load the member's deletion request; the card says so", e);
+      deletionRequestUnavailable = true;
+    }
+    model.addAttribute("deletionRequest", deletionRequest);
+    model.addAttribute("deletionRequestUnavailable", deletionRequestUnavailable);
+  }
+
+  /**
+   * Adds the section "my home location": the curated options and the form with the stored choice
+   * and its own version.
+   *
+   * @param model the profile model
+   */
+  private void addHomeLocationSection(@NotNull Model model) {
+    ProfileHomeLocationSection homeLocation = homeLocationReader.profileSection();
+    model.addAttribute("homeLocationOptions", homeLocation.options());
+    model.addAttribute(
+        "profileHomeLocationForm",
+        new ProfileHomeLocationForm(homeLocation.homeLocationId(), homeLocation.version()));
   }
 
   /**

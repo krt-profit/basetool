@@ -218,6 +218,7 @@ class AdminAuditLogPageControllerTest {
             "PATCH_CHANGE_LABEL_CORRECTED",
             "PATCH_CHANGE_PHASE_ENDED",
             "PATCH_CHANGE_RELOCATED",
+            "HOME_LOCATION_PREFERENCE_SET",
             "PATCH_CHANGE_AUDIT_EXPORTED",
             "PATCH_CHANGE_AUDIT_PURGED"),
         model.getAttribute("eventTypes"));
@@ -237,6 +238,7 @@ class AdminAuditLogPageControllerTest {
     Properties labels = loadDefaultBundle();
     assertTrue(labels.containsKey("admin.audit.domain.PATCH_CHANGE"));
     assertTrue(labels.containsKey("admin.audit.event.JOB_ORDER_MONEY_CURRENCY_WIPED"));
+    assertTrue(labels.containsKey("admin.audit.event.HOME_LOCATION_PREFERENCE_SET"));
   }
 
   @Test

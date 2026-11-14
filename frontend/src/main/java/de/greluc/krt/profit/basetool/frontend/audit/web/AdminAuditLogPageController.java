@@ -536,6 +536,7 @@ public class AdminAuditLogPageController {
                   "PATCH_CHANGE_LABEL_CORRECTED",
                   "PATCH_CHANGE_PHASE_ENDED",
                   "PATCH_CHANGE_RELOCATED",
+                  "HOME_LOCATION_PREFERENCE_SET",
                   "PATCH_CHANGE_AUDIT_EXPORTED",
                   "PATCH_CHANGE_AUDIT_PURGED")));
 

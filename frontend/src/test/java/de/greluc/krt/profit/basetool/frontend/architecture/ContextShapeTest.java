@@ -40,7 +40,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class ContextShapeTest {
 
   /** The frontend's shape under the test profile. */
-  static final ContextShape EXPECTED = new ContextShape(0, 0, 165, 2);
+  static final ContextShape EXPECTED = new ContextShape(0, 0, 166, 2);
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
