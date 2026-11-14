@@ -40,7 +40,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Unit tests for the bulk-write side of {@link HangarRelocationGuard}: which owners' ships a fitted
- * reset leaves out for its caller (REQ-PATCH-023).
+ * reset leaves out for its caller, judged by the phase read for the write (REQ-PATCH-023,
+ * REQ-PATCH-064).
  */
 @ExtendWith(MockitoExtension.class)
 class HangarRelocationGuardTest {
@@ -58,7 +59,7 @@ class HangarRelocationGuardTest {
 
   @Test
   void lockedForNamesTheOwnersTheLockRefusesWithTheLiveTime() {
-    when(lock.openPhaseLiveAt()).thenReturn(Optional.of(LIVE_AT));
+    when(lock.writeCutoff()).thenReturn(Optional.of(LIVE_AT));
     when(lock.refusedAmong(List.of(free, refused))).thenReturn(Set.of(refused));
 
     assertThat(guard.lockedFor(List.of(free, refused)))
@@ -67,7 +68,7 @@ class HangarRelocationGuardTest {
 
   @Test
   void lockedForLocksNothingWhileNoPhaseIsOpenOrNobodyIsRefused() {
-    when(lock.openPhaseLiveAt()).thenReturn(Optional.empty(), Optional.of(LIVE_AT));
+    when(lock.writeCutoff()).thenReturn(Optional.empty(), Optional.of(LIVE_AT));
     when(lock.refusedAmong(List.of(free))).thenReturn(Set.of());
 
     assertThat(guard.lockedFor(List.of(free))).isSameAs(LockedShips.NONE);

@@ -44,6 +44,9 @@ public enum PatchChangeProblemCode implements ProblemCode {
   /** The member has chosen a home location in the open phase already (REQ-PATCH-022). */
   HOME_LOCATION_ALREADY_CHOSEN(HttpStatus.CONFLICT),
 
+  /** The choice names a phase that is no longer the open one (REQ-PATCH-062). */
+  HOME_LOCATION_PHASE_CHANGED(HttpStatus.CONFLICT),
+
   /** The chosen location is no curated home location on offer (REQ-PATCH-021). */
   HOME_LOCATION_NOT_OFFERED(HttpStatus.BAD_REQUEST);
 

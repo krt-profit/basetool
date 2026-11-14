@@ -64,26 +64,31 @@ public class MemberRelocations implements PatchChangeExchangeWriter {
   private final PlatformTransactionManager transactionManager;
 
   /**
-   * Stores a member's choice in the open phase and relocates the member.
+   * Stores a member's choice in the phase the prompt showed and relocates the member.
    *
    * @param member the member who relocates
+   * @param phaseId the patch change whose phase the prompt showed
    * @param locationId the chosen home location
    * @param chooser who chose
    * @return what moved
-   * @throws HomeLocationChoiceRefusedException without an open phase, when the phase does not ask
-   *     the member, when the member chose before, or when the location is not a curated home
-   *     location on offer
+   * @throws HomeLocationChoiceRefusedException without an open phase, when another phase than the
+   *     shown one is open, when the phase does not ask the member, when the member chose before, or
+   *     when the location is not a curated home location on offer
    */
   public @NotNull RelocationResultDto relocate(
-      @NotNull UUID member, @NotNull UUID locationId, @NotNull RelocationChooser chooser) {
-    return relocate(member, locationId, chooser, null);
+      @NotNull UUID member,
+      @NotNull UUID phaseId,
+      @NotNull UUID locationId,
+      @NotNull RelocationChooser chooser) {
+    return relocate(member, phaseId, locationId, chooser, null);
   }
 
   /**
-   * Stores a member's choice in the open phase and relocates the member, in its own transaction
-   * attributed to the phase's patch change.
+   * Stores a member's choice in the phase the prompt showed and relocates the member, in its own
+   * transaction attributed to that phase's patch change.
    *
    * @param member the member who relocates
+   * @param phaseId the patch change whose phase the prompt showed
    * @param locationId the chosen home location
    * @param chooser who chose
    * @param clientId the exchange client that chose, or {@code null} for a choice on the web
@@ -91,23 +96,27 @@ public class MemberRelocations implements PatchChangeExchangeWriter {
    */
   private @NotNull RelocationResultDto relocate(
       @NotNull UUID member,
+      @NotNull UUID phaseId,
       @NotNull UUID locationId,
       @NotNull RelocationChooser chooser,
       @Nullable String clientId) {
-    HomeLocationPhase phase = phases.open().orElseThrow(MemberRelocations::phaseNotOpen);
     TransactionTemplate transaction = new TransactionTemplate(transactionManager);
     return PatchChangeWrites.runFor(
-        phase.id(),
+        phaseId,
         () ->
             Objects.requireNonNull(
                 transaction.execute(_ ->
-                    relocateWithinTransaction(phase.id(), member, locationId, chooser, clientId))));
+                    relocateWithinTransaction(phaseId, member, locationId, chooser, clientId))));
   }
 
   @Override
   public @NotNull Chosen chooseHomeLocation(
-      @NotNull UUID member, @NotNull UUID locationId, @NotNull String clientId) {
-    RelocationResultDto result = relocate(member, locationId, RelocationChooser.CLIENT, clientId);
+      @NotNull UUID member,
+      @NotNull UUID phaseId,
+      @NotNull UUID locationId,
+      @NotNull String clientId) {
+    RelocationResultDto result =
+        relocate(member, phaseId, locationId, RelocationChooser.CLIENT, clientId);
     HomeLocationOptionDto location = result.location();
     return new Chosen(
         new PatchChangeExchangeView.Place(location.id(), location.name(), location.system()),
@@ -116,10 +125,12 @@ public class MemberRelocations implements PatchChangeExchangeWriter {
   }
 
   /**
-   * Checks the phase and the member under the history's shared lock, claims the relocation, moves
-   * the stock and the ships, sets the member's home-location setting and records the result.
+   * Checks under the history's shared lock that the shown phase is the open one and asks the
+   * member, claims the relocation, moves the stock and the ships, sets the member's home-location
+   * setting and records the result.
    *
-   * @param phaseId the phase the writes are attributed to
+   * @param phaseId the patch change whose phase the prompt showed, which the writes are attributed
+   *     to
    * @param member the member
    * @param locationId the chosen home location
    * @param chooser who chose
@@ -137,9 +148,11 @@ public class MemberRelocations implements PatchChangeExchangeWriter {
         repository
             .findFirstByHomeLocationPromptTrueOrderByLiveAtDesc()
             .filter(record -> record.getPhaseEndedAt() == null)
-            .filter(record -> record.getId().equals(phaseId))
             .map(HomeLocationPhase::of)
             .orElseThrow(MemberRelocations::phaseNotOpen);
+    if (!phase.id().equals(phaseId)) {
+      throw new HomeLocationChoiceRefusedException(Reason.PHASE_CHANGED);
+    }
     HomeLocationOptionDto chosen = HomeLocationOffer.toOption(offer.requireOffered(locationId));
     PatchChangeRelocation.Key key = new PatchChangeRelocation.Key(phase.id(), member);
     if (phases.pendingAmong(phase, List.of(member)).isEmpty()) {

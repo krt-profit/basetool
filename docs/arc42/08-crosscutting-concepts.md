@@ -78,7 +78,9 @@ Beyond roles there are three mechanisms that are easy to miss:
   section, a handler's fallback or the AJAX relay `BackendErrorResponses` meets it
   (`SectionFallback#rethrowHandOff`), except on a gate's own page, which renders the layout the
   gate refuses and so falls back instead of redirecting to itself; the layout chrome degrades. The
-  scripts' header and event lists are pinned against the gate beans.
+  scripts' header and event lists are pinned against the gate beans. A gate may leave its repair
+  open to an admin it holds (`adminExemptPaths`, `adminPages`); for the admin such a page is a gate
+  page, and the browser is never handed off from a page the layout marks as one (REQ-PATCH-063).
 - **A security expression is code the compiler cannot check** — every `@bean.method(…)` in a
   `@PreAuthorize` is resolved against the running context in a test, the security beans carry
   explicit names, the SpEL stays constant (REQ-SEC-075), no class calls its own gated method past

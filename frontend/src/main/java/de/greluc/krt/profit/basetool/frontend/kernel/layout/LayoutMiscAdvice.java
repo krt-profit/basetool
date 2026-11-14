@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.security.GatePageRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
@@ -30,7 +31,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
  * Contributes the miscellaneous layout model attributes: {@code appTitle}, {@code
- * unreadNotificationCount} and {@code currentRequestUri}.
+ * unreadNotificationCount}, {@code sessionGatePage} and {@code currentRequestUri}.
  *
  * <p>Scoped to {@link UsesLayoutModel}; the notification count comes from the shared {@link
  * LayoutContextLoader} read, and a backend error hides the badge.
@@ -91,6 +92,18 @@ public class LayoutMiscAdvice {
   @ModelAttribute("unreadNotificationCount")
   public long unreadNotificationCount(HttpServletRequest request) {
     return layoutContextLoader.load(request).unreadNotifications();
+  }
+
+  /**
+   * Whether the request renders a session gate's page, an admin's recovery page included, which the
+   * layout marks so the page's scripts never hand the browser off to a gate's page again (ADR-0385,
+   * REQ-PATCH-063).
+   *
+   * @return {@code true} inside a request {@link GatePageRequest} marked
+   */
+  @ModelAttribute("sessionGatePage")
+  public boolean sessionGatePage() {
+    return GatePageRequest.isCurrent();
   }
 
   /**

@@ -67,7 +67,11 @@ class AdminMemberHomeLocationRelayControllerMvcTest {
       new HomeLocationOptionDto(
           UUID.fromString("10c4710c-0000-4000-8000-000000000001"), "Lorville", "Stanton");
 
-  private static final String CHOICE_JSON = "{\"locationId\":\"" + LORVILLE.id() + "\"}";
+  /** The patch change whose phase the tab showed. */
+  private static final UUID PATCH_CHANGE = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000a4");
+
+  private static final String CHOICE_JSON =
+      "{\"locationId\":\"" + LORVILLE.id() + "\",\"patchChangeId\":\"" + PATCH_CHANGE + "\"}";
 
   @Autowired private WebApplicationContext context;
 
@@ -99,7 +103,7 @@ class AdminMemberHomeLocationRelayControllerMvcTest {
   void theChoiceIsRelayedForTheMemberAndAnswersWhatMoved() throws Exception {
     when(backendApiClient.post(
             CHOICE,
-            new ChooseHomeLocationRequest(LORVILLE.id()),
+            new ChooseHomeLocationRequest(LORVILLE.id(), PATCH_CHANGE),
             RelocationResultDto.class,
             MEMBER))
         .thenReturn(new RelocationResultDto(LORVILLE, 12, 1));

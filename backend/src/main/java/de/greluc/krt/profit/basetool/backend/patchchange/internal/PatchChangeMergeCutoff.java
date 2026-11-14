@@ -26,7 +26,9 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -43,9 +45,27 @@ class PatchChangeMergeCutoff implements StockMergeCutoff {
   @Override
   @Transactional(readOnly = true)
   public @NotNull Optional<Instant> cutoffFor(@NotNull UUID holderId) {
-    return phases
-        .open()
-        .filter(phase -> !phases.pendingAmong(phase, List.of(holderId)).isEmpty())
-        .map(HomeLocationPhase::liveAt);
+    return cutoffIn(phases.open().orElse(null), holderId);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull Optional<Instant> cutoffForWrite(@NotNull UUID holderId) {
+    return cutoffIn(phases.openForWrite().orElse(null), holderId);
+  }
+
+  /**
+   * Returns a phase's live time while a holder's relocation is pending in it.
+   *
+   * @param phase the open phase, or {@code null} while none is open
+   * @param holderId the holder
+   * @return the live time, or empty when no phase is open or the holder is not pending in it
+   */
+  private @NotNull Optional<Instant> cutoffIn(
+      @Nullable HomeLocationPhase phase, @NotNull UUID holderId) {
+    if (phase == null || phases.pendingAmong(phase, List.of(holderId)).isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(phase.liveAt());
   }
 }

@@ -25,6 +25,7 @@ import java.util.Optional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.server.PathContainer;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
@@ -35,7 +36,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
  *
  * <p>A gate never holds a member on its own page nor on the page of a gate before it, so each step
  * stays reachable while an earlier one holds the member; the approval waiting page is open to every
- * gate.
+ * gate. A gate's admin pages are open to an admin and count as gate pages for them.
  */
 @Component
 public class SessionGates {
@@ -45,6 +46,9 @@ public class SessionGates {
 
   /** Each gate's page, parsed once, in the gates' order. */
   private final @Unmodifiable List<PathPattern> pages;
+
+  /** Each gate's pages open to an admin, parsed once, in the gates' order. */
+  private final @Unmodifiable List<List<PathPattern>> adminPages;
 
   /**
    * Holds the gates the domains implement.
@@ -56,6 +60,11 @@ public class SessionGates {
     this.pages =
         this.gates.stream()
             .map(gate -> PathPatternParser.defaultInstance.parse(gate.pagePath()))
+            .toList();
+    this.adminPages =
+        this.gates.stream()
+            .map(gate ->
+                gate.adminPages().stream().map(PathPatternParser.defaultInstance::parse).toList())
             .toList();
   }
 
@@ -80,10 +89,12 @@ public class SessionGates {
 
   /**
    * Tells whether a path is a session gate's page or the approval waiting page with its status
-   * poll. A gated session lands on these pages and they render without the active org unit.
+   * poll, and for an admin also a page a gate leaves open to an admin. A gated session lands on
+   * these pages and they render without the active org unit.
    *
    * @param path a context-relative path, as {@link PublicPaths#relativePath} returns it
-   * @return {@code true} for a gate's page, the waiting page or a path below the waiting page
+   * @return {@code true} for a gate's page, the waiting page or a path below the waiting page, or
+   *     an admin page of a gate while the caller is an admin
    */
   public boolean isGatePage(@NotNull String path) {
     return isOpenTo(gates.size() - 1, PathContainer.parsePath(path));
@@ -102,7 +113,8 @@ public class SessionGates {
 
   /**
    * Tells whether the gate at an index leaves a path open: its own page, the page of every gate
-   * before it, and the approval waiting page.
+   * before it, and the approval waiting page; to an admin also its own and the earlier gates' admin
+   * pages (REQ-PATCH-063).
    *
    * @param index the gate's position in {@link #all()}
    * @param path the parsed context-relative path
@@ -112,11 +124,13 @@ public class SessionGates {
     if (PublicPaths.isApprovalWaitingPage(path)) {
       return true;
     }
+    boolean adminPage = false;
     for (int i = 0; i <= index && i < pages.size(); i++) {
       if (pages.get(i).matches(path)) {
         return true;
       }
+      adminPage |= adminPages.get(i).stream().anyMatch(pattern -> pattern.matches(path));
     }
-    return false;
+    return adminPage && Roles.isAdmin(SecurityContextHolder.getContext().getAuthentication());
   }
 }

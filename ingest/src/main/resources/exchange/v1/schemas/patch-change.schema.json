@@ -384,7 +384,7 @@
     },
     "homeLocationChoice": {
       "title": "Home-location choice",
-      "description": "The member's choice in the open phase: final, once per member and phase. It relocates the member in the same request.",
+      "description": "The member's choice in the phase the read showed: final, once per member and phase. It relocates the member in the same request.",
       "type": "object",
       "properties": {
         "location": {
@@ -392,10 +392,17 @@
           "format": "uuid",
           "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
           "description": "The id of one of the home locations the read offers."
+        },
+        "patchChange": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+          "description": "The id of the patch change whose phase the read showed, homeLocation.patchChange.id. While another phase is open the choice answers 409 HOME_LOCATION_PHASE_CHANGED and moves nothing."
         }
       },
       "required": [
-        "location"
+        "location",
+        "patchChange"
       ]
     },
     "homeLocationChosen": {

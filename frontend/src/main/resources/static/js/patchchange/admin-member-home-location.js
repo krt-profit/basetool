@@ -51,6 +51,14 @@ const MODAL_ID = 'mhl-confirm-modal';
  */
 
 /**
+ * A pick under confirmation, with the phase the content showed when it was made.
+ *
+ * @typedef {object} PendingChoice
+ * @property {PickedLocation} location the picked location
+ * @property {string} patchChangeId the patch change whose phase the content showed
+ */
+
+/**
  * Reads the tab's localized strings.
  *
  * @returns {MemberHomeLocationMessages} the strings; a missing one is reported and shows its key
@@ -99,7 +107,9 @@ function syncPick() {
 /**
  * Wires the admin's member home-location tab (REQ-PATCH-022): the pick of a curated location, the
  * confirmation naming it, the choice on the member's behalf after which the content re-renders in
- * place, and the `patch-change` room the backend announces every relocation and phase end in.
+ * place, and the `patch-change` room the backend announces every relocation and phase end in. The
+ * choice names the phase the content showed; a refusal re-renders the content, so a phase that
+ * changed meanwhile is read again (REQ-PATCH-062).
  */
 function initMemberHomeLocation() {
     const page = document.getElementById('mhl-page');
@@ -138,7 +148,7 @@ function initMemberHomeLocation() {
         receiver: { coalesceMs: 1000 },
     });
 
-    /** @type {PickedLocation | null} */
+    /** @type {PendingChoice | null} */
     let choosing = null;
 
     /** Closes the confirmation and forgets the pick under confirmation. */
@@ -175,7 +185,7 @@ function initMemberHomeLocation() {
         if (!picked) {
             return;
         }
-        choosing = picked;
+        choosing = { location: picked, patchChangeId: target.dataset.patchChangeId || '' };
         confirmText.textContent = format(i18n.confirmText, [
             target.dataset.label || '',
             picked.name,
@@ -192,13 +202,15 @@ function initMemberHomeLocation() {
         sections.write({
             method: 'POST',
             url: pageUrl,
-            payload: { locationId: current.id },
+            payload: { locationId: current.location.id, patchChangeId: current.patchChangeId },
             toast: false,
             errorMessage: i18n.error,
             submitter: confirmSubmit,
             onSuccess(/** @type {ApiDto<'RelocationResultDto'> | null} */ body) {
                 close();
-                showFrontendSuccessToast(relocationSummary(i18n.relocation, body, current.name));
+                showFrontendSuccessToast(
+                    relocationSummary(i18n.relocation, body, current.location.name),
+                );
                 return sections.refresh('history', { broadcast: false });
             },
             onConflict(/** @type {ApiProblem | null} */ problem) {

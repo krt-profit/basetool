@@ -85,6 +85,7 @@ class PatchChangeTriggerIntegrationTest {
   private UUID admin;
   private UUID owner;
   private UUID location;
+  private UUID home;
 
   @BeforeEach
   void setUp() {
@@ -92,6 +93,7 @@ class PatchChangeTriggerIntegrationTest {
     owner = persistUser("patch-owner-");
     location = UUID.randomUUID();
     TestPlaces.insertLocation(jdbc, location, "Patch refinery " + location);
+    home = TestPlaces.insertHomeLocation(jdbc, "Patch home " + UUID.randomUUID());
     Jwt jwt =
         Jwt.withTokenValue("t")
             .header("alg", "none")
@@ -110,6 +112,7 @@ class PatchChangeTriggerIntegrationTest {
     jdbc.update("DELETE FROM patch_change");
     jdbc.update("DELETE FROM refinery_order WHERE owner_id = ?", owner);
     jdbc.update("DELETE FROM app_user WHERE id IN (?, ?)", owner, admin);
+    TestPlaces.deleteLocation(jdbc, home);
   }
 
   @Test
@@ -177,6 +180,30 @@ class PatchChangeTriggerIntegrationTest {
         .hasMessage("error.patch_change.confirmation_mismatch");
     assertThat(history.history()).isEmpty();
     assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.OPEN);
+  }
+
+  @Test
+  void aPromptWithoutASelectableHomeLocationRecordsNothing() {
+    UUID openBefore = persistOrder(RefineryOrderStatus.OPEN, BEFORE);
+    List<UUID> curated =
+        jdbc.queryForList(
+            "UPDATE location SET is_home_location = FALSE WHERE is_home_location RETURNING id",
+            UUID.class);
+    try {
+      assertThatThrownBy(() -> trigger.trigger(request("0.1", LIVE_AT)))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("error.patch_change.no_home_location_offered");
+      assertThat(history.history()).isEmpty();
+      assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.OPEN);
+
+      PatchChangeOptions withoutPrompt = new PatchChangeOptions(Set.of(), true, false, false);
+      trigger.trigger(
+          new TriggerPatchChangeRequest("0.1", PatchKind.REBUILD, LIVE_AT, withoutPrompt, "0.1"));
+      assertThat(history.history()).extracting(PatchChangeDto::label).containsExactly("0.1");
+    } finally {
+      curated.forEach(
+          id -> jdbc.update("UPDATE location SET is_home_location = TRUE WHERE id = ?", id));
+    }
   }
 
   @Test

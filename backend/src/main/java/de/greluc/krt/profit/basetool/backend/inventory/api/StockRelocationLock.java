@@ -32,6 +32,11 @@ import org.jetbrains.annotations.Unmodifiable;
  * home-location phase is open, the rows created before its live time, or without a creation time,
  * of a holder who has not chosen yet. Implemented by the patch-change module; each call joins the
  * caller's transaction.
+ *
+ * <p>A write reads the phase through {@link #writeCutoff()} or {@link #requireWritable}: fresh,
+ * under the patch-change history's lock held until the transaction ends (REQ-PATCH-064). Once a
+ * transaction has, every other call answers by the same phase; before, a call answers by the phase
+ * read once per request.
  */
 public interface StockRelocationLock {
 
@@ -42,6 +47,17 @@ public interface StockRelocationLock {
    */
   @NotNull
   Optional<Instant> openPhaseLiveAt();
+
+  /**
+   * Returns the cutoff below which the current caller's write is judged, read for the write.
+   *
+   * @return the open phase's live time, or empty while no phase is open or when the lock never
+   *     refuses the caller: a patch change's own write, work without a caller, an admin on the web
+   * @throws RuntimeException a {@code 409} problem while a trigger, a phase end or a label
+   *     correction holds the patch-change history
+   */
+  @NotNull
+  Optional<Instant> writeCutoff();
 
   /**
    * Returns the holders among the given ones who must still relocate in the open phase.

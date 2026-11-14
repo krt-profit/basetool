@@ -64,6 +64,18 @@ public interface PatchChangeRepository extends JpaRepository<PatchChange, UUID> 
   int lockHistoryShared();
 
   /**
+   * Tries the history's lock in shared mode without waiting, for a write the relocation lock judges
+   * (REQ-PATCH-064): it fails while a trigger, a phase end or a label correction holds the lock or
+   * waits for it, so such a write never waits behind them while it holds other locks.
+   *
+   * @return {@code true} when the transaction holds the lock now
+   */
+  @Query(
+      value = "SELECT pg_try_advisory_xact_lock_shared(" + HISTORY_LOCK_SPACE + ", 0)",
+      nativeQuery = true)
+  boolean tryLockHistoryShared();
+
+  /**
    * Returns the latest patch change that asked for a new home location, the only one whose phase
    * can be open (REQ-PATCH-024).
    *

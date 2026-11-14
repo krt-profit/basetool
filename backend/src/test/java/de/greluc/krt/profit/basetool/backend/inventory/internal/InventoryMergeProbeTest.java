@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
+import de.greluc.krt.profit.basetool.backend.support.FixedMergeCutoff;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,7 +79,7 @@ class InventoryMergeProbeTest {
         orgUnitStampingService,
         inventoryAccessPolicy,
         new InventoryProperties(enabled),
-        _ -> Optional.empty());
+        FixedMergeCutoff.none());
   }
 
   @Test

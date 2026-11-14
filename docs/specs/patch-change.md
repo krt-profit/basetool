@@ -7,7 +7,9 @@
 > (REQ-PATCH-020…029), the profile setting „Meine Home Location“ as form default
 > (REQ-PATCH-030…033), the currency wipe (REQ-PATCH-040…046) and the exchange resource with the
 > home-location choice through a client and the patch change named in stale pushes
-> (REQ-PATCH-050…054), also on org-stock entries (REQ-PATCH-057).
+> (REQ-PATCH-050…054), also on org-stock entries (REQ-PATCH-057), the choice bound to the phase it
+> was made on (REQ-PATCH-062), the recovery of a phase without a home location on offer
+> (REQ-PATCH-063) and the writes serialized with the phase's transitions (REQ-PATCH-064).
 > **Related ADRs:** [ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md),
 > [ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md),
 > [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md),
@@ -503,7 +505,8 @@ request, in sessions already open as well:
   handshake is marked (`SessionGateHandoff`) and closed with the terminal code `4003`;
 - the backend's `HomeLocationGate`, run by `SessionGateAccessFilter`, refuses every other `/api/**`
   call of the member's web session with `403 HOME_LOCATION_REQUIRED`, leaving open the gate's own
-  endpoints, the caller's `/api/v1/users/me` and the endpoints the consent gate leaves open;
+  endpoints, the caller's `/api/v1/users/me` and the endpoints the consent gate leaves open, and to
+  an admin the phase's recovery (REQ-PATCH-063);
 - when a trigger opens a phase, the asked members' notification streams close after the commit, so
   their open pages reconnect through the gate and are handed off to the page at once.
 
@@ -542,7 +545,8 @@ creation time), members with nothing to relocate included; an account created la
 Only the **admin-curated home locations** are offered: locations with the home-location flag, not
 hidden and not reference-only, as the hangar's home-location picker lists them, each with the star
 system of its city or station. The admin's form lists them under the home-location switch, links to
-their curation and warns while the switch is on and the list is empty.
+their curation and warns while the switch is on and the list is empty; the trigger then refuses
+(REQ-PATCH-063).
 
 The member's page (variant A of the prototype) shows a greeting banner with the patch label, the
 curated locations as selectable cards and the table „Was umzieht“: per current location the stock
@@ -574,7 +578,8 @@ choice in the same phase is refused with `409 HOME_LOCATION_ALREADY_CHOSEN`
 (`error.patch_change.already_relocated`), a choice without an open phase, or by a member the phase
 does not ask, with `409 HOME_LOCATION_NOT_ASKED` (`error.patch_change.phase_not_open`,
 `error.patch_change.not_asked`), a location not on offer with `400 HOME_LOCATION_NOT_OFFERED`
-(`error.patch_change.home_location_not_offered`); the web and the exchange share the codes
+(`error.patch_change.home_location_not_offered`), a choice for another phase than the open one
+with `409 HOME_LOCATION_PHASE_CHANGED` (REQ-PATCH-062); the web and the exchange share the codes
 (`HomeLocationChoiceRefusedException`). There is no undo; later corrections use the ordinary
 rebooks.
 
@@ -583,7 +588,8 @@ An admin chooses on a member's behalf from the member's admin tab „Home Locati
 the same relocation. The choice is part of the member's Art. 15 export (`homeLocationChoices`).
 
 Endpoints: `GET`/`POST /api/v1/patch-changes/me/home-location` (any member) and
-`GET`/`POST /api/v1/patch-changes/admin/members/{userId}/home-location` (`ROLE_ADMIN`).
+`GET`/`POST /api/v1/patch-changes/admin/members/{userId}/home-location` (`ROLE_ADMIN`); a choice
+names `locationId` and `patchChangeId`, the phase the prompt showed.
 
 **Acceptance**
 
@@ -610,12 +616,14 @@ member.
   refused.
 
 The Lager holds every write to an existing row against the lock: its rows' entity listener notes
-each row Hibernate updates or deletes in a writing transaction, and before the commit, once the
-last changes are flushed, a changed row from before the live time is checked
-(`inventory.api.StockRelocationLock`, implemented by this module). A row a write only reads is never
-refused; a bulk statement, which flushes no entity, is not seen. The hangar checks a ship edit, a
-unit change and a delete (`hangar.api.ShipRelocationLock`); an officer's fitted reset leaves the
-ships the lock keeps from the caller as they are and counts only the ships it cleared.
+each row Hibernate updates or deletes in a writing transaction, and the row of each earmark or
+donation pledge it inserts, updates or deletes, since such a write changes no column of the row;
+before the commit, once the last changes are flushed, a changed row from before the live time is
+checked (`inventory.api.StockRelocationLock`, implemented by this module). A row a write only reads
+is never refused; a bulk statement, which flushes no entity, is not seen. The hangar checks a ship
+edit, a unit change and a delete (`hangar.api.ShipRelocationLock`); an officer's fitted reset
+leaves the ships the lock keeps from the caller as they are and counts only the ships it cleared.
+Every such check reads the phase for the write (REQ-PATCH-064).
 
 Others see the lock where they meet another member's stock and ships: a locked row, and a stack
 or ship of a pending holder, carries the chip „Umzug ausstehend" with the explanation — in the
@@ -632,6 +640,8 @@ follow without a reload.
 - [x] Another member's web write to a locked row and an exchange client's write to a locked row or
   ship are refused with `RELOCATION_PENDING`; the holder and an admin may write; a row created after
   the live time stays editable; after the relocation the lock is gone.
+- [x] Another member's change or removal of an earmark on a locked row is refused with
+  `RELOCATION_PENDING`; the holder may change it.
 - [x] An officer's fitted reset leaves the locked ships of a pending owner fitted.
 - [x] Another member's locked row shows „Umzug ausstehend" with its actions disabled and
   explained; an admin sees the chip and keeps the actions; the unit hangar overview and the admin
@@ -641,7 +651,8 @@ follow without a reload.
 `HangarRelocationGuardTest`, `HangarServiceTest`, `ShipRepositoryPersonalHangarTest`,
 `InventoryRelocationMarkerRenderTest`, `HangarPagePatternRenderTest`,
 `MemberHangarPageControllerTest` · **Code:** `RelocationLocks`, `InventoryRelocationGuard`,
-`InventoryRelocationListener`, `InventoryRelocationMarks`, `HangarRelocationGuard`,
+`InventoryRelocationListener`, `InventorySliceRelocationListener`, `InventoryRelocationMarks`,
+`HangarRelocationGuard`,
 `ShipRelocationScope`, `RelocationPendingException`, `PatchChangeProblemCode`
 
 ### REQ-PATCH-024 — The home-location phase: open, ended early, superseded
@@ -654,9 +665,10 @@ change with the option on can hold an open phase:
   a member who chose for the earlier phase is asked again too, because the game delivered again;
 - a later patch change **without** the option leaves the open phase open;
 - an **admin may end** the open phase early („Abfrage beenden“ in the history,
-  `POST /api/v1/patch-changes/admin/{id}/phase-end`); the gate and the lock end for every member
-  who has not chosen, and nothing more relocates in it. Ending writes only the phase's columns,
-  under the history's lock, so it never collides with a label correction.
+  `POST /api/v1/patch-changes/admin/{id}/phase-end`), also while the gate holds the admin
+  (REQ-PATCH-063); the gate and the lock end for every member who has not chosen, and nothing more
+  relocates in it. Ending writes only the phase's columns, under the history's lock, so it never
+  collides with a label correction.
 
 The history shows the phase as a chip: „offen · x / y umgezogen“, „abgelöst“ or „beendet“.
 
@@ -704,7 +716,8 @@ A relocation is one transaction per member, opened inside `PatchChangeWrites.run
 patch change:
 
 1. take the patch-change history's lock in shared mode, so relocations run side by side but never
-   beside a trigger or a phase end, and re-check that the phase is still the open one;
+   beside a trigger or a phase end, and check that the phase the prompt showed is still the open
+   one (REQ-PATCH-062);
 2. claim the member's relocation (`INSERT … ON CONFLICT DO NOTHING`): a concurrent second choice
    waits for the first and then finds the key taken;
 3. take the shared hierarchy lock (REQ-ORDERS-055), then the advisory locks of every affected lot,
@@ -1154,16 +1167,18 @@ read; an admin role widens nothing.
 
 Under the capability `exchange.patch.write`, which the registry grants only together with
 `exchange.patch.read` (`error.exchange.client.patchWriteNeedsRead`),
-`POST /exchange/v1/me/patch-change/home-location` with `{"location": "<id>"}` makes the member's
+`POST /exchange/v1/me/patch-change/home-location` with `{"location": "<id>", "patchChange": "<id>"}`,
+the phase the client's read showed (REQ-PATCH-062), makes the member's
 choice with the rules of REQ-PATCH-021 and REQ-PATCH-022 and runs the same relocation in the same
 request (REQ-PATCH-025, REQ-PATCH-026), recorded as chosen by `CLIENT`, and the member's setting
 „Meine Home Location“ follows the choice as for any other (REQ-PATCH-031); the audit event
 `PATCH_CHANGE_RELOCATED` names the client in `client` (REQ-PATCH-027). A second choice answers
 `409 HOME_LOCATION_ALREADY_CHOSEN`, a choice without an open phase asking the member
-`409 HOME_LOCATION_NOT_ASKED`, a location not on offer `400 HOME_LOCATION_NOT_OFFERED`; nothing
+`409 HOME_LOCATION_NOT_ASKED`, a choice for another phase than the open one
+`409 HOME_LOCATION_PHASE_CHANGED`, a location not on offer `400 HOME_LOCATION_NOT_OFFERED`; nothing
 moves then. The request needs an `Idempotency-Key` and counts one write against the daily quota
 (REQ-XCH-020); the answer names the chosen location and the moved row and ship counts. The
-gateway passes the three codes on with fixed details (`ExchangeRelay.DETAILS`).
+gateway passes the four codes on with fixed details (`ExchangeRelay.DETAILS`).
 
 **Acceptance**
 
@@ -1266,3 +1281,97 @@ wire changes.
 `OrgStockRefusals`, `OrgStockExecutor`, `OrgStockPlan.PoolWrite#entry`,
 `ExchangePatchRemovals#latestPatchChangeOfOrgEntry`, `ExchangeChangeRepository#findLatestForOrgEntry`,
 `V429`
+
+### REQ-PATCH-062 — A home-location choice is bound to the phase its prompt showed
+
+Every choice names the phase the prompt showed: the member's page and the admin's member tab send
+`patchChangeId` with `locationId`, an exchange client `patchChange` with `location`. The relocation
+compares it under the history's shared lock, before it claims the member's relocation
+(REQ-PATCH-026); while another phase is open, because a later patch change asked again
+(REQ-PATCH-024), the choice is refused with `409 HOME_LOCATION_PHASE_CHANGED`
+(`error.patch_change.phase_changed`) and nothing moves, so a choice made on an older prompt never
+relocates what a newer phase asks about. Without any open phase the refusal stays
+`409 HOME_LOCATION_NOT_ASKED`.
+
+The client reads the prompt again: the member's page reloads with a notice that a new prompt runs
+(`/home-location?phaseChanged=true`), the admin's member tab shows the reason and re-renders its
+content in place, an exchange client reads the patch change again. In the exchange schema
+`patchChange` is required; the resource is new in `v1` and was never released without it.
+
+**Acceptance**
+
+- [x] A choice for a superseded phase is refused with `HOME_LOCATION_PHASE_CHANGED` and moves
+  nothing; the same choice for the open phase relocates the member.
+- [x] An exchange client's choice for another phase answers `409 HOME_LOCATION_PHASE_CHANGED`; the
+  gateway refuses a choice without `patchChange` with `400 SCHEMA_INVALID` before the relay.
+- [x] The member's page sends the phase it shows and reads the prompt again after the conflict.
+
+**Enforced by:** `HomeLocationRelocationIntegrationTest`, `ExchangePatchChangeControllerTest`,
+`ExchangePatchChangeRouteTest`, `HomeLocationPageControllerMvcTest`, `testHomeLocationJs` ·
+**Code:** `MemberRelocations`, `ChooseHomeLocationRequest` (both modules),
+`ExchangeHomeLocationChoiceRequest`, `HomeLocationChoiceRefusedException`,
+`patch-change.schema.json#/$defs/homeLocationChoice`, `static/js/patchchange/home-location.js`,
+`static/js/patchchange/admin-member-home-location.js`
+
+### REQ-PATCH-063 — A phase always has a home location on offer or a way out
+
+A trigger with the home-location prompt on is refused with `400`
+(`error.patch_change.no_home_location_offered`) while no curated home location is on offer
+(REQ-PATCH-021); nothing is recorded. The admin switches the prompt off or curates a location
+first.
+
+When the last offered location is hidden or loses its flag during an open phase, a pending admin
+keeps the way out, because the gate holds admins too. The gate leaves open, to a caller with
+`ROLE_ADMIN` only, the phase's recovery: on the backend the admin patch-change endpoints
+(`/api/v1/patch-changes/admin`, `…/form`, `…/preview`, `…/{id}/label`, `…/{id}/phase-end`) and
+the location curation (`/api/v1/locations`, `/api/v1/locations/{id}`), on the frontend the pages
+below `/admin/settings/patch-change` and `/admin/locations`. The admin ends the phase early
+(REQ-PATCH-024) or curates a location and then chooses. Both sides express this through the
+gate's admin exemptions (`SessionGate#adminExemptPaths`, `SessionGate#adminPages`, ADR-0385); a
+member without the admin role stays held there. An admin recovery page counts as a gate page for
+the admin: its sections fall back on a gate refusal, and the browser is not handed off from it
+again. The member page shows a pending admin the two ways when nothing is on offer.
+
+**Acceptance**
+
+- [x] A trigger with the prompt on and no curated home location records nothing; without the prompt
+  it records the patch change.
+- [x] A pending admin reaches the phase end and the location curation on both sides; a pending
+  member is refused there, and an admin reaches nothing else.
+- [x] The member page shows a pending admin the ways out when nothing is on offer, and a member
+  none.
+
+**Enforced by:** `PatchChangeTriggerIntegrationTest`, `HomeLocationGateTest` (frontend and
+backend), `SessionGateAccessFilterTest`, `SessionGateFilterTest`, `HomeLocationPageControllerMvcTest`,
+`testKrtFetchReadJs` · **Code:** `PatchChangeTrigger`, `HomeLocationOffer#requireAnyOffered`,
+`HomeLocationGate` (both modules), `SessionGate` (both modules), `SessionGateAccessFilter`,
+`SessionGates`, `LayoutMiscAdvice#sessionGatePage`, `krt-fetch.js`,
+`templates/patchchange/home-location.html`
+
+### REQ-PATCH-064 — Writes the lock judges are serialized with the phase's transitions
+
+A write that decides by the open phase reads it fresh, under the patch-change history's lock in
+shared mode, which its transaction holds until it ends; it never takes the phase the session gate
+read for the request. That covers the Lager's before-commit guard (REQ-PATCH-023), the merge cutoff
+of a write-time merge (REQ-PATCH-004), and the hangar's ship edit, unit change, delete and fitted
+reset. A trigger or a phase end, which take the lock exclusively, therefore never commits between a
+write's check and its commit: the fitted reset leaves exactly the ships the lock kept when it
+counted them. Every later read of the write's transaction answers by the same phase.
+
+The trigger and the relocation take the history first, before the Profit hierarchy, the material
+scopes, the lots, the rows and the ships. A write takes it without waiting and refuses with `409`
+(`error.patch_change.history_busy`) while a trigger, a phase end or a label correction holds the
+history or waits for it, so a write holding other locks never waits behind the trigger and the
+order cannot deadlock. A write that does not consult the phase takes no history lock.
+
+**Acceptance**
+
+- [x] A write after a trigger in the same request judges the lock by the new phase, not by the
+  phase the request read before.
+- [x] While another transaction holds the history exclusively, a write that judges the lock is
+  refused with `error.patch_change.history_busy`; afterwards it is judged by the lock.
+
+**Enforced by:** `HomeLocationRelocationIntegrationTest`, `PatchChangeMergeCutoffTest`,
+`HangarRelocationGuardTest` · **Code:** `HomeLocationPhases#openForWrite`,
+`PatchChangeRepository#tryLockHistoryShared`, `RelocationLocks#writeCutoff`,
+`PatchChangeMergeCutoff#cutoffForWrite`, `InventoryRelocationGuard`, `HangarRelocationGuard`

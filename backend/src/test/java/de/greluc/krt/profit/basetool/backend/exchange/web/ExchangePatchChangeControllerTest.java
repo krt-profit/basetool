@@ -289,7 +289,7 @@ class ExchangePatchChangeControllerTest {
         home);
     jdbc.update("UPDATE material SET name = ? WHERE id = ?", materialName, material);
     row(port, null);
-    trigger();
+    PatchChangeDto recorded = trigger();
 
     mockMvc
         .perform(relayed(get(PATH), READ))
@@ -302,7 +302,7 @@ class ExchangePatchChangeControllerTest {
         .andExpect(
             jsonPath("$.patchChange.options.wipeExceptions[0].entry.name")
                 .value(materialName.substring(0, FEED_NAME)));
-    choose(home)
+    choose(home, recorded.id())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.location.name").value(homeName))
         .andExpect(jsonPath("$.location.system").value(system));
@@ -329,7 +329,7 @@ class ExchangePatchChangeControllerTest {
     UUID own = row(port, null);
     PatchChangeDto recorded = trigger();
 
-    choose(home)
+    choose(home, recorded.id())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.location.id").value(home.toString()))
         .andExpect(jsonPath("$.location.system").value("Stanton"))
@@ -355,7 +355,7 @@ class ExchangePatchChangeControllerTest {
         .contains("chosenBy=CLIENT")
         .contains("client=" + client)
         .contains("patchChange=" + recorded.id());
-    choose(home)
+    choose(home, recorded.id())
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("HOME_LOCATION_ALREADY_CHOSEN"));
     mockMvc
@@ -368,13 +368,13 @@ class ExchangePatchChangeControllerTest {
 
   @Test
   void aChoiceWithoutAnOpenPhaseOrOfALocationNotOnOfferIsRefused() throws Exception {
-    choose(home)
+    choose(home, UUID.randomUUID())
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("HOME_LOCATION_NOT_ASKED"));
 
-    trigger();
+    PatchChangeDto recorded = trigger();
 
-    choose(port)
+    choose(port, recorded.id())
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("HOME_LOCATION_NOT_OFFERED"));
     assertThat(
@@ -383,6 +383,20 @@ class ExchangePatchChangeControllerTest {
                 Long.class,
                 member))
         .isZero();
+  }
+
+  @Test
+  void aChoiceForAPhaseThatIsNoLongerTheOpenOneIsAConflict() throws Exception {
+    UUID own = row(port, null);
+    trigger();
+
+    choose(home, UUID.randomUUID())
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("HOME_LOCATION_PHASE_CHANGED"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT location_id FROM inventory_item WHERE id = ?", UUID.class, own))
+        .isEqualTo(port);
   }
 
   @Test
@@ -395,7 +409,7 @@ class ExchangePatchChangeControllerTest {
         .perform(
             relayed(post(CHOICE), READ)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(choice(home)))
+                .content(choice(home, UUID.randomUUID())))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
   }
@@ -404,7 +418,7 @@ class ExchangePatchChangeControllerTest {
   void aPushAgainstALotThePatchChangeMovedIsRemovedElsewhereWithThePatchChange() throws Exception {
     row(port, null);
     PatchChangeDto recorded = trigger();
-    choose(home).andExpect(status().isOk());
+    choose(home, recorded.id()).andExpect(status().isOk());
 
     mockMvc
         .perform(
@@ -431,7 +445,7 @@ class ExchangePatchChangeControllerTest {
     row(port, null);
     row(port, null, Instant.now());
     PatchChangeDto recorded = trigger();
-    choose(home).andExpect(status().isOk());
+    choose(home, recorded.id()).andExpect(status().isOk());
 
     mockMvc
         .perform(
@@ -465,7 +479,7 @@ class ExchangePatchChangeControllerTest {
         port,
         Timestamp.from(BEFORE));
     PatchChangeDto recorded = trigger();
-    choose(home).andExpect(status().isOk()).andExpect(jsonPath("$.ships").value(1));
+    choose(home, recorded.id()).andExpect(status().isOk()).andExpect(jsonPath("$.ships").value(1));
 
     mockMvc
         .perform(
@@ -556,24 +570,27 @@ class ExchangePatchChangeControllerTest {
    * Posts the member's choice with both patch scopes.
    *
    * @param location the chosen location
+   * @param patchChange the patch change whose phase the client showed
    * @return the result
    * @throws Exception if the request fails
    */
-  private @NotNull ResultActions choose(@NotNull UUID location) throws Exception {
+  private @NotNull ResultActions choose(@NotNull UUID location, @NotNull UUID patchChange)
+      throws Exception {
     return mockMvc.perform(
         relayed(post(CHOICE), BOTH)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(choice(location)));
+            .content(choice(location, patchChange)));
   }
 
   /**
    * Renders a choice body.
    *
    * @param location the chosen location
+   * @param patchChange the patch change whose phase the client showed
    * @return the body
    */
-  private static @NotNull String choice(@NotNull UUID location) {
-    return "{\"location\":\"" + location + "\"}";
+  private static @NotNull String choice(@NotNull UUID location, @NotNull UUID patchChange) {
+    return "{\"location\":\"" + location + "\",\"patchChange\":\"" + patchChange + "\"}";
   }
 
   /**

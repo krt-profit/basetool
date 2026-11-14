@@ -388,8 +388,10 @@ The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-0
    reads the same prompt with the latest patch change and its wipe list through
    `GET /exchange/v1/me/patch-change` and may send the choice through
    `POST …/home-location`, which runs the same step 3 recorded as `CLIENT` (REQ-PATCH-050…052).
-3. The choice opens one transaction inside `PatchChangeWrites.runFor` of the phase. It takes the
-   history's lock in shared mode and re-checks the phase, claims the member's
+3. The choice names the phase its prompt showed and opens one transaction inside
+   `PatchChangeWrites.runFor` of that phase. It takes the history's lock in shared mode and refuses
+   with `409 HOME_LOCATION_PHASE_CHANGED` unless the named phase is the open one (REQ-PATCH-062),
+   claims the member's
    `patch_change_relocation` row, takes the shared hierarchy lock, the lot locks of the old and new
    lot keys in ascending order and the rows, moves the rows in place with a new version, then locks
    the member's ships and moves them.

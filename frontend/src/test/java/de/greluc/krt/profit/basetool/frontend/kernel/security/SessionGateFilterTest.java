@@ -143,6 +143,33 @@ class SessionGateFilterTest {
   }
 
   @Test
+  void aGateLeavesItsAdminPagesOpenToAnAdminAndToNobodyElse() throws Exception {
+    second.adminPages("/second-repair/**").holding(true);
+    SessionGateFilter repairing =
+        new SessionGateFilter(new SessionGates(List.of(first, second)), new MockEnvironment());
+
+    assertThat(invoke(repairing, "/second-repair/7", mock(FilterChain.class)).getRedirectedUrl())
+        .isEqualTo("/second");
+
+    signInAsAdmin();
+    assertThat(invoke(repairing, "/second-repair/7", mock(FilterChain.class)).getRedirectedUrl())
+        .isNull();
+    assertThat(invoke(repairing, "/missions", mock(FilterChain.class)).getRedirectedUrl())
+        .isEqualTo("/second");
+  }
+
+  @Test
+  void anAdminPageIsAGatePageForAnAdminOnly() {
+    second.adminPages("/second-repair/**");
+    SessionGates repairing = new SessionGates(List.of(first, second));
+
+    assertThat(repairing.isGatePage("/second-repair")).isFalse();
+    signInAsAdmin();
+    assertThat(repairing.isGatePage("/second-repair")).isTrue();
+    assertThat(repairing.isGatePage("/missions")).isFalse();
+  }
+
+  @Test
   void theListAnswersForTheGatePagesTheRefusalsAndTheCachedVerdicts() {
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
 
@@ -155,6 +182,14 @@ class SessionGateFilterTest {
     assertThat(gates.anyKnownHolding(request)).isFalse();
     second.knownHolding(true);
     assertThat(gates.anyKnownHolding(request)).isTrue();
+  }
+
+  /** Signs the test's member in as an admin. */
+  private static void signInAsAdmin() {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                "admin", "n/a", AuthorityUtils.createAuthorityList("ROLE_ADMIN")));
   }
 
   /**

@@ -210,6 +210,10 @@ public class ExchangeRelay {
               "The member has chosen the home location for this patch change already; the choice"
                   + " is final."),
           Map.entry(
+              "HOME_LOCATION_PHASE_CHANGED",
+              "Another home-location phase is open than the one the choice names; read the patch"
+                  + " change again; nothing was moved."),
+          Map.entry(
               "HOME_LOCATION_NOT_OFFERED",
               "The location is not one of the home locations on offer; nothing was moved."),
           Map.entry(

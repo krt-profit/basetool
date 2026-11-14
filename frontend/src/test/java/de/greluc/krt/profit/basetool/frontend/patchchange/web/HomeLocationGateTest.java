@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBack
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationStatusDto;
 import jakarta.servlet.FilterChain;
 import java.util.List;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,6 +97,29 @@ class HomeLocationGateTest {
 
     assertThat(response.getRedirectedUrl()).isEqualTo("/home-location");
     verify(filterChain, never()).doFilter(any(), any());
+  }
+
+  @Test
+  void leavesThePhaseRecoveryOpenToAPendingAdminOnly() throws Exception {
+    stubRequired(true);
+
+    assertThat(invoke(request("GET", "/admin/settings/patch-change")).getRedirectedUrl())
+        .isEqualTo("/home-location");
+
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                "admin", "n/a", AuthorityUtils.createAuthorityList("ROLE_ADMIN")));
+    for (String path :
+        new String[] {
+          "/admin/settings/patch-change",
+          "/admin/settings/patch-change/" + UUID.randomUUID() + "/phase-end",
+          "/admin/locations",
+          "/admin/locations/" + UUID.randomUUID() + "/toggle-home-location"
+        }) {
+      assertThat(invoke(request("GET", path)).getRedirectedUrl()).as(path).isNull();
+    }
+    assertThat(invoke(request("GET", "/missions")).getRedirectedUrl()).isEqualTo("/home-location");
   }
 
   @Test

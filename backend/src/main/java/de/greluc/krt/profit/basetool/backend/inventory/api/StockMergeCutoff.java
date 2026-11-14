@@ -42,4 +42,17 @@ public interface StockMergeCutoff {
    */
   @NotNull
   Optional<Instant> cutoffFor(@NotNull UUID holderId);
+
+  /**
+   * Returns the instant before which a holder's rows never merge, for a merge the current writing
+   * transaction runs: read fresh under the patch-change history's lock held until the transaction
+   * ends, so no patch change opens a phase before the merge commits (REQ-PATCH-064).
+   *
+   * @param holderId the member whose rows the merge touches
+   * @return the cutoff as {@link #cutoffFor} answers it
+   * @throws RuntimeException a {@code 409} problem while a trigger, a phase end or a label
+   *     correction holds the patch-change history
+   */
+  @NotNull
+  Optional<Instant> cutoffForWrite(@NotNull UUID holderId);
 }

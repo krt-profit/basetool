@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.support.FixedMergeCutoff;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -63,7 +64,11 @@ class InventoryMergeCutoffTest {
   void setUp() {
     service =
         new InventoryMergeService(
-            orderWrites, repository, offers, auditRecorder, _ -> Optional.of(CUTOFF));
+            orderWrites,
+            repository,
+            offers,
+            auditRecorder,
+            new FixedMergeCutoff(_ -> Optional.of(CUTOFF)));
   }
 
   @Test
@@ -92,7 +97,7 @@ class InventoryMergeCutoffTest {
   void aHolderWithoutACutoffMergesEveryRowDatedOrNot() {
     InventoryMergeService unrestricted =
         new InventoryMergeService(
-            orderWrites, repository, offers, auditRecorder, _ -> Optional.empty());
+            orderWrites, repository, offers, auditRecorder, FixedMergeCutoff.none());
     InventoryItem undated = pieceRow(null);
     when(repository.findMergeGroupForUpdate(
             eq(undated.getUser().getId()),
@@ -120,7 +125,8 @@ class InventoryMergeCutoffTest {
             repository,
             offers,
             auditRecorder,
-            asked -> asked.equals(holder) ? Optional.of(CUTOFF) : Optional.empty());
+            new FixedMergeCutoff(
+                asked -> asked.equals(holder) ? Optional.of(CUTOFF) : Optional.empty()));
 
     InventoryItem result = perHolder.mergeStockIfRequested(prePatch, false);
 

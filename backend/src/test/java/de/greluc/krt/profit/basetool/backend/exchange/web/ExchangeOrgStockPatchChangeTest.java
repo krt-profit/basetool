@@ -204,7 +204,8 @@ class ExchangeOrgStockPatchChangeTest {
         .perform(
             relayed(post(CHOICE), PATCH_BOTH, holder)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"location\":\"" + home + "\"}"))
+                .content(
+                    "{\"location\":\"" + home + "\",\"patchChange\":\"" + recorded.id() + "\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.rows").value(1));
 

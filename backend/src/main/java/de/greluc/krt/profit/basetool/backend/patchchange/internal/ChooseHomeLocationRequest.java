@@ -23,8 +23,10 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * A member's home-location choice (REQ-PATCH-022).
+ * A member's home-location choice (REQ-PATCH-022, REQ-PATCH-062).
  *
  * @param locationId one of the curated home locations on offer
+ * @param patchChangeId the patch change whose phase the prompt showed; a choice while another phase
+ *     is open is refused
  */
-public record ChooseHomeLocationRequest(@NotNull UUID locationId) {}
+public record ChooseHomeLocationRequest(@NotNull UUID locationId, @NotNull UUID patchChangeId) {}

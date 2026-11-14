@@ -154,8 +154,17 @@ phase, **final**. The request needs an `Idempotency-Key` and counts one unit of 
 quota ([limits](../sync-guide.md#rate-limits-quota-and-back-off)). Send it only after the member
 picked the location; never choose on the member's behalf.
 
+The choice names the location and the phase the member saw: `patchChange` is the
+`homeLocation.patchChange.id` of the read the member chose from. When another phase is open by then,
+because a later patch change asked again or an admin ended the phase, the choice answers
+`409 HOME_LOCATION_PHASE_CHANGED` and moves nothing: read the patch change again and let the member
+choose from the new prompt.
+
 ```json
-{ "location": "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f" }
+{
+  "location": "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+  "patchChange": "3f0c2b1a-9e8d-4c7b-a6f5-e4d3c2b1a098"
+}
 ```
 
 The Basetool relocates the member in the same request and answers with the chosen location and
@@ -217,9 +226,10 @@ names it for no entry. Every other gone entry stays `NOT_PERMITTED`.
 
 | Code | When |
 | --- | --- |
-| `400 SCHEMA_INVALID` | The choice names no location, or its `location` is no id. |
+| `400 SCHEMA_INVALID` | The choice names no location or no `patchChange`, or one of them is no id. |
 | `400 HOME_LOCATION_NOT_OFFERED` | The location is not one of the home locations on offer; nothing moved. |
 | `403 SCOPE_MISSING` | Reading without `exchange.patch.read`, or choosing without `exchange.patch.write`. |
 | `409 HOME_LOCATION_ALREADY_CHOSEN` | The member chose in this phase already, anywhere; the choice is final. |
 | `409 HOME_LOCATION_NOT_ASKED` | No open phase asks the member: none is open, an admin ended it, or the account was created after the live time. |
+| `409 HOME_LOCATION_PHASE_CHANGED` | Another phase is open than the one `patchChange` names, after a later patch change asked again; nothing moved. Read the patch change again. |
 | `409 RELOCATION_PENDING` | Not from this resource: a change set on the stock or ship feeds that writes a locked lot or ship while the member is `PENDING` ([errors](../errors.md#request-errors)). |

@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.kernel.security;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * A step a member must take before the frontend serves their session, such as accepting the Terms
@@ -40,6 +42,17 @@ public interface SessionGate {
    */
   @NotNull
   String pagePath();
+
+  /**
+   * Returns the pages the gate leaves open to an admin it holds, so an admin can still repair what
+   * the gate's step depends on (REQ-PATCH-063); they count as the gate's pages for an admin and
+   * stay held for anyone else.
+   *
+   * @return the pages as context-relative path patterns, none by default
+   */
+  default @NotNull @Unmodifiable List<String> adminPages() {
+    return List.of();
+  }
 
   /**
    * Returns the response header that names the gate's page to an AJAX caller.

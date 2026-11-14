@@ -57,6 +57,6 @@ class InventoryRelocationListener {
   @PreUpdate
   @PreRemove
   void changing(@NotNull InventoryItem row) {
-    guard.getObject().changed(row.getUser().getId(), row.getCreatedAt());
+    guard.getObject().changed(row);
   }
 }

@@ -81,7 +81,7 @@ public class ExchangePatchChangeController {
   /**
    * Makes the member's home-location choice and relocates the member.
    *
-   * @param body the chosen home location
+   * @param body the chosen home location and the patch change whose phase the client showed
    * @param authentication the relayed acting member the gate admitted
    * @return the chosen home location and what moved
    */
@@ -92,18 +92,23 @@ public class ExchangePatchChangeController {
       summary = "Exchange: choose my home location",
       description =
           "Gateway-only. The web's rules: only a curated home location on offer, once per member"
-              + " and phase, final. Runs the member's relocation in this request. No open phase"
-              + " asking the member answers 409 HOME_LOCATION_NOT_ASKED, a second choice 409"
-              + " HOME_LOCATION_ALREADY_CHOSEN, a location not on offer 400"
-              + " HOME_LOCATION_NOT_OFFERED.")
+              + " and phase, final, for the phase of the patch change the body names. Runs the"
+              + " member's relocation in this request. No open phase asking the member answers 409"
+              + " HOME_LOCATION_NOT_ASKED, another open phase than the named one 409"
+              + " HOME_LOCATION_PHASE_CHANGED, a second choice 409 HOME_LOCATION_ALREADY_CHOSEN, a"
+              + " location not on offer 400 HOME_LOCATION_NOT_OFFERED.")
   @ApiResponse(responseCode = "200", description = "The chosen home location and what moved")
   @ApiResponse(responseCode = "400", description = "The location is not on offer")
-  @ApiResponse(responseCode = "409", description = "No open phase asks the member, or chosen")
+  @ApiResponse(
+      responseCode = "409",
+      description = "No open phase asks the member, another phase is open, or chosen")
   public ResponseEntity<ExchangeHomeLocationChosenDto> chooseHomeLocation(
       @NotNull @Valid @RequestBody ExchangeHomeLocationChoiceRequest body,
       @NotNull Authentication authentication) {
     return ResponseEntity.ok(
         patchChanges.choose(
-            ExchangeCaller.of((SubjectAuthentication) authentication), body.location()));
+            ExchangeCaller.of((SubjectAuthentication) authentication),
+            body.patchChange(),
+            body.location()));
   }
 }

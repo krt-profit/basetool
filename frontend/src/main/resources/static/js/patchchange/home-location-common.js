@@ -21,6 +21,25 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { format } from '/js/patchchange/patch-change-messages.js';
 
+/** The code of a choice made for a phase that is no longer the open one (REQ-PATCH-062). */
+const PHASE_CHANGED = 'HOME_LOCATION_PHASE_CHANGED';
+
+/**
+ * Tells whether the backend refused a choice because the prompt it was made on showed a phase that
+ * is no longer the open one, so the prompt must be read again (REQ-PATCH-062).
+ *
+ * @param {ApiProblem | null} problem the backend's refusal
+ * @returns {boolean} true for that refusal
+ */
+export function phaseChanged(problem) {
+    return (
+        problem !== null &&
+        typeof problem === 'object' &&
+        'code' in problem &&
+        problem.code === PHASE_CHANGED
+    );
+}
+
 /**
  * Marks the rows of a home-location preview that stay where they are: the row of the chosen home
  * location shows its „bleibt“ chip and is dimmed, every other row moves (REQ-PATCH-021).

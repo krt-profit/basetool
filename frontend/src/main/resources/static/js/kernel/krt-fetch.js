@@ -220,18 +220,31 @@ function maybeSessionGate(response) {
 /**
  * Navigates the window to a session gate's page, refusing anything that is not a same-origin
  * absolute path. Also used by the session gates' SSE events and the /ws/sync 4003 close, which
- * carry a bare URL.
+ * carry a bare URL. A page the server rendered as a gate's page, an admin's recovery page included,
+ * keeps the browser: the hand-off is taken as handled without navigating (ADR-0385).
  *
  * @param {string | null | undefined} url the gate page's path the server named
- * @returns {boolean} true when the browser was sent to the gate's page
+ * @returns {boolean} true when the browser was sent to the gate's page or stays on a gate's page
  */
 function sessionGateRedirect(url) {
     const target = safeSameOriginUrl(url);
     if (!target) {
         return false;
     }
+    if (onSessionGatePage()) {
+        return true;
+    }
     window.location.assign(target);
     return true;
+}
+
+/**
+ * Tells whether the server rendered the current page as a session gate's page.
+ *
+ * @returns {boolean} true when the layout marked the body as a gate's page
+ */
+function onSessionGatePage() {
+    return Boolean(document.body) && document.body.dataset.sessionGatePage === 'true';
 }
 
 /** @type {KrtReauthApi} */

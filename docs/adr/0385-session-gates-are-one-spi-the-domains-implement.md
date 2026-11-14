@@ -4,7 +4,7 @@
 - **Date:** 2026-11-14
 - **Deciders:** @greluc
 - **Related:** [security-and-access spec](../specs/security-and-access.md) (REQ-SEC-028,
-  REQ-SEC-029) · [patch-change spec](../specs/patch-change.md) (REQ-PATCH-020) ·
+  REQ-SEC-029) · [patch-change spec](../specs/patch-change.md) (REQ-PATCH-020, REQ-PATCH-063) ·
   [ADR-0128](0128-gated-websocket-handshake-refused-with-a-terminal-close-code.md) ·
   [ADR-0380](0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md) ·
   owner decision D4 on the review of #3423
@@ -68,6 +68,16 @@ change asks could keep using the tool for up to a minute while every backend cal
    verdict before asking it about an upgrade: the socket outlives the verdict, and the frontend
    authorizes the rooms it holds without a backend call a gate could refuse, so a cached pass would
    otherwise admit a member a new phase or new wording holds, without the `4003` close.
+8. **A gate may leave its repair open to an admin.** Besides its exempt endpoints, a gate names the
+   endpoints (`SessionGate#adminExemptPaths`) and pages (`SessionGate#adminPages`) it leaves open
+   to a caller with `ROLE_ADMIN`, so an admin the gate holds can still repair what the step
+   depends on; everyone else stays held there, and a later gate also leaves an earlier gate's
+   admin endpoints open. For an admin such a page counts as a gate's page (decision 3). The layout
+   marks a gate's page (`data-session-gate-page`), and on a marked page `krt-fetch.js` takes a
+   gate's hand-off of a background call, stream or socket as handled without navigating, so the
+   page the server rendered keeps the browser. The home-location gate leaves the phase's recovery
+   open: the admin's patch-change page with the phase end and the location curation
+   (REQ-PATCH-063).
 
 Paths, AJAX headers, SSE events, the WebSocket hand-off, the session attributes and the metric
 labels stay as they were for both gates.

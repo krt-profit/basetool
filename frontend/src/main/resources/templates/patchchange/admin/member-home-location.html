@@ -58,7 +58,8 @@
                         <div th:if="${#lists.isEmpty(prompt.locations())}" class="alert alert-warning mhl-alert" role="alert"
                              data-testid="mhl-no-locations" th:text="#{admin.memberHomeLocation.empty}">Es ist keine Home Location gepflegt, die f&uuml;r das Mitglied gew&auml;hlt werden kann.</div>
                         <form th:unless="${#lists.isEmpty(prompt.locations())}" id="mhl-form" class="mhl-form stack gap-3 no-track"
-                              novalidate data-testid="mhl-form" th:data-label="${prompt.label()}">
+                              novalidate data-testid="mhl-form" th:data-label="${prompt.label()}"
+                              th:data-patch-change-id="${prompt.patchChangeId()}">
                             <div class="form-group">
                                 <label for="mhl-location" th:text="#{admin.memberHomeLocation.choice.label}">Neue Home Location</label>
                                 <select id="mhl-location" name="locationId" required data-testid="mhl-location">

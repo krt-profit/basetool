@@ -23,10 +23,12 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.UUID;
 
 /**
- * A home-location choice (REQ-PATCH-022), relayed to the backend for the caller or, by an admin,
- * for a member.
+ * A home-location choice (REQ-PATCH-022, REQ-PATCH-062), relayed to the backend for the caller or,
+ * by an admin, for a member.
  *
  * @param locationId one of the curated home locations on offer
+ * @param patchChangeId the patch change whose phase the prompt showed; the backend refuses the
+ *     choice while another phase is open
  */
 @DtoMirror
-public record ChooseHomeLocationRequest(UUID locationId) {}
+public record ChooseHomeLocationRequest(UUID locationId, UUID patchChangeId) {}

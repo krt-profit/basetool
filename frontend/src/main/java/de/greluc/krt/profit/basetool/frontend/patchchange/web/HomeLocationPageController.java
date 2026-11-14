@@ -30,6 +30,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * The member's home-location page {@code /home-location} behind the home-location gate
@@ -55,14 +56,21 @@ public class HomeLocationPageController {
    * Renders the prompt of a pending member, or sends a member who has nothing to choose into the
    * tool. A prompt that cannot be read renders {@code promptError}, so the gate cannot loop.
    *
+   * @param phaseChanged whether the page is read again because a choice named a phase that is no
+   *     longer the open one (REQ-PATCH-062)
    * @param request the current request, whose session caches the gate's verdict
-   * @param model receives {@code prompt}, or {@code promptError} on a failed read
+   * @param model receives {@code prompt} and {@code phaseChanged}, or {@code promptError} on a
+   *     failed read
    * @return {@code patchchange/home-location}, or a redirect to the start page when the member is
    *     not pending
    */
   @NotNull
   @GetMapping(HomeLocationGate.PAGE_PATH)
-  public String page(@NotNull HttpServletRequest request, Model model) {
+  public String page(
+      @RequestParam(defaultValue = "false") boolean phaseChanged,
+      @NotNull HttpServletRequest request,
+      Model model) {
+    model.addAttribute("phaseChanged", phaseChanged);
     Optional<HomeLocationPromptDto> read = pageReader.myPrompt();
     if (read.isEmpty()) {
       model.addAttribute("promptError", PROMPT_ERROR);

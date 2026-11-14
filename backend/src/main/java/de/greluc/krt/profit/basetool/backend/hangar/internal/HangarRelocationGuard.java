@@ -39,7 +39,8 @@ import org.springframework.stereotype.Component;
  * Holds the hangar's ship writes against the relocation lock (REQ-PATCH-023): an edit, a unit or
  * origin change or a delete of a ship from before the open home-location phase's live time is
  * refused for anyone the lock refuses, a fitted reset leaves such ships out, and the pages that
- * list other members' ships mark them.
+ * list other members' ships mark them. A write reads the phase fresh under the lock the trigger
+ * shares and holds it until its commit (REQ-PATCH-064).
  */
 @Component
 @RequiredArgsConstructor
@@ -58,7 +59,7 @@ class HangarRelocationGuard {
     if (shipIds.isEmpty()) {
       return;
     }
-    Optional<Instant> liveAt = lock.openPhaseLiveAt();
+    Optional<Instant> liveAt = lock.writeCutoff();
     if (liveAt.isEmpty()) {
       return;
     }
@@ -80,7 +81,7 @@ class HangarRelocationGuard {
     if (owners.isEmpty()) {
       return LockedShips.NONE;
     }
-    Optional<Instant> liveAt = lock.openPhaseLiveAt();
+    Optional<Instant> liveAt = lock.writeCutoff();
     if (liveAt.isEmpty()) {
       return LockedShips.NONE;
     }

@@ -105,6 +105,7 @@ function load() {
             error: 'The home location could not be saved.',
         }),
     };
+    el['hl-form'].dataset.patchChangeId = 'pc-1';
     el['hl-error'].hidden = true;
     el['hl-done'].hidden = true;
     const ui = { writes: [], navigations: [] };
@@ -171,7 +172,10 @@ test('a relocation shows what moved and offers the way on without leaving the pa
     submit();
     assert.equal(ui.writes.length, 1);
     assert.equal(ui.writes[0].url, '/home-location');
-    assert.deepEqual(JSON.parse(JSON.stringify(ui.writes[0].payload)), { locationId: 'loc-1' });
+    assert.deepEqual(JSON.parse(JSON.stringify(ui.writes[0].payload)), {
+        locationId: 'loc-1',
+        patchChangeId: 'pc-1',
+    });
 
     ui.writes[0].onSuccess({ location: { name: 'Lorville' }, rows: 3, ships: 1 });
 
@@ -209,6 +213,18 @@ test('a refused choice shows the reason and keeps the choice open', () => {
     assert.equal(el['hl-pending'].hidden, false);
     assert.ok(radios.every((radio) => !radio.disabled));
     assert.deepEqual(ui.navigations, []);
+});
+
+test('a choice for a phase that is no longer the open one reads the prompt again', () => {
+    const { ui, el, radios, choose, submit } = load();
+    choose(radios[0]);
+    submit();
+
+    const problem = { code: 'HOME_LOCATION_PHASE_CHANGED', detail: 'Read the prompt again.' };
+    assert.equal(ui.writes[0].onError(409, problem), true);
+
+    assert.deepEqual(ui.navigations, ['/home-location?phaseChanged=true']);
+    assert.equal(el['hl-done'].hidden, true);
 });
 
 test('a refusal without a reason and a network failure show the fallback', () => {
