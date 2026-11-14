@@ -504,7 +504,7 @@ To query Prometheus or Loki from a workstation, for example as an agent analysin
 
 **Create it** (once, as a Grafana server admin: a Keycloak user with the `grafana-admin` role):
 
-1. Sign in at `https://grafana.profit-base.online` with **Sign in with Keycloak**.
+1. Open `https://grafana.profit-base.online`; Grafana forwards straight to the Keycloak sign-in.
 2. **Administration → Users and access → Service accounts → Add service account**: display name
    `claude-readonly` (or the agent's name), role **Viewer**, **Create**.
 3. **Add service account token**: a name for the purpose, an **expiration** (a few days for one
