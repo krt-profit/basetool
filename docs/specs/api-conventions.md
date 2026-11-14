@@ -305,9 +305,9 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   `CATALOGUE_BLUEPRINT_RETIRED`, REQ-P4K-013) and
   `patchchange.api.PatchChangeProblemCode` (`HOME_LOCATION_REQUIRED`, REQ-PATCH-020;
   `RELOCATION_PENDING`, REQ-PATCH-023; `HOME_LOCATION_NOT_ASKED`, `HOME_LOCATION_ALREADY_CHOSEN`,
-  `HOME_LOCATION_NOT_OFFERED`, REQ-PATCH-052). Names and wire
-  values did not change when they left `CoreProblemCode`; the registry holds 96 codes across the
-  fourteen enums. Two are
+  `HOME_LOCATION_NOT_OFFERED`, REQ-PATCH-052; `HOME_LOCATION_PHASE_CHANGED`, REQ-PATCH-062). Names
+  and wire values did not change when they left `CoreProblemCode`; the registry holds 97 codes
+  across the fourteen enums. Two are
   **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039) and
   `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109). `APP_UPDATE_REQUIRED` left the registry with the app
   floor (REQ-API-020, superseded). Every producer references the enum; no code is a literal any

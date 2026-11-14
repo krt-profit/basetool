@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-11-14
 - **Deciders:** @greluc
-- **Related:** [patch-change spec](../specs/patch-change.md) (REQ-PATCH-020…029) ·
+- **Related:** [patch-change spec](../specs/patch-change.md) (REQ-PATCH-020…029, REQ-PATCH-062,
+  REQ-PATCH-064) ·
   [ADR-0380](0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md) ·
   [ADR-0381](0381-the-live-time-decides-what-a-patch-change-touches.md) ·
   [ADR-0229](0229-exchange-stock-writes-take-an-advisory-lock-per-lot.md) ·
@@ -33,20 +34,32 @@ version, so a stale form or client could write the old location back.
    before it, or without a creation time (ADR-0381). Rows and ships already at the target stay.
 3. **One transaction per member, all or nothing, once per phase.** It runs inside
    `PatchChangeWrites.runFor` of the phase, so the exchange feed attributes it to the `patch`
-   source. It takes the patch-change history's lock in shared mode, claims the member's record
+   source. The choice names the phase its prompt showed (REQ-PATCH-062). The relocation takes the
+   patch-change history's lock in shared mode, refuses with `409 HOME_LOCATION_PHASE_CHANGED`
+   unless the named phase is the open one, claims the member's record
    with an `INSERT … ON CONFLICT DO NOTHING`, then the shared hierarchy lock, the lot locks of the
    old and new keys in ascending order and the rows. It validates no linked job order: like the
    wipe, it is a game fact and no order write (REQ-ORDERS-055).
 4. **A lock holds the rest of the system off until the member relocates.** Each lower module owns
    an SPI the patch-change module implements (`inventory.api.StockRelocationLock`,
    `hangar.api.ShipRelocationLock`, ADR-0380 item 4). The Lager notes every row Hibernate updates
-   or deletes in a writing transaction through an entity listener and checks them before the
-   commit, after a final flush; the hangar checks its ship writes directly. The refusal is
+   or deletes in a writing transaction through an entity listener, and the row of every earmark
+   or pledge it writes through a listener on the slices, because a slice's write changes no
+   column of the row and the row's forced version increment runs no callback; it checks them before
+   the commit, after a final flush. The hangar checks its ship writes directly. The refusal is
    `409 RELOCATION_PENDING`, on the web for everyone but the member and admins, on the exchange
    for every client. Writes of a patch change itself and work without a caller pass.
 5. **The phase belongs to the latest patch change with the home-location option on.** A later one
    with the option supersedes it and asks again; one without the option leaves it open; an admin
    may end it early, which writes only the phase's columns.
+6. **A write the lock judges reads the phase under the history's lock** (REQ-PATCH-064). The lock's
+   checks read the phase fresh, through `HomeLocationPhases#openForWrite`, under the history's lock
+   in shared mode held until the write commits, never the phase the session gate read for the
+   request; so a trigger or a phase end never commits between a write's check and its commit. The
+   trigger and the relocation take the history before the hierarchy, lot and row locks; a write
+   takes it without waiting and refuses with `409` while a trigger, a phase end or a label
+   correction holds it, so it never waits behind the trigger while it holds other locks
+   ([backend concurrency](../agents/backend-concurrency.md)).
 
 ## Consequences
 
@@ -58,6 +71,8 @@ version, so a stale form or client could write the old location back.
   is not checked. Today the bulk deletes and updates on Lager rows are the admin's global wipe, the
   account erasure and the patch change's own effects, none of which the lock should refuse.
 - The guard flushes before the commit of every writing transaction that loaded a Lager row.
+- A Lager write that changed existing rows, a merge and the hangar's ship writes fail with `409`
+  while a trigger, a phase end or a label correction runs; the member retries.
 
 ## Alternatives considered
 
@@ -69,3 +84,9 @@ version, so a stale form or client could write the old location back.
   also sees rows a write only observes; the listener sees exactly the rows that change.
 - **A per-member snapshot of the asked members at the trigger.** The live time and the accounts'
   creation times answer it without a second source of truth.
+- **Waiting for the history's lock in every write.** A write that already holds hierarchy, lot,
+  row or domain locks the trigger needs would wait for the trigger while the trigger waits for it;
+  trying the lock without waiting keeps the order free of deadlocks.
+- **Taking the history's lock in the hierarchy lock of every order write.** Order writes that hold
+  Bank or domain locks first would then wait behind a currency wipe that locks them; only writes
+  that consult the phase need the lock.
