@@ -166,7 +166,7 @@ web, naming its client (REQ-AUDIT-005):
   transaction records the affected occurrence and its order-visible history.
   A patch change's currency wipe records one summary event per trigger instead of per order
   (`JOB_ORDER_MONEY_CURRENCY_WIPED`, subject the patch change with its label, details `orders`,
-  `holdings`, `shortageTotal`, `attemptsCancelled`, `commitmentsEnded` and `patchChange`,
+  `shortages`, `shortageTotal`, `attemptsCancelled`, `commitmentsEnded` and `patchChange`,
   [REQ-PATCH-046](patch-change.md#req-patch-046--preview-audit-and-live-update-of-the-currency-wipe));
   its shortages, cancelled attempts and ended commitments carry no event of their own.
   Adding or removing an assignee who is not a direct member of the processing unit (REQ-ORDERS-047)

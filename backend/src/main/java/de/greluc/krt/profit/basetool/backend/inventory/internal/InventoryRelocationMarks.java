@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRelocationLock;
 import java.time.Instant;
@@ -27,6 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -88,6 +90,22 @@ class InventoryRelocationMarks {
   @Unmodifiable
   Set<UUID> pendingHolders(@NotNull Collection<UUID> holders) {
     return holders.isEmpty() ? Set.of() : lock.pendingAmong(holders);
+  }
+
+  /**
+   * Returns the holders of the given stacks who have not chosen yet, for the marker on a stack.
+   *
+   * @param stacks the stacks
+   * @param holderOf reads a stack's holder, or {@code null} for a stack without one
+   * @param <S> the stack aggregate
+   * @return the pending holders, empty while no phase is open
+   */
+  @NotNull
+  @Unmodifiable
+  <S> Set<UUID> pendingHoldersOf(
+      @NotNull Collection<S> stacks, @NotNull Function<S, User> holderOf) {
+    return pendingHolders(
+        stacks.stream().map(holderOf).filter(Objects::nonNull).map(User::getId).toList());
   }
 
   /**
