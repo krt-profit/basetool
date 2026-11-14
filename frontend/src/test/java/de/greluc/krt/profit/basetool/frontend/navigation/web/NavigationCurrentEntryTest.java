@@ -80,6 +80,15 @@ class NavigationCurrentEntryTest {
   }
 
   @Test
+  @DisplayName("a repeated query parameter is read once instead of failing the request")
+  void aRepeatedQueryParameterIsReadOnce() {
+    NavigationMenu menu = menu(Set.of("KRT_MEMBER"), Set.of());
+
+    assertThat(current(menu, "/?pp=env&pp=env")).isNull();
+    assertThat(current(menu, "/inventory?storage=my&storage=my")).isEqualTo("storage.my");
+  }
+
+  @Test
   @DisplayName("an entry the caller may not open is no current entry")
   void anUnpermittedEntryIsNotCurrent() {
     assertThat(current(menu(Set.of("KRT_MEMBER"), Set.of()), "/admin/terms")).isNull();

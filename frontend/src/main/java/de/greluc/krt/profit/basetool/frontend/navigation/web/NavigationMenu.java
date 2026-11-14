@@ -178,7 +178,7 @@ public record NavigationMenu(
   public Optional<NavigationEntry> currentEntry(@NotNull String requestUri) {
     String[] parts = requestUri.split("\\?", 2);
     String path = withoutTrailingSlash(parts[0]);
-    Set<String> parameters = parts.length > 1 ? Set.of(parts[1].split("&")) : Set.of();
+    Set<String> parameters = parts.length > 1 ? queryParameters(parts[1]) : Set.of();
     return starrableEntries()
         .filter(entry -> showsRequest(entry.href(), path, parameters))
         .max(Comparator.comparingInt(entry -> entry.href().split("\\?", 2).length));
@@ -209,7 +209,12 @@ public record NavigationMenu(
       @NotNull String href, @NotNull String path, @NotNull Set<String> parameters) {
     String[] parts = href.split("\\?", 2);
     return withoutTrailingSlash(parts[0]).equals(path)
-        && (parts.length == 1 || parameters.containsAll(Set.of(parts[1].split("&"))));
+        && (parts.length == 1 || parameters.containsAll(queryParameters(parts[1])));
+  }
+
+  @NotNull
+  private static Set<String> queryParameters(@NotNull String query) {
+    return Stream.of(query.split("&")).collect(Collectors.toUnmodifiableSet());
   }
 
   @NotNull
