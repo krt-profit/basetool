@@ -231,7 +231,7 @@ public class AdminSettingsPageController {
     } catch (NumberFormatException _) {
       redirectAttributes.addFlashAttribute("errorToast", "error.settings.invalid.format");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to update settings", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.settings.update.failed");
     }

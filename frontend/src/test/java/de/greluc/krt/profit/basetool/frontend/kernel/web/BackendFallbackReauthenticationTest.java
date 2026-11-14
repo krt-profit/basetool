@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEvict
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.MissionManagerGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.OrgUnitContextAdvice;
@@ -85,10 +86,35 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
-/** Exercises actual domain fallbacks with session loss and ordinary backend failure. */
+/**
+ * Exercises actual domain fallbacks with session loss, a session gate's refusal and ordinary
+ * backend failure.
+ */
 class BackendFallbackReauthenticationTest {
 
   private static final UUID ID = UUID.fromString("ace5ee48-52e7-4f29-afd8-5fe2c92695da");
+
+  /**
+   * A gate's refusal wrapped the way a joined parallel read carries it reaches every custom
+   * fallback through its hand-off guard, which lets it through; the layout chrome answers it
+   * instead.
+   */
+  @ParameterizedTest
+  @EnumSource(Domain.class)
+  void aWrappedSessionGatesRefusalEscapesEveryFallbackButTheLayoutChromes(Domain domain) {
+    SessionGateRefusalException refusal =
+        new SessionGateRefusalException("held", null, 403, "ANY_GATE_REQUIRED", null, null);
+    RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+    Runnable action =
+        domain.action(new CompletionException(new IllegalStateException(refusal)), attributes);
+
+    if (domain.chrome()) {
+      assertThatCode(action::run).doesNotThrowAnyException();
+    } else {
+      assertThatThrownBy(action::run).isSameAs(refusal);
+      assertThat(attributes.getFlashAttributes()).isEmpty();
+    }
+  }
 
   @ParameterizedTest
   @EnumSource(Domain.class)
@@ -148,6 +174,34 @@ class BackendFallbackReauthenticationTest {
     QUALITY_TIERS,
     LAYOUT,
     SIDEBAR;
+
+    /**
+     * Tells whether the fallback belongs to the layout chrome, which renders on every page, the
+     * gate-exempt ones included, and therefore degrades instead of handing the browser to a gate.
+     *
+     * @return {@code true} for the layout context, the sidebar and the navigation's supply switch
+     */
+    boolean chrome() {
+      return switch (this) {
+        case LAYOUT, SIDEBAR, SUPPLY -> true;
+        case BANK,
+            BLUEPRINT,
+            CATALOGUE,
+            HANGAR,
+            IDENTITY,
+            INVENTORY,
+            JOB_ORDER,
+            MISSION,
+            NOTIFICATION,
+            OPERATION,
+            ORG_UNIT,
+            PERSONAL_INVENTORY,
+            REFINERY,
+            SETTINGS,
+            QUALITY_TIERS ->
+            false;
+      };
+    }
 
     Runnable action(RuntimeException failure, RedirectAttributesModelMap attributes) {
       return switch (this) {

@@ -140,7 +140,7 @@ public class InventoryWriteController {
       redirectAttributes.addFlashAttribute("inventoryForm", form);
       return "redirect:/inventory/input";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to add inventory item", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.add.failed");
       redirectAttributes.addFlashAttribute("inventoryForm", form);
@@ -433,7 +433,7 @@ public class InventoryWriteController {
       BackendErrorLogging.warn(log, "bookOutInventoryItem", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.bookout.failed");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to book out inventory item", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.bookout.failed");
     }
