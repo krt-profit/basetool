@@ -81,14 +81,14 @@ class PatchChangeExchangeViews implements PatchChangeExchangeReader {
    * @param selected whether the patch change selected it
    * @return its view
    */
-  private static @NotNull PatchChangeExchangeView.WipeGroup wipeGroup(
+  private static @NotNull PatchChangeExchangeView.GroupEntry wipeGroup(
       @NotNull WipeGroup group, boolean selected) {
-    return new PatchChangeExchangeView.WipeGroup(
+    return new PatchChangeExchangeView.GroupEntry(
         group.name(),
         selected,
         WipeGroupTypes.typesOf(group).stream()
             .map(type ->
-                new PatchChangeExchangeView.WipeGroupType(type.source().name(), type.value()))
+                new PatchChangeExchangeView.TypeKey(type.source().name(), type.value()))
             .toList());
   }
 
@@ -98,7 +98,7 @@ class PatchChangeExchangeViews implements PatchChangeExchangeReader {
    * @param options the patch change's options
    * @return the exceptions
    */
-  private @NotNull List<PatchChangeExchangeView.WipeException> wipeExceptions(
+  private @NotNull List<PatchChangeExchangeView.ExceptionEntry> wipeExceptions(
       @NotNull PatchChangeOptions options) {
     if (options.wipeExceptions().isEmpty()) {
       return List.of();
@@ -107,14 +107,14 @@ class PatchChangeExchangeViews implements PatchChangeExchangeReader {
     return options.wipeExceptions().stream()
         .filter(exception -> names.of(exception) != null)
         .map(exception ->
-            new PatchChangeExchangeView.WipeException(
+            new PatchChangeExchangeView.ExceptionEntry(
                 exception.target().name(),
                 exception.id(),
                 Objects.requireNonNull(names.of(exception)),
                 exception.mode().name()))
         .sorted(
-            Comparator.comparing(PatchChangeExchangeView.WipeException::name)
-                .thenComparing(PatchChangeExchangeView.WipeException::id))
+            Comparator.comparing(PatchChangeExchangeView.ExceptionEntry::name)
+                .thenComparing(PatchChangeExchangeView.ExceptionEntry::id))
         .toList();
   }
 

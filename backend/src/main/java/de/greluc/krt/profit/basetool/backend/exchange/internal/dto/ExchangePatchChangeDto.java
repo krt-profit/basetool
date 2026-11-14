@@ -67,8 +67,8 @@ public record ExchangePatchChangeDto(
    */
   @Schema(name = "ExchangePatchChangeOptions")
   public record Options(
-      @NotNull @Unmodifiable List<WipeGroup> wipeGroups,
-      @NotNull @Unmodifiable List<WipeException> wipeExceptions,
+      @NotNull @Unmodifiable List<GroupEntry> wipeGroups,
+      @NotNull @Unmodifiable List<ExceptionEntry> wipeExceptions,
       boolean cancelRefineryOrders,
       boolean currencyWipe,
       boolean homeLocationPrompt) {}
@@ -81,8 +81,8 @@ public record ExchangePatchChangeDto(
    * @param types the catalogue types it claims; none for {@code OTHER_ITEMS}
    */
   @Schema(name = "ExchangePatchWipeGroup")
-  public record WipeGroup(
-      @NotNull String group, boolean selected, @NotNull @Unmodifiable List<WipeGroupType> types) {}
+  public record GroupEntry(
+      @NotNull String group, boolean selected, @NotNull @Unmodifiable List<TypeKey> types) {}
 
   /**
    * One catalogue type a wipe group claims.
@@ -91,7 +91,7 @@ public record ExchangePatchChangeDto(
    * @param value the type key, e.g. {@code Food}
    */
   @Schema(name = "ExchangePatchWipeGroupType")
-  public record WipeGroupType(@NotNull String source, @NotNull String value) {}
+  public record TypeKey(@NotNull String source, @NotNull String value) {}
 
   /**
    * One wipe exception.
@@ -101,7 +101,7 @@ public record ExchangePatchChangeDto(
    * @param mode {@code KEEP} or {@code WIPE}
    */
   @Schema(name = "ExchangePatchWipeException")
-  public record WipeException(
+  public record ExceptionEntry(
       @NotNull ExchangeItemRefDto entry, @NotNull String target, @NotNull String mode) {}
 
   /**

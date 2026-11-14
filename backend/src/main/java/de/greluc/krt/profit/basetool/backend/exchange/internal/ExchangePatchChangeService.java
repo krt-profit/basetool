@@ -116,18 +116,18 @@ public class ExchangePatchChangeService {
         new ExchangePatchChangeDto.Options(
             current.wipeGroups().stream()
                 .map(group ->
-                    new ExchangePatchChangeDto.WipeGroup(
+                    new ExchangePatchChangeDto.GroupEntry(
                         group.group(),
                         group.selected(),
                         group.types().stream()
                             .map(type ->
-                                new ExchangePatchChangeDto.WipeGroupType(
+                                new ExchangePatchChangeDto.TypeKey(
                                     type.source(), type.value()))
                             .toList()))
                 .toList(),
             current.wipeExceptions().stream()
                 .map(exception ->
-                    new ExchangePatchChangeDto.WipeException(
+                    new ExchangePatchChangeDto.ExceptionEntry(
                         new ExchangeItemRefDto(exception.id().toString(), exception.name()),
                         exception.target(),
                         exception.mode()))

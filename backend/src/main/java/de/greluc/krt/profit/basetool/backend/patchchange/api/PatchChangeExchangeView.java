@@ -57,8 +57,8 @@ public record PatchChangeExchangeView(
       @NotNull String label,
       @NotNull String kind,
       @NotNull Instant liveAt,
-      @NotNull @Unmodifiable List<WipeGroup> wipeGroups,
-      @NotNull @Unmodifiable List<WipeException> wipeExceptions,
+      @NotNull @Unmodifiable List<GroupEntry> wipeGroups,
+      @NotNull @Unmodifiable List<ExceptionEntry> wipeExceptions,
       boolean cancelRefineryOrders,
       boolean currencyWipe,
       boolean homeLocationPrompt) {}
@@ -70,8 +70,8 @@ public record PatchChangeExchangeView(
    * @param selected whether the patch change wiped it
    * @param types the catalogue types it claims, none for the other items
    */
-  public record WipeGroup(
-      @NotNull String group, boolean selected, @NotNull @Unmodifiable List<WipeGroupType> types) {}
+  public record GroupEntry(
+      @NotNull String group, boolean selected, @NotNull @Unmodifiable List<TypeKey> types) {}
 
   /**
    * One catalogue type a wipe group claims (REQ-PATCH-010).
@@ -79,7 +79,7 @@ public record PatchChangeExchangeView(
    * @param source the name of the catalogue fact it is compared with, e.g. {@code ITEM_TYPE}
    * @param value the type key, e.g. {@code Food}
    */
-  public record WipeGroupType(@NotNull String source, @NotNull String value) {}
+  public record TypeKey(@NotNull String source, @NotNull String value) {}
 
   /**
    * One wipe exception (REQ-PATCH-011).
@@ -89,7 +89,7 @@ public record PatchChangeExchangeView(
    * @param name its current catalogue name
    * @param mode the mode's name, {@code KEEP} or {@code WIPE}
    */
-  public record WipeException(
+  public record ExceptionEntry(
       @NotNull String target, @NotNull UUID id, @NotNull String name, @NotNull String mode) {}
 
   /**
