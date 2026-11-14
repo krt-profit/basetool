@@ -1420,7 +1420,7 @@ Binding details:
   URL. **`crossorigin="use-credentials"` is expressly rejected** — it makes the fetch an
   *authenticated* request, and the unscoped layout `@ControllerAdvice` beans run before every
   handler, `@RestController`s included, so one manifest fetch cost **five** backend round trips and
-  needed carve-outs in `TermsAcceptanceGateFilter` and `BackendRoleSyncFilter` for a public
+  needed carve-outs in the consent gate and `BackendRoleSyncFilter` for a public
   document. It bought nothing measurable: `name` and `short_name` are identical in both bundles,
   Safari implements neither `lang` nor `description`, and the iOS home-screen label comes from
   `apple-mobile-web-app-title` on the page. Re-adding it needs an ADR.
@@ -1527,7 +1527,7 @@ this requirement is the user-facing one. The discontinued Android app had the sa
 Tests: `OssLicenseCatalogTest` (the generated report exists, merges the modules, contains no
 AspectJ, and every library carries an allowed SPDX licence), `OssLicensesControllerTest` (public,
 rendered, linked beside the terms in the footer), `OssBundledComponentsTest`, and the public-page
-entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsAcceptanceGateFilterTest` and
+entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsGateTest` and
 `AnonymousSurfaceE2eTest`. Monitoring: `/licenses` is a `blackbox-public-surface` target
 (`REQ-OBS-012`).
 

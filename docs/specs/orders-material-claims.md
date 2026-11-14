@@ -93,6 +93,15 @@ facts together. Restore the wrongly removed amount only for a still-running prom
 current capacity; no negative quantity or ended-promise revival is allowed. Connected later
 records may require the agreed connected correction rather than an isolated inverse. A true
 stock loss is not a correction of a truthful historic contribution.
+*Patch change (amendment,
+[REQ-PATCH-013](patch-change.md#req-patch-013--what-depends-on-a-wiped-row-goes-with-it),
+[REQ-PATCH-025](patch-change.md#req-patch-025--the-relocation-moves-in-place)):* a patch change's
+wipe of provided stock is a genuine loss, not a correction: the credited contribution stays, the
+row's earmarks go with it and the order records the loss. A relocation moves the stock in place
+and is neither a new provision nor a credit; the provision, its credit and its promise stay as
+they were. An upward provision correction may still add its quantity to a row created before the
+live time while the holder's relocation is pending
+([REQ-PATCH-004](patch-change.md#req-patch-004--no-mixing-a-row-a-relocation-still-moves-never-merges)).
 The same ordinary correction action also corrects a falsely recorded original supplied quality.
 Retain its prior observed value, or its explicit unknown status, and the corrected declared value
 in history. Apply the resulting truthful historical credit and prescribed promise/capacity

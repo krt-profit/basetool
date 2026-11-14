@@ -65,6 +65,15 @@ Beyond roles there are three mechanisms that are easy to miss:
   behind the relay (`ActingMemberFilter`, an explicit list of exchange routes, gated by
   `@exchangeGate`) the member holds a reduced exchange authentication, never their stored roles,
   and every write is journaled, undoable and bounded by a mass-change guard (§8.13).
+- **A step a member must take is a session gate** ([ADR-0385](../adr/0385-session-gates-are-one-spi-the-domains-implement.md))
+  — accepting the Terms of Use (REQ-SEC-028) and choosing a home location after a patch change
+  (REQ-PATCH-020) are gates of one SPI on each side: the backend platform's `SessionGate` with one
+  `SessionGateAccessFilter`, the frontend kernel's `SessionGate` with the ordered `SessionGates`
+  and one `SessionGateFilter`. The domains implement them; the kernel and the platform name none.
+  A gate leaves open the pages and endpoints of every earlier gate, answers each kind of request
+  in its own idiom (redirect, AJAX header, SSE event, `4003` socket close), and a backend refusal
+  discards the frontend's cached verdict. The scripts' header and event lists are pinned against
+  the gate beans.
 - **A security expression is code the compiler cannot check** — every `@bean.method(…)` in a
   `@PreAuthorize` is resolved against the running context in a test, the security beans carry
   explicit names, the SpEL stays constant (REQ-SEC-075), no class calls its own gated method past

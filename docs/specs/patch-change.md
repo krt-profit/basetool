@@ -6,12 +6,14 @@
 > (REQ-PATCH-010…018), the home-location phase with its gate, lock and in-place relocation
 > (REQ-PATCH-020…029), the profile setting „Meine Home Location“ as form default
 > (REQ-PATCH-030…033), the currency wipe (REQ-PATCH-040…046) and the exchange resource with the
-> home-location choice through a client (REQ-PATCH-050…053).
+> home-location choice through a client and the patch change named in stale pushes
+> (REQ-PATCH-050…054).
 > **Related ADRs:** [ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md),
 > [ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md),
 > [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md),
 > [ADR-0383](../adr/0383-a-patch-change-relocation-moves-stock-in-place.md),
-> [ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)
+> [ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md),
+> [ADR-0385](../adr/0385-session-gates-are-one-spi-the-domains-implement.md)
 
 # Patch change
 
@@ -106,26 +108,41 @@ label stays correctable (REQ-PATCH-008). The preview counts only what the live t
 **Enforced by:** `PatchChangeRulesTest`, `PatchChangeTriggerIntegrationTest` · **Code:**
 `PatchChangeRules`, `PatchChange`
 
-### REQ-PATCH-004 — No mixing: a row from before the live time never merges
+### REQ-PATCH-004 — No mixing: a row a relocation still moves never merges
 
-From the latest patch change's live time on, no write adds quantity to a stock row created before
-it, and no such row is folded into another. The write-time merge of
+While a member's relocation is pending in the open home-location phase (REQ-PATCH-024), no write
+adds quantity to that member's stock rows created before the phase's live time, and no such row is
+folded into another. The write-time merge of
 [REQ-INV-026](inventory-lager.md#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in)
 skips such rows as survivor and as candidate, and the merge probe of the Einbuchen form does not
 count them; the write then lands its own row. A pre-patch row therefore holds only pre-patch stock,
-which the wipe and the relocation select by its creation time (ADR-0381). A candidate row without a
-creation time counts as created before the live time. Before the first patch change every row
-takes part as before, dated or not.
+which the relocation selects by its creation time (ADR-0381). A row without a creation time, the
+just-written one included, counts as created before the live time.
+
+The wipe runs at the trigger and needs no window: once the member relocates, or the phase ends or
+is superseded, the member's rows merge again. Before the first phase every row takes part as
+before, dated or not.
+
+One write is excepted: a provision correction that adds quantity (the truthful upward correction
+of [REQ-ORDERS-*](orders-material-claims.md)) restores a historic fact on the row the provision
+came from, so it adds the quantity in place to a row created before the live time even while the
+holder's relocation is pending (owner decision D3, ADR-0381).
 
 **Acceptance**
 
-- [x] A merge whose just-written row was created before the cutoff leaves every row as it is.
-- [x] The merge group and the merge probe leave out rows created before the cutoff or without a
-  creation time; without a patch change they leave out none.
+- [x] While the holder's relocation is pending, a merge whose just-written row was created before
+  the live time, or has no creation time, leaves every row as it is.
+- [x] The merge group and the merge probe leave out the holder's rows created before the live time
+  or without a creation time; a holder without a pending relocation, or any holder while no phase
+  is open, merges every row.
+- [x] An upward provision correction adds its quantity to a pre-patch row of a holder whose
+  relocation is pending.
 
-**Enforced by:** `InventoryMergeCutoffTest`, `InventoryMergeGroupDataTest` · **Code:**
-`inventory.api.StockMergeCutoff`, `PatchChangeMergeCutoff`, `InventoryMergeService`,
-`InventoryItemRepository#findMergeGroupForUpdate`, `#countMergeCandidates`
+**Enforced by:** `InventoryMergeCutoffTest`, `PatchChangeMergeCutoffTest`,
+`InventoryMergeGroupDataTest`, `MaterialProvisionCorrectionDuringRelocationIntegrationTest` ·
+**Code:** `inventory.api.StockMergeCutoff#cutoffFor`, `PatchChangeMergeCutoff`,
+`InventoryMergeService`, `InventoryItemRepository#findMergeGroupForUpdate`, `#countMergeCandidates`,
+`InventoryQuantityCorrections#addKnownQuantity`
 
 ### REQ-PATCH-005 — The trigger is one all-or-nothing step with the record
 
@@ -154,9 +171,9 @@ module's api package (ADR-0380); the trigger and the preview run all of them.
 ### REQ-PATCH-006 — The refinery effect ends the running orders started before the live time
 
 When its option is on, the trigger cancels every `OPEN` or `IN_PROGRESS` refinery order of every
-member that started before the live time; an order without a start counts from its creation. An
-order that ran in the game before the patch is lost even when it was entered later; an order
-started after the live time stays.
+member that started before the live time; an order without a start counts from its creation, and
+one with neither time counts as started before the live time. An order that ran in the game before
+the patch is lost even when it was entered later; an order started after the live time stays.
 
 Each order is cancelled as the web cancels it: status `CANCELED`, its game-data counter advanced
 (REQ-REFINERY-029), its ready notice cleared (`readyCleared`), the web as its last change
@@ -169,8 +186,9 @@ trail (REQ-PATCH-009), and the open refinery pages refresh in place.
 
 **Acceptance**
 
-- [x] Only running orders started (or, without a start, created) before the live time are
-  cancelled, each with the patch change as its reason and an advanced game-data counter.
+- [x] Only running orders started (or, without a start, created) before the live time, or with
+  neither time, are cancelled, each with the patch change as its reason and an advanced game-data
+  counter.
 
 **Enforced by:** `PatchChangeTriggerIntegrationTest` · **Code:** `RefineryCancellationEffect`,
 `refinery.api.RefineryPatchCancellation`, `RefineryPatchCancellationService`
@@ -436,10 +454,11 @@ rolled-back trigger.
 
 - [x] The supply, Materialbörse and member hangar rooms are published after the commit, and none
   when nothing changed.
-- [ ] The Lager and order rooms are asserted by a test.
+- [x] The Lager and order rooms are asserted by a test.
 
 **Enforced by:** `SupplyPatchWipeServiceTest`, `MaterialExchangePatchWipeServiceTest`,
-`HangarPatchWipeServiceTest`, `LiveSyncTopicRegistryParityTest` (every room exists on both sides)
+`HangarPatchWipeServiceTest`, `PatchChangeWipeIntegrationTest` (the `inventory`, `order` and
+`orders` rooms of a full wipe), `LiveSyncTopicRegistryParityTest` (every room exists on both sides)
 · **Code:**
 `InventoryPatchWipeService`, `MaterialExchangePatchWipeService`, `SupplyPatchWipeService`,
 `HangarPatchWipeService`, `JobOrderStockWriteEligibility`
@@ -451,15 +470,20 @@ While a home-location phase is open (REQ-PATCH-024), a member who must still cho
 web redirects to `/home-location` until the choice is made. It takes effect on the member's next
 request, in sessions already open as well:
 
-- the frontend's `HomeLocationGateFilter` (after `TermsAcceptanceGateFilter`) asks the backend
-  (`GET /api/v1/patch-changes/me/home-location/status`) and caches only a verdict that lets the
-  member through, for 60 seconds; the home-location page clears it;
+- it is the second session gate on both sides (ADR-0385), after the consent gate: the frontend's
+  `HomeLocationGate` asks the backend (`GET /api/v1/patch-changes/me/home-location/status`) through
+  `SessionGateFilter` and caches only a verdict that lets the member through, for 60 seconds; the
+  home-location page and the choice clear it;
+- a backend refusal with `403 HOME_LOCATION_REQUIRED` that reaches the frontend discards the cached
+  verdict at once and hands the browser to the page: a page load is redirected, an AJAX call gets
+  the header; so a member a new phase asks is held by the first refused request, not after the
+  cache expires;
 - an AJAX call gets `403` with the header `X-Home-Location-Required` naming the page, which
   `krtFetch` follows; an `EventSource` gets the one-shot event `home-location-gate`; a WebSocket
   handshake is marked (`SessionGateHandoff`) and closed with the terminal code `4003`;
-- the backend's `HomeLocationGateAccessFilter` refuses every other `/api/**` call of the member's
-  web session with `403 HOME_LOCATION_REQUIRED`, leaving open the gate's own endpoints, the caller's
-  `/api/v1/users/me` and the endpoints the terms gate leaves open;
+- the backend's `HomeLocationGate`, run by `SessionGateAccessFilter`, refuses every other `/api/**`
+  call of the member's web session with `403 HOME_LOCATION_REQUIRED`, leaving open the gate's own
+  endpoints, the caller's `/api/v1/users/me` and the endpoints the consent gate leaves open;
 - when a trigger opens a phase, the asked members' notification streams close after the commit, so
   their open pages reconnect through the gate and are handed off to the page at once.
 
@@ -472,10 +496,14 @@ relocation lock refuses its writes on locked rows and ships instead (REQ-PATCH-0
   stream gets the event, a WebSocket handshake is marked; the gate pages stay reachable.
 - [x] The backend refuses a pending member's web calls with `403 HOME_LOCATION_REQUIRED` and lets
   the exempt endpoints and an exchange client's relayed call through.
+- [x] A backend refusal of the gate discards the frontend's cached verdict and hands the browser to
+  the page.
 
-**Enforced by:** `HomeLocationGateFilterTest`, `HomeLocationGateAccessFilterTest`,
-`HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGateFilter`, `SessionGateHandoff`,
-`HomeLocationGateAccessFilter`, `NotificationPageController`, `NotificationStreamService#reconnect`,
+**Enforced by:** `HomeLocationGateTest` (frontend and backend), `SessionGateFilterTest`,
+`SessionGateAccessFilterTest`, `GlobalExceptionHandlerTest`, `SessionGateClientParityTest`,
+`HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate` (frontend and backend),
+`SessionGateFilter`, `SessionGates`, `SessionGateHandoff`, `SessionGateAccessFilter`,
+`GlobalExceptionHandler`, `NotificationPageController`, `NotificationStreamService#reconnect`,
 `krt-fetch.js`, `notifications.js`
 
 ### REQ-PATCH-021 — Who is asked and what is offered
@@ -493,7 +521,9 @@ their curation and warns while the switch is on and the list is empty.
 The member's page (variant A of the prototype) shows a greeting banner with the patch label, the
 curated locations as selectable cards and the table „Was umzieht“: per current location the stock
 rows from before the live time, the share held for each org unit's pool, and the ships; the row of
-the chosen location reads „bleibt“. Rows and ships created later are not counted.
+the chosen location reads „bleibt“. Rows and ships created later are not counted. Once the member
+has chosen, the page shows the relocation's summary in place, „Umgezogen nach X.“ with what moved,
+and a link „Weiter zum Basetool“; it never navigates by itself (REQ-FE-001).
 
 **Acceptance**
 
@@ -502,10 +532,12 @@ the chosen location reads „bleibt“. Rows and ships created later are not cou
   shares and the ships without a location.
 - [x] A location that is not a curated home location is refused with
   `error.patch_change.home_location_not_offered`.
+- [x] After the choice the page shows the summary and the link into the tool and stays put.
 
 **Enforced by:** `HomeLocationRelocationIntegrationTest`, `HomeLocationPageControllerMvcTest`,
-`AdminPatchChangePageControllerMvcTest` · **Code:** `HomeLocationPhases`, `HomeLocationOffer`,
-`HomeLocationPrompts`, `HomeLocationPromptEffect`, `templates/patchchange/home-location.html`
+`AdminPatchChangePageControllerMvcTest`, `testHomeLocationJs` · **Code:** `HomeLocationPhases`,
+`HomeLocationOffer`, `HomeLocationPrompts`, `HomeLocationPromptEffect`, `HomeLocationPageReader`,
+`templates/patchchange/home-location.html`, `static/js/patchchange/home-location.js`
 
 ### REQ-PATCH-022 — The choice is final, once per member and phase
 
@@ -951,7 +983,7 @@ does.
 
 The trigger records one summary event in each affected trail: the job orders'
 `JOB_ORDER_MONEY_CURRENCY_WIPED` (subject the patch change with its label; details `orders`,
-`holdings`, `shortageTotal`, `attemptsCancelled`, `commitmentsEnded`, `patchChange`) and the
+`shortages`, `shortageTotal`, `attemptsCancelled`, `commitmentsEnded`, `patchChange`) and the
 Bank's own `WIPE_RESET_EXECUTED` (details `patchChange`, `liveAt`, `accounts`, `stashes`,
 `totalZeroed`, `clampedAccounts`, `clampedStashes`, `cancelledRequests`; counts only, no amount
 per account). Single shortages, attempts, requests and commitments are not audited one by one. Open order pages refresh their money and participation sections and the order
@@ -975,9 +1007,11 @@ Under the capability `exchange.patch.read`, `GET /exchange/v1/me/patch-change` a
 patch change by live time (`patchChange`, absent before the first): its `id`, the same the feeds
 name in every entry it caused (REQ-PATCH-007), its current label, its kind, its live time and its
 options as triggered — **every** wipe group in declaration order with `selected` and the keys of
-its catalogue types (`source` and `value` of `WipeGroupTypes`, REQ-PATCH-010), the wipe exceptions
-whose catalogue entry still exists with the entry named as the stock feed names it, its target and
-its mode (REQ-PATCH-011), and the refinery, currency-wipe and home-location options. The list is
+its catalogue types (`source` and `value` of `WipeGroupTypes`, REQ-PATCH-010), every wipe
+exception as triggered with the entry named as the stock feed names it, its target and its mode
+(REQ-PATCH-011), and the refinery, currency-wipe and home-location options. An exception whose
+catalogue entry was deleted since stays in the list with its stored key as `bt` and no `name`. The
+list is
 the central list of what a patch change wiped, so a client can apply the same groups to its own
 items (#3021, #3251). The resource is its own page of the exchange documentation
 ([`patch-change.md`](../exchange/resources/patch-change.md)) and is additive in `v1`.
@@ -987,6 +1021,7 @@ items (#3021, #3251). The resource is its own page of the exchange documentation
 - [x] Before the first patch change the read carries no patch change; after it, its id, label,
   kind, live time, all eight wipe groups with their types and `selected`, the exceptions and the
   further options.
+- [x] An exception whose catalogue entry was deleted stays in the read with its stored key.
 - [x] Without `exchange.patch.read` the read answers `403 SCOPE_MISSING`.
 
 **Enforced by:** `ExchangePatchChangeControllerTest`, `ExchangePatchChangeRouteTest`,
@@ -1053,8 +1088,8 @@ and keeps the empty lot or sends `override`; a ship `upsert` naming a ship a pat
 is refused the same way (REQ-XCH-014). The op result names the patch change in
 `results[].patchChange` `{id, label}`, so a client drops its pending change and pulls instead of
 asking the member (#3255 amendment). A lot that kept rows from after the live time is no removed
-lot: a stale op on it stays `VERSION_CONFLICT`. The change is additive in `v1`
-(`change-result.schema.json`).
+lot: a stale op on it stays `VERSION_CONFLICT`, which names the patch change as well
+(REQ-PATCH-054). The change is additive in `v1` (`change-result.schema.json`).
 
 **Acceptance**
 
@@ -1066,3 +1101,25 @@ lot: a stale op on it stays `VERSION_CONFLICT`. The change is additive in `v1`
 **Enforced by:** `ExchangePatchChangeControllerTest` · **Code:** `ExchangePatchRemovals`,
 `ExchangeStockWriteService#removedByPatch`, `ExchangeShipWriteService`,
 `ExchangeChangeSetAdapter#removedByPatch`, `ExchangeChangeResultDto.OpResult`
+
+### REQ-PATCH-054 — A stale push after a patch change names it in the version conflict
+
+A stock op that expected another quantity than the lot holds, a share or unshare the lot no longer
+allows for the same reason, and a ship `upsert` or `remove` that sends an older version are refused
+per op as `VERSION_CONFLICT` (REQ-XCH-014). When the lot's or the ship's latest feed entry came
+from a patch change, typically a relocation that moved part of a lot whose rows from after the live
+time stayed, or moved a ship, the op result also names the patch change in
+`results[].patchChange` `{id, label}`, so a client can tell the member why its view is stale
+(owner decision D1). A conflict after any other change carries no `patchChange`. The property is
+the optional one of REQ-PATCH-053 (`change-result.schema.json`); nothing else on the wire changes.
+
+**Acceptance**
+
+- [x] After a relocation that leaves rows from after the live time in a lot, a push with the lot's
+  old quantity is `VERSION_CONFLICT` with the patch change's id and label.
+- [x] After a relocation moved a ship, an upsert with the ship's old version is `VERSION_CONFLICT`
+  with the patch change's id.
+
+**Enforced by:** `ExchangePatchChangeControllerTest` · **Code:** `ExchangePatchRemovals`,
+`ExchangeStockWriteService`, `ExchangeShipWriteService#staleVersion`,
+`ExchangeChangeSetAdapter#versionConflict`

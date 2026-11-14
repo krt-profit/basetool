@@ -33,6 +33,15 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   ship a patch change wiped likewise; the result item names the patch change `{id, label}`
   ([pushing against what a patch change removed](resources/patch-change.md#pushing-against-what-a-patch-change-removed)).
   New in `change-result.schema.json`: the optional `results[].patchChange`.
+- **New: `results[].patchChange` on `VERSION_CONFLICT`.** A stale stock op against a lot a patch
+  change moved in part, and a stale ship `upsert` or `remove` of a ship it moved, stay
+  `VERSION_CONFLICT`; when the lot's or the ship's last change came from a patch change, the
+  result item now names it in the same optional `patchChange`
+  ([pushing against what a patch change removed](resources/patch-change.md#pushing-against-what-a-patch-change-removed)).
+  No schema change beyond the description.
+- **Changed: deleted wipe exceptions stay in the patch-change read.** An exception whose item or
+  material was removed from the catalogue since is no longer left out: its `entry` keeps its `bt`
+  and carries no `name` ([patch change](resources/patch-change.md)). No schema change.
 
 ## 2026-11-13
 

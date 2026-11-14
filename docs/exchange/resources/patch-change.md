@@ -110,7 +110,9 @@ origin is `IN_GAME`; a pledged ship and one of unknown origin are never wiped.
 `wipeExceptions` names single items, and materials in every quality, that the patch change kept
 although their group was wiped (`KEEP`) or wiped although it was not (`WIPE`). An exception's entry
 follows the exception, never its group. `entry` names it as the [stock](stock.md) feed names a lot's
-`material`; `target` is `GAME_ITEM` or `MATERIAL`.
+`material`; `target` is `GAME_ITEM` or `MATERIAL`. An exception whose item or material was removed
+from the catalogue since stays in the list: its `entry` keeps the `bt` it had and carries no
+`name`.
 
 Only stock rows and ships **created before `liveAt`** were wiped; what was booked or added later
 stayed. Personal inventory, blueprints and the bank are never part of the wipe.
@@ -193,10 +195,14 @@ there or fills it, without `override`, is refused per op as `REMOVED_ELSEWHERE`,
 ```
 
 A ship `upsert` naming a ship the patch change wiped is refused the same way. Drop your pending
-change for that lot or ship and pull the feed. A lot that kept rows from after the live time is not
-empty; an op against it with a stale `expectedQuantity` is `VERSION_CONFLICT` as for any lot changed
-elsewhere. A moved ship keeps its id and has a new `version`, so a stale op on it is
-`VERSION_CONFLICT` too.
+change for that lot or ship and pull the feed.
+
+A lot that kept rows from after the live time is not empty; an op against it with a stale
+`expectedQuantity` is `VERSION_CONFLICT`. A moved ship keeps its id and has a new `version`, so a
+stale `upsert` or `remove` of it is `VERSION_CONFLICT` too. When the lot's or the ship's last
+change came from a patch change, that conflict names it as well, in the same `patchChange`
+property; pull the feed and show the member why their view was stale. A conflict after any other
+change carries no `patchChange`.
 
 ## Errors
 

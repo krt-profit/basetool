@@ -1902,12 +1902,19 @@ cannot exist in one locale only) · **Text:** `terms.list_4_1_5`, `terms.p_4_2` 
 
 ### REQ-SEC-028 — Terms-of-Use consent is recorded, versioned and enforced
 
-> [!note] Amended 2026-11-14 (REQ-PATCH-020) — a second session gate shares the handoff
-> The home-location gate of a patch change holds a pending member the same way, after the consent
-> gate: a redirect to `/home-location`, the AJAX header `X-Home-Location-Required`, the one-shot SSE
-> event `home-location-gate` and the marked WebSocket handshake through the shared
-> `SessionGateHandoff`, with the backend's `403 HOME_LOCATION_REQUIRED` as the boundary
+> [!note] Amended 2026-11-14 (REQ-PATCH-020, ADR-0385) — the consent gate is one of the session gates
+> The consent gate is the first of the **session gates**: the backend platform owns the
+> `SessionGate` SPI and one `SessionGateAccessFilter` that runs every gate in its order, the
+> frontend kernel a `SessionGate` SPI, the ordered `SessionGates` list and one `SessionGateFilter`.
+> Identity implements the consent gate on both sides (`TermsAcceptanceGate`, `TermsGate`); the
+> home-location gate of a patch change follows it and holds a pending member the same way: a
+> redirect to `/home-location`, the AJAX header `X-Home-Location-Required`, the one-shot SSE event
+> `home-location-gate` and the marked WebSocket handshake through the shared `SessionGateHandoff`,
+> with the backend's `403 HOME_LOCATION_REQUIRED` as the boundary
 > ([REQ-PATCH-020](patch-change.md#req-patch-020--the-home-location-gate-holds-a-pending-member-at-the-next-request)).
+> A gate never refuses its own endpoints or pages nor those of an earlier gate. When a gate's
+> backend `403` reaches the frontend, the frontend discards that gate's cached verdict and hands the
+> browser to the gate's page. Paths, headers, events, the close code and the metrics are unchanged.
 > [!note] The go-live consent round — 2026-09-28 (epic #2078, #2092)
 > The wording change of REQ-SEC-027 (section 4), of the intro and of section 12 moves the version
 > from `df1f9b31581b0d0d` to `355bfed7e78bd936` (`generateTermsVersion` over the German bundle's
@@ -1947,9 +1954,10 @@ updated; re-consent after a change adds history instead of overwriting it. The u
 `uq_terms_acceptance_user_version` does double duty as the index behind the per-request lookup and
 as the idempotence guard for a double submit.
 
-**Enforced in the backend, surfaced in the frontend.** `TermsAcceptanceAccessFilter` refuses
-`/api/**` with `403 TERMS_NOT_ACCEPTED`; `TermsAcceptanceGateFilter` redirects the web UI to
-`/terms/accept`. The backend is the boundary because it is the one place every caller passes
+**Enforced in the backend, surfaced in the frontend.** The backend's `TermsAcceptanceGate`, run by
+`SessionGateAccessFilter`, refuses `/api/**` with `403 TERMS_NOT_ACCEPTED`; the frontend's
+`TermsGate`, run by `SessionGateFilter`, redirects the web UI to `/terms/accept`. The backend is
+the boundary because it is the one place every caller passes
 through — the web UI and every connected application. A connected application is covered because
 `ActingMemberFilter` makes the member the security identity of a gateway call before this filter
 runs (ADR-0129); it is **not** covered by bearer relaying, which that ADR removed. The distinction
@@ -1970,19 +1978,22 @@ backend boundary and take the `403` there. And a WebSocket handshake gets no HTT
 reaches the client as a bare `1006` it can only read as "connection dropped" (see below).
 
 **The `terms-gate` event has two emitters, because the gate has two holes it cannot cover itself.**
-`TermsAcceptanceGateFilter` emits it for a stream it intercepts; `NotificationPageController`'s
+`SessionGateFilter` emits it for a stream it intercepts; `NotificationPageController`'s
 `handleStreamError` emits the same event when the *backend* refuses a stream the frontend gate let
 through. That happens in exactly two windows — the frontend verdict cache still holds a fresh
 `true` from the 60 s before a wording change took effect, and the fail-open path when the status
-read itself failed. Both are narrow, and both would otherwise reconnect forever. The event name and
-the consent path are shared constants (`TermsAcceptanceGateFilter.SSE_GATE_EVENT` / `CONSENT_PATH`)
-so the two emitters and the one client listener cannot drift apart.
+read itself failed. Both are narrow, and both would otherwise reconnect forever. Both emitters read
+the event name and the consent path from the gate in `SessionGates`, and
+`SessionGateClientParityTest` pins the client listener's event list against the gates, so they
+cannot drift apart.
 
 **The verdict cache is read back on both sides.** Caching the negative but never honouring it made
 every gated request a blocking backend round trip; during the 2026-08-03 rollout that turned 491
 stream attempts plus 483 consent-page renders into 973 reads of `/api/v1/terms/status`. Honouring it
-is safe because recording consent calls `clearCachedVerdict`, so nobody is held behind a stale "no",
-and a backend failure never caches a negative in the first place (it fails open without writing).
+is safe because recording consent discards the verdict (`TermsGate#forget`), so nobody is held
+behind a stale "no", and a backend failure never caches a negative in the first place (it fails
+open without writing). A backend `403 TERMS_NOT_ACCEPTED` that reaches the frontend discards a
+stale "yes" the same way and sends the browser to the consent page (ADR-0385).
 
 **A WebSocket handshake is answered with a terminal close code, never a redirect.** A refused
 upgrade — `302` to the consent page included — reaches the browser's `WebSocket` as `close` with
@@ -2049,7 +2060,8 @@ Six invariants that must survive any rewrite:
   are synthetic subjects that cannot consent). A property that must be set to switch it on was
   rejected: it ships a gate that looks armed and is not. The stand-down had a cost that only
   surfaced later — no test could observe the gate at all, so a fail-open on the ingest path stayed
-  green — so `app.security.terms.armed-in-test` re-arms it for a single test class. It is read
+  green — so `app.security.terms.armed-in-test` (`TermsAcceptanceGate.ARMED_IN_TEST`) re-arms it
+  for a single test class. It is read
   **only** when the `test` profile is active and can only arm, never disarm; outside that profile
   the gate is armed unconditionally and the property is never consulted. The E2E profile is `dev`,
   so the gate is live there and `E2eSupport#acceptTermsIfPrompted` clicks through it on every login
@@ -2059,7 +2071,7 @@ Six invariants that must survive any rewrite:
   both halves are load-bearing. Without the `X-Requested-With` marker the gate answers a `302` that
   `fetch` follows transparently, so the consent page arrives as a `200 text/html` for which `res.ok`
   is **true** and the refusal is read as the payload. With the marker but without a
-  `krtTermsGate.check`, the `403` merely falls through the `res.ok` test and the surface freezes on
+  `krtSessionGate.check`, the `403` merely falls through the `res.ok` test and the surface freezes on
   its last value with nothing on screen saying why. On a *polling* caller the first failure is worse
   still: if the timer is re-evaluated only after a successful parse, the refusal leaves it armed and
   the page re-fetches and re-renders the consent page every tick for as long as the tab is open.
@@ -2067,7 +2079,7 @@ Six invariants that must survive any rewrite:
   traffic — the P4K import poll (3 s cadence) and the notification badge / bell reads, whose three
   call sites now share one gate-aware reader so they cannot drift apart again one at a time. Every
   hand-rolled `fetch` outside `krtFetch`
-  therefore sends the marker, offers its response to `krtTermsGate.check` before touching the body,
+  therefore sends the marker, offers its response to `krtSessionGate.check` before touching the body,
   rejects `res.redirected` explicitly, and disarms its own timer on any answer that is not the
   payload it asked for.
 
@@ -2099,7 +2111,7 @@ from this response blanks a legal document on a build nobody can redeploy.
 **Acceptance**
 
 - [x] A user without consent cannot reach any `/api/**` endpoint but the consent ones.
-  *`TermsAcceptanceAccessFilterTest`.*
+  *`TermsAcceptanceGateTest`, `SessionGateAccessFilterTest`.*
 - [x] A wording change re-prompts every user, without anyone editing a version number.
   *`TermsVersionParityTest` (the committed version is the hash of the wording),
   `TermsAcceptanceQueryDataTest#existsIsScopedToTheExactVersion`.*
@@ -2116,14 +2128,18 @@ from this response blanks a legal document on a build nobody can redeploy.
   refused with a terminal close code the client stops reconnecting on.
 - [x] A gated background read navigates to the consent page and disarms its timer, instead of
   re-fetching the refusal on every tick or freezing on its last value.
-  *`BackgroundReadGateContractTest`, `TermsAcceptanceGateFilterTest`.*
+  *`BackgroundReadGateContractTest`, `TermsGateTest`.*
+- [x] A backend refusal that reaches the frontend discards the cached verdict and hands the
+  browser to the consent page. *`GlobalExceptionHandlerTest`.*
 
-**Enforced by:** `TermsAcceptanceAccessFilterTest` (refusal, both exemptions, non-UUID subjects),
-`TermsAcceptanceGateFilterTest` (redirect, the AJAX header, the SSE `terms-gate` handoff and that it
+**Enforced by:** `TermsAcceptanceGateTest` (backend: refusal, both exemptions, non-UUID subjects,
+the test-profile arming), `SessionGateAccessFilterTest` (the gates' order and exemptions),
+`TermsGateTest` (frontend: redirect, the AJAX header, the SSE `terms-gate` handoff and that it
 fires only while the gate is closed, the WebSocket mark and that a plain request to the same
 path is still redirected, the readable-documents exemption, fail-open, cache bound),
-`BackgroundReadGateContractTest` (the client half: every read goes through `krtFetch.get`, which
-sends the XHR marker, offers the answer to `krtTermsGate` and refuses a redirect; no raw request in
+`SessionGateFilterTest`, `SessionGateClientParityTest` (the scripts' headers and events against the
+gates), `BackgroundReadGateContractTest` (the client half: every read goes through `krtFetch.get`,
+which sends the XHR marker, offers the answer to `krtSessionGate` and refuses a redirect; no raw request in
 any script or template; the polls disarm on a gated answer — pinned against the shipped JS and
 templates; REQ-FE-031), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
 version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`, `TermsVersionParityTest`,
@@ -2132,12 +2148,14 @@ version scoping, one-sided cache, sort translation), `TermsAcceptancePageControl
 `LiveSyncCloseCodeWireParityTest` (the WebSocket handoff: the mark is relayed, the socket is closed
 with `4003` and the consent URL, the refusal costs no per-user socket slot, and the code cannot
 drift from the client's) · **Code:** `TermsVersionProvider`, `TermsAcceptanceService`,
-`identity.api.TermsConsentCheck` (the leaf interface that keeps `config` and `service` acyclic per
-ADR-0047), `kernel.security.SessionGateHandoff` (the leaf that does the same for the frontend's `config` →
-`websocket` handoff), `TermsController`, `AdminTermsController` · **Monitoring:**
+`identity.api.TermsAcceptanceGate`, `identity.api.TermsConsentCheck`, `platform.api.SessionGate`,
+`SessionGateAccessFilter`, `identity.web.TermsGate`, `kernel.security.SessionGate`, `SessionGates`,
+`SessionGateFilter`, `kernel.security.SessionGateHandoff` (the leaf that keeps the frontend's
+`config` → `websocket` handoff acyclic), `TermsController`, `AdminTermsController` · **Monitoring:**
 `basetool_terms_acceptances_total`, `basetool_terms_accepted_users`,
 `basetool_terms_refused_subjects`, `TermsConsentRolloutStalled`,
-`basetool_livesync_socket_rejected_total{reason="terms_gate"}` · **Decision:** ADR-0128
+`basetool_livesync_socket_rejected_total{reason="terms_gate"}` (every session gate's socket
+refusal) · **Decision:** ADR-0128, ADR-0385
 
 ### REQ-SEC-029 — A path-scoped filter matches the DECODED path, never the raw request URI
 
@@ -2224,11 +2242,11 @@ filter runs, so such a test passes against the broken code.
   **resource** set is unchanged; an encoded slash cannot manufacture an asset prefix, and a
   double-encoded spelling is not decoded a second time.
 
-**Enforced by:** `PendingApprovalAccessFilterTest`, `TermsAcceptanceAccessFilterTest`,
+**Enforced by:** `PendingApprovalAccessFilterTest`, `TermsAcceptanceGateTest`,
 `ActingMemberFilterPathMatchingTest`, `IngestPathScopeTest`,
 `FiltersTest`, `RequestLoggingFilterTest` (ingest), `RequestBodySizeLimitFilterTest`,
 `ApiCacheControlFilterTest`, `PublicPathsTest` · **Code:** `IngestPathScope`,
-`PendingApprovalAccessFilter`, `TermsAcceptanceAccessFilter`, `ActingMemberFilter`,
+`PendingApprovalAccessFilter`, `SessionGateAccessFilter`, `ActingMemberFilter`,
 `RequestBodySizeLimitFilter`, `ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest),
 `PayloadSizeLimitFilter`, `RequestLoggingFilter` (ingest), `PublicPaths` (frontend)
 
@@ -4055,7 +4073,7 @@ discovered it ends.
 - `SessionAttributeRepairFilter` — ordered `SessionRepositoryFilter.DEFAULT_ORDER + 10`, i.e.
   immediately inside Spring Session's own filter — drains the queue in a `finally` and calls
   `HttpSession#removeAttribute`. That is the same public API `BackendRoleSyncFilter` and
-  `TermsAcceptanceGateFilter` already use, so **no Redis write is added to the session read path**;
+  `TermsGate` already use, so **no Redis write is added to the session read path**;
   repairing from inside the serializer or the mapper is forbidden for that reason (ADR-0154,
   ADR-0157).
 - The queue is cleared on the way **into** the chain as well as drained on the way out. Tomcat pools
@@ -4446,8 +4464,8 @@ a method gate.
 >
 > [!important] `permitAll` is only half of "public" — the session gates are the other half
 > `permitAll` decides **authorisation**. It does not stop a filter further down the chain from
-> redirecting an *authenticated* caller away from the path, and two do: `TermsAcceptanceGateFilter`
-> sends an unconsented member to the consent page, and `BackendRoleSyncFilter` sends an unapproved
+> redirecting an *authenticated* caller away from the path, and two do: `SessionGateFilter`
+> sends a member a session gate holds to the gate's page, and `BackendRoleSyncFilter` sends an unapproved
 > one to the waiting page and reconciles roles against the backend on the way.
 >
 > For a **page** that is correct. For a **document** — one an external verifier or a browser fetches
@@ -4478,7 +4496,7 @@ a method gate.
 > stays inside its segment. Matching per segment cannot make that mistake. `PublicPathsTest` pins
 > `%73`, `%2E`, `%2e%2e`, `%252e` and `%2f`; the default `StrictHttpFirewall` refuses all but the
 > first of those with a `400` before any of it is reached. Same defect, same fix and same
-> reasoning as the backend's `TermsAcceptanceAccessFilter`, `PendingApprovalAccessFilter` and
+> reasoning as the backend's `SessionGateAccessFilter`, `PendingApprovalAccessFilter` and
 > `RequestBodySizeLimitFilter`.
 
 **Backend** — the only `permitAll()` matchers on the main chain:
@@ -6290,7 +6308,7 @@ literal paths, each naming a real mapping:
 
 - **Pending approval and role-less** (`PendingApprovalAccessFilter`):
   `/api/v1/users/me/registration-status`, `/api/v1/terms/document`.
-- **Terms acceptance** (`TermsAcceptanceAccessFilter`): `/api/v1/terms/document`,
+- **Terms acceptance** (`TermsAcceptanceGate.EXEMPT_PATHS`): `/api/v1/terms/document`,
   `/api/v1/terms/status`, `/api/v1/terms/acceptance`, `/api/v1/users/me/registration-status`.
   This replaced the patterns `/api/v1/terms` and `/api/v1/terms/**`, under which a future
   `/api/v1/terms/admin` would have escaped the gate; for the three mappings under `/api/v1/terms`
@@ -6306,11 +6324,11 @@ consent.
 - [x] Each of the three sets equals its pinned list exactly, every entry is a literal and names a
   mapping.
 - [x] Every mapping under `/api/v1/terms` is decided; a planted `/api/v1/terms/admin` is reported
-  (`PathControlInventoryTest`) and refused by the terms gate (`TermsAcceptanceAccessFilterTest`).
+  (`PathControlInventoryTest`) and refused by the terms gate (`TermsAcceptanceGateTest`).
 
-**Enforced by:** `FilterExemptionSetsTest`, `TermsAcceptanceAccessFilterTest`,
+**Enforced by:** `FilterExemptionSetsTest`, `TermsAcceptanceGateTest`,
 `PathControlInventoryTest`, `AnonymousSurfaceSweepTest` · **Code:** `PendingApprovalAccessFilter`,
-`TermsAcceptanceAccessFilter`, `ActingMemberFilter` · **Related:** REQ-SEC-017, REQ-SEC-028,
+`TermsAcceptanceGate`, `SessionGateAccessFilter`, `ActingMemberFilter` · **Related:** REQ-SEC-017, REQ-SEC-028,
 REQ-SEC-053, REQ-XCH-009
 
 ### REQ-SEC-081 — The external-integration clients reach external addresses only

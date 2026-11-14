@@ -377,10 +377,12 @@ The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-0
 ## 6.15 A member chooses a new home location after a patch change
 
 1. A trigger with the home-location option opens its phase. After the commit the asked members'
-   notification streams close; on reconnect the backend's `HomeLocationGateAccessFilter` refuses
-   the stream with `403 HOME_LOCATION_REQUIRED`, and the frontend relay hands the browser the event
-   `home-location-gate`. A page load meets the frontend's `HomeLocationGateFilter` instead, an AJAX
-   call the header `X-Home-Location-Required`.
+   notification streams close; on reconnect the backend's `HomeLocationGate` (run by
+   `SessionGateAccessFilter`) refuses the stream with `403 HOME_LOCATION_REQUIRED`, and the
+   frontend relay hands the browser the event `home-location-gate`. A page load meets the frontend's
+   `HomeLocationGate` (run by `SessionGateFilter`) instead, an AJAX call the header
+   `X-Home-Location-Required`; a backend `403` of the gate discards the frontend's cached verdict
+   and hands the browser over at once (ADR-0385).
 2. The page `/home-location` reads the member's prompt: the curated home locations and, per current
    location, the rows (with the pool shares) and ships from before the live time. An exchange client
    reads the same prompt with the latest patch change and its wipe list through
