@@ -25,11 +25,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderResponsibilityGuard;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LivesyncMetricNames;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -73,6 +76,7 @@ class PatchChangeWipeIntegrationTest {
   @Autowired private JobOrderRepository orderRepository;
   @Autowired private JobOrderResponsibilityGuard responsibilityGuard;
   @Autowired private PlatformTransactionManager transactionManager;
+  @Autowired private MeterRegistry meterRegistry;
 
   private final List<UUID> users = new ArrayList<>();
   private final List<UUID> units = new ArrayList<>();
@@ -176,11 +180,23 @@ class PatchChangeWipeIntegrationTest {
         new WipeException(WipeExceptionTarget.MATERIAL, gold, WipeExceptionMode.KEEP);
     PatchChangeOptions options =
         new PatchChangeOptions(EnumSet.allOf(WipeGroup.class), Set.of(keepGold), true, false, true);
+    double lagerFrames = frames("inventory_all");
+    double orderFrames = frames("order_detail");
+    double queueFrames = frames("orders_queue");
 
     PatchChangeDto recorded =
         trigger.trigger(
             new TriggerPatchChangeRequest("0.1", PatchKind.FULL_WIPE, LIVE_AT, options, "0.1"));
 
+    assertThat(frames("inventory_all"))
+        .as("the Lager room refreshes after the commit (REQ-PATCH-018)")
+        .isGreaterThan(lagerFrames);
+    assertThat(frames("order_detail"))
+        .as("the room of the order whose earmark went refreshes after the commit")
+        .isGreaterThan(orderFrames);
+    assertThat(frames("orders_queue"))
+        .as("the order queue refreshes after the commit")
+        .isGreaterThan(queueFrames);
     assertThat(exists("inventory_item", oreBefore)).isFalse();
     assertThat(exists("inventory_item", rationBefore)).isFalse();
     assertThat(exists("inventory_item", rifleUndated)).isFalse();
@@ -493,5 +509,20 @@ class PatchChangeWipeIntegrationTest {
             type,
             subject);
     return count == null ? 0 : count;
+  }
+
+  /**
+   * Reads how many live-sync frames the backend published for one room class.
+   *
+   * @param topicClass the room class's metric label
+   * @return the count so far
+   */
+  private double frames(@NotNull String topicClass) {
+    Counter counter =
+        meterRegistry
+            .find(LivesyncMetricNames.LIVESYNC_PUBLISH_ACCEPTED)
+            .tag(LivesyncMetricNames.TAG_TOPIC_CLASS, topicClass)
+            .counter();
+    return counter == null ? 0 : counter.count();
   }
 }
