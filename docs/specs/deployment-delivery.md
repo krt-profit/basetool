@@ -2517,6 +2517,13 @@ there.
   an empty realm of the pinned 26.7.4 image failed its verification on `basetool-frontend` and only
   a second apply converged it; the stub did not model the behaviour, so the self-test stayed green.
   Found against a throwaway local Keycloak while building WP 2.2.)*
+- **A WebAuthn policy is written whole.** The passwordless policy states its passkey requirement
+  with `residentKey` = `required` and leaves the deprecated `requireResidentKey` `not specified`,
+  which Keycloak warns about at every policy load while it is `Yes` or `No`. Keycloak 26.8 applies a
+  realm update's WebAuthn policy only when the update names that policy's `RpEntityName`, and then
+  rebuilds the policy from the update alone, resetting every key it leaves out. The realm-settings
+  update therefore carries every live key of a WebAuthn policy it changes, with the managed keys
+  overlaid, and no other key of that policy changes.
 
 **Acceptance**
 
@@ -2527,6 +2534,10 @@ there.
   diffs only in the lines its header lists as environment-specific.
 - [ ] `provision-keycloak-realm.test.sh` section 8: against a realm still carrying the entries
   retired on 2026-09-22, the plan removes exactly those and a second apply is empty.
+- [x] Section 13: a passwordless policy with `requireResidentKey` = `Yes` converges to
+  `not specified` and keeps its entity name, signature algorithms, user verification and passkey
+  switch; the stub, like Keycloak, ignores a WebAuthn policy update without its `RpEntityName` and
+  drops every key such an update leaves out.
 - [x] Section 4: a realm still holding `basetool-android`, its marker role, the DPoP policy and
   profile plans exactly the three deletions in order (policy, profile, client), writes nothing in
   the dry run, deletes them on apply while every foreign policy and profile survives, verifies
