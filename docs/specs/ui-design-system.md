@@ -2803,8 +2803,8 @@ not part of the default. A new option is a change to this table.
 new summary reads where a list would otherwise be loaded whole (hangar readiness, next mission)
 or data is new (REQ-ORDERS-040 `assignedToMe`, REQ-INV-068, REQ-BANK-064). Each widget loads and
 fails on its own, never blocking the page: a refused (`403`) or failed read replaces the body with
-an error state and a retry button, carrying the test ids `dashboard-<widget>-error` and
-`dashboard-<widget>-retry`. „Aufträge zu bearbeiten" reads `GET /orders?toProcess=true` (with
+an error state and a retry button, inset by the widget's padding like its content, carrying the
+test ids `dashboard-<widget>-error` and `dashboard-<widget>-retry`. „Aufträge zu bearbeiten" reads `GET /orders?toProcess=true` (with
 `orgUnitId` for a unit pinned in the widget, which only narrows the caller's processing units),
 „Raffinerie: fertig" the ready segment of
 `GET /refinery-orders/all` (REQ-REFINERY-019), each with the row count as page size and the page
