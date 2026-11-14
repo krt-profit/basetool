@@ -64,13 +64,21 @@
         min-width: 0;
     }
 
-    .dash-state {
+    .dash-state,
+    .dash-widget__error {
         display: flex;
         flex-direction: column;
         gap: var(--space-3);
         align-items: flex-start;
-        margin-bottom: var(--space-4);
         padding: var(--space-4);
+    }
+
+    .dash-state {
+        margin-bottom: var(--space-4);
+    }
+
+    .dash-widget__error .home-notifs__empty {
+        padding: 0;
     }
 
     .dash-widget.is-unavailable {

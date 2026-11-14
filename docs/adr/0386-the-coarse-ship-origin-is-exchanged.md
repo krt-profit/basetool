@@ -1,4 +1,4 @@
-# ADR-0379 — The coarse ship origin is exchanged; purchase data still is not
+# ADR-0386 — The coarse ship origin is exchanged; purchase data still is not
 
 - **Status:** Accepted
 - **Date:** 2026-11-13

@@ -76,6 +76,12 @@ public enum SyncEventType {
    */
   MANUFACTURER_RELINKED,
 
+  /**
+   * Wiki vehicle sync: a complete census no longer carries the ship type's game UUID and the Wiki
+   * vehicle carrying its P4K GUID took its place, so {@code external_uuid} moved to it.
+   */
+  VEHICLE_RELINKED,
+
   /** Wiki item sync (R4): a UUID present in UEX is absent on the Wiki. */
   WIKI_MISSING,
 

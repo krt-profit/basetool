@@ -13,7 +13,7 @@
 > [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
 > [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md),
 > [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md),
-> [ADR-0379](../adr/0379-the-coarse-ship-origin-is-exchanged.md)
+> [ADR-0386](../adr/0386-the-coarse-ship-origin-is-exchanged.md)
 > **The bank on the exchange:** its route family, switch, limits and refusal codes live in
 > [`bank-exchange.md`](bank-exchange.md) (`REQ-BXCH-*`, [ADR-0354](../adr/0354-bank-resources-on-the-exchange.md)).
 
@@ -1239,7 +1239,7 @@ lowers or removes is audited by that book-out (`MARKET_OFFER_REDUCED`, `MARKET_O
 
 `link` attaches a client ship to an existing server ship; `upsert` and `remove` carry the ship's
 `version`. A client links before it creates, so a Fleetview import is never duplicated. Purchase
-data is never sent; the one exception is the coarse ship origin (REQ-XCH-057, ADR-0379).
+data is never sent; the one exception is the coarse ship origin (REQ-XCH-057, ADR-0386).
 Detaching a ship from a mission by removal is reported in `detachedFromMissions` and audited (`MISSION_UNIT_UPDATED`). Writes are audited in the Hangar domain
 with the external client. A ship's `name` is optional and up to 255 characters, as in the web: an
 unnamed ship is sent without it, and an upsert may leave it out (owner decision 2026-09-27). An
@@ -3845,7 +3845,7 @@ Every ship of `GET /exchange/v1/me/ships` carries `origin`: `PLEDGE`, `IN_GAME` 
 ship origin of REQ-HANGAR-017 as the ship reads it. A ship locked to `PLEDGE` — one from a hangar
 file import or with a pledge id — always reads `PLEDGE`, whatever was chosen before. The narrow
 exception to "purchase data is never sent" (REQ-XCH-017) is this one value: a pledge id, a purchase
-date or a price never leaves the Basetool (ADR-0379, which narrows ADR-0295).
+date or a price never leaves the Basetool (ADR-0386, which narrows ADR-0295).
 
 - **Write.** An `upsert` may send `origin`. Leaving it out keeps the stored origin, and a create
   without it stores `UNKNOWN` (#3250). A change of the origin goes through the Hangar's own update,
@@ -3904,7 +3904,7 @@ date or a price never leaves the Basetool (ADR-0379, which narrows ADR-0295).
 | A single open order recognisable in the org demand feed | withheld unless the member passes the web's job-order gate (`canViewJobOrders`, under the reduced authorities); membership-only scope, catalogue fields only, no requester, title or free text; no low-count suppression, 7-day client cache (REQ-XCH-018) — accepted risk (ADR-0220 and its 2026-09-28 amendment); the per-order details go only to a Logistician of the responsible unit under their own capability (REQ-XCH-047, ADR-0257) |
 | Members' names and notes on a third-party program's PC | only for a Logistician of the pool, under `exchange.orgstock.details`, membership-only scope, 7-day client cache; each member can withhold their name; a per-client pseudonym instead of the user id (REQ-XCH-043/-044) — accepted (ADR-0257) |
 | A faulty or malicious client release changing other members' shared stock | only a Logistician of the pool, only shared rows of that pool, through the Lager's services with web rules; journal, the writer's and the admin's undo, the guard per writer and pool, audit naming writer and client (REQ-XCH-045/-046) — accepted (ADR-0257) |
-| A client learning which of the member's ships were bought with real money | only the coarse `origin`, never a pledge id, date or price; the member's own ships under their own capability and consent (REQ-XCH-057) — accepted (ADR-0379) |
+| A client learning which of the member's ships were bought with real money | only the coarse `origin`, never a pledge id, date or price; the member's own ships under their own capability and consent (REQ-XCH-057) — accepted (ADR-0386) |
 | A client learning which units a member belongs to | the member's own direct memberships only, under their own capability and the member's consent; unit names and kinds, no other member, no roles or flags (REQ-XCH-048) — accepted |
 | Correlating members across clients | the holder `ref` is an HMAC under a per-client salt that never leaves the backend (REQ-XCH-043) |
 | Silent removal of Materialbörse offers by a sync book-out | reported and audited, not undoable — accepted (REQ-XCH-016/-022) |
