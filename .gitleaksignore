@@ -3,3 +3,5 @@ d149011c59605cf1991b10d22cfec41ebe1c74a5:docs/exchange/examples/v1/page--bluepri
 d149011c59605cf1991b10d22cfec41ebe1c74a5:ingest/src/test/resources/exchange/golden/route-get-blueprints.golden:generic-api-key:29
 5d4ce9df81d7a46a6d04bf715dcf10ccb66b8dbc:docs/exchange/examples/v1/page--refineryOrderPage/valid/feed.json:generic-api-key:20
 66bc323162649839c61f7dcf52e5977d60fb8534:docs/exchange/examples/v1/page--bankRequestPage/valid/feed.json:generic-api-key:31
+8a7aad9b35052a13a668f8183bbe734032f69252:backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/ScWikiVehicleSyncService.java:generic-api-key:198
+8a7aad9b35052a13a668f8183bbe734032f69252:backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/ScWikiVehicleSyncService.java:generic-api-key:222
