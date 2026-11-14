@@ -457,6 +457,11 @@ removes are audited with the reason `stock`. `CheckoutType` is not part of the e
 
 ### REQ-INV-026 — Write-time stock merge for PIECE (auto) and SCU (per-action opt-in)
 
+> [!note] Amended 2026-11-14 (REQ-PATCH-033) — the Einbuchen form starts at the home location
+> A fresh Einbuchen form has the location of the member's profile setting „Meine Home Location"
+> preselected, and the merge probe below reads it like a chosen location
+> ([REQ-PATCH-033](patch-change.md#req-patch-033--the-home-location-prefills-the-location-of-three-forms)).
+
 A write that lands a row whose material's quantity type is **`PIECE`** (Stück) is merged into a
 single Lager entry with every existing row that shares its stock identity; a write whose material is
 **`SCU`** does the same **only when the caller opts in for that one action** — a modal checkbox that
