@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
-> **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md), [ADR-0295](../adr/0295-a-hangar-import-matches-ships-by-pledge-and-keeps-pledge-data-private.md), [ADR-0379](../adr/0379-the-coarse-ship-origin-is-exchanged.md)
+> **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md), [ADR-0295](../adr/0295-a-hangar-import-matches-ships-by-pledge-and-keeps-pledge-data-private.md), [ADR-0386](../adr/0386-the-coarse-ship-origin-is-exchanged.md)
 
 # Personal hangar overview — pagination & server-side sort/filter
 
@@ -458,7 +458,7 @@ Every ship MUST carry an origin: `PLEDGE` (bought on the RSI website), `IN_GAME`
 in-game currency) or `UNKNOWN`. A patch wipe removes only unlocked `IN_GAME` ships created before
 its live time, through the ordinary deletion path, and treats `UNKNOWN` like `PLEDGE`
 ([REQ-PATCH-015](patch-change.md#req-patch-015--in-game-ships-go-through-the-ordinary-deletion-path)).
-Decisions #3250 and #3255; [ADR-0379](../adr/0379-the-coarse-ship-origin-is-exchanged.md).
+Decisions #3250 and #3255; [ADR-0386](../adr/0386-the-coarse-ship-origin-is-exchanged.md).
 
 - **Version.** The origin is part of the ship's `version`: an origin change is an ordinary edit, and
   a concurrent edit with the old `version` gets the 409 conflict dialog.
