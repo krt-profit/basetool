@@ -139,7 +139,9 @@ class SupplyWithdrawalReasonRenderTest {
     assertThat(html.split(REASON_TESTID, -1)).hasSize(2);
   }
 
-  /** The unit's incoming list names patch change 4.4 under the wiped pledge's status, in English. */
+  /**
+   * The unit's incoming list names patch change 4.4 under the wiped pledge's status, in English.
+   */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void incomingDonationsNameThePatchChangeThatWithdrewAPledge() throws Exception {
