@@ -27,6 +27,11 @@ per-ship gates of `HangarAccessPolicy` (`canSeeShip` / `canEditShip`, REQ-ORG-01
 
 ### REQ-HANGAR-002 — Personal hangar paginates with server-side sort & search
 
+> [!note] Amended 2026-11-14 (REQ-PATCH-033) — „Schiff hinzufügen" starts at the home location
+> The add-ship dialog opens with the location of the member's profile setting „Meine Home Location"
+> preselected; without one it opens empty as before
+> ([REQ-PATCH-033](patch-change.md#req-patch-033--the-home-location-prefills-the-location-of-three-forms)).
+
 The personal hangar MUST fetch one **server-side page** of the caller's ships from
 `/api/v1/hangar/my-ships` (`page`/`size`/`search`/`fitted`) instead of the former unbounded `size=1000` pull,
 and render the shared pagination component — the `.pagination` page-nav plus the square `.page-btn`

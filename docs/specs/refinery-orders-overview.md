@@ -233,6 +233,11 @@ into. Two consequences bind:
 
 ### REQ-REFINERY-022 — A stored refinery order is stored exactly once
 
+> [!note] Amended 2026-11-14 (REQ-PATCH-033) — the store dialog starts at the home location
+> Every item of the „Einlagern" dialog starts at the location of the member's profile setting „Meine
+> Home Location", and at the order's refinery only without one
+> ([REQ-PATCH-033](patch-change.md#req-patch-033--the-home-location-prefills-the-location-of-three-forms)).
+
 Storing an order books its output as inventory rows and writes one `INVENTORY_RECEIVED_FROM_REFINERY`
 event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most once per order.
 

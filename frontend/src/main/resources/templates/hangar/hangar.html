@@ -358,7 +358,8 @@
                 </fieldset>
                 <div class="form-group">
                     <label for="ship-location" th:text="#{hangar.ship.location}">Ort</label>
-                    <select id="ship-location" name="locationId" th:field="*{locationId}">
+                    <select id="ship-location" name="locationId" th:field="*{locationId}"
+                            th:data-default-location="${shipLocationDefault}" data-testid="hangar-ship-location">
                         <option value="" th:text="#{hangar.ship.select_location}">Bitte wählen...</option>
                         <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                     </select>

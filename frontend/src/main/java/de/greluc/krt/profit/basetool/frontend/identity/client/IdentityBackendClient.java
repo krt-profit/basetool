@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.identity.client;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.ConsolidateAccountRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.MergeAccountRequest;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.AdminDeletionRequestDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ApproveRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.AssignableRole;
@@ -29,6 +30,8 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.DecideDeletionReque
 import de.greluc.krt.profit.basetool.frontend.identity.model.LinkRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyBlueprintSharingRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyBlueprintSharingResponse;
+import de.greluc.krt.profit.basetool.frontend.identity.model.MyHomeLocationRequest;
+import de.greluc.krt.profit.basetool.frontend.identity.model.MyHomeLocationResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyPayoutPreferenceRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyPayoutPreferenceResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleRequest;
@@ -51,6 +54,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.UserRoleSetDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
@@ -71,11 +75,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.netty.http.client.HttpClientRequest;
 
 /**
- * Typed backend client of the identity domain: the member's own profile, RSI handle, data export
- * and erasure request, the member administration, the user pickers, the Discord registration queue,
- * the erasure-request queue, the person search, the approval status and the Terms-of-Use consent
- * (REQ-SEC-017, REQ-SEC-028, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-072), over {@link
- * BackendApiClient} (plan §5.9, ADR-0032).
+ * Typed backend client of the identity domain: the member's own profile, RSI handle, home location,
+ * data export and erasure request, the member administration, the user pickers, the Discord
+ * registration queue, the erasure-request queue, the person search, the approval status and the
+ * Terms-of-Use consent (REQ-SEC-017, REQ-SEC-028, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061,
+ * REQ-SEC-072, REQ-PATCH-030), over {@link BackendApiClient} (plan §5.9, ADR-0032).
  */
 @Service
 @RequiredArgsConstructor
@@ -83,6 +87,12 @@ public class IdentityBackendClient {
 
   /** The admin Discord registration queue. */
   private static final String REGISTRATIONS = "/api/v1/users/admin/registrations";
+
+  /** The caller's profile setting "my home location". */
+  private static final String MY_HOME_LOCATION = "/api/v1/users/me/home-location";
+
+  private static final ParameterizedTypeReference<List<LocationDto>> LOCATION_LIST =
+      new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE =
       new ParameterizedTypeReference<>() {};
@@ -150,6 +160,37 @@ public class IdentityBackendClient {
   @Nullable
   public MyRsiHandleResponse myRsiHandle() {
     return backendApiClient.get("/api/v1/users/me/rsi-handle", MyRsiHandleResponse.class);
+  }
+
+  /**
+   * Reads the caller's profile setting "my home location" with its version (REQ-PATCH-030).
+   *
+   * @return the setting, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public MyHomeLocationResponse myHomeLocation() {
+    return backendApiClient.get(MY_HOME_LOCATION, MyHomeLocationResponse.class);
+  }
+
+  /**
+   * Saves the caller's profile setting "my home location" (REQ-PATCH-030).
+   *
+   * @param update the chosen home location and the setting's version
+   * @return the stored setting with its new version, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public MyHomeLocationResponse updateMyHomeLocation(@NotNull MyHomeLocationRequest update) {
+    return backendApiClient.put(MY_HOME_LOCATION, update, MyHomeLocationResponse.class);
+  }
+
+  /**
+   * Reads the curated home locations the profile offers, from the catalogue cache.
+   *
+   * @return the home locations, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<LocationDto> homeLocations() {
+    return backendApiClient.getCached(CachedCatalog.LOCATIONS_HOME, LOCATION_LIST);
   }
 
   /**

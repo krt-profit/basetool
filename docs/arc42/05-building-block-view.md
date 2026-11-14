@@ -299,7 +299,11 @@ The identity module moved in part since P4-7 slice a (plan §7.6). `identity.api
 client (`KeycloakService`, `KeycloakTrustSupport`, `KeycloakUserDto`), the two access filters
 `SecurityConfig` registers (`PendingApprovalAccessFilter`, `TermsAcceptanceAccessFilter`) and the
 registration request and result records beside the events; `identity.web` holds the role, terms and
-Discord-existence controllers, `identity.internal` their services, mappers and DTOs. `RestClientConfig`
+Discord-existence controllers, `identity.internal` their services, mappers and DTOs. The member's
+profile setting „Meine Home Location“ (`member_home_location`) is the identity module's too: the
+patch-change relocation sets it through `identity.api.HomeLocationPreference`, and the frontend's
+stock booking, refinery store and add-ship dialog read it as their default location
+([REQ-PATCH-030…033](../specs/patch-change.md)). `RestClientConfig`
 lies in `platform.api`, which `KeycloakTrustSupport` needs. `UserService`, `UserRegistrationService`,
 `UserReconciliationService` now lie in `identity.api` (P4-7 slice c); `User`, `Role`, their repositories and `UserDto` / `UserReferenceDto`
 followed with the org-unit module (umbrella steps 6 and 7). The calls out of the identity module are inverted through identity-owned SPIs:  `UserService` reaches the org-unit

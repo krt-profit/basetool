@@ -4,8 +4,9 @@
 > its history, the audit area, the `patch` change source and the no-mixing rule are implemented
 > (REQ-PATCH-001…009), the wipe by group and exception with its dependents, preview and audit
 > (REQ-PATCH-010…018), the home-location phase with its gate, lock and in-place relocation
-> (REQ-PATCH-020…029) and the currency wipe (REQ-PATCH-040…046). The form default and the exchange
-> resource follow in their own slices of epic #3328 and add their requirements here.
+> (REQ-PATCH-020…029), the profile setting „Meine Home Location“ as form default
+> (REQ-PATCH-030…033) and the currency wipe (REQ-PATCH-040…046). The exchange resource follows in
+> its own slice of epic #3328 and adds its requirements here.
 > **Related ADRs:** [ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md),
 > [ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md),
 > [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md),
@@ -710,6 +711,104 @@ business dashboard shows it in a panel. There is no alert rule (#3257).
 **Enforced by:** `HomeLocationRelocationIntegrationTest`, `LiveSyncSectionMapParityTest` · **Code:**
 `InventoryStockRelocation`, `HangarShipRelocation`, `PatchChangeLiveSync`,
 `HomeLocationPromptEffect`
+
+### REQ-PATCH-030 — The profile setting „Meine Home Location“
+
+Every member has a profile setting **„Meine Home Location“** (#3252, the profile surface of #3256).
+It is editable at any time from the **curated home locations** (REQ-PATCH-021: the home-location
+flag, not hidden, not reference-only) and is the default location of three forms (REQ-PATCH-033).
+It **only sets that default and moves nothing**; new members set it there.
+
+- It is stored per member in `member_home_location` (owned by the `identity` module, `V427`), with
+  its **own optimistic-lock version** that starts at `1`, so it never collides with an edit of the
+  member's other settings and version `0` always means "no choice". A location deleted later leaves
+  the setting empty.
+- The profile shows it as section „6 · Meine Home Location“ of the settings card: a select of the
+  curated locations by name, the hint that it only prefills the forms and moves nothing, and the
+  shared save bar, which saves it in place (`POST /profile/home-location`, REQ-FE-001). A stored
+  location the profile no longer offers shows as no choice. There is no way back to "no choice".
+- Endpoints: `GET`/`PUT /api/v1/users/me/home-location` (any member, only their own row). A
+  location that is not curated is refused with `400` (`error.profile.home_location_not_offered`), a
+  stale version with `409`; choosing the stored location again changes nothing.
+- The setting is part of the member's Art. 15 / Art. 20 export (`homeLocationPreference`), goes
+  with the account (FK `ON DELETE CASCADE`) and stays with the source account in an account merge.
+
+**Acceptance**
+
+- [x] A member reads and sets their own home location from the curated ones; another location and
+  a stale version are refused.
+- [x] The profile section lists the curated locations by name with the stored one selected and
+  saves in place.
+
+**Enforced by:** `MemberHomeLocationIntegrationTest`, `MyHomeLocationControllerIntegrationTest`,
+`ProfileHomeLocationMvcTest`, `HomeLocationPreferenceReaderTest`, `IdentityBackendClientTest`,
+`PersonalDataExportCatalogueTest`, `DataExportEndStateTest`, `GdprParticipantCoverageTest` ·
+**Code:** `MemberHomeLocation`, `MemberHomeLocationRepository`, `MemberHomeLocationService`,
+`MyHomeLocationController`, `IdentityExportSections`, `IdentityUserReassignment`,
+`ProfileHomeLocationController`, `ProfileHomeLocationProxyController`,
+`HomeLocationPreferenceReader`, `templates/identity/profile.html`, `static/js/identity/profile.js`
+
+### REQ-PATCH-031 — The latest home-location choice overwrites the setting
+
+When a relocation stores a member's choice (REQ-PATCH-022), whoever chose (`SELF`, `ADMIN`,
+`CLIENT`), the member's setting „Meine Home Location“ becomes the chosen location **in the
+relocation's transaction**: a relocation that fails leaves the setting as it was. The
+relocation calls `identity.api.HomeLocationPreference#followRelocation`, which writes whatever the
+setting's version is and gives it a new version, so a profile page still holding the old version
+gets `409` on its next save. A choice equal to the stored setting changes nothing.
+
+**Acceptance**
+
+- [x] After a relocation the setting is the chosen location with a new version; a failed choice
+  leaves it unchanged.
+
+**Enforced by:** `HomeLocationRelocationIntegrationTest`, `MemberHomeLocationIntegrationTest` ·
+**Code:** `MemberRelocations`, `identity.api.HomeLocationPreference`,
+`MemberHomeLocationService#followRelocation`, `MemberHomeLocationRepository#follow`
+
+### REQ-PATCH-032 — Audit of the setting
+
+Every change of the setting records `HOME_LOCATION_PREFERENCE_SET` in the patch-change trail
+(REQ-PATCH-009, #3257): the subject and the target are the member, the details are the curated
+location's name and the `source`, `PROFILE` for the member's own change or `RELOCATION` for a
+relocation's (REQ-PATCH-031). An unchanged choice records nothing. No free text and no personal data
+go into the details. The admin viewer lists the event under „Patchwechsel“ with its DE/EN label;
+`basetool_audit_events_total{domain}` counts it with the area, and no further metric is needed
+(REQ-OBS-011).
+
+**Acceptance**
+
+- [x] A member's change and a relocation's change each record one event with their source.
+
+**Enforced by:** `MemberHomeLocationIntegrationTest`, `HomeLocationRelocationIntegrationTest`,
+`AdminAuditLogPageControllerTest` · **Code:** `MemberHomeLocationService`, `AuditEventType`,
+`AdminAuditLogPageController`
+
+### REQ-PATCH-033 — The home location prefills the location of three forms
+
+The member's setting (REQ-PATCH-030) is the default location of:
+
+- the **stock booking** („Einbuchen“, `/inventory/input`): a fresh form starts at it, from every
+  entry point; a form re-shown after an error keeps what the member entered, and the merge probe
+  reads the prefilled location like a chosen one
+  ([REQ-INV-026](inventory-lager.md#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in));
+- the **refinery store** (the „Einlagern“ dialog of a refinery order): every item starts at it,
+  else at the order's refinery as before;
+- **adding a ship** (the member's own hangar, „Schiff hinzufügen“): the dialog opens at it.
+
+The default is only a starting value; the member may pick any location the form offers. A form
+whose location list does not hold it starts empty, and a failed read of the setting leaves the
+form as without one. The admin's ship dialog in a member's hangar and the other location fields
+keep no default.
+
+**Acceptance**
+
+- [x] The three forms start at the member's home location and fall back as before without one.
+
+**Enforced by:** `InventoryInputFormPatternRenderTest`, `RefineryOrderStorageCalculationTest`,
+`HangarPageControllerMvcTest`, `HomeLocationPreferenceReaderTest` · **Code:**
+`HomeLocationPreferenceReader#formDefault`, `InventoryInputPageController`,
+`RefineryOrderPageController#addOrderAndForms`, `HangarPageController`, `static/js/hangar/hangar.js`
 
 ### REQ-PATCH-040 — The currency wipe follows the game in the Bank and the aUEC orders
 

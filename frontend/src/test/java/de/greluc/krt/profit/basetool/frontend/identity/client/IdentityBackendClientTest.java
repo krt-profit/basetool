@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.CreateDeletionReque
 import de.greluc.krt.profit.basetool.frontend.identity.model.DecideDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.LinkRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyBlueprintSharingRequest;
+import de.greluc.krt.profit.basetool.frontend.identity.model.MyHomeLocationRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyPayoutPreferenceRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.RejectRegistrationRequest;
@@ -92,6 +93,22 @@ class IdentityBackendClientTest {
     backend.expect("GET", "/api/v1/users/me/rsi-handle");
     backend.expect("GET", "/api/v1/users/me/deletion-request");
     backend.expect("GET", "/api/v1/users/me/registration-status");
+  }
+
+  @Test
+  void ownHomeLocationReadAndWrite() {
+    backend.answerJson("{\"homeLocationId\":null,\"version\":0}");
+    backend.answerJson("{\"homeLocationId\":\"" + OTHER + "\",\"version\":1}");
+
+    assertThat(client.myHomeLocation().homeLocationId()).isNull();
+    assertThat(client.updateMyHomeLocation(new MyHomeLocationRequest(OTHER, 0L)).version())
+        .isEqualTo(1L);
+
+    backend.expect("GET", "/api/v1/users/me/home-location");
+    backend.expect(
+        "PUT",
+        "/api/v1/users/me/home-location",
+        "{\"homeLocationId\":\"" + OTHER + "\",\"version\":0}");
   }
 
   @Test

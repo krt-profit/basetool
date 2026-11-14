@@ -133,6 +133,7 @@ class ProfileSettingsPatternRenderTest {
         .contains("href=\"#profile-section-payout\"")
         .contains("href=\"#profile-section-blueprints\"")
         .contains("href=\"#profile-section-name-withholding\"")
+        .contains("href=\"#profile-section-home-location\"")
         .contains("href=\"#profile-security-card\"")
         .contains("href=\"#profile-export-card\"")
         .contains("href=\"#profile-deletion-card\"")
@@ -141,9 +142,9 @@ class ProfileSettingsPatternRenderTest {
         .contains("id=\"profile-deletion-card\"");
   }
 
-  /** The five sections keep their forms and endpoints and share one save bar that starts hidden. */
+  /** The six sections keep their forms and endpoints and share one save bar that starts hidden. */
   @Test
-  void rendersFiveSectionsAndOneHiddenSaveBar() throws Exception {
+  void rendersSixSectionsAndOneHiddenSaveBar() throws Exception {
     String html = render();
 
     assertThat(html)
@@ -159,9 +160,11 @@ class ProfileSettingsPatternRenderTest {
         .contains(">4 · Blaupausen-Verfügbarkeit<")
         .containsPattern(
             "id=\"profile-name-withholding-form\"[^>]*action=\"/profile/name-withholding\"")
-        .contains(">5 · Verbundene Anwendungen<");
-    assertThat(html.split("class=\"form-section\"", -1)).hasSize(6);
-    assertThat(NOSCRIPT_SAVE.matcher(html).results().count()).isEqualTo(5);
+        .contains(">5 · Verbundene Anwendungen<")
+        .containsPattern("id=\"profile-home-location-form\"[^>]*action=\"/profile/home-location\"")
+        .contains(">6 · Meine Home Location<");
+    assertThat(html.split("class=\"form-section\"", -1)).hasSize(7);
+    assertThat(NOSCRIPT_SAVE.matcher(html).results().count()).isEqualTo(6);
     assertThat(html)
         .containsPattern("class=\"form-actions--sticky profile-save-bar\"[^>]*hidden")
         .contains("data-testid=\"profile-save\"")

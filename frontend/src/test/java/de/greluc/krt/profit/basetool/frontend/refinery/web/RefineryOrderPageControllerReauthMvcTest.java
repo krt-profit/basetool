@@ -28,6 +28,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
@@ -55,7 +56,8 @@ class RefineryOrderPageControllerReauthMvcTest {
                 client,
                 mock(LogisticianGate.class),
                 mock(IngestHandoffService.class),
-                new ParallelPageLoader()));
+                new ParallelPageLoader(),
+                mock(HomeLocationPreferenceReader.class)));
     ReauthPageMvc.signInMember();
   }
 
