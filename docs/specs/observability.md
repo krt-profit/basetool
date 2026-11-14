@@ -1562,6 +1562,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   timestamps from durable attempts without replaying completion counters. This recovery runs once
   per process before recording any new attempt, including a zero-delay scheduler tick. A refresh-only
   cache-training context performs no recovery database access.
+- A `PARTIAL` attempt logs one WARN naming its source and slice and the counters that made it
+  partial: fetched, valid, applied, skipped, failed, whether the census stayed complete and the
+  sweep outcome (`SyncRunService`). The umbrella job's failure names every incomplete slice with its
+  outcome (`SHIP_TYPE=PARTIAL`; `ScWikiScheduler`, `UexScheduler`), so the log alone tells which
+  slice to open on the sync-report page, where the records behind a conflict are listed.
 - `basetool_catalogue_attempt_active{source,aggregate}` identifies in-flight attempts;
   `basetool_catalogue_attempt_started_timestamp_seconds{source,aggregate}` records their actual
   start. `CatalogueAttemptRunningTooLong` watches source sweeps active for more than two hours.
