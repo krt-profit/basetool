@@ -93,6 +93,8 @@
                                            th:aria-label="#{hangar.bulk.select(${named ? ship.name : hull})}"></label>
                                     <span class="hangar-row__name">
                                         <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
+                                        <span th:if="${ship.relocationPending}" class="chip chip--warning" data-testid="relocation-pending-chip"
+                                              th:title="#{patchChange.relocationPending.title}" th:text="#{patchChange.relocationPending.chip}">Umzug ausstehend</span>
                                         <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
                                               class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
                                         <th:block th:replace="~{hangar/fragments/ship-meta :: shipMeta(${ship})}"></th:block>

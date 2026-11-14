@@ -54,6 +54,17 @@ public interface StockRelocationLock {
   Set<UUID> pendingAmong(@NotNull Collection<UUID> holders);
 
   /**
+   * Returns the holders among the given ones whose rows from before the open phase's live time the
+   * current caller may not write, by the rule of {@link #requireWritable}.
+   *
+   * @param holders the holders to look at
+   * @return the holders the caller is refused for, empty while no phase is open
+   */
+  @NotNull
+  @Unmodifiable
+  Set<UUID> refusedAmong(@NotNull Collection<UUID> holders);
+
+  /**
    * Refuses the current caller's write to rows from before the open phase's live time.
    *
    * @param holders the holders of the rows from before the live time the write changes

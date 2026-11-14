@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRelocationLock;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
@@ -57,6 +58,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
@@ -93,6 +95,10 @@ class InventoryItemServiceAggregateTest {
         .when(stockLevelService.lowSubjects())
         .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
   }
+
+  @Spy
+  private InventoryRelocationMarks relocationMarks =
+      new InventoryRelocationMarks(org.mockito.Mockito.mock(StockRelocationLock.class));
 
   @InjectMocks private InventoryAggregationService service;
 

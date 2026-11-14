@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRelocationLock;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
@@ -140,7 +141,8 @@ class InventoryItemServiceTest {
             materialMapper,
             requestScopeResolver,
             null,
-            stockLevelService);
+            stockLevelService,
+            new InventoryRelocationMarks(mock(StockRelocationLock.class)));
     realCheckoutService =
         InventoryCheckoutFixtures.create(
             inventoryItemRepository,

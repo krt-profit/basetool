@@ -22,10 +22,13 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRelocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRelocation;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -34,8 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Ends an open home-location phase early (REQ-PATCH-024): the gate and the lock end for every
- * member who has not chosen, and nothing more relocates in it. The label and its version stay as
- * they are, so a concurrent label correction never collides with the end.
+ * member who has not chosen, and nothing more relocates in it; the open Lager and hangar pages
+ * refresh their markers after the commit. The label and its version stay as they are, so a
+ * concurrent label correction never collides with the end.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,6 +51,8 @@ public class HomeLocationPhaseEnd {
   private final PatchChangeLiveSync liveSync;
   private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelper;
+  private final StockRelocation stockRelocation;
+  private final ShipRelocation shipRelocation;
 
   /**
    * Ends a patch change's open phase.
@@ -69,7 +75,7 @@ public class HomeLocationPhaseEnd {
             .filter(latest -> latest.getId().equals(id) && latest.getPhaseEndedAt() == null)
             .map(HomeLocationPhase::of)
             .orElseThrow(HomeLocationPhaseEnd::notOpen);
-    long pending = phases.allPending(phase).size();
+    List<UUID> pending = phases.allPending(phase);
     if (repository.endPhase(id, Instant.now(), authHelper.currentUserId().orElse(null)) == 0) {
       throw notOpen();
     }
@@ -78,8 +84,10 @@ public class HomeLocationPhaseEnd {
         id,
         record.getLabel(),
         null,
-        AuditDetails.of("pending", pending));
+        AuditDetails.of("pending", pending.size()));
     liveSync.historyChanged();
+    stockRelocation.announceLockChange();
+    shipRelocation.announceLockChange(pending);
     return history.toDto(
         Entities.require(repository.findWithDetailsById(id), "error.patch_change.not_found"));
   }

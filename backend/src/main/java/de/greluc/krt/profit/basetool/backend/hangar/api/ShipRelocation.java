@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -47,7 +48,8 @@ public interface ShipRelocation {
   /**
    * Moves the owner's ships created before an instant, or without a creation time, to the target
    * location inside the caller's transaction; ships already there stay and are not counted. The
-   * owner's and the units' hangar pages refresh after the commit.
+   * owner's and the units' hangar pages refresh after the commit, also when nothing moved, because
+   * the owner's lock ends.
    *
    * @param owner the owner
    * @param createdBefore the instant
@@ -55,4 +57,12 @@ public interface ShipRelocation {
    * @return how many ships moved
    */
   int relocate(@NotNull UUID owner, @NotNull Instant createdBefore, @NotNull UUID targetLocationId);
+
+  /**
+   * Tells the owners' and their units' open hangar pages after the commit that the relocation lock
+   * changed for them, so their „Umzug ausstehend" markers follow: a phase opened or ended.
+   *
+   * @param owners the owners whose lock changed
+   */
+  void announceLockChange(@NotNull Collection<UUID> owners);
 }

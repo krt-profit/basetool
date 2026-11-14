@@ -56,6 +56,9 @@ class InventoryStockRelocation implements StockRelocation {
   /** The most row ids one statement binds. */
   private static final int MAX_IDS_PER_STATEMENT = 4_096;
 
+  /** The global Lager's section that lists the rows and their markers. */
+  private static final String STOCK_SECTION = "stock";
+
   private final InventoryRelocationRepository relocations;
   private final InventoryItemRepository rows;
   private final InventoryOrderWrites orderWrites;
@@ -91,6 +94,7 @@ class InventoryStockRelocation implements StockRelocation {
     List<InventoryRelocationRepository.MovableRow> planned =
         relocations.findMovable(holder, createdBefore, targetLocationId);
     if (planned.isEmpty()) {
+      announceLockChange();
       return 0;
     }
     Set<Long> lots = new TreeSet<>();
@@ -116,11 +120,20 @@ class InventoryStockRelocation implements StockRelocation {
     }
     if (moved > 0) {
       liveSync.publishAfterCommit(
-          LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL), List.of("stock", "stock-levels"));
+          LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL),
+          List.of(STOCK_SECTION, "stock-levels"));
       liveSync.publishAfterCommit(
           LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD), List.of("board"));
+    } else {
+      announceLockChange();
     }
     return moved;
+  }
+
+  @Override
+  public void announceLockChange() {
+    liveSync.publishAfterCommit(
+        LiveSyncTopic.global(LiveSyncTopicClass.INVENTORY_ALL), List.of(STOCK_SECTION));
   }
 
   /**

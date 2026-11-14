@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarRelocationGuard.LockedShips;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -51,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +64,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -217,6 +220,18 @@ public class HangarService {
   }
 
   /**
+   * Returns the ships among the listed ones that a pending relocation locks, for the „Umzug
+   * ausstehend" marker (REQ-PATCH-023): those from before the open home-location phase's live time
+   * of an owner who has not chosen yet.
+   *
+   * @param ships the listed ships, their owners readable
+   * @return the ids of the locked ships, empty while no phase is open
+   */
+  public @NotNull @Unmodifiable Set<UUID> relocationPendingShips(@NotNull Collection<Ship> ships) {
+    return relocationGuard.pendingShips(ships);
+  }
+
+  /**
    * Returns one page of the user's own ships in the personal-hangar order, optionally filtered by
    * ship-type or manufacturer name, by the fitted flag (REQ-HANGAR-002) and by the effective origin
    * (REQ-HANGAR-017). Ordering and filtering run in the repository across the whole fleet.
@@ -290,6 +305,7 @@ public class HangarService {
 
     Map<UUID, List<Ship>> shipsByType =
         ships.stream().collect(Collectors.groupingBy(s -> s.getShipType().getId()));
+    Set<UUID> relocationPending = relocationGuard.pendingShips(ships);
 
     return p.map(obj -> {
       ShipType type = (ShipType) obj[0];
@@ -301,7 +317,8 @@ public class HangarService {
                     new SquadronShipDetailDto(
                         s.getOwner() != null ? s.getOwner().getEffectiveName() : "Unknown",
                         s.getLocation() != null ? s.getLocation().getName() : null,
-                        s.isFitted()))
+                        s.isFitted(),
+                        relocationPending.contains(s.getId())))
                 .toList();
       }
 
@@ -676,20 +693,32 @@ public class HangarService {
 
   /**
    * Clears the {@code fitted} flag on every ship of the units in the caller's scope in which the
-   * caller holds officer reach; in the admin all-squadrons mode on every ship.
+   * caller holds officer reach; in the admin all-squadrons mode on every ship. Ships a pending
+   * relocation locks for the caller stay as they are (REQ-PATCH-023).
    */
   @Transactional
   public void resetAllFittedStatus() {
     ScopePredicate scope = officerResetScope(requestScopeResolver.currentScopePredicate());
+    List<ShipRepository.OwnerShipCount> fittedOwners = countFitted(scope, LockedShips.NONE);
+    LockedShips locked =
+        relocationGuard.lockedFor(
+            fittedOwners.stream().map(ShipRepository.OwnerShipCount::getOwnerId).toList());
     List<ShipRepository.OwnerShipCount> perOwner =
-        shipRepository.countFittedByOwnerScoped(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+        locked.owners().isEmpty() ? fittedOwners : countFitted(scope, locked);
     List<UUID> units =
         shipRepository.findFittedOrgUnitIdsScoped(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            locked.owners(),
+            locked.before());
     int reset =
         shipRepository.resetAllFittedScoped(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            locked.owners(),
+            locked.before());
     if (reset > 0) {
       auditRecorder.record(
           AuditEventType.HANGAR_FITTED_RESET,
@@ -704,6 +733,23 @@ public class HangarService {
       }
       unitLiveSync.unitsChanged(units);
     }
+  }
+
+  /**
+   * Counts the fitted ships per owner that a fitted reset in {@code scope} clears.
+   *
+   * @param scope the reset's scope
+   * @param locked the ships the reset leaves out
+   * @return one row per owner with at least one such ship
+   */
+  private @NotNull List<ShipRepository.OwnerShipCount> countFitted(
+      @NotNull ScopePredicate scope, @NotNull LockedShips locked) {
+    return shipRepository.countFittedByOwnerScoped(
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        locked.owners(),
+        locked.before());
   }
 
   /**

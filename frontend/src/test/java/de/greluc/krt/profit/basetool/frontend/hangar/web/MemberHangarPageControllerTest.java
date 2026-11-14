@@ -112,7 +112,20 @@ class MemberHangarPageControllerTest {
             false);
     ShipDto ship =
         new ShipDto(
-            SHIP, "Iron Mule", type, "LTI", null, true, null, null, 3L, 0L, null, null, null);
+            SHIP,
+            "Iron Mule",
+            type,
+            "LTI",
+            null,
+            true,
+            null,
+            null,
+            3L,
+            0L,
+            null,
+            null,
+            null,
+            false);
     when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
         .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
     when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(MEMBER)))
@@ -166,6 +179,33 @@ class MemberHangarPageControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("hangar/member-hangar :: memberHangarResults"))
         .andExpect(content().string(not(containsString("<html"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void aShipAPendingRelocationLocksCarriesTheChipAndKeepsTheAdminsActions() throws Exception {
+    ShipTypeDto type =
+        new ShipTypeDto(
+            UUID.randomUUID(),
+            "Cutlass Black",
+            new ManufacturerDto(UUID.randomUUID(), "Drake", "DRAK", null, null, null, false),
+            "Cutlass",
+            new BigDecimal("0"),
+            false);
+    ShipDto ship =
+        new ShipDto(
+            SHIP, "Iron Mule", type, "LTI", null, true, null, null, 3L, 0L, null, null, null, true);
+    when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
+        .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(MEMBER)))
+        .thenReturn(member());
+
+    mockMvc
+        .perform(get(BASE).param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"relocation-pending-chip\"")))
+        .andExpect(content().string(containsString("data-trigger=\"member-hangar-edit\"")))
+        .andExpect(content().string(containsString("data-trigger=\"member-hangar-change-unit\"")));
   }
 
   @Test
@@ -324,7 +364,8 @@ class MemberHangarPageControllerTest {
             4L,
             null,
             null,
-            null);
+            null,
+            false);
     when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
         .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
     when(backendApiClient.get(

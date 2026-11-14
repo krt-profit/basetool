@@ -50,7 +50,7 @@ public interface StockRelocation {
    * locks of the old and the new lots in ascending order, then the rows; it validates no linked job
    * order, because a relocation is a game fact and no order write (REQ-ORDERS-055). Rows already at
    * the target stay and are not counted. Every moved row's version advances; the Lager's open pages
-   * refresh after the commit.
+   * refresh after the commit, also when nothing moved, because the holder's lock ends.
    *
    * @param holder the holder
    * @param createdBefore the instant
@@ -59,4 +59,10 @@ public interface StockRelocation {
    */
   int relocate(
       @NotNull UUID holder, @NotNull Instant createdBefore, @NotNull UUID targetLocationId);
+
+  /**
+   * Tells the Lager's open pages after the commit that the relocation lock changed, so their „Umzug
+   * ausstehend" markers follow: a phase opened or ended.
+   */
+  void announceLockChange();
 }

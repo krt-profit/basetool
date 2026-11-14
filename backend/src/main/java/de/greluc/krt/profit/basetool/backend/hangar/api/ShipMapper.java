@@ -48,6 +48,8 @@ public interface ShipMapper {
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "pledge", ignore = true)
   @Mapping(target = "origin", ignore = true)
+  @Mapping(target = "relocationPending", ignore = true)
+  @Mapping(target = "withRelocationPending", ignore = true)
   ShipDto toDto(Ship ship);
 
   /**
@@ -61,6 +63,8 @@ public interface ShipMapper {
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "pledge", source = "ship")
   @Mapping(target = "origin", source = "ship")
+  @Mapping(target = "relocationPending", ignore = true)
+  @Mapping(target = "withRelocationPending", ignore = true)
   ShipDto toOwnerDto(Ship ship);
 
   /**

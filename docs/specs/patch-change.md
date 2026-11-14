@@ -551,17 +551,35 @@ each row Hibernate updates or deletes in a writing transaction, and before the c
 last changes are flushed, a changed row from before the live time is checked
 (`inventory.api.StockRelocationLock`, implemented by this module). A row a write only reads is never
 refused; a bulk statement, which flushes no entity, is not seen. The hangar checks a ship edit, a
-unit change and a delete (`hangar.api.ShipRelocationLock`).
+unit change and a delete (`hangar.api.ShipRelocationLock`); an officer's fitted reset leaves the
+ships the lock keeps from the caller as they are and counts only the ships it cleared.
+
+Others see the lock where they meet another member's stock and ships: a locked row, and a stack
+or ship of a pending holder, carries the chip „Umzug ausstehend" with the explanation — in the
+global Lager (the unit's stock and its pools, stack and rows), the material and item drill-downs,
+the unit hangar overview's owner rows and the admin member hangar. A locked row's actions (book
+out, rebook, pool change, stolen mark, note, earmarks) are disabled with the reason for a caller
+the lock refuses; the row DTO says both (`relocationPending`, `relocationLocked`), so the page
+never decides who may write. An admin keeps every action. The trigger, the end of a phase and a
+relocation tell the open Lager and hangar pages through their live-sync rooms, so the markers
+follow without a reload.
 
 **Acceptance**
 
 - [x] Another member's web write to a locked row and an exchange client's write to a locked row or
   ship are refused with `RELOCATION_PENDING`; the holder and an admin may write; a row created after
   the live time stays editable; after the relocation the lock is gone.
+- [x] An officer's fitted reset leaves the locked ships of a pending owner fitted.
+- [x] Another member's locked row shows „Umzug ausstehend" with its actions disabled and
+  explained; an admin sees the chip and keeps the actions; the unit hangar overview and the admin
+  member hangar mark a pending owner's locked ships.
 
-**Enforced by:** `HomeLocationRelocationIntegrationTest` · **Code:** `RelocationLocks`,
-`InventoryRelocationGuard`, `InventoryRelocationListener`, `HangarRelocationGuard`,
-`RelocationPendingException`, `PatchChangeProblemCode`
+**Enforced by:** `HomeLocationRelocationIntegrationTest`, `InventoryRelocationMarksTest`,
+`HangarRelocationGuardTest`, `HangarServiceTest`, `ShipRepositoryPersonalHangarTest`,
+`InventoryRelocationMarkerRenderTest`, `HangarPagePatternRenderTest`,
+`MemberHangarPageControllerTest` · **Code:** `RelocationLocks`, `InventoryRelocationGuard`,
+`InventoryRelocationListener`, `InventoryRelocationMarks`, `HangarRelocationGuard`,
+`ShipRelocationScope`, `RelocationPendingException`, `PatchChangeProblemCode`
 
 ### REQ-PATCH-024 — The home-location phase: open, ended early, superseded
 

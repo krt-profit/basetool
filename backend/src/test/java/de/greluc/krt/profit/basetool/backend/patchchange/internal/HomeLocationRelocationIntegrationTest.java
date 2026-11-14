@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
@@ -38,6 +39,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -46,6 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -81,6 +84,7 @@ class HomeLocationRelocationIntegrationTest {
   @Autowired private UserRepository userRepository;
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private RelocationLocks locks;
 
   private final List<UUID> locations = new ArrayList<>();
   private UUID admin;
@@ -317,6 +321,65 @@ class HomeLocationRelocationIntegrationTest {
         .satisfies(value -> assertThat(value).isPositive());
     assertThatThrownBy(() -> phaseEnd.end(first.id()))
         .isInstanceOf(BusinessConflictException.class);
+  }
+
+  @Test
+  void theMarkerFollowsTheLockOnOtherHoldersRowsAndShips() {
+    UUID locked = row(port, false, null, BEFORE);
+    UUID later = row(port, false, null, null);
+    jdbc.update("UPDATE inventory_item SET created_at = now() WHERE id = ?", later);
+    UUID lockedShip = ship(port, BEFORE);
+    ship(port, Instant.now());
+    trigger("0.1", LIVE_AT);
+
+    assertThat(stackEntries(port))
+        .filteredOn(entry -> entry.id().equals(locked))
+        .singleElement()
+        .satisfies(entry -> {
+          assertThat(entry.relocationPending()).isTrue();
+          assertThat(entry.relocationLocked()).isFalse();
+        });
+    assertThat(stackEntries(port))
+        .filteredOn(entry -> entry.id().equals(later))
+        .singleElement()
+        .extracting(InventoryItemDto::relocationPending)
+        .isEqualTo(false);
+    assertThat(memberShipsPending()).containsExactly(lockedShip);
+    authenticate(logistician, false);
+    assertThat(locks.refusedAmong(List.of(member))).containsExactly(member);
+    authenticate(member, false);
+    assertThat(locks.refusedAmong(List.of(member))).isEmpty();
+
+    relocations.relocate(member, home, RelocationChooser.SELF);
+
+    authenticate(admin, true);
+    assertThat(stackEntries(home)).noneMatch(InventoryItemDto::relocationPending);
+    assertThat(memberShipsPending()).isEmpty();
+    authenticate(logistician, false);
+    assertThat(locks.refusedAmong(List.of(member))).isEmpty();
+  }
+
+  /**
+   * Reads the member's stack of the test's material at a location as an admin sees it.
+   *
+   * @param location the stack's location
+   * @return the stack's rows
+   */
+  private @NotNull List<InventoryItemDto> stackEntries(@NotNull UUID location) {
+    authenticate(admin, true);
+    return inventory
+        .getAllStackEntries(material, member, location, 500, false, null, PageRequest.of(0, 50))
+        .getContent();
+  }
+
+  /**
+   * Reads which of the member's ships carry the relocation marker.
+   *
+   * @return the marked ships
+   */
+  private @NotNull Set<UUID> memberShipsPending() {
+    return hangar.relocationPendingShips(
+        hangar.getMyShips(member, PageRequest.of(0, 50)).getContent());
   }
 
   /**

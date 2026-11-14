@@ -457,6 +457,8 @@
             <div class="tree-leaf-main">
                 <span th:if="${entry.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                       th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
+                <span th:if="${entry.relocationPending}" class="chip chip--warning" data-testid="relocation-pending-chip"
+                      th:title="#{patchChange.relocationPending.title}" th:text="#{patchChange.relocationPending.chip}">Umzug ausstehend</span>
                 <div class="tree-fieldset">
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
@@ -466,7 +468,7 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
-                            <th:block th:if="${isLogisticianOrAbove}">
+                            <th:block th:if="${isLogisticianOrAbove and !entry.relocationLocked}">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order"
                                       role="button" tabindex="0"
@@ -515,7 +517,7 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <th:block th:unless="${isLogisticianOrAbove}">
+                            <th:block th:unless="${isLogisticianOrAbove and !entry.relocationLocked}">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
@@ -536,7 +538,7 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
-                            <th:block th:if="${isLogisticianOrAbove}">
+                            <th:block th:if="${isLogisticianOrAbove and !entry.relocationLocked}">
                                 <span th:each="a : ${entry.missionAllocations}"
                                       class="assoc-chip assoc-chip--mission"
                                       role="button" tabindex="0"
@@ -584,7 +586,7 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <th:block th:unless="${isLogisticianOrAbove}">
+                            <th:block th:unless="${isLogisticianOrAbove and !entry.relocationLocked}">
                                 <span th:each="a : ${entry.missionAllocations}"
                                       class="assoc-chip assoc-chip--mission">
                                     <span th:text="${#strings.isEmpty(a.missionName)} ? #{inventory.assoc.mission.unknown} : ${a.missionName}">Nachtfalke</span> ·
@@ -613,7 +615,8 @@
                         th:data-user-id="${entry.user.id}"
                         th:data-location-id="${entry.location.id}"
                         data-trigger="inv-admin-bookout"
-                        th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
+                        th:disabled="${entry.relocationLocked}"
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : #{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
@@ -628,7 +631,8 @@
                         th:data-location-name="${entry.location.name}"
                         th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
                         data-trigger="inv-admin-umbuchen"
-                        th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
+                        th:disabled="${entry.relocationLocked}"
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : #{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
@@ -639,8 +643,9 @@
                         th:data-quantity-type="${entry.material.quantityType}"
                         th:data-org-unit-name="${entry.owningSquadron.name}"
                         data-trigger="inv-admin-pool"
+                        th:disabled="${entry.relocationLocked}"
                         data-testid="pool-change-open"
-                        th:title="#{inventory.poolChange.action}" th:aria-label="#{inventory.poolChange.action}">
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : #{inventory.poolChange.action}" th:aria-label="#{inventory.poolChange.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
@@ -651,8 +656,9 @@
                         th:data-quantity-type="${entry.material.quantityType}"
                         th:data-stolen="${entry.stolen == true}"
                         data-trigger="inv-admin-stolen"
+                        th:disabled="${entry.relocationLocked}"
                         data-testid="stolen-mark-open"
-                        th:title="${entry.stolen == true} ? #{inventory.stolen.unmark.action} : #{inventory.stolen.mark.action}"
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : (${entry.stolen == true} ? #{inventory.stolen.unmark.action} : #{inventory.stolen.mark.action})"
                         th:aria-label="${entry.stolen == true} ? #{inventory.stolen.unmark.action} : #{inventory.stolen.mark.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
                 </button>
@@ -662,7 +668,8 @@
                         th:data-version="${entry.version}"
                         th:data-note="${entry.note}"
                         data-trigger="inv-admin-open-note"
-                        th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
+                        th:disabled="${entry.relocationLocked}"
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : (${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add})"
                         th:aria-label="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
                 </button>
@@ -681,6 +688,8 @@
             <div class="tree-leaf-main">
                 <span th:if="${entry.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                       th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
+                <span th:if="${entry.relocationPending}" class="chip chip--warning" data-testid="relocation-pending-chip"
+                      th:title="#{patchChange.relocationPending.title}" th:text="#{patchChange.relocationPending.chip}">Umzug ausstehend</span>
                 <div class="tree-fieldset">
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
@@ -690,7 +699,7 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              data-piece="true">
-                            <th:block th:if="${isLogisticianOrAbove}">
+                            <th:block th:if="${isLogisticianOrAbove and !entry.relocationLocked}">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order"
                                       role="button" tabindex="0"
@@ -739,7 +748,7 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <th:block th:unless="${isLogisticianOrAbove}">
+                            <th:block th:unless="${isLogisticianOrAbove and !entry.relocationLocked}">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
@@ -767,7 +776,8 @@
                         th:data-user-id="${entry.user.id}"
                         th:data-location-id="${entry.location.id}"
                         data-trigger="inv-admin-bookout"
-                        th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
+                        th:disabled="${entry.relocationLocked}"
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : #{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
@@ -780,7 +790,8 @@
                         th:data-location-id="${entry.location.id}"
                         th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
                         data-trigger="inv-admin-umbuchen"
-                        th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
+                        th:disabled="${entry.relocationLocked}"
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : #{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
@@ -791,8 +802,9 @@
                         data-quantity-type="PIECE"
                         th:data-org-unit-name="${entry.owningSquadron.name}"
                         data-trigger="inv-admin-pool"
+                        th:disabled="${entry.relocationLocked}"
                         data-testid="pool-change-open"
-                        th:title="#{inventory.poolChange.action}" th:aria-label="#{inventory.poolChange.action}">
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : #{inventory.poolChange.action}" th:aria-label="#{inventory.poolChange.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
@@ -803,8 +815,9 @@
                         data-quantity-type="PIECE"
                         th:data-stolen="${entry.stolen == true}"
                         data-trigger="inv-admin-stolen"
+                        th:disabled="${entry.relocationLocked}"
                         data-testid="stolen-mark-open"
-                        th:title="${entry.stolen == true} ? #{inventory.stolen.unmark.action} : #{inventory.stolen.mark.action}"
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : (${entry.stolen == true} ? #{inventory.stolen.unmark.action} : #{inventory.stolen.mark.action})"
                         th:aria-label="${entry.stolen == true} ? #{inventory.stolen.unmark.action} : #{inventory.stolen.mark.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
                 </button>
@@ -814,7 +827,8 @@
                         th:data-version="${entry.version}"
                         th:data-note="${entry.note}"
                         data-trigger="inv-admin-open-note"
-                        th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
+                        th:disabled="${entry.relocationLocked}"
+                        th:title="${entry.relocationLocked} ? #{patchChange.relocationPending.locked} : (${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add})"
                         th:aria-label="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
                 </button>

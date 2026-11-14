@@ -94761,6 +94761,12 @@
             "type" : "integer",
             "format" : "int32"
           },
+          "relocationLocked" : {
+            "type" : "boolean"
+          },
+          "relocationPending" : {
+            "type" : "boolean"
+          },
           "stolen" : {
             "type" : "boolean"
           },
@@ -94985,6 +94991,9 @@
           "quality" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "relocationPending" : {
+            "type" : "boolean"
           },
           "stolen" : {
             "type" : "boolean"
@@ -106772,6 +106781,9 @@
             "type" : "string",
             "enum" : [ "FLIGHT_READY", "IN_CONCEPT", "IN_PRODUCTION" ]
           },
+          "relocationPending" : {
+            "type" : "boolean"
+          },
           "shipType" : {
             "$ref" : "#/components/schemas/ShipTypeDto"
           },
@@ -107159,6 +107171,9 @@
           },
           "ownerName" : {
             "type" : "string"
+          },
+          "relocationPending" : {
+            "type" : "boolean"
           }
         }
       },

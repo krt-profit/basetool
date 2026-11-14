@@ -66,6 +66,19 @@ interface HangarRelocationRepository extends Repository<Ship, UUID> {
   List<UUID> findOwnersOfShipsBefore(
       @Param("ids") Collection<UUID> ids, @Param("before") Instant before);
 
+  /**
+   * Lists the org units the owners' ships belong to, for the unit hangar live sync.
+   *
+   * @param owners the owners
+   * @return the distinct org unit ids; ships without a unit are left out
+   */
+  @Query(
+      """
+      SELECT DISTINCT s.owningOrgUnit.id FROM Ship s
+      WHERE s.owner.id IN :owners AND s.owningOrgUnit IS NOT NULL
+      """)
+  List<UUID> findOrgUnitIdsOfOwners(@Param("owners") Collection<UUID> owners);
+
   /** One location's share of an owner's ships. */
   interface LocationGroup {
 

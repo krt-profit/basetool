@@ -360,7 +360,8 @@ public class HangarController {
 
   /**
    * Admin-only: lists a target user's hangar. User id comes from the path (not the JWT) so admins
-   * can inspect any user's fleet.
+   * can inspect any user's fleet; a ship a pending relocation locks carries {@code
+   * relocationPending} (REQ-PATCH-023).
    *
    * @return paged ship DTOs
    */
@@ -376,7 +377,10 @@ public class HangarController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "insurance", "fitted", "id"), "name");
     Page<Ship> p = hangarService.getMyShips(userId, pageable);
-    return PageResponse.of(p.map(shipMapper::toOwnerDto));
+    Set<UUID> pending = hangarService.relocationPendingShips(p.getContent());
+    return PageResponse.of(
+        p.map(ship ->
+            shipMapper.toOwnerDto(ship).withRelocationPending(pending.contains(ship.getId()))));
   }
 
   /** Admin-only: adds a ship to a target user's hangar. */

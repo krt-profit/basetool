@@ -63,24 +63,30 @@ class RelocationLocks implements StockRelocationLock, ShipRelocationLock {
 
   @Override
   @Transactional(readOnly = true)
-  public void requireWritable(@NotNull Collection<UUID> holders) {
+  public @NotNull @Unmodifiable Set<UUID> refusedAmong(@NotNull Collection<UUID> holders) {
     if (holders.isEmpty() || PatchChangeWrites.current().isPresent()) {
-      return;
+      return Set.of();
     }
     Optional<Authentication> caller = authHelper.currentAuthentication();
     if (caller.isEmpty()) {
-      return;
+      return Set.of();
     }
     boolean client =
         caller.get() instanceof SubjectAuthentication subject && subject.externalClient() != null;
     if (!client && authHelper.isAdmin()) {
-      return;
+      return Set.of();
     }
     Set<UUID> refused = new HashSet<>(pendingAmong(holders));
     if (!client) {
       authHelper.currentUserId().ifPresent(refused::remove);
     }
-    if (!refused.isEmpty()) {
+    return Set.copyOf(refused);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public void requireWritable(@NotNull Collection<UUID> holders) {
+    if (!refusedAmong(holders).isEmpty()) {
       throw new RelocationPendingException();
     }
   }

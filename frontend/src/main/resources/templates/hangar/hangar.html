@@ -276,7 +276,9 @@
                         </tbody>
                         <tbody th:if="${canSeeHangarOwnerDetails and hasDetails}" class="hangar-tree__owners" th:id="${groupId}" hidden>
                             <tr th:each="detail : ${item.details}" class="hangar-tree__owner" data-testid="squadron-owner-row">
-                                <td><span class="hangar-tree__owner-name" th:text="${detail.ownerName}">greluc</span></td>
+                                <td><span class="hangar-tree__owner-name" th:text="${detail.ownerName}">greluc</span>
+                                    <span th:if="${detail.relocationPending}" class="chip chip--warning" data-testid="relocation-pending-chip"
+                                          th:title="#{patchChange.relocationPending.title}" th:text="#{patchChange.relocationPending.chip}">Umzug ausstehend</span></td>
                                 <td class="num hangar-tree__owner-gap"></td>
                                 <td>
                                     <div class="hangar-tree__owner-meta">

@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.hangar.api;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Tells the hangar which ships a pending relocation locks (REQ-PATCH-023, ADR-0383): while a
@@ -40,6 +42,27 @@ public interface ShipRelocationLock {
    */
   @NotNull
   Optional<Instant> openPhaseLiveAt();
+
+  /**
+   * Returns the owners among the given ones who must still relocate in the open phase.
+   *
+   * @param owners the owners to look at
+   * @return the pending owners, empty while no phase is open
+   */
+  @NotNull
+  @Unmodifiable
+  Set<UUID> pendingAmong(@NotNull Collection<UUID> owners);
+
+  /**
+   * Returns the owners among the given ones whose ships from before the open phase's live time the
+   * current caller may not write, by the rule of {@link #requireWritable}.
+   *
+   * @param owners the owners to look at
+   * @return the owners the caller is refused for, empty while no phase is open
+   */
+  @NotNull
+  @Unmodifiable
+  Set<UUID> refusedAmong(@NotNull Collection<UUID> owners);
 
   /**
    * Refuses the current caller's write to ships from before the open phase's live time.

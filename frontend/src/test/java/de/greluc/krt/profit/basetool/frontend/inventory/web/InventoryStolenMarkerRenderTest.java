@@ -112,7 +112,8 @@ class InventoryStolenMarkerRenderTest {
         10.0,
         700.0,
         700,
-        1);
+        1,
+        false);
   }
 
   private GroupedInventoryDto group(InventoryStackDto... stacks) {

@@ -39,6 +39,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +72,7 @@ public class InventoryAggregationService {
   private final RequestScopeResolver requestScopeResolver;
   private final InventoryItemViewRepository inventoryItemViewRepository;
   private final StockLevelService stockLevelService;
+  private final InventoryRelocationMarks relocationMarks;
 
   /**
    * Sums the caller's own stock into one SCU total per material and quality for the blueprint
@@ -143,14 +145,15 @@ public class InventoryAggregationService {
     Material material =
         Entities.require(materialRepository.findById(materialId), "Material not found");
     ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
-    return inventoryItemRepository
-        .findByMaterialAndPersonalFalseScoped(
-            material,
-            scope.adminAllScope(),
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds(),
-            pageable)
-        .map(inventoryItemMapper::toDto);
+    return relocationMarks.markRows(
+        inventoryItemRepository
+            .findByMaterialAndPersonalFalseScoped(
+                material,
+                scope.adminAllScope(),
+                scope.activeOrgUnitId(),
+                scope.memberOrgUnitIds(),
+                pageable)
+            .map(inventoryItemMapper::toDto));
   }
 
   /**
@@ -166,14 +169,15 @@ public class InventoryAggregationService {
     GameItem gameItem =
         Entities.require(gameItemRepository.findById(gameItemId), "Game item not found");
     ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
-    return inventoryItemRepository
-        .findByGameItemAndPersonalFalseScoped(
-            gameItem,
-            scope.adminAllScope(),
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds(),
-            pageable)
-        .map(inventoryItemMapper::toDto);
+    return relocationMarks.markRows(
+        inventoryItemRepository
+            .findByGameItemAndPersonalFalseScoped(
+                gameItem,
+                scope.adminAllScope(),
+                scope.activeOrgUnitId(),
+                scope.memberOrgUnitIds(),
+                pageable)
+            .map(inventoryItemMapper::toDto));
   }
 
   /**
@@ -290,7 +294,7 @@ public class InventoryAggregationService {
             filter.stolenOnly(),
             filter.nonStolenOnly());
 
-    return buildGroupedFromStacks(stacks);
+    return buildGroupedFromStacks(stacks, Set.of());
   }
 
   /**
@@ -338,7 +342,14 @@ public class InventoryAggregationService {
             filter.nonStolenOnly());
 
     LowStockSubjects low = stockLevelService.lowSubjects();
-    return buildGroupedFromStacks(stacks).stream()
+    Set<UUID> pending =
+        relocationMarks.pendingHolders(
+            stacks.stream()
+                .map(InventoryStackAggregate::user)
+                .filter(Objects::nonNull)
+                .map(User::getId)
+                .toList());
+    return buildGroupedFromStacks(stacks, pending).stream()
         .map(group ->
             group.withLowStock(
                 low.lowMaterial(group.material() == null ? null : group.material().id())))
@@ -385,7 +396,7 @@ public class InventoryAggregationService {
             attributes.gradesOrNull(),
             attributes.hasItemClasses(),
             attributes.itemClassesOrNull());
-    return buildGroupedFromItemStacks(stacks);
+    return buildGroupedFromItemStacks(stacks, Set.of());
   }
 
   /**
@@ -497,7 +508,14 @@ public class InventoryAggregationService {
             attributes.hasItemClasses(),
             attributes.itemClassesOrNull());
     LowStockSubjects low = stockLevelService.lowSubjects();
-    return buildGroupedFromItemStacks(stacks).stream()
+    Set<UUID> pending =
+        relocationMarks.pendingHolders(
+            stacks.stream()
+                .map(InventoryItemStackAggregate::user)
+                .filter(Objects::nonNull)
+                .map(User::getId)
+                .toList());
+    return buildGroupedFromItemStacks(stacks, pending).stream()
         .map(group ->
             group.withLowStock(
                 low.lowGameItem(group.gameItem() == null ? null : group.gameItem().id())))
@@ -509,17 +527,18 @@ public class InventoryAggregationService {
    * are not included; they load lazily per stack (ADR-0003).
    *
    * @param aggregates the SQL-grouped per-stack rows for the current scope/filter
+   * @param pendingHolders the holders whose stacks carry the relocation marker
    * @return the materials, each carrying its sorted stacks and material-wide totals
    */
   private List<GroupedInventoryDto> buildGroupedFromStacks(
-      @NotNull List<InventoryStackAggregate> aggregates) {
+      @NotNull List<InventoryStackAggregate> aggregates, @NotNull Set<UUID> pendingHolders) {
     return aggregates.stream()
         .collect(
             Collectors.groupingBy(
                 aggregate -> aggregate.material().getId(), LinkedHashMap::new, Collectors.toList()))
         .values()
         .stream()
-        .map(this::buildMaterialGroup)
+        .map(group -> buildMaterialGroup(group, pendingHolders))
         .sorted(Comparator.comparing(g -> Objects.requireNonNull(g.material()).name()))
         .toList();
   }
@@ -529,10 +548,12 @@ public class InventoryAggregationService {
    * mean quality and max quality, computed from the raw database sums.
    *
    * @param matStacks every per-stack aggregate of one material in the current scope; never empty
+   * @param pendingHolders the holders whose stacks carry the relocation marker
    * @return the populated material group with its nested stacks
    */
   @NotNull
-  private GroupedInventoryDto buildMaterialGroup(@NotNull List<InventoryStackAggregate> matStacks) {
+  private GroupedInventoryDto buildMaterialGroup(
+      @NotNull List<InventoryStackAggregate> matStacks, @NotNull Set<UUID> pendingHolders) {
     List<InventoryStackDto> stacks = new ArrayList<>(matStacks.size());
     MaterialReferenceDto material = null;
     double totalAmount = 0.0;
@@ -558,7 +579,8 @@ public class InventoryAggregationService {
               amt,
               stackAvg,
               mq,
-              aggregate.entryCount() != null ? aggregate.entryCount().intValue() : 0));
+              aggregate.entryCount() != null ? aggregate.entryCount().intValue() : 0,
+              holderPending(refs, pendingHolders)));
       totalAmount += amt;
       weightedQualitySum += wqs;
       if (mq > maxQuality) {
@@ -572,21 +594,22 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #buildGroupedFromStacks(List)}: groups per-stack item aggregates by
-   * game item, sorted by item name.
+   * Game-item sibling of {@link #buildGroupedFromStacks(List, Set)}: groups per-stack item
+   * aggregates by game item, sorted by item name.
    *
    * @param aggregates the SQL-grouped per-item-stack rows for the current scope/filter
+   * @param pendingHolders the holders whose stacks carry the relocation marker
    * @return the game-item groups, each carrying its sorted stacks and item-wide total
    */
   private List<GroupedInventoryDto> buildGroupedFromItemStacks(
-      @NotNull List<InventoryItemStackAggregate> aggregates) {
+      @NotNull List<InventoryItemStackAggregate> aggregates, @NotNull Set<UUID> pendingHolders) {
     return aggregates.stream()
         .collect(
             Collectors.groupingBy(
                 aggregate -> aggregate.gameItem().getId(), LinkedHashMap::new, Collectors.toList()))
         .values()
         .stream()
-        .map(this::buildItemGroup)
+        .map(group -> buildItemGroup(group, pendingHolders))
         .sorted(Comparator.comparing(g -> Objects.requireNonNull(g.gameItem()).name()))
         .toList();
   }
@@ -596,11 +619,12 @@ public class InventoryAggregationService {
    * summed amount; quality figures stay {@code null}.
    *
    * @param itemStacks every per-stack aggregate of one game item in the current scope; never empty
+   * @param pendingHolders the holders whose stacks carry the relocation marker
    * @return the populated game-item group with its nested stacks
    */
   @NotNull
   private GroupedInventoryDto buildItemGroup(
-      @NotNull List<InventoryItemStackAggregate> itemStacks) {
+      @NotNull List<InventoryItemStackAggregate> itemStacks, @NotNull Set<UUID> pendingHolders) {
     List<InventoryStackDto> stacks = new ArrayList<>(itemStacks.size());
     InventoryGameItemReferenceDto gameItem = null;
     double totalAmount = 0.0;
@@ -621,11 +645,24 @@ public class InventoryAggregationService {
               amt,
               null,
               null,
-              aggregate.entryCount() != null ? aggregate.entryCount().intValue() : 0));
+              aggregate.entryCount() != null ? aggregate.entryCount().intValue() : 0,
+              holderPending(refs, pendingHolders)));
       totalAmount += amt;
     }
     stacks.sort(STACK_ORDER);
     return new GroupedInventoryDto(null, gameItem, totalAmount, null, null, stacks);
+  }
+
+  /**
+   * Tells whether a stack's holder has not chosen yet in the open home-location phase.
+   *
+   * @param refs the stack's mapped identity
+   * @param pendingHolders the pending holders
+   * @return {@code true} when the stack carries the relocation marker
+   */
+  private static boolean holderPending(
+      @NotNull InventoryItemDto refs, @NotNull Set<UUID> pendingHolders) {
+    return refs.user() != null && pendingHolders.contains(refs.user().id());
   }
 
   /**
@@ -730,19 +767,20 @@ public class InventoryAggregationService {
       UUID owningOrgUnitId,
       Pageable pageable) {
     ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
-    return inventoryItemRepository
-        .findGlobalStackEntries(
-            materialId,
-            userId,
-            locationId,
-            quality,
-            stolen != null ? stolen : Boolean.FALSE,
-            owningOrgUnitId,
-            scope.adminAllScope(),
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds(),
-            pageable)
-        .map(inventoryItemMapper::toDto);
+    return relocationMarks.markRows(
+        inventoryItemRepository
+            .findGlobalStackEntries(
+                materialId,
+                userId,
+                locationId,
+                quality,
+                stolen != null ? stolen : Boolean.FALSE,
+                owningOrgUnitId,
+                scope.adminAllScope(),
+                scope.activeOrgUnitId(),
+                scope.memberOrgUnitIds(),
+                pageable)
+            .map(inventoryItemMapper::toDto));
   }
 
   /**
@@ -802,18 +840,19 @@ public class InventoryAggregationService {
       UUID owningOrgUnitId,
       Pageable pageable) {
     ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
-    return inventoryItemRepository
-        .findGlobalItemStackEntries(
-            canonicalGameItemId(gameItemId),
-            userId,
-            locationId,
-            stolen != null ? stolen : Boolean.FALSE,
-            owningOrgUnitId,
-            scope.adminAllScope(),
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds(),
-            pageable)
-        .map(inventoryItemMapper::toDto);
+    return relocationMarks.markRows(
+        inventoryItemRepository
+            .findGlobalItemStackEntries(
+                canonicalGameItemId(gameItemId),
+                userId,
+                locationId,
+                stolen != null ? stolen : Boolean.FALSE,
+                owningOrgUnitId,
+                scope.adminAllScope(),
+                scope.activeOrgUnitId(),
+                scope.memberOrgUnitIds(),
+                pageable)
+            .map(inventoryItemMapper::toDto));
   }
 
   private UUID canonicalGameItemId(UUID gameItemId) {

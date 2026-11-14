@@ -2084,7 +2084,8 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null,
-            null);
+            null,
+            false);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto outsiderShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
             outsiderShipId,
@@ -2099,7 +2100,8 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null,
-            null);
+            null,
+            false);
 
     MissionDto mission =
         new MissionDto(
@@ -2253,7 +2255,8 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null,
-            null);
+            null,
+            false);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto assignedShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
             assignedShipId,
@@ -2268,7 +2271,8 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null,
-            null);
+            null,
+            false);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto strayShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
             strayShipId,
@@ -2283,7 +2287,8 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null,
-            null);
+            null,
+            false);
 
     de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto assignedUnit =
         new de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto(

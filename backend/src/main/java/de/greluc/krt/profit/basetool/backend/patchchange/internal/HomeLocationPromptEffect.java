@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRelocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRelocation;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationStreamService;
 import java.util.List;
 import java.util.UUID;
@@ -33,7 +35,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * the trigger opens the patch change's phase, which asks every active member whose account is older
  * than the live time. Nothing moves at the trigger; each member relocates after the choice. Once
  * the trigger has committed, the asked members' open notification streams close, so their open
- * pages reconnect through the gate.
+ * pages reconnect through the gate, and the open Lager and hangar pages refresh their markers.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,6 +43,8 @@ class HomeLocationPromptEffect implements PatchEffect {
 
   private final HomeLocationPhases phases;
   private final NotificationStreamService streams;
+  private final StockRelocation stockRelocation;
+  private final ShipRelocation shipRelocation;
 
   @Override
   public @NotNull PatchCounts preview(@NotNull PatchChangePlan plan) {
@@ -58,6 +62,8 @@ class HomeLocationPromptEffect implements PatchEffect {
     List<UUID> asked =
         phases.allPending(
             new HomeLocationPhase(run.patchChangeId(), run.label(), run.plan().liveAt()));
+    stockRelocation.announceLockChange();
+    shipRelocation.announceLockChange(asked);
     TransactionSynchronizationManager.registerSynchronization(
         new TransactionSynchronization() {
           @Override

@@ -28,11 +28,9 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -71,34 +69,31 @@ class HangarShipRelocation implements ShipRelocation {
   public int relocate(
       @NotNull UUID owner, @NotNull Instant createdBefore, @NotNull UUID targetLocationId) {
     Location target = locationRepository.getReferenceById(targetLocationId);
-    List<OrgUnit> units = new ArrayList<>();
     int moved = 0;
     for (Ship ship : shipRepository.lockAllOwnedByOrderById(owner)) {
-      if (isBefore(ship, createdBefore) && !isAt(ship, targetLocationId)) {
+      if (HangarRelocationGuard.fromBefore(ship, createdBefore) && !isAt(ship, targetLocationId)) {
         ship.setLocation(target);
-        units.add(ship.getOwningOrgUnit());
         moved++;
       }
     }
     if (moved > 0) {
       shipRepository.flush();
-      liveSync.publishAfterCommit(
-          LiveSyncTopic.of(LiveSyncTopicClass.HANGAR_OWN, owner),
-          List.of(HangarUnitLiveSync.SHIPS));
-      unitLiveSync.shipsChanged(units.stream().filter(Objects::nonNull).toList());
     }
+    announceLockChange(List.of(owner));
     return moved;
   }
 
-  /**
-   * Tells whether a ship is from before the cutoff; a ship without a creation time counts as such.
-   *
-   * @param ship the ship
-   * @param createdBefore the cutoff
-   * @return {@code true} when the ship moves with the relocation
-   */
-  private static boolean isBefore(@NotNull Ship ship, @NotNull Instant createdBefore) {
-    return ship.getCreatedAt() == null || ship.getCreatedAt().isBefore(createdBefore);
+  @Override
+  public void announceLockChange(@NotNull Collection<UUID> owners) {
+    if (owners.isEmpty()) {
+      return;
+    }
+    for (UUID owner : owners) {
+      liveSync.publishAfterCommit(
+          LiveSyncTopic.of(LiveSyncTopicClass.HANGAR_OWN, owner),
+          List.of(HangarUnitLiveSync.SHIPS));
+    }
+    unitLiveSync.unitsChanged(relocations.findOrgUnitIdsOfOwners(owners));
   }
 
   /**
