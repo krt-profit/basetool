@@ -47,7 +47,8 @@ SCOPES = ("offline_access exchange.connect exchange.blueprints.read exchange.blu
           "exchange.orgstock.details exchange.orgstock.write exchange.demand.details "
           "exchange.refinery.read exchange.refinery.write exchange.refinery.store "
 
-          "exchange.bank.read exchange.bank.request exchange.bank.queue")
+          "exchange.bank.read exchange.bank.request exchange.bank.queue "
+          "exchange.patch.read exchange.patch.write")
 DEFAULT_CA = ROOT / "docker" / "test-tls" / "basetool-test-ca.crt"
 USER_AGENT = "BasetoolSandboxClient/1.0.0 (+https://krt-profit.github.io/basetool/)"
 
