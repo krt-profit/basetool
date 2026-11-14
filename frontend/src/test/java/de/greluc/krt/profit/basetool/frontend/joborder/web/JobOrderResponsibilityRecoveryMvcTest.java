@@ -152,7 +152,11 @@ class JobOrderResponsibilityRecoveryMvcTest {
     var transfer =
         Pattern.compile("id=\"responsibility-transfer-form\"[^>]*>(.*?)</form>", Pattern.DOTALL)
             .matcher(html);
-    assertThat(html).containsPattern("id=\"responsibility-transfer-form\"[^>]*data-version=\"6\"");
+    assertThat(html)
+        .containsPattern("id=\"order-head-meta\"[^>]*data-responsibility-version=\"6\"")
+        .contains(
+            "data-testid=\"order-transfer-responsibility\"",
+            "id=\"transfer-responsibility-modal\"");
     assertThat(transfer.find()).isTrue();
     assertThat(transfer.group(1))
         .contains("Current Profit Bereich", "Current Profit Staffel", "Current Profit SK");

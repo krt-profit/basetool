@@ -35,14 +35,19 @@
             </button>
             <a th:if="${isItemOrder and (order.callerMayUseItemProcessingEditor() or canEditAsRequester)}"
                th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
-            <th:block th:if="${!order.responsibilityInvalid and (order.type != 'AUEC' or (money != null and money.canDelete))}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+            <th:block th:with="canDeleteOrder=${!order.responsibilityInvalid and (order.type != 'AUEC' or (money != null and money.canDelete)) and #authorization.expression('hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)')}">
+            <th:block th:if="${canTransferResponsibility or canDeleteOrder}">
                 <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='order-menu', items=~{::order-menu-items})}">
                     <th:block th:ref="order-menu-items">
-                        <form id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
+                        <button th:if="${canTransferResponsibility}" type="button" class="overflow-menu__item" role="menuitem"
+                                data-testid="order-transfer-responsibility" data-trigger="open-modal-display" data-modal-id="transfer-responsibility-modal"
+                            ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg> <span th:text="#{orders.responsibility.transfer}">Verantwortung umschreiben</span></button>
+                        <form th:if="${canDeleteOrder}" id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
                             <button type="submit" class="overflow-menu__item overflow-menu__item--danger" role="menuitem" data-testid="order-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{orders.detail.delete}">Auftrag löschen</span></button>
                         </form>
                     </th:block>
                 </th:block>
+            </th:block>
             </th:block>
         </th:block></div>
     </div>
@@ -52,6 +57,7 @@
         <span id="order-head-meta" hidden
               th:data-responsibility-invalid="${order.responsibilityInvalid}"
               th:data-order-version="${order.version}"
+              th:data-responsibility-version="${order.responsibilityVersion}"
               th:data-can-fulfill="${canFulfill}"
               th:data-requesting-unit-id="${order.requestingOrgUnit != null ? order.requestingOrgUnit.id() : null}"
               th:data-status="${order.status}"
@@ -62,11 +68,6 @@
               th:text="'#' + ${order.displayId}" th:data-order-number="'#' + ${order.displayId}">#1</span>
         <p th:if="${order.responsibilityInvalid}" class="alert alert-warning" data-testid="responsibility-invalid" th:text="#{orders.responsibility.invalid}"></p>
         <p th:if="${order.originalProfitBoundaryUnknown}" class="alert alert-info" data-testid="responsibility-origin-unknown" th:text="#{orders.responsibility.originUnknown}"></p>
-        <form th:if="${canTransferResponsibility}" id="responsibility-transfer-form" class="krt-form" data-trigger="od-transfer-responsibility"
-              th:data-order-id="${order.id}" th:data-version="${order.responsibilityVersion}" th:data-error="#{orders.responsibility.transfer.error}">
-            <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('transfer-responsible-org-unit', 'responsibleOrgUnitId', ${responsibleOptions}, null, 'orders.responsibility.transfer.target', true)}"></div>
-            <button type="submit" class="btn btn-ghost" th:text="#{orders.responsibility.transfer}"></button>
-        </form>
         <div class="facts-bar">
             <span>
                 <span class="fact-k" th:text="#{orders.detail.createdAt}">Erstellt am</span>
@@ -139,12 +140,27 @@
         </div>
     </th:block></div>
     <div id="order-participations-results"><th:block th:fragment="participationsSection">
-        <div class="od-summary__body" th:if="${support != null and (!support.participations.isEmpty() or !support.enrollmentOptions.isEmpty())}">
-            <h2 class="section-title" th:text="#{orders.support.title}">Staffelunterstützung</h2>
-            <ul class="od-assignee-list" th:unless="${support.participations.isEmpty()}">
-                <li class="od-assignee split" th:each="participation : ${support.participations}">
-                    <div class="cluster gap-1">
-                        <span th:text="${participation.unit.orgUnitName}"></span>
+        <details class="od-support" data-testid="order-support" data-od-support
+                 th:if="${support != null and (!support.participations.isEmpty() or !support.enrollmentOptions.isEmpty())}"
+                 th:with="activeSupport=${support.participations.?[active]}">
+            <summary class="od-support__summary" data-testid="order-support-toggle">
+                <svg class="krt-icon od-support__chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                <h2 class="od-support__title" th:text="#{orders.support.title}">Staffelunterstützung</h2>
+                <span class="od-support__chips">
+                    <span th:each="participation : ${activeSupport}" class="squadron-badge"
+                          th:title="${participation.unit.orgUnitName}"
+                          th:text="${participation.unit.orgUnitShorthand ?: participation.unit.orgUnitName}">ALP</span>
+                    <span th:if="${activeSupport.isEmpty()}" class="od-support__none"
+                          th:text="#{orders.support.none}">Keine Staffel beteiligt</span>
+                </span>
+            </summary>
+            <div class="od-support__body">
+            <ul class="od-support__list" th:unless="${support.participations.isEmpty()}">
+                <li class="od-support__row" th:each="participation : ${support.participations}">
+                    <div class="cluster gap-2">
+                        <span class="squadron-badge" th:classappend="${participation.active} ? '' : 'squadron-badge-muted'"
+                              th:text="${participation.unit.orgUnitShorthand ?: participation.unit.orgUnitName}">ALP</span>
+                        <span class="od-support__name" th:text="${participation.unit.orgUnitName}"></span>
                         <span th:unless="${participation.active}" class="status-pill status-cancelled"
                               th:text="#{orders.support.ended}">Beendet</span>
                     </div>
@@ -157,13 +173,14 @@
                             th:text="#{orders.support.withdraw}">Unterstützung beenden</button>
                 </li>
             </ul>
-            <form th:unless="${support.enrollmentOptions.isEmpty()}" class="krt-form"
+            <form th:unless="${support.enrollmentOptions.isEmpty()}" class="krt-form od-support__enroll"
                   data-testid="order-support-enroll" data-trigger="od-enroll-support"
                   th:data-order-id="${order.id}" th:data-error="#{orders.support.error}">
                 <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('support-unit', 'unitId', ${support.enrollmentOptions}, null, 'orders.support.staffel', true)}"></div>
-                <button type="submit" class="btn btn-ghost" th:text="#{orders.support.enroll}">Staffel hinzufügen</button>
+                <button type="submit" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{orders.support.enroll}">Staffel hinzufügen</span></button>
             </form>
-        </div>
+            </div>
+        </details>
         <th:block th:if="${order.type == 'AUEC' and support != null}">
             <th:block th:replace="~{joborder/fragments/order-money-commitments :: commitments}"></th:block>
         </th:block>
@@ -847,6 +864,28 @@
 </main>
 
 <div id="order-dialogs-results"><th:block th:fragment="orderDialogs">
+<th:block th:if="${canTransferResponsibility}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='transfer-responsibility-modal', titleKey='orders.responsibility.transfer', body=~{::transfer-responsibility-body})}">
+    <th:block th:ref="transfer-responsibility-body">
+        <form id="responsibility-transfer-form" class="krt-form" data-trigger="od-transfer-responsibility"
+              th:data-order-id="${order.id}" th:data-error="#{orders.responsibility.transfer.error}">
+        <div class="krt-modal-body">
+            <p class="od-modal-lead" th:text="#{orders.responsibility.transfer.lead}">Wähle die Einheit, die diesen Auftrag ab jetzt bearbeitet.</p>
+            <div class="od-transfer-current" th:if="${order.responsibleOrgUnit != null}">
+                <span class="fact-k" th:text="#{orders.responsibility.transfer.current}">Aktuell verantwortlich</span>
+                <span class="squadron-badge" th:text="${order.responsibleOrgUnit.shorthand() ?: order.responsibleOrgUnit.name()}">ALP</span>
+                <span class="od-transfer-current__name" th:text="${order.responsibleOrgUnit.name()}">Alpha</span>
+            </div>
+            <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('transfer-responsible-org-unit', 'responsibleOrgUnitId', ${responsibleOptions}, null, 'orders.responsibility.transfer.target', true)}"></div>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="transfer-responsibility-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
+            <button type="submit" class="btn btn--cta" data-testid="order-transfer-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg> <span th:text="#{orders.responsibility.transfer.submit}">Umschreiben</span></button>
+        </div>
+        </form>
+    </th:block>
+</th:block>
+</th:block>
 <th:block th:if="${!order.responsibilityInvalid}">
 <th:block th:if="${order.type == 'MATERIAL' and (isLogistician or canEditAsRequester)}">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='edit-modal', titleKey='orders.detail.edit', variant='krt-modal--xwide', body=~{::edit-modal-body})}">
@@ -1318,6 +1357,7 @@
 <script type="module" th:src="@{/js/joborder/orders-detail-reports.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/joborder/orders-detail-production.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/joborder/orders-detail-events.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/joborder/orders-detail-support.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/joborder/orders-money.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
