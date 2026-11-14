@@ -96,6 +96,7 @@ material_occurrence catalogue
 material_price catalogue
 member_active_org_unit scope
 member_blueprint_sharing blueprint
+member_home_location identity
 member_payout_setting mission
 mission mission
 mission_crew mission

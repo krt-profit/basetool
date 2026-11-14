@@ -655,11 +655,13 @@ The coverage list holds the **Patchwechsel** area
   a home-location phase early (subject the patch change; details `pending`, the members still to
   relocate); `PATCH_CHANGE_RELOCATED` per member after the home-location choice (subject and target
   the member; details `patchChange`, `label`, `location`, `rows`, `ships` and `chosenBy` `SELF`,
-  `ADMIN` or `CLIENT`, REQ-PATCH-027); `PATCH_CHANGE_AUDIT_EXPORTED` and
-  `PATCH_CHANGE_AUDIT_PURGED` as every area records its export and purge. Only the relocation has a
-  target user, and the details carry enums, instants, booleans, ids, the curated location name and
-  counts only (`wipeExceptions` is the number of exceptions); a relocation records no event in the
-  Lager's or the hangar's trail. Each affected area records one summary event of the trigger in its
+  `ADMIN` or `CLIENT`, REQ-PATCH-027); `HOME_LOCATION_PREFERENCE_SET` when the member's profile
+  setting "my home location" changes (subject and target the member; details `location` and
+  `source` `PROFILE` or `RELOCATION`, REQ-PATCH-032); `PATCH_CHANGE_AUDIT_EXPORTED` and
+  `PATCH_CHANGE_AUDIT_PURGED` as every area records its export and purge. Only the relocation and
+  the home-location setting have a target user, and the details carry enums, instants, booleans,
+  ids, the curated location name and counts only (`wipeExceptions` is the number of exceptions); a
+  relocation records no event in the Lager's or the hangar's trail. Each affected area records one summary event of the trigger in its
   own trail: the refinery's and the job orders' above, the Bank's own `WIPE_RESET_EXECUTED` naming
   the patch change, the live time and the cancelled requests
   ([REQ-PATCH-046](patch-change.md#req-patch-046--preview-audit-and-live-update-of-the-currency-wipe)),

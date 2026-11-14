@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipForm;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrigin;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
@@ -48,6 +49,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -99,6 +101,9 @@ public class HangarPageController {
   /** Reads the cached reference catalogues behind the ship form. */
   private final CachedCatalogListLoader catalogListLoader;
 
+  /** Reads the caller's home location, where a new ship starts (REQ-PATCH-033). */
+  private final HomeLocationPreferenceReader homeLocationReader;
+
   /**
    * Publishes the ship-import upload cap to every hangar view for the client-side size check.
    *
@@ -127,7 +132,7 @@ public class HangarPageController {
    * Renders the hangar page on its „Meine Schiffe" tab, server-side paginated and filtered by
    * search term and fitted flag (REQ-HANGAR-002). The uncached ship page, the ready/total counter
    * and the cached reference catalogs load in parallel; each catalog degrades to an empty list on
-   * failure.
+   * failure. The add-ship dialog starts at the caller's home location (REQ-PATCH-033).
    *
    * @param page zero-based page index; negatives are clamped to 0
    * @param size page size, validated against {@link #HANGAR_PAGE_SIZES}
@@ -229,17 +234,12 @@ public class HangarPageController {
             catalogListLoader.loadPageContent(
                 CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE, "manufacturers"));
 
-    CompletableFuture<List<LocationDto>> homeLocationsFuture =
-        parallelPageLoader
-            .<List<LocationDto>>loadAsync(() -> {
-              List<LocationDto> hl = hangarClient.homeLocations();
-              return hl != null ? new ArrayList<>(hl) : new ArrayList<>();
-            })
-            .exceptionally(e -> {
-              SectionFallback.rethrowIfReauthenticationRequired(e);
-              log.error("Failed to fetch home locations", e);
-              return new ArrayList<>();
-            });
+    CompletableFuture<List<LocationDto>> homeLocationsFuture = loadHomeLocations();
+
+    CompletableFuture<Optional<UUID>> shipLocationDefaultFuture =
+        fragmentOnly
+            ? CompletableFuture.completedFuture(Optional.empty())
+            : parallelPageLoader.loadAsync(homeLocationReader::formDefault);
 
     CompletableFuture.allOf(
             shipsFuture,
@@ -249,7 +249,8 @@ public class HangarPageController {
             shipTypesFuture,
             locationsFuture,
             manufacturersFuture,
-            homeLocationsFuture)
+            homeLocationsFuture,
+            shipLocationDefaultFuture)
         .join();
 
     List<ShipTypeDto> shipTypes = shipTypesFuture.join();
@@ -296,7 +297,26 @@ public class HangarPageController {
       return "hangar/hangar :: hangarResults";
     }
     model.addAttribute("unitOptions", fetchDirectOrgUnits());
+    model.addAttribute("shipLocationDefault", shipLocationDefaultFuture.join().orElse(null));
     return "hangar/hangar";
+  }
+
+  /**
+   * Loads the curated home locations of the „Home-Location für alle setzen" dialog in parallel.
+   *
+   * @return the locations, an empty list when the backend fails
+   */
+  private @NotNull CompletableFuture<List<LocationDto>> loadHomeLocations() {
+    return parallelPageLoader
+        .<List<LocationDto>>loadAsync(() -> {
+          List<LocationDto> hl = hangarClient.homeLocations();
+          return hl != null ? new ArrayList<>(hl) : new ArrayList<>();
+        })
+        .exceptionally(e -> {
+          SectionFallback.rethrowIfReauthenticationRequired(e);
+          log.error("Failed to fetch home locations", e);
+          return new ArrayList<>();
+        });
   }
 
   /**

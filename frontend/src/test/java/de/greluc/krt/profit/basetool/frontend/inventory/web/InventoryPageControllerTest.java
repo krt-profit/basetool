@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.CheckoutType;
@@ -86,7 +87,9 @@ class InventoryPageControllerTest {
     controller =
         new InventoryPageController(inventoryClient, catalogs, mock(ItemPickerLabels.class));
     listController = new InventoryListPageController(inventoryClient, catalogs);
-    inputController = new InventoryInputPageController(inventoryClient, PARALLEL, catalogs);
+    inputController =
+        new InventoryInputPageController(
+            inventoryClient, PARALLEL, catalogs, mock(HomeLocationPreferenceReader.class));
     writeController =
         new InventoryWriteController(inventoryClient, inputController, listController);
   }

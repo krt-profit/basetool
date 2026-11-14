@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRelocation;
+import de.greluc.krt.profit.basetool.backend.identity.api.HomeLocationPreference;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRelocation;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationChoiceRefusedException;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationChoiceRefusedException.Reason;
@@ -44,8 +45,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Runs a member's relocation after the home-location choice (REQ-PATCH-022, REQ-PATCH-025,
  * REQ-PATCH-026, REQ-PATCH-052, ADR-0383): one transaction per member, all or nothing, exactly once
  * per phase. The member's stock rows and ships from before the phase's live time move in place to
- * the chosen home location, and the exchange feed attributes every change to the phase's patch
- * change.
+ * the chosen home location, the member's profile setting "my home location" follows the choice
+ * (REQ-PATCH-031), and the exchange feed attributes every change to the phase's patch change.
  */
 @Service
 @RequiredArgsConstructor
@@ -57,6 +58,7 @@ public class MemberRelocations implements PatchChangeExchangeWriter {
   private final HomeLocationOffer offer;
   private final StockRelocation stock;
   private final ShipRelocation ships;
+  private final HomeLocationPreference homeLocationPreference;
   private final AuditRecorder auditRecorder;
   private final PatchChangeLiveSync liveSync;
   private final PlatformTransactionManager transactionManager;
@@ -115,7 +117,7 @@ public class MemberRelocations implements PatchChangeExchangeWriter {
 
   /**
    * Checks the phase and the member under the history's shared lock, claims the relocation, moves
-   * the stock and the ships and records the result.
+   * the stock and the ships, sets the member's home-location setting and records the result.
    *
    * @param phaseId the phase the writes are attributed to
    * @param member the member
@@ -150,6 +152,7 @@ public class MemberRelocations implements PatchChangeExchangeWriter {
     int rows = stock.relocate(member, phase.liveAt(), chosen.id());
     int shipCount = ships.relocate(member, phase.liveAt(), chosen.id());
     relocations.recordMoved(phase.id(), member, rows, shipCount);
+    homeLocationPreference.followRelocation(member, chosen.id());
     AuditDetails details =
         AuditDetails.of("patchChange", phase.id())
             .with("label", phase.label())

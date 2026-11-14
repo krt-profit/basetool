@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.internal.MemberHomeLocationService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
@@ -87,6 +88,7 @@ class HomeLocationRelocationIntegrationTest {
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private RelocationLocks locks;
+  @Autowired private MemberHomeLocationService preferences;
 
   private final List<UUID> locations = new ArrayList<>();
   private UUID admin;
@@ -213,6 +215,8 @@ class HomeLocationRelocationIntegrationTest {
                 member))
         .isEqualTo("SELF");
     assertThat(auditCount("PATCH_CHANGE_RELOCATED", member)).isEqualTo(1L);
+    assertThat(preferences.homeLocationOf(member).homeLocationId()).isEqualTo(home);
+    assertThat(auditCount("HOME_LOCATION_PREFERENCE_SET", member)).isEqualTo(1L);
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM exchange_change WHERE user_id = ?"
@@ -256,6 +260,7 @@ class HomeLocationRelocationIntegrationTest {
             refused -> assertThat(refused.getReason()).isEqualTo(Reason.NOT_OFFERED))
         .hasMessageContaining("home_location_not_offered");
     assertThat(phases.mustChoose(member)).isTrue();
+    assertThat(preferences.homeLocationOf(member).homeLocationId()).isNull();
   }
 
   @Test
@@ -291,6 +296,7 @@ class HomeLocationRelocationIntegrationTest {
                 String.class,
                 member))
         .isEqualTo("ADMIN");
+    assertThat(preferences.homeLocationOf(member).homeLocationId()).isEqualTo(home);
   }
 
   @Test

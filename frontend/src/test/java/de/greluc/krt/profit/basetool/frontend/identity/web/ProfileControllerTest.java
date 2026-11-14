@@ -89,11 +89,13 @@ class ProfileControllerTest {
 
   @BeforeEach
   void setUp() {
+    IdentityBackendClient identityClient = new IdentityBackendClient(backendApiClient);
     controller =
         new ProfileController(
-            new IdentityBackendClient(backendApiClient),
+            identityClient,
             new NotificationBackendClient(backendApiClient),
             new ExchangeBackendClient(backendApiClient),
+            new HomeLocationPreferenceReader(identityClient),
             messageSource);
     ReflectionTestUtils.setField(controller, "issuerUri", "https://kc.example.com/realms/basetool");
   }

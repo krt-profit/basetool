@@ -270,7 +270,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let chooseShipType = () => {};
 
     /**
-     * Opens the ship dialog blank, posting to the clicked button's action.
+     * Opens the ship dialog blank, at the member's home location, posting to the clicked button's
+     * action.
      *
      * @param {HTMLElement} btn the add button
      */
@@ -280,7 +281,8 @@ document.addEventListener('DOMContentLoaded', () => {
         shipField('ship-name').value = '';
         chooseShipType('');
         setInsurance('');
-        shipField('ship-location').value = '';
+        const locationField = shipField('ship-location');
+        locationField.value = locationField.getAttribute('data-default-location') || '';
         shipField('ship-fitted').checked = false;
         shipField('ship-version').value = '';
         originField.reset();
