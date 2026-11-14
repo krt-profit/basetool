@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.web.AdminLocationsPageCo
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.hangar.web.HangarPageController;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.identity.web.MemberManagementController;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm;
@@ -171,7 +172,8 @@ class BackendFallbackReauthenticationTest {
                 new HangarPageController(
                         rejecting(HangarBackendClient.class, failure),
                         new ParallelPageLoader(),
-                        mock(CachedCatalogListLoader.class))
+                        mock(CachedCatalogListLoader.class),
+                        mock(HomeLocationPreferenceReader.class))
                     .deleteShip(ID, attributes);
         case IDENTITY ->
             () ->

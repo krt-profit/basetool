@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.MyHomeLocationResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -151,6 +152,28 @@ class HangarPageControllerMvcTest {
         .perform(get("/hangar"))
         .andExpect(status().isOk())
         .andExpect(view().name("hangar/hangar"));
+  }
+
+  /** The add-ship dialog starts at the member's home location (REQ-PATCH-033). */
+  @Test
+  @WithMockUser
+  void theShipDialogCarriesTheHomeLocationAsItsDefault() throws Exception {
+    UUID home = UUID.fromString("5a1e0000-0000-4000-8000-00000000d001");
+    when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 1, List.of()));
+    when(backendApiClient.get("/api/v1/users/me/home-location", MyHomeLocationResponse.class))
+        .thenReturn(new MyHomeLocationResponse(home, 1L));
+
+    String html =
+        mockMvc
+            .perform(get("/hangar"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("id=\"ship-location\"[^>]*data-default-location=\"" + home + "\"");
   }
 
   @Test
