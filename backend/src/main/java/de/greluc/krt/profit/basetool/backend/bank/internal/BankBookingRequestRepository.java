@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
@@ -116,6 +117,46 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT r FROM BankBookingRequest r WHERE r.id = :id")
   Optional<BankBookingRequest> findByIdForUpdate(@Param("id") UUID id);
+
+  /**
+   * Reads a request's purpose without loading or locking the request, so the purpose's owner can be
+   * locked before the request (REQ-BANK-063).
+   *
+   * @param id the request id
+   * @return the purpose, or empty when the request does not exist or carries none
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose(r.purposeKind, r.purposeRef)
+      FROM BankBookingRequest r WHERE r.id = :id AND r.purposeKind IS NOT NULL
+      """)
+  Optional<BankPurpose> findPurposeById(@Param("id") UUID id);
+
+  /**
+   * Reads the distinct purposes of the requests {@link #lockUnlinkedCreatedBefore} would lock,
+   * without locking, so their owners can be locked first (REQ-BANK-063, REQ-PATCH-042).
+   *
+   * @param status the lifecycle state (the currency wipe passes {@code PENDING})
+   * @param before the exclusive upper bound of the submission time
+   * @return the purposes of such requests
+   */
+  @Query(
+      """
+      SELECT DISTINCT new de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose(r.purposeKind, r.purposeRef)
+      FROM BankBookingRequest r
+      WHERE r.status = :status AND r.linkedAttempt IS NULL AND r.createdAt < :before
+        AND r.purposeKind IS NOT NULL
+      """)
+  List<BankPurpose> findUnlinkedPurposesCreatedBefore(
+      @Param("status") BankBookingRequestStatus status, @Param("before") Instant before);
+
+  /**
+   * Counts the requests a patch change cancelled, linked and unlinked alike (REQ-PATCH-046).
+   *
+   * @param patchChangeId the patch change kept as their reason
+   * @return the number of such requests
+   */
+  long countByCancelledByPatchChange(UUID patchChangeId);
 
   /**
    * Locks the requests in a status that were submitted before an instant and that no order payment

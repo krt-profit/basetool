@@ -44,8 +44,10 @@ import org.springframework.transaction.annotation.Transactional;
  * time in one wipe reset, so every later booking stays.
  *
  * <p>An account or holder whose later debits exceed its later credits would go below zero by that
- * offset; its offset then stops at zero ({@link BankWipeOffsets}). The request locks come before
- * the account locks, as in a request's confirmation.
+ * offset; its offset then stops at zero ({@link BankWipeOffsets}). The owners of purpose-bound
+ * requests are locked before the requests, the request locks come before the account locks, as in a
+ * request's confirmation, and every holder is locked after the accounts before a balance is read,
+ * so no custody move lands between the read and the reset.
  */
 @Service
 @RequiredArgsConstructor
@@ -54,7 +56,7 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   /** The sections of an account's detail room the reset changes. */
   private static final List<String> ACCOUNT_SECTIONS = List.of("account", "bookings", "chart");
 
-  private final BankAccountRepository accounts;
+  private final BankPostingWriter writer;
   private final BankPostingRepository postings;
   private final BankHolderPostingRepository holderPostings;
   private final BankWipeResetBooking resetBooking;
@@ -74,11 +76,11 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull Effect apply(@NotNull Instant liveAt, @NotNull UUID patchChangeId) {
     int cancelled = requests.cancelUnlinkedBefore(liveAt, patchChangeId);
-    List<BankAccount> locked = accounts.findAllForUpdateOrderById();
+    List<BankAccount> locked = writer.lockLedger();
     BankWipeOffsets accountOffsets = accountOffsets(liveAt);
     BankWipeOffsets holderOffsets = holderOffsets(liveAt);
     BankWipeResetBooking.Booked booked =
-        resetBooking.book(locked, accountOffsets.offsets(), holderOffsets.offsets());
+        resetBooking.book(locked, accountOffsets.offsets(), holderOffsets.offsets(), liveAt);
     auditService.record(
         BankAuditEventType.WIPE_RESET_EXECUTED,
         null,
@@ -91,7 +93,7 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
             .with("totalZeroed", plain(booked.total()))
             .with("clampedAccounts", accountOffsets.clamped())
             .with("clampedStashes", holderOffsets.clamped())
-            .with("cancelledRequests", cancelled));
+            .with("cancelledRequests", requests.countCancelledBy(patchChangeId)));
     if (booked.transactionId() != null) {
       announce(locked, accountOffsets.offsets());
     }

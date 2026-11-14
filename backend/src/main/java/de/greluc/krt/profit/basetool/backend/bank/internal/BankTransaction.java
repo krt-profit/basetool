@@ -167,4 +167,14 @@ public class BankTransaction {
    */
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
+
+  /**
+   * The live time of the patch change whose currency wipe booked this {@link
+   * BankTransactionType#WIPE_RESET}; a later wipe's balance as of its own live time counts the
+   * reset at this instant instead of {@link #createdAt} (REQ-PATCH-041). {@code null} for every
+   * booking that takes effect when it is recorded, the standalone reset included (V430 CHECK).
+   */
+  @Nullable
+  @Column(name = "effective_at", updatable = false)
+  private Instant effectiveAt;
 }

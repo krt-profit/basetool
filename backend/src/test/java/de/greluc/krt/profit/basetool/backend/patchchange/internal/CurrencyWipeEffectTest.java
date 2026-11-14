@@ -42,7 +42,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * The currency wipe's effect (REQ-PATCH-040, -046): it runs only with its option, the orders before
- * the Bank, and reports one tile per count.
+ * the Bank, and reports one tile per count; the Bank requests count those of the cancelled order
+ * attempts too.
  */
 @ExtendWith(MockitoExtension.class)
 class CurrencyWipeEffectTest {
@@ -88,11 +89,24 @@ class CurrencyWipeEffectTest {
         .containsExactly(
             Map.entry(PatchCount.BANK_RESET_TOTAL, 1_250_000L),
             Map.entry(PatchCount.BANK_ACCOUNTS_CLAMPED, 2L),
-            Map.entry(PatchCount.BANK_REQUESTS_CANCELED, 4L),
+            Map.entry(PatchCount.BANK_REQUESTS_CANCELED, 6L),
             Map.entry(PatchCount.AUEC_SHORTAGES, 3L),
             Map.entry(PatchCount.AUEC_SHORTAGE_TOTAL, 7_000_000L),
             Map.entry(PatchCount.AUEC_BANK_ATTEMPTS_CANCELED, 2L),
             Map.entry(PatchCount.AUEC_COMMITMENTS_ENDED, 1L));
+  }
+
+  @Test
+  void theBankRequestsCountTheUnlinkedOnesAndThoseOfTheCancelledAttempts() {
+    when(orders.preview(LIVE_AT))
+        .thenReturn(new JobOrderCurrencyWipe.Effect(1, new BigDecimal("500"), 3, 0));
+    when(bank.preview(LIVE_AT)).thenReturn(new BankCurrencyWipe.Effect(2, BigDecimal.ZERO, 0));
+
+    PatchCounts counts = effect.preview(WIPING);
+
+    assertThat(counts.asMap())
+        .containsEntry(PatchCount.BANK_REQUESTS_CANCELED, 5L)
+        .containsEntry(PatchCount.AUEC_BANK_ATTEMPTS_CANCELED, 3L);
   }
 
   @Test

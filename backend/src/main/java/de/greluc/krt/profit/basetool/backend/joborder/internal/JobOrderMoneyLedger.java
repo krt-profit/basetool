@@ -257,15 +257,17 @@ class JobOrderMoneyLedger {
     }
 
     /**
-     * Folds only the facts recorded before the cutoff, at their current effective amounts and
-     * holder identities: the order's funds as they stood then, as corrected since (REQ-PATCH-044).
+     * Folds only the facts that took effect before the cutoff, at their current effective amounts
+     * and holder identities: the order's funds as they stood then, as corrected since
+     * (REQ-PATCH-044). An earlier currency wipe's shortage takes effect at its patch change's live
+     * time, every other fact when it was recorded.
      *
-     * @param cutoff the exclusive upper bound of the recording time
+     * @param cutoff the exclusive upper bound of the effective time
      * @return the earlier ledger of the same order
      */
     Ledger before(Instant cutoff) {
       return fold(
-          facts.stream().filter(fact -> fact.getRecordedAt().isBefore(cutoff)).toList(),
+          facts.stream().filter(fact -> fact.effectiveAt().isBefore(cutoff)).toList(),
           identities,
           accountHoldings,
           recipientAliases,
