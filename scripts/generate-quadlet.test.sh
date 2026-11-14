@@ -300,6 +300,17 @@ bad = [l for t in files.values() for l in t.splitlines()
 print("writable:", bad)' \
   'writable: []'
 
+echo "== keycloak trusts the backend through the internal CA (REQ-SEC-022, REQ-SEC-070) =="
+expect "the production keycloak unit mounts the CA-only internal truststore" \
+  'files, _ = g.generate(); print(files["quadlet/systemd/keycloak.container"])' \
+  'Volume=/etc/basetool/secrets/tls/truststore.p12:/run/secrets/internal-truststore.p12:ro'
+expect "the account-existence precheck reads that mount, not a host-chosen path" \
+  'files, _ = g.generate(); print(files["quadlet/env.d/keycloak.env.tmpl"])' \
+  'KRT_BACKEND_TRUSTSTORE_PATH=/run/secrets/internal-truststore.p12'
+expect "its password is the one the three apps read for the same store" \
+  'files, _ = g.generate(); print(files["quadlet/env.d/keycloak.env.tmpl"])' \
+  'KRT_BACKEND_TRUSTSTORE_PASSWORD=${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?'
+
 echo "== the data networks are internal under Quadlet (OPS-SEC-05, ADR-0162) =="
 for net in net-db-backend net-db-keycloak net-redis-backend net-redis-frontend net-redis-ingest; do
   expect "${net} is Internal=true" \

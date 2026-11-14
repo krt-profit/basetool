@@ -6030,8 +6030,11 @@ production rollout reaches step by step:
   added to the set afterwards, and a rotation re-mints the whole set.
 - **Clients pin the CA, not a certificate.** Every internal SSL bundle (`backend-trust`,
   `keycloak-trust`) reads `INTERNAL_TLS_TRUSTSTORE`, a CA-only truststore mounted at
-  `/run/secrets/internal-truststore.p12`; the edge, Prometheus and the blackbox exporter trust the CA
-  through `basetool-ca.crt`.
+  `/run/secrets/internal-truststore.p12`; Keycloak's SPI client for the Discord account-existence
+  precheck (REQ-SEC-022) trusts the same store, mounted at the same path in the `prod` keycloak
+  service and its Quadlet unit, with `KRT_BACKEND_TRUSTSTORE_PATH` and its password fixed in
+  `docker-compose.yml`; the edge, Prometheus and the blackbox exporter trust the CA through
+  `basetool-ca.crt`.
 - **Clients check the name.** With `INTERNAL_TLS_VERIFY_HOSTNAME=true` the frontend's backend client
   (`WebClientConfig`), its backend readiness probe (`BackendHealthIndicator`) and the ingest relay
   (`RestClientConfig`) verify the backend's hostname, which ADR-0204 §6 had switched off for the
@@ -6073,20 +6076,28 @@ leaf and all four verify against the CA alone with the name checked; step 4 17:5
 `basetool-cert-expiry` reports the CA's expiry (2036). **Steps 0–4 are done: the target shape holds on
 production.** The documented step-4 command failed on the root-owned truststore and was redone on
 a working copy; the runbook now carries that form. A release rollback to 1.11.0 or older needs step
-4 undone first. *(Updated 2026-09-25 evening; this paragraph said steps 3 and 4 were open.)*
+4 undone first. *(Updated 2026-09-25 evening; this paragraph said steps 3 and 4 were open.)* The
+separate SPI truststore built in step 2 is replaced by Keycloak's mount of the internal truststore
+(ADR-0051 amendment, 2026-11-13); its leftovers on the host are a one-time cleanup
+([`deployment.md`](../deployment.md#one-time-cleanup-the-hand-built-precheck-truststore)).
 
 **Enforced by:** `scripts/mint-internal-tls.test.sh` (`repo-lint.yml`) · `RestClientConfigTest`
 (ingest) · `IngestPropertiesTest` · `BackendHostnameVerificationTest` ·
 `BackendHealthIndicatorHostnameTest` · `BackendHostnameDefaultTest` ·
 `scripts/deploy.test.sh` (`scenario_podman_missing_per_service_keystore_refuses`) ·
-`generate-quadlet.py --check` · the E2E suite (`docker-compose.e2e.yml`, `BackendSeeder`) ·
+`generate-quadlet.py --check` · `scripts/generate-quadlet.test.sh` (the keycloak unit mounts the
+CA-only truststore and points the SPI at it) · the E2E suite (`docker-compose.e2e.yml`,
+`BackendSeeder`) ·
 **Code:** `scripts/mint-internal-tls.sh`, `WebClientConfig`, `BackendHealthIndicator`,
 `AppHttpProperties#verifyBackendHostname`, `RestClientConfig` (ingest),
 `IngestProperties#verifyBackendHostname`, the `application-prod.yml` SSL bundles of all three apps,
 `docker-compose.yml`, `scripts/generate-quadlet.py` (`PATH_VARS`), `scripts/deploy.sh`
 (`keystore_mount_sources`), `scripts/backup.sh` · **Monitoring:** unchanged series — the blackbox
 `https_internal` probes and the three app scrapes already verify each service's name against
-`basetool-ca.crt`, and `basetool-cert-expiry` reports the CA's expiry once that file is the CA ·
+`basetool-ca.crt`, and `basetool-cert-expiry` reports the CA's expiry once that file is the CA;
+`KeycloakBackendTruststoreUnreadable` fires when Keycloak cannot load the store and
+`KeycloakAccountExistenceProbeFailing` when the precheck cannot reach or trust the backend
+(REQ-SEC-022) ·
 **Runbook:** [`deployment.md` &rarr; Internal TLS](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)
 · **ADR:** [ADR-0211](../adr/0211-each-internal-service-holds-its-own-leaf-from-a-private-ca.md) · **Related:** REQ-SEC-014, REQ-OPS-016, REQ-OBS-008, REQ-INGEST-001
 

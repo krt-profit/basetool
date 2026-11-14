@@ -65,6 +65,8 @@ blackbox exporter — trusts. Two things follow.
   `basetool-cert-expiry` already reads `basetool-ca.crt`, which becomes the CA.
 - The Keycloak SPI precheck's hand-built truststore and the Android dev build's bundled test anchor
   follow the new CA; both are listed in the rollout and in ADR-0139's amendment.
+  *The precheck's store is replaced by the internal truststore itself:
+  [ADR-0051](0051-discord-first-login-account-existence-precheck.md) amendment of 2026-11-13.*
 - `/etc/basetool/secrets/tls` is one more directory in the backup, captured best-effort like the keystore.
 
 ## Alternatives considered
