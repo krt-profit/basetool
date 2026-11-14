@@ -42,13 +42,12 @@ staging directory `…/staging/<UTC timestamp>/`:
 | Monitoring plane (ADR-0072)    | `monitoring/grafana.db`, `monitoring/secrets.tar.gz`, `monitoring/alertmanager.tar.gz` | Grafana SQLite (brief `grafana` stop for a consistent copy), `/etc/basetool/monitoring/{secrets,certs}`, Alertmanager silences + notification log |
 | Prometheus TSDB (Sundays only) | `monitoring/prometheus-tsdb-snapshot.tar.gz` | admin-API snapshot via a throwaway curl container on `net-monitoring-core` |
 
-**Not captured, and needed after a host rebuild** *(added 2026-09-25)*: the Keycloak SPI's
-`/etc/basetool/secrets/backend-truststore.p12` and the drop-in that mounts it,
-`/etc/containers/systemd/users/<basetool uid>/keycloak.container.d/50-backend-truststore.conf`. Both hold
-public material only and are rebuilt, not restored —
-[`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate).
-Without them `basetool.env`'s `KRT_BACKEND_TRUSTSTORE_PATH` points at nothing and the Discord
-duplicate-account precheck fails open (the state production was in until 2026-09-25).
+**The Keycloak SPI's truststore needs nothing of its own:** the Discord duplicate-account precheck
+trusts the backend through the internal `truststore.p12`, which `config/internal-tls.tar` captures
+with the rest of `/etc/basetool/secrets/tls`, and the release's keycloak unit mounts it
+([`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate)).
+The hand-built `backend-truststore.p12` and its `keycloak.container.d` drop-in are obsolete and need
+no restore.
 
 Root-owned files and named volumes are read through a throwaway **helper container**
 (`BASETOOL_BACKUP_HELPER_IMAGE`, default: the digest pin of `db-backend`'s own unit). **The helper never

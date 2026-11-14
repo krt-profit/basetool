@@ -100,7 +100,8 @@ Consequences worth stating:
   neither depends on which ACL users exist.
 - **Each service mounts its own keystore and an internal truststore** — `/run/secrets/keystore.p12`
   from `BASETOOL_<SERVICE>_KEYSTORE_HOST_PATH`, `/run/secrets/internal-truststore.p12` from
-  `BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH` (REQ-SEC-070, ADR-0211). The generator bakes all five to
+  `BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH` (REQ-SEC-070, ADR-0211); keycloak's is read by its
+  Discord precheck (REQ-SEC-022). The generator bakes all five to
   `/etc/basetool/secrets/tls/`, which the owner minted with `mint-internal-tls.sh` (installed by the
   role, run through the backend image) in step 2 of the rollout; the release before that baked them
   to the shared `/etc/basetool/secrets/keystore.p12`. `deploy.sh` refuses a release whose units mount any
@@ -112,9 +113,10 @@ Consequences worth stating:
   anchor.
 - **Hand-installed drop-ins live beside the generated units.** `deploy.sh` never touches a
   `<unit>.container.d/` under `/etc/containers/systemd/users/<uid>/`, so what the operator puts there
-  survives every release — and is in no bundle and no backup. Production's `keycloak.container.d`
-  holds `30-log-driver.conf` and, since 2026-09-25, `50-backend-truststore.conf`, which mounts the
-  Discord precheck's truststore (REQ-SEC-022).
+  survives every release — and is in no bundle and no backup. Keycloak needs none: its Discord
+  precheck trusts the backend through the internal truststore the generated unit mounts
+  (REQ-SEC-022, ADR-0051 amendment), not through a drop-in, because a lost drop-in fails that guard
+  open with no outage to notice it by.
 - **A restart travels along `Requires=`.** `backend` requires `db-backend` and `keycloak`,
   `frontend` requires `backend`, `keycloak` and `redis`, `ingest` requires `backend` and `redis` — so
   restarting keycloak restarts the whole app (about two minutes, measured 2026-09-25), and

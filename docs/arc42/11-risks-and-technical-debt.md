@@ -228,12 +228,18 @@ external exchange client; the way back was a server snapshot taken immediately b
   reaches a host with the same role run. **Still open, not decided:** keycloak, the databases and
   redis are outside the drift check, so an unhealthy keycloak is healed by nobody — and healing it
   automatically would be a full-app restart on one failed probe.
-- **A configured Discord precheck can fail open with nobody noticing.** The account-existence
-  precheck (REQ-SEC-022) is fail-open by design, and its only witness is a Keycloak `WARN`. On
-  production the truststore `basetool.env` named never existed and the warning repeated at every start for
-  at least seven days before a rollout step found it (2026-09-25, fixed the same day). No alert reads
-  that line — `KeycloakErrorRateHigh`, whose description names this very path, counts `ERROR` lines, and
-  this is one `WARN` per start. The runbook's verify step now reads it; an alert is not built.
+- ~~**A configured Discord precheck can fail open with nobody noticing.**~~ — **closed in the
+  repository 2026-11-13** (ADR-0051 amendment). The account-existence precheck (REQ-SEC-022) is
+  fail-open by design, and its only witness was a Keycloak `WARN`. On production the truststore
+  `basetool.env` named never existed for at least seven days before a rollout step found it
+  (2026-09-25); the hand-installed drop-in built then was later lost the same silent way. Now the
+  generated keycloak unit mounts the CA-only internal truststore, with path and password fixed in
+  `docker-compose.yml`, so the precheck depends on no host file the apps do not need too, and the
+  Loki alert `KeycloakBackendTruststoreUnreadable` reads the `WARN` a start writes when it cannot
+  load the store, and `KeycloakAccountExistenceProbeFailing` reads the `Account-existence probe
+  could not reach the backend` `WARN` a first login writes when the store loads but does not trust
+  the backend (or the backend does not answer). **Closes on a host** with the deploy of that
+  release.
 - **A drift re-apply could destroy the only rollback anchor.** A re-apply of the deployed release
   ("drift: frontend: no container") saved the deployed pin over `previous-digest-pin.yml` — and, with
   the unit files gone, the deployed tree over `config-previous/`. Had that re-apply failed its gate,
@@ -294,8 +300,9 @@ not happened.
   steps 1–2 at ~15:40/~15:52 UTC, step 3 with v1.12.0 (deployed 17:38–17:44 UTC), step 4 at
   17:58–18:03 UTC. The units mount `/etc/basetool/secrets/tls/<service>.p12`,
   `INTERNAL_TLS_VERIFY_HOSTNAME=true`, and no anchor carries the old certificate. Left behind: a
-  release rollback to 1.11.0 or older now needs step 4 undone first — above all the Discord
-  precheck's truststore, or that guard fails open again without an outage to notice it by.
+  release rollback to 1.11.0 or older now needs step 4 undone first, and any rollback to a release
+  from before keycloak's managed truststore mount runs the Discord precheck without a truststore,
+  so that guard fails open without an outage to notice it by until the release is back.
 
 ## 11.7a Accepted risks of the exchange API
 
