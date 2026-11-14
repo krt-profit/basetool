@@ -23,151 +23,157 @@
 
     <form th:if="${form != null}" id="pc-form" class="pc-layout no-track" novalidate data-testid="pc-form"
           th:attr="data-previous-label=${form.previousLabel()},data-previous-live-at=${form.previousLiveAt()}">
-        <section class="hud-box" aria-labelledby="pc-form-title">
+        <section class="hud-box form-layout pc-form" aria-labelledby="pc-form-title">
             <h2 id="pc-form-title" class="pc-heading" th:text="#{admin.patchChange.form.title}">Patchwechsel erfassen</h2>
-            <div class="pc-fields">
-                <fieldset class="form-group pc-kind">
-                    <legend th:text="#{admin.patchChange.kind}">Patch-Art</legend>
-                    <div class="krt-segmented" data-testid="pc-kind">
-                        <label class="krt-segmented__item" th:each="kind : ${kinds}"
-                               th:with="preset=${form.presetFor(kind)}" th:data-testid="|pc-kind-${kind}|">
-                            <input type="radio" name="kind" th:value="${kind}" th:checked="${kind == defaultKind}"
-                                   th:data-wipe-groups="${preset != null} ? ${#strings.setJoin(preset.wipeGroups(), ' ')} : ''"
-                                   th:attr="data-cancel-refinery-orders=${preset != null and preset.cancelRefineryOrders()},data-currency-wipe=${preset != null and preset.currencyWipe()},data-home-location-prompt=${preset != null and preset.homeLocationPrompt()}">
-                            <span th:text="#{|admin.patchChange.kind.${kind}|}">LTP-Rebuild</span>
-                        </label>
-                    </div>
-                </fieldset>
-                <div class="form-group">
-                    <label for="pc-label" th:text="#{admin.patchChange.label}">Patch-Bezeichnung</label>
-                    <input type="text" id="pc-label" name="label" maxlength="32" required autocomplete="off"
-                           spellcheck="false" th:value="${form.suggestedLabel()}" data-testid="pc-label">
-                    <p class="form-hint" th:text="#{admin.patchChange.label.hint}">Zwei oder drei Zahlen, z. B. 4.4 oder 4.4.1.</p>
-                </div>
-                <div class="form-group">
-                    <label for="pc-live-at" th:text="#{admin.patchChange.liveAt}">Live-Zeit (Stichtag)</label>
-                    <input type="datetime-local" id="pc-live-at" name="liveAt" step="60" data-testid="pc-live-at">
-                </div>
-            </div>
-            <p class="form-hint pc-hint" th:text="#{admin.patchChange.liveAt.hint}">Die Live-Zeit entscheidet, was betroffen ist: nur was vor ihr angelegt wurde. Nach dem Ausl&ouml;sen ist sie fest.</p>
-            <p id="pc-previous" class="form-hint pc-hint" data-testid="pc-previous"
-               th:hidden="${form.previousLabel() == null}"
-               th:with="previousAt=${form.previousLiveAt() != null} ? #{admin.patchChange.utc(${#temporals.format(form.previousLiveAt(), 'dd.MM.yyyy HH:mm', 'UTC')})} : ''"
-               th:text="${form.previousLabel() != null} ? #{admin.patchChange.previous(${form.previousLabel()}, ${previousAt})} : ''">Letzter Patchwechsel: 4.3, live seit 02.08.2026 18:00 UTC.</p>
-
-            <h3 class="pc-subheading" th:text="#{admin.patchChange.wipe.title}">Wipe</h3>
-            <div class="card card--flush">
-                <table class="data-table data-table--stack data-table--compact" data-testid="pc-wipe-groups">
-                    <thead>
-                    <tr>
-                        <th scope="col" th:text="#{admin.patchChange.wipe.column.group}">Wipe-Gruppe</th>
-                        <th scope="col" class="pc-num" th:text="#{admin.patchChange.wipe.column.rows}">Posten</th>
-                        <th scope="col" class="pc-num" th:text="#{admin.patchChange.wipe.column.members}">Mitglieder</th>
-                        <th scope="col" class="cell-status pc-switch-cell" th:text="#{admin.patchChange.wipe.column.active}">Aktiv</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="group : ${wipeGroups}" th:data-pc-group="${group}" th:data-testid="|pc-group-row-${group}|">
-                        <td>
-                            <div class="stack gap-1" th:with="types=${form.typesOf(group)}">
-                                <span class="cell-title" th:id="|pc-group-${group}|" th:text="#{|admin.patchChange.wipeGroup.${group}|}">Verbrauchsg&uuml;ter</span>
-                                <span class="cell-sub" th:text="#{|admin.patchChange.wipeGroup.${group}.contents|}">Essen, Trinken, Medpens, FPS-Verbrauchsg&uuml;ter, Magazine, Munition</span>
-                                <details th:unless="${#lists.isEmpty(types)}" class="pc-types">
-                                    <summary th:text="#{admin.patchChange.wipe.types}">Katalogtypen</summary>
-                                    <ul class="cluster gap-1 pc-type-list">
-                                        <li th:each="type : ${types}" class="chip chip--data"
-                                            th:with="sourceLabel=#{|admin.patchChange.typeSource.${type.source()}|}"
-                                            th:text="#{admin.patchChange.typeSource.entry(${sourceLabel}, ${type.value()})}">Typ Food</li>
-                                    </ul>
-                                </details>
-                            </div>
-                        </td>
-                        <td class="pc-num" data-pc-group-rows th:attr="data-label=#{admin.patchChange.wipe.column.rows}">&ndash;</td>
-                        <td class="pc-num" data-pc-group-members th:attr="data-label=#{admin.patchChange.wipe.column.members}">&ndash;</td>
-                        <td class="cell-status pc-switch-cell">
-                            <label class="krt-switch">
-                                <input type="checkbox" role="switch" name="wipeGroup" th:value="${group}"
-                                       th:checked="${defaults != null and defaults.wipes(group)}"
-                                       th:attr="aria-labelledby=|pc-group-${group}|">
+            <div class="form-section">
+                <div class="pc-fields">
+                    <fieldset class="form-group pc-kind">
+                        <legend class="form-label" th:text="#{admin.patchChange.kind}">Patch-Art</legend>
+                        <div class="krt-segmented" data-testid="pc-kind">
+                            <label class="krt-segmented__item" th:each="kind : ${kinds}"
+                                   th:with="preset=${form.presetFor(kind)}" th:data-testid="|pc-kind-${kind}|">
+                                <input type="radio" name="kind" th:value="${kind}" th:checked="${kind == defaultKind}"
+                                       th:data-wipe-groups="${preset != null} ? ${#strings.setJoin(preset.wipeGroups(), ' ')} : ''"
+                                       th:attr="data-cancel-refinery-orders=${preset != null and preset.cancelRefineryOrders()},data-currency-wipe=${preset != null and preset.currencyWipe()},data-home-location-prompt=${preset != null and preset.homeLocationPrompt()}">
+                                <span th:text="#{|admin.patchChange.kind.${kind}|}">LTP-Rebuild</span>
                             </label>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-            <p class="form-hint pc-hint" th:text="#{admin.patchChange.wipe.hint}">Gel&ouml;scht wird nur, was vor der Live-Zeit angelegt wurde.</p>
-
-            <div class="pc-exceptions" data-pc-exceptions data-testid="pc-exceptions"
-                 th:attr="data-limit=${exceptionLimit}">
-                <h4 class="pc-minor-heading" id="pc-exceptions-title" th:text="#{admin.patchChange.exceptions.title}">Ausnahmen (einzelne Items / Materialien)</h4>
-                <p class="form-hint pc-hint" th:text="#{admin.patchChange.exceptions.hint}">Eine Ausnahme beh&auml;lt ein Item oder Material trotz eingeschalteter Gruppe oder l&ouml;scht es zus&auml;tzlich.</p>
-                <div id="pc-exception-list" class="filter-chips pc-exception-list" aria-labelledby="pc-exceptions-title"
-                     data-testid="pc-exception-list"></div>
-                <p id="pc-exception-empty" class="form-hint pc-hint" data-testid="pc-exception-empty"
-                   th:text="#{admin.patchChange.exceptions.empty}">Keine Ausnahmen.</p>
-                <div class="pc-exception-add">
+                        </div>
+                    </fieldset>
                     <div class="form-group">
-                        <label for="pc-exception-target" th:text="#{admin.patchChange.exceptions.target}">Katalog</label>
-                        <select id="pc-exception-target" data-testid="pc-exception-target">
-                            <option th:each="target : ${exceptionTargets}" th:value="${target}"
-                                    th:text="#{|admin.patchChange.exceptions.target.${target}|}">Item</option>
-                        </select>
-                    </div>
-                    <div class="form-group" data-pc-exception-entry="GAME_ITEM">
-                        <label for="pc-exception-item" th:text="#{admin.patchChange.exceptions.entry}">Eintrag</label>
-                        <select id="pc-exception-item" data-krt-combobox="remote-game-items" data-testid="pc-exception-item">
-                            <option value=""></option>
-                        </select>
-                    </div>
-                    <div class="form-group" data-pc-exception-entry="MATERIAL" hidden>
-                        <label for="pc-exception-material" th:text="#{admin.patchChange.exceptions.entry}">Eintrag</label>
-                        <select id="pc-exception-material" data-krt-combobox="remote-materials" data-testid="pc-exception-material">
-                            <option value=""></option>
-                        </select>
+                        <label for="pc-label" th:text="#{admin.patchChange.label}">Patch-Bezeichnung</label>
+                        <input type="text" id="pc-label" name="label" maxlength="32" required autocomplete="off"
+                               spellcheck="false" th:value="${form.suggestedLabel()}" data-testid="pc-label">
+                        <p class="form-hint" th:text="#{admin.patchChange.label.hint}">Zwei oder drei Zahlen, z. B. 4.4 oder 4.4.1.</p>
                     </div>
                     <div class="form-group">
-                        <label for="pc-exception-mode" th:text="#{admin.patchChange.exceptions.mode}">Wirkung</label>
-                        <select id="pc-exception-mode" data-testid="pc-exception-mode">
-                            <option th:each="mode : ${exceptionModes}" th:value="${mode}"
-                                    th:text="#{|admin.patchChange.exceptions.mode.${mode}|}">behalten</option>
-                        </select>
+                        <label for="pc-live-at" th:text="#{admin.patchChange.liveAt}">Live-Zeit (Stichtag)</label>
+                        <input type="datetime-local" id="pc-live-at" name="liveAt" step="60" data-testid="pc-live-at">
                     </div>
-                    <button type="button" id="pc-exception-add" class="btn btn-ghost" data-testid="pc-exception-add">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                        <span th:text="#{admin.patchChange.exceptions.add}">Ausnahme hinzuf&uuml;gen</span>
-                    </button>
                 </div>
-                <p id="pc-exception-error" class="form-hint pc-hint pc-error" role="alert" hidden data-testid="pc-exception-error"></p>
+                <p class="form-hint pc-hint" th:text="#{admin.patchChange.liveAt.hint}">Die Live-Zeit entscheidet, was betroffen ist: nur was vor ihr angelegt wurde. Nach dem Ausl&ouml;sen ist sie fest.</p>
+                <p id="pc-previous" class="form-hint pc-hint" data-testid="pc-previous"
+                   th:hidden="${form.previousLabel() == null}"
+                   th:with="previousAt=${form.previousLiveAt() != null} ? #{admin.patchChange.utc(${#temporals.format(form.previousLiveAt(), 'dd.MM.yyyy HH:mm', 'UTC')})} : ''"
+                   th:text="${form.previousLabel() != null} ? #{admin.patchChange.previous(${form.previousLabel()}, ${previousAt})} : ''">Letzter Patchwechsel: 4.3, live seit 02.08.2026 18:00 UTC.</p>
             </div>
 
-            <h3 class="pc-subheading" th:text="#{admin.patchChange.effects.title}">Weitere Wirkungen</h3>
-            <div class="pc-effects">
-                <label class="krt-switch">
-                    <input type="checkbox" role="switch" name="cancelRefineryOrders" data-testid="pc-option-refinery"
-                           th:checked="${defaults != null and defaults.cancelRefineryOrders()}">
-                    <span th:text="#{admin.patchChange.option.cancelRefineryOrders}">Laufende Raffinerieauftr&auml;ge beenden (vor der Live-Zeit begonnen)</span>
-                </label>
-                <label class="krt-switch">
-                    <input type="checkbox" role="switch" name="currencyWipe" data-testid="pc-option-currency"
-                           th:checked="${defaults != null and defaults.currencyWipe()}">
-                    <span th:text="#{admin.patchChange.option.currencyWipe}">W&auml;hrungs-Wipe: Bank-Reset und aUEC-Auftr&auml;ge</span>
-                </label>
-                <label class="krt-switch">
-                    <input type="checkbox" role="switch" name="homeLocationPrompt" data-testid="pc-option-home"
-                           th:checked="${defaults != null and defaults.homeLocationPrompt()}">
-                    <span th:text="#{admin.patchChange.option.homeLocationPrompt}">Home-Location-Abfrage beim n&auml;chsten Login</span>
-                </label>
-                <p class="form-hint pc-hint" data-testid="pc-home-locations-hint"
-                   th:with="homeNames=${#strings.listJoin(form.homeLocations().![name()], ', ')}">
-                    <span id="pc-home-locations" data-testid="pc-home-locations"
-                          th:data-count="${#lists.size(form.homeLocations())}"
-                          th:text="${#lists.isEmpty(form.homeLocations())} ? #{admin.patchChange.homeLocations.none} : #{admin.patchChange.homeLocations.label(${homeNames})}">W&auml;hlbare Home Locations: Lorville, Area18</span>
-                    <a th:href="@{/admin/locations}" data-testid="pc-home-locations-curate"
-                       th:text="#{admin.patchChange.homeLocations.curate}">Home Locations pflegen</a>
-                </p>
-                <p id="pc-home-alert" class="alert alert-warning pc-alert" role="alert" data-testid="pc-home-alert"
-                   th:hidden="${!#lists.isEmpty(form.homeLocations()) or defaults == null or !defaults.homeLocationPrompt()}"
-                   th:text="#{admin.patchChange.homeLocations.empty}">Es ist keine Home Location gepflegt. Die Mitglieder k&ouml;nnten nichts w&auml;hlen; pflege die Home Locations vor dem Ausl&ouml;sen.</p>
+            <div class="form-section">
+                <h3 class="pc-subheading" th:text="#{admin.patchChange.wipe.title}">Wipe</h3>
+                <div class="card card--flush">
+                    <table class="data-table data-table--stack data-table--compact" data-testid="pc-wipe-groups">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{admin.patchChange.wipe.column.group}">Wipe-Gruppe</th>
+                            <th scope="col" class="pc-num" th:text="#{admin.patchChange.wipe.column.rows}">Posten</th>
+                            <th scope="col" class="pc-num" th:text="#{admin.patchChange.wipe.column.members}">Mitglieder</th>
+                            <th scope="col" class="cell-status pc-switch-cell" th:text="#{admin.patchChange.wipe.column.active}">Aktiv</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="group : ${wipeGroups}" th:data-pc-group="${group}" th:data-testid="|pc-group-row-${group}|">
+                            <td>
+                                <div class="stack gap-1" th:with="types=${form.typesOf(group)}">
+                                    <span class="cell-title" th:id="|pc-group-${group}|" th:text="#{|admin.patchChange.wipeGroup.${group}|}">Verbrauchsg&uuml;ter</span>
+                                    <span class="cell-sub" th:text="#{|admin.patchChange.wipeGroup.${group}.contents|}">Essen, Trinken, Medpens, FPS-Verbrauchsg&uuml;ter, Magazine, Munition</span>
+                                    <details th:unless="${#lists.isEmpty(types)}" class="pc-types">
+                                        <summary th:text="#{admin.patchChange.wipe.types}">Katalogtypen</summary>
+                                        <ul class="cluster gap-1 pc-type-list">
+                                            <li th:each="type : ${types}" class="chip chip--data"
+                                                th:with="sourceLabel=#{|admin.patchChange.typeSource.${type.source()}|}"
+                                                th:text="#{admin.patchChange.typeSource.entry(${sourceLabel}, ${type.value()})}">Typ Food</li>
+                                        </ul>
+                                    </details>
+                                </div>
+                            </td>
+                            <td class="pc-num" data-pc-group-rows th:attr="data-label=#{admin.patchChange.wipe.column.rows}">&ndash;</td>
+                            <td class="pc-num" data-pc-group-members th:attr="data-label=#{admin.patchChange.wipe.column.members}">&ndash;</td>
+                            <td class="cell-status pc-switch-cell">
+                                <label class="krt-switch">
+                                    <input type="checkbox" role="switch" name="wipeGroup" th:value="${group}"
+                                           th:checked="${defaults != null and defaults.wipes(group)}"
+                                           th:attr="aria-labelledby=|pc-group-${group}|">
+                                </label>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="form-hint pc-hint" th:text="#{admin.patchChange.wipe.hint}">Gel&ouml;scht wird nur, was vor der Live-Zeit angelegt wurde.</p>
+
+                <div class="pc-exceptions" data-pc-exceptions data-testid="pc-exceptions"
+                     th:attr="data-limit=${exceptionLimit}">
+                    <h4 class="pc-minor-heading" id="pc-exceptions-title" th:text="#{admin.patchChange.exceptions.title}">Ausnahmen (einzelne Items / Materialien)</h4>
+                    <p class="form-hint pc-hint" th:text="#{admin.patchChange.exceptions.hint}">Eine Ausnahme beh&auml;lt ein Item oder Material trotz eingeschalteter Gruppe oder l&ouml;scht es zus&auml;tzlich.</p>
+                    <div id="pc-exception-list" class="filter-chips pc-exception-list" aria-labelledby="pc-exceptions-title"
+                         data-testid="pc-exception-list"></div>
+                    <p id="pc-exception-empty" class="form-hint pc-hint" data-testid="pc-exception-empty"
+                       th:text="#{admin.patchChange.exceptions.empty}">Keine Ausnahmen.</p>
+                    <div class="pc-exception-add">
+                        <div class="form-group">
+                            <label for="pc-exception-target" th:text="#{admin.patchChange.exceptions.target}">Katalog</label>
+                            <select id="pc-exception-target" data-testid="pc-exception-target">
+                                <option th:each="target : ${exceptionTargets}" th:value="${target}"
+                                        th:text="#{|admin.patchChange.exceptions.target.${target}|}">Item</option>
+                            </select>
+                        </div>
+                        <div class="form-group" data-pc-exception-entry="GAME_ITEM">
+                            <label for="pc-exception-item" th:text="#{admin.patchChange.exceptions.entry}">Eintrag</label>
+                            <select id="pc-exception-item" data-krt-combobox="remote-game-items" data-testid="pc-exception-item">
+                                <option value=""></option>
+                            </select>
+                        </div>
+                        <div class="form-group" data-pc-exception-entry="MATERIAL" hidden>
+                            <label for="pc-exception-material" th:text="#{admin.patchChange.exceptions.entry}">Eintrag</label>
+                            <select id="pc-exception-material" data-krt-combobox="remote-materials" data-testid="pc-exception-material">
+                                <option value=""></option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="pc-exception-mode" th:text="#{admin.patchChange.exceptions.mode}">Wirkung</label>
+                            <select id="pc-exception-mode" data-testid="pc-exception-mode">
+                                <option th:each="mode : ${exceptionModes}" th:value="${mode}"
+                                        th:text="#{|admin.patchChange.exceptions.mode.${mode}|}">behalten</option>
+                            </select>
+                        </div>
+                        <button type="button" id="pc-exception-add" class="btn btn-ghost" data-testid="pc-exception-add">
+                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                            <span th:text="#{admin.patchChange.exceptions.add}">Ausnahme hinzuf&uuml;gen</span>
+                        </button>
+                    </div>
+                    <p id="pc-exception-error" class="form-hint pc-hint pc-error" role="alert" hidden data-testid="pc-exception-error"></p>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3 class="pc-subheading" th:text="#{admin.patchChange.effects.title}">Weitere Wirkungen</h3>
+                <div class="pc-effects">
+                    <label class="krt-switch">
+                        <input type="checkbox" role="switch" name="cancelRefineryOrders" data-testid="pc-option-refinery"
+                               th:checked="${defaults != null and defaults.cancelRefineryOrders()}">
+                        <span th:text="#{admin.patchChange.option.cancelRefineryOrders}">Laufende Raffinerieauftr&auml;ge beenden (vor der Live-Zeit begonnen)</span>
+                    </label>
+                    <label class="krt-switch">
+                        <input type="checkbox" role="switch" name="currencyWipe" data-testid="pc-option-currency"
+                               th:checked="${defaults != null and defaults.currencyWipe()}">
+                        <span th:text="#{admin.patchChange.option.currencyWipe}">W&auml;hrungs-Wipe: Bank-Reset und aUEC-Auftr&auml;ge</span>
+                    </label>
+                    <label class="krt-switch">
+                        <input type="checkbox" role="switch" name="homeLocationPrompt" data-testid="pc-option-home"
+                               th:checked="${defaults != null and defaults.homeLocationPrompt()}">
+                        <span th:text="#{admin.patchChange.option.homeLocationPrompt}">Home-Location-Abfrage beim n&auml;chsten Login</span>
+                    </label>
+                    <p class="form-hint pc-hint" data-testid="pc-home-locations-hint"
+                       th:with="homeNames=${#strings.listJoin(form.homeLocations().![name()], ', ')}">
+                        <span id="pc-home-locations" data-testid="pc-home-locations"
+                              th:data-count="${#lists.size(form.homeLocations())}"
+                              th:text="${#lists.isEmpty(form.homeLocations())} ? #{admin.patchChange.homeLocations.none} : #{admin.patchChange.homeLocations.label(${homeNames})}">W&auml;hlbare Home Locations: Lorville, Area18</span>
+                        <a th:href="@{/admin/locations}" data-testid="pc-home-locations-curate"
+                           th:text="#{admin.patchChange.homeLocations.curate}">Home Locations pflegen</a>
+                    </p>
+                    <p id="pc-home-alert" class="alert alert-warning pc-alert" role="alert" data-testid="pc-home-alert"
+                       th:hidden="${!#lists.isEmpty(form.homeLocations()) or defaults == null or !defaults.homeLocationPrompt()}"
+                       th:text="#{admin.patchChange.homeLocations.empty}">Es ist keine Home Location gepflegt. Die Mitglieder k&ouml;nnten nichts w&auml;hlen; pflege die Home Locations vor dem Ausl&ouml;sen.</p>
+                </div>
             </div>
         </section>
 
