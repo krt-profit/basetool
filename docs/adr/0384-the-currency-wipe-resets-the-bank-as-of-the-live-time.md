@@ -32,8 +32,13 @@ pending Bank requests and order Bank attempts may still name money from before t
    behaviour. The reset takes effect at the live time: its legs keep the trigger as their booking
    time, and the transaction stores the live time (`effective_at`), where a later wipe's balances
    as of its own live time count it. The orders' shortages store it the same way. The standalone
-   reset takes effect when it is recorded. The reset locks every account and then every holder
-   before it reads a balance, so no custody move lands between the read and the booking.
+   reset takes effect when it is recorded. A reset that took effect at or after the live time (in
+   practice the standalone button, pressed between the live time and the trigger, because live
+   times strictly increase) already zeroed every account and holder balance and with it everything
+   held at the live time; the wipe then offsets nothing, books no reset and keeps every booking
+   after that reset. The reset locks every account and then every holder before it reads a balance
+   or looks for such a reset, so no custody move and no standalone reset lands between the read and
+   the booking.
 3. **An offset stops at zero.** When an account's or a holder's current balance cannot cover its
    offset, because more was booked out of it than into it since the live time, the offset is cut
    to what is still there: the account or holder ends at zero, and a holder already below zero
@@ -61,8 +66,9 @@ pending Bank requests and order Bank attempts may still name money from before t
 - Where post-patch bookings already spent pre-patch money, the reset offsets less than the account
   held at the live time; the clamp count in the preview and the summary event shows how many
   accounts that concerns, so staff can check them.
-- A reset after an earlier standalone reset in the same window finds nothing left on the accounts
-  that reset already zeroed; their offsets stop at zero instead of offsetting the money twice.
+- A wipe whose live time lies before an earlier standalone reset offsets nothing: that reset
+  already zeroed the money of the live time, so the wipe neither offsets it twice nor takes the
+  bookings made after that reset, and no account or holder counts as stopped at zero.
 - A later patch change whose live time lies before an earlier one's trigger counts the earlier
   wipe at the earlier live time, so it never offsets the same money twice and never takes money
   booked after its own live time.

@@ -506,10 +506,12 @@ reason, and its one `WIPE_RESET_EXECUTED` names the patch change, the live time,
 cancelled requests and the number of accounts and holders whose offset stopped at zero. The
 button above keeps its behaviour. The patch reset takes effect at the live time
 (`bank_transaction.effective_at`, V430), where a later patch reset's balances count it; the
-button's reset takes effect when it is recorded. Both resets lock every account and then every
-holder, in id order, before they read a balance.
+button's reset takes effect when it is recorded. A button reset recorded after a patch change's
+live time and before its trigger already zeroed everything held at that live time, so the patch
+reset then offsets nothing and every booking after the button's reset stays. Both resets lock
+every account and then every holder, in id order, before they read a balance.
 
-**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent, takes effect when recorded), `BankControllerSecurityTest` (admin-only), `BankCurrencyWipeIntegrationTest` (reset as of the live time, effective at it), `V430CurrencyWipeEffectiveTimeMigrationTest` · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/internal/BankWipeResetBooking`, `bank/internal/BankPostingWriter#lockLedger`, `bank/internal/BankCurrencyWipeService`, `bank/web/BankAdminController`, `V430` · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent, takes effect when recorded), `BankControllerSecurityTest` (admin-only), `BankCurrencyWipeIntegrationTest` (reset as of the live time, effective at it, nothing after a button reset since the live time), `V430CurrencyWipeEffectiveTimeMigrationTest` · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/internal/BankWipeResetBooking`, `bank/internal/BankPostingWriter#lockLedger`, `bank/internal/BankCurrencyWipeService`, `bank/internal/BankTransactionRepository#existsWipeResetTakingEffectSince`, `bank/web/BankAdminController`, `V430` · **Issues:** #556
 
 ### REQ-BANK-014 — Account statement PDF (Kontoauszug)
 
