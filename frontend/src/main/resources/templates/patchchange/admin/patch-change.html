@@ -61,7 +61,6 @@
                     <thead>
                     <tr>
                         <th scope="col" th:text="#{admin.patchChange.wipe.column.group}">Wipe-Gruppe</th>
-                        <th scope="col" th:text="#{admin.patchChange.wipe.column.contents}">Enth&auml;lt</th>
                         <th scope="col" class="pc-num" th:text="#{admin.patchChange.wipe.column.rows}">Posten</th>
                         <th scope="col" class="pc-num" th:text="#{admin.patchChange.wipe.column.members}">Mitglieder</th>
                         <th scope="col" class="cell-status pc-switch-cell" th:text="#{admin.patchChange.wipe.column.active}">Aktiv</th>
@@ -69,10 +68,10 @@
                     </thead>
                     <tbody>
                     <tr th:each="group : ${wipeGroups}" th:data-pc-group="${group}" th:data-testid="|pc-group-row-${group}|">
-                        <td><span class="cell-title" th:id="|pc-group-${group}|" th:text="#{|admin.patchChange.wipeGroup.${group}|}">Verbrauchsg&uuml;ter</span></td>
-                        <td th:attr="data-label=#{admin.patchChange.wipe.column.contents}">
+                        <td>
                             <div class="stack gap-1" th:with="types=${form.typesOf(group)}">
-                                <span th:text="#{|admin.patchChange.wipeGroup.${group}.contents|}">Essen, Trinken, Medpens, FPS-Verbrauchsg&uuml;ter, Magazine, Munition</span>
+                                <span class="cell-title" th:id="|pc-group-${group}|" th:text="#{|admin.patchChange.wipeGroup.${group}|}">Verbrauchsg&uuml;ter</span>
+                                <span class="cell-sub" th:text="#{|admin.patchChange.wipeGroup.${group}.contents|}">Essen, Trinken, Medpens, FPS-Verbrauchsg&uuml;ter, Magazine, Munition</span>
                                 <details th:unless="${#lists.isEmpty(types)}" class="pc-types">
                                     <summary th:text="#{admin.patchChange.wipe.types}">Katalogtypen</summary>
                                     <ul class="cluster gap-1 pc-type-list">
