@@ -45,7 +45,8 @@ import org.springframework.transaction.annotation.Transactional;
  * the member's home-location prompt, and makes the member's choice, each in the exchange's shapes.
  *
  * <p>A location carries its UEX place and starmap GUID as the stock feed names it, so a client can
- * match it with its own places.
+ * match it with its own places. A home location keeps its full name; a preview's location and an
+ * exception's entry carry their names cut as the stock feed cuts them.
  */
 @Service
 @RequiredArgsConstructor
@@ -128,7 +129,11 @@ public class ExchangePatchChangeService {
             current.wipeExceptions().stream()
                 .map(exception ->
                     new ExchangePatchChangeDto.ExceptionEntry(
-                        new ExchangeItemRefDto(exception.id().toString(), exception.name()),
+                        new ExchangeItemRefDto(
+                            exception.id().toString(),
+                            exception.name() == null
+                                ? null
+                                : ExchangeStockFeedService.cut(exception.name())),
                         exception.target().name(),
                         exception.mode().name()))
                 .toList(),
@@ -149,7 +154,10 @@ public class ExchangePatchChangeService {
     PatchChangeExchangeView.Place place = entry.location();
     Links linked = place == null ? Links.NONE : links.getOrDefault(place.id(), Links.NONE);
     return new ExchangePatchChangeDto.Preview(
-        place == null ? null : new ExchangeLocationDto(place.name(), linked.uex(), linked.guid()),
+        place == null
+            ? null
+            : new ExchangeLocationDto(
+                ExchangeStockFeedService.cut(place.name()), linked.uex(), linked.guid()),
         entry.rows(),
         entry.pools().stream()
             .map(pool ->

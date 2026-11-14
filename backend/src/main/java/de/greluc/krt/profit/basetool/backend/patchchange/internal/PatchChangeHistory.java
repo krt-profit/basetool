@@ -56,13 +56,14 @@ public class PatchChangeHistory {
   private final WipeExceptionCatalogue exceptionCatalogue;
 
   /**
-   * Lists every patch change, newest live time first.
+   * Lists every patch change, newest live time first, in a fixed number of statements however long
+   * the history is (REQ-DATA-003).
    *
    * @return the history rows
    */
   @Transactional(readOnly = true)
   public @NotNull @Unmodifiable List<PatchChangeDto> history() {
-    List<PatchChange> records = repository.findAllByOrderByLiveAtDesc();
+    List<PatchChange> records = repository.findHistory();
     Map<UUID, String> names =
         names(records.stream().map(PatchChange::getTriggeredBy).filter(Objects::nonNull).toList());
     UUID latestPrompt =
@@ -76,7 +77,10 @@ public class PatchChangeHistory {
             records.stream()
                 .flatMap(record -> record.options().wipeExceptions().stream())
                 .toList());
-    return records.stream().map(record -> toDto(record, names, entries, latestPrompt)).toList();
+    Map<UUID, PatchChangePhaseDto> phaseById = phases.phasesOf(records, latestPrompt);
+    return records.stream()
+        .map(record -> toDto(record, names, entries, phaseById.get(record.getId())))
+        .toList();
   }
 
   /**
@@ -115,23 +119,24 @@ public class PatchChangeHistory {
         record,
         admin == null ? Map.of() : names(Set.of(admin)),
         exceptionCatalogue.names(record.options().wipeExceptions()),
-        phases.latestPromptId());
+        phases.phasesOf(List.of(record), phases.latestPromptId()).get(record.getId()));
   }
 
   /**
-   * Maps one record to its history row with the admins' and the exceptions' names already read.
+   * Maps one record to its history row with the admins' and the exceptions' names and its phase
+   * already read.
    *
    * @param record the record, its wipe groups, exceptions and counts readable
    * @param names the display name by member id
    * @param entries the names of the exceptions' catalogue entries
-   * @param latestPrompt the latest patch change with the prompt on, or {@code null}
+   * @param phase its home-location phase, or {@code null} when it did not ask for a home location
    * @return the history row
    */
   private @NotNull PatchChangeDto toDto(
       @NotNull PatchChange record,
       @NotNull Map<UUID, String> names,
       @NotNull WipeExceptionCatalogue.Names entries,
-      @Nullable UUID latestPrompt) {
+      @Nullable PatchChangePhaseDto phase) {
     UUID admin = record.getTriggeredBy();
     PatchChangeOptions options = record.options();
     return new PatchChangeDto(
@@ -148,7 +153,7 @@ public class PatchChangeHistory {
             .sorted(Comparator.comparing(dto -> Objects.requireNonNullElse(dto.name(), "")))
             .toList(),
         record.counts().toDtos(),
-        phases.phaseOf(record, latestPrompt));
+        phase);
   }
 
   /**

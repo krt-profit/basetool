@@ -228,6 +228,10 @@ of the prototype on `prototype/patch-change`):
 - **below, the history:** label, kind, live time, triggered by and at, the effects' counts and the
   options, newest first, with „Bezeichnung korrigieren“ per row.
 
+The backend reads the history in a fixed number of statements however many patch changes, phases
+and exceptions it holds (REQ-DATA-003): the wipe exceptions in one statement apart from the wipe
+groups and counts, and the asked and relocated members of every phase in one.
+
 A label correction checks the version the admin last saw and keeps the label between its
 neighbours' labels. Every write updates the page in place; the backend announces a trigger or a
 correction in the `patch-change` room (section `history`), so every other admin's open page
@@ -237,11 +241,13 @@ refreshes its history and its form's previous values.
 
 - [x] A correction with a stale version answers 409.
 - [x] The page renders the form, the preview, the confirmation and the history.
+- [x] The history's statement count does not grow with its patch changes, phases and exceptions.
 
-**Enforced by:** `PatchChangeTriggerIntegrationTest`, `AdminPatchChangePageControllerMvcTest`,
-`AdminPatchChangeRelayControllerMvcTest`, `PatchChangeBackendClientTest`,
-`LiveSyncSectionMapParityTest`, `LiveSyncTopicTest`, `NavigationMenuTest` · **Code:**
-`PatchChangeHistory`, `PatchChangeLabelCorrection`, `PatchChangeLiveSync`, the frontend's
+**Enforced by:** `PatchChangeTriggerIntegrationTest`, `PatchChangeHistoryNoNPlusOneTest`,
+`AdminPatchChangePageControllerMvcTest`, `AdminPatchChangeRelayControllerMvcTest`,
+`PatchChangeBackendClientTest`, `LiveSyncSectionMapParityTest`, `LiveSyncTopicTest`,
+`NavigationMenuTest` · **Code:** `PatchChangeHistory`, `PatchChangeRepository#findHistory`,
+`HomeLocationPhases#phasesOf`, `PatchChangeLabelCorrection`, `PatchChangeLiveSync`, the frontend's
 `patchchange` domain (`AdminPatchChangePageController`, `AdminPatchChangeRelayController`,
 `PatchChangeBackendClient`, `static/js/patchchange/`), `LiveSyncTopicClass.PATCH_CHANGE`
 
@@ -745,15 +751,19 @@ business dashboard shows it in a panel. There is no alert rule (#3257).
   end.
 - After a trigger with the option on, the asked members' open pages are handed off to the gate
   (REQ-PATCH-020).
-- The member's page navigates into the tool after the choice, as the consent page does.
+- After the choice the member's page shows the relocation's summary in place, „Umgezogen nach X.“
+  with what moved, and the link „Weiter zum Basetool“; it never navigates by itself (REQ-PATCH-021,
+  REQ-FE-001).
 
 **Acceptance**
 
 - [x] A relocation and a phase end announce their rooms after the commit.
+- [x] After the choice the member's page shows the summary and the link into the tool in place and
+  stays put.
 
-**Enforced by:** `HomeLocationRelocationIntegrationTest`, `LiveSyncSectionMapParityTest` · **Code:**
-`InventoryStockRelocation`, `HangarShipRelocation`, `PatchChangeLiveSync`,
-`HomeLocationPromptEffect`
+**Enforced by:** `HomeLocationRelocationIntegrationTest`, `LiveSyncSectionMapParityTest`,
+`testHomeLocationJs` · **Code:** `InventoryStockRelocation`, `HangarShipRelocation`,
+`PatchChangeLiveSync`, `HomeLocationPromptEffect`, `static/js/patchchange/home-location.js`
 
 ### REQ-PATCH-030 — The profile setting „Meine Home Location“
 
@@ -1062,15 +1072,24 @@ and the time of the choice, the curated home locations on offer with the id a ch
 while the member is pending, the preview per current location: rows from before the live time, the
 share held for each org unit's pool, and the ships. Every location carries its name, its UEX place
 and its starmap GUID as the stock feed names them (REQ-XCH-018), a home location also its star
-system. Only the member's own prompt is read; an admin role widens nothing.
+system. A home location's name and star system come in full, up to the 255 characters the
+catalogue stores, in the read and in the choice's answer (REQ-PATCH-052); a preview's location and
+an exception's entry carry the stock feed's name, cut to 200. The UEX places and GUIDs of every
+location a read names come from one statement (REQ-DATA-003). Only the member's own prompt is
+read; an admin role widens nothing.
 
 **Acceptance**
 
 - [x] A pending member's read carries the phase, the offered home locations and the preview with
   the pool share; after the choice it reads `RELOCATED` with the chosen location and its time.
+- [x] A home location with a 255-character name and star system passes the gateway in the read
+  and in a committed choice's answer; a preview's location and an exception's entry are cut to 200.
+- [x] The links of many places on UEX cities and space stations come from one statement.
 
-**Enforced by:** `ExchangePatchChangeControllerTest` · **Code:** `PatchChangeExchangeViews`,
-`ExchangeLocationLinks`, `ExchangePatchChangeDto`
+**Enforced by:** `ExchangePatchChangeControllerTest`, `ExchangePatchChangeRouteTest`,
+`ExchangeLocationLinksNoNPlusOneTest` · **Code:** `PatchChangeExchangeViews`,
+`ExchangeLocationLinks`, `LocationRepository#findExchangeLinks`, `ExchangePatchChangeDto`,
+`patch-change.schema.json`
 
 ### REQ-PATCH-052 — An exchange client makes the member's choice with the web's rules
 
