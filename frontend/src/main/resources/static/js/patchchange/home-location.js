@@ -129,7 +129,7 @@ function initHomeLocation() {
 
     /**
      * Shows what moved in place of the call to action and offers the way on; the final choice can
-     * no longer be changed.
+     * no longer be changed, and the notice that an earlier choice was not taken goes.
      *
      * @param {string} summary the localized summary of the relocation
      */
@@ -139,6 +139,7 @@ function initHomeLocation() {
                 radio.disabled = true;
             }
         });
+        document.getElementById('hl-phase-changed')?.remove();
         success.textContent = summary;
         pending.hidden = true;
         done.hidden = false;

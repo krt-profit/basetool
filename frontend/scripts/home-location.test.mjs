@@ -49,6 +49,10 @@ class FakeElement {
     focus() {
         this.focused = true;
     }
+
+    remove() {
+        this.removed = true;
+    }
 }
 
 class FakeButton extends FakeElement {}
@@ -82,11 +86,14 @@ class FakeForm extends FakeElement {
 /**
  * Loads the page script over a fresh fake page with two curated home locations.
  *
+ * @param {boolean} [phaseChanged] whether the page was read again after a choice for a phase that
+ *     is no longer the open one, so it renders the notice
  * @returns {object} the harness: the recorded writes, the elements, the radios, choose and submit
  */
-function load() {
+function load(phaseChanged = false) {
     const radios = [new FakeInput('loc-1', 'Lorville'), new FakeInput('loc-2', 'Levski')];
     const el = {
+        ...(phaseChanged ? { 'hl-phase-changed': new FakeElement() } : {}),
         'hl-form': new FakeForm(radios),
         'hl-submit': new FakeButton(),
         'hl-error': new FakeElement(),
@@ -225,6 +232,17 @@ test('a choice for a phase that is no longer the open one reads the prompt again
 
     assert.deepEqual(ui.navigations, ['/home-location?phaseChanged=true']);
     assert.equal(el['hl-done'].hidden, true);
+});
+
+test('a relocation on the prompt read again drops the notice that the choice was not taken', () => {
+    const { ui, el, radios, choose, submit } = load(true);
+    choose(radios[1]);
+    submit();
+
+    ui.writes[0].onSuccess({ location: { name: 'Levski' }, rows: 0, ships: 0 });
+
+    assert.equal(el['hl-phase-changed'].removed, true);
+    assert.equal(el['hl-done'].hidden, false);
 });
 
 test('a refusal without a reason and a network failure show the fallback', () => {
