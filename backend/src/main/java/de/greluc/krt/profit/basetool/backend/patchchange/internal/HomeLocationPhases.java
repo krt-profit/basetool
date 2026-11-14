@@ -22,13 +22,17 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationGateCheck;
+import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeRelocationRepository.PhaseCounts;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -126,18 +130,48 @@ public class HomeLocationPhases implements HomeLocationGateCheck {
   }
 
   /**
-   * Describes a patch change's phase for the history.
+   * Describes the phases of patch changes for the history, counting every phase's members in one
+   * statement.
    *
-   * @param record the patch change
+   * @param records the patch changes, flushed
    * @param latestPromptId the latest patch change with the prompt on, or {@code null}
-   * @return the phase, or {@code null} when the patch change did not ask for a home location
+   * @return the phase by patch change id; a patch change that did not ask for a home location is
+   *     absent
    */
   @Transactional(readOnly = true)
-  public @Nullable PatchChangePhaseDto phaseOf(
-      @NotNull PatchChange record, @Nullable UUID latestPromptId) {
-    if (!record.isHomeLocationPrompt()) {
-      return null;
+  public @NotNull @Unmodifiable Map<UUID, PatchChangePhaseDto> phasesOf(
+      @NotNull Collection<PatchChange> records, @Nullable UUID latestPromptId) {
+    List<PatchChange> prompted =
+        records.stream().filter(PatchChange::isHomeLocationPrompt).toList();
+    if (prompted.isEmpty()) {
+      return Map.of();
     }
+    Map<UUID, PhaseCounts> counts =
+        relocations
+            .countPhases(prompted.stream().map(PatchChange::getId).toList(), ApprovalStatus.ACTIVE)
+            .stream()
+            .collect(Collectors.toMap(PhaseCounts::getPatchChangeId, Function.identity()));
+    return prompted.stream()
+        .collect(
+            Collectors.toUnmodifiableMap(
+                PatchChange::getId,
+                record ->
+                    phase(
+                        record,
+                        latestPromptId,
+                        Objects.requireNonNull(counts.get(record.getId()), "phase counts"))));
+  }
+
+  /**
+   * Describes one patch change's phase.
+   *
+   * @param record the patch change, which asked for a home location
+   * @param latestPromptId the latest patch change with the prompt on, or {@code null}
+   * @param counts its asked and relocated members
+   * @return the phase
+   */
+  private static @NotNull PatchChangePhaseDto phase(
+      @NotNull PatchChange record, @Nullable UUID latestPromptId, @NotNull PhaseCounts counts) {
     PatchChangePhaseState state;
     if (record.getPhaseEndedAt() != null) {
       state = PatchChangePhaseState.ENDED;
@@ -146,10 +180,7 @@ public class HomeLocationPhases implements HomeLocationGateCheck {
     } else {
       state = PatchChangePhaseState.SUPERSEDED;
     }
-    return new PatchChangePhaseDto(
-        state,
-        countAsked(record.getLiveAt()),
-        relocations.countRelocated(record.getId(), record.getLiveAt(), ApprovalStatus.ACTIVE));
+    return new PatchChangePhaseDto(state, counts.getAsked(), counts.getRelocated());
   }
 
   /**
