@@ -44,16 +44,19 @@ import org.springframework.transaction.support.TransactionTemplate;
  * reset offsets the balances as of the live time on both ledgers, later bookings stay, the pending
  * requests from before the live time end as cancelled with the patch change as reason, a reset that
  * would overdraw an account stops at zero, a custody move without an account leg waits for the
- * reset, and a later wipe counts an earlier wipe's reset at that wipe's live time.
+ * reset, a later wipe counts an earlier wipe's reset at that wipe's live time, and a wipe after a
+ * standalone reset since its live time offsets nothing, so every booking after that reset stays.
  *
  * <p>Its live time lies in 2000, before every other test's bookings; every row it writes is removed
- * afterwards, so no later test meets a balance as of that time.
+ * afterwards, the standalone resets included, so no later test meets a balance as of that time or a
+ * reset that took effect after it.
  */
 @SpringBootTest
 class BankCurrencyWipeIntegrationTest {
 
   private static final Instant LIVE_AT = Instant.parse("2000-01-01T00:00:00Z");
   private static final Instant BEFORE = Instant.parse("1999-06-01T00:00:00Z");
+  private static final Instant BETWEEN = Instant.parse("2000-03-01T00:00:00Z");
   private static final Instant LATER_LIVE_AT = Instant.parse("2000-06-01T00:00:00Z");
   private static final String FEE_RATE = "operation.transfer_fee_rate";
 
@@ -136,13 +139,8 @@ class BankCurrencyWipeIntegrationTest {
     assertThat(reasonOf(before)).isEqualTo(patchChange);
     assertThat(statusOf(after)).isEqualTo("PENDING");
     assertThat(reasonOf(after)).isNull();
-    assertThat(
-            jdbc.queryForList(
-                "SELECT details FROM bank_audit_event WHERE event_type = 'WIPE_RESET_EXECUTED'"
-                    + " AND details LIKE ?",
-                String.class,
-                "patchChange=" + patchChange + "%"))
-        .containsExactly(
+    assertThat(summaryOf(patchChange))
+        .isEqualTo(
             "patchChange="
                 + patchChange
                 + " liveAt="
@@ -171,13 +169,69 @@ class BankCurrencyWipeIntegrationTest {
     assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("0");
     assertThat(holderPostingRepository.holderTotal(holder.getId()))
         .isEqualByComparingTo(custody.min(BigDecimal.ZERO));
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT details FROM bank_audit_event WHERE event_type = 'WIPE_RESET_EXECUTED'"
-                    + " AND details LIKE ?",
-                String.class,
-                "patchChange=" + patchChange + "%"))
-        .contains(" clampedAccounts=1 clampedStashes=1 ");
+    assertThat(summaryOf(patchChange)).contains(" clampedAccounts=1 clampedStashes=1 ");
+  }
+
+  @Test
+  void aWipeAfterAStandaloneResetKeepsTheCreditBookedSinceThatReset() {
+    backdate(deposit(account, holder, "100"));
+    ledger.resetAllBalances();
+    deposit(account, holder, "50");
+
+    BankCurrencyWipe.Effect preview = transactions.execute(_ -> wipe.preview(LIVE_AT));
+    BankCurrencyWipe.Effect applied = transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange));
+
+    assertTheWipeOffsetNothing(preview, applied);
+    assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("50");
+    assertThat(holderPostingRepository.holderTotal(holder.getId())).isEqualByComparingTo("50");
+    assertThat(effectiveTimesOfTheResets()).containsExactly((Timestamp) null);
+  }
+
+  @Test
+  void aWipeAfterAStandaloneResetOffsetsNothingOfWhatWasSpentBeforeThatReset() {
+    backdate(deposit(account, holder, "100"));
+    ledger.bookWithdrawal(
+        new BankWithdrawalRequest(account.getId(), holder.getId(), new BigDecimal("80"), null));
+    ledger.resetAllBalances();
+    deposit(account, holder, "50");
+
+    BankCurrencyWipe.Effect preview = transactions.execute(_ -> wipe.preview(LIVE_AT));
+    BankCurrencyWipe.Effect applied = transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange));
+
+    assertTheWipeOffsetNothing(preview, applied);
+    assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("50");
+    assertThat(holderPostingRepository.holderTotal(holder.getId())).isEqualByComparingTo("50");
+  }
+
+  @Test
+  void aWipeAfterAStandaloneResetKeepsTheCustodyAHolderTookOnSinceThatReset() {
+    backdate(deposit(account, holder, "100"));
+    ledger.resetAllBalances();
+    deposit(otherAccount, holder, "50");
+
+    BankCurrencyWipe.Effect preview = transactions.execute(_ -> wipe.preview(LIVE_AT));
+    BankCurrencyWipe.Effect applied = transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange));
+
+    assertTheWipeOffsetNothing(preview, applied);
+    assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("0");
+    assertThat(postingRepository.accountBalance(otherAccount.getId())).isEqualByComparingTo("50");
+    assertThat(holderPostingRepository.holderTotal(holder.getId())).isEqualByComparingTo("50");
+  }
+
+  @Test
+  void aLaterWipeStillOffsetsWhatWasBookedBetweenTheTwoLiveTimes() {
+    backdate(deposit(account, holder, "100"));
+    backdate(deposit(account, holder, "30"), BETWEEN);
+    transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange));
+    deposit(account, holder, "20");
+
+    BankCurrencyWipe.Effect applied =
+        transactions.execute(_ -> wipe.apply(LATER_LIVE_AT, laterPatchChange));
+
+    assertThat(Objects.requireNonNull(applied).resetTotal()).isEqualByComparingTo("30");
+    assertThat(applied.accountsClamped()).isZero();
+    assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("20");
+    assertThat(holderPostingRepository.holderTotal(holder.getId())).isEqualByComparingTo("20");
   }
 
   @Test
@@ -225,6 +279,43 @@ class BankCurrencyWipeIntegrationTest {
     assertThat(holderPostingRepository.holderTotal(holder.getId())).isEqualByComparingTo("0");
     assertThat(holderPostingRepository.holderTotal(otherHolder.getId()))
         .isEqualByComparingTo("1000");
+  }
+
+  /**
+   * Asserts that the wipe at the live time offset nothing and stopped no account or holder at zero,
+   * in its preview, its result and its summary event.
+   *
+   * @param preview the wipe's preview
+   * @param applied the wipe's result
+   */
+  private void assertTheWipeOffsetNothing(
+      BankCurrencyWipe.Effect preview, BankCurrencyWipe.Effect applied) {
+    assertThat(Objects.requireNonNull(preview).resetTotal()).isEqualByComparingTo("0");
+    assertThat(preview.accountsClamped()).isZero();
+    assertThat(Objects.requireNonNull(applied).resetTotal()).isEqualByComparingTo("0");
+    assertThat(applied.accountsClamped()).isZero();
+    assertThat(summaryOf(patchChange))
+        .isEqualTo(
+            "patchChange="
+                + patchChange
+                + " liveAt="
+                + LIVE_AT
+                + " accounts=0 stashes=0 totalZeroed=0 clampedAccounts=0 clampedStashes=0"
+                + " cancelledRequests=0");
+  }
+
+  /**
+   * Reads the details of the one summary event a wipe recorded.
+   *
+   * @param wiped the patch change of the wipe
+   * @return the event's details
+   */
+  private String summaryOf(@NotNull UUID wiped) {
+    return jdbc.queryForObject(
+        "SELECT details FROM bank_audit_event WHERE event_type = 'WIPE_RESET_EXECUTED'"
+            + " AND details LIKE ?",
+        String.class,
+        "patchChange=" + wiped + "%");
   }
 
   /**
@@ -285,7 +376,17 @@ class BankCurrencyWipeIntegrationTest {
    * @param transaction the transaction
    */
   private void backdate(@NotNull UUID transaction) {
-    Timestamp at = Timestamp.from(BEFORE);
+    backdate(transaction, BEFORE);
+  }
+
+  /**
+   * Moves a transaction and its legs to a past booking time.
+   *
+   * @param transaction the transaction
+   * @param bookedAt the booking time
+   */
+  private void backdate(@NotNull UUID transaction, @NotNull Instant bookedAt) {
+    Timestamp at = Timestamp.from(bookedAt);
     jdbc.update("UPDATE bank_transaction SET created_at = ? WHERE id = ?", at, transaction);
     jdbc.update("UPDATE bank_posting SET created_at = ? WHERE transaction_id = ?", at, transaction);
     jdbc.update(

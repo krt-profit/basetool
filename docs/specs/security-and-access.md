@@ -3693,7 +3693,11 @@ the member, with the remainder of the unique constraint as the conflict key, and
 stay with the act. `UserAccountMergeService` asks every participant to refuse the merge first (the
 bank does, on two ledgers), runs them by position, moves the declared tables through the
 `OwnedRowsMover` and writes the `USER_MERGED` row from the rows each reported, in participant order.
-Eighteen participants in seventeen modules take part; `UserReassignmentOrderTest` pins their order,
+A participant whose module's writers take a lock before they reference an account row implements
+`PreparedUserReassignmentParticipant`, and the merge takes that lock before it locks the two
+account rows: the job-order money identity lock comes first, as in every money writer and money
+notice, so a merge never deadlocks against a writer of either account
+(`JobOrderAccountMergeLockOrderIntegrationTest`). Eighteen participants in seventeen modules take part; `UserReassignmentOrderTest` pins their order,
 columns and conflict keys.
 
 **The classification is exhaustive by construction.** `UserAccountMergeCoverageTest` reads every

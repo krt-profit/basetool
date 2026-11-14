@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRows;
+import de.greluc.krt.profit.basetool.backend.platform.api.PreparedUserReassignmentParticipant;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserReassignmentParticipant;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserReassignmentParticipant.Moved;
 import jakarta.persistence.EntityManager;
@@ -43,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Moves everything one account owns onto another, so an admin can repair a member who ended up with
- * two (REQ-SEC-045).
+ * two (REQ-SEC-046).
  *
  * <p>Ownership follows the member; attribution stays with the act. Every foreign key into {@code
  * app_user} is declared by the owning module's {@link UserReassignmentParticipant} in exactly one
@@ -121,6 +122,8 @@ public class UserAccountMergeService {
    * Moves everything {@code sourceUserId} owns onto {@code targetUserId}.
    *
    * <p>The emptied source row is left in place; removing it is the separate user-deletion flow.
+   * Every {@link PreparedUserReassignmentParticipant} takes its locks before the two account rows
+   * are locked, in the order its module's writers take them.
    *
    * @param sourceUserId the account to empty, which the member can no longer reach
    * @param targetUserId the account to keep, which the member logs into now
@@ -136,13 +139,18 @@ public class UserAccountMergeService {
     if (sourceUserId.equals(targetUserId)) {
       throw new BusinessConflictException("An account cannot be merged into itself");
     }
+    List<UserReassignmentParticipant> ordered = inRunOrder();
+    for (UserReassignmentParticipant participant : ordered) {
+      if (participant instanceof PreparedUserReassignmentParticipant prepared) {
+        prepared.prepareMerge(sourceUserId, targetUserId);
+      }
+    }
     userRepository.lockAccountsForMerge(List.of(sourceUserId, targetUserId));
     final User source =
         Entities.require(userRepository.findById(sourceUserId), "Source account not found");
     final User target =
         Entities.require(userRepository.findById(targetUserId), "Target account not found");
 
-    List<UserReassignmentParticipant> ordered = inRunOrder();
     for (UserReassignmentParticipant participant : ordered) {
       participant.assertMergeable(sourceUserId, targetUserId);
     }

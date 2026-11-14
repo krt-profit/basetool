@@ -681,7 +681,8 @@ postings before the live time and the aUEC orders book what the facts before it 
 both keep every later booking
 ([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)). An earlier
 wipe's reset and shortages count at that wipe's live time, so a later wipe never takes the same
-money twice. The currency wipe takes the order guards and the purchasing deals before the Bank's
+money twice; after a standalone Bank reset since the live time the Bank reset offsets nothing,
+because that reset already zeroed the money of the live time. The currency wipe takes the order guards and the purchasing deals before the Bank's
 request locks, and every account and then every holder last, the order every Bank decision
 follows (REQ-BANK-063).
 A relocation is the one write that changes a row's location in place: it keeps every earmark,

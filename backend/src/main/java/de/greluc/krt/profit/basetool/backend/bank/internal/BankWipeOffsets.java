@@ -37,6 +37,12 @@ import org.jetbrains.annotations.Unmodifiable;
  */
 record BankWipeOffsets(@NotNull @Unmodifiable Map<UUID, BigDecimal> offsets, int clamped) {
 
+  /**
+   * No offset and no clamp: a reset since the live time already zeroed every balance of it, so a
+   * wipe has nothing left to offset.
+   */
+  static final BankWipeOffsets NONE = new BankWipeOffsets(Map.of(), 0);
+
   /** Copies the offsets, so the record never shares a caller's map. */
   BankWipeOffsets {
     offsets = Map.copyOf(offsets);
