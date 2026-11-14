@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationChoiceRefusedException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -62,8 +62,8 @@ class HomeLocationOffer {
    *
    * @param id the location
    * @return the location
-   * @throws BadRequestException {@code error.patch_change.home_location_not_offered} when it is not
-   *     a curated home location on offer
+   * @throws HomeLocationChoiceRefusedException {@code NOT_OFFERED} when it is not a curated home
+   *     location on offer
    */
   @Transactional(readOnly = true)
   @NotNull
@@ -71,7 +71,9 @@ class HomeLocationOffer {
     return curated().stream()
         .filter(location -> id.equals(location.getId()))
         .findFirst()
-        .orElseThrow(() -> new BadRequestException("error.patch_change.home_location_not_offered"));
+        .orElseThrow(() ->
+            new HomeLocationChoiceRefusedException(
+                HomeLocationChoiceRefusedException.Reason.NOT_OFFERED));
   }
 
   /**
