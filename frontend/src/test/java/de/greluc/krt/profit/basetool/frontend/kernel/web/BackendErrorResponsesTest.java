@@ -27,6 +27,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.GatePageRequest;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -35,6 +37,9 @@ import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -176,6 +181,57 @@ class BackendErrorResponsesTest {
         .hasCause(refusal);
   }
 
+  /**
+   * A session gate's refusal is never relayed as an ordinary problem: it reaches the global
+   * handler, which discards the gate's cached verdict and answers with the gate's header
+   * (ADR-0385).
+   */
+  @Test
+  void relayPropagateAndWithBackendStatusLetASessionGatesRefusalThrough() {
+    Logger log = mock(Logger.class);
+    SessionGateRefusalException refusal = sessionGateRefusal();
+
+    assertThatThrownBy(() ->
+            BackendErrorResponses.relay(
+                log,
+                "update thing",
+                () -> {
+                  throw refusal;
+                }))
+        .isSameAs(refusal);
+    assertThatThrownBy(() -> BackendErrorResponses.propagateBackendError(refusal))
+        .isSameAs(refusal);
+    assertThatThrownBy(() ->
+            BackendErrorResponses.withBackendStatus(() -> {
+              throw refusal;
+            }))
+        .isSameAs(refusal);
+  }
+
+  /** On a gate's own page the refusal is relayed like any other, so the page never hands off. */
+  @Test
+  @SuppressWarnings("unchecked")
+  void onAGatesOwnPageASessionGatesRefusalIsRelayedAsAProblem() {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/gate/choice");
+    GatePageRequest.mark(request);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    try {
+      ResponseEntity<Object> response =
+          BackendErrorResponses.relay(
+              mock(Logger.class),
+              "choose",
+              () -> {
+                throw sessionGateRefusal();
+              });
+
+      assertThat(response.getStatusCode().value()).isEqualTo(403);
+      assertThat((Map<String, Object>) response.getBody())
+          .containsEntry("code", "ANY_GATE_REQUIRED");
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+  }
+
   /** A result and the re-authentication signal pass through {@code withBackendStatus} untouched. */
   @Test
   void withBackendStatus_passesResultAndReauthenticationThrough() {
@@ -188,5 +244,9 @@ class BackendErrorResponsesTest {
               throw signal;
             }))
         .isSameAs(signal);
+  }
+
+  private static SessionGateRefusalException sessionGateRefusal() {
+    return new SessionGateRefusalException("gated", null, 403, "ANY_GATE_REQUIRED", null, null);
   }
 }

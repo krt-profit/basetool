@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.qos.logback.classic.Level;
@@ -248,6 +249,43 @@ class SectionFallbackTest {
       RequestContextHolder.resetRequestAttributes();
     }
     assertThat(appender.list).extracting(ILoggingEvent::getLevel).containsOnly(Level.DEBUG);
+  }
+
+  @Test
+  void aCustomFallbacksHandOffGuardPropagatesASessionLossAndAWrappedSessionGatesRefusal() {
+    ReauthenticationRequiredException reauth = reauth();
+    SessionGateRefusalException refusal = sessionGateRefusal();
+
+    assertThatThrownBy(() -> SectionFallback.rethrowHandOff(new CompletionException(reauth)))
+        .isSameAs(reauth);
+    assertThatThrownBy(() ->
+            SectionFallback.rethrowHandOff(
+                new CompletionException(new IllegalStateException(refusal))))
+        .isSameAs(refusal);
+    assertThatCode(
+            () -> SectionFallback.rethrowHandOff(new BackendServiceException("down", null, 503)))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  void onAGatesOwnPageTheHandOffGuardLetsTheCustomFallbackAnswerAGatesRefusal() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gate");
+    GatePageRequest.mark(request);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    try {
+      assertThatCode(() -> SectionFallback.rethrowHandOff(sessionGateRefusal()))
+          .doesNotThrowAnyException();
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+  }
+
+  @Test
+  void theReauthenticationOnlyGuardLetsAChromeFallbackAnswerAGatesRefusal() {
+    assertThatCode(() -> SectionFallback.rethrowIfReauthenticationRequired(sessionGateRefusal()))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(() -> SectionFallback.rethrowIfReauthenticationRequired(reauth()))
+        .isInstanceOf(ReauthenticationRequiredException.class);
   }
 
   @Test

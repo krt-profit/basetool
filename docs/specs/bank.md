@@ -504,9 +504,12 @@ zero stops at zero, so no account is overdrawn (REQ-BANK-006) and the wipe alway
 It cancels the pending requests submitted before the live time with the patch change as their
 reason, and its one `WIPE_RESET_EXECUTED` names the patch change, the live time, the number of
 cancelled requests and the number of accounts and holders whose offset stopped at zero. The
-button above keeps its behaviour.
+button above keeps its behaviour. The patch reset takes effect at the live time
+(`bank_transaction.effective_at`, V430), where a later patch reset's balances count it; the
+button's reset takes effect when it is recorded. Both resets lock every account and then every
+holder, in id order, before they read a balance.
 
-**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only), `BankCurrencyWipeIntegrationTest` (reset as of the live time) · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/internal/BankWipeResetBooking`, `bank/internal/BankCurrencyWipeService`, `bank/web/BankAdminController` · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent, takes effect when recorded), `BankControllerSecurityTest` (admin-only), `BankCurrencyWipeIntegrationTest` (reset as of the live time, effective at it), `V430CurrencyWipeEffectiveTimeMigrationTest` · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/internal/BankWipeResetBooking`, `bank/internal/BankPostingWriter#lockLedger`, `bank/internal/BankCurrencyWipeService`, `bank/web/BankAdminController`, `V430` · **Issues:** #556
 
 ### REQ-BANK-014 — Account statement PDF (Kontoauszug)
 
@@ -1505,6 +1508,11 @@ in the unified activity audit (REQ-AUDIT-001).
 > rounds to `0` keeps the legacy fee-free shape (no account leg, holder legs net to zero); historical
 > fee-free rows (`transfer_fee = 0`) stay sound. A **reversal** negates all three legs.
 
+**Locking (amendment, [REQ-PATCH-041](patch-change.md#req-patch-041--the-bank-reset-offsets-the-balances-as-of-the-live-time)).**
+An Umbuchung locks both holders in id order after the fee account, and a reversal locks the
+holders of its holder legs after its accounts, so a custody move without an account leg and a
+wipe reset (REQ-BANK-013) take turns.
+
 **Acceptance**
 
 - [x] An Umbuchung of `A` with `fee = round(A × rate)` debits the source holder `A + fee`, credits
@@ -1518,7 +1526,7 @@ in the unified activity audit (REQ-AUDIT-001).
   holder overdraft); same source/destination holder is rejected.
 - [x] It is reachable by `BANK_EMPLOYEE` without an account grant; a plain member is 403; it writes a `HOLDER_TRANSFER` audit event (detail carries the fee, amounts only).
 
-**Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankControllerSecurityTest` · **Code:** `bank/internal/BankLedgerService#bookHolderTransfer`, `bank/internal/BankLedgerIntegrityService` + `bank/internal/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `bank/web/BankHolderController`, `bank/internal/BankHolderTransferRequest`, `bank/internal/BankTransactionType`, `bank/internal/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
+**Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankControllerSecurityTest`, `BankCurrencyWipeIntegrationTest` (a zero-fee Umbuchung and a wipe reset take turns) · **Code:** `bank/internal/BankLedgerService#bookHolderTransfer`, `bank/internal/BankPostingWriter#lockHolders`, `bank/internal/BankLedgerIntegrityService` + `bank/internal/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `bank/web/BankHolderController`, `bank/internal/BankHolderTransferRequest`, `bank/internal/BankTransactionType`, `bank/internal/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
 
 ### REQ-BANK-032 — Holder custody history (own for employees, all for management)
 
@@ -3402,8 +3410,19 @@ rolls the bank's decision back. A request without a purpose calls no observer. A
 owner itself asked for through `PurposeBoundRequests#cancel` is reported like any other, so an
 observer treats the call as idempotent.
 
-**Enforced by:** `BankPurposeBoundRequestServiceTest` · **Code:**
-`bank/api/BookingRequestPurposeObserver`, `bank/internal/BankBookingRequestService` · **ADR:**
+**Lock order (amendment, [REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled)).**
+Before the Bank locks a purpose-bound request for a decision (a confirmation, a rejection, a
+cancellation by its requester, the currency wipe), it reads the request's purpose without loading
+the request and calls the observer's `beforeDecision`, which locks the owner. The owner's own
+cancellation through `PurposeBoundRequests#cancel` already holds that lock. Owner, request and
+accounts are therefore locked in one order on every path, the order a linked decision follows
+through `BankLinkedEffectHandler#beforeEffect`.
+
+**Enforced by:** `BankPurposeBoundRequestServiceTest`, `PurchasingRequestObserverTest`,
+`PurchasingDealCurrencyWipeLockOrderIntegrationTest` · **Code:**
+`bank/api/BookingRequestPurposeObserver`, `bank/internal/BankBookingRequestService`,
+`bank/internal/BankPurposeObservers`, `bank/internal/BankBookingRequestRepository#findPurposeById` ·
+**ADR:**
 [ADR-0254](../adr/0254-a-bank-booking-request-may-carry-an-opaque-purpose.md)
 
 ### REQ-BANK-064 — Collective read of the viewable org-unit bank accounts

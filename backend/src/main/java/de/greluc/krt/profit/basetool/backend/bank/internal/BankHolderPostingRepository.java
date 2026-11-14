@@ -89,15 +89,18 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
 
   /**
    * Every holder's global custody immediately before an instant in one grouped statement, the basis
-   * of a currency wipe's reset (REQ-PATCH-041). Holders without an earlier leg produce no row.
+   * of a currency wipe's reset (REQ-PATCH-041). An earlier wipe's reset counts at its patch
+   * change's live time, every other leg at its booking instant. Holders without an earlier leg
+   * produce no row.
    *
    * @param before exclusive upper bound
-   * @return one total per holder with a leg strictly before {@code before}
+   * @return one total per holder with a leg that took effect strictly before {@code before}
    */
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderAmount(p.holder.id, SUM(p.amount))
-      FROM BankHolderPosting p WHERE p.createdAt < :before GROUP BY p.holder.id
+      FROM BankHolderPosting p JOIN p.transaction t
+      WHERE COALESCE(t.effectiveAt, p.createdAt) < :before GROUP BY p.holder.id
       """)
   List<BankHolderAmount> holderAmountsBefore(@Param("before") Instant before);
 

@@ -60,7 +60,7 @@ public class QualityTierCatalog {
           backendApiClient.getCached(CachedCatalog.QUALITY_TIERS, LIST_OF_TIERS);
       return tiers == null ? List.of() : tiers.stream().sorted(PICKER_ORDER).toList();
     } catch (RuntimeException e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.warn("Quality-tier catalogue unavailable: {}", e.getMessage());
       return List.of();
     }

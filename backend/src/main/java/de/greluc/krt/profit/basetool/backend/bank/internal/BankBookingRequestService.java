@@ -421,6 +421,7 @@ public class BankBookingRequestService {
       @NotNull UUID requestId,
       long version,
       @Nullable BankLinkedDecisions.Prepared linked) {
+    lockPurposeOwner(requestId);
     BankBookingRequest request = lockRequest(requestId);
     if (!policy.ownsRequest(requester, request)
         || (linked == null && request.getLinkedAttempt() != null)) {
@@ -433,8 +434,9 @@ public class BankBookingRequestService {
 
   /**
    * Cancels a pending request on behalf of the module that raised it for a purpose (REQ-BANK-061),
-   * for example because the deal it pays for was cancelled. Joins the caller's transaction, skips
-   * the requester check and tells the purpose observer like any other cancellation.
+   * for example because the deal it pays for was cancelled. Joins the caller's transaction, which
+   * already holds the owner's lock, skips the requester check and tells the purpose observer like
+   * any other cancellation.
    *
    * @param requestId the request to cancel
    * @param kind the purpose kind the request must carry
@@ -657,8 +659,9 @@ public class BankBookingRequestService {
       boolean ownerApprovalConfirmed,
       @Nullable String staffNote,
       long version) {
-    BankLinkedDecisions.Prepared linked =
+    final BankLinkedDecisions.Prepared linked =
         linkedDecisions.forRequest(requestId, Action.CONFIRM, null);
+    lockPurposeOwner(requestId);
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     request.requirePending();
@@ -752,8 +755,9 @@ public class BankBookingRequestService {
   @Transactional
   public BankBookingRequestDto reject(
       @NotNull UUID requestId, @NotNull String reason, long version) {
-    BankLinkedDecisions.Prepared linked =
+    final BankLinkedDecisions.Prepared linked =
         linkedDecisions.forRequest(requestId, Action.REJECT, null);
+    lockPurposeOwner(requestId);
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     request.requirePending();
@@ -868,6 +872,18 @@ public class BankBookingRequestService {
   public boolean hasOpenRequests(@NotNull UUID accountId) {
     return requestRepository.existsByAccountIdAndStatus(
         accountId, BankBookingRequestStatus.PENDING);
+  }
+
+  /**
+   * Lets the owner of a purpose-bound request lock its purpose before the request is locked, so a
+   * Bank decision and the owner's own cancellation lock in one order (REQ-BANK-063).
+   *
+   * @param requestId the request about to be locked
+   */
+  private void lockPurposeOwner(@NotNull UUID requestId) {
+    requestRepository
+        .findPurposeById(requestId)
+        .ifPresent(purpose -> purposeObservers.beforeDecisions(List.of(purpose)));
   }
 
   /**

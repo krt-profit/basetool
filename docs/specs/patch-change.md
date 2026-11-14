@@ -230,6 +230,10 @@ of the prototype on `prototype/patch-change`):
 - **below, the history:** label, kind, live time, triggered by and at, the effects' counts and the
   options, newest first, with „Bezeichnung korrigieren“ per row.
 
+The backend reads the history in a fixed number of statements however many patch changes, phases
+and exceptions it holds (REQ-DATA-003): the wipe exceptions in one statement apart from the wipe
+groups and counts, and the asked and relocated members of every phase in one.
+
 A label correction checks the version the admin last saw and keeps the label between its
 neighbours' labels. Every write updates the page in place; the backend announces a trigger or a
 correction in the `patch-change` room (section `history`), so every other admin's open page
@@ -239,11 +243,13 @@ refreshes its history and its form's previous values.
 
 - [x] A correction with a stale version answers 409.
 - [x] The page renders the form, the preview, the confirmation and the history.
+- [x] The history's statement count does not grow with its patch changes, phases and exceptions.
 
-**Enforced by:** `PatchChangeTriggerIntegrationTest`, `AdminPatchChangePageControllerMvcTest`,
-`AdminPatchChangeRelayControllerMvcTest`, `PatchChangeBackendClientTest`,
-`LiveSyncSectionMapParityTest`, `LiveSyncTopicTest`, `NavigationMenuTest` · **Code:**
-`PatchChangeHistory`, `PatchChangeLabelCorrection`, `PatchChangeLiveSync`, the frontend's
+**Enforced by:** `PatchChangeTriggerIntegrationTest`, `PatchChangeHistoryNoNPlusOneTest`,
+`AdminPatchChangePageControllerMvcTest`, `AdminPatchChangeRelayControllerMvcTest`,
+`PatchChangeBackendClientTest`, `LiveSyncSectionMapParityTest`, `LiveSyncTopicTest`,
+`NavigationMenuTest` · **Code:** `PatchChangeHistory`, `PatchChangeRepository#findHistory`,
+`HomeLocationPhases#phasesOf`, `PatchChangeLabelCorrection`, `PatchChangeLiveSync`, the frontend's
 `patchchange` domain (`AdminPatchChangePageController`, `AdminPatchChangeRelayController`,
 `PatchChangeBackendClient`, `static/js/patchchange/`), `LiveSyncTopicClass.PATCH_CHANGE`
 
@@ -481,11 +487,19 @@ request, in sessions already open as well:
   `HomeLocationGate` asks the backend (`GET /api/v1/patch-changes/me/home-location/status`) through
   `SessionGateFilter` and caches only a verdict that lets the member through, for 60 seconds; the
   home-location page and the choice clear it;
-- a backend refusal with `403 HOME_LOCATION_REQUIRED` that reaches the frontend, a page section's
-  read included, discards the cached verdict at once and hands the browser to the page: a page load
-  is redirected, an AJAX call gets the header; so a member a new phase asks is held by the first
-  refused request, not after the cache expires. The refusal carries `sessionGate: true` like every
-  session gate's, by which the frontend tells it (REQ-SEC-028);
+- a WebSocket handshake never reuses a cached verdict: `SessionGateFilter` discards it and asks
+  the backend again, because the socket outlives the verdict and the rooms it then holds are
+  authorized without a backend call the gate could refuse; a member whose phase opened after the
+  cached verdict gets the `4003` close;
+- a backend refusal with `403 HOME_LOCATION_REQUIRED` that reaches the frontend discards the
+  cached verdict at once and hands the browser to the page: a page load is redirected, an AJAX
+  call gets the header; so a member a new phase asks is held by the first refused request, not
+  after the cache expires. This holds for a page section's read, a parallel read's fallback, a
+  form post's fallback and the shared AJAX relay (`BackendErrorResponses`) alike: each lets the
+  refusal through to `GlobalExceptionHandler` (`SectionFallback#rethrowHandOff`) instead of
+  answering it as an ordinary failure. The layout chrome, which also renders on the pages the gate
+  leaves open, degrades instead. The refusal carries `sessionGate: true` like every session gate's,
+  by which the frontend tells it (REQ-SEC-028);
 - an AJAX call gets `403` with the header `X-Home-Location-Required` naming the page, which
   `krtFetch` follows; an `EventSource` gets the one-shot event `home-location-gate`; a WebSocket
   handshake is marked (`SessionGateHandoff`) and closed with the terminal code `4003`;
@@ -506,15 +520,20 @@ relocation lock refuses its writes on locked rows and ships instead (REQ-PATCH-0
 - [x] The backend refuses a pending member's web calls with `403 HOME_LOCATION_REQUIRED` and lets
   the exempt endpoints and an exchange client's relayed call through.
 - [x] A backend refusal of the gate discards the frontend's cached verdict and hands the browser to
-  the page, also when a page section's read meets it.
+  the page, also when a page section's read, a parallel read's fallback, a form post's fallback or
+  the shared AJAX relay meets it, with a cached pass still warm.
+- [x] A WebSocket handshake asks the backend despite a cached pass and marks the socket of a member
+  whose phase opened since.
 
 **Enforced by:** `HomeLocationGateTest` (frontend and backend), `SessionGateFilterTest`,
 `SessionGateAccessFilterTest`, `GlobalExceptionHandlerTest`, `SectionSessionGateHandoffMvcTest`,
-`SessionGateClientParityTest`, `HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate`
-(frontend and backend), `SessionGateFilter`, `SessionGates`, `SessionGateHandoff`,
-`SessionGateAccessFilter`, `SessionGateRefusalException`, `SectionFallback`,
-`GlobalExceptionHandler`, `NotificationPageController`, `NotificationStreamService#reconnect`,
-`krt-fetch.js`, `notifications.js`
+`SharedFallbackSessionGateHandoffMvcTest`, `BackendErrorResponsesTest`,
+`BackendFallbackReauthenticationTest`, `SessionGateClientParityTest`,
+`HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate` (frontend and backend),
+`SessionGateFilter`, `SessionGates`, `SessionGateHandoff`, `SessionGateAccessFilter`,
+`SessionGateRefusalException`, `SectionFallback`, `BackendErrorResponses`,
+`MutationResponseHelper`, `GlobalExceptionHandler`, `NotificationPageController`,
+`NotificationStreamService#reconnect`, `krt-fetch.js`, `notifications.js`
 
 ### REQ-PATCH-021 — Who is asked and what is offered
 
@@ -758,15 +777,19 @@ business dashboard shows it in a panel. There is no alert rule (#3257).
   end.
 - After a trigger with the option on, the asked members' open pages are handed off to the gate
   (REQ-PATCH-020).
-- The member's page navigates into the tool after the choice, as the consent page does.
+- After the choice the member's page shows the relocation's summary in place, „Umgezogen nach X.“
+  with what moved, and the link „Weiter zum Basetool“; it never navigates by itself (REQ-PATCH-021,
+  REQ-FE-001).
 
 **Acceptance**
 
 - [x] A relocation and a phase end announce their rooms after the commit.
+- [x] After the choice the member's page shows the summary and the link into the tool in place and
+  stays put.
 
-**Enforced by:** `HomeLocationRelocationIntegrationTest`, `LiveSyncSectionMapParityTest` · **Code:**
-`InventoryStockRelocation`, `HangarShipRelocation`, `PatchChangeLiveSync`,
-`HomeLocationPromptEffect`
+**Enforced by:** `HomeLocationRelocationIntegrationTest`, `LiveSyncSectionMapParityTest`,
+`testHomeLocationJs` · **Code:** `InventoryStockRelocation`, `HangarShipRelocation`,
+`PatchChangeLiveSync`, `HomeLocationPromptEffect`, `static/js/patchchange/home-location.js`
 
 ### REQ-PATCH-030 — The profile setting „Meine Home Location“
 
@@ -783,6 +806,10 @@ It **only sets that default and moves nothing**; new members set it there.
   curated locations by name, the hint that it only prefills the forms and moves nothing, and the
   shared save bar, which saves it in place (`POST /profile/home-location`, REQ-FE-001). A stored
   location the profile no longer offers shows as no choice. There is no way back to "no choice".
+- The section is editable only after the setting and the curated locations were both read: the
+  page reader `HomeLocationPreferenceReader` carries that availability explicitly, and while either
+  read fails the section says it cannot be loaded and renders no form, so no version the page never
+  read is posted and a failed read is never shown as "no choice".
 - Endpoints: `GET`/`PUT /api/v1/users/me/home-location` (any member, only their own row). A
   location that is not curated is refused with `400` (`error.profile.home_location_not_offered`), a
   stale version with `409`; choosing the stored location again changes nothing.
@@ -795,6 +822,8 @@ It **only sets that default and moves nothing**; new members set it there.
   a stale version are refused.
 - [x] The profile section lists the curated locations by name with the stored one selected and
   saves in place.
+- [x] A failed read of the setting or of the curated locations shows the section unavailable,
+  without a form to save.
 
 **Enforced by:** `MemberHomeLocationIntegrationTest`, `MyHomeLocationControllerIntegrationTest`,
 `ProfileHomeLocationMvcTest`, `HomeLocationPreferenceReaderTest`, `IdentityBackendClientTest`,
@@ -893,6 +922,17 @@ One `WIPE_RESET` transaction offsets the balances **as of the live time** on bot
 (ADR-0384): a negative account leg per account and a negative holder leg per holder whose balance
 from the postings before the live time is not zero. Every booking after the live time stays.
 
+The reset's legs keep the trigger as their booking time, and the reset takes effect at the live
+time (`bank_transaction.effective_at`, V430). A later patch change's live time may lie between
+this live time and this trigger (REQ-PATCH-003); its balances as of its own live time count this
+reset there, so it never offsets again what this one already offset. The standalone reset takes
+effect when it is recorded.
+
+The reset locks every Bank account and then every holder, each in id order, before it reads a
+balance. A custody move without an account leg, such as a holder transfer whose fee rounds to zero
+or its reversal, locks its holders after its accounts (REQ-BANK-031), so the move and the reset
+take turns and no custody the reset read moves before it books.
+
 When an offset would take an account or a holder below zero, because more was booked out of it
 than into it since the live time, the offset **stops at zero**: the account or holder ends at
 zero, and a holder that is already below zero keeps its balance. The no-overdraft rule
@@ -909,11 +949,17 @@ detail the reset booked on refresh in place.
 - [x] After the reset the accounts and holders hold exactly what was booked after the live time.
 - [x] An account whose later debits exceed its later credits ends at zero, and the clamp is
   counted.
+- [x] A later wipe counts an earlier wipe's reset at that wipe's live time, so money booked after
+  the later live time stays.
+- [x] A holder transfer whose fee rounds to zero and that races the reset waits for it; its source
+  ends at zero.
 
 **Enforced by:** `BankWipeOffsetsTest`, `BankCurrencyWipeIntegrationTest`,
-`CurrencyWipeEffectTest`, `BankLedgerServiceTest` · **Code:** `BankCurrencyWipeService`,
-`BankWipeOffsets`, `BankWipeResetBooking`, `BankPostingRepository#accountBalancesBefore`,
-`BankHolderPostingRepository#holderAmountsBefore`, `#holderAmountsOf`
+`CurrencyWipeEffectTest`, `BankLedgerServiceTest`, `V430CurrencyWipeEffectiveTimeMigrationTest` ·
+**Code:** `BankCurrencyWipeService`, `BankWipeOffsets`, `BankWipeResetBooking`,
+`BankPostingWriter#lockLedger`, `#lockHolders`, `#persistWipeReset`, `BankTransaction#effectiveAt`,
+`BankPostingRepository#accountBalancesBefore`, `BankHolderPostingRepository#holderAmountsBefore`,
+`#holderAmountsOf`, `V430`
 
 ### REQ-PATCH-042 — Pending Bank requests from before the live time are cancelled
 
@@ -923,6 +969,13 @@ owns ends as `CANCELLED`, with the patch change as its reason
 request notices like any other, and a purpose-bound request tells its owner (REQ-BANK-063). A
 request submitted after the live time stays pending; a request of an order attempt follows
 REQ-PATCH-043.
+
+The wipe locks the owner of every purpose-bound request it cancels before the request, as the
+owner's own cancellation does: the purchasing deal first, then its requests, then the accounts
+(REQ-BANK-063, REQ-PUR-026). A deal cancelled at the same moment therefore waits for the wipe or
+the wipe for it, and the patch change never ends in a deadlock. A purpose-bound request that turns
+up between the wipe's read of the owners and its request lock fails the trigger with a conflict,
+and the admin triggers again.
 
 Wherever the web shows the request's status it names the patch change by its current label
 beneath the status („Patchwechsel 4.4“): „Meine Anträge“
@@ -940,11 +993,15 @@ needs one. A request its requester withdrew shows the status alone. The exchange
   its reason.
 - [x] Every web view of a cancelled request names the patch change beneath its status, and only
   for a request the wipe cancelled; the exchange carries `cancelledByPatch` for exactly those.
+- [x] A manual cancellation of a purchasing deal and the wipe on the same deal both finish.
 
 **Enforced by:** `BankCurrencyWipeIntegrationTest`, `BankRequestPatchLabelsTest`,
-`BankBookingRequestServiceTest`, `ExchangeBankRequestServiceTest`, frontend
+`BankBookingRequestServiceTest`, `ExchangeBankRequestServiceTest`,
+`PurchasingDealCurrencyWipeLockOrderIntegrationTest`, frontend
 `BankRequestCancelledByPatchRenderTest`, `DashboardTradeWidgetsMvcTest` · **Code:**
-`BankCurrencyWipeRequests`, `BankBookingRequest#cancelByPatchChange`, `V425`,
+`BankCurrencyWipeRequests`, `BankPurposeObservers#beforeDecisions`,
+`BankBookingRequestRepository#findUnlinkedPurposesCreatedBefore`,
+`BankBookingRequest#cancelByPatchChange`, `V425`,
 `bank.api.BankPatchLabels`, `BankRequestPatchLabels`, `PatchChangeLabelDirectory`,
 `ExchangeBankRequestService`, `templates/bank/fragments/bank-request-reason.html`
 
@@ -972,9 +1029,12 @@ shows the patch label.
 Per holder and per Bank account position of every aUEC order, the part of the booked holding that
 existed at the live time and is still held becomes a **real shortage**
 ([REQ-ORDERS-061](orders-auec.md#req-orders-061--settlement-reuses-movements-and-explicit-purpose-changes),
--062): the lesser of the balance from the facts recorded before the live time, at their current
-effective amounts, and the current balance less what stays bound once the attempts of
-REQ-PATCH-043 are cancelled. Money added later and money a later attempt still binds stay.
+-062): the lesser of the balance from the facts that took effect before the live time, at their
+current effective amounts, and the current balance less what stays bound once the attempts of
+REQ-PATCH-043 are cancelled. Money added later and money a later attempt still binds stay. A fact
+takes effect when it is recorded, except an earlier patch change's shortage, which takes effect at
+that patch change's live time (`job_order_money_operation.effective_at`, V430); a later wipe whose
+live time lies before the earlier trigger therefore never books that money twice.
 
 Each shortage is its own `SHORTAGE` operation with its own operation id, recorded by no actor and
 naming the patch change (`job_order_money_operation.patch_change_id`). Past provision and
@@ -988,11 +1048,14 @@ participant-readable history shows the shortage with the patch change's current 
 - [x] A holding of the live time is booked as a shortage, a later provision stays, a holding moved
   away after the live time is booked only for what its holder still holds, and the status stays.
 - [x] The history shows the shortage with the patch label and without an actor.
+- [x] A later wipe counts an earlier wipe's shortage at that wipe's live time and books no shortage
+  of money added after the later live time.
 
-**Enforced by:** `PatchChangeCurrencyWipeIntegrationTest`, `OrdersDetailPatternRenderTest` ·
-**Code:** `JobOrderCurrencyWipePlanner`, `JobOrderCurrencyWipeService`,
-`JobOrderMoneyLedger.Ledger#before`, `JobOrderMoneyOperation#currencyWipeShortage`,
-`JobOrderMoneyQueries`, `PatchChangeLabelDirectory`, `V424`
+**Enforced by:** `PatchChangeCurrencyWipeIntegrationTest`, `OrdersDetailPatternRenderTest`,
+`V430CurrencyWipeEffectiveTimeMigrationTest` · **Code:** `JobOrderCurrencyWipePlanner`,
+`JobOrderCurrencyWipeService`, `JobOrderMoneyLedger.Ledger#before`,
+`JobOrderMoneyOperation#currencyWipeShortage`, `#effectiveAt`, `JobOrderMoneyQueries`,
+`PatchChangeLabelDirectory`, `V424`, `V430`
 
 ### REQ-PATCH-045 — Open unit commitments from before the live time end
 
@@ -1012,17 +1075,19 @@ after the live time stays.
 ### REQ-PATCH-046 — Preview, audit and live update of the currency wipe
 
 The preview and the record count seven kinds: the Bank reset total (`BANK_RESET_TOTAL`, aUEC),
-the accounts whose reset stopped at zero (`BANK_ACCOUNTS_CLAMPED`), the Bank requests cancelled,
-the aUEC holdings booked as shortage and their total (`AUEC_SHORTAGE_TOTAL`, aUEC), the order Bank
-attempts cancelled and the commitments ended. The preview counts exactly what the trigger then
-does.
+the accounts whose reset stopped at zero (`BANK_ACCOUNTS_CLAMPED`), the Bank requests cancelled
+(`BANK_REQUESTS_CANCELED`: the unlinked ones of REQ-PATCH-042 and the one of every order attempt
+of REQ-PATCH-043, so every request the Bank shows as cancelled by the patch change), the aUEC
+holdings booked as shortage and their total (`AUEC_SHORTAGE_TOTAL`, aUEC), the order Bank attempts
+cancelled and the commitments ended. The preview counts exactly what the trigger then does.
 
 The trigger records one summary event in each affected trail: the job orders'
 `JOB_ORDER_MONEY_CURRENCY_WIPED` (subject the patch change with its label; details `orders`,
 `shortages`, `shortageTotal`, `attemptsCancelled`, `commitmentsEnded`, `patchChange`) and the
 Bank's own `WIPE_RESET_EXECUTED` (details `patchChange`, `liveAt`, `accounts`, `stashes`,
-`totalZeroed`, `clampedAccounts`, `clampedStashes`, `cancelledRequests`; counts only, no amount
-per account). Single shortages, attempts, requests and commitments are not audited one by one. Open order pages refresh their money and participation sections and the order
+`totalZeroed`, `clampedAccounts`, `clampedStashes`, `cancelledRequests`, the last counting every
+request that names the patch change as its reason, linked or not; counts only, no amount per
+account). Single shortages, attempts, requests and commitments are not audited one by one. Open order pages refresh their money and participation sections and the order
 queue; the Bank's staff queue and grid, the org-unit Bank view and the touched account details
 refresh in place.
 
@@ -1031,10 +1096,14 @@ refresh in place.
 - [x] Preview and record carry the same seven counts.
 - [x] A trigger records one `JOB_ORDER_MONEY_CURRENCY_WIPED` and one `WIPE_RESET_EXECUTED` naming
   the patch change.
+- [x] The Bank request count of the preview, the record and the Bank's summary event includes the
+  request of every cancelled order attempt.
 
 **Enforced by:** `PatchChangeCurrencyWipeIntegrationTest`, `BankCurrencyWipeIntegrationTest`,
-`AdminAuditLogPageControllerTest`, `LiveSyncTopicRegistryParityTest` · **Code:** `PatchCount`,
-`CurrencyWipeEffect`, `JobOrderCurrencyWipeService`, `BankCurrencyWipeService`,
+`CurrencyWipeEffectTest`, `JobOrderLinkedBankIntegrationTest`, `AdminAuditLogPageControllerTest`,
+`LiveSyncTopicRegistryParityTest` · **Code:** `PatchCount`, `CurrencyWipeEffect#counts`,
+`JobOrderCurrencyWipeService`, `BankCurrencyWipeService`,
+`BankBookingRequestRepository#countByCancelledByPatchChange`,
 `JobOrderMoneyEffects#currencyWiped`, `LiveSyncTopicClass.BANK_ACCOUNT`
 
 ### REQ-PATCH-050 — An exchange client reads the latest patch change and its options
@@ -1075,15 +1144,24 @@ and the time of the choice, the curated home locations on offer with the id a ch
 while the member is pending, the preview per current location: rows from before the live time, the
 share held for each org unit's pool, and the ships. Every location carries its name, its UEX place
 and its starmap GUID as the stock feed names them (REQ-XCH-018), a home location also its star
-system. Only the member's own prompt is read; an admin role widens nothing.
+system. A home location's name and star system come in full, up to the 255 characters the
+catalogue stores, in the read and in the choice's answer (REQ-PATCH-052); a preview's location and
+an exception's entry carry the stock feed's name, cut to 200. The UEX places and GUIDs of every
+location a read names come from one statement (REQ-DATA-003). Only the member's own prompt is
+read; an admin role widens nothing.
 
 **Acceptance**
 
 - [x] A pending member's read carries the phase, the offered home locations and the preview with
   the pool share; after the choice it reads `RELOCATED` with the chosen location and its time.
+- [x] A home location with a 255-character name and star system passes the gateway in the read
+  and in a committed choice's answer; a preview's location and an exception's entry are cut to 200.
+- [x] The links of many places on UEX cities and space stations come from one statement.
 
-**Enforced by:** `ExchangePatchChangeControllerTest` · **Code:** `PatchChangeExchangeViews`,
-`ExchangeLocationLinks`, `ExchangePatchChangeDto`
+**Enforced by:** `ExchangePatchChangeControllerTest`, `ExchangePatchChangeRouteTest`,
+`ExchangeLocationLinksNoNPlusOneTest` · **Code:** `PatchChangeExchangeViews`,
+`ExchangeLocationLinks`, `LocationRepository#findExchangeLinks`, `ExchangePatchChangeDto`,
+`patch-change.schema.json`
 
 ### REQ-PATCH-052 — An exchange client makes the member's choice with the web's rules
 

@@ -19,8 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import lombok.RequiredArgsConstructor;
@@ -29,15 +32,37 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 /**
- * Tells the observer that owns a request's purpose kind how the request ended, inside the bank's
- * transaction (REQ-BANK-063).
+ * Lets the observer that owns a request's purpose kind lock the purpose before the bank locks the
+ * request, and tells it how the request ended, inside the bank's transaction (REQ-BANK-063).
  */
 @Component
 @RequiredArgsConstructor
 class BankPurposeObservers {
 
+  /** Orders purposes by kind, then by reference as PostgreSQL orders UUIDs. */
+  private static final Comparator<BankPurpose> PURPOSE_ORDER =
+      Comparator.comparing(BankPurpose::kind)
+          .thenComparing(BankPurpose::ref, BankPostingWriter.ACCOUNT_ID_ORDER);
+
   /** Every observer bean; each owns one purpose kind. */
   private final ObjectProvider<BookingRequestPurposeObserver> observers;
+
+  /**
+   * Lets the owner of each purpose lock it before the bank locks a request of it, one purpose at a
+   * time in kind and reference order; a purpose whose kind has no observer is skipped.
+   *
+   * @param purposes the purposes of the requests the bank is about to lock
+   */
+  void beforeDecisions(@NotNull Collection<BankPurpose> purposes) {
+    purposes.stream()
+        .distinct()
+        .sorted(PURPOSE_ORDER)
+        .forEach(purpose ->
+            observers
+                .orderedStream()
+                .filter(observer -> observer.kind() == purpose.kind())
+                .forEach(observer -> observer.beforeDecision(purpose.ref())));
+  }
 
   /**
    * Calls the observers of the request's purpose kind; nothing for a request without a purpose.

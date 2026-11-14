@@ -584,7 +584,7 @@ public class RefineryOrderPageController {
         model.addAttribute("importErrorKey", "refineryImport.error.failed");
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Refinery import relay failed (ajax)", e);
       model.addAttribute("importErrorKey", "refineryImport.error.failed");
     }

@@ -22,12 +22,14 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankCurrencyWipe;
+import de.greluc.krt.profit.basetool.backend.support.LockRace;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.Future;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,8 +42,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * The Kartellbank's part of a currency wipe against PostgreSQL (REQ-PATCH-041, -042, ADR-0384): one
  * reset offsets the balances as of the live time on both ledgers, later bookings stay, the pending
- * requests from before the live time end as cancelled with the patch change as reason, and a reset
- * that would overdraw an account refuses the wipe.
+ * requests from before the live time end as cancelled with the patch change as reason, a reset that
+ * would overdraw an account stops at zero, a custody move without an account leg waits for the
+ * reset, and a later wipe counts an earlier wipe's reset at that wipe's live time.
  *
  * <p>Its live time lies in 2000, before every other test's bookings; every row it writes is removed
  * afterwards, so no later test meets a balance as of that time.
@@ -51,6 +54,8 @@ class BankCurrencyWipeIntegrationTest {
 
   private static final Instant LIVE_AT = Instant.parse("2000-01-01T00:00:00Z");
   private static final Instant BEFORE = Instant.parse("1999-06-01T00:00:00Z");
+  private static final Instant LATER_LIVE_AT = Instant.parse("2000-06-01T00:00:00Z");
+  private static final String FEE_RATE = "operation.transfer_fee_rate";
 
   @Autowired private BankCurrencyWipe wipe;
   @Autowired private BankLedgerService ledger;
@@ -62,6 +67,7 @@ class BankCurrencyWipeIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
 
   private final UUID patchChange = UUID.randomUUID();
+  private final UUID laterPatchChange = UUID.randomUUID();
   private BankAccount account;
   private BankAccount otherAccount;
   private BankHolder holder;
@@ -99,8 +105,10 @@ class BankCurrencyWipeIntegrationTest {
       jdbc.update("DELETE FROM bank_posting WHERE transaction_id = ?", transaction);
       jdbc.update("DELETE FROM bank_transaction WHERE id = ?", transaction);
     }
-    jdbc.update(
-        "DELETE FROM bank_audit_event WHERE details LIKE ?", "patchChange=" + patchChange + "%");
+    for (UUID wiped : List.of(patchChange, laterPatchChange)) {
+      jdbc.update(
+          "DELETE FROM bank_audit_event WHERE details LIKE ?", "patchChange=" + wiped + "%");
+    }
     jdbc.update("DELETE FROM bank_holder WHERE id IN (?, ?)", holder.getId(), otherHolder.getId());
     jdbc.update("DELETE FROM bank_account WHERE id IN (?, ?)", accounts.get(0), accounts.get(1));
   }
@@ -116,9 +124,9 @@ class BankCurrencyWipeIntegrationTest {
     BankCurrencyWipe.Effect preview = transactions.execute(_ -> wipe.preview(LIVE_AT));
     BankCurrencyWipe.Effect applied = transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange));
 
-    assertThat(Objects.requireNonNull(preview).requestsCancelled()).isEqualTo(1);
+    assertThat(Objects.requireNonNull(preview).unlinkedRequestsCancelled()).isEqualTo(1);
     assertThat(preview.resetTotal()).isEqualByComparingTo("1300");
-    assertThat(Objects.requireNonNull(applied).requestsCancelled()).isEqualTo(1);
+    assertThat(Objects.requireNonNull(applied).unlinkedRequestsCancelled()).isEqualTo(1);
     assertThat(applied.resetTotal()).isEqualByComparingTo("1300");
     assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("200");
     assertThat(postingRepository.accountBalance(otherAccount.getId())).isEqualByComparingTo("0");
@@ -170,6 +178,89 @@ class BankCurrencyWipeIntegrationTest {
                 String.class,
                 "patchChange=" + patchChange + "%"))
         .contains(" clampedAccounts=1 clampedStashes=1 ");
+  }
+
+  @Test
+  void aLaterWipeCountsAnEarlierWipesResetAtThatWipesLiveTime() {
+    backdate(deposit(account, holder, "100"));
+    transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange));
+    deposit(account, holder, "20");
+
+    BankCurrencyWipe.Effect preview = transactions.execute(_ -> wipe.preview(LATER_LIVE_AT));
+    BankCurrencyWipe.Effect applied =
+        transactions.execute(_ -> wipe.apply(LATER_LIVE_AT, laterPatchChange));
+
+    assertThat(Objects.requireNonNull(preview).resetTotal()).isEqualByComparingTo("0");
+    assertThat(preview.accountsClamped()).isZero();
+    assertThat(Objects.requireNonNull(applied).resetTotal()).isEqualByComparingTo("0");
+    assertThat(applied.accountsClamped()).isZero();
+    assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("20");
+    assertThat(holderPostingRepository.holderTotal(holder.getId())).isEqualByComparingTo("20");
+    assertThat(effectiveTimesOfTheResets()).containsExactly(Timestamp.from(LIVE_AT));
+  }
+
+  @Test
+  void aZeroFeeHolderTransferThatRacesTheWipeLeavesItsSourceAtZero() throws Exception {
+    backdate(deposit(account, holder, "1000"));
+    String feeRate = feeRate();
+    setFeeRate("0");
+    try (LockRace race = new LockRace(transactions, jdbc)) {
+      LockRace.Held<BankTransactionDto> transfer =
+          race.hold(
+              null,
+              () ->
+                  ledger.bookHolderTransfer(
+                      new BankHolderTransferRequest(
+                          holder.getId(), otherHolder.getId(), new BigDecimal("1000"), null)));
+      Future<BankCurrencyWipe.Effect> wiped =
+          race.startWaiting(
+              null, () -> transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange)));
+      transfer.commit();
+      LockRace.finish(wiped);
+    } finally {
+      setFeeRate(feeRate);
+    }
+
+    assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("0");
+    assertThat(holderPostingRepository.holderTotal(holder.getId())).isEqualByComparingTo("0");
+    assertThat(holderPostingRepository.holderTotal(otherHolder.getId()))
+        .isEqualByComparingTo("1000");
+  }
+
+  /**
+   * Reads the effective time of every wipe reset that booked on the test's account.
+   *
+   * @return the stored effective times, {@code null} for a reset that takes effect when recorded
+   */
+  private List<Timestamp> effectiveTimesOfTheResets() {
+    return jdbc.queryForList(
+        """
+        SELECT t.effective_at FROM bank_transaction t
+        WHERE t.type = 'WIPE_RESET'
+          AND t.id IN (SELECT transaction_id FROM bank_posting WHERE account_id = ?)
+        """,
+        Timestamp.class,
+        account.getId());
+  }
+
+  /**
+   * Reads the configured transfer-fee rate.
+   *
+   * @return the stored setting value
+   */
+  private String feeRate() {
+    return jdbc.queryForObject(
+        "SELECT setting_value FROM system_setting WHERE setting_key = ?", String.class, FEE_RATE);
+  }
+
+  /**
+   * Stores the transfer-fee rate.
+   *
+   * @param rate the setting value
+   */
+  private void setFeeRate(String rate) {
+    jdbc.update(
+        "UPDATE system_setting SET setting_value = ? WHERE setting_key = ?", rate, FEE_RATE);
   }
 
   /**

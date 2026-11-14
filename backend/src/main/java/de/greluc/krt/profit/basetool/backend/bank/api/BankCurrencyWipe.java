@@ -39,8 +39,8 @@ public interface BankCurrencyWipe {
    * Counts what {@link #apply} would do now, without writing.
    *
    * @param liveAt the live time of the patch
-   * @return the requests it would cancel, the total it would reset and the accounts it would stop
-   *     at zero
+   * @return the unlinked requests it would cancel, the total it would reset and the accounts it
+   *     would stop at zero
    */
   @NotNull
   Effect preview(@NotNull Instant liveAt);
@@ -48,11 +48,12 @@ public interface BankCurrencyWipe {
   /**
    * Cancels the pending requests submitted before the live time and books the reset inside the
    * caller's transaction, recording one {@code WIPE_RESET_EXECUTED} event in the Bank's trail that
-   * names the patch change.
+   * names the patch change. The event counts every request the patch change cancelled, those its
+   * owners cancelled through {@link BankLinkedPayments#cancelForCurrencyWipe} before included.
    *
    * @param liveAt the live time of the patch
    * @param patchChangeId the patch change, kept as each cancelled request's reason
-   * @return the requests cancelled, the total reset and the accounts stopped at zero
+   * @return the unlinked requests cancelled, the total reset and the accounts stopped at zero
    * @throws org.springframework.transaction.IllegalTransactionStateException when no transaction is
    *     active
    */
@@ -62,10 +63,12 @@ public interface BankCurrencyWipe {
   /**
    * What the currency wipe does in the Kartellbank.
    *
-   * @param requestsCancelled the pending requests submitted before the live time
+   * @param unlinkedRequestsCancelled the pending requests submitted before the live time that no
+   *     order attempt owns; the requests of the order attempts are the orders' count
    * @param resetTotal the sum offset from the accounts, in whole aUEC
    * @param accountsClamped the accounts whose offset stopped at zero because more was booked out of
    *     them than into them since the live time
    */
-  record Effect(long requestsCancelled, @NotNull BigDecimal resetTotal, long accountsClamped) {}
+  record Effect(
+      long unlinkedRequestsCancelled, @NotNull BigDecimal resetTotal, long accountsClamped) {}
 }

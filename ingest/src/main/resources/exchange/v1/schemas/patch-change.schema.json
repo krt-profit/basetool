@@ -278,12 +278,13 @@
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 200
+          "maxLength": 255,
+          "description": "The location's curated name, in full."
         },
         "system": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 200,
+          "maxLength": 255,
           "description": "The star system of the location's city or station; absent when unknown."
         },
         "uex": {
@@ -324,7 +325,7 @@
       "properties": {
         "location": {
           "$ref": "location.schema.json",
-          "description": "The current location; absent for ships without a location."
+          "description": "The current location, named as the stock feed names it; absent for ships without a location."
         },
         "rows": {
           "type": "integer",

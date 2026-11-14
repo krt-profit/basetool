@@ -29,7 +29,11 @@ pending Bank requests and order Bank attempts may still name money from before t
 2. **One reset booking offsets the balances as of the live time**, account legs and holder legs
    alike: each balance is the sum of the postings before the live time. Every booking after the
    live time stays. The reset shares its booking with the standalone button, which keeps its
-   behaviour.
+   behaviour. The reset takes effect at the live time: its legs keep the trigger as their booking
+   time, and the transaction stores the live time (`effective_at`), where a later wipe's balances
+   as of its own live time count it. The orders' shortages store it the same way. The standalone
+   reset takes effect when it is recorded. The reset locks every account and then every holder
+   before it reads a balance, so no custody move lands between the read and the booking.
 3. **An offset stops at zero.** When an account's or a holder's current balance cannot cover its
    offset, because more was booked out of it than into it since the live time, the offset is cut
    to what is still there: the account or holder ends at zero, and a holder already below zero
@@ -39,7 +43,9 @@ pending Bank requests and order Bank attempts may still name money from before t
 4. **Pending requests and attempts from before the live time are cancelled**, each with the patch
    change as its reason. An order cancels its own attempts and their Bank requests under its order
    guard, before the Bank takes its request and account locks; the Bank cancels the remaining
-   requests.
+   requests. Every owner is locked before its requests: the Bank lets the purchasing deal of each
+   remaining purpose-bound request lock itself first, as the deal's own cancellation does, then
+   locks the requests, then the accounts and the holders.
 5. **The orders book what is lost as real shortages**: per holding, the part that existed at the
    live time and is still held. Open commitments from before the live time end; statuses do not
    change.
@@ -57,6 +63,9 @@ pending Bank requests and order Bank attempts may still name money from before t
   accounts that concerns, so staff can check them.
 - A reset after an earlier standalone reset in the same window finds nothing left on the accounts
   that reset already zeroed; their offsets stop at zero instead of offsetting the money twice.
+- A later patch change whose live time lies before an earlier one's trigger counts the earlier
+  wipe at the earlier live time, so it never offsets the same money twice and never takes money
+  booked after its own live time.
 - The order history and the Bank both explain each wiped amount by the patch change.
 
 ## Alternatives considered

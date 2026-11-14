@@ -147,6 +147,29 @@ public interface PatchChangeRelocationRepository
       @Param("active") ApprovalStatus active);
 
   /**
+   * Counts, for each given patch change, the members its phase asks and those of them who have
+   * chosen in it, in one statement however many phases there are (REQ-DATA-003).
+   *
+   * @param patchChangeIds the phases' patch changes; never empty
+   * @param active the approval status of an active member
+   * @return one row per patch change found
+   */
+  @Query(
+      """
+      SELECT p.id AS patchChangeId,
+        (SELECT COUNT(u) FROM User u
+         WHERE u.approvalStatus = :active
+           AND (u.createdAt IS NULL OR u.createdAt < p.liveAt)) AS asked,
+        (SELECT COUNT(r) FROM PatchChangeRelocation r, User ru
+         WHERE r.patchChangeId = p.id AND ru.id = r.userId AND ru.approvalStatus = :active
+           AND (ru.createdAt IS NULL OR ru.createdAt < p.liveAt)) AS relocated
+      FROM PatchChange p WHERE p.id IN :patchChangeIds
+      """)
+  List<PhaseCounts> countPhases(
+      @Param("patchChangeIds") Collection<UUID> patchChangeIds,
+      @Param("active") ApprovalStatus active);
+
+  /**
    * Returns the ids of the members a phase asks who have not chosen in it.
    *
    * @param patchChangeId the phase's patch change
@@ -166,4 +189,29 @@ public interface PatchChangeRelocationRepository
       @Param("patchChangeId") UUID patchChangeId,
       @Param("liveAt") Instant liveAt,
       @Param("active") ApprovalStatus active);
+
+  /** One phase's member counts as {@link #countPhases(Collection, ApprovalStatus)} reads them. */
+  interface PhaseCounts {
+
+    /**
+     * The phase's patch change.
+     *
+     * @return its id
+     */
+    UUID getPatchChangeId();
+
+    /**
+     * How many members the phase asks.
+     *
+     * @return the active members whose accounts are older than the phase's live time
+     */
+    long getAsked();
+
+    /**
+     * How many of the asked members have chosen in the phase.
+     *
+     * @return the asked members who relocated
+     */
+    long getRelocated();
+  }
 }

@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -134,13 +135,37 @@ public interface PatchChangeRepository extends JpaRepository<PatchChange, UUID> 
   boolean existsByLabelAndIdNot(String label, UUID id);
 
   /**
-   * Lists every patch change with its wipe groups and counts, newest live time first, for the admin
-   * history (REQ-PATCH-008).
+   * Lists every patch change with its wipe groups, counts and exceptions, newest live time first,
+   * for the admin history (REQ-PATCH-008), in two statements however long the history is. Runs
+   * inside the caller's transaction, whose persistence context the second statement fills.
    *
    * @return the history
    */
+  default @NotNull List<PatchChange> findHistory() {
+    List<PatchChange> records = findAllByOrderByLiveAtDesc();
+    if (!records.isEmpty()) {
+      findWithWipeExceptionsByIdIn(records.stream().map(PatchChange::getId).toList());
+    }
+    return records;
+  }
+
+  /**
+   * Lists every patch change with its wipe groups and counts, newest live time first.
+   *
+   * @return the patch changes
+   */
   @EntityGraph(attributePaths = {"wipeGroups", "effectCounts"})
   List<PatchChange> findAllByOrderByLiveAtDesc();
+
+  /**
+   * Loads the given patch changes with their wipe exceptions in one statement, apart from the wipe
+   * groups and counts so their rows do not multiply.
+   *
+   * @param ids the patch changes
+   * @return the patch changes found
+   */
+  @EntityGraph(attributePaths = "wipeExceptions")
+  List<PatchChange> findWithWipeExceptionsByIdIn(Collection<UUID> ids);
 
   /**
    * Loads one patch change with its wipe groups and counts.

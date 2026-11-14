@@ -199,7 +199,7 @@ public class QuickAccessSearchController {
       hits = future.join();
     } catch (CompletionException e) {
       Throwable cause = e.getCause() == null ? e : e.getCause();
-      SectionFallback.rethrowIfReauthenticationRequired(cause);
+      SectionFallback.rethrowHandOff(cause);
       Outcome outcome = cause instanceof TimeoutException ? Outcome.TIMEOUT : Outcome.ERROR;
       metrics.record(kind, outcome);
       Level level =
