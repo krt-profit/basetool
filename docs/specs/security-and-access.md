@@ -2136,6 +2136,9 @@ from this response blanks a legal document on a build nobody can redeploy.
 - [x] A backend refusal that reaches the frontend, a page section's read included, discards the
   cached verdict and hands the browser to the consent page; any other section failure still falls
   back. *`GlobalExceptionHandlerTest`, `SectionFallbackTest`, `SectionSessionGateHandoffMvcTest`.*
+- [x] On a gate's own page a gate refusal is never handed off again, so the page cannot redirect to
+  itself: a page section falls back, a direct refusal is shown. *`SessionGateFilterTest`,
+  `SectionFallbackTest`, `GlobalExceptionHandlerTest`, `SectionSessionGateHandoffMvcTest`.*
 - [x] Every gate's refusal carries `sessionGate: true`, and the frontend kernel tells a gate's
   refusal by it alone. *`SessionGateAccessFilterTest`, `BackendErrorMapperTest`,
   `KernelGateCodeReachTest`.*
@@ -2147,7 +2150,8 @@ fires only while the gate is closed, the WebSocket mark and that a plain request
 path is still redirected, the readable-documents exemption, fail-open, cache bound),
 `SessionGateFilterTest`, `SessionGateClientParityTest` (the scripts' headers and events against the
 gates), `KernelGateCodeReachTest` (no kernel class file carries a gate's code),
-`SectionSessionGateHandoffMvcTest` (a section's gate refusal is handed off for both gates),
+`SectionSessionGateHandoffMvcTest` (a section's gate refusal is handed off for both gates, and
+falls back on the gate's own page),
 `BackgroundReadGateContractTest` (the client half: every read goes through `krtFetch.get`,
 which sends the XHR marker, offers the answer to `krtSessionGate` and refuses a redirect; no raw request in
 any script or template; the polls disarm on a gated answer — pinned against the shipped JS and

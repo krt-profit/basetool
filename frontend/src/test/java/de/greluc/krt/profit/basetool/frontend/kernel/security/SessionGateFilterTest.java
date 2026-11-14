@@ -37,6 +37,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * The one filter and the one list of the frontend's session gates (ADR-0385): the gates run in
@@ -119,6 +121,25 @@ class SessionGateFilterTest {
     SecurityContextHolder.clearContext();
     assertThat(invoke("/missions", mock(FilterChain.class)).getRedirectedUrl()).isNull();
     assertThat(first.asked()).isZero();
+  }
+
+  @Test
+  void aRequestForAGatesPageIsMarkedAndAnyOtherIsNot() throws Exception {
+    first.holding(true);
+    MockHttpServletRequest gatePage = new MockHttpServletRequest("GET", "/first");
+    MockHttpServletRequest other = new MockHttpServletRequest("GET", "/missions");
+
+    filter.doFilter(gatePage, new MockHttpServletResponse(), mock(FilterChain.class));
+    filter.doFilter(other, new MockHttpServletResponse(), mock(FilterChain.class));
+
+    try {
+      RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(gatePage));
+      assertThat(GatePageRequest.isCurrent()).isTrue();
+      RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(other));
+      assertThat(GatePageRequest.isCurrent()).isFalse();
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
   }
 
   @Test

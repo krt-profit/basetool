@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.GatePageRequest;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
@@ -37,9 +38,11 @@ import org.slf4j.event.Level;
  * failure whose cause chain carries the OAuth2 re-authentication signal, propagates to {@link
  * GlobalExceptionHandler}, which sends the browser to the login. Neither is a session gate's
  * refusal: a {@link SessionGateRefusalException}, also inside a cause chain, propagates so the
- * handler hands the browser to the gate (ADR-0385). Every other runtime failure is logged once and
- * answered with the fallback: a mapped {@link BackendServiceException} at {@code DEBUG}, anything
- * else at {@code WARN} or the level the caller names.
+ * handler hands the browser to the gate (ADR-0385), except while a gate's own page renders ({@link
+ * GatePageRequest}), where it falls back so the page cannot send the browser to itself. Every other
+ * runtime failure is logged once and answered with the fallback: a mapped {@link
+ * BackendServiceException} at {@code DEBUG}, anything else at {@code WARN} or the level the caller
+ * names.
  */
 public final class SectionFallback {
 
@@ -70,7 +73,8 @@ public final class SectionFallback {
    * @return the call's result, or {@code fallback} when the call threw
    * @throws ReauthenticationRequiredException when the user's session can no longer reach the
    *     backend
-   * @throws SessionGateRefusalException when a session gate holds the user
+   * @throws SessionGateRefusalException when a session gate holds the user, outside a gate's own
+   *     page
    */
   public static <T> T load(
       @NotNull Logger log,
@@ -93,7 +97,8 @@ public final class SectionFallback {
    * @return the call's result, or {@code fallback} when the call threw
    * @throws ReauthenticationRequiredException when the user's session can no longer reach the
    *     backend
-   * @throws SessionGateRefusalException when a session gate holds the user
+   * @throws SessionGateRefusalException when a session gate holds the user, outside a gate's own
+   *     page
    */
   public static <T> T load(
       @NotNull Logger log,
@@ -103,7 +108,7 @@ public final class SectionFallback {
       T fallback) {
     try {
       return call.get();
-    } catch (ReauthenticationRequiredException | SessionGateRefusalException e) {
+    } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (RuntimeException e) {
       rethrowHandOff(section, e);
@@ -122,7 +127,8 @@ public final class SectionFallback {
    * @return {@code true} when the work completed, {@code false} when it threw
    * @throws ReauthenticationRequiredException when the user's session can no longer reach the
    *     backend
-   * @throws SessionGateRefusalException when a session gate holds the user
+   * @throws SessionGateRefusalException when a session gate holds the user, outside a gate's own
+   *     page
    */
   public static boolean run(@NotNull Logger log, @NotNull String section, @NotNull Runnable work) {
     return run(log, Level.WARN, section, work);
@@ -139,7 +145,8 @@ public final class SectionFallback {
    * @return {@code true} when the work completed, {@code false} when it threw
    * @throws ReauthenticationRequiredException when the user's session can no longer reach the
    *     backend
-   * @throws SessionGateRefusalException when a session gate holds the user
+   * @throws SessionGateRefusalException when a session gate holds the user, outside a gate's own
+   *     page
    */
   public static boolean run(
       @NotNull Logger log,
@@ -149,7 +156,7 @@ public final class SectionFallback {
     try {
       work.run();
       return true;
-    } catch (ReauthenticationRequiredException | SessionGateRefusalException e) {
+    } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (RuntimeException e) {
       rethrowHandOff(section, e);
@@ -183,7 +190,10 @@ public final class SectionFallback {
       @NotNull Level unexpectedLevel,
       @NotNull String section,
       @NotNull RuntimeException failure) {
-    Level level = failure instanceof BackendServiceException ? Level.DEBUG : unexpectedLevel;
+    Level level =
+        failure instanceof BackendServiceException || sessionGateRefusalIn(failure).isPresent()
+            ? Level.DEBUG
+            : unexpectedLevel;
     log.atLevel(level).setCause(failure).log("Page section '{}' unavailable", section);
   }
 
@@ -210,18 +220,19 @@ public final class SectionFallback {
 
   /**
    * Propagates what a section never answers with its fallback: a lost session first, then a session
-   * gate's refusal.
+   * gate's refusal outside a gate's own page.
    *
    * @param section the section name for the exception message
    * @param failure the caught failure
    * @throws ReauthenticationRequiredException when {@code failure}'s cause chain carries the
    *     re-authentication signal
    * @throws SessionGateRefusalException when {@code failure}'s cause chain carries a gate's refusal
+   *     and no gate's page is rendering
    */
   private static void rethrowHandOff(@NotNull String section, @NotNull Throwable failure) {
     rethrowReauthSignal(section, failure);
     Optional<SessionGateRefusalException> refusal = sessionGateRefusalIn(failure);
-    if (refusal.isPresent()) {
+    if (refusal.isPresent() && !GatePageRequest.isCurrent()) {
       throw refusal.get();
     }
   }

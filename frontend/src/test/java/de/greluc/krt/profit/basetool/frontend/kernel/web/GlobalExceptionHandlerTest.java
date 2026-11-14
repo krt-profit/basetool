@@ -98,6 +98,19 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void aSessionGatesRefusalOnAGatesOwnPageIsShownInsteadOfRedirectingToItself() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/basetool/gate");
+    request.setContextPath("/basetool");
+
+    Object result =
+        handler.handleBackendServiceException(gateRefusal(403), request, new ConcurrentModel());
+
+    ModelAndView view = assertInstanceOf(ModelAndView.class, result);
+    assertEquals(HttpStatus.FORBIDDEN, view.getStatus());
+    assertEquals(0, gate.forgotten());
+  }
+
+  @Test
   void theGatesCodeOnAnotherStatusIsAnOrdinaryError() {
     Object result =
         handler.handleBackendServiceException(

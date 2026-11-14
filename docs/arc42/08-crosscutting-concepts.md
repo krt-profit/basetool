@@ -74,8 +74,9 @@ Beyond roles there are three mechanisms that are easy to miss:
   in its own idiom (redirect, AJAX header, SSE event, `4003` socket close), and a backend refusal
   discards the frontend's cached verdict. Every gate refusal carries the problem property
   `sessionGate: true`; the frontend kernel tells it by that mark, never by a code, and hands it off
-  also when a page section's `SectionFallback` meets it. The scripts' header and event lists are
-  pinned against the gate beans.
+  also when a page section's `SectionFallback` meets it, except on a gate's own page, which renders
+  the layout the gate refuses and so falls back instead of redirecting to itself. The scripts'
+  header and event lists are pinned against the gate beans.
 - **A security expression is code the compiler cannot check** — every `@bean.method(…)` in a
   `@PreAuthorize` is resolved against the running context in a test, the security beans carry
   explicit names, the SpEL stays constant (REQ-SEC-075), no class calls its own gated method past

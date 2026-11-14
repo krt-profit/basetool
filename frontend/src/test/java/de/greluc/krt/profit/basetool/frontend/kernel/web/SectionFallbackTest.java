@@ -29,6 +29,7 @@ import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.GatePageRequest;
 import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,8 +37,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.client.ClientAuthorizationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /** Pins the section-fallback contract of {@link SectionFallback} (REQ-FE-036). */
 class SectionFallbackTest {
@@ -215,6 +219,35 @@ class SectionFallbackTest {
                   throw refusal;
                 }))
         .isSameAs(refusal);
+  }
+
+  @Test
+  void onAGatesOwnPageASessionGatesRefusalFallsBackInsteadOfHandingOffAgain() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gate");
+    GatePageRequest.mark(request);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    try {
+      assertThat(
+              SectionFallback.load(
+                  log,
+                  "rows",
+                  () -> {
+                    throw sessionGateRefusal();
+                  },
+                  List.of("fallback")))
+          .containsExactly("fallback");
+      assertThat(
+              SectionFallback.run(
+                  log,
+                  "stats",
+                  () -> {
+                    throw new CompletionException(sessionGateRefusal());
+                  }))
+          .isFalse();
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+    assertThat(appender.list).extracting(ILoggingEvent::getLevel).containsOnly(Level.DEBUG);
   }
 
   @Test

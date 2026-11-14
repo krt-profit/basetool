@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.web.TermsGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorMapper;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGate;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateFilter;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
@@ -50,6 +51,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.stereotype.Controller;
@@ -63,7 +65,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * A session gate's refusal that meets a page section is handed off like any other gate refusal, for
  * the consent gate and the home-location gate alike (REQ-SEC-028, REQ-PATCH-020, ADR-0385): the
  * gate's cached verdict is discarded, a navigation is redirected to the gate's page and an AJAX
- * caller gets {@code 403} with the gate's header. Any other refusal still falls back.
+ * caller gets {@code 403} with the gate's header. On the gate's own page, and for any other
+ * refusal, the section still falls back.
  */
 class SectionSessionGateHandoffMvcTest {
 
@@ -121,6 +124,19 @@ class SectionSessionGateHandoffMvcTest {
         .perform(get(PAGE).header("X-Requested-With", "XMLHttpRequest"))
         .andExpect(status().isForbidden())
         .andExpect(header().string(gate.ajaxHeader(), gate.pagePath()));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("gates")
+  void onTheGatesOwnPageASectionMeetingTheGatesRefusalFallsBackInsteadOfRedirectingToItself(
+      GateCase gateCase) throws Exception {
+    SessionGate gate = gateCase.gate();
+
+    gateCase
+        .page(refusedBy(gate))
+        .perform(get(gate.pagePath()))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("rows", List.of("fallback")));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -187,7 +203,8 @@ class SectionSessionGateHandoffMvcTest {
   record GateCase(@NotNull String name, @NotNull SessionGate gate, @NotNull SessionGates gates) {
 
     /**
-     * Builds the page behind the global error handling, its section failing with a refusal.
+     * Builds the page behind the gate filter and the global error handling, its section failing
+     * with a refusal; the page also answers on each gate's own page.
      *
      * @param failure the refusal the section's backend read raises
      * @return the page
@@ -196,8 +213,11 @@ class SectionSessionGateHandoffMvcTest {
     MockMvc page(@NotNull BackendServiceException failure) {
       StaticMessageSource messages = new StaticMessageSource();
       messages.setUseCodeAsDefaultMessage(true);
+      MockEnvironment testProfile = new MockEnvironment();
+      testProfile.setActiveProfiles("test");
       return MockMvcBuilders.standaloneSetup(new SectionPage(failure))
           .setControllerAdvice(new GlobalExceptionHandler(messages, gates))
+          .addFilters(new SessionGateFilter(gates, testProfile))
           .build();
     }
 
@@ -222,7 +242,7 @@ class SectionSessionGateHandoffMvcTest {
      * @param model receives {@code rows}
      * @return the page's view name
      */
-    @GetMapping(PAGE)
+    @GetMapping({PAGE, TermsGate.CONSENT_PATH, HomeLocationGate.PAGE_PATH})
     String page(Model model) {
       model.addAttribute(
           "rows",

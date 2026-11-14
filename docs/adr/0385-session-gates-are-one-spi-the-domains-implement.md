@@ -39,7 +39,10 @@ change asks could keep using the tool for up to a minute while every backend cal
 3. **A gate leaves open what an earlier gate needs.** On both sides a gate never holds a member on
    its own page or endpoints nor on those of a gate ordered before it, so each step stays reachable
    while an earlier one holds the member. The approval waiting page is open to every gate. A gate's
-   page reads only what its backend gate leaves open.
+   page renders the layout, whose reads the backend gate refuses, so on a gate's own page a gate
+   refusal is never handed off again: `SessionGateFilter` marks the request (`GatePageRequest`), a
+   page section falls back, and the error handler shows a direct refusal instead of redirecting to
+   the page the browser is on.
 4. **Every gate refusal is marked, and the frontend tells it by the mark.**
    `SessionGateAccessFilter` adds the problem property `sessionGate: true` to every gate's `403`;
    the body only grows. The frontend kernel parses a marked refusal into a
@@ -50,7 +53,7 @@ change asks could keep using the tool for up to a minute while every backend cal
    request with a gate's `403`, directly or inside a page section, the frontend discards that gate's
    verdict and hands the browser to the gate's page: a redirect for a navigation, a `403` with the
    gate's header for an AJAX caller. The gate is the one in `SessionGates` whose code the refusal
-   carries.
+   carries. A gate's own page is the exception of decision 3.
 6. **The browser half stays a list of its own.** `krt-fetch.js` and `notifications.js` keep the
    gates' headers and events as constants, and `SessionGateClientParityTest` pins them against the
    gate beans of the running context.
