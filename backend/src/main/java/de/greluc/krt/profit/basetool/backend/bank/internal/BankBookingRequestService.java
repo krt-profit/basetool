@@ -90,6 +90,7 @@ public class BankBookingRequestService {
   private final ApplicationEventPublisher eventPublisher;
   private final BankPurposeObservers purposeObservers;
   private final BankRequestClientNames clientNames;
+  private final BankRequestPatchLabels patchLabels;
   private final BankLinkedDecisions linkedDecisions;
   private final BankLinkedBookings linkedBookings;
   private final BankLinkedRequestLiveSync linkedLiveSync;
@@ -361,8 +362,10 @@ public class BankBookingRequestService {
             .toList();
 
     Function<BankBookingRequest, String> names = clientNames.forRequests(shown);
+    Function<BankBookingRequest, String> patches = patchLabels.forRequests(shown);
     return shown.stream()
-        .map(request -> BankBookingRequestDtos.of(request, names.apply(request), null))
+        .map(request ->
+            BankBookingRequestDtos.of(request, names.apply(request), null, patches.apply(request)))
         .toList();
   }
 
@@ -558,11 +561,13 @@ public class BankBookingRequestService {
     BankStaffRights rights = staffRights();
     Page<BankBookingRequest> page = pageQueue(statuses, pageable, rights);
     Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
+    Function<BankBookingRequest, String> patches = patchLabels.forRequests(page.getContent());
     return page.map(request ->
         BankBookingRequestDtos.of(
             request,
             names.apply(request),
-            BankBookingRequestDtos.callerMayConfirm(request, rights)));
+            BankBookingRequestDtos.callerMayConfirm(request, rights),
+            patches.apply(request)));
   }
 
   /**
@@ -915,12 +920,13 @@ public class BankBookingRequestService {
    */
   @NotNull
   private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
-    return BankBookingRequestDtos.of(request, clientNames.nameOf(request), null);
+    return BankBookingRequestDtos.of(
+        request, clientNames.nameOf(request), null, patchLabels.labelOf(request));
   }
 
   /**
    * Maps a page of request entities as {@link #toDto(BankBookingRequest)} does, naming every row's
-   * client from one registry read.
+   * client from one registry read and every cancelling patch change from one label read.
    *
    * @param page the page of request entities
    * @return the page of wire DTOs
@@ -928,6 +934,8 @@ public class BankBookingRequestService {
   @NotNull
   private Page<BankBookingRequestDto> toDtos(@NotNull Page<BankBookingRequest> page) {
     Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
-    return page.map(request -> BankBookingRequestDtos.of(request, names.apply(request), null));
+    Function<BankBookingRequest, String> patches = patchLabels.forRequests(page.getContent());
+    return page.map(request ->
+        BankBookingRequestDtos.of(request, names.apply(request), null, patches.apply(request)));
   }
 }

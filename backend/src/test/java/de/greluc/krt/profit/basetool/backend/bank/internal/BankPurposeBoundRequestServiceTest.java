@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPatchLabels;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
@@ -126,6 +127,7 @@ class BankPurposeBoundRequestServiceTest {
             eventPublisher,
             new BankPurposeObservers(purposeObservers),
             new BankRequestClientNames(clientDirectory),
+            new BankRequestPatchLabels(mock(BankPatchLabels.class)),
             mock(BankLinkedDecisions.class),
             mock(BankLinkedBookings.class),
             mock(BankLinkedRequestLiveSync.class),
