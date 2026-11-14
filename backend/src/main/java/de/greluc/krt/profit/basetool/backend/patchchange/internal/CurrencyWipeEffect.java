@@ -19,11 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankCurrencyWipe;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCurrencyWipe;
-import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
-import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
@@ -34,14 +31,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>The orders run first: they take their guards before any Bank request, as a linked Bank
  * decision does, and release the bindings of the attempts they cancel before the shortages are
- * measured. A Bank reset that would overdraw an account refuses the patch change.
+ * measured.
  */
 @Component
 @RequiredArgsConstructor
 class CurrencyWipeEffect implements PatchEffect {
-
-  /** The refusal the admin sees when the reset would overdraw a Bank account. */
-  static final String OVERDRAFT = "error.patch_change.currency_wipe_overdraft";
 
   private final JobOrderCurrencyWipe orders;
   private final BankCurrencyWipe bank;
@@ -51,8 +45,7 @@ class CurrencyWipeEffect implements PatchEffect {
     if (!plan.options().currencyWipe()) {
       return PatchCounts.none();
     }
-    return counts(
-        orders.preview(plan.liveAt()), refusingOverdraft(() -> bank.preview(plan.liveAt())));
+    return counts(orders.preview(plan.liveAt()), bank.preview(plan.liveAt()));
   }
 
   @Override
@@ -62,27 +55,7 @@ class CurrencyWipeEffect implements PatchEffect {
     }
     JobOrderCurrencyWipe.Effect wiped =
         orders.apply(run.plan().liveAt(), run.patchChangeId(), run.label());
-    return counts(
-        wiped, refusingOverdraft(() -> bank.apply(run.plan().liveAt(), run.patchChangeId())));
-  }
-
-  /**
-   * Turns the Bank's overdraft refusal into the patch change's own.
-   *
-   * @param step the Bank step
-   * @return what the Bank step did
-   * @throws BusinessConflictException when the reset would overdraw an account
-   */
-  private static @NotNull BankCurrencyWipe.Effect refusingOverdraft(
-      @NotNull Supplier<BankCurrencyWipe.Effect> step) {
-    try {
-      return step.get();
-    } catch (BankConflictException refused) {
-      if (BankConflictException.CODE_BANK_OVERDRAFT.equals(refused.getCode())) {
-        throw new BusinessConflictException(OVERDRAFT, refused);
-      }
-      throw refused;
-    }
+    return counts(wiped, bank.apply(run.plan().liveAt(), run.patchChangeId()));
   }
 
   /**
@@ -95,6 +68,7 @@ class CurrencyWipeEffect implements PatchEffect {
   private static @NotNull PatchCounts counts(
       @NotNull JobOrderCurrencyWipe.Effect orders, @NotNull BankCurrencyWipe.Effect bank) {
     return PatchCounts.of(PatchCount.BANK_RESET_TOTAL, bank.resetTotal().longValueExact())
+        .plus(PatchCounts.of(PatchCount.BANK_ACCOUNTS_CLAMPED, bank.accountsClamped()))
         .plus(PatchCounts.of(PatchCount.BANK_REQUESTS_CANCELED, bank.requestsCancelled()))
         .plus(PatchCounts.of(PatchCount.AUEC_SHORTAGES, orders.shortages()))
         .plus(
