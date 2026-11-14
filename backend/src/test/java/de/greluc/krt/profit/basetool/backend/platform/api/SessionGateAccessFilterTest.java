@@ -49,6 +49,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.BooleanNode;
 
 /**
  * The one filter every session gate runs in (REQ-SEC-028, REQ-PATCH-020, ADR-0385): the gates run
@@ -115,6 +116,19 @@ class SessionGateAccessFilterTest {
     assertThat(meterRegistry.counter("basetool.http.error", "code", "SECOND_REQUIRED").count())
         .isEqualTo(1.0);
     assertThat(MDC.get("userId")).as("the MDC key is released after the write").isNull();
+  }
+
+  @Test
+  void everyGatesRefusalCarriesTheSessionGateMarker() throws Exception {
+    first.holding = true;
+    String firstRefusal = invoke("/api/v1/missions", mock(FilterChain.class)).getContentAsString();
+    first.holding = false;
+    second.holding = true;
+    String secondRefusal = invoke("/api/v1/missions", mock(FilterChain.class)).getContentAsString();
+
+    assertThat(List.of(firstRefusal, secondRefusal))
+        .extracting(body -> new ObjectMapper().readTree(body).findValue("sessionGate"))
+        .containsExactly(BooleanNode.TRUE, BooleanNode.TRUE);
   }
 
   @Test

@@ -170,8 +170,9 @@ chain, so the MDC is already populated and the header already echoed.
 
 Document the format in OpenAPI and keep frontend error display in sync. **Every `code` value comes
 from the error-code registry (REQ-API-019)**, and the document's `ProblemDetail` schema carries
-`code` (with the registered values), `correlationId`, `errors` and `fieldErrors`, plus a `429` on
-every `/api/**` operation, since both rate limiters answer it there.
+`code` (with the registered values), `correlationId`, `errors`, `fieldErrors` and `sessionGate`
+(`true` on a session gate's `403`, REQ-SEC-028, ADR-0385), plus a `429` on every `/api/**`
+operation, since both rate limiters answer it there.
 
 > [!note] Corrected 2026-10-03
 > Until REQ-API-019 the document's `ProblemDetail` listed none of `code`, `correlationId` or

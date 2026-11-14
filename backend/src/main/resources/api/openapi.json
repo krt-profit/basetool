@@ -105002,6 +105002,10 @@
             "type" : "string",
             "format" : "uri"
           },
+          "sessionGate" : {
+            "type" : "boolean",
+            "description" : "true on the 403 of a session gate, a step the member must take first (REQ-SEC-028, ADR-0385); absent on every other problem."
+          },
           "status" : {
             "type" : "integer",
             "format" : "int32"
