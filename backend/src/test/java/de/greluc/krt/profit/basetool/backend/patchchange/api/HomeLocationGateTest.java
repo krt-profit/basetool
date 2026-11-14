@@ -25,13 +25,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceGate;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
+import de.greluc.krt.profit.basetool.backend.platform.api.SessionGateAccessFilter;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -45,6 +49,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.support.StaticMessageSource;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -54,13 +59,13 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Behaviour of the backend's home-location gate (REQ-PATCH-020): a pending member's web calls are
- * refused, the gate's own endpoints and the terms endpoints stay open, and an exchange client's
- * relayed call passes.
+ * Behaviour of the backend's home-location gate (REQ-PATCH-020), run by the session-gate filter
+ * behind the consent gate as in the chain: a pending member's web calls are refused, the gate's own
+ * endpoints and the terms endpoints stay open, and an exchange client's relayed call passes.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class HomeLocationGateAccessFilterTest {
+class HomeLocationGateTest {
 
   private static final UUID USER_ID = UUID.randomUUID();
 
@@ -68,7 +73,7 @@ class HomeLocationGateAccessFilterTest {
   @Mock private FilterChain filterChain;
 
   private MeterRegistry meterRegistry;
-  private HomeLocationGateAccessFilter filter;
+  private SessionGateAccessFilter filter;
 
   @BeforeEach
   void setUp() {
@@ -76,9 +81,14 @@ class HomeLocationGateAccessFilterTest {
     messages.addMessage("problem.home_location_required.title", Locale.ENGLISH, "Choose");
     messages.addMessage("problem.home_location_required.detail", Locale.ENGLISH, "Choose.");
     meterRegistry = new SimpleMeterRegistry();
+    TermsAcceptanceGate consented =
+        new TermsAcceptanceGate(
+            _ -> true,
+            new RefusedSubjectWindow(Duration.ofMinutes(15), 5_000),
+            new MockEnvironment());
     filter =
-        new HomeLocationGateAccessFilter(
-            gateCheck,
+        new SessionGateAccessFilter(
+            List.of(consented, new HomeLocationGate(gateCheck)),
             messages,
             new ProblemResponseFactory(BoundProperties.defaults(AppProblemProperties.class)),
             new ObjectMapper(),
@@ -120,8 +130,8 @@ class HomeLocationGateAccessFilterTest {
   void leavesTheGatesOwnEndpointsAndTheTermsEndpointsOpen() throws Exception {
     when(gateCheck.mustChoose(USER_ID)).thenReturn(true);
 
-    assertThat(invoke(HomeLocationGateAccessFilter.PROMPT_PATH).getStatus()).isEqualTo(200);
-    assertThat(invoke(HomeLocationGateAccessFilter.STATUS_PATH).getStatus()).isEqualTo(200);
+    assertThat(invoke(HomeLocationGate.PROMPT_PATH).getStatus()).isEqualTo(200);
+    assertThat(invoke(HomeLocationGate.STATUS_PATH).getStatus()).isEqualTo(200);
     assertThat(invoke("/api/v1/terms/status").getStatus()).isEqualTo(200);
     assertThat(invoke("/api/v1/users/me").getStatus()).isEqualTo(200);
   }

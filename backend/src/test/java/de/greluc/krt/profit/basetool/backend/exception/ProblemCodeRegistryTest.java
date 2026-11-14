@@ -189,7 +189,6 @@ class ProblemCodeRegistryTest {
         List.of(
             "de.greluc.krt.profit.basetool.backend.platform.api.ProblemSupport",
             "de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException",
-            "de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter",
             "de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter",
             "de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter",
             "de.greluc.krt.profit.basetool.backend.platform.api.IdentityProviderUnavailableFilter",

@@ -21,13 +21,9 @@ package de.greluc.krt.profit.basetool.backend.app.api;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakTrustSupport;
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
-import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter;
-import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationGateAccessFilter;
-import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationGateCheck;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberFilterProvider;
 import de.greluc.krt.profit.basetool.backend.platform.api.ApiClientMetricsFilter;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
@@ -36,6 +32,8 @@ import de.greluc.krt.profit.basetool.backend.platform.api.JwtAudienceStartupChec
 import de.greluc.krt.profit.basetool.backend.platform.api.JwtAuthorizedPartyStartupCheck;
 import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
+import de.greluc.krt.profit.basetool.backend.platform.api.SessionGate;
+import de.greluc.krt.profit.basetool.backend.platform.api.SessionGateAccessFilter;
 import de.greluc.krt.profit.basetool.backend.platform.api.SecurityProblemResponseHandler;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectRateLimitingFilter;
 import io.micrometer.core.instrument.Gauge;
@@ -56,7 +54,6 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
@@ -106,12 +103,6 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-  /**
-   * Re-arms the consent gate under the {@code test} profile for a single test class.
-   *
-   * <p>Only honoured when the {@code test} profile is active; production is armed regardless.
-   */
-  static final String TERMS_GATE_ARMED_IN_TEST = "app.security.terms.armed-in-test";
 
   /** The Keycloak claim naming the client a token was issued to (ADR-0270). */
   static final String AUTHORIZED_PARTY_CLAIM = "azp";
@@ -274,7 +265,7 @@ public class SecurityConfig {
    * {@code basetool_terms_refused_subjects} gauge (REQ-SEC-028) and capped at 5 000 entries.
    *
    * @param meterRegistry the registry the gauge is published to
-   * @return the window the consent filter records refusals into
+   * @return the window the consent gate records refusals into
    */
   @NotNull
   @Bean
@@ -295,8 +286,6 @@ public class SecurityConfig {
    *
    * @param http the Spring Security builder
    * @param jwtAuthenticationConverter the converter from {@link #jwtAuthenticationConverter}
-   * @param env the environment; the {@code test} profile stands the consent gate down unless {@link
-   *     #TERMS_GATE_ARMED_IN_TEST} re-arms it
    * @param securityProblemResponseHandler renders filter-level 401/403 as problem+json
    * @param messageSource localizes the 403 bodies of the refusing filters
    * @param problemResponseFactory assembles the RFC&nbsp;7807 body for those filters
@@ -306,7 +295,7 @@ public class SecurityConfig {
    * @param actingMemberFilterProvider supplies the acting-member filter, placed after the
    *     bearer-token filter (ADR-0129)
    * @param clientAttribution bounds the {@code client_id} label of the API client request counter
-   * @param homeLocationGate tells the home-location gate which members must still choose
+   * @param sessionGates the session gates the domains implement, in their order (ADR-0385)
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -314,30 +303,22 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(
       HttpSecurity http,
       JwtAuthenticationConverter jwtAuthenticationConverter,
-      @NotNull Environment env,
       SecurityProblemResponseHandler securityProblemResponseHandler,
       MessageSource messageSource,
       ProblemResponseFactory problemResponseFactory,
       ObjectMapper objectMapper,
       MeterRegistry meterRegistry,
-      TermsConsentCheck termsConsentCheck,
-      RefusedSubjectWindow refusedSubjectWindow,
       RefusedSubjectWindow noRoleRefusedSubjectWindow,
       ActingMemberFilterProvider actingMemberFilterProvider,
       RateLimitProperties rateLimitProperties,
       ClientAttribution clientAttribution,
-      HomeLocationGateCheck homeLocationGate)
+      List<SessionGate> sessionGates)
       throws Exception {
 
-    boolean isTest = env.matchesProfiles("test");
     Filter actingMemberFilter = actingMemberFilterProvider.actingMemberFilter();
-
-    boolean armed =
-        !isTest || env.getProperty(TERMS_GATE_ARMED_IN_TEST, Boolean.class, Boolean.FALSE);
-    TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : _ -> true;
-    Filter homeLocationFilter =
-        new HomeLocationGateAccessFilter(
-            homeLocationGate, messageSource, problemResponseFactory, objectMapper, meterRegistry);
+    Filter sessionGateFilter =
+        new SessionGateAccessFilter(
+            sessionGates, messageSource, problemResponseFactory, objectMapper, meterRegistry);
 
     http.csrf(AbstractHttpConfigurer::disable)
         .cors(AbstractHttpConfigurer::disable)
@@ -460,16 +441,7 @@ public class SecurityConfig {
                 meterRegistry,
                 noRoleRefusedSubjectWindow),
             actingMemberFilter.getClass())
-        .addFilterAfter(
-            new TermsAcceptanceAccessFilter(
-                effectiveConsentCheck,
-                messageSource,
-                problemResponseFactory,
-                objectMapper,
-                meterRegistry,
-                refusedSubjectWindow),
-            PendingApprovalAccessFilter.class)
-        .addFilterAfter(homeLocationFilter, TermsAcceptanceAccessFilter.class)
+        .addFilterAfter(sessionGateFilter, PendingApprovalAccessFilter.class)
         .addFilterAfter(
             new SubjectRateLimitingFilter(
                 rateLimitProperties,
@@ -477,7 +449,7 @@ public class SecurityConfig {
                 problemResponseFactory,
                 objectMapper,
                 meterRegistry),
-            HomeLocationGateAccessFilter.class)
+            SessionGateAccessFilter.class)
         .addFilterBefore(
             new IdentityProviderUnavailableFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),

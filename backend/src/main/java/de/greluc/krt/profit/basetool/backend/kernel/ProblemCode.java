@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.kernel;
 
+import java.util.Locale;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 
@@ -48,4 +49,56 @@ public interface ProblemCode {
    */
   @NotNull
   HttpStatus status();
+
+  /**
+   * Returns the {@code type} suffix of a problem with this code.
+   *
+   * @return the code in lower case with hyphens instead of underscores
+   */
+  @NotNull
+  default String typeSuffix() {
+    return typeSuffixOf(code());
+  }
+
+  /**
+   * Returns the bundle key of a problem's {@code title}.
+   *
+   * @return {@code problem.<code in lower case>.title}
+   */
+  @NotNull
+  default String titleKey() {
+    return keyBaseOf(code()) + ".title";
+  }
+
+  /**
+   * Returns the bundle key of a problem's {@code detail}.
+   *
+   * @return {@code problem.<code in lower case>.detail}
+   */
+  @NotNull
+  default String detailKey() {
+    return keyBaseOf(code()) + ".detail";
+  }
+
+  /**
+   * Derives the {@code type} suffix of a code string.
+   *
+   * @param code the upper-snake-case code
+   * @return the code in lower case with hyphens instead of underscores
+   */
+  @NotNull
+  static String typeSuffixOf(@NotNull String code) {
+    return code.toLowerCase(Locale.ROOT).replace('_', '-');
+  }
+
+  /**
+   * Derives the bundle-key prefix of a code string, which the title and detail keys extend.
+   *
+   * @param code the upper-snake-case code
+   * @return {@code problem.<code in lower case>}
+   */
+  @NotNull
+  static String keyBaseOf(@NotNull String code) {
+    return "problem." + code.toLowerCase(Locale.ROOT);
+  }
 }
