@@ -209,8 +209,8 @@ public final class SectionFallback {
   }
 
   /**
-   * Propagates what a section never answers with its fallback: a lost session first, then a
-   * session gate's refusal.
+   * Propagates what a section never answers with its fallback: a lost session first, then a session
+   * gate's refusal.
    *
    * @param section the section name for the exception message
    * @param failure the caught failure

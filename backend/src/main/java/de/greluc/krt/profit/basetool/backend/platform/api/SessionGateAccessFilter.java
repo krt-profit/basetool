@@ -52,11 +52,10 @@ import tools.jackson.databind.ObjectMapper;
  * (REQ-SEC-028, REQ-PATCH-020, ADR-0385).
  *
  * <p>The gates run in their order, and the first that holds the caller refuses; the refusal carries
- * {@code sessionGate: true} besides the gate's code. A gate leaves open its own exempt endpoints and
- * those of every gate before it. Non-{@code /api} and unauthenticated
- * requests pass, and so does a {@code sub} that is not a UUID. Paths are matched as {@link
- * PathPattern}s on the decoded path, so a percent-encoded spelling neither bypasses a gate nor
- * loses an exemption.
+ * {@code sessionGate: true} besides the gate's code. A gate leaves open its own exempt endpoints
+ * and those of every gate before it. Non-{@code /api} and unauthenticated requests pass, and so
+ * does a {@code sub} that is not a UUID. Paths are matched as {@link PathPattern}s on the decoded
+ * path, so a percent-encoded spelling neither bypasses a gate nor loses an exemption.
  */
 @Slf4j
 public class SessionGateAccessFilter extends OncePerRequestFilter {

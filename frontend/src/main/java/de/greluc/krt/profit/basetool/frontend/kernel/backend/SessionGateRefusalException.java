@@ -29,8 +29,8 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>The marker, not the code, makes a refusal a gate's, so the kernel names no gate. Like a lost
  * session it is expected and self-clearing: logged at {@code DEBUG}, not counted as a failed
- * backend call, never swallowed by a page section's fallback; the error handler hands the browser to
- * the gate whose code it carries.
+ * backend call, never swallowed by a page section's fallback; the error handler hands the browser
+ * to the gate whose code it carries.
  */
 public final class SessionGateRefusalException extends BackendServiceException {
 

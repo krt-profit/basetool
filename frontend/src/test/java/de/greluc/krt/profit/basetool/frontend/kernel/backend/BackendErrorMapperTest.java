@@ -123,7 +123,8 @@ class BackendErrorMapperTest {
   @Test
   void theApprovalAndRoleRefusalsAreLoggedAtDebugAndNotCounted() {
     for (String code :
-        List.of(BackendServiceException.CODE_PENDING_APPROVAL, BackendServiceException.CODE_NO_ROLE)) {
+        List.of(
+            BackendServiceException.CODE_PENDING_APPROVAL, BackendServiceException.CODE_NO_ROLE)) {
       RuntimeException mapped =
           mapper.map(response(403, "{\"code\":\"" + code + "\"}"), "GET", URI_TEMPLATE);
 

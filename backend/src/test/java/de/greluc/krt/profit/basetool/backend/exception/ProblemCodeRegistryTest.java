@@ -328,8 +328,8 @@ class ProblemCodeRegistryTest {
 
   /**
    * The committed document lists exactly the registered codes on {@code ProblemDetail.code}, and
-   * documents {@code correlationId}, {@code fieldErrors} and the session gates' {@code
-   * sessionGate} marker.
+   * documents {@code correlationId}, {@code fieldErrors} and the session gates' {@code sessionGate}
+   * marker.
    *
    * @throws IOException if the document cannot be read
    */

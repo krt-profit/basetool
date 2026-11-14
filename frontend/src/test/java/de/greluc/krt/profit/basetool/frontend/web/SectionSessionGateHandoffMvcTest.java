@@ -60,8 +60,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * A session gate's refusal that meets a page section is handed off like any other gate refusal,
- * for the consent gate and the home-location gate alike (REQ-SEC-028, REQ-PATCH-020, ADR-0385): the
+ * A session gate's refusal that meets a page section is handed off like any other gate refusal, for
+ * the consent gate and the home-location gate alike (REQ-SEC-028, REQ-PATCH-020, ADR-0385): the
  * gate's cached verdict is discarded, a navigation is redirected to the gate's page and an AJAX
  * caller gets {@code 403} with the gate's header. Any other refusal still falls back.
  */

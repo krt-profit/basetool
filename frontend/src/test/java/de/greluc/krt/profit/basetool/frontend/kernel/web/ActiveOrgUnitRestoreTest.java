@@ -244,9 +244,7 @@ class ActiveOrgUnitRestoreTest {
     session.setAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY, HEL.toString());
     session.setAttribute(ActiveOrgUnitRestore.RESTORED_FOR_SESSION_KEY, "max");
     signIn("lena");
-    when(source.storedChoice())
-        .thenThrow(sessionGateRefusal())
-        .thenReturn(Optional.empty());
+    when(source.storedChoice()).thenThrow(sessionGateRefusal()).thenReturn(Optional.empty());
     ActiveOrgUnitRestore restore = restoreAt(NOW);
 
     restore.restoreOnce(request);
