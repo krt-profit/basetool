@@ -19,9 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository.ExchangeLocationGuid;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository.ExchangeLocationLinkRow;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationDto;
 import java.util.Collection;
 import java.util.Map;
@@ -45,7 +44,7 @@ class ExchangeLocationLinks {
   private final LocationRepository locationRepository;
 
   /**
-   * Reads the links of the given locations, one query for the locations and one for the GUIDs.
+   * Reads the links of the given locations in one statement, however many they are.
    *
    * @param ids the locations
    * @return the links by location; a location that no longer exists is absent
@@ -57,28 +56,21 @@ class ExchangeLocationLinks {
     if (ids.isEmpty()) {
       return Map.of();
     }
-    Map<UUID, UUID> guids =
-        locationRepository.findExchangeGuids(ids).stream()
-            .collect(
-                Collectors.toMap(
-                    ExchangeLocationGuid::getLocationId, ExchangeLocationGuid::getGuid));
-    return locationRepository.findAllById(ids).stream()
+    return locationRepository.findExchangeLinks(ids).stream()
         .collect(
             Collectors.toUnmodifiableMap(
-                Location::getId,
-                location -> new Links(uex(location), guids.get(location.getId()))));
+                ExchangeLocationLinkRow::getLocationId, ExchangeLocationLinks::links));
   }
 
   /**
-   * Returns the UEX place of a location; a city link wins over a space-station link.
+   * Returns the links of one location; a city link wins over a space-station link.
    *
-   * @param location the location
-   * @return the place, or {@code null} when the location links none
+   * @param row the location's UEX ids and GUID
+   * @return its links
    */
-  private static @Nullable ExchangeLocationDto.UexRef uex(@NotNull Location location) {
-    return ExchangeCatalogService.uex(
-        location.getCity() == null ? null : location.getCity().getIdCity(),
-        location.getSpaceStation() == null ? null : location.getSpaceStation().getIdSpaceStation());
+  private static @NotNull Links links(@NotNull ExchangeLocationLinkRow row) {
+    return new Links(
+        ExchangeCatalogService.uex(row.getUexCityId(), row.getUexSpaceStationId()), row.getGuid());
   }
 
   /**
