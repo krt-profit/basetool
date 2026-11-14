@@ -500,7 +500,7 @@ REQ-PATCH-043. The web and the exchange show only the status.
   its reason.
 
 **Enforced by:** `BankCurrencyWipeIntegrationTest` · **Code:** `BankCurrencyWipeRequests`,
-`BankBookingRequest#cancelByPatchChange`, `V428`
+`BankBookingRequest#cancelByPatchChange`, `V425`
 
 ### REQ-PATCH-043 — Waiting order Bank attempts from before the live time are cancelled
 
@@ -519,7 +519,7 @@ shows the patch label.
   patch change as their reason; a later attempt stays waiting.
 
 **Enforced by:** `JobOrderLinkedBankIntegrationTest` · **Code:** `JobOrderCurrencyWipeService`,
-`JobOrderLinkedMoneyAttempt#cancelForCurrencyWipe`, `AuecBankComposition`, `V427`
+`JobOrderLinkedMoneyAttempt#cancelForCurrencyWipe`, `AuecBankComposition`, `V424`
 
 ### REQ-PATCH-044 — Holdings that existed at the live time become real shortages
 
@@ -546,7 +546,7 @@ participant-readable history shows the shortage with the patch change's current 
 **Enforced by:** `PatchChangeCurrencyWipeIntegrationTest`, `OrdersDetailPatternRenderTest` ·
 **Code:** `JobOrderCurrencyWipePlanner`, `JobOrderCurrencyWipeService`,
 `JobOrderMoneyLedger.Ledger#before`, `JobOrderMoneyOperation#currencyWipeShortage`,
-`JobOrderMoneyQueries`, `PatchChangeLabelDirectory`, `V427`
+`JobOrderMoneyQueries`, `PatchChangeLabelDirectory`, `V424`
 
 ### REQ-PATCH-045 — Open unit commitments from before the live time end
 
