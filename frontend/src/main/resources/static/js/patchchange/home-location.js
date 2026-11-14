@@ -19,7 +19,11 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
-import { markStaying, relocationSummary } from '/js/patchchange/home-location-common.js';
+import {
+    markStaying,
+    readRelocationMessages,
+    relocationSummary,
+} from '/js/patchchange/home-location-common.js';
 import { format } from '/js/patchchange/patch-change-messages.js';
 
 /** The page's path, also the relay of the choice. */
@@ -31,7 +35,7 @@ const PAGE_URL = '/home-location';
  * @typedef {object} HomeLocationMessages
  * @property {string} cta the call to action once a location is chosen, `{0}` the location
  * @property {string} ctaChoose the call to action before a location is chosen
- * @property {string} success what moved, `{0}` the location, `{1}` the items, `{2}` the ships
+ * @property {ReturnType<typeof readRelocationMessages>} relocation the summary of what moved
  * @property {string} error the fallback error of the choice
  */
 
@@ -46,7 +50,7 @@ function readHomeLocationMessages() {
     return {
         cta: krtI18nText(data.cta, 'data-cta'),
         ctaChoose: krtI18nText(data.ctaChoose, 'data-cta-choose'),
-        success: krtI18nText(data.success, 'data-success'),
+        relocation: readRelocationMessages(data),
         error: krtI18nText(data.error, 'data-error'),
     };
 }
@@ -152,7 +156,7 @@ function initHomeLocation() {
             toast: false,
             submitter: submit,
             onSuccess(/** @type {ApiDto<'RelocationResultDto'> | null} */ body) {
-                showRelocated(relocationSummary(i18n.success, body, name));
+                showRelocated(relocationSummary(i18n.relocation, body, name));
             },
             onError(_status, /** @type {ApiProblem | null} */ problem) {
                 showError(problem && problem.detail ? problem.detail : i18n.error);

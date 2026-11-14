@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { format } from '/js/patchchange/patch-change-messages.js';
 
@@ -42,19 +43,61 @@ export function markStaying(root, locationId) {
 }
 
 /**
+ * The localized strings of a relocation summary; each count pattern has `{0}` for the count.
+ *
+ * @typedef {object} RelocationMessages
+ * @property {string} success what moved, `{0}` the location, `{1}` the items, `{2}` the ships
+ * @property {string} rowsOne the items count for exactly one item
+ * @property {string} rowsOther the items count for any other number
+ * @property {string} shipsOne the ships count for exactly one ship
+ * @property {string} shipsOther the ships count for any other number
+ */
+
+/**
+ * Reads the strings of a relocation summary from a page's i18n holder.
+ *
+ * @param {DOMStringMap} data the holder's dataset
+ * @returns {RelocationMessages} the strings; a missing one is reported and shows its key
+ */
+export function readRelocationMessages(data) {
+    return {
+        success: krtI18nText(data.success, 'data-success'),
+        rowsOne: krtI18nText(data.rowsOne, 'data-rows-one'),
+        rowsOther: krtI18nText(data.rowsOther, 'data-rows-other'),
+        shipsOne: krtI18nText(data.shipsOne, 'data-ships-one'),
+        shipsOther: krtI18nText(data.shipsOther, 'data-ships-other'),
+    };
+}
+
+/**
  * Says what a relocation moved, in the page language (REQ-PATCH-025).
  *
- * @param {string} template the message, `{0}` the location, `{1}` the items, `{2}` the ships
+ * @param {RelocationMessages} messages the summary and its count patterns
  * @param {ApiDto<'RelocationResultDto'> | null} result what the backend reports as moved
  * @param {string} fallbackName the chosen location's name, for an answer without one
  * @returns {string} the summary
  */
-export function relocationSummary(template, result, fallbackName) {
+export function relocationSummary(messages, result, fallbackName) {
     const lang = document.documentElement.lang;
     const name = result && result.location && result.location.name;
-    return format(template, [
+    const rows = result && result.rows ? result.rows : 0;
+    const ships = result && result.ships ? result.ships : 0;
+    return format(messages.success, [
         name || fallbackName,
-        formatNumber(result && result.rows ? result.rows : 0, 0, lang),
-        formatNumber(result && result.ships ? result.ships : 0, 0, lang),
+        countOf(rows, messages.rowsOne, messages.rowsOther, lang),
+        countOf(ships, messages.shipsOne, messages.shipsOther, lang),
     ]);
+}
+
+/**
+ * Formats a count with its singular or plural pattern.
+ *
+ * @param {number} count the count
+ * @param {string} one the pattern for exactly one
+ * @param {string} other the pattern for any other count
+ * @param {string} lang the page language
+ * @returns {string} the count phrase
+ */
+function countOf(count, one, other, lang) {
+    return format(count === 1 ? one : other, [formatNumber(count, 0, lang)]);
 }

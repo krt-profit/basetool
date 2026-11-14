@@ -97,7 +97,11 @@ function load() {
         'hl-i18n': new FakeElement({
             cta: 'Move to {0}',
             ctaChoose: 'Choose a home location',
-            success: 'Moved to {0}: {1} items, {2} ships.',
+            success: 'Moved to {0}: {1}, {2}.',
+            rowsOne: '{0} item',
+            rowsOther: '{0} items',
+            shipsOne: '{0} ship',
+            shipsOther: '{0} ships',
             error: 'The home location could not be saved.',
         }),
     };
@@ -171,7 +175,7 @@ test('a relocation shows what moved and offers the way on without leaving the pa
 
     ui.writes[0].onSuccess({ location: { name: 'Lorville' }, rows: 3, ships: 1 });
 
-    assert.equal(el['hl-success'].textContent, 'Moved to Lorville: 3 items, 1 ships.');
+    assert.equal(el['hl-success'].textContent, 'Moved to Lorville: 3 items, 1 ship.');
     assert.equal(el['hl-done'].hidden, false, 'the summary and the way on show');
     assert.equal(el['hl-pending'].hidden, true, 'the call to action and the note go');
     assert.equal(el['hl-continue'].focused, true, 'the way on takes the focus');
@@ -180,6 +184,16 @@ test('a relocation shows what moved and offers the way on without leaving the pa
         'the final choice cannot be changed',
     );
     assert.deepEqual(ui.navigations, [], 'the page never navigates by itself');
+});
+
+test('the summary counts one item and several ships in their own forms', () => {
+    const { ui, el, radios, choose, submit } = load();
+    choose(radios[1]);
+    submit();
+
+    ui.writes[0].onSuccess({ location: { name: 'Levski' }, rows: 1, ships: 2 });
+
+    assert.equal(el['hl-success'].textContent, 'Moved to Levski: 1 item, 2 ships.');
 });
 
 test('a refused choice shows the reason and keeps the choice open', () => {

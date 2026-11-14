@@ -18,7 +18,7 @@
     <th:block th:replace="~{identity/fragments/member-tabs :: tabs(${memberId}, 'homeLocation')}"></th:block>
 
     <span id="mhl-i18n" hidden
-          th:attr="data-confirm-text=#{admin.memberHomeLocation.confirm.text},data-confirm-submit=#{homeLocation.cta},data-success=#{homeLocation.success},data-error=#{admin.memberHomeLocation.error},data-refresh-error=#{admin.memberHomeLocation.refreshError}"></span>
+          th:attr="data-confirm-text=#{admin.memberHomeLocation.confirm.text},data-confirm-submit=#{homeLocation.cta},data-success=#{homeLocation.success},data-rows-one=#{homeLocation.success.rows.one},data-rows-other=#{homeLocation.success.rows.other},data-ships-one=#{homeLocation.success.ships.one},data-ships-other=#{homeLocation.success.ships.other},data-error=#{admin.memberHomeLocation.error},data-refresh-error=#{admin.memberHomeLocation.refreshError}"></span>
 
     <div id="mhl-content" class="stack gap-4">
         <th:block th:fragment="content">

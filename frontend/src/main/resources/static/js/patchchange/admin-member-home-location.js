@@ -21,7 +21,11 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
-import { markStaying, relocationSummary } from '/js/patchchange/home-location-common.js';
+import {
+    markStaying,
+    readRelocationMessages,
+    relocationSummary,
+} from '/js/patchchange/home-location-common.js';
 import { format, localizeTimes } from '/js/patchchange/patch-change-messages.js';
 
 /** The confirmation dialog of the choice. */
@@ -33,7 +37,7 @@ const MODAL_ID = 'mhl-confirm-modal';
  * @typedef {object} MemberHomeLocationMessages
  * @property {string} confirmText the confirmation, `{0}` the patch label, `{1}` the location
  * @property {string} confirmSubmit the confirmation's button, `{0}` the location
- * @property {string} success what moved, `{0}` the location, `{1}` the items, `{2}` the ships
+ * @property {ReturnType<typeof readRelocationMessages>} relocation the summary of what moved
  * @property {string} error the fallback error of the choice
  * @property {string} refreshError the toast of a failed re-render
  */
@@ -57,7 +61,7 @@ function readMemberMessages() {
     return {
         confirmText: krtI18nText(data.confirmText, 'data-confirm-text'),
         confirmSubmit: krtI18nText(data.confirmSubmit, 'data-confirm-submit'),
-        success: krtI18nText(data.success, 'data-success'),
+        relocation: readRelocationMessages(data),
         error: krtI18nText(data.error, 'data-error'),
         refreshError: krtI18nText(data.refreshError, 'data-refresh-error'),
     };
@@ -194,7 +198,7 @@ function initMemberHomeLocation() {
             submitter: confirmSubmit,
             onSuccess(/** @type {ApiDto<'RelocationResultDto'> | null} */ body) {
                 close();
-                showFrontendSuccessToast(relocationSummary(i18n.success, body, current.name));
+                showFrontendSuccessToast(relocationSummary(i18n.relocation, body, current.name));
                 return sections.refresh('history', { broadcast: false });
             },
             onConflict(/** @type {ApiProblem | null} */ problem) {
