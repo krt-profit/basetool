@@ -151,6 +151,14 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
       @Param("status") BankBookingRequestStatus status, @Param("before") Instant before);
 
   /**
+   * Counts the requests a patch change cancelled, linked and unlinked alike (REQ-PATCH-046).
+   *
+   * @param patchChangeId the patch change kept as their reason
+   * @return the number of such requests
+   */
+  long countByCancelledByPatchChange(UUID patchChangeId);
+
+  /**
    * Locks the requests in a status that were submitted before an instant and that no order payment
    * attempt owns, in id order (REQ-PATCH-042).
    *

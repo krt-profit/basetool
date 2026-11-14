@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankCurrencyWipe;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Account;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Actor;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Holder;
@@ -109,6 +110,7 @@ class JobOrderLinkedBankIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private TransactionTemplate transactions;
   @Autowired private JobOrderCurrencyWipe currencyWipe;
+  @Autowired private BankCurrencyWipe bankCurrencyWipe;
   @Autowired private EntityManager entityManager;
 
   private final List<LinkedOrderAccount> supplementalAccounts = new ArrayList<>();
@@ -1581,10 +1583,19 @@ class JobOrderLinkedBankIntegrationTest {
     UUID patchChange = UUID.randomUUID();
 
     JobOrderCurrencyWipe.Effect effect = currencyWipe.apply(WIPE_LIVE_AT, patchChange, "0.1");
+    BankCurrencyWipe.Effect bank = bankCurrencyWipe.apply(WIPE_LIVE_AT, patchChange);
 
     assertThat(effect.attemptsCancelled()).isEqualTo(1);
+    assertThat(bank.unlinkedRequestsCancelled()).isZero();
     entityManager.flush();
     entityManager.clear();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT details FROM bank_audit_event WHERE event_type = 'WIPE_RESET_EXECUTED'"
+                    + " AND details LIKE ?",
+                String.class,
+                "patchChange=" + patchChange + "%"))
+        .endsWith(" cancelledRequests=1");
     outcome(order, earlier)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.state").value("CANCELLED"));

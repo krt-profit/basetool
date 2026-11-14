@@ -53,6 +53,17 @@ class BankCurrencyWipeRequests {
   private final BankLinkedRequestLiveSync liveSync;
 
   /**
+   * Counts every request the patch change cancelled so far, the unlinked ones and those of the order
+   * attempts alike (REQ-PATCH-046).
+   *
+   * @param patchChangeId the patch change kept as their reason
+   * @return the number of requests that name it
+   */
+  long countCancelledBy(@NotNull UUID patchChangeId) {
+    return requests.countByCancelledByPatchChange(patchChangeId);
+  }
+
+  /**
    * Counts the requests {@link #cancelUnlinkedBefore} would cancel now.
    *
    * @param liveAt the live time of the patch

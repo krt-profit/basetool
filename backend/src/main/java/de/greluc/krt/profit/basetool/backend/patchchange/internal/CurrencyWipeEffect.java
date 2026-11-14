@@ -59,7 +59,8 @@ class CurrencyWipeEffect implements PatchEffect {
   }
 
   /**
-   * Reports one tile per count the wipe has.
+   * Reports one tile per count the wipe has. The Bank requests count the unlinked ones the Bank
+   * cancels and the one each cancelled order attempt ends (REQ-PATCH-046).
    *
    * @param orders what the wipe does in the aUEC orders
    * @param bank what it does in the Kartellbank
@@ -69,7 +70,10 @@ class CurrencyWipeEffect implements PatchEffect {
       @NotNull JobOrderCurrencyWipe.Effect orders, @NotNull BankCurrencyWipe.Effect bank) {
     return PatchCounts.of(PatchCount.BANK_RESET_TOTAL, bank.resetTotal().longValueExact())
         .plus(PatchCounts.of(PatchCount.BANK_ACCOUNTS_CLAMPED, bank.accountsClamped()))
-        .plus(PatchCounts.of(PatchCount.BANK_REQUESTS_CANCELED, bank.requestsCancelled()))
+        .plus(
+            PatchCounts.of(
+                PatchCount.BANK_REQUESTS_CANCELED,
+                bank.unlinkedRequestsCancelled() + orders.attemptsCancelled()))
         .plus(PatchCounts.of(PatchCount.AUEC_SHORTAGES, orders.shortages()))
         .plus(
             PatchCounts.of(PatchCount.AUEC_SHORTAGE_TOTAL, orders.shortageTotal().longValueExact()))

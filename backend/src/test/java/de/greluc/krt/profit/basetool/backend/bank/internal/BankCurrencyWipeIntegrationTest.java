@@ -124,9 +124,9 @@ class BankCurrencyWipeIntegrationTest {
     BankCurrencyWipe.Effect preview = transactions.execute(_ -> wipe.preview(LIVE_AT));
     BankCurrencyWipe.Effect applied = transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange));
 
-    assertThat(Objects.requireNonNull(preview).requestsCancelled()).isEqualTo(1);
+    assertThat(Objects.requireNonNull(preview).unlinkedRequestsCancelled()).isEqualTo(1);
     assertThat(preview.resetTotal()).isEqualByComparingTo("1300");
-    assertThat(Objects.requireNonNull(applied).requestsCancelled()).isEqualTo(1);
+    assertThat(Objects.requireNonNull(applied).unlinkedRequestsCancelled()).isEqualTo(1);
     assertThat(applied.resetTotal()).isEqualByComparingTo("1300");
     assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("200");
     assertThat(postingRepository.accountBalance(otherAccount.getId())).isEqualByComparingTo("0");

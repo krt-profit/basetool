@@ -93,7 +93,7 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
             .with("totalZeroed", plain(booked.total()))
             .with("clampedAccounts", accountOffsets.clamped())
             .with("clampedStashes", holderOffsets.clamped())
-            .with("cancelledRequests", cancelled));
+            .with("cancelledRequests", requests.countCancelledBy(patchChangeId)));
     if (booked.transactionId() != null) {
       announce(locked, accountOffsets.offsets());
     }
