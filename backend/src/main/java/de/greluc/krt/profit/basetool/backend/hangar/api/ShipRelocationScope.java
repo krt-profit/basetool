@@ -21,16 +21,18 @@ package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 /**
  * The JPQL fragment of a bulk ship write that the relocation lock narrows (REQ-PATCH-023), spliced
- * after {@link ShipScope#TRIPLE} into the {@code @Query} values of {@link ShipRepository}.
+ * after {@link ShipScope#TRIPLE} into the {@code @Query} values of {@link ShipRepository}. It is a
+ * compile-time constant, which an annotation value needs, so the class is {@code public} and has no
+ * behaviour.
  */
-final class ShipRelocationScope {
+public final class ShipRelocationScope {
 
   /**
    * Leaves out (alias {@code s}) the ships of the locked owners created before the cutoff or
    * without a creation time; a {@code null} {@code :lockedBefore} leaves out nothing, whatever an
    * empty {@code :lockedOwners} renders to.
    */
-  static final String UNLOCKED =
+  public static final String UNLOCKED =
       """
        AND (
          CAST(:lockedBefore AS timestamp) IS NULL
