@@ -45,6 +45,43 @@
     .pc-switch-cell {
         white-space: nowrap;
     }
+    .pc-num {
+        text-align: end;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .pc-types summary {
+        cursor: pointer;
+        color: var(--color-gray-1);
+        font-size: var(--fs-xs);
+    }
+    .pc-type-list {
+        margin: var(--space-2) 0 0;
+        padding: 0;
+        list-style: none;
+    }
+    .pc-exceptions {
+        margin-top: var(--space-4);
+    }
+    .pc-minor-heading {
+        margin: 0;
+    }
+    .pc-exception-list {
+        margin: var(--space-3) 0 0;
+    }
+    .pc-exception-list:empty {
+        display: none;
+    }
+    .pc-exception-add {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+        gap: var(--space-3);
+        align-items: end;
+        margin-top: var(--space-3);
+    }
+    .pc-error {
+        color: var(--color-danger-text);
+    }
     .pc-effects {
         display: flex;
         flex-direction: column;

@@ -29,6 +29,8 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param wipeGroups the selected wipe groups, never {@code null} once constructed; a missing set
  *     reads as none
+ * @param wipeExceptions the single game items and materials kept or wiped beside the groups
+ *     (REQ-PATCH-011), never {@code null} once constructed; a missing set reads as none
  * @param cancelRefineryOrders whether running refinery orders started before the live time end
  * @param currencyWipe whether the currency wipe runs
  * @param homeLocationPrompt whether members are asked for a new home location
@@ -36,13 +38,34 @@ import org.jetbrains.annotations.NotNull;
 @DtoMirror
 public record PatchChangeOptions(
     Set<WipeGroup> wipeGroups,
+    Set<WipeException> wipeExceptions,
     boolean cancelRefineryOrders,
     boolean currencyWipe,
     boolean homeLocationPrompt) {
 
-  /** Copies the wipe groups, so the options never share a caller's set. */
+  /** Mirror of the backend's limit of wipe exceptions per patch change. */
+  public static final int MAX_WIPE_EXCEPTIONS = 100;
+
+  /** Copies the sets, so the options never share a caller's set. */
   public PatchChangeOptions {
     wipeGroups = wipeGroups == null ? Set.of() : Set.copyOf(wipeGroups);
+    wipeExceptions = wipeExceptions == null ? Set.of() : Set.copyOf(wipeExceptions);
+  }
+
+  /**
+   * Builds options without wipe exceptions.
+   *
+   * @param wipeGroups the selected wipe groups
+   * @param cancelRefineryOrders whether running refinery orders end
+   * @param currencyWipe whether the currency wipe runs
+   * @param homeLocationPrompt whether members are asked for a new home location
+   */
+  public PatchChangeOptions(
+      Set<WipeGroup> wipeGroups,
+      boolean cancelRefineryOrders,
+      boolean currencyWipe,
+      boolean homeLocationPrompt) {
+    this(wipeGroups, Set.of(), cancelRefineryOrders, currencyWipe, homeLocationPrompt);
   }
 
   /**

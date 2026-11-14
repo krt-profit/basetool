@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import java.util.EnumSet;
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
@@ -29,19 +31,43 @@ import org.jetbrains.annotations.Unmodifiable;
  * change each before the trigger.
  *
  * @param wipeGroups the selected wipe groups; a missing set reads as none
+ * @param wipeExceptions the single game items and materials kept or wiped beside the groups
+ *     (REQ-PATCH-011); a missing set reads as none
  * @param cancelRefineryOrders whether running refinery orders started before the live time end
  * @param currencyWipe whether the currency wipe runs
  * @param homeLocationPrompt whether members are asked for a new home location
  */
 public record PatchChangeOptions(
     @NotNull @Unmodifiable Set<WipeGroup> wipeGroups,
+    @NotNull @Unmodifiable @Size(max = PatchChangeOptions.MAX_WIPE_EXCEPTIONS)
+        Set<@jakarta.validation.constraints.NotNull @Valid WipeException> wipeExceptions,
     boolean cancelRefineryOrders,
     boolean currencyWipe,
     boolean homeLocationPrompt) {
 
-  /** Copies the wipe groups, so the options never share a caller's set. */
+  /** The most wipe exceptions one patch change carries. */
+  public static final int MAX_WIPE_EXCEPTIONS = 100;
+
+  /** Copies the sets, so the options never share a caller's set. */
   public PatchChangeOptions {
     wipeGroups = wipeGroups == null ? Set.of() : Set.copyOf(wipeGroups);
+    wipeExceptions = wipeExceptions == null ? Set.of() : Set.copyOf(wipeExceptions);
+  }
+
+  /**
+   * Builds options without wipe exceptions.
+   *
+   * @param wipeGroups the selected wipe groups
+   * @param cancelRefineryOrders whether running refinery orders end
+   * @param currencyWipe whether the currency wipe runs
+   * @param homeLocationPrompt whether members are asked for a new home location
+   */
+  public PatchChangeOptions(
+      @NotNull Set<WipeGroup> wipeGroups,
+      boolean cancelRefineryOrders,
+      boolean currencyWipe,
+      boolean homeLocationPrompt) {
+    this(wipeGroups, Set.of(), cancelRefineryOrders, currencyWipe, homeLocationPrompt);
   }
 
   /**
@@ -49,7 +75,7 @@ public record PatchChangeOptions(
    *
    * @param kind the patch kind
    * @return the preset: a rebuild wipes consumables, a full wipe every group; both end refinery
-   *     orders and ask for a home location, neither wipes the currency
+   *     orders and ask for a home location, neither wipes the currency; no exceptions
    */
   public static @NotNull PatchChangeOptions presetFor(@NotNull PatchKind kind) {
     Set<WipeGroup> groups =
@@ -58,5 +84,16 @@ public record PatchChangeOptions(
           case FULL_WIPE -> EnumSet.allOf(WipeGroup.class);
         };
     return new PatchChangeOptions(groups, true, false, true);
+  }
+
+  /**
+   * Tells whether the options wipe any stock row: a stock wipe group or a wiping exception.
+   *
+   * @return {@code true} when the stock wipe runs
+   */
+  public boolean wipesStock() {
+    return wipeGroups.stream().anyMatch(WipeGroup::selectsStock)
+        || wipeExceptions.stream()
+            .anyMatch(exception -> exception.mode() == WipeExceptionMode.WIPE);
   }
 }

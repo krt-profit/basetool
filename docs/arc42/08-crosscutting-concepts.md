@@ -656,6 +656,9 @@ write-time merge skips every older row (REQ-PATCH-004), and the Lager learns the
 SPI `inventory.api.StockMergeCutoff` the `patchchange` module implements. The trigger itself is one
 transaction that takes the history's advisory lock first and lets each effect lock its own rows in
 id order ([ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md)).
+The stock wipe is the transaction's one stock plan and follows the common resource order of every
+stock write; it is a game fact, so an earmarked order with invalid responsibility does not refuse it
+([ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md)).
 For money the same criterion reads the ledgers: the Bank reset offsets the balances from the
 postings before the live time and the aUEC orders book what the facts before it still hold, so
 both keep every later booking

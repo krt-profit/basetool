@@ -1206,7 +1206,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `supply` | 3 | `supply_donation`, `supply_need`, `supply_unit_setting` |
 | `purchasing` | 11 | `purchasing_deal`, `purchasing_deal_delivery`, `purchasing_deal_settlement`, `purchasing_deal_tranche`, `purchasing_delegate`, `purchasing_partner`, `purchasing_risk_class`, `purchasing_setting`, `purchasing_setting_allowed_tier`, `purchasing_setting_governing_area`, `purchasing_unit_pause` |
 | `exchange` | 12 | `exchange_bulk_undo_run`, `exchange_bulk_undo_skip`, `exchange_change`, `exchange_client`, `exchange_client_capability`, `exchange_client_revocation`, `exchange_feed_horizon`, `exchange_installation`, `exchange_journal`, `exchange_refinery_order_link`, `exchange_settings`, `exchange_ship_link` |
-| `patchchange` | 3 | `patch_change`, `patch_change_effect_count`, `patch_change_wipe_group` |
+| `patchchange` | 4 | `patch_change`, `patch_change_effect_count`, `patch_change_wipe_exception`, `patch_change_wipe_group` |
 
 The listed crossings:
 

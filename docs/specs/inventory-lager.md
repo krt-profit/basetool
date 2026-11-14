@@ -1460,6 +1460,12 @@ stock of every org unit, an admin pinned to one org unit wipes only that unit's.
   removed rows (REQ-AUDIT-001); the unified viewer's Lager filter lists it.
 - **In place.** On success the page clears the grouped table through its existing filter swap, not
   a reload ([`frontend-ajax-mutations.md`](frontend-ajax-mutations.md) REQ-FE-005).
+- **Not the patch wipe.** A patch change's wipe
+  ([REQ-PATCH-012](patch-change.md#req-patch-012--the-stock-wipe-reaches-every-members-rows-created-before-the-live-time))
+  is a separate path for every member and org unit: it selects by wipe group, exception and live
+  time, reaches personal rows too, ends offers and withdraws pledges with their notices, and is
+  excepted from the invalid-responsibility gate (ADR-0382). This action stays the scoped clean-up
+  of pool stock.
 
 **Acceptance**
 

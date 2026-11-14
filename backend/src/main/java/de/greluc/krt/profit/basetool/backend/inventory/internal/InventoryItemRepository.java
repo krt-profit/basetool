@@ -55,6 +55,7 @@ public interface InventoryItemRepository
     extends JpaRepository<InventoryItem, UUID>,
         InventoryLotLockRepository,
         InventoryOrderAllocationQueries,
+        InventoryPatchWipeQueries,
         InventoryQuantityQueries,
         InventoryQuantityEvidenceLockRepository,
         InventoryRestoreQueries,

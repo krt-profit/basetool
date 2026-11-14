@@ -141,6 +141,7 @@ p4k_import_run_kind catalogue
 p4k_review_case catalogue
 patch_change patchchange
 patch_change_effect_count patchchange
+patch_change_wipe_exception patchchange
 patch_change_wipe_group patchchange
 personal_blueprint blueprint
 personal_inventory_item personalinventory

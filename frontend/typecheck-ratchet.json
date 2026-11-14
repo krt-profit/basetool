@@ -254,7 +254,8 @@
       "patchchange/admin-patch-change.js",
       "patchchange/patch-change-form.js",
       "patchchange/patch-change-history.js",
-      "patchchange/patch-change-messages.js"
+      "patchchange/patch-change-messages.js",
+      "patchchange/patch-change-wipe.js"
     ],
     "personalinventory": [
       "personalinventory/admin-personal-blueprints-purge.js",

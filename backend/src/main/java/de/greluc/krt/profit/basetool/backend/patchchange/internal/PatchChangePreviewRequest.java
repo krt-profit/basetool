@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import org.jetbrains.annotations.Nullable;
@@ -30,4 +31,4 @@ import org.jetbrains.annotations.Nullable;
  * @param options the chosen options
  */
 public record PatchChangePreviewRequest(
-    @Nullable Instant liveAt, @NotNull PatchChangeOptions options) {}
+    @Nullable Instant liveAt, @NotNull @Valid PatchChangeOptions options) {}

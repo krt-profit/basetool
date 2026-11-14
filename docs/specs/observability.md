@@ -2104,6 +2104,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   is excluded from `AuditDomainSilenceAnomaly` too: patch changes come a few times a year
   (`audit_domain_silence_alerts_14_silent_patch_change_is_exempt_test.yml`). The existing
   `basetool_audit_events_total{domain}` counts the domain without a new metric.
+  A patch change's wipe ([REQ-PATCH-017](patch-change.md#req-patch-017--one-summary-event-per-affected-area))
+  adds no metric either: its summary events count under their areas' domains, the pledges it
+  withdraws count once each in `basetool_supply_donations_total{status="WITHDRAWN"}`, and the
+  DB-sampled gauges (open pledges, active offers, stock levels below minimum) see its deletes.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most

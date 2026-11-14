@@ -30,8 +30,27 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
  */
 @DtoMirror
 public enum PatchCount {
+  /** The stock rows the wipe removes (REQ-PATCH-012). */
+  STOCK_ROWS_WIPED,
+
+  /** The in-game ships the wipe removes (REQ-PATCH-015). */
+  IN_GAME_SHIPS_WIPED,
+
+  /** The members who hold a stock row the wipe removes (REQ-PATCH-016). */
+  STOCK_MEMBERS_AFFECTED,
+
   /** The running refinery orders the refinery effect cancels (REQ-PATCH-006). */
   REFINERY_ORDERS_CANCELED,
+
+  /** The job orders with an earmark on a wiped row (REQ-PATCH-013). */
+  JOB_ORDERS_AFFECTED,
+
+  /** The Materialbörse offers that end with their stock (REQ-PATCH-013). */
+  MARKET_OFFERS_ENDED,
+
+  /** The donation pledges withdrawn with their stock (REQ-PATCH-013). */
+  DONATIONS_WITHDRAWN,
+
   /** The Bank balances as of the live time the currency wipe resets (REQ-PATCH-041). */
   BANK_RESET_TOTAL,
   /** The pending Kartellbank requests the currency wipe cancels (REQ-PATCH-042). */

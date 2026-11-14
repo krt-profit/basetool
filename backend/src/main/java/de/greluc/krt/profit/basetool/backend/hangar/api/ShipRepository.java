@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -113,6 +114,45 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT s FROM Ship s WHERE s.owner.id = :owner ORDER BY s.id")
   List<Ship> lockAllOwnedByOrderById(@Param("owner") UUID owner);
+
+  /**
+   * The ships a patch wipe removes (REQ-PATCH-015): bought in-game by the owner's choice, never a
+   * ship whose origin an import or a pledge id locked, created before the cutoff or undated.
+   */
+  String PATCH_WIPEABLE =
+      """
+      s.originLocked = false
+      AND s.origin = de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin.IN_GAME
+      AND (s.createdAt < :cutoff OR s.createdAt IS NULL)
+      """;
+
+  /**
+   * Counts the ships a patch wipe with the given live time removes.
+   *
+   * @param cutoff the patch's live time
+   * @return the number of ships
+   */
+  @Query("SELECT COUNT(s) FROM Ship s WHERE " + PATCH_WIPEABLE)
+  long countPatchWipeable(@Param("cutoff") Instant cutoff);
+
+  /**
+   * Counts the members who own a ship a patch wipe with the given live time removes.
+   *
+   * @param cutoff the patch's live time
+   * @return the number of distinct owners
+   */
+  @Query("SELECT COUNT(DISTINCT s.owner.id) FROM Ship s WHERE " + PATCH_WIPEABLE)
+  long countPatchWipeableOwners(@Param("cutoff") Instant cutoff);
+
+  /**
+   * Locks the ships a patch wipe with the given live time removes, in ascending id order.
+   *
+   * @param cutoff the patch's live time
+   * @return the ships, locked for this transaction, ordered by id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT s FROM Ship s WHERE " + PATCH_WIPEABLE + " ORDER BY s.id")
+  List<Ship> lockPatchWipeable(@Param("cutoff") Instant cutoff);
 
   /**
    * Counts a member's ships.

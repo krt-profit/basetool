@@ -2,11 +2,13 @@
 > **Owner area:** PATCH
 > **Status:** The record, the options, the trigger with the refinery effect, the admin page with
 > its history, the audit area, the `patch` change source and the no-mixing rule are implemented
-> (REQ-PATCH-001…009), and so is the currency wipe (REQ-PATCH-040…046). The wipe, the
-> home-location phase with the relocation, the form default and the exchange resource follow in
-> their own slices of epic #3328 and add their requirements here.
+> (REQ-PATCH-001…009), the wipe by group and exception with its dependents, preview and audit
+> (REQ-PATCH-010…018) and the currency wipe (REQ-PATCH-040…046). The home-location phase with
+> the relocation, the form default and the exchange resource follow in their own slices of epic
+> #3328 and add their requirements here.
 > **Related ADRs:** [ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md),
 > [ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md),
+> [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md),
 > [ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)
 
 # Patch change
@@ -19,7 +21,8 @@ records the patch change once, for every org unit. The **live time** of the patc
 live in the game, decides what each effect touches: only what existed before it.
 
 The decisions behind this spec are on the wayfinder map #3246: the ground rules #3247 (with its
-live-time amendment), the refinery effect #3254, the exchange side #3255, the admin page #3256,
+live-time amendment), the dependents #3249, the ship origin #3250, the wipe selection #3251 (with
+its live-time amendment), the refinery effect #3254, the exchange side #3255, the admin page #3256,
 audit and monitoring #3257, the currency wipe #3258 and the spec and ADR cut #3327.
 
 **Terms** (arc42 §12): a *patch change* is the admin's record of a game patch and its options; the
@@ -70,10 +73,12 @@ The patch kind presets the options, and the admin may change each before the tri
 
 The wipe groups are fixed: consumables, FPS equipment, ship components and vehicle weapons, raw
 materials, refined materials, materials that cannot be refined, other items and in-game ships
-(#3251). The record stores every option as triggered (`patch_change_wipe_group` and the option
-columns of `patch_change`). The trigger runs the effect of an option only once its effect exists:
-today the refinery effect (REQ-PATCH-006) and the currency wipe (REQ-PATCH-040); the wipe and the
-home-location phase are stored and take effect with their slices.
+(#3251, REQ-PATCH-010); exceptions keep or wipe single entries beside them (REQ-PATCH-011). The
+record stores every option as triggered (`patch_change_wipe_group`, `patch_change_wipe_exception`
+and the option columns of `patch_change`). The trigger runs the effect of an option only once its
+effect exists: today the refinery effect (REQ-PATCH-006), the wipe (REQ-PATCH-012,
+REQ-PATCH-015) and the currency wipe (REQ-PATCH-040); the home-location phase is stored and takes
+effect with its slice.
 
 **Acceptance**
 
@@ -195,7 +200,9 @@ of the prototype on `prototype/patch-change`):
 
 - **left, the form:** the patch kind as a segmented control that presets everything below, the
   label and the live time with the line that the live time selects what is affected and is fixed
-  once triggered, the wipe groups with one switch each, and the further effects as switches;
+  once triggered, the wipe groups with one switch each, their catalogue types and the rows and
+  members each would wipe, the exceptions as removable chips with a picker for an item or a
+  material and its mode (REQ-PATCH-011, REQ-PATCH-016), and the further effects as switches;
 - **right, a sticky preview:** one tile per count the enabled effects report, refreshed on every
   change, a danger alert while the currency wipe is on, and the confirmation: typing the label
   enables the single danger button „Patchwechsel <label> auslösen“;
@@ -231,9 +238,9 @@ The audit domain `PATCH_CHANGE` keeps the patch-change trail (REQ-AUDIT-001):
 
 Each affected area records **one** summary event per trigger in its own trail, with counts and the
 patch change id: the refinery `REFINERY_ORDERS_CANCELED_BY_PATCH` with the number of orders
-cancelled, and the currency wipe's two events (REQ-PATCH-046). Single orders are not audited one
-by one. No free text and no personal data go into
-any details. The area has its own filter and DE/EN labels in the admin viewer.
+cancelled, the wipe's areas as REQ-PATCH-017 lists them and the currency wipe's two events
+(REQ-PATCH-046). Single orders are not audited one by one. No free text and no personal data go
+into any details. The area has its own filter and DE/EN labels in the admin viewer.
 
 The existing `basetool_audit_events_total{domain}` counts the area by itself; `AuditDomainSilenceAnomaly`
 exempts `PATCH_CHANGE`, because patch changes are rare (REQ-OBS-011).
@@ -248,6 +255,193 @@ exempts `PATCH_CHANGE`, because patch changes are rare (REQ-OBS-011).
 `AuditDomain.PATCH_CHANGE`, `AuditDomains`, `AdminAuditLogPageController`, `PatchChangeTrigger`,
 `PatchChangeLabelCorrection`, `RefineryPatchCancellationService`
 
+### REQ-PATCH-010 — The wipe groups are defined over catalogue types
+
+Every stock row falls into exactly one wipe group, decided in code from its catalogue entry
+(`WipeGroupTypes`); the groups need no maintenance:
+
+| Group | Catalogue types |
+| --- | --- |
+| Consumables | P4K types `FPS_Consumable`, `Food`, `Drink`, `Bottle`; sub-types `WeaponPersonal:Grenade`, `WeaponAttachment:Magazine`, `WeaponAttachment:Missile`, `Misc:Consumable`; untyped: wiki classification `FPS.Consumable…`, `FPS.WeaponAttachment.Magazine…`, kind `FOOD` |
+| FPS equipment | P4K types `WeaponPersonal`, `WeaponAttachment`, `Suit`, every type starting with `Char_Armor_`, `Char_Clothing_`, `Char_Accessory_`; untyped: `FPS.Armor…`, `FPS.Clothing…`, `FPS.Weapon…`, kinds `WEAPON`, `WEAPON_ATTACHMENT`, `ARMOR`, `CLOTHING` |
+| Ship components and vehicle weapons | the P4K type of every `ShipComponentType` and `GroundVehicleMissileLauncher`; untyped: `Ship.…`, kinds `VEHICLE_ITEM`, `VEHICLE_WEAPON` |
+| Materials: raw / refined / no-refine | the material's type `RAW` / `REFINED` / `NO_REFINE`, in every quality |
+| Other items | every item no other group claims, a new type included |
+| In-game ships | ships with the origin `IN_GAME` (REQ-PATCH-015) |
+
+An item with a P4K type (`GameItem#wikiType`, the SC Wiki filling a gap) is matched by its type and
+sub-type, then its type, then the longest matching type prefix; the wiki classification and the
+kind decide only for an item without a type. The admin form shows the catalogue types of each
+group; the form defaults carry them (`PatchChangeFormDto.groups`).
+
+**Acceptance**
+
+- [x] Each group claims the types of the table; an item with a known type no group names is an
+  other item, whatever its kind.
+
+**Enforced by:** `WipeGroupTypesTest` · **Code:** `WipeGroup`, `WipeGroupType`, `WipeGroupTypes`
+
+### REQ-PATCH-011 — Exceptions keep or wipe single game items and materials
+
+Beside the groups the admin may add **exceptions**: a single game item, or a material in every
+quality, whose rows are **kept** although their group is selected, or **wiped** although it is not.
+A row of an exception's entry follows the exception, never its group. Each entry has at most one
+exception, and a patch change carries at most 100; an exception naming an unknown entry is refused
+with `error.patch_change.wipe_exception_unknown`, a second exception of one entry with
+`error.patch_change.wipe_exception_duplicate`. The record stores the exceptions with the options
+(`patch_change_wipe_exception`, V422); the history names each entry by its current catalogue name.
+
+**Acceptance**
+
+- [x] A keeping exception saves its entry's rows in a selected group; a wiping exception wipes its
+  entry's rows outside the selected groups.
+- [x] An unknown entry and a second exception of one entry are refused.
+
+**Enforced by:** `WipeSelectionTest`, `PatchChangeOptionsTest`, `PatchChangeWipeIntegrationTest` ·
+**Code:** `WipeException`, `WipeSelection`, `WipeExceptionCatalogue`, `PatchChange`, V422
+
+### REQ-PATCH-012 — The stock wipe reaches every member's rows created before the live time
+
+When a stock group or a wiping exception is selected, the trigger deletes every stock row the
+options select that was **created before the live time** (a row without a creation time counts as
+created before it): own, pool and personal rows (`personal = true`) of every member in every org
+unit, stolen ones included. Rows created after the live time stay. Personal inventory
+(`personal_inventory_item`), blueprints and the Bank are never touched; money is the currency
+wipe.
+
+The rows are selected, locked and selected again on their locked facts, then deleted by their ids
+(ADR-0362). The Lager's admin action „Globales Lager leeren“ (REQ-INV-041) stays the scoped
+clean-up of pool stock; the patch wipe is a separate path for everyone.
+
+**Acceptance**
+
+- [x] Only the selected rows created before the live time or undated go, personal rows included;
+  rows created after it and rows of unselected groups stay.
+
+**Enforced by:** `PatchChangeWipeIntegrationTest` · **Code:** `StockWipeEffect`,
+`inventory.api.StockPatchWipe`, `InventoryPatchWipeService`
+
+### REQ-PATCH-013 — What depends on a wiped row goes with it
+
+- **Job orders:** the earmarks on a wiped row go with it. For material promises the wipe is a
+  genuine stock loss (ADR-0360): credited contribution stays, uncovered demand rises and no ended
+  promise revives. The open order pages refresh through the stock write.
+- **Donation pledges** earmarked on a wiped row are withdrawn as their donor would withdraw them,
+  with the usual notice; the donation keeps the patch change as its reason
+  (`supply_donation.withdrawn_by_patch_change`, V423), which only a withdrawn donation holds.
+- **Materialbörse offers** standing on a wiped row end with the usual „stock gone“ notice to the
+  members who registered interest.
+- **Minimum stock levels** turn low by themselves; they are read-time sums.
+
+**Acceptance**
+
+- [x] A wiped row's earmark, active offer and pledge go: the earmark and the offer are deleted, the
+  pledge is withdrawn with the patch change as its reason; the job order stays.
+
+**Enforced by:** `PatchChangeWipeIntegrationTest` · **Code:** `StockWipeEffect`,
+`materialexchange.api.MaterialExchangePatchWipe`, `supply.api.SupplyPatchWipe`,
+`joborder.api.JobOrderPatchWipe`
+
+### REQ-PATCH-014 — The wipe is excepted from the invalid-responsibility gate
+
+The stock wipe is a game fact, not an order write (ADR-0382): an earmarked job order with invalid
+responsibility (REQ-ORDERS-055) does not refuse it. The wipe still takes every lock an ordinary
+stock write takes, the shared hierarchy lock first, then the material scopes, the lots and the rows,
+and the orders must exist. Every other stock write keeps the ordinary check.
+
+**Acceptance**
+
+- [x] A row earmarked for an order with invalid responsibility is wiped; the order keeps its
+  history.
+
+**Enforced by:** `PatchChangeWipeIntegrationTest` · **Code:**
+`InventoryOrderWrites#duringGameFactLoss`, `OrderLinkedStockWriteObserver#beforeGameFactStockLoss`,
+`JobOrderStockWriteEligibility`
+
+### REQ-PATCH-015 — In-game ships go through the ordinary deletion path
+
+When the in-game ships are selected, the trigger deletes every member's ship whose chosen origin is
+`IN_GAME` and not locked (REQ-HANGAR-017) and that was created before the live time (undated
+counts as before). A pledged ship, a ship of unknown origin and a ship whose origin an import or a
+pledge id locked stay. Each ship goes through the ordinary deletion path (`HangarShipRemoval`), so
+`ShipDeletionObserver` releases a mission unit that carried it with its notice; the exchange ship
+feed records the removal under the `patch` source.
+
+**Acceptance**
+
+- [x] Only unlocked in-game ships created before the live time go; their mission units let go of
+  them.
+
+**Enforced by:** `PatchChangeWipeIntegrationTest`, `HangarServiceTest` · **Code:**
+`ShipWipeEffect`, `hangar.api.ShipPatchWipe`, `HangarPatchWipeService`, `HangarShipRemoval`
+
+### REQ-PATCH-016 — The preview counts each group and exception
+
+The preview counts, from what the live time selects:
+
+- the tiles: stock rows wiped, in-game ships wiped, members with wiped stock rows, job orders with
+  wiped earmarks, offers ended and pledges withdrawn (each only while its option wipes);
+- per wipe group, selected or not, the rows (ships for the in-game ships) and the members who hold
+  them, shown in the group table;
+- per exception, the rows of its entry, shown on its chip.
+
+One survey per transaction and plan serves the tiles and the breakdown, so they agree
+(`WipeSurvey`). There is no list of removed rows for members and no undo; the preview and the typed
+label are the safeguard.
+
+**Acceptance**
+
+- [x] The preview counts every group and every exception without writing.
+
+**Enforced by:** `PatchChangeWipeIntegrationTest`, `AdminPatchChangePageControllerMvcTest`,
+`AdminPatchChangeRelayControllerMvcTest` · **Code:** `WipeSurvey`, `WipePreview`,
+`WipePreviewDto`, `static/js/patchchange/patch-change-wipe.js`
+
+### REQ-PATCH-017 — One summary event per affected area
+
+Each area the wipe touches records **one** summary event per trigger in its own trail; the subject
+is the patch change with its label, the details carry counts and `patchChange=<id>`:
+
+| Area | Event | Details |
+| --- | --- | --- |
+| Inventory | `INVENTORY_WIPED_BY_PATCH` | rows, members, job orders, rows per wipe group (`WIPE_EXCEPTIONS` for rows a wiping exception selects) |
+| Hangar | `HANGAR_SHIPS_WIPED_BY_PATCH` | ships, owners, mission units released |
+| Supply | `DONATIONS_WITHDRAWN_BY_PATCH` | pledges withdrawn |
+| Materialbörse | `MARKET_OFFERS_ENDED_BY_PATCH` | offers ended |
+| Job orders | `JOB_ORDERS_STOCK_WIPED_BY_PATCH` | orders whose earmarks went |
+
+Single rows, ships, offers and pledges are not audited one by one. No free text and no personal
+data go into any details.
+
+**Acceptance**
+
+- [x] A wipe records each area's summary event once and no per-offer or per-ship event.
+
+**Enforced by:** `PatchChangeWipeIntegrationTest`, `SupplyPatchWipeServiceTest`,
+`MaterialExchangePatchWipeServiceTest`, `HangarPatchWipeServiceTest`,
+`AdminAuditLogPageControllerTest` · **Code:**
+`InventoryPatchWipeService`, `HangarPatchWipeService`, `SupplyPatchWipeService`,
+`MaterialExchangePatchWipeService`, `JobOrderPatchWipeService`
+
+### REQ-PATCH-018 — Open pages of the affected areas refresh in place
+
+After the commit the backend publishes the rooms the wipe changed: `inventory` (`stock`,
+`stock-levels`), `materialboard` (`board`), `supply-needs` (`needs`, `mine`, `stats`) and
+`supply-donations:{unit}` of every receiving unit, `hangar:{member}` of every owner and the unit
+hangar rooms, and through the stock write `order:{id}` and `orders`. Nothing is published for a
+rolled-back trigger.
+
+**Acceptance**
+
+- [x] The supply, Materialbörse and member hangar rooms are published after the commit, and none
+  when nothing changed.
+- [ ] The Lager and order rooms are asserted by a test.
+
+**Enforced by:** `SupplyPatchWipeServiceTest`, `MaterialExchangePatchWipeServiceTest`,
+`HangarPatchWipeServiceTest`, `LiveSyncTopicRegistryParityTest` (every room exists on both sides)
+· **Code:**
+`InventoryPatchWipeService`, `MaterialExchangePatchWipeService`, `SupplyPatchWipeService`,
+`HangarPatchWipeService`, `JobOrderStockWriteEligibility`
 ### REQ-PATCH-040 — The currency wipe follows the game in the Bank and the aUEC orders
 
 The option **currency wipe** is off by default and offered for both kinds (REQ-PATCH-002). When it
