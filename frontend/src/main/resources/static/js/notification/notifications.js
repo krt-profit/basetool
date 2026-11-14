@@ -19,7 +19,7 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
-import { krtFetch, krtReauth, krtTermsGate } from '/js/kernel/krt-fetch.js';
+import { krtFetch, krtReauth, krtSessionGate } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { badgeText, bellAriaLabel } from '/js/notification/notification-bell-label.js';
 
@@ -27,6 +27,8 @@ const POLL_INTERVAL_FAST_MS = 60000;
 const POLL_INTERVAL_SLOW_MS = 300000;
 const SSE_LIVENESS_TIMEOUT_MS = 60000;
 const OPEN_MARK_READ_WAIT_MS = 1500;
+/** The one-shot events by which a session gate hands the stream off to its page. */
+const SESSION_GATE_EVENTS = ['terms-gate', 'home-location-gate'];
 const bell = document.getElementById('notification-bell');
 const i18n = readMessages();
 /** @type {number | null} */
@@ -852,10 +854,11 @@ function startSse() {
             if (sseSource === source) {
                 sseSource = null;
             }
-            krtTermsGate.redirect(event && event.data ? event.data : null);
+            krtSessionGate.redirect(event && event.data ? event.data : null);
         };
-        source.addEventListener('terms-gate', handOffToGate);
-        source.addEventListener('home-location-gate', handOffToGate);
+        for (const gateEvent of SESSION_GATE_EVENTS) {
+            source.addEventListener(gateEvent, handOffToGate);
+        }
         source.addEventListener('replaced', () => {
             sseStopped = true;
             if (sseReconnectTimer !== null) {

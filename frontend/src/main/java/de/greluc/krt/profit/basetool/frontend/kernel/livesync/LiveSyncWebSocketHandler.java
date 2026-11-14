@@ -138,12 +138,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   static final CloseStatus SOCKET_CAP_EXCEEDED = new CloseStatus(4029, "socket cap exceeded");
 
   /**
-   * Session-attribute key ({@link String}) holding the consent-page URL for a handshake the
-   * Terms-of-Use gate marked instead of redirecting (REQ-SEC-028). Set by the {@code /ws/sync}
+   * Session-attribute key ({@link String}) holding the gate page's URL for a handshake a session
+   * gate marked instead of redirecting (REQ-SEC-028, REQ-PATCH-020). Set by the {@code /ws/sync}
    * handshake interceptor; its presence means the socket must be refused at connect. Public so the
    * interceptor can populate it.
    */
-  public static final String ATTR_TERMS_GATE = "livesync.termsGate";
+  public static final String ATTR_SESSION_GATE = "livesync.sessionGate";
 
   /**
    * Close status code {@code 4003} for a socket whose user has not accepted the Terms of Use

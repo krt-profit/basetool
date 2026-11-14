@@ -20,14 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.patchchange.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.HomeLocationGateFilter;
-import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationPromptDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.MemberRelocationState;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -43,14 +40,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 @UsesLayoutModel
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
-@Slf4j
 public class HomeLocationPageController {
 
   /** The message key shown in place of the choice when the prompt cannot be read. */
   static final String PROMPT_ERROR = "homeLocation.error.load";
 
   /** Reads the prompt. */
-  private final PatchChangeBackendClient patchChangeClient;
+  private final HomeLocationPageReader pageReader;
+
+  /** The gate whose cached verdict a pending prompt discards. */
+  private final HomeLocationGate homeLocationGate;
 
   /**
    * Renders the prompt of a pending member, or sends a member who has nothing to choose into the
@@ -62,19 +61,18 @@ public class HomeLocationPageController {
    *     not pending
    */
   @NotNull
-  @GetMapping(HomeLocationGateFilter.GATE_PATH)
+  @GetMapping(HomeLocationGate.PAGE_PATH)
   public String page(@NotNull HttpServletRequest request, Model model) {
-    HomeLocationPromptDto prompt =
-        SectionFallback.load(
-            log, "home-location-prompt", patchChangeClient::myHomeLocationPrompt, null);
-    if (prompt == null) {
+    Optional<HomeLocationPromptDto> read = pageReader.myPrompt();
+    if (read.isEmpty()) {
       model.addAttribute("promptError", PROMPT_ERROR);
       return "patchchange/home-location";
     }
+    HomeLocationPromptDto prompt = read.get();
     if (prompt.state() != MemberRelocationState.PENDING) {
       return "redirect:/";
     }
-    HomeLocationGateFilter.clearCachedVerdict(request);
+    homeLocationGate.forget(request);
     model.addAttribute("prompt", prompt);
     return "patchchange/home-location";
   }

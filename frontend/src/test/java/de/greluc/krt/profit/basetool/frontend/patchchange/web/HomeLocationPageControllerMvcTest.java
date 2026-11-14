@@ -74,8 +74,8 @@ class HomeLocationPageControllerMvcTest {
   private static final String PROMPT = "/api/v1/patch-changes/me/home-location";
   private static final String PAGE = "/home-location";
 
-  /** The session attribute {@code HomeLocationGateFilter} caches its "may proceed" verdict in. */
-  private static final String GATE_VERDICT = "krt.homeLocation.checkedAt";
+  /** The session attribute {@link HomeLocationGate} caches its "may proceed" verdict in. */
+  private static final String GATE_VERDICT = HomeLocationGate.SESSION_CHECKED_AT;
 
   private static final UUID PATCH_CHANGE = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000a4");
   private static final UUID PORT_TRESSLER = UUID.fromString("10c4710c-0000-4000-8000-000000000009");
@@ -183,6 +183,8 @@ class HomeLocationPageControllerMvcTest {
         .contains("Home Location wählen")
         .contains("Die Wahl ist endgültig.")
         .contains("data-cta=\"Nach {0} umziehen\"")
+        .containsPattern("id=\"hl-done\"[^>]*hidden")
+        .containsPattern("id=\"hl-continue\" href=\"/\"[^>]*>Weiter zum Basetool<")
         .contains("action=\"/logout\"")
         .contains("/js/patchchange/home-location")
         .doesNotContain("data-testid=\"hl-no-locations\"")

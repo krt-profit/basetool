@@ -17,7 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.kernel.model;
+package de.greluc.krt.profit.basetool.frontend.patchchange.model;
+
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
  * Frontend mirror of the backend's home-location gate status (REQ-PATCH-020).

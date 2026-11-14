@@ -27,12 +27,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicyFixture;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -70,7 +72,8 @@ class BankDownloadErrorMvcTest {
     mvc =
         MockMvcBuilders.standaloneSetup(
                 new BankReportProxyController(new BankBackendClient(kernel)))
-            .setControllerAdvice(new GlobalExceptionHandler(new StaticMessageSource()))
+            .setControllerAdvice(
+                new GlobalExceptionHandler(new StaticMessageSource(), new SessionGates(List.of())))
             .addFilters(
                 (jakarta.servlet.Filter)
                     (request, response, chain) -> {

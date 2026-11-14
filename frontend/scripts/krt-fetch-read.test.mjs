@@ -128,7 +128,7 @@ function harness(script = []) {
     return {
         krtFetch: context.krtFetch,
         reauth: vm.runInContext('krtReauth', context),
-        terms: vm.runInContext('krtTermsGate', context),
+        terms: vm.runInContext('krtSessionGate', context),
         calls,
         navigations,
         errors,

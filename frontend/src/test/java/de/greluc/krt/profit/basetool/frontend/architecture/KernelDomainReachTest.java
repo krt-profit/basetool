@@ -64,8 +64,7 @@ class KernelDomainReachTest {
           "kernel.layout.OrgUnitContextAdvice -> orgunit.model.OrgUnitMembershipOptionDto",
           "kernel.layout.OrgUnitContextAdvice -> orgunit.model.SquadronDto",
           "kernel.security.BackendRoleSyncFilter -> identity.model.RegistrationStatusDto",
-          "kernel.security.BackendRoleSyncFilter -> identity.model.UserDto",
-          "kernel.security.TermsAcceptanceGateFilter -> identity.model.TermsStatusDto");
+          "kernel.security.BackendRoleSyncFilter -> identity.model.UserDto");
 
   @Test
   void theKernelReachesNoDomainBeyondTheFrozenList() {

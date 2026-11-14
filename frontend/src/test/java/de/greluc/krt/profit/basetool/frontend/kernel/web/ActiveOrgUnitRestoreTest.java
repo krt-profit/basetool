@@ -32,6 +32,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.StubSessionGate;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -101,7 +103,15 @@ class ActiveOrgUnitRestoreTest {
   }
 
   private ActiveOrgUnitRestore restoreAt(Instant instant) {
-    return new ActiveOrgUnitRestore(source, Clock.fixed(instant, ZoneOffset.UTC));
+    return new ActiveOrgUnitRestore(
+        source,
+        new SessionGates(
+            List.of(
+                new StubSessionGate(
+                    "/terms/accept", "X-Terms-Acceptance-Required", "terms-gate", "T"),
+                new StubSessionGate(
+                    "/home-location", "X-Home-Location-Required", "home-location-gate", "H"))),
+        Clock.fixed(instant, ZoneOffset.UTC));
   }
 
   private Object sessionPin() {
@@ -253,7 +263,13 @@ class ActiveOrgUnitRestoreTest {
    * the first page after the gate restores it.
    */
   @ParameterizedTest
-  @ValueSource(strings = {"/pending-approval", "/pending-approval/status", "/terms/accept"})
+  @ValueSource(
+      strings = {
+        "/pending-approval",
+        "/pending-approval/status",
+        "/terms/accept",
+        "/home-location"
+      })
   void aGatePageReadsNothingAndTheNextPageRestores(String gatePage) {
     signIn("lena");
     when(source.storedChoice()).thenReturn(Optional.of(ARGON));

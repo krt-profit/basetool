@@ -17,19 +17,23 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.kernel.security;
+package de.greluc.krt.profit.basetool.frontend.patchchange.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.HomeLocationStatusDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateFilter;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateHandoff;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.StubSessionGate;
+import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBackendClient;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationStatusDto;
 import jakarta.servlet.FilterChain;
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,25 +52,30 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
- * Behaviour of the frontend's home-location gate (REQ-PATCH-020): a pending member is sent to the
- * home-location page on every kind of request, the gate pages stay open, and only a verdict that
- * lets the member through is cached.
+ * Behaviour of the frontend's home-location gate (REQ-PATCH-020) as the session-gate filter runs it
+ * behind a consent gate that lets the member through: a pending member is sent to the home-location
+ * page on every kind of request, the gate pages stay open, and only a verdict that lets the member
+ * through is cached.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class HomeLocationGateFilterTest {
+class HomeLocationGateTest {
 
-  private static final String STATUS = "/api/v1/patch-changes/me/home-location/status";
-
-  @Mock private BackendApiClient backendApiClient;
+  @Mock private PatchChangeBackendClient patchChangeClient;
   @Mock private FilterChain filterChain;
 
-  private HomeLocationGateFilter filter;
+  private HomeLocationGate gate;
+  private SessionGateFilter filter;
   private MockHttpSession session;
 
   @BeforeEach
   void setUp() {
-    filter = new HomeLocationGateFilter(backendApiClient, new MockEnvironment());
+    gate = new HomeLocationGate(patchChangeClient);
+    StubSessionGate consented =
+        new StubSessionGate(
+            "/terms/accept", "X-Terms-Acceptance-Required", "terms-gate", "TERMS_NOT_ACCEPTED");
+    filter =
+        new SessionGateFilter(new SessionGates(List.of(consented, gate)), new MockEnvironment());
     session = new MockHttpSession();
     SecurityContextHolder.getContext()
         .setAuthentication(
@@ -133,8 +142,9 @@ class HomeLocationGateFilterTest {
 
     invoke(request("GET", "/home-location"));
     invoke(request("GET", "/terms/accept"));
+    invoke(request("GET", "/pending-approval"));
 
-    verify(filterChain, times(2)).doFilter(any(), any());
+    verify(filterChain, times(3)).doFilter(any(), any());
   }
 
   @Test
@@ -142,15 +152,15 @@ class HomeLocationGateFilterTest {
     stubRequired(false);
     invoke(request("GET", "/missions"));
     invoke(request("GET", "/missions"));
-    verify(backendApiClient, times(1)).get(eq(STATUS), eq(HomeLocationStatusDto.class));
+    verify(patchChangeClient, times(1)).myHomeLocationStatus();
 
-    HomeLocationGateFilter.clearCachedVerdict(request("GET", "/missions"));
+    gate.forget(request("GET", "/missions"));
     stubRequired(true);
     invoke(request("GET", "/missions"));
     MockHttpServletResponse held = invoke(request("GET", "/missions"));
 
     assertThat(held.getRedirectedUrl()).isEqualTo("/home-location");
-    verify(backendApiClient, times(3)).get(eq(STATUS), eq(HomeLocationStatusDto.class));
+    verify(patchChangeClient, times(3)).myHomeLocationStatus();
   }
 
   /**
@@ -159,8 +169,7 @@ class HomeLocationGateFilterTest {
    * @param required whether the member must choose
    */
   private void stubRequired(boolean required) {
-    when(backendApiClient.get(STATUS, HomeLocationStatusDto.class))
-        .thenReturn(new HomeLocationStatusDto(required));
+    when(patchChangeClient.myHomeLocationStatus()).thenReturn(new HomeLocationStatusDto(required));
   }
 
   /**

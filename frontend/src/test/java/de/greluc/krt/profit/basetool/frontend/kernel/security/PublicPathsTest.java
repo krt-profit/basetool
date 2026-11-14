@@ -25,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.server.PathContainer;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
@@ -197,16 +198,16 @@ class PublicPathsTest {
   }
 
   @ParameterizedTest
-  @DisplayName("the consent page, the waiting page and its poll are pages of an access gate")
-  @ValueSource(strings = {"/terms/accept", "/pending-approval", "/pending-approval/status"})
-  void theGatePagesAreAccessGatePages(String path) {
-    assertThat(PublicPaths.isAccessGatePage(path)).as(path).isTrue();
+  @DisplayName("the waiting page and its poll are the approval waiting page")
+  @ValueSource(strings = {"/pending-approval", "/pending-approval/status"})
+  void theWaitingPageAndItsPollAreTheApprovalWaitingPage(String path) {
+    assertThat(PublicPaths.isApprovalWaitingPage(PathContainer.parsePath(path))).as(path).isTrue();
   }
 
   @ParameterizedTest
-  @DisplayName("member pages and the public terms page are no access gate pages")
-  @ValueSource(strings = {"/", "/lager", "/terms", "/terms/acceptance", "/pending-approvals"})
-  void otherPagesAreNoAccessGatePages(String path) {
-    assertThat(PublicPaths.isAccessGatePage(path)).as(path).isFalse();
+  @DisplayName("member pages, the public terms page and a gate page are no approval waiting page")
+  @ValueSource(strings = {"/", "/lager", "/terms", "/terms/accept", "/pending-approvals"})
+  void otherPagesAreNoApprovalWaitingPage(String path) {
+    assertThat(PublicPaths.isApprovalWaitingPage(PathContainer.parsePath(path))).as(path).isFalse();
   }
 }

@@ -74,6 +74,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class BackendRoleSyncFilter extends OncePerRequestFilter {
 
   private final BackendApiClient backendApiClient;
+
+  /** Lets the sync skip a read a session gate's backend half would refuse anyway. */
+  private final SessionGates sessionGates;
+
   private final SecurityContextRepository securityContextRepository =
       new HttpSessionSecurityContextRepository();
 
@@ -177,7 +181,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         || STATE_NO_ROLE.equals(approval)) {
       return routeToAccountStatus(request, response);
     }
-    if (TermsAcceptanceGateFilter.consentKnownMissing(request)) {
+    if (sessionGates.anyKnownHolding(request)) {
       return true;
     }
     if (isDue(session.getAttribute(ROLES_SYNCED_AT_FLAG), ROLE_RESYNC_MILLIS)) {

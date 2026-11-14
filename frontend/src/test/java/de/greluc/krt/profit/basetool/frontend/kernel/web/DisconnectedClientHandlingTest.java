@@ -26,8 +26,10 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.util.List;
 import org.apache.catalina.connector.ClientAbortException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,7 +107,8 @@ class DisconnectedClientHandlingTest {
     handlerLogger.addAppender(appender);
     mockMvc =
         MockMvcBuilders.standaloneSetup(new DisconnectingController())
-            .setControllerAdvice(new GlobalExceptionHandler(new StaticMessageSource()))
+            .setControllerAdvice(
+                new GlobalExceptionHandler(new StaticMessageSource(), new SessionGates(List.of())))
             .build();
   }
 

@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationOpti
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationPoolRowsDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationPromptDto;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationStatusDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.MemberRelocationState;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeFormDto;
@@ -270,6 +271,16 @@ class PatchChangeBackendClientTest {
         "POST",
         "/api/v1/patch-changes/me/home-location",
         "{\"locationId\":\"" + LORVILLE.id() + "\"}");
+  }
+
+  @Test
+  void theGatesStatusReadUsesTheOwnStatusEndpoint() {
+    backend.answerJson("{\"required\":true}");
+
+    HomeLocationStatusDto status = client.myHomeLocationStatus();
+
+    assertThat(status).isEqualTo(new HomeLocationStatusDto(true));
+    backend.expect("GET", "/api/v1/patch-changes/me/home-location/status");
   }
 
   @Test
