@@ -25,9 +25,6 @@ import { format } from '/js/patchchange/patch-change-messages.js';
 /** The page's path, also the relay of the choice. */
 const PAGE_URL = '/home-location';
 
-/** Where the member continues once relocated. */
-const START_URL = '/';
-
 /**
  * The localized strings of the home-location page, read once from the `#hl-i18n` holder.
  *
@@ -57,19 +54,25 @@ function readHomeLocationMessages() {
 /**
  * Wires the member's home-location page (REQ-PATCH-022): choosing a card names the location in
  * the call to action and marks the preview row that stays; the confirmation relays the final
- * choice, shows what moved and continues into the tool, and a refusal shows the backend's reason
- * in place.
+ * choice, then shows in place what moved and the way on into the tool, which the member follows
+ * (REQ-FE-001); a refusal shows the backend's reason in place.
  */
 function initHomeLocation() {
     const formEl = document.getElementById('hl-form');
     const submitEl = document.getElementById('hl-submit');
     const errorEl = document.getElementById('hl-error');
     const successEl = document.getElementById('hl-success');
+    const pendingEl = document.getElementById('hl-pending');
+    const doneEl = document.getElementById('hl-done');
+    const continueEl = document.getElementById('hl-continue');
     if (
         !(formEl instanceof HTMLFormElement) ||
         !(submitEl instanceof HTMLButtonElement) ||
         !errorEl ||
-        !successEl
+        !successEl ||
+        !pendingEl ||
+        !doneEl ||
+        !continueEl
     ) {
         return;
     }
@@ -81,6 +84,12 @@ function initHomeLocation() {
     const error = errorEl;
     /** @type {HTMLElement} */
     const success = successEl;
+    /** @type {HTMLElement} */
+    const pending = pendingEl;
+    /** @type {HTMLElement} */
+    const done = doneEl;
+    /** @type {HTMLElement} */
+    const continueLink = continueEl;
     const i18n = readHomeLocationMessages();
 
     /** @returns {HTMLInputElement | null} the chosen card's radio, or null before a choice */
@@ -109,6 +118,24 @@ function initHomeLocation() {
         error.hidden = false;
     }
 
+    /**
+     * Shows what moved in place of the call to action and offers the way on; the final choice can
+     * no longer be changed.
+     *
+     * @param {string} summary the localized summary of the relocation
+     */
+    function showRelocated(summary) {
+        form.querySelectorAll('input[name="locationId"]').forEach((radio) => {
+            if (radio instanceof HTMLInputElement) {
+                radio.disabled = true;
+            }
+        });
+        success.textContent = summary;
+        pending.hidden = true;
+        done.hidden = false;
+        continueLink.focus();
+    }
+
     form.addEventListener('change', sync);
     form.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -125,9 +152,7 @@ function initHomeLocation() {
             toast: false,
             submitter: submit,
             onSuccess(/** @type {ApiDto<'RelocationResultDto'> | null} */ body) {
-                success.textContent = relocationSummary(i18n.success, body, name);
-                success.hidden = false;
-                window.location.assign(START_URL);
+                showRelocated(relocationSummary(i18n.success, body, name));
             },
             onError(_status, /** @type {ApiProblem | null} */ problem) {
                 showError(problem && problem.detail ? problem.detail : i18n.error);

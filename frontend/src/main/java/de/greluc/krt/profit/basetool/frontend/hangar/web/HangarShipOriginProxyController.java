@@ -63,7 +63,7 @@ public class HangarShipOriginProxyController {
       @RequestBody @Nullable ShipBulkOriginRequestDto request) {
     ShipBulkOriginRequestDto valid = BulkOriginRequests.validated(request);
     if (valid == null) {
-      return BulkOriginRequests.validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,

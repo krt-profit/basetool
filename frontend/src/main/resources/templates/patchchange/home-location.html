@@ -55,10 +55,16 @@
 
             <div class="hl-confirm">
                 <p id="hl-error" class="alert alert-danger hl-alert" role="alert" hidden data-testid="hl-error"></p>
-                <p id="hl-success" class="alert alert-success hl-alert" role="status" hidden data-testid="hl-success"></p>
-                <button type="submit" id="hl-submit" class="btn btn--cta" disabled data-testid="hl-submit"
-                        th:text="#{homeLocation.cta.choose}">Home Location w&auml;hlen</button>
-                <p class="form-hint" th:text="#{homeLocation.note}">Die Wahl ist endg&uuml;ltig. Es zieht alles um, was vor der Live-Zeit angelegt wurde. Bis dahin sind diese Posten und Schiffe f&uuml;r andere gesperrt.</p>
+                <div id="hl-pending" class="hl-confirm" data-testid="hl-pending">
+                    <button type="submit" id="hl-submit" class="btn btn--cta" disabled data-testid="hl-submit"
+                            th:text="#{homeLocation.cta.choose}">Home Location w&auml;hlen</button>
+                    <p class="form-hint" th:text="#{homeLocation.note}">Die Wahl ist endg&uuml;ltig. Es zieht alles um, was vor der Live-Zeit angelegt wurde. Bis dahin sind diese Posten und Schiffe f&uuml;r andere gesperrt.</p>
+                </div>
+                <div id="hl-done" class="hl-confirm" hidden data-testid="hl-done">
+                    <p id="hl-success" class="alert alert-success hl-alert" role="status" data-testid="hl-success"></p>
+                    <a id="hl-continue" th:href="@{/}" class="btn btn--cta" data-testid="hl-continue"
+                       th:text="#{homeLocation.continue}">Weiter zum Basetool</a>
+                </div>
             </div>
         </form>
     </th:block>
