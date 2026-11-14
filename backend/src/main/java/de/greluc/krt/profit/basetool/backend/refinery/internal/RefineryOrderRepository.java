@@ -186,22 +186,30 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   List<UUID> findExistingIds(@Param("ids") Collection<UUID> ids);
 
   /**
+   * JPQL condition on {@code r} that holds for an order started before {@code :liveAt}: an order
+   * without a start counts from its creation, one with neither as started before (REQ-PATCH-006).
+   */
+  String STARTED_BEFORE_LIVE_AT =
+      " AND (COALESCE(r.startedAt, r.createdAt) IS NULL"
+          + " OR COALESCE(r.startedAt, r.createdAt) < :liveAt)";
+
+  /**
    * Counts the orders in the given statuses that started before an instant, an order without a
-   * start counting from its creation (REQ-PATCH-006).
+   * start counting from its creation and one with neither as started before (REQ-PATCH-006).
    *
    * @param statuses the statuses to count
    * @param liveAt the instant, exclusive
    * @return the number of such orders of every member
    */
   @Query(
-      "SELECT COUNT(r) FROM RefineryOrder r WHERE r.status IN :statuses"
-          + " AND COALESCE(r.startedAt, r.createdAt) < :liveAt")
+      "SELECT COUNT(r) FROM RefineryOrder r WHERE r.status IN :statuses" + STARTED_BEFORE_LIVE_AT)
   long countStartedBefore(
       @Param("statuses") Collection<RefineryOrderStatus> statuses, @Param("liveAt") Instant liveAt);
 
   /**
    * Row-locks the orders in the given statuses that started before an instant, in ascending id
-   * order, an order without a start counting from its creation (REQ-PATCH-006).
+   * order, an order without a start counting from its creation and one with neither as started
+   * before (REQ-PATCH-006).
    *
    * @param statuses the statuses to lock
    * @param liveAt the instant, exclusive
@@ -210,7 +218,8 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       "SELECT r FROM RefineryOrder r WHERE r.status IN :statuses"
-          + " AND COALESCE(r.startedAt, r.createdAt) < :liveAt ORDER BY r.id")
+          + STARTED_BEFORE_LIVE_AT
+          + " ORDER BY r.id")
   List<RefineryOrder> lockStartedBeforeOrderById(
       @Param("statuses") Collection<RefineryOrderStatus> statuses, @Param("liveAt") Instant liveAt);
 
