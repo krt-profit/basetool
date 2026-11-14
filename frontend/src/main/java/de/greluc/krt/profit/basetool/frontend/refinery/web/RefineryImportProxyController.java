@@ -129,7 +129,7 @@ public class RefineryImportProxyController {
       }
       return "redirect:/refinery-orders/create";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Refinery import relay failed", e);
       redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.failed");
       return "redirect:/refinery-orders/create";

@@ -72,11 +72,13 @@ Beyond roles there are three mechanisms that are easy to miss:
   and one `SessionGateFilter`. The domains implement them; the kernel and the platform name none.
   A gate leaves open the pages and endpoints of every earlier gate, answers each kind of request
   in its own idiom (redirect, AJAX header, SSE event, `4003` socket close), and a backend refusal
-  discards the frontend's cached verdict. Every gate refusal carries the problem property
-  `sessionGate: true`; the frontend kernel tells it by that mark, never by a code, and hands it off
-  also when a page section's `SectionFallback` meets it, except on a gate's own page, which renders
-  the layout the gate refuses and so falls back instead of redirecting to itself. The scripts'
-  header and event lists are pinned against the gate beans.
+  discards the frontend's cached verdict; a socket handshake never reuses that verdict and asks
+  every gate afresh. Every gate refusal carries the problem property `sessionGate: true`; the
+  frontend kernel tells it by that mark, never by a code, and hands it off also when a page
+  section, a handler's fallback or the AJAX relay `BackendErrorResponses` meets it
+  (`SectionFallback#rethrowHandOff`), except on a gate's own page, which renders the layout the
+  gate refuses and so falls back instead of redirecting to itself; the layout chrome degrades. The
+  scripts' header and event lists are pinned against the gate beans.
 - **A security expression is code the compiler cannot check** — every `@bean.method(…)` in a
   `@PreAuthorize` is resolved against the running context in a test, the security beans carry
   explicit names, the SpEL stays constant (REQ-SEC-075), no class calls its own gated method past
@@ -395,7 +397,8 @@ kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE r
 `TypedBackendClientTest`). `BackendErrorMapper` maps every failed `BackendApiClient` call in one
 exhaustive switch and `GlobalExceptionHandler` answers it; a `web` handler adds no catch-all of its
 own, a page section that may fail alone goes through `SectionFallback`, which lets a lost session
-reach the login and a session gate's refusal reach the gate, and the broad catch clauses that
+reach the login and a session gate's refusal reach the gate — so does a remaining custom fallback
+through `SectionFallback#rethrowHandOff` and the AJAX relay `BackendErrorResponses` — and the broad catch clauses that
 remain are frozen per file and only shrink (REQ-FE-036, `BroadCatchRatchetTest`). A runtime value enters a backend URI only as a template variable, for every
 verb (REQ-SEC-051, `WriteUriTemplateTest` and `ReadUriTemplateTest`). The first filter of all four refuses any request whose scheme, host
 and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —

@@ -168,31 +168,41 @@
                         </fieldset>
                     </form>
 
-                    <form id="profile-home-location-form" th:action="@{/profile/home-location}" method="post" th:object="${profileHomeLocationForm}"
-                          th:data-section-name="#{profile.homeLocation.label}">
-                        <input type="hidden" name="version" th:field="*{version}">
-                        <fieldset class="form-section" id="profile-section-home-location">
-                            <legend class="form-section__head">
-                                <span th:text="'6 · ' + #{profile.homeLocation.label}">6 · Meine Home Location</span>
-                                <span class="opt" th:text="'· ' + #{form.optional}">· optional</span>
-                            </legend>
-                            <div class="form-group">
-                                <label for="homeLocationId" class="form-label" th:text="#{profile.homeLocation.field}">Home Location</label>
-                                <select id="homeLocationId" name="homeLocationId" data-testid="profile-home-location-select"
-                                        th:disabled="${#lists.isEmpty(homeLocationOptions)}">
-                                    <option value="" disabled th:selected="*{homeLocationId == null}" th:text="#{profile.homeLocation.placeholder}">Home Location wählen</option>
-                                    <option th:each="loc : ${homeLocationOptions}" th:value="${loc.id}"
-                                            th:selected="${loc.id == profileHomeLocationForm.homeLocationId}" th:text="${loc.name}">Lorville</option>
-                                </select>
-                                <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.homeLocation.hint}">Füllt den Lagerort vor. Verschiebt nichts.</span></p>
-                                <p class="form-hint" th:if="${#lists.isEmpty(homeLocationOptions)}" data-testid="profile-home-location-empty"
-                                   th:text="#{profile.homeLocation.empty}">Es sind noch keine Home Locations gepflegt.</p>
+                    <div id="profile-section-home-location">
+                        <fieldset class="form-section" th:unless="${homeLocationAvailable}">
+                            <legend class="form-section__head" th:text="'6 · ' + #{profile.homeLocation.label}">6 · Meine Home Location</legend>
+                            <div class="alert alert-warning profile-home-location-warning" role="alert" data-testid="profile-home-location-unavailable">
+                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+                                <p th:text="#{profile.homeLocation.unavailable}">Deine Home Location konnte nicht geladen werden.</p>
                             </div>
-                            <noscript>
-                                <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.homeLocation.save}">Save</button>
-                            </noscript>
                         </fieldset>
-                    </form>
+
+                        <form id="profile-home-location-form" th:action="@{/profile/home-location}" method="post" th:object="${profileHomeLocationForm}"
+                              th:if="${homeLocationAvailable}" th:data-section-name="#{profile.homeLocation.label}">
+                            <input type="hidden" name="version" th:field="*{version}">
+                            <fieldset class="form-section">
+                                <legend class="form-section__head">
+                                    <span th:text="'6 · ' + #{profile.homeLocation.label}">6 · Meine Home Location</span>
+                                    <span class="opt" th:text="'· ' + #{form.optional}">· optional</span>
+                                </legend>
+                                <div class="form-group">
+                                    <label for="homeLocationId" class="form-label" th:text="#{profile.homeLocation.field}">Home Location</label>
+                                    <select id="homeLocationId" name="homeLocationId" data-testid="profile-home-location-select"
+                                            th:disabled="${#lists.isEmpty(homeLocationOptions)}">
+                                        <option value="" disabled th:selected="*{homeLocationId == null}" th:text="#{profile.homeLocation.placeholder}">Home Location wählen</option>
+                                        <option th:each="loc : ${homeLocationOptions}" th:value="${loc.id}"
+                                                th:selected="${loc.id == profileHomeLocationForm.homeLocationId}" th:text="${loc.name}">Lorville</option>
+                                    </select>
+                                    <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.homeLocation.hint}">Füllt den Lagerort vor. Verschiebt nichts.</span></p>
+                                    <p class="form-hint" th:if="${#lists.isEmpty(homeLocationOptions)}" data-testid="profile-home-location-empty"
+                                       th:text="#{profile.homeLocation.empty}">Es sind noch keine Home Locations gepflegt.</p>
+                                </div>
+                                <noscript>
+                                    <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.homeLocation.save}">Save</button>
+                                </noscript>
+                            </fieldset>
+                        </form>
+                    </div>
 
                     <div class="form-actions--sticky profile-save-bar" id="profile-save-bar" data-testid="profile-save-bar" hidden>
                         <span class="form-actions__summary" id="profile-save-summary" data-testid="profile-save-summary"

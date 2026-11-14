@@ -53,10 +53,21 @@ change asks could keep using the tool for up to a minute while every backend cal
    request with a gate's `403`, directly or inside a page section, the frontend discards that gate's
    verdict and hands the browser to the gate's page: a redirect for a navigation, a `403` with the
    gate's header for an AJAX caller. The gate is the one in `SessionGates` whose code the refusal
-   carries. A gate's own page is the exception of decision 3.
+   carries. A gate's own page is the exception of decision 3. No shared fallback answers the
+   refusal as an ordinary failure: the AJAX relay `BackendErrorResponses` (`relay`,
+   `propagateBackendError`, `withBackendStatus`) and every custom fallback of a handler, a parallel
+   read's `exceptionally` and `MutationResponseHelper` included, let it through to
+   `GlobalExceptionHandler` with `SectionFallback#rethrowHandOff`. The reauthentication-only guard
+   `SectionFallback#rethrowIfReauthenticationRequired` stays with the code where a gate's refusal
+   must not propagate: the servlet filters, a gate's own status read, the error handler and the
+   layout chrome, which renders on the pages a gate leaves open and so degrades.
 6. **The browser half stays a list of its own.** `krt-fetch.js` and `notifications.js` keep the
    gates' headers and events as constants, and `SessionGateClientParityTest` pins them against the
    gate beans of the running context.
+7. **A WebSocket handshake asks every gate afresh.** `SessionGateFilter` discards a gate's cached
+   verdict before asking it about an upgrade: the socket outlives the verdict, and the frontend
+   authorizes the rooms it holds without a backend call a gate could refuse, so a cached pass would
+   otherwise admit a member a new phase or new wording holds, without the `4003` close.
 
 Paths, AJAX headers, SSE events, the WebSocket hand-off, the session attributes and the metric
 labels stay as they were for both gates.
@@ -68,7 +79,9 @@ labels stay as they were for both gates.
 - The kernel and the platform name no domain gate; `KernelDomainReachTest` lost one frozen reach,
   and `KernelGateCodeReachTest` fails the build when a kernel class file carries a gate's code.
 - A member a patch change asks is sent to the home-location page by the first refused request,
-  a page section's read included, instead of after the cache expires.
+  a page section's read, a fallback and the AJAX relay included, instead of after the cache
+  expires.
+- Opening a live-sync socket costs one status read per gate, also with a fresh cached verdict.
 
 ## Alternatives considered
 
@@ -83,4 +96,6 @@ labels stay as they were for both gates.
 - **A shared problem-type prefix for the gates.** It changes the `type` existing clients already
   see; a new property leaves every field they read as it is.
 - **Evict the cached verdicts from the trigger.** The frontend's sessions live in Redis, keyed by
-  session, not by member; reaching them from the backend's commit would need a new channel.
+  session, not by member; reaching them from the backend's commit would need a new channel. It
+  would also leave the consent gate's window open when new wording comes into force, which no
+  trigger announces; asking afresh at the handshake closes both with the gates' existing reads.

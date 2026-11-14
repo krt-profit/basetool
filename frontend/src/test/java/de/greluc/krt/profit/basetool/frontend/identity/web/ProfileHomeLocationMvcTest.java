@@ -110,8 +110,29 @@ class ProfileHomeLocationMvcTest {
   @Test
   void withoutCuratedLocationsTheSectionSaysSo() throws Exception {
     offer();
+    when(backendApiClient.get(BACKEND, MyHomeLocationResponse.class))
+        .thenReturn(new MyHomeLocationResponse(null, 0L));
 
     assertThat(profile()).contains("data-testid=\"profile-home-location-empty\"");
+  }
+
+  @Test
+  void aFailedSettingReadShowsTheSectionUnavailableWithoutAFormToSave() throws Exception {
+    offer(home(LORVILLE, "Lorville"));
+    when(backendApiClient.get(BACKEND, MyHomeLocationResponse.class))
+        .thenThrow(new BackendServiceException("down", null, 503));
+
+    assertUnavailable(profile());
+  }
+
+  @Test
+  void aFailedOptionsReadShowsTheSectionUnavailableWithoutAFormToSave() throws Exception {
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_HOME), anyTypeRef()))
+        .thenThrow(new BackendServiceException("down", null, 503));
+    when(backendApiClient.get(BACKEND, MyHomeLocationResponse.class))
+        .thenReturn(new MyHomeLocationResponse(LORVILLE, 3L));
+
+    assertUnavailable(profile());
   }
 
   @Test
@@ -193,6 +214,20 @@ class ProfileHomeLocationMvcTest {
         .andReturn()
         .getResponse()
         .getContentAsString();
+  }
+
+  /**
+   * Asserts that the section says it cannot be read and renders nothing to save, so no version the
+   * page never read can be posted; the navigation's anchor still lands on the section.
+   *
+   * @param html the rendered profile page
+   */
+  private static void assertUnavailable(String html) {
+    assertThat(html)
+        .contains("id=\"profile-section-home-location\"")
+        .contains("data-testid=\"profile-home-location-unavailable\"")
+        .doesNotContain("id=\"profile-home-location-form\"")
+        .doesNotContain("data-testid=\"profile-home-location-select\"");
   }
 
   /**

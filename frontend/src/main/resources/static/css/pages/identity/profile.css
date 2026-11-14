@@ -71,16 +71,19 @@
     .profile-save-bar[hidden] {
         display: none;
     }
-    .profile-deletion-warning {
+    .profile-deletion-warning,
+    .profile-home-location-warning {
         display: flex;
         gap: var(--space-3);
         align-items: flex-start;
     }
-    .profile-deletion-warning .krt-icon {
+    .profile-deletion-warning .krt-icon,
+    .profile-home-location-warning .krt-icon {
         flex: none;
         margin-top: 0.1rem;
     }
-    .profile-deletion-warning p {
+    .profile-deletion-warning p,
+    .profile-home-location-warning p {
         margin: 0;
     }
     @media (pointer: coarse) {

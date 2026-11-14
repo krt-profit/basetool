@@ -61,6 +61,7 @@ public class SupplyFeatureState {
       remembered = new Remembered(enabled, Instant.now().plus(TTL));
       return enabled;
     } catch (RuntimeException e) {
+      // Chrome renders on the pages a session gate leaves open, so a gate refusal degrades it.
       SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug("Supply state unavailable: {}", e.getMessage());
       return false;

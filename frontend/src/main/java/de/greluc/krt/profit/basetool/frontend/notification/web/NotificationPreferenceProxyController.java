@@ -74,7 +74,7 @@ public class NotificationPreferenceProxyController {
     try {
       preferences = client.preferences();
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug("Could not load the notification preferences", e);
     }
     model.addAttribute("notificationPrefsUnavailable", preferences == null);

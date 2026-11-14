@@ -141,7 +141,7 @@ public class SpecialCommandMembersPageController {
       log.debug("Load SpecialCommand detail failed", e);
       return "redirect:" + backUrl + "?error=LoadSpecialCommandDetailFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Load SpecialCommand detail failed", e);
       return "redirect:" + backUrl + "?error=LoadSpecialCommandDetailFailed";
     }
@@ -177,7 +177,7 @@ public class SpecialCommandMembersPageController {
       }
       return "redirect:" + PAGE_BASE + id + "?error=AddMemberFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Add SpecialCommand member failed", e);
       return "redirect:" + PAGE_BASE + id + "?error=AddMemberFailed";
     }
@@ -204,7 +204,7 @@ public class SpecialCommandMembersPageController {
       orgUnitClient.removeSpecialCommandMember(id, userId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Remove SpecialCommand member failed", e);
       return "redirect:" + PAGE_BASE + id + "?error=RemoveMemberFailed";
     }
@@ -241,7 +241,7 @@ public class SpecialCommandMembersPageController {
       }
       return "redirect:" + PAGE_BASE + id + "?error=PatchMemberFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Patch SpecialCommand member flags failed", e);
       return "redirect:" + PAGE_BASE + id + "?error=PatchMemberFailed";
     }

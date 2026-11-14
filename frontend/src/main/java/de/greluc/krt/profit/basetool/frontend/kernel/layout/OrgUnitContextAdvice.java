@@ -129,6 +129,7 @@ public class OrgUnitContextAdvice {
           backendApiClient.getCached(CachedCatalog.SQUADRONS, SQUADRON_PAGE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception ex) {
+      // Chrome renders on the pages a session gate leaves open, so a gate refusal degrades it.
       SectionFallback.rethrowIfReauthenticationRequired(ex);
       log.debug("Failed to load squadron list for sidebar dropdown", ex);
       return List.of();
