@@ -987,7 +987,10 @@ not silent — so the only detector was a human reading a log export.
   restricted to the client role `grafana-admin` of the `grafana` client (`ROLES_AND_PERMISSIONS.md`):
   the client's `client roles` mapper puts it into the ID token and userinfo as `grafana_roles`, and
   `GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH` maps it to Grafana's server admin under
-  `ROLE_ATTRIBUTE_STRICT`. The provisioner creates the role; it is assigned by hand to the few
+  `ROLE_ATTRIBUTE_STRICT`. Keycloak is Grafana's **only** sign-in: the username/password form
+  (`GF_AUTH_DISABLE_LOGIN_FORM`) and HTTP basic auth (`GF_AUTH_BASIC_ENABLED`) are off, and
+  `GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN` sends `/login` straight to Keycloak; service accounts keep
+  their bearer tokens. The provisioner creates the role; it is assigned by hand to the few
   Grafana admins and is independent of the Basetool's own roles. No other monitoring component
   (Prometheus, Alertmanager, Loki, Tempo, exporters) has a public route. Inside the host, two ports
   are published on **loopback only** so the host-native Alloy can reach them (`loki` on
