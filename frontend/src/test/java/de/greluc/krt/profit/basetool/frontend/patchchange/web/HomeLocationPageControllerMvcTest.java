@@ -89,7 +89,8 @@ class HomeLocationPageControllerMvcTest {
       new HomeLocationOptionDto(
           UUID.fromString("10c4710c-0000-4000-8000-000000000002"), "Levski", "Nyx");
 
-  private static final String CHOICE_JSON = "{\"locationId\":\"" + LORVILLE.id() + "\"}";
+  private static final String CHOICE_JSON =
+      "{\"locationId\":\"" + LORVILLE.id() + "\",\"patchChangeId\":\"" + PATCH_CHANGE + "\"}";
 
   @Autowired private WebApplicationContext context;
 
@@ -193,6 +194,48 @@ class HomeLocationPageControllerMvcTest {
 
   @Test
   @WithMockUser
+  void thePageNamesThePhaseItShowsAndSaysWhenAChoiceMetAnotherOne() throws Exception {
+    when(backendApiClient.get(PROMPT, HomeLocationPromptDto.class))
+        .thenReturn(pending(List.of(LORVILLE)));
+
+    assertThat(renderPage())
+        .contains("data-patch-change-id=\"" + PATCH_CHANGE + "\"")
+        .doesNotContain("data-testid=\"hl-phase-changed\"");
+    assertThat(
+            mockMvc
+                .perform(get(PAGE).param("phaseChanged", "true"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString())
+        .contains("data-testid=\"hl-phase-changed\"")
+        .contains("Inzwischen läuft eine neue Abfrage.");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void aPendingAdminWithoutALocationOnOfferIsShownTheWayToRecoverThePhase() throws Exception {
+    when(backendApiClient.get(PROMPT, HomeLocationPromptDto.class)).thenReturn(pending(List.of()));
+
+    assertThat(renderPage())
+        .contains("data-testid=\"hl-no-locations\"")
+        .contains("data-testid=\"hl-admin-recovery\"")
+        .contains("href=\"/admin/settings/patch-change\"")
+        .contains("href=\"/admin/locations\"");
+  }
+
+  @Test
+  @WithMockUser
+  void aPendingMemberWithoutALocationOnOfferIsShownNoAdminWay() throws Exception {
+    when(backendApiClient.get(PROMPT, HomeLocationPromptDto.class)).thenReturn(pending(List.of()));
+
+    assertThat(renderPage())
+        .contains("data-testid=\"hl-no-locations\"")
+        .doesNotContain("data-testid=\"hl-admin-recovery\"");
+  }
+
+  @Test
+  @WithMockUser
   void showingAPendingPromptDropsTheGatesCachedVerdict() throws Exception {
     when(backendApiClient.get(PROMPT, HomeLocationPromptDto.class))
         .thenReturn(pending(List.of(LORVILLE)));
@@ -251,7 +294,9 @@ class HomeLocationPageControllerMvcTest {
   @WithMockUser
   void theChoiceIsRelayedAnswersWhatMovedAndDropsTheGatesCachedVerdict() throws Exception {
     when(backendApiClient.post(
-            PROMPT, new ChooseHomeLocationRequest(LORVILLE.id()), RelocationResultDto.class))
+            PROMPT,
+            new ChooseHomeLocationRequest(LORVILLE.id(), PATCH_CHANGE),
+            RelocationResultDto.class))
         .thenReturn(new RelocationResultDto(LORVILLE, 12, 1));
     MockHttpSession session = new MockHttpSession();
     session.setAttribute(GATE_VERDICT, 1L);

@@ -251,7 +251,7 @@ class PatchChangeBackendClientTest {
 
     HomeLocationPromptDto prompt = client.myHomeLocationPrompt();
     RelocationResultDto result =
-        client.chooseMyHomeLocation(new ChooseHomeLocationRequest(LORVILLE.id()));
+        client.chooseMyHomeLocation(new ChooseHomeLocationRequest(LORVILLE.id(), ID));
 
     assertThat(prompt).isNotNull();
     assertThat(prompt.state()).isEqualTo(MemberRelocationState.PENDING);
@@ -270,7 +270,7 @@ class PatchChangeBackendClientTest {
     backend.expect(
         "POST",
         "/api/v1/patch-changes/me/home-location",
-        "{\"locationId\":\"" + LORVILLE.id() + "\"}");
+        "{\"locationId\":\"" + LORVILLE.id() + "\",\"patchChangeId\":\"" + ID + "\"}");
   }
 
   @Test
@@ -290,7 +290,7 @@ class PatchChangeBackendClientTest {
 
     HomeLocationPromptDto prompt = client.memberHomeLocationPrompt(MEMBER);
     RelocationResultDto result =
-        client.chooseMemberHomeLocation(MEMBER, new ChooseHomeLocationRequest(LORVILLE.id()));
+        client.chooseMemberHomeLocation(MEMBER, new ChooseHomeLocationRequest(LORVILLE.id(), ID));
 
     assertThat(prompt).isNotNull();
     assertThat(prompt.state()).isEqualTo(MemberRelocationState.PENDING);
@@ -299,7 +299,7 @@ class PatchChangeBackendClientTest {
     backend.expect(
         "POST",
         "/api/v1/patch-changes/admin/members/" + MEMBER + "/home-location",
-        "{\"locationId\":\"" + LORVILLE.id() + "\"}");
+        "{\"locationId\":\"" + LORVILLE.id() + "\",\"patchChangeId\":\"" + ID + "\"}");
   }
 
   @Test
@@ -314,7 +314,7 @@ class PatchChangeBackendClientTest {
     assertThat(prompt.locations()).isEmpty();
     assertThat(prompt.preview()).isEmpty();
     assertThatThrownBy(
-            () -> client.chooseMyHomeLocation(new ChooseHomeLocationRequest(LORVILLE.id())))
+            () -> client.chooseMyHomeLocation(new ChooseHomeLocationRequest(LORVILLE.id(), ID)))
         .isInstanceOfSatisfying(
             BackendServiceException.class,
             failure -> assertThat(failure.getStatusCode()).isEqualTo(409));

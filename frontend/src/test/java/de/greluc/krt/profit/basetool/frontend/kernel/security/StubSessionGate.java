@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 /** A session gate whose verdict a test sets, recording how often it was asked and forgotten. */
@@ -29,6 +30,7 @@ public final class StubSessionGate implements SessionGate {
   private final String ajaxHeader;
   private final String sseEvent;
   private final String problemCode;
+  private List<String> adminPages = List.of();
   private boolean holding;
   private boolean knownHolding;
   private int asked;
@@ -61,6 +63,17 @@ public final class StubSessionGate implements SessionGate {
    */
   public @NotNull StubSessionGate holding(boolean holding) {
     this.holding = holding;
+    return this;
+  }
+
+  /**
+   * Sets the pages the gate leaves open to an admin it holds.
+   *
+   * @param pages the pages, as path patterns
+   * @return this gate
+   */
+  public @NotNull StubSessionGate adminPages(@NotNull String... pages) {
+    this.adminPages = List.of(pages);
     return this;
   }
 
@@ -111,6 +124,11 @@ public final class StubSessionGate implements SessionGate {
   @Override
   public @NotNull String problemCode() {
     return problemCode;
+  }
+
+  @Override
+  public @NotNull List<String> adminPages() {
+    return adminPages;
   }
 
   @Override

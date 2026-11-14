@@ -25,8 +25,10 @@ import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBack
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationStatusDto;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -37,7 +39,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>A verdict that lets the member through is cached per session for {@link #RECHECK_MILLIS}; a
  * verdict that holds the member is never cached, so the choice frees the member on the next
- * request. A backend failure lets the member through.
+ * request. A backend failure lets the member through. A pending admin keeps the phase's recovery
+ * pages (REQ-PATCH-063).
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -62,11 +65,23 @@ public class HomeLocationGate implements SessionGate {
   /** How long a verdict that lets the member through may be reused. */
   static final long RECHECK_MILLIS = 60_000L;
 
+  /**
+   * The pages a pending admin may still reach to recover a phase that offers no home location
+   * (REQ-PATCH-063): the patch-change page with the phase end, and the location curation.
+   */
+  static final List<String> ADMIN_PAGES =
+      List.of(AdminPatchChangePageController.PAGE + "/**", "/admin/locations/**");
+
   private final PatchChangeBackendClient patchChangeClient;
 
   @Override
   public @NotNull String pagePath() {
     return PAGE_PATH;
+  }
+
+  @Override
+  public @NotNull @Unmodifiable List<String> adminPages() {
+    return ADMIN_PAGES;
   }
 
   @Override

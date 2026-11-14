@@ -21,6 +21,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import {
     markStaying,
+    phaseChanged,
     readRelocationMessages,
     relocationSummary,
 } from '/js/patchchange/home-location-common.js';
@@ -28,6 +29,9 @@ import { format } from '/js/patchchange/patch-change-messages.js';
 
 /** The page's path, also the relay of the choice. */
 const PAGE_URL = '/home-location';
+
+/** The page read again after a choice for a phase that is no longer the open one. */
+const PHASE_CHANGED_URL = PAGE_URL + '?phaseChanged=true';
 
 /**
  * The localized strings of the home-location page, read once from the `#hl-i18n` holder.
@@ -59,7 +63,8 @@ function readHomeLocationMessages() {
  * Wires the member's home-location page (REQ-PATCH-022): choosing a card names the location in
  * the call to action and marks the preview row that stays; the confirmation relays the final
  * choice, then shows in place what moved and the way on into the tool, which the member follows
- * (REQ-FE-001); a refusal shows the backend's reason in place.
+ * (REQ-FE-001); a refusal shows the backend's reason in place. The choice names the phase the page
+ * shows; when another phase is open by then, the page is read again (REQ-PATCH-062).
  */
 function initHomeLocation() {
     const formEl = document.getElementById('hl-form');
@@ -152,13 +157,17 @@ function initHomeLocation() {
         krtFetch.write({
             method: 'POST',
             url: PAGE_URL,
-            payload: { locationId: radio.value },
+            payload: { locationId: radio.value, patchChangeId: form.dataset.patchChangeId },
             toast: false,
             submitter: submit,
             onSuccess(/** @type {ApiDto<'RelocationResultDto'> | null} */ body) {
                 showRelocated(relocationSummary(i18n.relocation, body, name));
             },
             onError(_status, /** @type {ApiProblem | null} */ problem) {
+                if (phaseChanged(problem)) {
+                    window.location.assign(PHASE_CHANGED_URL);
+                    return true;
+                }
                 showError(problem && problem.detail ? problem.detail : i18n.error);
                 return true;
             },
