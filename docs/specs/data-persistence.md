@@ -1442,14 +1442,22 @@ request and no sync writes it.
 
 - **The UEX vehicle sync** resolves by `external_uuid`, then `uex_vehicle_id`, then the aliased
   class name when exactly one ship type carries it, then the name, and only then seeds.
-- **The SC Wiki vehicle sync** resolves by `external_uuid`, then the ship type that holds the UEX
-  vehicle id aliased to its class name, then the name when only one Wiki vehicle carries it. A Wiki
+- **The SC Wiki vehicle sync** resolves by `external_uuid`, then the ship type whose `p4k_uuid` is
+  the Wiki vehicle's UUID, then the ship type that holds the UEX vehicle id aliased to its class
+  name, then the name when only one Wiki vehicle carries it (ADR-0379). A Wiki
   vehicle whose name several Wiki vehicles share (`AEGS_Hammerhead` / `AEGS_Hammerhead_GS`) and a
   stored ship type already holds stays unlinked and is reported as `SOURCE_IDENTITY_CONFLICT`; it
   never seeds a second row of that name, which `ship_type.name`'s unique key would refuse. When the
-  holding row is linked to another vehicle of the same census, the variant counts as covered and
-  leaves the census complete, so the REQ-DATA-014 sweep still runs; a holder without a game UUID or
-  with one the census lacks keeps the run incomplete.
+  holding row's game UUID or P4K GUID belongs to a vehicle of the same census, the variant counts
+  as covered and leaves the census complete, so the REQ-DATA-014 sweep still runs; a holder without
+  a game UUID or with one the census lacks keeps the run incomplete, with two exceptions:
+  - **A game UUID change follows the P4K GUID.** A ship type found through its `p4k_uuid` whose
+    `external_uuid` the census no longer carries moves to the Wiki vehicle's UUID, reported as
+    `VEHICLE_RELINKED`. A game UUID the census still carries is never moved; that stays a conflict.
+  - **A name held by a departed vehicle of another class** — the holder's game UUID is absent from
+    the census and its class name differs from the Wiki vehicle's — is reported as
+    `SOURCE_IDENTITY_CONFLICT` and leaves the Wiki vehicle unlinked, but keeps the census complete.
+    Without both class names, or with equal ones, it stays a blocking conflict.
 - **The P4K import** resolves by `external_uuid`, then the class name, and when no row carries the
   class name, the ship type that holds the aliased UEX vehicle id, then the name.
 - A row matched through the alias keeps its own `name`; each source writes only its own columns, as
@@ -1470,6 +1478,11 @@ request and no sync writes it.
   is already stored, it is reported as an identity conflict and no insert reaches the database.
 - [x] A variant whose shared name a sibling of the same census holds does not block the sweep; a
   holder outside the census does.
+- [x] A ship type whose game UUID left a complete census follows the Wiki vehicle carrying its P4K
+  GUID, and a variant sharing its name counts as covered in either order; a P4K GUID match never
+  moves a game UUID the census still carries.
+- [x] A name held by a departed vehicle of another class is reported without blocking the sweep;
+  the same class name still blocks it.
 - [x] The V310 merge moves every reference onto the survivor, carries the UEX columns over, bumps
   the versions and deletes the UEX half; a half that is not `UEX_ONLY`, or an ambiguous class name,
   merges nothing.
