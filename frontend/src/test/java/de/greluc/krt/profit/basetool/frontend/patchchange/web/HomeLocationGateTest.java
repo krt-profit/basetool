@@ -137,6 +137,22 @@ class HomeLocationGateTest {
   }
 
   @Test
+  void aWebSocketHandshakeAsksTheBackendDespiteACachedPass() throws Exception {
+    when(patchChangeClient.myHomeLocationStatus())
+        .thenReturn(new HomeLocationStatusDto(false), new HomeLocationStatusDto(true));
+    invoke(request("GET", "/missions"));
+    MockHttpServletRequest handshake = request("GET", "/ws/sync");
+    handshake.addHeader("Upgrade", "websocket");
+
+    invoke(handshake);
+
+    assertThat(SessionGateHandoff.gateUrl(handshake))
+        .as("a phase that opened after the cached pass marks the socket for its 4003 close")
+        .isEqualTo("/home-location");
+    verify(patchChangeClient, times(2)).myHomeLocationStatus();
+  }
+
+  @Test
   void leavesTheGatePagesOpen() throws Exception {
     stubRequired(true);
 

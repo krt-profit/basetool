@@ -147,7 +147,7 @@ public class ProfileController {
         }
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.warn(
           "Could not load the caller's user row for the profile page; showing token claims", e);
     }
@@ -163,7 +163,7 @@ public class ProfileController {
         payoutVersion = pref.version();
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Could not load the default payout preference; defaulting the selector to PAYOUT", e);
     }
@@ -181,7 +181,7 @@ public class ProfileController {
         }
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Could not load the global blueprint-sharing flag; defaulting the toggle to off", e);
     }
@@ -196,7 +196,7 @@ public class ProfileController {
         withholdingVersion = withholding.version();
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug("Could not load the name withholding; defaulting the toggle to off", e);
     }
 
@@ -207,7 +207,7 @@ public class ProfileController {
         rsiHandle = handle.rsiHandle();
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug("Could not load the RSI handle; the field starts empty", e);
     }
 
@@ -269,7 +269,7 @@ public class ProfileController {
     try {
       deletionRequest = identityClient.myDeletionRequest();
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug("Could not load the member's deletion request; the card says so", e);
       deletionRequestUnavailable = true;
     }
@@ -278,13 +278,17 @@ public class ProfileController {
   }
 
   /**
-   * Adds the section "my home location": the curated options and the form with the stored choice
-   * and its own version.
+   * Adds the section "my home location": whether it could be read and, when it could, the curated
+   * options and the form with the stored choice and its own version.
    *
    * @param model the profile model
    */
   private void addHomeLocationSection(@NotNull Model model) {
     ProfileHomeLocationSection homeLocation = homeLocationReader.profileSection();
+    model.addAttribute("homeLocationAvailable", homeLocation.available());
+    if (!homeLocation.available()) {
+      return;
+    }
     model.addAttribute("homeLocationOptions", homeLocation.options());
     model.addAttribute(
         "profileHomeLocationForm",
@@ -332,7 +336,7 @@ public class ProfileController {
       }
       return "redirect:/profile";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       return "redirect:/profile";
@@ -423,7 +427,7 @@ public class ProfileController {
       }
       return "redirect:/profile";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       return "redirect:/profile";
@@ -514,7 +518,7 @@ public class ProfileController {
       }
       return "redirect:/profile";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       return "redirect:/profile";
@@ -600,7 +604,7 @@ public class ProfileController {
         redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Name-withholding update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
     }
@@ -646,7 +650,7 @@ public class ProfileController {
         redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("RSI handle update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
     }
@@ -680,7 +684,7 @@ public class ProfileController {
         return me.version();
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.warn("Could not re-read the caller's user-row version; assuming the next one", e);
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;

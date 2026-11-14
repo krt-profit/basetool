@@ -267,7 +267,7 @@ public class PersonalInventoryBlueprintsPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.noteUpdated");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to update blueprint note {}", id, e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.blueprints.error.update"));
@@ -290,7 +290,7 @@ public class PersonalInventoryBlueprintsPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removed");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to remove blueprint {}", id, e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.blueprints.error.remove"));
@@ -313,7 +313,7 @@ public class PersonalInventoryBlueprintsPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removedAll");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to clear all owned blueprints", e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.blueprints.error.removeAll"));

@@ -352,6 +352,26 @@ class TermsGateTest {
   }
 
   /**
+   * A socket outlives a cached "accepted", so its handshake asks the backend again: wording that
+   * came into force after the cached verdict marks the socket for its {@code 4003} close.
+   */
+  @Test
+  void aWebSocketHandshakeAsksTheBackendDespiteACachedAcceptance() throws Exception {
+    when(identityClient.termsStatus())
+        .thenReturn(new TermsStatusDto(true, "v1"), new TermsStatusDto(false, "v2"));
+    MockHttpServletRequest handshake = webSocketHandshake();
+    MockHttpServletRequest page = new MockHttpServletRequest("GET", "/missions");
+    page.setRequestURI("/missions");
+    page.setSession(handshake.getSession());
+    filter.doFilter(page, new MockHttpServletResponse(), filterChain);
+
+    filter.doFilter(handshake, new MockHttpServletResponse(), filterChain);
+
+    assertThat(SessionGateHandoff.gateUrl(handshake)).isEqualTo("/terms/accept");
+    verify(identityClient, times(2)).termsStatus();
+  }
+
+  /**
    * The handoff is keyed on the upgrade, not on the path: an ordinary navigation to the same path
    * is still redirected. Guards against a future "skip {@code /ws/**}" shortcut, which would leave
    * the socket connected and un-refused.

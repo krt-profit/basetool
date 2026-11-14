@@ -46,7 +46,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * BackendRoleSyncFilter}. Assets, public documents, the authentication plumbing, the legal pages,
  * the approval waiting page and the pages of the gates up to the one asked are never held. An
  * anonymous visitor and the {@code test} profile pass. A request for a gate's page is marked as
- * {@link GatePageRequest}.
+ * {@link GatePageRequest}. A WebSocket handshake asks every gate afresh, never from a cached
+ * verdict.
  */
 @Slf4j
 @Component
@@ -81,7 +82,7 @@ public class SessionGateFilter extends OncePerRequestFilter {
       }
       boolean holds;
       try {
-        holds = gate.holds(request);
+        holds = holds(gate, request);
       } catch (ReauthenticationRequiredException _) {
         if (isWebSocketUpgrade(request)) {
           filterChain.doFilter(request, response);
@@ -97,6 +98,23 @@ public class SessionGateFilter extends OncePerRequestFilter {
       }
     }
     filterChain.doFilter(request, response);
+  }
+
+  /**
+   * Asks a gate whether it holds the request. A WebSocket handshake discards the gate's cached
+   * verdict first: the socket outlives that verdict, and the rooms it then holds are authorized
+   * without a backend call the gate could refuse (REQ-PATCH-020, REQ-SEC-028).
+   *
+   * @param gate the gate to ask
+   * @param request the current request
+   * @return {@code true} when the gate holds the request
+   * @throws ReauthenticationRequiredException when the session can no longer reach the backend
+   */
+  private static boolean holds(@NotNull SessionGate gate, @NotNull HttpServletRequest request) {
+    if (isWebSocketUpgrade(request)) {
+      gate.forget(request);
+    }
+    return gate.holds(request);
   }
 
   /**

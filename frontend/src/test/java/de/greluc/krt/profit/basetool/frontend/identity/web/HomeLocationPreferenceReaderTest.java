@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.identity.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
@@ -37,7 +39,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Verifies how the pages read the member's home-location setting (REQ-PATCH-030, REQ-PATCH-033):
- * the form default, and a failed read that degrades to "no choice" instead of failing the page.
+ * the form default, which a failed read degrades to "no choice", and the profile section, which a
+ * failed read marks unavailable; neither fails the page.
  */
 @ExtendWith(MockitoExtension.class)
 class HomeLocationPreferenceReaderTest {
@@ -84,8 +87,27 @@ class HomeLocationPreferenceReaderTest {
 
     ProfileHomeLocationSection section = reader.profileSection();
 
+    assertThat(section.available()).isTrue();
     assertThat(section.homeLocationId()).isNull();
     assertThat(section.version()).isEqualTo(5L);
     assertThat(section.options()).extracting(LocationDto::id).containsExactly(LORVILLE);
+  }
+
+  @Test
+  void aFailedSettingReadMakesTheProfileSectionUnavailableInsteadOfNoChoice() {
+    when(identityClient.myHomeLocation())
+        .thenThrow(new BackendServiceException("down", null, 503, null, null, List.of(), null));
+
+    assertThat(reader.profileSection()).isEqualTo(ProfileHomeLocationSection.UNAVAILABLE);
+    verify(identityClient, never()).homeLocations();
+  }
+
+  @Test
+  void aFailedOptionsReadMakesTheProfileSectionUnavailable() {
+    when(identityClient.myHomeLocation()).thenReturn(new MyHomeLocationResponse(LORVILLE, 3L));
+    when(identityClient.homeLocations())
+        .thenThrow(new BackendServiceException("down", null, 503, null, null, List.of(), null));
+
+    assertThat(reader.profileSection().available()).isFalse();
   }
 }

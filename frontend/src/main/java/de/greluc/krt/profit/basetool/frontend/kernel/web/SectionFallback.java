@@ -42,23 +42,45 @@ import org.slf4j.event.Level;
  * GatePageRequest}), where it falls back so the page cannot send the browser to itself. Every other
  * runtime failure is logged once and answered with the fallback: a mapped {@link
  * BackendServiceException} at {@code DEBUG}, anything else at {@code WARN} or the level the caller
- * names.
+ * names. A custom fallback guards the same way with {@link #rethrowHandOff(Throwable)}.
  */
 public final class SectionFallback {
 
   /** Upper bound on the cause-chain walk for a wrapped failure that must propagate. */
   private static final int MAX_CAUSE_DEPTH = 25;
 
+  /** The section name a custom fallback's propagated session loss carries in its message. */
+  private static final String CUSTOM_FALLBACK = "backend-fallback";
+
   private SectionFallback() {}
 
   /**
-   * Propagates a direct or wrapped session-loss signal before a local fallback handles a failure.
+   * Propagates a direct or wrapped session-loss signal before a local fallback handles a failure,
+   * and nothing else.
+   *
+   * <p>Only for code a session gate's refusal must not leave: a servlet filter, a gate's own status
+   * read, the error handler and the layout chrome, which also renders on the pages a gate leaves
+   * open. A handler's fallback uses {@link #rethrowHandOff(Throwable)}.
    *
    * @param failure the caught failure
    * @throws ReauthenticationRequiredException when the failure carries a reauthentication signal
    */
   public static void rethrowIfReauthenticationRequired(@NotNull Throwable failure) {
-    rethrowReauthSignal("backend-fallback", failure);
+    rethrowReauthSignal(CUSTOM_FALLBACK, failure);
+  }
+
+  /**
+   * Propagates what a handler's fallback never answers, before it handles a failure: a direct or
+   * wrapped session loss, then a session gate's refusal unless a gate's own page is rendering, so
+   * {@link GlobalExceptionHandler} sends the browser to the login or to the gate (ADR-0385).
+   *
+   * @param failure the caught failure
+   * @throws ReauthenticationRequiredException when the failure carries a reauthentication signal
+   * @throws SessionGateRefusalException when the failure carries a gate's refusal and no gate's
+   *     page is rendering
+   */
+  public static void rethrowHandOff(@NotNull Throwable failure) {
+    propagateHandOff(CUSTOM_FALLBACK, failure);
   }
 
   /**
@@ -111,7 +133,7 @@ public final class SectionFallback {
     } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (RuntimeException e) {
-      rethrowHandOff(section, e);
+      propagateHandOff(section, e);
       logFailure(log, unexpectedLevel, section, e);
       return fallback;
     }
@@ -159,7 +181,7 @@ public final class SectionFallback {
     } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (RuntimeException e) {
-      rethrowHandOff(section, e);
+      propagateHandOff(section, e);
       logFailure(log, unexpectedLevel, section, e);
       return false;
     }
@@ -229,7 +251,7 @@ public final class SectionFallback {
    * @throws SessionGateRefusalException when {@code failure}'s cause chain carries a gate's refusal
    *     and no gate's page is rendering
    */
-  private static void rethrowHandOff(@NotNull String section, @NotNull Throwable failure) {
+  private static void propagateHandOff(@NotNull String section, @NotNull Throwable failure) {
     rethrowReauthSignal(section, failure);
     Optional<SessionGateRefusalException> refusal = sessionGateRefusalIn(failure);
     if (refusal.isPresent() && !GatePageRequest.isCurrent()) {

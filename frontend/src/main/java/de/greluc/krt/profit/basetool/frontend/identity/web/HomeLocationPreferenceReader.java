@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileHomeLocation
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,8 @@ import org.springframework.stereotype.Component;
 /**
  * Reads the caller's profile setting "my home location" for the pages that show it: the profile
  * section (REQ-PATCH-030) and the location default of the stock booking, the refinery store and a
- * new ship (REQ-PATCH-033). A failed read degrades to "no choice" and never fails the page.
+ * new ship (REQ-PATCH-033). A failed read never fails the page: a form default degrades to "no
+ * choice", the profile section to unavailable.
  */
 @Component
 @RequiredArgsConstructor
@@ -63,24 +65,36 @@ public class HomeLocationPreferenceReader {
 
   /**
    * Returns what the profile's section shows; a stored choice the profile no longer offers shows as
-   * none, so the select never pretends another location is chosen.
+   * none, so the select never pretends another location is chosen. The section is unavailable
+   * unless the setting and the curated home locations were both read.
    *
-   * @return the stored choice with its version and the curated home locations by name
+   * @return the stored choice with its version and the curated home locations by name, or {@link
+   *     ProfileHomeLocationSection#UNAVAILABLE}
    */
   public @NotNull ProfileHomeLocationSection profileSection() {
     MyHomeLocationResponse stored = stored("profile-home-location");
-    List<LocationDto> offered =
-        SectionFallback.load(
-            log, "profile-home-location-options", identityClient::homeLocations, null);
-    List<LocationDto> options =
-        offered == null ? List.of() : offered.stream().sorted(BY_NAME).toList();
     if (stored == null) {
-      return new ProfileHomeLocationSection(null, 0L, options);
+      return ProfileHomeLocationSection.UNAVAILABLE;
     }
+    Optional<List<LocationDto>> offered =
+        SectionFallback.load(
+            log,
+            "profile-home-location-options",
+            () ->
+                Optional.of(
+                    Objects.requireNonNullElseGet(identityClient.homeLocations(), List::of)),
+            Optional.empty());
+    if (offered.isEmpty()) {
+      return ProfileHomeLocationSection.UNAVAILABLE;
+    }
+    List<LocationDto> options = offered.get().stream().sorted(BY_NAME).toList();
     UUID chosen = stored.homeLocationId();
     boolean offeredStill = options.stream().anyMatch(option -> option.id().equals(chosen));
     return new ProfileHomeLocationSection(
-        offeredStill ? chosen : null, stored.version() == null ? 0L : stored.version(), options);
+        true,
+        offeredStill ? chosen : null,
+        stored.version() == null ? 0L : stored.version(),
+        options);
   }
 
   /**

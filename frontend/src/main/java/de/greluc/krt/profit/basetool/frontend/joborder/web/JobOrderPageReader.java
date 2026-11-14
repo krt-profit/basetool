@@ -660,7 +660,7 @@ public class JobOrderPageReader {
     try {
       CompletableFuture.allOf(futures).join();
     } catch (CompletionException e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       throw e;
     }
   }
