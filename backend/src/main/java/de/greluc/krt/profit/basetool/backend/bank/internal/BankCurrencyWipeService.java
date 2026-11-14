@@ -45,7 +45,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>An account or holder whose later debits exceed its later credits would go below zero by that
  * offset; its offset then stops at zero ({@link BankWipeOffsets}). The request locks come before
- * the account locks, as in a request's confirmation.
+ * the account locks, as in a request's confirmation, and every holder is locked after the accounts
+ * before a balance is read, so no custody move lands between the read and the reset.
  */
 @Service
 @RequiredArgsConstructor
@@ -54,7 +55,7 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   /** The sections of an account's detail room the reset changes. */
   private static final List<String> ACCOUNT_SECTIONS = List.of("account", "bookings", "chart");
 
-  private final BankAccountRepository accounts;
+  private final BankPostingWriter writer;
   private final BankPostingRepository postings;
   private final BankHolderPostingRepository holderPostings;
   private final BankWipeResetBooking resetBooking;
@@ -74,7 +75,7 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull Effect apply(@NotNull Instant liveAt, @NotNull UUID patchChangeId) {
     int cancelled = requests.cancelUnlinkedBefore(liveAt, patchChangeId);
-    List<BankAccount> locked = accounts.findAllForUpdateOrderById();
+    List<BankAccount> locked = writer.lockLedger();
     BankWipeOffsets accountOffsets = accountOffsets(liveAt);
     BankWipeOffsets holderOffsets = holderOffsets(liveAt);
     BankWipeResetBooking.Booked booked =

@@ -27,7 +27,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -82,6 +84,34 @@ public class BankPostingWriter {
   }
 
   /**
+   * Locks every account and then every holder, each in id order, for a wipe reset that reads and
+   * offsets the whole ledger (REQ-BANK-013, REQ-PATCH-041): every booking, a custody move without an
+   * account leg included, waits until the reset ends.
+   *
+   * @return every account, locked, in id order
+   */
+  public List<BankAccount> lockLedger() {
+    List<BankAccount> accounts = accountRepository.findAllForUpdateOrderById();
+    holderRepository.findAllForUpdateOrderById();
+    return accounts;
+  }
+
+  /**
+   * Locks the holders a booking moves custody between, in id order and after the booking's account
+   * locks, so the booking and a wipe reset take turns (REQ-BANK-031, REQ-PATCH-041).
+   *
+   * @param holderIds the holders the booking posts to; may be empty
+   * @return holder id to locked entity for every id that exists
+   */
+  public Map<UUID, BankHolder> lockHolders(@NotNull Collection<UUID> holderIds) {
+    if (holderIds.isEmpty()) {
+      return Map.of();
+    }
+    return holderRepository.findAllByIdForUpdateOrderById(Set.copyOf(holderIds)).stream()
+        .collect(Collectors.toMap(BankHolder::getId, holder -> holder));
+  }
+
+  /**
    * Resolves a holder or fails with 404.
    *
    * @param holderId the holder id
@@ -93,7 +123,8 @@ public class BankPostingWriter {
   }
 
   /**
-   * Resolves a holder from a map pre-loaded by {@link #loadHolders(Collection)}.
+   * Resolves a holder from a map pre-loaded by {@link #loadHolders(Collection)} or {@link
+   * #lockHolders(Collection)}.
    *
    * @param holders the pre-loaded holder map
    * @param holderId the holder to resolve
