@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntSupplier;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
@@ -45,7 +46,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Persists an independent start and finish around each catalogue application attempt. */
+/**
+ * Persists an independent start and finish around each catalogue application attempt and logs a
+ * partially applied attempt with the counters that made it partial.
+ */
+@Slf4j
 @Service
 public class SyncRunService {
 
@@ -238,6 +243,9 @@ public class SyncRunService {
             status.name())
         .increment();
     publishStatus(key, status);
+    if (status == SyncRunStatus.PARTIAL) {
+      logPartial(key, snapshot);
+    }
     if (status == SyncRunStatus.SUCCESS || status == SyncRunStatus.UNCHANGED) {
       lastComplete
           .computeIfAbsent(
@@ -267,6 +275,29 @@ public class SyncRunService {
             .with("skipped", run.getSkipped())
             .with("failed", run.getFailed())
             .with("sweep", run.getSweepOutcome()));
+  }
+
+  /**
+   * Logs which counter made an attempt partial: failed operations, a census an identity or
+   * validation conflict invalidated, or a skipped absence sweep. The records behind a conflict are
+   * in the run's sync report.
+   *
+   * @param key the attempt's source and slice
+   * @param snapshot the attempt's final counters
+   */
+  private static void logPartial(@NotNull RunKey key, @NotNull SyncRunProgress.Snapshot snapshot) {
+    log.warn(
+        "Catalogue attempt {} {} applied partially: fetched={}, valid={}, applied={}, skipped={},"
+            + " failed={}, censusComplete={}, sweep={}",
+        key.source(),
+        key.aggregate(),
+        snapshot.getFetched(),
+        snapshot.getValid(),
+        snapshot.getApplied(),
+        snapshot.getSkipped(),
+        snapshot.getFailed(),
+        snapshot.isCensusComplete(),
+        snapshot.getSweepOutcome());
   }
 
   private void publishStatus(RunKey key, SyncRunStatus currentStatus) {
