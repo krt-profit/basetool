@@ -19,33 +19,25 @@
 
 package de.greluc.krt.profit.basetool.frontend.patchchange.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
-
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.HomeLocationGateFilter;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBackendClient;
-import de.greluc.krt.profit.basetool.frontend.patchchange.model.ChooseHomeLocationRequest;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationPromptDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.MemberRelocationState;
-import de.greluc.krt.profit.basetool.frontend.patchchange.model.RelocationResultDto;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * The member's home-location page {@code /home-location} behind the home-location gate
  * (REQ-PATCH-020, REQ-PATCH-022): the curated home locations, what the relocation would move and
- * the one final choice, relayed to the backend.
+ * the one final choice, which {@link HomeLocationRelayController} relays.
  */
 @Controller
 @UsesLayoutModel
@@ -54,13 +46,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Slf4j
 public class HomeLocationPageController {
 
-  /** The page's view. */
-  static final String VIEW = "patchchange/home-location";
-
   /** The message key shown in place of the choice when the prompt cannot be read. */
   static final String PROMPT_ERROR = "homeLocation.error.load";
 
-  /** Reads the prompt and relays the choice. */
+  /** Reads the prompt. */
   private final PatchChangeBackendClient patchChangeClient;
 
   /**
@@ -80,36 +69,13 @@ public class HomeLocationPageController {
             log, "home-location-prompt", patchChangeClient::myHomeLocationPrompt, null);
     if (prompt == null) {
       model.addAttribute("promptError", PROMPT_ERROR);
-      return VIEW;
+      return "patchchange/home-location";
     }
     if (prompt.state() != MemberRelocationState.PENDING) {
       return "redirect:/";
     }
     HomeLocationGateFilter.clearCachedVerdict(request);
     model.addAttribute("prompt", prompt);
-    return VIEW;
-  }
-
-  /**
-   * Relays the caller's final choice; the page navigates into the tool afterwards.
-   *
-   * @param choice the chosen home location
-   * @param request the current request, whose session caches the gate's verdict
-   * @return what moved, or the relayed backend refusal with its localised detail
-   */
-  @PostMapping(
-      value = HomeLocationGateFilter.GATE_PATH,
-      headers = "X-Requested-With=XMLHttpRequest")
-  @ResponseBody
-  public ResponseEntity<Object> chooseHomeLocation(
-      @RequestBody @NotNull ChooseHomeLocationRequest choice, @NotNull HttpServletRequest request) {
-    return relay(
-        log,
-        "choose the caller's home location (ajax)",
-        () -> {
-          RelocationResultDto result = patchChangeClient.chooseMyHomeLocation(choice);
-          HomeLocationGateFilter.clearCachedVerdict(request);
-          return ResponseEntity.ok(result);
-        });
+    return "patchchange/home-location";
   }
 }

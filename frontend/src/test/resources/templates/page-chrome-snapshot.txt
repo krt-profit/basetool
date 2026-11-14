@@ -398,11 +398,21 @@ orgunit/organisation/special-command-detail.html head-fixed 00150f920b29c0de
 orgunit/organisation/special-command-detail.html head-own <title>Profit Basetool</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/orgunit/organisation-unit-detail.css"><link rel="stylesheet" href="/css/pages/orgunit/organisation-special-command-detail.css">
 orgunit/organisation/special-command-detail.html body <body data-nav-mode="drawer">
 orgunit/organisation/special-command-detail.html parts chrome:414d9d76af1903a4 x-content toast:a1359ecc4bd4b21d x-tail
+patchchange/admin/member-home-location.html html <html lang="de">
+patchchange/admin/member-home-location.html head-fixed 9da8545696a2fbb9
+patchchange/admin/member-home-location.html head-own <title>Home Location des Mitglieds - Profit Basetool</title><link rel="stylesheet" href="/css/patchchange/home-location-preview.css"><link rel="stylesheet" href="/css/pages/patchchange/member-home-location.css">
+patchchange/admin/member-home-location.html body <body data-nav-mode="drawer">
+patchchange/admin/member-home-location.html parts chrome:414d9d76af1903a4 x-content toast:a1359ecc4bd4b21d x-tail
 patchchange/admin/patch-change.html html <html lang="de">
 patchchange/admin/patch-change.html head-fixed 00150f920b29c0de
 patchchange/admin/patch-change.html head-own <title>Patchwechsel - Profit Basetool</title><link rel="stylesheet" href="/css/pages/patchchange/admin-patch-change.css">
 patchchange/admin/patch-change.html body <body data-nav-mode="drawer">
 patchchange/admin/patch-change.html parts chrome:414d9d76af1903a4 x-content toast:a1359ecc4bd4b21d x-tail
+patchchange/home-location.html html <html lang="de">
+patchchange/home-location.html head-fixed a95e054b5349b84d
+patchchange/home-location.html head-own <title>Profit Basetool - Neue Home Location</title><link rel="stylesheet" href="/css/patchchange/home-location-preview.css"><link rel="stylesheet" href="/css/pages/patchchange/home-location.css">
+patchchange/home-location.html body <body data-nav-mode="drawer">
+patchchange/home-location.html parts x-content x-tail
 personalinventory/admin/personal-inventory.html html <html lang="de">
 personalinventory/admin/personal-inventory.html head-fixed d8fe691370413daf
 personalinventory/admin/personal-inventory.html head-own <title>Persönliche Inventare (Admin)</title><link rel="stylesheet" href="/css/personalinventory/personal-inventory.css"><link rel="stylesheet" href="/css/pages/personalinventory/admin-personal-inventory.css">

@@ -402,6 +402,7 @@ public final class ExchangeSeam {
           "PESSIMISTIC_LOCK",
           "CURSOR_EXPIRED",
           "MASS_CHANGE_CONFIRMATION_REQUIRED",
+          "RELOCATION_PENDING",
           "BANK_JUSTIFICATION_REQUIRED",
           "BANK_SELF_TRANSFER",
           "BANK_REQUEST_NOT_PENDING",

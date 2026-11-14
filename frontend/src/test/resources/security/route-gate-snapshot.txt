@@ -346,7 +346,7 @@
 /hangar/{id}/update POST -> HangarPageController#updateShip gate=class:isAuthenticated() layout=yes
 /hangar/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#updateShipAjax gate=class:isAuthenticated() layout=yes
 /home-location GET -> HomeLocationPageController#page gate=class:isAuthenticated() layout=yes
-/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> HomeLocationPageController#chooseHomeLocation gate=class:isAuthenticated() layout=yes
+/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> HomeLocationRelayController#chooseHomeLocation gate=class:isAuthenticated() layout=no
 /impressum GET -> ImpressumController#showImpressum gate=none layout=yes
 /internal/client-error POST -> ClientErrorReportController#report gate=class:isAuthenticated() layout=no
 /inventory GET -> InventoryPageController#viewAggregatedInventory gate=class:isAuthenticated() layout=yes

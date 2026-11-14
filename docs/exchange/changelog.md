@@ -14,6 +14,7 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   of those lots or ships answers `409 RELOCATION_PENDING` and writes nothing, from the member's own
   client and from another member's client on a pool lot the member holds; reads and new stock still
   work ([errors](errors.md#request-errors)). No schema changes.
+
 ## 2026-11-13
 
 - **New: the ship's `origin`.** Every ship in `GET /exchange/v1/me/ships` carries `origin`:

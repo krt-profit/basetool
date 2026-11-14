@@ -306,7 +306,7 @@ public class SecurityConfig {
    * @param actingMemberFilterProvider supplies the acting-member filter, placed after the
    *     bearer-token filter (ADR-0129)
    * @param clientAttribution bounds the {@code client_id} label of the API client request counter
-   * @param homeLocationGateCheck tells the home-location gate which members must still choose
+   * @param homeLocationGate tells the home-location gate which members must still choose
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -326,7 +326,7 @@ public class SecurityConfig {
       ActingMemberFilterProvider actingMemberFilterProvider,
       RateLimitProperties rateLimitProperties,
       ClientAttribution clientAttribution,
-      HomeLocationGateCheck homeLocationGateCheck)
+      HomeLocationGateCheck homeLocationGate)
       throws Exception {
 
     boolean isTest = env.matchesProfiles("test");
@@ -335,6 +335,9 @@ public class SecurityConfig {
     boolean armed =
         !isTest || env.getProperty(TERMS_GATE_ARMED_IN_TEST, Boolean.class, Boolean.FALSE);
     TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : _ -> true;
+    Filter homeLocationFilter =
+        new HomeLocationGateAccessFilter(
+            homeLocationGate, messageSource, problemResponseFactory, objectMapper, meterRegistry);
 
     http.csrf(AbstractHttpConfigurer::disable)
         .cors(AbstractHttpConfigurer::disable)
@@ -466,14 +469,7 @@ public class SecurityConfig {
                 meterRegistry,
                 refusedSubjectWindow),
             PendingApprovalAccessFilter.class)
-        .addFilterAfter(
-            new HomeLocationGateAccessFilter(
-                homeLocationGateCheck,
-                messageSource,
-                problemResponseFactory,
-                objectMapper,
-                meterRegistry),
-            TermsAcceptanceAccessFilter.class)
+        .addFilterAfter(homeLocationFilter, TermsAcceptanceAccessFilter.class)
         .addFilterAfter(
             new SubjectRateLimitingFilter(
                 rateLimitProperties,

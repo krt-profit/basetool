@@ -56,9 +56,6 @@ public class AdminMemberHomeLocationPageController {
   /** The page's path, also the path of its relay endpoint. */
   static final String PAGE = "/admin/members/{userId}/home-location";
 
-  /** The page's view. */
-  static final String VIEW = "patchchange/admin/member-home-location";
-
   /** The {@code fragment} value that renders only the content, for the in-place swap. */
   static final String CONTENT_FRAGMENT = "content";
 
@@ -97,13 +94,13 @@ public class AdminMemberHomeLocationPageController {
       model.addAttribute("prompt", prompt);
     }
     if (CONTENT_FRAGMENT.equals(fragment)) {
-      return VIEW + " :: " + CONTENT_FRAGMENT;
+      return "patchchange/admin/member-home-location :: content";
     }
     UserDto member =
         SectionFallback.load(
             log, "member-home-location-member", () -> patchChangeClient.member(userId), null);
     model.addAttribute("memberName", memberName(member));
-    return VIEW;
+    return "patchchange/admin/member-home-location";
   }
 
   /**

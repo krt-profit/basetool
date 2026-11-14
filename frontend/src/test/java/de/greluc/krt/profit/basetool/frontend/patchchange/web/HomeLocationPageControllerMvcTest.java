@@ -62,10 +62,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC test of {@link HomeLocationPageController} (REQ-PATCH-020, REQ-PATCH-022): a pending member
- * sees the curated home locations and what would move, a member with nothing to choose is sent into
- * the tool, and the final choice reaches the backend, frees the gate's cached verdict and relays a
- * refusal with the backend's localised detail.
+ * MVC test of {@link HomeLocationPageController} and {@link HomeLocationRelayController}
+ * (REQ-PATCH-020, REQ-PATCH-022): a pending member sees the curated home locations and what would
+ * move, a member with nothing to choose is sent into the tool, and the final choice reaches the
+ * backend, frees the gate's cached verdict and relays a refusal with the backend's localised
+ * detail.
  */
 @SpringBootTest
 class HomeLocationPageControllerMvcTest {
