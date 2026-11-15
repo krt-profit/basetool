@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,6 +49,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.test.scheduler.VirtualTimeScheduler;
 
 /** Exercises fast headers, delayed bodies and bounded binary response consumption. */
 class BackendOperationLifetimeTest {
@@ -148,28 +150,47 @@ class BackendOperationLifetimeTest {
   }
 
   @Test
-  void aKnownClientRefusalWithAStalledBodyKeepsItsStatusWithoutRetryOrCircuitFailure() {
+  void aKnownClientRefusalWithAStalledBodyKeepsItsStatusWithoutRetryOrCircuitFailure()
+      throws Exception {
+    Duration deadline = Duration.ofMillis(30);
     AtomicInteger attempts = new AtomicInteger();
+    CountDownLatch bodySubscribed = new CountDownLatch(1);
     CircuitBreakerRegistry circuits = CircuitBreakerRegistry.ofDefaults();
-    BackendCallPolicy policy =
-        policy(Duration.ofMillis(30), BulkheadRegistry.ofDefaults(), circuits);
-    WebClient transport =
-        WebClient.builder()
-            .filter(BackendResponseStatus.observer())
-            .exchangeFunction(_ -> {
-              attempts.incrementAndGet();
-              return Mono.just(
-                  ClientResponse.create(HttpStatus.FORBIDDEN)
-                      .header("Content-Type", "application/problem+json")
-                      .body(Flux.never())
-                      .build());
-            })
-            .build();
+    VirtualTimeScheduler clock = VirtualTimeScheduler.getOrSet();
+    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+      BackendCallPolicy policy = policy(deadline, BulkheadRegistry.ofDefaults(), circuits);
+      WebClient transport =
+          WebClient.builder()
+              .filter(BackendResponseStatus.observer())
+              .exchangeFunction(_ -> {
+                attempts.incrementAndGet();
+                return Mono.just(
+                    ClientResponse.create(HttpStatus.FORBIDDEN)
+                        .header("Content-Type", "application/problem+json")
+                        .body(
+                            Flux.<DataBuffer>never().doOnSubscribe(_ -> bodySubscribed.countDown()))
+                        .build());
+              })
+              .build();
+      var refused =
+          executor.submit(() -> client(transport, policy).get("/forbidden", String.class));
+      try {
+        assertThat(bodySubscribed.await(5, TimeUnit.SECONDS)).isTrue();
+        clock.advanceTimeBy(deadline);
 
-    assertThatThrownBy(() -> client(transport, policy).get("/forbidden", String.class))
-        .isInstanceOfSatisfying(
-            BackendServiceException.class,
-            failure -> assertThat(failure.getStatusCode()).isEqualTo(403));
+        assertThat(refused)
+            .failsWithin(Duration.ofSeconds(5))
+            .withThrowableOfType(ExecutionException.class)
+            .havingCause()
+            .isInstanceOfSatisfying(
+                BackendServiceException.class,
+                failure -> assertThat(failure.getStatusCode()).isEqualTo(403));
+      } finally {
+        refused.cancel(true);
+      }
+    } finally {
+      VirtualTimeScheduler.reset();
+    }
     assertThat(attempts.get()).isEqualTo(1);
     assertThat(circuits.circuitBreaker("backendApi").getMetrics().getNumberOfFailedCalls())
         .isZero();
