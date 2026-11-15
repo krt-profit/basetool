@@ -65,6 +65,24 @@ Beyond roles there are three mechanisms that are easy to miss:
   behind the relay (`ActingMemberFilter`, an explicit list of exchange routes, gated by
   `@exchangeGate`) the member holds a reduced exchange authentication, never their stored roles,
   and every write is journaled, undoable and bounded by a mass-change guard (§8.13).
+- **A step a member must take is a session gate** ([ADR-0385](../adr/0385-session-gates-are-one-spi-the-domains-implement.md))
+  — accepting the Terms of Use (REQ-SEC-028) and choosing a home location after a patch change
+  (REQ-PATCH-020) are gates of one SPI on each side: the backend platform's `SessionGate` with one
+  `SessionGateAccessFilter`, the frontend kernel's `SessionGate` with the ordered `SessionGates`
+  and one `SessionGateFilter`. The domains implement them; the kernel and the platform name none.
+  A gate leaves open the pages and endpoints of every earlier gate, answers each kind of request
+  in its own idiom (redirect, AJAX header, SSE event, `4003` socket close), and a backend refusal
+  discards the frontend's cached verdict; a socket handshake never reuses that verdict and asks
+  every gate afresh. Every gate refusal carries the problem property `sessionGate: true`; the
+  frontend kernel tells it by that mark, never by a code, and hands it off also when a page
+  section, a handler's fallback or own catch arm, or the AJAX relay `BackendErrorResponses` meets
+  it (`SectionFallback#rethrowHandOff`; `SessionGateHandOffArmTest` fails the build on a domain
+  catch arm that answers it itself), except on a gate's own page or a legal page, which render the
+  layout the gate refuses and so fall back and keep the browser; the layout chrome degrades
+  everywhere (`GateExemptPageChromeMvcTest`). The
+  scripts' header and event lists are pinned against the gate beans. A gate may leave its repair
+  open to an admin it holds (`adminExemptPaths`, `adminPages`); for the admin such a page is a gate
+  page, and the browser is never handed off from a page the layout marks as one (REQ-PATCH-063).
 - **A security expression is code the compiler cannot check** — every `@bean.method(…)` in a
   `@PreAuthorize` is resolved against the running context in a test, the security beans carry
   explicit names, the SpEL stays constant (REQ-SEC-075), no class calls its own gated method past
@@ -383,8 +401,10 @@ kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE r
 `TypedBackendClientTest`). `BackendErrorMapper` maps every failed `BackendApiClient` call in one
 exhaustive switch and `GlobalExceptionHandler` answers it; a `web` handler adds no catch-all of its
 own, a page section that may fail alone goes through `SectionFallback`, which lets a lost session
-reach the login, and the broad catch clauses that remain are frozen per file and only shrink
-(REQ-FE-036, `BroadCatchRatchetTest`). A runtime value enters a backend URI only as a template variable, for every
+reach the login and a session gate's refusal reach the gate — so does a remaining custom fallback
+or catch arm through `SectionFallback#rethrowHandOff` (`SessionGateHandOffArmTest`) and the AJAX
+relay `BackendErrorResponses` — and the broad catch clauses that
+remain are frozen per file and only shrink (REQ-FE-036, `BroadCatchRatchetTest`). A runtime value enters a backend URI only as a template variable, for every
 verb (REQ-SEC-051, `WriteUriTemplateTest` and `ReadUriTemplateTest`). The first filter of all four refuses any request whose scheme, host
 and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —
 an absolute URL handed to a client would otherwise carry the token to that host. Future
@@ -645,3 +665,32 @@ rules; [data persistence](../specs/data-persistence.md), [audit](../specs/audit.
 [observability](../specs/observability.md) own their respective contracts. Retained credited-subset
 history is not evidence of a complete original provision or its actual quality. The shared
 read gate and Inventory write gate stay independent; no money/Bank workflow is implied.
+
+## 8.16 The live time of a patch change
+
+A patch change's effects touch only what was created or started before its live time; anything
+later is a post-patch fact and stays
+([ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)). The creation time
+of a stock row is that criterion, so no write may blur it: from the latest live time on, the
+write-time merge skips every older row (REQ-PATCH-004), and the Lager learns the cutoff through the
+SPI `inventory.api.StockMergeCutoff` the `patchchange` module implements. The trigger itself is one
+transaction that takes the history's advisory lock first and lets each effect lock its own rows in
+id order ([ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md)).
+The stock wipe is the transaction's one stock plan and follows the common resource order of every
+stock write; it is a game fact, so an earmarked order with invalid responsibility does not refuse it
+([ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md)).
+For money the same criterion reads the ledgers: the Bank reset offsets the balances from the
+postings before the live time and the aUEC orders book what the facts before it still hold, so
+both keep every later booking
+([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)). An earlier
+wipe's reset and shortages count at that wipe's live time, so a later wipe never takes the same
+money twice; after a standalone Bank reset since the live time the Bank reset offsets nothing,
+because that reset already zeroed the money of the live time. The currency wipe takes the order guards and the purchasing deals before the Bank's
+request locks, and every account and then every holder last, the order every Bank decision
+follows (REQ-BANK-063).
+A relocation is the one write that changes a row's location in place: it keeps every earmark,
+pledge and offer, advances the row's version, and runs once per member under the history's shared
+lock, the hierarchy lock and the lot locks in ascending order; until it ran, the member's rows and
+ships from before the live time are locked against everyone but the member and admins
+([ADR-0383](../adr/0383-a-patch-change-relocation-moves-stock-in-place.md)).
+The contract lives in [`patch-change.md`](../specs/patch-change.md).

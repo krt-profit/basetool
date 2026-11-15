@@ -161,7 +161,7 @@ public class AdminMissionDataPageController {
    * @param e the throwable handed to {@link CompletableFuture#exceptionally}
    */
   private static void logFragmentLoadFailure(String what, Throwable e) {
-    SectionFallback.rethrowIfReauthenticationRequired(e);
+    SectionFallback.rethrowHandOff(e);
     Throwable cause = (e instanceof CompletionException && e.getCause() != null) ? e.getCause() : e;
     if (cause instanceof BackendServiceException) {
       log.debug("Error loading {}", what, cause);
@@ -254,6 +254,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Create JobType failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.jobtype");
@@ -261,7 +262,7 @@ public class AdminMissionDataPageController {
       }
       return "redirect:/admin/mission-data?error=CreateJobTypeFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Create JobType failed", e);
       return "redirect:/admin/mission-data?error=CreateJobTypeFailed";
     }
@@ -308,6 +309,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update JobType failed", e);
       if (e.getStatusCode() == 409) {
         if ("concurrency-conflict".equals(e.getProblemType())) {
@@ -319,7 +321,7 @@ public class AdminMissionDataPageController {
       }
       return "redirect:/admin/mission-data?error=UpdateJobTypeFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update JobType failed", e);
       return "redirect:/admin/mission-data?error=UpdateJobTypeFailed";
     }
@@ -342,6 +344,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Delete JobType failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.jobtype.in_use");
@@ -349,7 +352,7 @@ public class AdminMissionDataPageController {
       }
       return "redirect:/admin/mission-data?error=DeleteJobTypeFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Delete JobType failed", e);
       return "redirect:/admin/mission-data?error=DeleteJobTypeFailed";
     }
@@ -373,10 +376,11 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Activate JobType failed", e);
       return "redirect:/admin/mission-data?error=ActivateJobTypeFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Activate JobType failed", e);
       return "redirect:/admin/mission-data?error=ActivateJobTypeFailed";
     }
@@ -410,7 +414,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Create FrequencyType failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     }
@@ -456,6 +460,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update FrequencyType failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -463,7 +468,7 @@ public class AdminMissionDataPageController {
         redirectAttributes.addFlashAttribute("errorToast", "error.general");
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update FrequencyType failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     }
@@ -486,6 +491,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Delete FrequencyType failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.frequency_type.in_use");
@@ -493,7 +499,7 @@ public class AdminMissionDataPageController {
       }
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Delete FrequencyType failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     }
@@ -517,7 +523,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Activate FrequencyType failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     }

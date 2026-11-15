@@ -90,9 +90,6 @@ public class ExchangeDemandService {
   /** The most raw ores the contract lists per material. */
   private static final int MAX_RAW_REFS = 20;
 
-  /** The longest display name the published item reference carries. */
-  private static final int MAX_NAME = 200;
-
   private static final List<JobOrderStatus> OPEN_STATUSES =
       List.of(JobOrderStatus.OPEN, JobOrderStatus.IN_PROGRESS);
 
@@ -263,7 +260,7 @@ public class ExchangeDemandService {
           raws.computeIfAbsent(
               Objects.requireNonNull(raw.getRefinedMaterial()).getId(), _ -> new ArrayList<>());
       if (list.size() < MAX_RAW_REFS) {
-        list.add(new ExchangeItemRefDto(raw.getId().toString(), cut(raw.getName())));
+        list.add(new ExchangeItemRefDto(raw.getId().toString(), ExchangeNames.cut(raw.getName())));
       }
     }
     return raws;
@@ -342,7 +339,8 @@ public class ExchangeDemandService {
       if (line.open > 0) {
         result.add(
             new ExchangeDemandItemDto(
-                new ExchangeItemRefDto(gameItemId.toString(), cut(line.item.getName())),
+                new ExchangeItemRefDto(
+                    gameItemId.toString(), ExchangeNames.cut(line.item.getName())),
                 ExchangeComponentDto.of(line.item),
                 new ExchangeQuantityDto(
                     ExchangeStockFeedService.amount(line.open, QuantityType.PIECE.name()),
@@ -488,7 +486,8 @@ public class ExchangeDemandService {
             GameItem gameItem = Objects.requireNonNull(gameItems.get(gameItemId));
             lines.add(
                 new ExchangeDemandOrderItemDto(
-                    new ExchangeItemRefDto(gameItemId.toString(), cut(gameItem.getName())),
+                    new ExchangeItemRefDto(
+                        gameItemId.toString(), ExchangeNames.cut(gameItem.getName())),
                     ExchangeComponentDto.of(gameItem),
                     new ExchangeQuantityDto(
                         ExchangeStockFeedService.amount(open, QuantityType.PIECE.name()),
@@ -516,7 +515,7 @@ public class ExchangeDemandService {
    * @return its id as {@code bt} and its name cut to the limit
    */
   private static @NotNull ExchangeItemRefDto ref(@NotNull MaterialDto material) {
-    return new ExchangeItemRefDto(material.id().toString(), cut(material.name()));
+    return new ExchangeItemRefDto(material.id().toString(), ExchangeNames.cut(material.name()));
   }
 
   /**
@@ -533,16 +532,6 @@ public class ExchangeDemandService {
             ? QuantityType.PIECE.name()
             : QuantityType.SCU.name();
     return new ExchangeQuantityDto(ExchangeStockFeedService.amount(amount, unit), unit);
-  }
-
-  /**
-   * Cuts a display name to the published limit.
-   *
-   * @param name the name
-   * @return the name, at most {@value #MAX_NAME} characters
-   */
-  private static @NotNull String cut(@NotNull String name) {
-    return name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name;
   }
 
   /**

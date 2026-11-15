@@ -50,6 +50,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -117,11 +118,11 @@ public class RefineryOrderWriteController {
     String input = raw.trim();
     try {
       return Instant.parse(input);
-    } catch (Exception _) {
+    } catch (DateTimeParseException _) {
     }
     try {
       return OffsetDateTime.parse(input).toInstant();
-    } catch (Exception _) {
+    } catch (DateTimeParseException _) {
     }
     if (input.length() == 10) {
       return LocalDate.parse(input).atStartOfDay(ZoneOffset.UTC).toInstant();
@@ -173,6 +174,7 @@ public class RefineryOrderWriteController {
 
       return "redirect:/refinery-orders";
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "POST /api/v1/refinery-orders", e);
       redirectAttributes.addFlashAttribute(
           "errorToast", failureToastKey(e, "error.refineryorder.create.failed"));
@@ -180,7 +182,7 @@ public class RefineryOrderWriteController {
       return "redirect:/refinery-orders/create"
           + (form.getSource() != null ? "?source=" + form.getSource() : "");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to create refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.create.failed");
       redirectAttributes.addFlashAttribute("refineryOrderForm", form);
@@ -222,13 +224,14 @@ public class RefineryOrderWriteController {
       saveChangedParts(id, request);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.update");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "PUT /api/v1/refinery-orders/{id}", id, e);
       redirectAttributes.addFlashAttribute(
           "errorToast", failureToastKey(e, "error.refineryorder.update.failed"));
       redirectAttributes.addFlashAttribute("refineryOrderForm", form);
       return "redirect:/refinery-orders/" + id;
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to update refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.update.failed");
       redirectAttributes.addFlashAttribute("refineryOrderForm", form);
@@ -269,10 +272,11 @@ public class RefineryOrderWriteController {
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.cancel");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "DELETE /api/v1/refinery-orders/{id}", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.cancel.failed");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to cancel refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.cancel.failed");
     }
@@ -319,13 +323,14 @@ public class RefineryOrderWriteController {
       liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.store");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "POST /api/v1/refinery-orders/{id}/store", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.store.failed");
       redirectAttributes.addFlashAttribute("storeForm", form);
       redirectAttributes.addFlashAttribute("showStoreModal", true);
       return "redirect:/refinery-orders/" + id;
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to store refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.store.failed");
       redirectAttributes.addFlashAttribute("storeForm", form);
@@ -440,7 +445,8 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * Resolves the caller's user id from the token, falling back to the backend's profile read.
+   * Resolves the caller's user id from the token, falling back to the backend's profile read when
+   * the token's subject is no user id.
    *
    * @param principal the authenticated user, or {@code null}
    * @return the user id, or {@code null} when it cannot be determined
@@ -450,17 +456,17 @@ public class RefineryOrderWriteController {
     if (principal == null) {
       return null;
     }
+    UUID fromToken = CurrentUser.userId(principal);
+    if (fromToken != null) {
+      return fromToken;
+    }
     try {
-      return CurrentUser.userId(principal);
-    } catch (Exception _) {
-      try {
-        UserDto me = refineryClient.currentUser();
-        return me != null ? me.id() : null;
-      } catch (Exception e) {
-        SectionFallback.rethrowIfReauthenticationRequired(e);
-        log.warn("Failed to get current user ID from backend: {}", e.getMessage());
-        return null;
-      }
+      UserDto me = refineryClient.currentUser();
+      return me != null ? me.id() : null;
+    } catch (Exception e) {
+      SectionFallback.rethrowHandOff(e);
+      log.warn("Failed to get current user ID from backend: {}", e.getMessage());
+      return null;
     }
   }
 
@@ -618,6 +624,7 @@ public class RefineryOrderWriteController {
       saveChangedParts(id, request);
       return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
     } catch (BackendServiceException bse) {
+      SectionFallback.rethrowHandOff(bse);
       log.debug("Failed to update refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
     }
@@ -648,6 +655,7 @@ public class RefineryOrderWriteController {
       liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
     } catch (BackendServiceException bse) {
+      SectionFallback.rethrowHandOff(bse);
       log.debug("Failed to store refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
     }
@@ -668,6 +676,7 @@ public class RefineryOrderWriteController {
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
     } catch (BackendServiceException bse) {
+      SectionFallback.rethrowHandOff(bse);
       log.debug("Failed to cancel refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
     }
@@ -700,6 +709,7 @@ public class RefineryOrderWriteController {
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
     } catch (BackendServiceException bse) {
+      SectionFallback.rethrowHandOff(bse);
       log.debug("Failed to create refinery order (ajax): {}", bse.getMessage());
       return propagateBackendError(bse);
     }

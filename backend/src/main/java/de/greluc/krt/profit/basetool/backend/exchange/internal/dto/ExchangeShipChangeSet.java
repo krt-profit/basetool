@@ -71,6 +71,8 @@ public record ExchangeShipChangeSet(
    *     one on create
    * @param orgUnitVersion the ship's unit counter the client last saw; required to change the unit
    *     of a ship the server knows
+   * @param origin {@code PLEDGE}, {@code IN_GAME} or {@code UNKNOWN}; {@code null} keeps the stored
+   *     origin, and a new ship without one is {@code UNKNOWN}
    */
   @Schema(name = "ExchangeShipOp")
   public record Op(
@@ -94,7 +96,8 @@ public record ExchangeShipChangeSet(
               maxLength = 128,
               description = "The ship's org unit; null for none, absent to keep it")
           ExchangeOrgUnitChoice orgUnit,
-      @Nullable @Min(0) Long orgUnitVersion) {}
+      @Nullable @Min(0) Long orgUnitVersion,
+      @Nullable @Pattern(regexp = "^(PLEDGE|IN_GAME|UNKNOWN)$") String origin) {}
 
   /**
    * A ship's insurance.

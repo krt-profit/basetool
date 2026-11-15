@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
@@ -220,6 +221,7 @@ public class AdminP4kReportController {
       }
       return user.displayName() != null ? user.displayName() : user.username();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("P4K run admin {} has no readable user record: {}", userId, e.getStatusCode());
       return null;
     }

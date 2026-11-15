@@ -284,6 +284,14 @@ completion under the current target; a cancelled order stays cancelled.
 A no-ledger authorisation has no ledger reversal. Its correction or release uses the ordinary
 authorised actions; no separate revocation queue or workflow is introduced.
 
+**Patch change (amendment, [REQ-PATCH-043](patch-change.md#req-patch-043--waiting-order-bank-attempts-from-before-the-live-time-are-cancelled)).**
+A patch change's currency wipe cancels every attempt waiting since before its live time,
+together with its pending Bank request, with the patch change as the reason. The cancellation
+follows this requirement: it creates no booking and releases the attempt's local binding,
+while an attempt with a reported actual payment keeps its money unavailable until a correction
+or a replacement. It runs whatever the order's status and responsibility, and the attempt
+history shows the patch label.
+
 For reversal of a Bank record linked to an actual player payment, retain effective order amounts
 until a targeted authorised correction establishes the correct facts. Add the visible clarification
 marker; a completed order may remain completed with that marker. Neither game principal nor a

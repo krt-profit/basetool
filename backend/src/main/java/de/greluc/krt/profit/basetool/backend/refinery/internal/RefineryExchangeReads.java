@@ -124,6 +124,7 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
     return new RefineryExchangeOrder(
         order.getId(),
         order.getStatus(),
+        order.getCanceledByPatchChange(),
         Objects.requireNonNullElse(order.getGameDataVersion(), 0L),
         Objects.requireNonNullElse(order.getFinancesVersion(), 0L),
         provenance.getCreatedClient(),

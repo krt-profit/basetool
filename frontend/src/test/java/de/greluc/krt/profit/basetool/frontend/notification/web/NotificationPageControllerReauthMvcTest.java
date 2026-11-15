@@ -28,9 +28,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +59,8 @@ class NotificationPageControllerReauthMvcTest {
                 mock(BackendSideChannels.class),
                 mock(OAuth2AuthorizedClientManager.class),
                 new SimpleMeterRegistry(),
-                SecurityConfig.roleHierarchy()));
+                SecurityConfig.roleHierarchy(),
+                new SessionGates(List.of())));
     ReauthPageMvc.signInMember();
   }
 

@@ -28,8 +28,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The identity's part of the Art. 15 / Art. 20 data export: the member's account, consents,
- * registration decisions, erasure requests and realm roles (REQ-SEC-058).
+ * The identity's part of the Art. 15 / Art. 20 data export: the member's account, home-location
+ * setting, consents, registration decisions, erasure requests and realm roles (REQ-SEC-058).
  */
 @Component
 public class IdentityExportSections implements PersonalDataExportSection {
@@ -59,6 +59,17 @@ public class IdentityExportSections implements PersonalDataExportSection {
                     + " inside a local part would have made the address unusable.")
             .keeping("discord_guild_nickname", "The subject's own nickname; see account.username.")
             .keeping("rsi_handle", "The subject's own RSI handle; see account.username."),
+        new Section(
+                15,
+                "homeLocationPreference",
+                ART_15_20,
+                "Chosen on the profile page or set by the member's latest patch-change relocation.",
+                """
+                SELECT l.name AS home_location, h.updated_at
+                FROM member_home_location h LEFT JOIN location l ON l.id = h.location_id
+                WHERE h.user_id = :userId
+                """)
+            .keeping("home_location", "location.name; see warehouseContributions.location."),
         new Section(
             20,
             "termsAcceptances",

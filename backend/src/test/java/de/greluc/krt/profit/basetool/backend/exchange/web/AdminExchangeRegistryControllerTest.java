@@ -153,6 +153,31 @@ class AdminExchangeRegistryControllerTest {
   }
 
   @Test
+  void thePatchChangeWriteIsGrantedOnlyWithItsRead() throws Exception {
+    mockMvc
+        .perform(
+            post(CLIENTS)
+                .with(admin())
+                .header("Accept-Language", "en")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    VALID.replace(
+                        "\"exchange.connect\",", "\"exchange.connect\",\"exchange.patch.write\",")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.detail").value(containsString("only together with")));
+    mockMvc
+        .perform(
+            post(CLIENTS)
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    VALID.replace(
+                        "\"exchange.connect\",",
+                        "\"exchange.connect\",\"exchange.patch.read\",\"exchange.patch.write\",")))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
   void aFirstPartyClientIdIsRefused() throws Exception {
     for (String firstParty : new String[] {"basetool-frontend", "test-client"}) {
       mockMvc

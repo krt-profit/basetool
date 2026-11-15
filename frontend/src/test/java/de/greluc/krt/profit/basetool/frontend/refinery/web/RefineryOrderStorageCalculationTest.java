@@ -25,7 +25,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -37,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreF
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +59,8 @@ class RefineryOrderStorageCalculationTest {
 
   @Mock private LogisticianGate logisticianGate;
 
+  @Mock private HomeLocationPreferenceReader homeLocationReader;
+
   private RefineryOrderPageController controller;
 
   @Mock private OidcUser oidcUser;
@@ -66,8 +71,94 @@ class RefineryOrderStorageCalculationTest {
   void setUp() {
     controller =
         new RefineryOrderPageController(
-            new RefineryBackendClient(backendApiClient), logisticianGate, null, null);
+            new RefineryBackendClient(backendApiClient),
+            logisticianGate,
+            null,
+            null,
+            homeLocationReader);
     model = new ExtendedModelMap();
+  }
+
+  /** The store dialog stores at the caller's home location (REQ-PATCH-033). */
+  @Test
+  void theStoreItemsStartAtTheCallersHomeLocation() {
+    UUID home = UUID.randomUUID();
+    when(homeLocationReader.formDefault()).thenReturn(Optional.of(home));
+
+    RefineryOrderStoreItemForm item = storeItemOfAnOrderAt(UUID.randomUUID());
+
+    assertEquals(home, item.getLocationId());
+  }
+
+  /** Without a home location the store dialog stores at the order's refinery. */
+  @Test
+  void withoutAHomeLocationTheStoreItemsStartAtTheRefinery() {
+    UUID refinery = UUID.randomUUID();
+    when(homeLocationReader.formDefault()).thenReturn(Optional.empty());
+
+    RefineryOrderStoreItemForm item = storeItemOfAnOrderAt(refinery);
+
+    assertEquals(refinery, item.getLocationId());
+  }
+
+  /**
+   * Opens the detail of an order at a refinery with one refined good and returns its store item.
+   *
+   * @param refinery the order's refinery location
+   * @return the store dialog's only item
+   */
+  private RefineryOrderStoreItemForm storeItemOfAnOrderAt(UUID refinery) {
+    UUID orderId = UUID.randomUUID();
+    MaterialDto scuMaterial =
+        new MaterialDto(
+            UUID.randomUUID(),
+            "ScuMat",
+            "TYPE",
+            "SCU",
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            0L);
+    RefineryGoodDto good =
+        new RefineryGoodDto(UUID.randomUUID(), scuMaterial, 100, scuMaterial, 100, 100, null);
+    RefineryOrderDto orderDto =
+        new RefineryOrderDto(
+            orderId,
+            null,
+            new LocationDto(refinery, "Refinery", null, false, false, 0L),
+            null,
+            null,
+            60L,
+            0.0,
+            0d,
+            0d,
+            0d,
+            null,
+            List.of(good),
+            RefineryOrderStatus.OPEN,
+            null,
+            0L,
+            null,
+            null,
+            null,
+            null);
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
+        .thenReturn(orderDto);
+    when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
+
+    controller.viewOrderDetail(orderId, null, model, oidcUser);
+
+    RefineryOrderStoreForm storeForm = (RefineryOrderStoreForm) model.getAttribute("storeForm");
+    assertNotNull(storeForm);
+    assertEquals(1, storeForm.getItems().size());
+    return storeForm.getItems().get(0);
   }
 
   private enum PickerCase {

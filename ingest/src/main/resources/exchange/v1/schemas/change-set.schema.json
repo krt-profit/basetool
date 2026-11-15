@@ -1188,6 +1188,15 @@
               "type": "integer",
               "minimum": 0,
               "description": "The ship's orgUnitVersion the client last saw; needed with shipId to change the unit. A difference answers ORG_UNIT_VERSION_CONFLICT."
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "PLEDGE",
+                "IN_GAME",
+                "UNKNOWN"
+              ],
+              "description": "Whether the ship was pledged, bought in-game or is of unknown origin. Absent keeps the ship's origin, and a new ship without it is UNKNOWN. A ship an import locked to PLEDGE answers ORIGIN_LOCKED to any other value."
             }
           },
           "required": [

@@ -419,7 +419,7 @@ public class OperationPageController {
       operationClient.createOperation(form);
       redirectAttributes.addFlashAttribute("successMessage", "operation.create.success");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Error creating operation", e);
       redirectAttributes.addFlashAttribute("errorMessage", "operation.create.error");
     }
@@ -446,6 +446,7 @@ public class OperationPageController {
       operationClient.updateOperation(id, form);
       redirectAttributes.addFlashAttribute("successMessage", "operation.update.success");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       if (e.getStatusCode() == 409) {
         log.warn("Optimistic locking failure updating operation: {}", id);
         redirectAttributes.addFlashAttribute("errorMessage", "error.optimistic.locking");
@@ -454,7 +455,7 @@ public class OperationPageController {
         redirectAttributes.addFlashAttribute("errorMessage", "operation.update.error");
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Error updating operation", e);
       redirectAttributes.addFlashAttribute("errorMessage", "operation.update.error");
     }
@@ -480,6 +481,7 @@ public class OperationPageController {
       OperationPayoutStatusDto updated = operationClient.updatePayoutStatus(id, request);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Update payout paid-out flag failed with status {}: {}",
           e.getStatusCode(),
@@ -526,7 +528,7 @@ public class OperationPageController {
       operationClient.deleteOperation(id);
       redirectAttributes.addFlashAttribute("successMessage", "operation.delete.success");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Error deleting operation", e);
       redirectAttributes.addFlashAttribute("errorMessage", "operation.delete.error");
     }

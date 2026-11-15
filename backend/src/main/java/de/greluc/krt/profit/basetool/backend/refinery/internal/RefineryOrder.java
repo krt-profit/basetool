@@ -150,6 +150,37 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   private RefineryOrderStatus status = RefineryOrderStatus.OPEN;
 
   /**
+   * The patch change that cancelled the order as its reason, or {@code null} for an order no patch
+   * change ended (REQ-PATCH-006). Held only while the order stays {@code CANCELED}.
+   */
+  @Column(name = "canceled_by_patch_change")
+  @Setter(AccessLevel.NONE)
+  @Nullable
+  private UUID canceledByPatchChange;
+
+  /**
+   * Sets the status; any status but {@code CANCELED} drops a patch change's cancel reason.
+   *
+   * @param status the new status
+   */
+  public void setStatus(RefineryOrderStatus status) {
+    this.status = status;
+    if (status != RefineryOrderStatus.CANCELED) {
+      canceledByPatchChange = null;
+    }
+  }
+
+  /**
+   * Cancels the order because a patch change ended it in the game (REQ-PATCH-006).
+   *
+   * @param patchChangeId the patch change, kept as the cancel reason
+   */
+  public void cancelByPatchChange(@NotNull UUID patchChangeId) {
+    status = RefineryOrderStatus.CANCELED;
+    canceledByPatchChange = patchChangeId;
+  }
+
+  /**
    * When the order's output was booked into inventory, or {@code null} while it has not been. Set
    * only by the store operation and never cleared; a stored order can be neither stored again nor
    * have its status changed by an update.

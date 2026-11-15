@@ -137,6 +137,23 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   List<ExchangeLocationGuid> findExchangeGuids(@Param("ids") Collection<UUID> ids);
 
   /**
+   * Reads the UEX ids of the given locations' city and space station and their starmap GUIDs in one
+   * statement (REQ-XCH-018, REQ-DATA-003).
+   *
+   * @param ids the location ids; never empty
+   * @return one row per given location that exists
+   */
+  @Query(
+      value =
+          "SELECT l.id AS locationId, c.id_city AS uexCityId,"
+              + " s.id_space_station AS uexSpaceStationId, "
+              + EXCHANGE_GUID
+              + " AS guid FROM location l LEFT JOIN city c ON c.id = l.city_id"
+              + " LEFT JOIN space_station s ON s.id = l.space_station_id WHERE l.id IN (:ids)",
+      nativeQuery = true)
+  List<ExchangeLocationLinkRow> findExchangeLinks(@Param("ids") Collection<UUID> ids);
+
+  /**
    * Paged live search for the location pickers (REQ-FE-016): non-hidden locations whose name
    * contains the LIKE-escaped fragment, case-insensitively.
    *
@@ -281,6 +298,15 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
    */
   Optional<Location> findFirstByNameAndHiddenFalseAndReferenceOnlyFalseOrderByIdAsc(String name);
 
+  /**
+   * Finds the non-hidden storage places whose name starts with a prefix, for an exchange write that
+   * names a place by the name the exchange cut its longer name to (REQ-XCH-026).
+   *
+   * @param prefix the start of the name, compared exactly
+   * @return every such place
+   */
+  List<Location> findAllByNameStartingWithAndHiddenFalseAndReferenceOnlyFalse(String prefix);
+
   /** One non-hidden location as the exchange catalogue reads it from the database. */
   interface ExchangeLocationRow {
 
@@ -331,6 +357,44 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
      *
      * @return the GUID
      */
+    UUID getGuid();
+  }
+
+  /**
+   * The UEX places and the starmap GUID of one location, as {@link #findExchangeLinks(Collection)}
+   * reads them.
+   */
+  interface ExchangeLocationLinkRow {
+
+    /**
+     * The location.
+     *
+     * @return the location id
+     */
+    UUID getLocationId();
+
+    /**
+     * The UEX id of the linked city.
+     *
+     * @return the id, or {@code null}
+     */
+    @Nullable
+    Integer getUexCityId();
+
+    /**
+     * The UEX id of the linked space station.
+     *
+     * @return the id, or {@code null}
+     */
+    @Nullable
+    Integer getUexSpaceStationId();
+
+    /**
+     * The GUID of the P4K starmap object the location stands for.
+     *
+     * @return the GUID, or {@code null} when the location links none
+     */
+    @Nullable
     UUID getGuid();
   }
 }

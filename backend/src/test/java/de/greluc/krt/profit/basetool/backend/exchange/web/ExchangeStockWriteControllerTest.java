@@ -83,6 +83,9 @@ class ExchangeStockWriteControllerTest {
   private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";
   private static final String KEY = "Kx9_" + "t".repeat(39);
 
+  /** The longest location name the published v1 schemas carry; a longer one is cut to it. */
+  private static final int PUBLISHED_NAME = 200;
+
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
@@ -445,6 +448,56 @@ class ExchangeStockWriteControllerTest {
         .andExpect(jsonPath("$.results[0].reason").value("UNIT_MISMATCH"));
     set(laranite, "Nowhere " + UUID.randomUUID(), 500, "2", "0", "SCU")
         .andExpect(jsonPath("$.results[0].reason").value("LOCATION_UNKNOWN"));
+  }
+
+  @Test
+  void aPlaceWithoutGuidOrUexLinkIsFoundByTheNameTheExchangeCutItTo() throws Exception {
+    UUID laranite = material("SCU", null);
+    String cut = cutName("Xch Cut Place ");
+    UUID place = namedLocation(cut + " beyond the published length " + tag());
+
+    set(laranite, cut, 500, "4", "0", "SCU")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT location_id FROM inventory_item WHERE user_id = ? AND material_id = ?",
+                UUID.class,
+                member,
+                laranite))
+        .containsExactly(place);
+  }
+
+  @Test
+  void twoPlacesTheExchangeCutsToOneNameAreNotFoundByIt() throws Exception {
+    UUID laranite = material("SCU", null);
+    String cut = cutName("Xch Shared Cut ");
+    namedLocation(cut + " first " + tag());
+    namedLocation(cut + " second " + tag());
+
+    set(laranite, cut, 500, "4", "0", "SCU")
+        .andExpect(jsonPath("$.results[0].reason").value("LOCATION_UNKNOWN"));
+
+    assertThat(total(laranite)).isZero();
+  }
+
+  @Test
+  void aPlaceNamedExactlyWinsOverOneTheExchangeCutsToItsName() throws Exception {
+    UUID laranite = material("SCU", null);
+    String cut = cutName("Xch Exact Cut ");
+    UUID exact = namedLocation(cut);
+    namedLocation(cut + " longer " + tag());
+
+    set(laranite, cut, 500, "4", "0", "SCU").andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT location_id FROM inventory_item WHERE user_id = ? AND material_id = ?",
+                UUID.class,
+                member,
+                laranite))
+        .containsExactly(exact);
   }
 
   @Test
@@ -1196,6 +1249,35 @@ class ExchangeStockWriteControllerTest {
         city);
     locations.add(id);
     return id;
+  }
+
+  /**
+   * Seeds a location with the given name on a new city without a UEX id, so it has neither a UEX
+   * link nor a starmap GUID and a write can name it only by its name.
+   *
+   * @param name the name
+   * @return its id
+   */
+  private @NotNull UUID namedLocation(@NotNull String name) {
+    UUID city = UUID.randomUUID();
+    jdbc.update("INSERT INTO city (id, id_city, name) VALUES (?, NULL, ?)", city, "City " + city);
+    cities.add(city);
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO location (id, name, hidden, city_id) VALUES (?, ?, false, ?)", id, name, city);
+    locations.add(id);
+    return id;
+  }
+
+  /**
+   * Builds a distinct name of exactly the 200 characters the exchange cuts a longer name to.
+   *
+   * @param prefix the distinctive start of the name
+   * @return the prefix, a random tag and {@code x} up to 200 characters
+   */
+  private static @NotNull String cutName(@NotNull String prefix) {
+    String start = prefix + tag() + " ";
+    return start + "x".repeat(PUBLISHED_NAME - start.length());
   }
 
   private @NotNull String locationName(@NotNull UUID location) {

@@ -41,7 +41,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Enforces responsibility validity for Inventory-owned stock operations in one batch. */
+/**
+ * Enforces responsibility validity for Inventory-owned stock operations in one batch; a game-fact
+ * stock loss takes the same locks without the validity check (REQ-ORDERS-055, ADR-0382).
+ */
 @Service
 @RequiredArgsConstructor
 public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObserver {
@@ -57,18 +60,36 @@ public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObser
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void beforeOrderLinkedStockWrite(@NotNull Collection<UUID> orderIds) {
+    List<JobOrder> affected = stabilize(orderIds);
+    if (responsibilityGuard.validOrderIds(affected).size() != affected.size()) {
+      throw new BadRequestException("orders.responsibility.invalid");
+    }
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void beforeGameFactStockLoss(@NotNull Collection<UUID> orderIds) {
+    stabilize(orderIds);
+  }
+
+  /**
+   * Takes the shared hierarchy lock and loads the affected orders.
+   *
+   * @param orderIds the affected orders
+   * @return the orders, one per distinct id
+   * @throws NotFoundException when an order does not exist
+   */
+  private @NotNull List<JobOrder> stabilize(@NotNull Collection<UUID> orderIds) {
     profitHierarchy.lockForOrderWrite();
     if (orderIds.isEmpty()) {
-      return;
+      return List.of();
     }
     Set<UUID> ids = Set.copyOf(orderIds);
     List<JobOrder> affected = orders.findAllById(ids);
     if (affected.size() != ids.size()) {
       throw new NotFoundException(AppExceptionKind.NOT_FOUND.detailKey());
     }
-    if (responsibilityGuard.validOrderIds(affected).size() != ids.size()) {
-      throw new BadRequestException("orders.responsibility.invalid");
-    }
+    return affected;
   }
 
   @Override
@@ -93,6 +114,13 @@ public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObser
         scopes.stream()
             .map(de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope::orderId)
             .toList());
+    materialPromises.requireLocked(scopes);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void assertGameFactMaterialLoss(@NotNull Collection<OrderMaterialScope> scopes) {
+    beforeGameFactStockLoss(scopes.stream().map(OrderMaterialScope::orderId).toList());
     materialPromises.requireLocked(scopes);
   }
 

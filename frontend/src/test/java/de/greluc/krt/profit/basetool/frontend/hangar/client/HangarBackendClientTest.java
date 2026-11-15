@@ -25,7 +25,9 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportRespon
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrigin;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.nio.charset.StandardCharsets;
@@ -78,8 +80,8 @@ class HangarBackendClientTest {
     backend.answerJson("[]");
     backend.answerJson("[]");
 
-    client.myShips(2, 50, Boolean.FALSE, "Cutlass & Co");
-    client.myShips(0, 1, null, " ");
+    client.myShips(2, 50, Boolean.FALSE, null, "Cutlass & Co");
+    client.myShips(0, 1, null, null, " ");
     client.squadronOverview(1, 10, "Cutlass & Co");
     client.squadronOverview(0, 1, null);
     assertThat(client.homeLocations()).isEmpty();
@@ -93,6 +95,28 @@ class HangarBackendClientTest {
     backend.expect("GET", "/api/v1/hangar/squadron-overview?page=0&size=1");
     backend.expect("GET", "/api/v1/locations/home-locations");
     backend.expect("GET", "/api/v1/org-units/me/pickable");
+  }
+
+  @Test
+  void theOriginFilterAndTheBulkOriginChangesReachTheirPaths() {
+    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson("{\"changed\":1,\"skipped\":0}");
+    backend.answerJson("{\"changed\":2,\"skipped\":1}");
+
+    client.myShips(0, 1, null, ShipOrigin.UNKNOWN, null);
+    client.bulkChangeShipOrigin(new ShipBulkOriginRequestDto(List.of(SHIP), "IN_GAME"));
+    client.bulkChangeMemberShipOrigin(
+        MEMBER, new ShipBulkOriginRequestDto(List.of(SHIP), "PLEDGE"));
+
+    backend.expect("GET", "/api/v1/hangar/my-ships?page=0&size=1&origin=UNKNOWN");
+    backend.expect(
+        "POST",
+        "/api/v1/hangar/ships/bulk-origin",
+        "{\"shipIds\":[\"" + SHIP + "\"],\"origin\":\"IN_GAME\"}");
+    backend.expect(
+        "POST",
+        "/api/v1/hangar/admin/users/" + MEMBER + "/ships/bulk-origin",
+        "{\"shipIds\":[\"" + SHIP + "\"],\"origin\":\"PLEDGE\"}");
   }
 
   @Test
@@ -138,8 +162,10 @@ class HangarBackendClientTest {
     backend.answerEmpty();
     backend.answerEmpty();
 
-    client.createShip(new ShipRequestDto("Kestrel", SHIP_TYPE, "LTI", LOCATION, true, null, UNIT));
-    client.updateShip(SHIP, new ShipRequestDto("Kestrel", SHIP_TYPE, "6", null, false, 3L, null));
+    client.createShip(
+        new ShipRequestDto("Kestrel", SHIP_TYPE, "LTI", LOCATION, true, null, UNIT, "PLEDGE"));
+    client.updateShip(
+        SHIP, new ShipRequestDto("Kestrel", SHIP_TYPE, "6", null, false, 3L, null, null));
     client.deleteShip(SHIP);
     client.setHomeLocation(new SetHomeLocationRequestDto(LOCATION));
     client.deleteAllShips();
@@ -153,14 +179,14 @@ class HangarBackendClientTest {
             + LOCATION
             + "\",\"fitted\":true,\"version\":null,\"owningOrgUnitId\":\""
             + UNIT
-            + "\"}");
+            + "\",\"origin\":\"PLEDGE\"}");
     backend.expect(
         "PUT",
         "/api/v1/hangar/ships/" + SHIP,
         "{\"name\":\"Kestrel\",\"shipTypeId\":\""
             + SHIP_TYPE
             + "\",\"insurance\":\"6\",\"locationId\":null,\"fitted\":false,\"version\":3,"
-            + "\"owningOrgUnitId\":null}");
+            + "\"owningOrgUnitId\":null,\"origin\":null}");
     backend.expect("DELETE", "/api/v1/hangar/ships/" + SHIP, null);
     backend.expect(
         "POST", "/api/v1/hangar/ships/home-location", "{\"locationId\":\"" + LOCATION + "\"}");
@@ -180,9 +206,11 @@ class HangarBackendClientTest {
     client.member(MEMBER);
     assertThat(client.memberOrgUnits(MEMBER)).isEmpty();
     client.createMemberShip(
-        MEMBER, new ShipRequestDto(null, SHIP_TYPE, "LTI", null, false, null, UNIT));
+        MEMBER, new ShipRequestDto(null, SHIP_TYPE, "LTI", null, false, null, UNIT, "IN_GAME"));
     client.updateMemberShip(
-        MEMBER, SHIP, new ShipRequestDto("Kestrel", SHIP_TYPE, "0", LOCATION, true, 4L, null));
+        MEMBER,
+        SHIP,
+        new ShipRequestDto("Kestrel", SHIP_TYPE, "0", LOCATION, true, 4L, null, null));
     client.deleteMemberShip(MEMBER, SHIP);
 
     backend.expect("GET", "/api/v1/hangar/admin/users/" + MEMBER + "/ships?page=1&size=10");
@@ -198,7 +226,7 @@ class HangarBackendClientTest {
             + "\",\"insurance\":\"LTI\",\"locationId\":null,\"fitted\":false,\"version\":null,"
             + "\"owningOrgUnitId\":\""
             + UNIT
-            + "\"}");
+            + "\",\"origin\":\"IN_GAME\"}");
     backend.expect(
         "PUT",
         "/api/v1/hangar/admin/users/" + MEMBER + "/ships/" + SHIP,
@@ -206,7 +234,7 @@ class HangarBackendClientTest {
             + SHIP_TYPE
             + "\",\"insurance\":\"0\",\"locationId\":\""
             + LOCATION
-            + "\",\"fitted\":true,\"version\":4,\"owningOrgUnitId\":null}");
+            + "\",\"fitted\":true,\"version\":4,\"owningOrgUnitId\":null,\"origin\":null}");
     backend.expect("DELETE", "/api/v1/hangar/admin/users/" + MEMBER + "/ships/" + SHIP, null);
   }
 

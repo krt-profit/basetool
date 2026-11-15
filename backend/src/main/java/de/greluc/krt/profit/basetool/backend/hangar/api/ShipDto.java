@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -43,6 +44,10 @@ import org.jetbrains.annotations.Nullable;
  *     imported
  * @param pledge the imported pledge data, or {@code null} when none was imported or the caller is
  *     neither the owner nor an admin (REQ-HANGAR-015)
+ * @param origin the ship's origin, or {@code null} when the caller is neither the owner nor an
+ *     admin (REQ-HANGAR-017)
+ * @param relocationPending whether a pending relocation locks the ship (REQ-PATCH-023); set on an
+ *     admin's view of a member's hangar, {@code false} everywhere else
  */
 public record ShipDto(
     UUID id,
@@ -56,4 +61,32 @@ public record ShipDto(
     Long version,
     long owningOrgUnitVersion,
     @Nullable ShipProductionStatus productionStatus,
-    @Nullable ShipPledgeDto pledge) {}
+    @Nullable ShipPledgeDto pledge,
+    @Nullable ShipOriginDto origin,
+    boolean relocationPending) {
+
+  /**
+   * Returns a copy of this projection with {@link #relocationPending} replaced.
+   *
+   * @param pending whether a pending relocation locks the ship
+   * @return a copy of this DTO carrying {@code pending}
+   */
+  @NotNull
+  public ShipDto withRelocationPending(boolean pending) {
+    return new ShipDto(
+        id,
+        name,
+        shipType,
+        insurance,
+        location,
+        fitted,
+        owner,
+        owningSquadron,
+        version,
+        owningOrgUnitVersion,
+        productionStatus,
+        pledge,
+        origin,
+        pending);
+  }
+}

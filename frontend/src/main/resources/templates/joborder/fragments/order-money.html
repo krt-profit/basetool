@@ -166,8 +166,12 @@
                                 <strong th:text="${#messages.msg(kindKey, principal)}"></strong>
                                 <div th:if="${entry.accountHoldingId == null and entry.recipientName != null}" th:text="#{orders.money.history.parties(${holder},
                                     ${@handles.display(entry.recipientName) ?: #messages.msg('orders.money.nameUnavailable')}, ${actor})}"></div>
-                                <div th:if="${entry.accountHoldingId == null and entry.recipientName == null}" th:text="#{orders.money.history.names(${holder}, ${actor})}"></div>
-                                <div th:if="${entry.accountHoldingId != null}" th:text="#{orders.money.history.recordedBy(${actor})}"></div>
+                                <div th:if="${entry.accountHoldingId == null and entry.recipientName == null and entry.patchLabel == null}" th:text="#{orders.money.history.names(${holder}, ${actor})}"></div>
+                                <div th:if="${entry.accountHoldingId != null and entry.patchLabel == null}" th:text="#{orders.money.history.recordedBy(${actor})}"></div>
+                                <div th:if="${entry.patchLabel != null and entry.accountHoldingId == null}" data-testid="order-money-history-patch"
+                                     th:text="#{orders.money.history.patchNames(${holder}, ${entry.patchLabel})}"></div>
+                                <div th:if="${entry.patchLabel != null and entry.accountHoldingId != null}" data-testid="order-money-history-patch"
+                                     th:text="#{orders.money.history.patchChange(${entry.patchLabel})}"></div>
                                 <a th:if="${entry.peerOrderId != null}" th:href="@{/orders/{id}(id=${entry.peerOrderId})}"
                                    th:text="#{orders.money.history.relatedOrder}"></a>
                                 <span th:if="${entry.fee != null and entry.fee != '0'}"

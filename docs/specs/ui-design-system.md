@@ -1420,7 +1420,7 @@ Binding details:
   URL. **`crossorigin="use-credentials"` is expressly rejected** — it makes the fetch an
   *authenticated* request, and the unscoped layout `@ControllerAdvice` beans run before every
   handler, `@RestController`s included, so one manifest fetch cost **five** backend round trips and
-  needed carve-outs in `TermsAcceptanceGateFilter` and `BackendRoleSyncFilter` for a public
+  needed carve-outs in the consent gate and `BackendRoleSyncFilter` for a public
   document. It bought nothing measurable: `name` and `short_name` are identical in both bundles,
   Safari implements neither `lang` nor `description`, and the iOS home-screen label comes from
   `apple-mobile-web-app-title` on the page. Re-adding it needs an ADR.
@@ -1527,7 +1527,7 @@ this requirement is the user-facing one. The discontinued Android app had the sa
 Tests: `OssLicenseCatalogTest` (the generated report exists, merges the modules, contains no
 AspectJ, and every library carries an allowed SPDX licence), `OssLicensesControllerTest` (public,
 rendered, linked beside the terms in the footer), `OssBundledComponentsTest`, and the public-page
-entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsAcceptanceGateFilterTest` and
+entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsGateTest` and
 `AnonymousSurfaceE2eTest`. Monitoring: `/licenses` is a `blackbox-public-surface` target
 (`REQ-OBS-012`).
 
@@ -1958,8 +1958,11 @@ Page merges this needs:
   personal-blueprints pages, now keyed by the member (`/admin/personal-inventory?userSub=…`,
   `/admin/personal-blueprints?userSub=…`); the member picker is gone and the pages without a member
   lead to the member list.
-- „Gefahrenzone" (`/admin/settings/danger-zone`) holds the destructive one-off actions: the bank
-  wipe reset and deleting every user's blueprints. `/admin/bank` redirects to it.
+- „Gefahrenzone" (`/admin/settings/danger-zone`) holds the destructive one-off actions: the patch
+  change, the bank wipe reset and deleting every user's blueprints. `/admin/bank` redirects to it.
+  The patch change's card leads to its own page `/admin/settings/patch-change` (REQ-PATCH-008),
+  which keeps the Gefahrenzone tab marked: a page below another tab's path marks the tab its page
+  head names.
 - „Informationen" (the home-page announcement) is edited inline in its dashboard widget; it has no
   admin link, and `/admin/announcement` redirects to the dashboard (page `GET` only).
 

@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedRef;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyPatchLabels;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -51,8 +52,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Maps needs and donations to their DTOs and applies the redaction rules of the supply module
- * (REQ-SUP-006, REQ-SUP-012). The caller's roles and the names of every unit and donor on a page
- * are read once per page, never per row (REQ-DATA-003).
+ * (REQ-SUP-006, REQ-SUP-012). The caller's roles and the names of every unit, donor and withdrawing
+ * patch change on a page are read once per page, never per row (REQ-DATA-003).
  */
 @Component
 @RequiredArgsConstructor
@@ -63,6 +64,7 @@ public class SupplyMapper {
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final JobOrderMaterialCoverage jobOrderMaterialCoverage;
+  private final SupplyPatchLabels patchLabels;
 
   /**
    * What a page of needs is mapped against.
@@ -111,6 +113,7 @@ public class SupplyMapper {
    * @param admin whether the caller is an admin, who sees every donor and may withdraw any pledge
    * @param leadership whether the caller belongs to the governing leadership
    * @param managed the units the caller manages
+   * @param patchLabels the labels of the patch changes that withdrew a pledge of the page, by id
    */
   record DonationContext(
       Map<UUID, OrgUnit> units,
@@ -118,7 +121,8 @@ public class SupplyMapper {
       @Nullable UUID caller,
       boolean admin,
       boolean leadership,
-      SupplyManagedUnits managed) {
+      SupplyManagedUnits managed,
+      Map<UUID, String> patchLabels) {
 
     /**
      * Whether the caller manages the donations of a unit.
@@ -128,6 +132,18 @@ public class SupplyMapper {
      */
     boolean manages(UUID unitId) {
       return managed.contains(unitId);
+    }
+
+    /**
+     * Names the patch change whose wipe withdrew a donation.
+     *
+     * @param donation the donation
+     * @return the patch change's label, or {@code null} when no patch change withdrew it
+     */
+    @Nullable
+    String withdrawnByPatchLabel(@NotNull SupplyDonation donation) {
+      UUID patchChange = donation.getWithdrawnByPatchChange();
+      return patchChange == null ? null : patchLabels.get(patchChange);
     }
   }
 
@@ -169,9 +185,13 @@ public class SupplyMapper {
     Set<UUID> unitIds =
         donations.stream().map(SupplyDonation::getReceivingOrgUnitId).collect(Collectors.toSet());
     Set<UUID> donorIds = new HashSet<>();
+    Set<UUID> patchChangeIds = new HashSet<>();
     for (SupplyDonation donation : donations) {
       if (donation.getDonorUserId() != null) {
         donorIds.add(donation.getDonorUserId());
+      }
+      if (donation.getWithdrawnByPatchChange() != null) {
+        patchChangeIds.add(donation.getWithdrawnByPatchChange());
       }
     }
     Map<UUID, User> donors = new HashMap<>();
@@ -186,7 +206,8 @@ public class SupplyMapper {
         authHelperService.currentUserId().orElse(null),
         accessPolicy.isAdmin(),
         accessPolicy.isGoverningLeadership(),
-        accessPolicy.managedUnits());
+        accessPolicy.managedUnits(),
+        patchChangeIds.isEmpty() ? Map.of() : patchLabels.labels(patchChangeIds));
   }
 
   private Map<UUID, OrgUnit> unitsById(Set<UUID> ids) {
@@ -242,7 +263,8 @@ public class SupplyMapper {
    *
    * @param donation the donation, with its catalogue entry loaded
    * @param context the page context
-   * @return the DTO, with the donor's name only for a caller who may read it
+   * @return the DTO, with the donor's name only for a caller who may read it and the label of the
+   *     patch change that withdrew the pledge, if one did
    */
   @NotNull
   DonationDto toDto(@NotNull SupplyDonation donation, @NotNull DonationContext context) {
@@ -267,6 +289,7 @@ public class SupplyMapper {
         donation.getNeedId(),
         donation.getStatus(),
         donation.getDeclineReason(),
+        context.withdrawnByPatchLabel(donation),
         seesDonor && donor != null ? donor.getEffectiveName() : null,
         donorIsMe,
         donation.getSourceInventoryItemId() != null,

@@ -294,6 +294,7 @@ exempt-column|role.description
 exempt-column|role.name
 exempt-column|role_permissions.permission
 exempt-column|ship.insurance
+exempt-column|ship.origin
 exempt-column|ship.pledge_cost_currency
 exempt-column|ship.pledge_id
 exempt-column|ship.production_status
@@ -331,6 +332,11 @@ exempt-table|p4k_import_change
 exempt-table|p4k_import_run
 exempt-table|p4k_import_run_kind
 exempt-table|p4k_review_case
+exempt-table|patch_change
+exempt-table|patch_change_effect_count
+exempt-table|patch_change_relocation
+exempt-table|patch_change_wipe_exception
+exempt-table|patch_change_wipe_group
 exempt-table|planet
 exempt-table|poi
 exempt-table|refining_method

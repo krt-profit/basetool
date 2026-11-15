@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.support;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler;
 import java.time.Instant;
 import java.util.Arrays;
@@ -61,7 +62,8 @@ public final class ReauthPageMvc {
   @NotNull
   public static MockMvc standalone(@NotNull Object... controllers) {
     return MockMvcBuilders.standaloneSetup(controllers)
-        .setControllerAdvice(new GlobalExceptionHandler(new StaticMessageSource()))
+        .setControllerAdvice(
+            new GlobalExceptionHandler(new StaticMessageSource(), new SessionGates(List.of())))
         .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
         .build();
   }

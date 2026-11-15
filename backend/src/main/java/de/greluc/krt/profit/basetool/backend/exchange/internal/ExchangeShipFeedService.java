@@ -54,7 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>A snapshot pages through the member's ships by id and ends with the feed position it was taken
  * at; the feed answers each ship changed after the cursor once, with its current state or a
- * tombstone. Purchase data is never read.
+ * tombstone. Purchase data is never read; the coarse origin is sent as the ship reads it
+ * (REQ-XCH-057).
  */
 @Service
 @RequiredArgsConstructor
@@ -65,9 +66,6 @@ public class ExchangeShipFeedService {
 
   /** The insurance kind of a number of months. */
   private static final String MONTHS = "MONTHS";
-
-  /** The longest display name the published item and location references carry. */
-  private static final int MAX_NAME = 200;
 
   private final ShipRepository shipRepository;
   private final ExchangeShipLinkRepository linkRepository;
@@ -216,18 +214,20 @@ public class ExchangeShipFeedService {
         ship.id().toString(),
         externalId,
         ship.version() == null ? 0 : ship.version(),
-        new ExchangeItemRefDto(ship.shipTypeId().toString(), cut(ship.shipTypeName())),
+        new ExchangeItemRefDto(
+            ship.shipTypeId().toString(), ExchangeNames.cut(ship.shipTypeName())),
         ship.name() == null || ship.name().isBlank() ? null : ship.name(),
         insurance(ship.insurance()),
         ship.locationName() == null
             ? null
             : new ExchangeLocationDto(
-                cut(ship.locationName()),
+                ExchangeNames.cut(ship.locationName()),
                 ExchangeCatalogService.uex(ship.uexCityId(), ship.uexSpaceStationId()),
                 ship.locationId() == null ? null : guids.get(ship.locationId())),
         ship.fitted(),
         orgUnit(ship.orgUnit()),
-        ship.orgUnitVersion());
+        ship.orgUnitVersion(),
+        ship.effectiveOrigin().name());
   }
 
   /**
@@ -256,15 +256,5 @@ public class ExchangeShipFeedService {
       return new ExchangeInsuranceDto(MONTHS, Math.min(Integer.parseInt(insurance), 120));
     }
     return new ExchangeInsuranceDto(MONTHS, 0);
-  }
-
-  /**
-   * Cuts a display name to the published limit.
-   *
-   * @param name the name
-   * @return the name, at most {@value #MAX_NAME} characters
-   */
-  private static @NotNull String cut(@NotNull String name) {
-    return name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name;
   }
 }

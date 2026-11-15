@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,8 @@ class BackendErrorPageStatusMvcTest {
   void setUp() {
     mockMvc =
         MockMvcBuilders.standaloneSetup(new FailingController())
-            .setControllerAdvice(new GlobalExceptionHandler(new StaticMessageSource()))
+            .setControllerAdvice(
+                new GlobalExceptionHandler(new StaticMessageSource(), new SessionGates(List.of())))
             .build();
   }
 

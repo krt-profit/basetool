@@ -87,6 +87,8 @@ public interface BankOwnRequestReads {
    *     Basetool
    * @param splitEnabled whether a deposit distributes {@code splitPercent} across squadron accounts
    * @param splitPercent the whole percent distributed, or {@code null} without a split
+   * @param cancelledByPatchChange the patch change whose currency wipe cancelled it, or {@code
+   *     null} for every other request (REQ-PATCH-042)
    */
   record OwnRequest(
       @NotNull UUID id,
@@ -106,7 +108,8 @@ public interface BankOwnRequestReads {
       @Nullable String rejectReason,
       @Nullable String client,
       boolean splitEnabled,
-      @Nullable BigDecimal splitPercent) {}
+      @Nullable BigDecimal splitPercent,
+      @Nullable UUID cancelledByPatchChange) {}
 
   /**
    * The account a request is raised against.

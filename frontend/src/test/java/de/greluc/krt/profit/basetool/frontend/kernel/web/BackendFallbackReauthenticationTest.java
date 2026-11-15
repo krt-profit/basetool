@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.web.AdminLocationsPageCo
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.hangar.web.HangarPageController;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.identity.web.MemberManagementController;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm;
@@ -52,6 +53,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEvict
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.MissionManagerGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.OrgUnitContextAdvice;
@@ -68,6 +70,9 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClien
 import de.greluc.krt.profit.basetool.frontend.orgunit.web.AdminSpecialCommandsPageController;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.web.AdminPersonalInventoryPageController;
+import de.greluc.krt.profit.basetool.frontend.purchasing.client.PurchasingBackendClient;
+import de.greluc.krt.profit.basetool.frontend.purchasing.web.PurchasingFeatureState;
+import de.greluc.krt.profit.basetool.frontend.purchasing.web.PurchasingRequestState;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.refinery.web.RefineryOrderWriteController;
 import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient;
@@ -84,10 +89,35 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
-/** Exercises actual domain fallbacks with session loss and ordinary backend failure. */
+/**
+ * Exercises actual domain fallbacks with session loss, a session gate's refusal and ordinary
+ * backend failure.
+ */
 class BackendFallbackReauthenticationTest {
 
   private static final UUID ID = UUID.fromString("ace5ee48-52e7-4f29-afd8-5fe2c92695da");
+
+  /**
+   * A gate's refusal wrapped the way a joined parallel read carries it reaches every custom
+   * fallback through its hand-off guard, which lets it through; the layout chrome answers it
+   * instead.
+   */
+  @ParameterizedTest
+  @EnumSource(Domain.class)
+  void aWrappedSessionGatesRefusalEscapesEveryFallbackButTheLayoutChromes(Domain domain) {
+    SessionGateRefusalException refusal =
+        new SessionGateRefusalException("held", null, 403, "ANY_GATE_REQUIRED", null, null);
+    RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+    Runnable action =
+        domain.action(new CompletionException(new IllegalStateException(refusal)), attributes);
+
+    if (domain.chrome()) {
+      assertThatCode(action::run).doesNotThrowAnyException();
+    } else {
+      assertThatThrownBy(action::run).isSameAs(refusal);
+      assertThat(attributes.getFlashAttributes()).isEmpty();
+    }
+  }
 
   @ParameterizedTest
   @EnumSource(Domain.class)
@@ -144,9 +174,39 @@ class BackendFallbackReauthenticationTest {
     REFINERY,
     SETTINGS,
     SUPPLY,
+    PURCHASING,
     QUALITY_TIERS,
     LAYOUT,
     SIDEBAR;
+
+    /**
+     * Tells whether the fallback belongs to the layout chrome, which renders on every page, the
+     * gate-exempt ones included, and therefore degrades instead of handing the browser to a gate.
+     *
+     * @return {@code true} for the layout context, the sidebar and the navigation's supply and
+     *     purchasing switches
+     */
+    boolean chrome() {
+      return switch (this) {
+        case LAYOUT, SIDEBAR, SUPPLY, PURCHASING -> true;
+        case BANK,
+            BLUEPRINT,
+            CATALOGUE,
+            HANGAR,
+            IDENTITY,
+            INVENTORY,
+            JOB_ORDER,
+            MISSION,
+            NOTIFICATION,
+            OPERATION,
+            ORG_UNIT,
+            PERSONAL_INVENTORY,
+            REFINERY,
+            SETTINGS,
+            QUALITY_TIERS ->
+            false;
+      };
+    }
 
     Runnable action(RuntimeException failure, RedirectAttributesModelMap attributes) {
       return switch (this) {
@@ -171,7 +231,8 @@ class BackendFallbackReauthenticationTest {
                 new HangarPageController(
                         rejecting(HangarBackendClient.class, failure),
                         new ParallelPageLoader(),
-                        mock(CachedCatalogListLoader.class))
+                        mock(CachedCatalogListLoader.class),
+                        mock(HomeLocationPreferenceReader.class))
                     .deleteShip(ID, attributes);
         case IDENTITY ->
             () ->
@@ -249,6 +310,12 @@ class BackendFallbackReauthenticationTest {
                     .updateSettings("30", 0L, "90", 0L, "UP", 0L, "0.5", 0L, attributes);
         case SUPPLY ->
             () -> new SupplyFeatureState(rejecting(SupplyBackendClient.class, failure)).enabled();
+        case PURCHASING ->
+            () ->
+                new PurchasingFeatureState(
+                        new PurchasingRequestState(
+                            rejecting(PurchasingBackendClient.class, failure)))
+                    .enabled();
         case QUALITY_TIERS ->
             () -> new QualityTierCatalog(rejecting(BackendApiClient.class, failure)).all();
         case LAYOUT ->

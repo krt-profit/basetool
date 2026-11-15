@@ -58,13 +58,16 @@ final class BankBookingRequestDtos {
    * @param request the request entity
    * @param clientName the connected application it was raised through, or {@code null}
    * @param callerMayConfirm whether the caller may confirm it, or {@code null} when not judged
+   * @param cancelledByPatchLabel the label of the patch change whose currency wipe cancelled it, or
+   *     {@code null}
    * @return the wire DTO
    */
   @NotNull
   static BankBookingRequestDto of(
       @NotNull BankBookingRequest request,
       @Nullable String clientName,
-      @Nullable Boolean callerMayConfirm) {
+      @Nullable Boolean callerMayConfirm,
+      @Nullable String cancelledByPatchLabel) {
     BankAccount account = request.getAccount();
     OrgUnit orgUnit = account == null ? null : account.getOrgUnit();
     boolean linked = request.getPurposeKind() == BankPurposeKind.AUEC_ORDER;
@@ -114,7 +117,8 @@ final class BankBookingRequestDtos {
         clientName,
         request.getVersion(),
         callerMayConfirm,
-        linked ? linkedDetails(request) : null);
+        linked ? linkedDetails(request) : null,
+        cancelledByPatchLabel);
   }
 
   @NotNull

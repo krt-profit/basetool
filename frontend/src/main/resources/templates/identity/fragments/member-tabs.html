@@ -8,6 +8,9 @@
     <a th:href="@{/admin/members/{id}/hangar(id=${memberId})}" class="tab" th:classappend="${active == 'hangar'} ? 'active'"
        th:attr="aria-current=${active == 'hangar'} ? 'page' : null" data-testid="member-tab-link-hangar"
        th:text="#{members.edit.hangar}">Hangar</a>
+    <a th:href="@{/admin/members/{id}/home-location(id=${memberId})}" class="tab" th:classappend="${active == 'homeLocation'} ? 'active'"
+       th:attr="aria-current=${active == 'homeLocation'} ? 'page' : null" data-testid="member-tab-link-home-location"
+       th:text="#{members.tab.homeLocation}">Home Location</a>
     <a th:href="@{/admin/personal-inventory(userSub=${memberId})}" class="tab" th:classappend="${active == 'inventory'} ? 'active'"
        th:attr="aria-current=${active == 'inventory'} ? 'page' : null" data-testid="member-tab-link-inventory"
        th:text="#{members.tab.inventory}">Inventar</a>

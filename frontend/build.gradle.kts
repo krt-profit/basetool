@@ -955,6 +955,48 @@ val testMemberRolesJs =
     )
   }
 
+val testHomeLocationJs =
+  registerNodeScriptTest(
+    "testHomeLocationJs",
+    "Regression tests for the member's home-location page: the relocation summary, the way on into the tool and a refusal, never a navigation by itself.",
+    "scripts/home-location.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/patchchange/home-location.js"),
+    )
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/patchchange/home-location-common.js",
+      ),
+    )
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/patchchange/patch-change-messages.js",
+      ),
+    )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-i18n.js"),
+    )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-number-format.js"),
+    )
+  }
+
+val testOrdersMoneyBankJs =
+  registerNodeScriptTest(
+    "testOrdersMoneyBankJs",
+    "Regression tests for the order money editors' Bank account choice: the opening suggestion survives a live refresh, a member's choice is never replaced.",
+    "scripts/orders-money-bank.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/joborder/orders-money-bank.js"),
+    )
+  }
+
 val testShortcutsJs =
   registerNodeScriptTest(
     "testShortcutsJs",
@@ -1264,6 +1306,8 @@ tasks.named("check").configure {
     testBoardSyncJs,
     testBankLiveSyncJs,
     testMemberRolesJs,
+    testHomeLocationJs,
+    testOrdersMoneyBankJs,
     testSearchJs,
     testNumberFormatJs,
     testLocalisedNameJs,

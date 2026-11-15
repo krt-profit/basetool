@@ -29,9 +29,10 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Finds the non-hidden Lager location an exchange write names (REQ-XCH-016, REQ-XCH-017): by its
- * starmap GUID first, then by its UEX place, then by its exact name; a reference that does not
- * match at one step falls through to the next.
+ * Finds the non-hidden Lager location an exchange write names (REQ-XCH-016, REQ-XCH-017,
+ * REQ-XCH-026): by its starmap GUID first, then by its UEX place, then by its exact name, then by
+ * the name the exchange cut its longer name to; a reference that does not match at one step falls
+ * through to the next.
  */
 @Component
 @RequiredArgsConstructor
@@ -65,9 +66,26 @@ public class ExchangeLocationResolver {
       }
     }
     if (ref.name() != null) {
-      return locationRepository.findFirstByNameAndHiddenFalseAndReferenceOnlyFalseOrderByIdAsc(
-          ref.name());
+      Optional<Location> exact =
+          locationRepository.findFirstByNameAndHiddenFalseAndReferenceOnlyFalseOrderByIdAsc(
+              ref.name());
+      return exact.isPresent() ? exact : byCutName(ref.name());
     }
     return Optional.empty();
+  }
+
+  /**
+   * Finds the one place whose longer name the exchange cut to the name a client sent back.
+   *
+   * @param name the name the client sent
+   * @return the place, or empty when no place or several places cut to that name
+   */
+  private @NotNull Optional<Location> byCutName(@NotNull String name) {
+    List<Location> cut =
+        ExchangeNames.cutTo(
+            name,
+            locationRepository::findAllByNameStartingWithAndHiddenFalseAndReferenceOnlyFalse,
+            Location::getName);
+    return cut.size() == 1 ? Optional.of(cut.getFirst()) : Optional.empty();
   }
 }

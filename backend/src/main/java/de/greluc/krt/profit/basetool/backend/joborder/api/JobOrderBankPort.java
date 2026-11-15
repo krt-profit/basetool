@@ -100,6 +100,21 @@ public interface JobOrderBankPort {
   void cancelUnexecuted(@NotNull UUID requestId, @NotNull UUID attemptId, @NotNull UUID purposeRef);
 
   /**
+   * Cancels the pending Bank request of an attempt a currency wipe already cancelled under the held
+   * order guard (REQ-PATCH-043); the order is not called back.
+   *
+   * @param requestId the pending request
+   * @param attemptId the exact linked attempt
+   * @param purposeRef the opaque lineage
+   * @param patchChangeId the patch change, kept as the request's cancel reason
+   */
+  void cancelForCurrencyWipe(
+      @NotNull UUID requestId,
+      @NotNull UUID attemptId,
+      @NotNull UUID purposeRef,
+      @NotNull UUID patchChangeId);
+
+  /**
    * Predecessor with an admitted rate and final failed request status.
    *
    * @param attemptId the prior attempt

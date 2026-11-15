@@ -132,7 +132,7 @@ public class AdminSyncReportsPageController {
       SyncReportPurgeResultDto result = syncReportClient.purgeSyncReports(canonicalSource, days);
       redirectAttributes.addFlashAttribute("deletedCount", result == null ? 0 : result.deleted());
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to delete old sync reports (source={}, days={})", source, days, e);
       redirectAttributes.addFlashAttribute("error", "error.admin.syncReports.delete");
     }

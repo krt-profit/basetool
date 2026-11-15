@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.inventory.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderGameItemNeedDto;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOpt
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -78,9 +80,13 @@ public class InventoryInputPageController {
 
   private final InventoryCatalogs catalogs;
 
+  /** Reads the caller's home location, the location a fresh form starts with (REQ-PATCH-033). */
+  private final HomeLocationPreferenceReader homeLocationReader;
+
   /**
    * Renders the inventory create form; {@code source=admin} seeds {@code isGlobal=true} so the
-   * admin can pick a target user, otherwise the entry is the caller's own.
+   * admin can pick a target user, otherwise the entry is the caller's own. A fresh form starts at
+   * the caller's home location (REQ-PATCH-033).
    *
    * @param source optional origin marker ({@code admin}, {@code my}, {@code aggregated}) used to
    *     pick the post-save redirect target
@@ -91,7 +97,8 @@ public class InventoryInputPageController {
   @GetMapping("/input")
   public String viewInputPage(@RequestParam(required = false) String source, Model model) {
     InventoryForm form;
-    if (!model.containsAttribute("inventoryForm")) {
+    boolean fresh = !model.containsAttribute("inventoryForm");
+    if (fresh) {
       form = new InventoryForm();
       if ("admin".equals(source)) {
         form.setIsGlobal(true);
@@ -111,6 +118,10 @@ public class InventoryInputPageController {
     var jobOrdersFuture = parallelPageLoader.loadAsync(() -> catalogs.activeJobOrders(true));
     var ownerFuture = parallelPageLoader.loadAsync(() -> fetchOwnerPickerOptions(boundForm));
     var selectedUserFuture = parallelPageLoader.loadAsync(() -> fetchSelectedInputUser(boundForm));
+    CompletableFuture<Optional<UUID>> homeLocationFuture =
+        fresh
+            ? parallelPageLoader.loadAsync(homeLocationReader::formDefault)
+            : CompletableFuture.completedFuture(Optional.empty());
     SectionFallback.run(
         log,
         "input-catalogs",
@@ -121,8 +132,10 @@ public class InventoryInputPageController {
                     missionsFuture,
                     jobOrdersFuture,
                     ownerFuture,
-                    selectedUserFuture)
+                    selectedUserFuture,
+                    homeLocationFuture)
                 .join());
+    homeLocationFuture.join().ifPresent(boundForm::setLocationId);
     model.addAttribute("materials", materialsFuture.join());
     model.addAttribute("locations", locationsFuture.join());
     model.addAttribute("missions", missionsFuture.join());

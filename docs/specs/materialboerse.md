@@ -181,7 +181,11 @@ persisting the reduction the stored value would silently **recover** on a later 
 An **increase** of the backing row never changes the offer — the conditional update is a no-op when
 stock rises, so offering more stays an explicit owner decision (the owner raises the offered amount
 themselves). A **full** book-out deletes the row and cascade-removes the offer (V210), so no clamp is
-needed there. The offer's `@Version` is intentionally left untouched by the ratchet; a concurrent
+needed there. A patch change's wipe ends every active offer on a row it deletes with the usual
+„stock gone“ notice and removes it before the row goes; the Materialbörse trail records one summary
+event per trigger (`MARKET_OFFERS_ENDED_BY_PATCH`) instead of one `MARKET_OFFER_REMOVED` per offer
+([REQ-PATCH-013](patch-change.md#req-patch-013--what-depends-on-a-wiped-row-goes-with-it),
+`MaterialExchangePatchWipeService`). The offer's `@Version` is intentionally left untouched by the ratchet; a concurrent
 owner edit is guarded independently by the release/edit `offeredAmount <= current stock` validation.
 
 **Both effects are audited** (REQ-MARKET-008, REQ-AUDIT-001). Every offer the ratchet lowers records

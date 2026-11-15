@@ -52,6 +52,27 @@
             "minLength": 1,
             "maxLength": 128,
             "description": "The existing order a refinery-order create refused ALREADY_EXISTS names. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+          },
+          "patchChange": {
+            "type": "object",
+            "description": "The patch change behind the change a refusal answers: the one that moved or wiped the lot, ship or org-stock entry a REMOVED_ELSEWHERE refusal names, or the one that made the lot's, ship's or org-stock entry's last change a VERSION_CONFLICT did not see; absent when that change came from any other channel.",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The patch change's id, the same in every feed entry the patch change caused."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32,
+                "description": "The patch label, e.g. 4.4; an admin may correct it later."
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
           }
         },
         "required": [

@@ -1,7 +1,8 @@
 # Ships
 
 The ships the member owns in the Hangar. Reading needs `exchange.hangar.read`, changing needs
-`exchange.hangar.write`. Purchase data is never exchanged in either direction.
+`exchange.hangar.write`. Purchase data is never exchanged in either direction: no pledge id, no
+purchase date and no price. The one exception is the coarse `origin` of a ship.
 
 ## A ship
 
@@ -17,6 +18,11 @@ The ships the member owns in the Hangar. Reading needs `exchange.hangar.read`, c
 | `fitted` | Whether the ship is fitted. |
 | `orgUnit` | `{id, name, shorthand, kind}` of the [org unit](org-units.md) the ship belongs to; absent when it belongs to none. |
 | `orgUnitVersion` | The counter of the ship's org unit. It moves only when the unit changes, and `version` does not move with it. |
+| `origin` | `PLEDGE` (bought on the RSI website), `IN_GAME` (bought with in-game currency) or `UNKNOWN` (not chosen yet). A patch wipe can remove only `IN_GAME` ships; `UNKNOWN` counts as pledged. |
+
+**Origin.** A ship from a hangar file import, or with an RSI pledge id, is locked to `PLEDGE`: it
+always reads `PLEDGE`, whatever was chosen before. The lock comes from the server and does not move
+`version`, but the ship is in the feed again when an import locks it.
 
 ## Reading the ships — `GET /exchange/v1/me/ships`
 
@@ -71,15 +77,22 @@ Send an `Idempotency-Key` and a change set of 1 to 500 ops, `dryRun` optional:
 | Op | Fields | Does |
 | --- | --- | --- |
 | `link` | `externalId`, `shipId` | Links your id to one of the member's ships. Re-linking an id moves it off its old ship. |
-| `upsert` without `shipId` | `externalId`, `shipType`, `insurance`, optional `name`, `location`, `fitted`, `orgUnit` | Creates a ship and links it. |
+| `upsert` without `shipId` | `externalId`, `shipType`, `insurance`, optional `name`, `location`, `fitted`, `orgUnit`, `origin` | Creates a ship and links it. |
 | `upsert` with `shipId` | the same, plus `version`, and `orgUnitVersion` to change the unit | Updates the ship and links it, if it is not linked yet. |
 | `remove` | `shipId`, `version` | Deletes the ship. |
 
 An `upsert` writes `shipType`, `name`, `insurance` and `location` as sent: leaving out `name` or
 `location` clears it, so send the ship's current values — the server's, or the member's change to
-them — with every `upsert`. Only an absent `fitted` keeps the ship's value, and a new ship without
-it is not fitted. `shipType` resolves as a `SHIP_TYPE` reference, `location` as in
+them — with every `upsert`. Only an absent `fitted` or `origin` keeps the ship's value; a new ship
+without `fitted` is not fitted, and one without `origin` is `UNKNOWN`. `shipType` resolves as a
+`SHIP_TYPE` reference, `location` as in
 [the catalogue](catalog.md#warehouse-locations--get-exchangev1cataloglocations).
+
+**Origin.** Send `PLEDGE` for a ship you know was pledged, for example one you read from the RSI
+hangar with a pledge id, and `IN_GAME` for one the member bought in the game. A ship the member
+added by hand without saying stays `UNKNOWN` until they choose. A change of `origin` moves the
+ship's `version`. A ship locked to `PLEDGE` refuses any other value with `ORIGIN_LOCKED`; sending
+`PLEDGE` for it changes nothing.
 
 **Org unit.** `orgUnit` works differently: leaving it out never changes the ship's unit. Send it to
 choose one: the `id` of one of the units [`GET /exchange/v1/me/org-units`](org-units.md) lists, or
@@ -101,16 +114,18 @@ batch may update or remove a ship only once. How an op that is not applied is re
 | A ship type that matches several | `ambiguous` | `AMBIGUOUS` |
 | A place without a warehouse location | `rejected` | `LOCATION_UNKNOWN` |
 | `link` or `upsert` of a ship this installation links to another id | `rejected` | `LINK_TARGET_TAKEN` |
-| `upsert` or `remove` with a `version` the ship no longer has, or of a ship an earlier op of the batch changed | `rejected` | `VERSION_CONFLICT` |
+| `upsert` or `remove` with a `version` the ship no longer has, or of a ship an earlier op of the batch changed | `rejected` | `VERSION_CONFLICT`; for a stale `version` after a patch change moved the ship the result item names it in `patchChange` ([patch change](patch-change.md#pushing-against-what-a-patch-change-removed)) |
 | `upsert` without `shipId` for an id this installation already linked | `rejected` | `VERSION_CONFLICT` |
-| `upsert` of a ship the web, the app, the system, another client or another installation removed | `rejected` | `REMOVED_ELSEWHERE` |
+| `upsert` of a ship the web, the app, the system, another client, another installation or a patch change removed | `rejected` | `REMOVED_ELSEWHERE`; for a patch change the result item names it in `patchChange` |
 | `upsert` naming an `orgUnit` the member does not directly belong to | `rejected` | `ORG_UNIT_NOT_ALLOWED` |
 | `upsert` changing the unit without `orgUnitVersion`, or with one the ship no longer has | `rejected` | `ORG_UNIT_VERSION_CONFLICT` |
+| `upsert` sending another `origin` than `PLEDGE` for a ship locked to `PLEDGE` | `rejected` | `ORIGIN_LOCKED` |
 
 On `VERSION_CONFLICT`, pull the feed, merge, and send the op again under a new `Idempotency-Key`; an
 id already linked means the ship exists — update it by its `shipId`. On `LINK_TARGET_TAKEN`, pull and
 re-link. On `ORG_UNIT_VERSION_CONFLICT`, pull the feed and ask again with the unit and counter it
-shows; on `ORG_UNIT_NOT_ALLOWED`, read the member's units again. An `upsert` naming a ship the
+shows; on `ORG_UNIT_NOT_ALLOWED`, read the member's units again. On `ORIGIN_LOCKED`, take `PLEDGE`
+from the feed and send the op again without `origin` or with `PLEDGE`. An `upsert` naming a ship the
 server no longer has brings it back only when this installation removed it, or with
 `override: true` after the member agreed. It comes back as a **new ship with a new `shipId`**,
 linked to your id.

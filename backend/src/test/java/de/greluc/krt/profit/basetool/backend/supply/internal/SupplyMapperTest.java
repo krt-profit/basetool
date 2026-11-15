@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyPatchLabels;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,8 +56,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The redaction of the purchase fields and the job-order link of a need and of the donor of a
- * donation, and the manage flags inside the active context (REQ-SUP-003, REQ-SUP-006, REQ-SUP-012,
- * REQ-SUP-023).
+ * donation, the manage flags inside the active context and the patch change named as a pledge's
+ * withdrawal reason (REQ-SUP-003, REQ-SUP-006, REQ-SUP-010, REQ-SUP-012, REQ-SUP-023).
  */
 class SupplyMapperTest {
 
@@ -77,7 +79,8 @@ class SupplyMapperTest {
             mock(OrgUnitRepository.class),
             mock(UserRepository.class),
             mock(AuthHelperService.class),
-            mock(JobOrderMaterialCoverage.class));
+            mock(JobOrderMaterialCoverage.class),
+            mock(SupplyPatchLabels.class));
     unit = new Squadron();
     unit.setId(UUID.randomUUID());
     unit.setName("Alpha");
@@ -147,7 +150,24 @@ class SupplyMapperTest {
         mock(OrgUnitRepository.class),
         mock(UserRepository.class),
         mock(AuthHelperService.class),
-        coverage);
+        coverage,
+        mock(SupplyPatchLabels.class));
+  }
+
+  /**
+   * A mapper for a member who manages no unit, reading the patch labels from the given port.
+   *
+   * @param patchLabels the patch-change labels
+   * @return the mapper
+   */
+  private static SupplyMapper mapperFor(SupplyPatchLabels patchLabels) {
+    return new SupplyMapper(
+        SupplyAccessPolicies.manager(Set.of()),
+        mock(OrgUnitRepository.class),
+        mock(UserRepository.class),
+        mock(AuthHelperService.class),
+        mock(JobOrderMaterialCoverage.class),
+        patchLabels);
   }
 
   private static QualityTier goodTier() {
@@ -345,7 +365,8 @@ class SupplyMapperTest {
         caller,
         admin,
         leadership,
-        new SupplyManagedUnits(false, managed));
+        new SupplyManagedUnits(false, managed),
+        Map.of());
   }
 
   @Test
@@ -408,6 +429,34 @@ class SupplyMapperTest {
     assertThat(pledgedForOwner.donorIsMe()).isTrue();
     assertThat(received.canReceive()).isFalse();
     assertThat(received.canWithdraw()).isFalse();
+  }
+
+  @Test
+  void aPledgeAPatchWipeWithdrewNamesThePatchChangeAndAnOrdinaryWithdrawalNone() {
+    UUID patchChange = UUID.randomUUID();
+    SupplyDonation wiped = donation(DonationStatus.WITHDRAWN);
+    wiped.setWithdrawnByPatchChange(patchChange);
+    SupplyDonation withdrawn = donation(DonationStatus.WITHDRAWN);
+    SupplyPatchLabels patchLabels = mock(SupplyPatchLabels.class);
+    when(patchLabels.labels(Set.of(patchChange))).thenReturn(Map.of(patchChange, "4.4"));
+    SupplyMapper page = mapperFor(patchLabels);
+
+    SupplyMapper.DonationContext context = page.donationContext(List.of(wiped, withdrawn));
+
+    assertThat(page.toDto(wiped, context).withdrawnByPatchLabel()).isEqualTo("4.4");
+    assertThat(page.toDto(withdrawn, context).withdrawnByPatchLabel()).isNull();
+    verify(patchLabels).labels(Set.of(patchChange));
+  }
+
+  @Test
+  void aPageWithoutAPatchWithdrawalReadsNoPatchLabel() {
+    SupplyPatchLabels patchLabels = mock(SupplyPatchLabels.class);
+    SupplyMapper page = mapperFor(patchLabels);
+
+    page.donationContext(
+        List.of(donation(DonationStatus.WITHDRAWN), donation(DonationStatus.PLEDGED)));
+
+    verifyNoInteractions(patchLabels);
   }
 
   @Test

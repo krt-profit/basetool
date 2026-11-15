@@ -168,6 +168,35 @@ class ExchangeShipControllerTest {
   }
 
   @Test
+  void aShipReadsItsOriginAndALockedShipReadsPledgeWhileTheImportLockBringsItIntoTheFeed()
+      throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID bought = ship(member, "Bought", cutlass, "LTI", null, false);
+    UUID imported = ship(member, "Imported", cutlass, "LTI", null, false);
+    jdbc.update("UPDATE ship SET origin = 'IN_GAME' WHERE id = ?", bought);
+    String cursor = snapshotEnd();
+
+    jdbc.update("UPDATE ship SET origin_locked = TRUE WHERE id = ?", imported);
+
+    String body =
+        read(relayed(get(PATH)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(JsonPath.<List<String>>read(body, "$.items[?(@.shipId == '" + bought + "')].origin"))
+        .containsExactly("IN_GAME");
+    assertThat(
+            JsonPath.<List<String>>read(body, "$.items[?(@.shipId == '" + imported + "')].origin"))
+        .containsExactly("PLEDGE");
+    read(relayed(get(PATH).param("cursor", cursor)))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].shipId").value(imported.toString()))
+        .andExpect(jsonPath("$.items[0].origin").value("PLEDGE"))
+        .andExpect(jsonPath("$.items[0].version").value(0));
+  }
+
+  @Test
   void aSnapshotPagesByShipAndEndsAtTheFeed() throws Exception {
     UUID cutlass = shipType("Cutlass Black");
     for (int i = 0; i < 3; i++) {

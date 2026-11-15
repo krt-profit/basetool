@@ -7,5 +7,8 @@
           : (${status == 'PAUSED' or status == 'PARTIALLY_RECEIVED'} ? 'chip--warning'
           : (${status == 'WITHDRAWN'} ? 'chip--muted' : 'chip--info')))"
       th:text="#{'supply.' + ${kind} + '.status.' + ${status}}">Offen</span>
+<span th:fragment="withdrawnByPatch(label)" th:if="${label != null}" class="cell-sub"
+      data-testid="supply-donation-withdrawn-by-patch"
+      th:text="#{supply.donation.withdrawnByPatch(${label})}">Patchwechsel 4.4</span>
 </body>
 </html>

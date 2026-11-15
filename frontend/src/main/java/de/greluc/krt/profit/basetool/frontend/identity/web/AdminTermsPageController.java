@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.TermsAcceptanceStat
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -84,6 +85,7 @@ public class AdminTermsPageController {
       PendingCountDto count = identityClient.termsPendingCount();
       pending = count == null ? null : count.pending();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Terms consent overview could not be read from the backend.", e);
     }
 

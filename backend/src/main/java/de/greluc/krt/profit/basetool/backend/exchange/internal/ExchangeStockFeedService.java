@@ -61,9 +61,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExchangeStockFeedService {
 
-  /** The longest display name the published item and location references carry. */
-  private static final int MAX_NAME = 200;
-
   /** The decimals an SCU amount carries. */
   private static final int SCU_SCALE = 3;
 
@@ -186,8 +183,10 @@ public class ExchangeStockFeedService {
     boolean material = lot.getMaterialId() != null;
     ExchangeItemRefDto ref =
         material
-            ? new ExchangeItemRefDto(lot.getMaterialId().toString(), cut(lot.getMaterialName()))
-            : new ExchangeItemRefDto(lot.getGameItemId().toString(), cut(lot.getGameItemName()));
+            ? new ExchangeItemRefDto(
+                lot.getMaterialId().toString(), ExchangeNames.cut(lot.getMaterialName()))
+            : new ExchangeItemRefDto(
+                lot.getGameItemId().toString(), ExchangeNames.cut(lot.getGameItemName()));
     ExchangeMaterialKindDto kind =
         material
             ? new ExchangeMaterialKindDto(
@@ -216,7 +215,7 @@ public class ExchangeStockFeedService {
                 lot.getGameItemGrade(),
                 lot.getGameItemClass()),
         new ExchangeLocationDto(
-            cut(lot.getLocationName()),
+            ExchangeNames.cut(lot.getLocationName()),
             ExchangeCatalogService.uex(lot.getUexCityId(), lot.getUexSpaceStationId()),
             lot.getLocationGuid()),
         lot.getQuality(),
@@ -273,15 +272,5 @@ public class ExchangeStockFeedService {
     BigDecimal rounded =
         BigDecimal.valueOf(amount).setScale(scale, RoundingMode.HALF_UP).stripTrailingZeros();
     return rounded.scale() < 0 ? rounded.setScale(0, RoundingMode.UNNECESSARY) : rounded;
-  }
-
-  /**
-   * Cuts a display name to the published limit.
-   *
-   * @param name the name
-   * @return the name, at most {@value #MAX_NAME} characters
-   */
-  static @NotNull String cut(@NotNull String name) {
-    return name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name;
   }
 }

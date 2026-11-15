@@ -115,17 +115,18 @@ class LiveSyncTopicRegistryParityTest {
     assertThat(backendKeys)
         .as(
             "a room the backend never publishes into is a room this registry should not name; the"
-                + " backend also publishes committed catalogue reference changes (ADR-0274) and"
-                + " bank requests written through the exchange (REQ-XCH-030)")
+                + " backend also publishes committed catalogue reference changes (ADR-0274), bank"
+                + " requests written through the exchange (REQ-XCH-030) and the accounts a"
+                + " currency wipe booked on (REQ-PATCH-046)")
         .contains(
             key("order", true),
             key("bank", false),
+            key("bank", true),
             key("orgunit-bank", false),
             key("refinery", false),
             key("refinery-order", true),
             key("orders", false))
         .doesNotContain(
-            key("bank", true),
             key("members", false),
             key("mission", true),
             key("missions", false),

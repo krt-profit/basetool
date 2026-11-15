@@ -31,15 +31,15 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a requester cancels their own pending bank booking request
- * (REQ-BANK-022, REQ-NOTIF-018).
+ * Domain event published when a pending bank booking request is cancelled: by its requester, its
+ * purpose owner or a patch change's currency wipe (REQ-BANK-022, REQ-NOTIF-018, REQ-PATCH-042).
  *
  * <p>Directed at nobody: it only {@linkplain #resolvesNotificationTypes() clears} the stale {@code
  * BANK_BOOKING_REQUEST_CREATED} items shown to the bank staff. Carries only scalars.
  *
  * @param requestId the cancelled request's id (also the notification's loose entity id)
  * @param accountId the target bank account id
- * @param actorSub the withdrawing requester's sub
+ * @param actorSub the withdrawing member's sub, or {@code null} for a currency wipe
  */
 public record BankBookingRequestCancelledEvent(
     UUID requestId, @Nullable UUID accountId, @Nullable UUID actorSub)

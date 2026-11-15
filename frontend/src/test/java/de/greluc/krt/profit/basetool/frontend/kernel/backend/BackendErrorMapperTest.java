@@ -102,14 +102,47 @@ class BackendErrorMapperTest {
   }
 
   @Test
-  void anAccessGateRefusalIsLoggedAtDebugAndNotCounted() {
+  void aRefusalTheBackendMarksAsASessionGatesIsLoggedAtDebugAndNotCounted() {
+    RuntimeException mapped =
+        mapper.map(
+            response(
+                403,
+                "{\"code\":\"ANY_GATE_REQUIRED\",\"sessionGate\":true,\"correlationId\":\"c-g\"}"),
+            "GET",
+            URI_TEMPLATE);
+
+    assertThat(mapped).isInstanceOf(SessionGateRefusalException.class);
+    SessionGateRefusalException refusal = (SessionGateRefusalException) mapped;
+    assertThat(refusal.getStatusCode()).isEqualTo(403);
+    assertThat(refusal.getProblemCode()).isEqualTo("ANY_GATE_REQUIRED");
+    assertThat(refusal.getCorrelationId()).isEqualTo("c-g");
+    assertThat(levels()).containsExactly(Level.DEBUG);
+    assertThat(meterRegistry.find(MetricNames.BACKEND_CLIENT_ERRORS).counters()).isEmpty();
+  }
+
+  @Test
+  void theApprovalAndRoleRefusalsAreLoggedAtDebugAndNotCounted() {
+    for (String code :
+        List.of(
+            BackendServiceException.CODE_PENDING_APPROVAL, BackendServiceException.CODE_NO_ROLE)) {
+      RuntimeException mapped =
+          mapper.map(response(403, "{\"code\":\"" + code + "\"}"), "GET", URI_TEMPLATE);
+
+      assertThat(mapped).isNotInstanceOf(SessionGateRefusalException.class);
+      assertThat(((BackendServiceException) mapped).getProblemCode()).isEqualTo(code);
+    }
+    assertThat(levels()).containsExactly(Level.DEBUG, Level.DEBUG);
+    assertThat(meterRegistry.find(MetricNames.BACKEND_CLIENT_ERRORS).counters()).isEmpty();
+  }
+
+  @Test
+  void aGatesCodeWithoutTheMarkerIsAnOrdinaryRefusal() {
     RuntimeException mapped =
         mapper.map(response(403, "{\"code\":\"TERMS_NOT_ACCEPTED\"}"), "GET", URI_TEMPLATE);
 
-    assertThat(((BackendServiceException) mapped).getProblemCode())
-        .isEqualTo(BackendServiceException.CODE_TERMS_NOT_ACCEPTED);
-    assertThat(levels()).containsExactly(Level.DEBUG);
-    assertThat(meterRegistry.find(MetricNames.BACKEND_CLIENT_ERRORS).counters()).isEmpty();
+    assertThat(mapped).isNotInstanceOf(SessionGateRefusalException.class);
+    assertThat(levels()).containsExactly(Level.WARN);
+    assertThat(count(MetricNames.REASON_BACKEND_4XX, "GET")).isEqualTo(1.0d);
   }
 
   @Test

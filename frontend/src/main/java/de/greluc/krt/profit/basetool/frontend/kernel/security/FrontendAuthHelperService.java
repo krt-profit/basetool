@@ -54,13 +54,7 @@ public class FrontendAuthHelperService {
    * @return whether the current principal is an admin.
    */
   public boolean isAdmin() {
-    Authentication auth = currentAuthentication();
-    if (auth == null) {
-      return false;
-    }
-    return auth.getAuthorities().stream()
-        .map(Object::toString)
-        .anyMatch(Roles.authority(Roles.ADMIN)::equals);
+    return Roles.isAdmin(currentAuthentication());
   }
 
   /**

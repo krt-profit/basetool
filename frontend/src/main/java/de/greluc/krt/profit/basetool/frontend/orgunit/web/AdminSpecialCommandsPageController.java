@@ -182,6 +182,7 @@ public class AdminSpecialCommandsPageController {
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Create SpecialCommand failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.specialcommand");
@@ -189,7 +190,7 @@ public class AdminSpecialCommandsPageController {
       }
       return "redirect:/admin/special-commands?error=CreateSpecialCommandFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Create SpecialCommand failed", e);
       return "redirect:/admin/special-commands?error=CreateSpecialCommandFailed";
     }
@@ -227,6 +228,7 @@ public class AdminSpecialCommandsPageController {
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update SpecialCommand failed", e);
       if (e.getStatusCode() == 409) {
         if ("concurrency-conflict".equals(e.getProblemType())) {
@@ -238,7 +240,7 @@ public class AdminSpecialCommandsPageController {
       }
       return "redirect:/admin/special-commands?error=UpdateSpecialCommandFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update SpecialCommand failed", e);
       return "redirect:/admin/special-commands?error=UpdateSpecialCommandFailed";
     }
@@ -261,6 +263,7 @@ public class AdminSpecialCommandsPageController {
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Delete SpecialCommand failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.specialcommand.in_use");
@@ -268,7 +271,7 @@ public class AdminSpecialCommandsPageController {
       }
       return "redirect:/admin/special-commands?error=DeleteSpecialCommandFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Delete SpecialCommand failed", e);
       return "redirect:/admin/special-commands?error=DeleteSpecialCommandFailed";
     }
@@ -291,7 +294,7 @@ public class AdminSpecialCommandsPageController {
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Activate SpecialCommand failed", e);
       return "redirect:/admin/special-commands?error=ActivateSpecialCommandFailed";
     }
@@ -335,6 +338,7 @@ public class AdminSpecialCommandsPageController {
           id, userId, new MembershipLeadToggleRequest(isLead, version));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Toggle SpecialCommand member lead failed", e);
       if (BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER.equals(
           e.getProblemCode())) {
@@ -347,7 +351,7 @@ public class AdminSpecialCommandsPageController {
       }
       return "redirect:" + MEMBER_PAGE_BASE + id + "?error=ToggleLeadFailed";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Toggle SpecialCommand member lead failed", e);
       return "redirect:" + MEMBER_PAGE_BASE + id + "?error=ToggleLeadFailed";
     }

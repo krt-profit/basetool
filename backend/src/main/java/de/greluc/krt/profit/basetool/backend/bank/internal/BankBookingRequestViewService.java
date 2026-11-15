@@ -45,6 +45,7 @@ public class BankBookingRequestViewService {
   private final BankAccessRules policy;
   private final BankBookingRequestRepository requestRepository;
   private final BankRequestClientNames clientNames;
+  private final BankRequestPatchLabels patchLabels;
 
   /**
    * Reads a request the actor may see; a requester who is neither staff nor approver gets it
@@ -74,7 +75,8 @@ public class BankBookingRequestViewService {
         BankBookingRequestDtos.of(
             request,
             clientNames.nameOf(request),
-            staff ? BankBookingRequestDtos.callerMayConfirm(request, rights) : null);
+            staff ? BankBookingRequestDtos.callerMayConfirm(request, rights) : null,
+            patchLabels.labelOf(request));
     return new BankBookingRequestViewDto(
         staff || approver ? dto : dto.withoutStaffNote(), own, staff, approver);
   }

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
@@ -140,6 +141,9 @@ public class RefineryOrderPageController {
 
   private final IngestHandoffService ingestHandoffService;
   private final ParallelPageLoader parallelPageLoader;
+
+  /** Reads the caller's home location, where the store dialog stores by default (REQ-PATCH-033). */
+  private final HomeLocationPreferenceReader homeLocationReader;
 
   /**
    * Renders one page of the refinery-order list ({@code /refinery-orders}) for one segment of the
@@ -573,6 +577,7 @@ public class RefineryOrderPageController {
         model.addAttribute("importRowsSkipped", draft.rowsSkipped());
       }
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       String detail = e.getProblemDetail();
       if (detail != null && !detail.isBlank()) {
         model.addAttribute("importErrorText", detail);
@@ -580,7 +585,7 @@ public class RefineryOrderPageController {
         model.addAttribute("importErrorKey", "refineryImport.error.failed");
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Refinery import relay failed (ajax)", e);
       model.addAttribute("importErrorKey", "refineryImport.error.failed");
     }
@@ -800,6 +805,10 @@ public class RefineryOrderPageController {
       RefineryOrderStoreForm storeForm = new RefineryOrderStoreForm();
       if (orderDto.goods() != null) {
         String roundingMode = fetchRoundingMode();
+        UUID storeLocationId =
+            homeLocationReader
+                .formDefault()
+                .orElse(orderDto.location() != null ? orderDto.location().id() : null);
         for (RefineryGoodDto good : orderDto.goods()) {
           if (good.outputMaterial() != null) {
             RefineryOrderStoreItemForm storeItem = new RefineryOrderStoreItemForm();
@@ -825,9 +834,7 @@ public class RefineryOrderPageController {
             storeItem.setQuantityType("PIECE".equals(materialQuantityType) ? "PIECE" : "SCU");
 
             storeItem.setQuality(good.quality() != null ? good.quality() : 0);
-            if (orderDto.location() != null) {
-              storeItem.setLocationId(orderDto.location().id());
-            }
+            storeItem.setLocationId(storeLocationId);
             if (currentUserId != null) {
               storeItem.setUserId(currentUserId);
             }

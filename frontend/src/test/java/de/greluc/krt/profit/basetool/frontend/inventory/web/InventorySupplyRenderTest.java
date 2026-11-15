@@ -120,7 +120,9 @@ class InventorySupplyRenderTest {
         null,
         3L,
         true,
-        Instant.parse("2026-09-01T10:00:00Z"));
+        Instant.parse("2026-09-01T10:00:00Z"),
+        false,
+        false);
   }
 
   private void stubEntries(InventoryItemDto item) {

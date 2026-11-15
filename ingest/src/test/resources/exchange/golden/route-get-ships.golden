@@ -6,7 +6,7 @@ accept: application/json, application/problem+json
 accept-encoding: gzip, deflate
 authorization: Bearer gateway-service-token
 x-correlation-id: <correlation-id>
-x-exchange-capabilities: exchange.bank.queue,exchange.bank.read,exchange.bank.request,exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.details,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.orgstock.details,exchange.orgstock.read,exchange.orgstock.write,exchange.orgunits.read,exchange.refinery.read,exchange.refinery.store,exchange.refinery.write,exchange.stock.read,exchange.stock.write
+x-exchange-capabilities: exchange.bank.queue,exchange.bank.read,exchange.bank.request,exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.details,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.orgstock.details,exchange.orgstock.read,exchange.orgstock.write,exchange.orgunits.read,exchange.patch.read,exchange.patch.write,exchange.refinery.read,exchange.refinery.store,exchange.refinery.write,exchange.stock.read,exchange.stock.write
 x-exchange-client: versekit
 x-exchange-connected-at: <connected-at>
 x-exchange-installation: <thumbprint>
@@ -26,4 +26,4 @@ x-content-type-options: nosniff
 x-correlation-id: <correlation-id>
 x-frame-options: DENY
 x-xss-protection: 0
-{"items":[{"shipId":"0b9f6c1e-2a3d-4e5f-8a7b-9c0d1e2f3a4b","version":0,"shipType":{"bt":"7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f","name":"Cutlass Black"},"insurance":{"kind":"LTI"},"fitted":false,"orgUnit":{"id":"0d6f3c1a-5b2e-4f7a-9c8d-1e2f3a4b5c6d","name":"Staffel Nord","shorthand":"NORD","kind":"SQUADRON"},"orgUnitVersion":1}],"removed":[],"nextCursor":"f1.9.0","hasMore":false}
+{"items":[{"shipId":"0b9f6c1e-2a3d-4e5f-8a7b-9c0d1e2f3a4b","version":0,"shipType":{"bt":"7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f","name":"Cutlass Black"},"insurance":{"kind":"LTI"},"origin":"PLEDGE","fitted":false,"orgUnit":{"id":"0d6f3c1a-5b2e-4f7a-9c8d-1e2f3a4b5c6d","name":"Staffel Nord","shorthand":"NORD","kind":"SQUADRON"},"orgUnitVersion":1}],"removed":[],"nextCursor":"f1.9.0","hasMore":false}

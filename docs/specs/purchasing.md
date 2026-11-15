@@ -292,8 +292,16 @@ The deal header, each tranche, each delivery, the settlement, the settings row a
 their own version. Tranche, delivery, acceptance, close and settlement take the deal's row lock and do
 not echo the header's version, so recording a delivery never conflicts with a tranche confirmation.
 
-**Enforced by:** `PurchasingDeliveryServiceTest`, `PurchasingTrancheServiceTest` · **Code:**
-`purchasing/internal/PurchasingDealService#lock`
+The deal's lock comes before its Bank requests on every path: the deal's own cancellation
+(REQ-PUR-020, REQ-PUR-022) locks the deal and then cancels its requests, and every Bank decision on
+one of them, the currency wipe of a patch change included, lets the observer lock the deal first
+(REQ-BANK-063, [REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled)).
+A cancellation and a Bank decision on the same deal therefore wait for each other instead of
+deadlocking.
+
+**Enforced by:** `PurchasingDeliveryServiceTest`, `PurchasingTrancheServiceTest`,
+`PurchasingRequestObserverTest`, `PurchasingDealCurrencyWipeLockOrderIntegrationTest` · **Code:**
+`purchasing/internal/PurchasingDealService#lock`, `purchasing/internal/PurchasingRequestObserver#beforeDecision`
 
 ### REQ-PUR-027 — Live update
 

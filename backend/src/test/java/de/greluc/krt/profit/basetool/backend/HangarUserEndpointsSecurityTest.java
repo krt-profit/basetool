@@ -150,7 +150,8 @@ class HangarUserEndpointsSecurityTest {
             + shipType.getId()
             + "\","
             + "\"insurance\": \"0\","
-            + "\"fitted\": false"
+            + "\"fitted\": false,"
+            + "\"origin\": \"PLEDGE\""
             + "}";
     mockMvc
         .perform(
@@ -173,7 +174,8 @@ class HangarUserEndpointsSecurityTest {
             + shipType.getId()
             + "\","
             + "\"insurance\": \"0\","
-            + "\"fitted\": false"
+            + "\"fitted\": false,"
+            + "\"origin\": \"PLEDGE\""
             + "}";
     mockMvc
         .perform(

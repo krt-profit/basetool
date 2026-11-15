@@ -27,7 +27,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -82,6 +84,34 @@ public class BankPostingWriter {
   }
 
   /**
+   * Locks every account and then every holder, each in id order, for a wipe reset that reads and
+   * offsets the whole ledger (REQ-BANK-013, REQ-PATCH-041): every booking, a custody move without
+   * an account leg included, waits until the reset ends.
+   *
+   * @return every account, locked, in id order
+   */
+  public List<BankAccount> lockLedger() {
+    List<BankAccount> accounts = accountRepository.findAllForUpdateOrderById();
+    holderRepository.findAllForUpdateOrderById();
+    return accounts;
+  }
+
+  /**
+   * Locks the holders a booking moves custody between, in id order and after the booking's account
+   * locks, so the booking and a wipe reset take turns (REQ-BANK-031, REQ-PATCH-041).
+   *
+   * @param holderIds the holders the booking posts to; may be empty
+   * @return holder id to locked entity for every id that exists
+   */
+  public Map<UUID, BankHolder> lockHolders(@NotNull Collection<UUID> holderIds) {
+    if (holderIds.isEmpty()) {
+      return Map.of();
+    }
+    return holderRepository.findAllByIdForUpdateOrderById(Set.copyOf(holderIds)).stream()
+        .collect(Collectors.toMap(BankHolder::getId, holder -> holder));
+  }
+
+  /**
    * Resolves a holder or fails with 404.
    *
    * @param holderId the holder id
@@ -93,7 +123,8 @@ public class BankPostingWriter {
   }
 
   /**
-   * Resolves a holder from a map pre-loaded by {@link #loadHolders(Collection)}.
+   * Resolves a holder from a map pre-loaded by {@link #loadHolders(Collection)} or {@link
+   * #lockHolders(Collection)}.
    *
    * @param holders the pre-loaded holder map
    * @param holderId the holder to resolve
@@ -143,10 +174,7 @@ public class BankPostingWriter {
       @NotNull Instant now,
       @Nullable CounterpartySnapshot counterparty) {
     BankTransaction tx =
-        BankTransaction.builder()
-            .type(type)
-            .initiatedBy(authHelperService.currentUserId().orElse(null))
-            .note(note)
+        header(type, note, now)
             .justification(justification)
             .staffNote(staffNote)
             .reversedTransaction(reversed)
@@ -155,9 +183,40 @@ public class BankPostingWriter {
             .counterpartyHandle(counterparty == null ? null : counterparty.handle())
             .counterpartyOrgUnitId(counterparty == null ? null : counterparty.orgUnitId())
             .counterpartyOrgUnitName(counterparty == null ? null : counterparty.orgUnitName())
-            .createdAt(now)
             .build();
     return transactionRepository.save(tx);
+  }
+
+  /**
+   * Persists one {@code WIPE_RESET} header stamped with the caller and the shared booking instant.
+   *
+   * @param note the reset's note
+   * @param now the shared booking instant
+   * @param effectiveAt the live time of the patch change whose currency wipe books the reset, or
+   *     {@code null} for the standalone reset, which takes effect when it is recorded
+   * @return the persisted header
+   */
+  public BankTransaction persistWipeReset(
+      @NotNull String note, @NotNull Instant now, @Nullable Instant effectiveAt) {
+    return transactionRepository.save(
+        header(BankTransactionType.WIPE_RESET, note, now).effectiveAt(effectiveAt).build());
+  }
+
+  /**
+   * Starts a transaction header with the fields every booking carries.
+   *
+   * @param type the transaction type
+   * @param note optional free-text note
+   * @param now the shared booking instant
+   * @return the builder, to be completed by the caller
+   */
+  private BankTransaction.BankTransactionBuilder header(
+      @NotNull BankTransactionType type, @Nullable String note, @NotNull Instant now) {
+    return BankTransaction.builder()
+        .type(type)
+        .initiatedBy(authHelperService.currentUserId().orElse(null))
+        .note(note)
+        .createdAt(now);
   }
 
   /**

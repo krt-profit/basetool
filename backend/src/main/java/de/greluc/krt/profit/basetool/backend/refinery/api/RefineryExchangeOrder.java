@@ -31,6 +31,8 @@ import org.jetbrains.annotations.Unmodifiable;
  *
  * @param id the order id, the feed key
  * @param status the status
+ * @param canceledByPatchChange the patch change that cancelled the order, or {@code null}
+ *     (REQ-PATCH-006)
  * @param gameDataVersion the counter of the game-data section (REQ-REFINERY-029)
  * @param financesVersion the counter of the finances section (REQ-REFINERY-029)
  * @param createdByClient the exchange client that created the order, or {@code null} when the web
@@ -52,6 +54,7 @@ import org.jetbrains.annotations.Unmodifiable;
 public record RefineryExchangeOrder(
     @NotNull UUID id,
     @NotNull RefineryOrderStatus status,
+    @Nullable UUID canceledByPatchChange,
     long gameDataVersion,
     long financesVersion,
     @Nullable String createdByClient,

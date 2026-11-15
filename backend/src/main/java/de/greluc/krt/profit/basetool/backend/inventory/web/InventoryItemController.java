@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPoo
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryMergeCandidatesDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryMergeProbe;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryPoolChangeService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStolenMarkService;
@@ -137,6 +138,7 @@ public class InventoryItemController {
   private final InventoryAggregationService inventoryAggregationService;
   private final UserService userService;
   private final InventoryAccessPolicy inventoryAccessPolicy;
+  private final InventoryMergeProbe inventoryMergeProbe;
 
   /**
    * Aggregated per-catalog-entry inventory view. For {@code catalog=MATERIAL} (the default) the
@@ -536,7 +538,7 @@ public class InventoryItemController {
       @RequestParam(required = false, defaultValue = "false") boolean stolen,
       @RequestParam(required = false) UUID owningOrgUnitId) {
     return new InventoryMergeCandidatesDto(
-        inventoryItemService.hasMergeCandidates(
+        inventoryMergeProbe.hasMergeCandidates(
             userId,
             userService.getUserIdFromJwt(jwt),
             materialId,

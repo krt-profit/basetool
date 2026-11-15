@@ -495,7 +495,23 @@ is idempotent (a second click on an all-zero bank is a no-op with a notice).
   design system's bank patterns (specimen `components/BankPatterns/preview.html`).
 - [x] The audit log contains the summary event (actor, account count, total zeroed).
 
-**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only) · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/web/BankAdminController` · **Issues:** #556
+**Patch change (amendment, [REQ-PATCH-041](patch-change.md#req-patch-041--the-bank-reset-offsets-the-balances-as-of-the-live-time),
+[REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled),
+ADR-0384).** A patch change with the currency wipe runs a second form of this reset at its
+trigger. Its `WIPE_RESET` offsets the account and holder balances **as of the live time**, so
+every booking after the live time stays; an offset that would take an account or a holder below
+zero stops at zero, so no account is overdrawn (REQ-BANK-006) and the wipe always goes through.
+It cancels the pending requests submitted before the live time with the patch change as their
+reason, and its one `WIPE_RESET_EXECUTED` names the patch change, the live time, the number of
+cancelled requests and the number of accounts and holders whose offset stopped at zero. The
+button above keeps its behaviour. The patch reset takes effect at the live time
+(`bank_transaction.effective_at`, V430), where a later patch reset's balances count it; the
+button's reset takes effect when it is recorded. A button reset recorded after a patch change's
+live time and before its trigger already zeroed everything held at that live time, so the patch
+reset then offsets nothing and every booking after the button's reset stays. Both resets lock
+every account and then every holder, in id order, before they read a balance.
+
+**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent, takes effect when recorded), `BankControllerSecurityTest` (admin-only), `BankCurrencyWipeIntegrationTest` (reset as of the live time, effective at it, nothing after a button reset since the live time), `V430CurrencyWipeEffectiveTimeMigrationTest` · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/internal/BankWipeResetBooking`, `bank/internal/BankPostingWriter#lockLedger`, `bank/internal/BankCurrencyWipeService`, `bank/internal/BankTransactionRepository#existsWipeResetTakingEffectSince`, `bank/web/BankAdminController`, `V430` · **Issues:** #556
 
 ### REQ-BANK-014 — Account statement PDF (Kontoauszug)
 
@@ -977,7 +993,12 @@ caller to oversee the org unit; cancel requires owning the request). A request c
 raised against a `CLOSED` account. `GET /api/v1/bank/org-units/requests/page` reads the same
 own requests as one page, filtered by lifecycle state (`status`, repeatable; every state when
 omitted), newest first, with the total over all pages — a read-only call that is not audited. The
-dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it.
+dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it. A patch change with the currency
+wipe also cancels a pending request submitted before its live time, with the patch change as
+the reason; the request then reads `CANCELLED`, and every view of it names the patch change by its
+current label beneath the status („Patchwechsel 4.4"), while a request its requester withdrew
+shows the status alone
+([REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled)).
 
 **Acceptance**
 
@@ -993,6 +1014,10 @@ dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it.
   already-decided → 409 `BANK_REQUEST_NOT_PENDING`), with optimistic-lock echo.
 - [x] Request form (no holder field) + own-status list with a cancel action on the slim page,
   AJAX no-reload (frontend `OrgUnitBankPageControllerMvcTest`).
+- [x] A request a currency wipe cancelled names its patch change beneath the status in the own
+  list, the foreign list, the staff queue, the request page and the dashboard widget, read once
+  per page (`BankBookingRequestServiceTest`, `BankRequestPatchLabelsTest`, frontend
+  `BankRequestCancelledByPatchRenderTest`, `DashboardTradeWidgetsMvcTest`).
 
 **Enforced by:** `BankBookingRequestServiceTest`, `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest` · **Code:** `bank/internal/OrgUnitBankAccessService`, `bank/internal/BankBookingRequestService`, `bank/internal/BankBookingRequest`, `db/migration/V159`, frontend `bank/web/OrgUnitBankProxyController`, `templates/bank/org-unit-bank.html`, `static/js/bank/bank.js` · **Issues:** #666, #670, #672
 
@@ -1485,6 +1510,11 @@ in the unified activity audit (REQ-AUDIT-001).
 > rounds to `0` keeps the legacy fee-free shape (no account leg, holder legs net to zero); historical
 > fee-free rows (`transfer_fee = 0`) stay sound. A **reversal** negates all three legs.
 
+**Locking (amendment, [REQ-PATCH-041](patch-change.md#req-patch-041--the-bank-reset-offsets-the-balances-as-of-the-live-time)).**
+An Umbuchung locks both holders in id order after the fee account, and a reversal locks the
+holders of its holder legs after its accounts, so a custody move without an account leg and a
+wipe reset (REQ-BANK-013) take turns.
+
 **Acceptance**
 
 - [x] An Umbuchung of `A` with `fee = round(A × rate)` debits the source holder `A + fee`, credits
@@ -1498,7 +1528,7 @@ in the unified activity audit (REQ-AUDIT-001).
   holder overdraft); same source/destination holder is rejected.
 - [x] It is reachable by `BANK_EMPLOYEE` without an account grant; a plain member is 403; it writes a `HOLDER_TRANSFER` audit event (detail carries the fee, amounts only).
 
-**Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankControllerSecurityTest` · **Code:** `bank/internal/BankLedgerService#bookHolderTransfer`, `bank/internal/BankLedgerIntegrityService` + `bank/internal/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `bank/web/BankHolderController`, `bank/internal/BankHolderTransferRequest`, `bank/internal/BankTransactionType`, `bank/internal/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
+**Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankControllerSecurityTest`, `BankCurrencyWipeIntegrationTest` (a zero-fee Umbuchung and a wipe reset take turns) · **Code:** `bank/internal/BankLedgerService#bookHolderTransfer`, `bank/internal/BankPostingWriter#lockHolders`, `bank/internal/BankLedgerIntegrityService` + `bank/internal/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `bank/web/BankHolderController`, `bank/internal/BankHolderTransferRequest`, `bank/internal/BankTransactionType`, `bank/internal/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
 
 ### REQ-BANK-032 — Holder custody history (own for employees, all for management)
 
@@ -3382,8 +3412,19 @@ rolls the bank's decision back. A request without a purpose calls no observer. A
 owner itself asked for through `PurposeBoundRequests#cancel` is reported like any other, so an
 observer treats the call as idempotent.
 
-**Enforced by:** `BankPurposeBoundRequestServiceTest` · **Code:**
-`bank/api/BookingRequestPurposeObserver`, `bank/internal/BankBookingRequestService` · **ADR:**
+**Lock order (amendment, [REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled)).**
+Before the Bank locks a purpose-bound request for a decision (a confirmation, a rejection, a
+cancellation by its requester, the currency wipe), it reads the request's purpose without loading
+the request and calls the observer's `beforeDecision`, which locks the owner. The owner's own
+cancellation through `PurposeBoundRequests#cancel` already holds that lock. Owner, request and
+accounts are therefore locked in one order on every path, the order a linked decision follows
+through `BankLinkedEffectHandler#beforeEffect`.
+
+**Enforced by:** `BankPurposeBoundRequestServiceTest`, `PurchasingRequestObserverTest`,
+`PurchasingDealCurrencyWipeLockOrderIntegrationTest` · **Code:**
+`bank/api/BookingRequestPurposeObserver`, `bank/internal/BankBookingRequestService`,
+`bank/internal/BankPurposeObservers`, `bank/internal/BankBookingRequestRepository#findPurposeById` ·
+**ADR:**
 [ADR-0254](../adr/0254-a-bank-booking-request-may-carry-an-opaque-purpose.md)
 
 ### REQ-BANK-064 — Collective read of the viewable org-unit bank accounts
@@ -3553,7 +3594,8 @@ REQ-BANK-046, REQ-BANK-068, REQ-BXCH-004 · **Issues:** #3113, #3119, #3159
 ### REQ-BANK-068 — One booking request has a page of its own
 
 `/bank/requests/{id}` shows one booking request: its type, status, approval state, account and
-target, amount, requester, justification and note, and once decided when, by whom and why. It is the
+target, amount, requester, justification and note, and once decided when, by whom and why; for a
+request a currency wipe cancelled the reason is the patch change (REQ-PATCH-042). It is the
 page the exchange staff queue's `link` opens (REQ-BXCH-005), so it is open to every signed-in member
 and the backend decides what it shows.
 

@@ -30,10 +30,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarRelocationGuard.LockedShips;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -44,27 +45,26 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
-import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
-import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -86,16 +86,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class HangarService {
 
-  /** The {@code changeCode} of an admin's notice that a ship moved to another org unit. */
-  private static final String ORG_UNIT_CHANGED = "ORG_UNIT_CHANGED";
-
   private final ShipRepository shipRepository;
   private final UserRepository userRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final LocationRepository locationRepository;
-  private final ShipDeletionObserver shipDeletionObserver;
+  private final HangarShipRemoval shipRemoval;
   private final ShipTypeMapper shipTypeMapper;
-  private final EntityManager entityManager;
   private final RequestScopeResolver requestScopeResolver;
   private final AccessGateService accessGateService;
   private final OrgUnitStampingService orgUnitStampingService;
@@ -103,6 +99,8 @@ public class HangarService {
   private final ApplicationEventPublisher eventPublisher;
   private final UserService userService;
   private final HangarUnitLiveSync unitLiveSync;
+  private final HangarAdminNotifier adminNotifier;
+  private final HangarRelocationGuard relocationGuard;
 
   /**
    * Adds a ship to a user's hangar, stamping the owning org unit from the user's stampable unit (an
@@ -111,16 +109,18 @@ public class HangarService {
    * personal ship visible only to them.
    *
    * @param userId owning user's id
-   * @param dto ship payload (name, type, insurance, fitted, location)
+   * @param dto ship payload (name, type, insurance, fitted, location, origin)
    * @return the persisted ship
    * @throws NotFoundException when the user id does not resolve
-   * @throws BadRequestException when the ship type or location id is missing or invalid, or the
-   *     picked unit is neither one of the user's stampable units nor a unit the caller may edit
+   * @throws BadRequestException when the origin is neither {@code PLEDGE} nor {@code IN_GAME}
+   *     (REQ-HANGAR-017), the ship type or location id is missing or invalid, or the picked unit is
+   *     neither one of the user's stampable units nor a unit the caller may edit
    * @throws de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException when the
    *     user has several stampable units and neither a pick nor a pin on one of them names one
    */
   @Transactional
   public Ship addShip(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
+    ShipOriginRules.requireChoice(dto.origin());
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return create(
         user,
@@ -132,7 +132,7 @@ public class HangarService {
    * Adds a ship a connected application creates for the member without naming a unit (REQ-XCH-017):
    * stamped with the member's only stampable unit (an active direct membership while the member
    * holds {@code KRT Member}), or none when the member has none or several; otherwise as {@link
-   * #addShip(UUID, ShipRequestDto)}.
+   * #addShip(UUID, ShipRequestDto)}, except that a ship without an origin stores {@code UNKNOWN}.
    *
    * @param userId owning user's id
    * @param dto ship payload (name, type, insurance, fitted, location); its org unit is ignored
@@ -148,7 +148,7 @@ public class HangarService {
 
   /**
    * Adds a ship a connected application creates for the member in the org unit it names
-   * (REQ-XCH-017); otherwise as {@link #addShip(UUID, ShipRequestDto)}.
+   * (REQ-XCH-017); otherwise as {@link #addShipForClient(UUID, ShipRequestDto)}.
    *
    * @param userId owning user's id
    * @param dto ship payload (name, type, insurance, fitted, location); its org unit is ignored
@@ -169,7 +169,7 @@ public class HangarService {
    * Creates the ship with the given owning org unit and audits it.
    *
    * @param user the owner
-   * @param dto ship payload (name, type, insurance, fitted, location)
+   * @param dto ship payload (name, type, insurance, fitted, location, origin)
    * @param owningOrgUnit the stamped org unit, or {@code null} for an ownerless personal ship
    * @return the persisted ship
    * @throws BadRequestException when the ship type or location id is missing or invalid
@@ -180,6 +180,7 @@ public class HangarService {
     ship.setName(dto.name());
     ship.setInsurance(dto.insurance());
     ship.setFitted(dto.fitted());
+    ship.setOrigin(Objects.requireNonNullElse(dto.origin(), ShipOrigin.UNKNOWN));
     ship.setOwner(user);
     ship.setOwningOrgUnit(owningOrgUnit);
     ship.setShipType(
@@ -216,13 +217,26 @@ public class HangarService {
   }
 
   /**
+   * Returns the ships among the listed ones that a pending relocation locks, for the „Umzug
+   * ausstehend" marker (REQ-PATCH-023): those from before the open home-location phase's live time
+   * of an owner who has not chosen yet.
+   *
+   * @param ships the listed ships, their owners readable
+   * @return the ids of the locked ships, empty while no phase is open
+   */
+  public @NotNull @Unmodifiable Set<UUID> relocationPendingShips(@NotNull Collection<Ship> ships) {
+    return relocationGuard.pendingShips(ships);
+  }
+
+  /**
    * Returns one page of the user's own ships in the personal-hangar order, optionally filtered by
-   * ship-type or manufacturer name and by the fitted flag (REQ-HANGAR-002). Ordering and filtering
-   * run in the repository across the whole fleet.
+   * ship-type or manufacturer name, by the fitted flag (REQ-HANGAR-002) and by the effective origin
+   * (REQ-HANGAR-017). Ordering and filtering run in the repository across the whole fleet.
    *
    * @param userId owner id; only this user's ships are returned
    * @param search optional ship-type/manufacturer name filter; {@code null}/blank means no filter
    * @param fitted optional fitted filter; {@code null} means fitted and unfitted ships
+   * @param origin optional origin filter; {@code null} means every origin
    * @param pageable page request, unsorted (the query defines the order)
    * @return one ordered, optionally filtered page of the user's ships
    */
@@ -230,10 +244,11 @@ public class HangarService {
       @NotNull UUID userId,
       @Nullable String search,
       @Nullable Boolean fitted,
+      @Nullable ShipOrigin origin,
       @NotNull Pageable pageable) {
     String normalizedSearch =
         search == null || search.isBlank() ? null : LikePatterns.escape(search.trim());
-    return shipRepository.findByOwnerIdFiltered(userId, normalizedSearch, fitted, pageable);
+    return shipRepository.findByOwnerIdFiltered(userId, normalizedSearch, fitted, origin, pageable);
   }
 
   /**
@@ -287,6 +302,7 @@ public class HangarService {
 
     Map<UUID, List<Ship>> shipsByType =
         ships.stream().collect(Collectors.groupingBy(s -> s.getShipType().getId()));
+    Set<UUID> relocationPending = relocationGuard.pendingShips(ships);
 
     return p.map(obj -> {
       ShipType type = (ShipType) obj[0];
@@ -298,7 +314,8 @@ public class HangarService {
                     new SquadronShipDetailDto(
                         s.getOwner() != null ? s.getOwner().getEffectiveName() : "Unknown",
                         s.getLocation() != null ? s.getLocation().getName() : null,
-                        s.isFitted()))
+                        s.isFitted(),
+                        relocationPending.contains(s.getId())))
                 .toList();
       }
 
@@ -312,7 +329,8 @@ public class HangarService {
 
   /**
    * Updates a ship owned by {@code userId}, checking the optimistic-lock version when {@code
-   * dto.version()} is non-null.
+   * dto.version()} is non-null. An absent origin keeps the stored one; a changed origin is part of
+   * the version and audited by its field name only (REQ-HANGAR-017).
    *
    * @param userId calling user's id
    * @param shipId ship primary key
@@ -322,16 +340,21 @@ public class HangarService {
    * @throws AccessDeniedException when the calling user is not the owner
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
    *     version is stale
-   * @throws BadRequestException when the ship type or location id is missing/invalid
+   * @throws BadRequestException when the ship type or location id is missing/invalid, or the ship's
+   *     origin is locked and the payload names another origin than {@code PLEDGE}
    */
   @Transactional
   public Ship updateShip(@NotNull UUID userId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
     Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
 
     OptimisticLock.checkOptionalClient(ship.getVersion(), dto.version(), Ship.class, shipId);
-    requireOwner(ship, userId);
+    ShipOwnership.requireOwner(ship, userId);
+    relocationGuard.requireWritable(List.of(shipId));
 
     List<String> changed = new ArrayList<>();
+    if (ShipOriginRules.apply(ship, dto.origin())) {
+      changed.add("origin");
+    }
     if (!Objects.equals(ship.getName(), dto.name())) {
       changed.add("name");
     }
@@ -431,7 +454,7 @@ public class HangarService {
       long owningOrgUnitVersion) {
     ShipMove move = moveShip(memberId, shipId, orgUnitId, owningOrgUnitVersion);
     if (move.moved()) {
-      announceByAdmin(memberId, ORG_UNIT_CHANGED, move.ship());
+      adminNotifier.shipChanged(memberId, HangarChangeCode.ORG_UNIT_CHANGED, move.ship());
     }
     return move.ship();
   }
@@ -451,7 +474,8 @@ public class HangarService {
       @Nullable UUID orgUnitId,
       long owningOrgUnitVersion) {
     Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
-    requireOwner(ship, userId);
+    ShipOwnership.requireOwner(ship, userId);
+    relocationGuard.requireWritable(List.of(shipId));
     OrgUnit current = ship.getOwningOrgUnit();
     if (Objects.equals(current == null ? null : current.getId(), orgUnitId)) {
       return new ShipMove(ship, false);
@@ -513,12 +537,11 @@ public class HangarService {
   public @NotNull ShipBulkOrgUnitResultDto bulkChangeShipOrgUnitByAdmin(
       @NotNull UUID memberId, @NotNull List<UUID> shipIds, @Nullable UUID orgUnitId) {
     BulkMove move = moveShips(memberId, shipIds, orgUnitId);
-    int moved = move.movedShips().size();
-    if (moved == 1) {
-      announceByAdmin(memberId, ORG_UNIT_CHANGED, move.movedShips().getFirst());
-    } else if (moved > 1) {
-      tellMember(memberId, actor -> HangarNotices.shipsOrgUnitChanged(memberId, moved, actor));
-    }
+    adminNotifier.shipsChanged(
+        memberId,
+        move.movedShips(),
+        HangarChangeCode.ORG_UNIT_CHANGED,
+        (count, actor) -> HangarNotices.shipsOrgUnitChanged(memberId, count, actor));
     return move.result();
   }
 
@@ -533,17 +556,14 @@ public class HangarService {
    */
   private @NotNull BulkMove moveShips(
       @NotNull UUID userId, @NotNull List<UUID> shipIds, @Nullable UUID orgUnitId) {
-    List<UUID> distinctIds = shipIds.stream().distinct().toList();
-    List<Ship> ships = shipRepository.lockAllByIdOrderById(distinctIds);
-    if (ships.size() != distinctIds.size()) {
-      throw new NotFoundException("Ship not found");
-    }
-    ships.forEach(ship -> requireOwner(ship, userId));
-    List<Ship> moving =
-        ships.stream()
-            .filter(ship -> !Objects.equals(orgUnitIdOf(ship.getOwningOrgUnit()), orgUnitId))
-            .toList();
-    int skipped = ships.size() - moving.size();
+    BulkShipSelection selection =
+        BulkShipSelection.lock(
+            shipRepository,
+            userId,
+            shipIds,
+            ship -> !Objects.equals(orgUnitIdOf(ship.getOwningOrgUnit()), orgUnitId));
+    List<Ship> moving = selection.changing();
+    int skipped = selection.skipped();
     if (moving.isEmpty()) {
       return new BulkMove(List.of(), new ShipBulkOrgUnitResultDto(0, skipped));
     }
@@ -615,21 +635,6 @@ public class HangarService {
   }
 
   /**
-   * Refuses a ship the calling user does not own.
-   *
-   * @param ship the ship
-   * @param userId calling user's id
-   * @throws AccessDeniedException when the calling user is not the owner
-   */
-  private static void requireOwner(@NotNull Ship ship, @NotNull UUID userId) {
-    if (ship.getOwner() == null
-        || ship.getOwner().getId() == null
-        || !ship.getOwner().getId().equals(userId)) {
-      throw new AccessDeniedException("Access denied: You do not own this ship");
-    }
-  }
-
-  /**
    * Deletes a ship owned by {@code userId} after detaching it from any mission units.
    *
    * @param userId calling user's id
@@ -641,19 +646,16 @@ public class HangarService {
   @Transactional
   public int deleteShip(@NotNull UUID userId, @NotNull UUID shipId) {
     Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
-    requireOwner(ship, userId);
+    ShipOwnership.requireOwner(ship, userId);
+    relocationGuard.requireWritable(List.of(shipId));
 
-    int detached = shipDeletionObserver.beforeShipDelete(shipId);
-
-    entityManager.flush();
-    shipRepository.delete(ship);
+    int detached = shipRemoval.remove(List.of(ship));
     auditRecorder.record(
         AuditEventType.HANGAR_SHIP_DELETED,
         shipId,
         ship.getShipType().getName(),
         userId,
         AuditDetails.of("detachedUnits", detached));
-    unitLiveSync.shipsChanged(Arrays.asList(ship.getOwningOrgUnit()));
     return detached;
   }
 
@@ -671,38 +673,44 @@ public class HangarService {
       return;
     }
     log.info("deleteAllShipsForUser: unlinking {} ships for user {}", ships.size(), userId);
-    int detached = 0;
-    for (Ship ship : ships) {
-      detached += shipDeletionObserver.beforeShipDelete(ship.getId());
-    }
-    entityManager.flush();
-    shipRepository.deleteAll(ships);
+    int detached = shipRemoval.remove(ships);
     auditRecorder.record(
         AuditEventType.HANGAR_EMPTIED,
         null,
         null,
         userId,
         AuditDetails.of("ships", ships.size()).with("detachedUnits", detached));
-    unitLiveSync.shipsChanged(ships.stream().map(Ship::getOwningOrgUnit).toList());
     log.info("deleteAllShipsForUser: deleted {} ships for user {}", ships.size(), userId);
   }
 
   /**
    * Clears the {@code fitted} flag on every ship of the units in the caller's scope in which the
-   * caller holds officer reach; in the admin all-squadrons mode on every ship.
+   * caller holds officer reach; in the admin all-squadrons mode on every ship. Ships a pending
+   * relocation locks for the caller stay as they are (REQ-PATCH-023).
    */
   @Transactional
   public void resetAllFittedStatus() {
     ScopePredicate scope = officerResetScope(requestScopeResolver.currentScopePredicate());
+    List<ShipRepository.OwnerShipCount> fittedOwners = countFitted(scope, LockedShips.NONE);
+    LockedShips locked =
+        relocationGuard.lockedFor(
+            fittedOwners.stream().map(ShipRepository.OwnerShipCount::getOwnerId).toList());
     List<ShipRepository.OwnerShipCount> perOwner =
-        shipRepository.countFittedByOwnerScoped(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+        locked.owners().isEmpty() ? fittedOwners : countFitted(scope, locked);
     List<UUID> units =
         shipRepository.findFittedOrgUnitIdsScoped(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            locked.owners(),
+            locked.before());
     int reset =
         shipRepository.resetAllFittedScoped(
-            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            locked.owners(),
+            locked.before());
     if (reset > 0) {
       auditRecorder.record(
           AuditEventType.HANGAR_FITTED_RESET,
@@ -717,6 +725,23 @@ public class HangarService {
       }
       unitLiveSync.unitsChanged(units);
     }
+  }
+
+  /**
+   * Counts the fitted ships per owner that a fitted reset in {@code scope} clears.
+   *
+   * @param scope the reset's scope
+   * @param locked the ships the reset leaves out
+   * @return one row per owner with at least one such ship
+   */
+  private @NotNull List<ShipRepository.OwnerShipCount> countFitted(
+      @NotNull ScopePredicate scope, @NotNull LockedShips locked) {
+    return shipRepository.countFittedByOwnerScoped(
+        scope.adminAllScope(),
+        scope.activeOrgUnitId(),
+        scope.memberOrgUnitIds(),
+        locked.owners(),
+        locked.before());
   }
 
   /**
@@ -753,20 +778,22 @@ public class HangarService {
    * @param dto the new ship
    * @return the saved ship
    * @throws NotFoundException when the member id does not resolve
-   * @throws BadRequestException when the picked unit is not a direct membership of the member, or
-   *     the ship type or location id is missing or invalid
+   * @throws BadRequestException when the origin is neither {@code PLEDGE} nor {@code IN_GAME}, the
+   *     picked unit is not a direct membership of the member, or the ship type or location id is
+   *     missing or invalid
    * @throws de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException when the
    *     member has several stampable units and no unit is picked
    */
   @Transactional
   public Ship addShipByAdmin(@NotNull UUID memberId, @NotNull ShipRequestDto dto) {
+    ShipOriginRules.requireChoice(dto.origin());
     User member = Entities.require(userRepository.findPlainById(memberId), "User not found");
     Ship ship =
         create(
             member,
             dto,
             orgUnitStampingService.resolveOrgUnitForAdminOnBehalf(member, dto.owningOrgUnitId()));
-    announceByAdmin(memberId, "ADDED", ship);
+    adminNotifier.shipChanged(memberId, HangarChangeCode.ADDED, ship);
     return ship;
   }
 
@@ -782,7 +809,7 @@ public class HangarService {
   public Ship updateShipByAdmin(
       @NotNull UUID memberId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
     Ship ship = updateShip(memberId, shipId, dto);
-    announceByAdmin(memberId, "UPDATED", ship);
+    adminNotifier.shipChanged(memberId, HangarChangeCode.UPDATED, ship);
     return ship;
   }
 
@@ -798,33 +825,9 @@ public class HangarService {
     Ship ship = shipRepository.findById(shipId).orElse(null);
     int detached = deleteShip(memberId, shipId);
     if (ship != null) {
-      announceByAdmin(memberId, "DELETED", ship);
+      adminNotifier.shipChanged(memberId, HangarChangeCode.DELETED, ship);
     }
     return detached;
-  }
-
-  private void announceByAdmin(UUID memberId, String changeCode, Ship ship) {
-    tellMember(
-        memberId,
-        actor ->
-            HangarNotices.hangarChanged(
-                memberId,
-                changeCode,
-                ship.getShipType() == null ? ActorRef.UNKNOWN_NAME : ship.getShipType().getName(),
-                actor));
-  }
-
-  /**
-   * Publishes a notice to a member about an admin's change, unless the admin is that member.
-   *
-   * @param memberId the member the change concerns
-   * @param notice builds the notice from the acting admin
-   */
-  private void tellMember(@NotNull UUID memberId, @NotNull Function<ActorRef, NoticeEvent> notice) {
-    ActorRef actor = userService.currentActor();
-    if (!memberId.equals(actor.id())) {
-      eventPublisher.publishEvent(notice.apply(actor));
-    }
   }
 
   /**

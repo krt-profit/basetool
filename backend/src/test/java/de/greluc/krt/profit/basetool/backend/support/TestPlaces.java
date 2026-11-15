@@ -71,6 +71,35 @@ public final class TestPlaces {
   }
 
   /**
+   * Inserts a curated home location on a city of its own, for a test whose patch change asks for a
+   * home location, which needs one on offer (REQ-PATCH-062).
+   *
+   * @param jdbc the test's JDBC template
+   * @param name the location's name
+   * @return the location's id
+   */
+  @NotNull
+  public static UUID insertHomeLocation(@NotNull JdbcTemplate jdbc, @NotNull String name) {
+    UUID id = UUID.randomUUID();
+    insertLocation(jdbc, id, name);
+    jdbc.update("UPDATE location SET is_home_location = TRUE WHERE id = ?", id);
+    return id;
+  }
+
+  /**
+   * Deletes a location {@link #insertLocation} or {@link #insertHomeLocation} inserted, with its
+   * city.
+   *
+   * @param jdbc the test's JDBC template
+   * @param id the location's id
+   */
+  public static void deleteLocation(@NotNull JdbcTemplate jdbc, @NotNull UUID id) {
+    UUID city = jdbc.queryForObject("SELECT city_id FROM location WHERE id = ?", UUID.class, id);
+    jdbc.update("DELETE FROM location WHERE id = ?", id);
+    jdbc.update("DELETE FROM city WHERE id = ?", city);
+  }
+
+  /**
    * Inserts a starmap object an admin set visible, for a test that creates a storage place on it
    * (REQ-P4K-036, REQ-P4K-038).
    *

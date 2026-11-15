@@ -187,7 +187,7 @@ public class AdminDefaultBlueprintsPageController {
       blueprintClient.removeDefault(id);
       redirectAttributes.addFlashAttribute("successToast", "admin.defaultBlueprints.toast.removed");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Failed to remove default blueprint {}", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "admin.defaultBlueprints.error.remove");
     }
@@ -257,6 +257,7 @@ public class AdminDefaultBlueprintsPageController {
       blueprintClient.addDefault(new DefaultBlueprintCreateRequest(key));
       return AddOutcome.ADDED;
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       if (e.getStatusCode() == HttpStatus.CONFLICT.value()) {
         return AddOutcome.SKIPPED;
       }
