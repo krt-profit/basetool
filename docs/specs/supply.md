@@ -321,7 +321,10 @@ scrolls, and above 768 px a row's actions sit side by side on one line. The tabl
 content, so a row's „⋯" menu is never cut off by the table; it opens upwards when it does not fit
 below (REQ-UI-027).
 
-**Enforced by:** manual check · **Code:** `static/css/pages/supply/supply.css`,
+The needs table wraps long material and item names, including names without spaces, so the table
+fits the content area at tablet width and the page does not scroll sideways (REQ-UI-009).
+
+**Enforced by:** `SupplyNeedsTableLayoutE2eTest` · **Code:** `static/css/pages/supply/supply.css`,
 `static/js/kernel/krt-overflow-menu.js`, `static/js/kernel/common-handlers.js`
 
 ### REQ-SUP-022 — Needs and donations show a component's type, size, grade and class
