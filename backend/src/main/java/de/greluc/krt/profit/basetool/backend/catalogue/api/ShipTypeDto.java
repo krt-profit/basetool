@@ -37,6 +37,7 @@ import org.jetbrains.annotations.Nullable;
  *     a review case; an existing ship of the type then shows the "no longer in the game" notice
  *     (REQ-P4K-013)
  * @param nameDe its German name, or {@code null} (REQ-P4K-023)
+ * @param descriptionInEnglish whether its description is the English source variant (REQ-P4K-023)
  */
 public record ShipTypeDto(
     UUID id,
@@ -47,7 +48,8 @@ public record ShipTypeDto(
     boolean hidden,
     @Nullable ShipCatalogueFacts catalogueFacts,
     boolean noLongerInGame,
-    @Nullable String nameDe) {
+    @Nullable String nameDe,
+    boolean descriptionInEnglish) {
 
   /**
    * Creates a ship type without a German name.
@@ -70,7 +72,17 @@ public record ShipTypeDto(
       boolean hidden,
       @Nullable ShipCatalogueFacts catalogueFacts,
       boolean noLongerInGame) {
-    this(id, name, manufacturer, description, scu, hidden, catalogueFacts, noLongerInGame, null);
+    this(
+        id,
+        name,
+        manufacturer,
+        description,
+        scu,
+        hidden,
+        catalogueFacts,
+        noLongerInGame,
+        null,
+        false);
   }
 
   /** Creates a ship summary of a type still in the game, without source-owned catalogue facts. */

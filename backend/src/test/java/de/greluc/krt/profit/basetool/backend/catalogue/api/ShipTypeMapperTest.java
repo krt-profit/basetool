@@ -20,8 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -62,7 +64,9 @@ class ShipTypeMapperTest {
     both.setName("Carrack");
     both.setDescriptionDe("Deutsche Beschreibung");
     both.setDescriptionEn("English description");
-    assertEquals("English description", mapper.toDto(both).description());
+    ShipTypeDto dto = mapper.toDto(both);
+    assertEquals("English description", dto.description());
+    assertTrue(dto.descriptionInEnglish());
   }
 
   @Test
@@ -70,7 +74,9 @@ class ShipTypeMapperTest {
     ShipType germanOnly = new ShipType();
     germanOnly.setName("Gladius");
     germanOnly.setDescriptionDe("Nur Deutsch");
-    assertEquals("Nur Deutsch", mapper.toDto(germanOnly).description());
+    ShipTypeDto dto = mapper.toDto(germanOnly);
+    assertEquals("Nur Deutsch", dto.description());
+    assertFalse(dto.descriptionInEnglish());
   }
 
   @Test

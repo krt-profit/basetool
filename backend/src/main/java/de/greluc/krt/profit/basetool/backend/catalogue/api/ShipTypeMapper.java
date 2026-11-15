@@ -30,6 +30,7 @@ public interface ShipTypeMapper {
   /**
    * Maps a {@link ShipType} to its DTO, with {@code description} taken from {@code descriptionEn},
    * falling back to {@code descriptionDe} only when no English description exists (REQ-P4K-023).
+   * The DTO indicates whether the selected description came from the English source.
    *
    * @param shipType the entity to project; {@code null} returns {@code null}
    * @return the ship-type DTO
@@ -39,6 +40,9 @@ public interface ShipTypeMapper {
       expression =
           "java(shipType.getDescriptionEn() != null ? shipType.getDescriptionEn()"
               + " : shipType.getDescriptionDe())")
+  @Mapping(
+      target = "descriptionInEnglish",
+      expression = "java(shipType.getDescriptionEn() != null)")
   @Mapping(target = "catalogueFacts", expression = "java(ShipCatalogueFacts.of(shipType))")
   @Mapping(target = "noLongerInGame", expression = "java(shipType.isP4kRetired())")
   ShipTypeDto toDto(ShipType shipType);
