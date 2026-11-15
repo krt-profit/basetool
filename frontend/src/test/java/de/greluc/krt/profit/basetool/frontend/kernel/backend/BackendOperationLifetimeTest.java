@@ -150,6 +150,38 @@ class BackendOperationLifetimeTest {
   }
 
   @Test
+  void aPostWithinItsOwnBudgetOutlastsTheTimeLimiterButNotTheBudget() {
+    BackendCallPolicy policy =
+        policy(
+            Duration.ofMillis(30),
+            BulkheadRegistry.ofDefaults(),
+            CircuitBreakerRegistry.ofDefaults());
+    WebClient transport =
+        WebClient.builder()
+            .exchangeFunction(_ ->
+                Mono.just(
+                    ClientResponse.create(HttpStatus.OK)
+                        .header("Content-Type", "application/json")
+                        .body(
+                            Mono.delay(Duration.ofMillis(300))
+                                .<DataBuffer>map(_ ->
+                                    DefaultDataBufferFactory.sharedInstance.wrap(
+                                        "{\"saved\":true}"
+                                            .getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                                .flux())
+                        .build()))
+            .build();
+    BackendApiClient client = client(transport, policy);
+
+    assertThat(client.postWithin("/slow", "{}", String.class, Duration.ofSeconds(5)))
+        .isEqualTo("{\"saved\":true}");
+    assertThatThrownBy(() -> client.postWithin("/slow", "{}", String.class, Duration.ofMillis(60)))
+        .isInstanceOfSatisfying(
+            BackendServiceException.class,
+            failure -> assertThat(failure.getStatusCode()).isEqualTo(504));
+  }
+
+  @Test
   void aKnownClientRefusalWithAStalledBodyKeepsItsStatusWithoutRetryOrCircuitFailure()
       throws Exception {
     Duration deadline = Duration.ofMillis(30);

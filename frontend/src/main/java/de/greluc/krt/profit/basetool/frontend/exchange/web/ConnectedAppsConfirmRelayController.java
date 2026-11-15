@@ -75,39 +75,24 @@ public class ConnectedAppsConfirmRelayController {
   private final Clock clock = Clock.systemUTC();
 
   /**
-   * Consumes the staged change set, keeps it in the session and previews it.
+   * Consumes the staged change set, keeps it in the session and previews it; a repeated load of a
+   * handoff this session already consumed previews the kept change set again.
    *
    * @param ref the handoff id
    * @param principal the member
    * @param session the member's session
-   * @return the preview, {@code 404} when the handoff is unknown, expired, already consumed or
-   *     carries no staging time, or the relayed backend error
+   * @return the preview, {@code 404} when the handoff is unknown, expired, consumed by another
+   *     session or carries no staging time, or the relayed backend error
    */
   @PostMapping(value = "/load", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> load(
       @RequestBody @NotNull HandoffRef ref,
       @AuthenticationPrincipal @Nullable OidcUser principal,
       @NotNull HttpSession session) {
-    Optional<StagedMassChange> staged =
-        handoffService.consume(
-            CurrentUser.userIdText(principal),
-            ref.handoffId(),
-            HandoffKind.MASS_CHANGE,
-            StagedMassChange.class);
-    if (staged.isEmpty()
-        || staged.get().changeSet() == null
-        || staged.get().stagedAt() == null
-        || expired(staged.get().stagedAt())) {
+    ConnectedAppMassChangeRequestDto request = consumeOrKept(ref.handoffId(), principal, session);
+    if (request == null) {
       return ResponseEntity.notFound().build();
     }
-    ConnectedAppMassChangeRequestDto request =
-        new ConnectedAppMassChangeRequestDto(
-            staged.get().clientId(),
-            staged.get().installationKey(),
-            staged.get().resource(),
-            staged.get().changeSet().toString(),
-            staged.get().stagedAt());
-    keep(session, ref.handoffId(), request);
     return relay(
         log,
         "preview held-back change set (ajax)",
@@ -147,6 +132,46 @@ public class ConnectedAppsConfirmRelayController {
       @RequestBody @NotNull HandoffRef ref, @NotNull HttpSession session) {
     take(session, ref.handoffId());
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Consumes the staged change set and keeps it in the session, or, when the handoff is already
+   * consumed, reads the change set this session keeps for it.
+   *
+   * @param handoffId the handoff id
+   * @param principal the member
+   * @param session the member's session
+   * @return the change set, or {@code null} when neither the gateway nor the session holds a live
+   *     one for the id
+   */
+  private @Nullable ConnectedAppMassChangeRequestDto consumeOrKept(
+      @Nullable String handoffId, @Nullable OidcUser principal, @NotNull HttpSession session) {
+    if (handoffId == null) {
+      return null;
+    }
+    Optional<StagedMassChange> consumed =
+        handoffService.consume(
+            CurrentUser.userIdText(principal),
+            handoffId,
+            HandoffKind.MASS_CHANGE,
+            StagedMassChange.class);
+    if (consumed.isEmpty()) {
+      String json = kept(session).get(handoffId);
+      return json == null ? null : live(json);
+    }
+    StagedMassChange staged = consumed.get();
+    if (staged.changeSet() == null || staged.stagedAt() == null || expired(staged.stagedAt())) {
+      return null;
+    }
+    ConnectedAppMassChangeRequestDto request =
+        new ConnectedAppMassChangeRequestDto(
+            staged.clientId(),
+            staged.installationKey(),
+            staged.resource(),
+            staged.changeSet().toString(),
+            staged.stagedAt());
+    keep(session, handoffId, request);
+    return request;
   }
 
   /**

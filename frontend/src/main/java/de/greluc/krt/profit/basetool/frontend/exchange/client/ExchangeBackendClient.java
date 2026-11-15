@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeUndoResultD
 import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -78,6 +79,12 @@ public class ExchangeBackendClient {
 
   /** The backend's mass-change endpoints. */
   private static final String MASS_CHANGES = "/api/v1/connected-apps/mass-changes/";
+
+  /**
+   * How long a mass-change preview or confirmation may take: the gateway's relay timeout for the
+   * same change set, which may hold up to 500 ops (REQ-XCH-021, REQ-XCH-023).
+   */
+  static final Duration MASS_CHANGE_RESPONSE_BUDGET = Duration.ofSeconds(30);
 
   private static final ParameterizedTypeReference<List<ExchangeClientDto>> CLIENT_LIST =
       new ParameterizedTypeReference<>() {};
@@ -369,8 +376,11 @@ public class ExchangeBackendClient {
   @Nullable
   public ConnectedAppMassChangeResultDto previewMassChange(
       @NotNull ConnectedAppMassChangeRequestDto request) {
-    return backendApiClient.post(
-        MASS_CHANGES + "preview", request, ConnectedAppMassChangeResultDto.class);
+    return backendApiClient.postWithin(
+        MASS_CHANGES + "preview",
+        request,
+        ConnectedAppMassChangeResultDto.class,
+        MASS_CHANGE_RESPONSE_BUDGET);
   }
 
   /**
@@ -382,7 +392,10 @@ public class ExchangeBackendClient {
   @Nullable
   public ConnectedAppMassChangeResultDto confirmMassChange(
       @NotNull ConnectedAppMassChangeRequestDto request) {
-    return backendApiClient.post(
-        MASS_CHANGES + "confirm", request, ConnectedAppMassChangeResultDto.class);
+    return backendApiClient.postWithin(
+        MASS_CHANGES + "confirm",
+        request,
+        ConnectedAppMassChangeResultDto.class,
+        MASS_CHANGE_RESPONSE_BUDGET);
   }
 }

@@ -11,12 +11,14 @@
     .cac-summary {
         font-weight: var(--fw-bold);
     }
-    .cac-preview {
+    .cac-preview,
+    .cac-failed {
         display: flex;
         flex-direction: column;
         gap: var(--space-3);
     }
-    .cac-preview[hidden] {
+    .cac-preview[hidden],
+    .cac-failed[hidden] {
         display: none;
     }
     .cac-actions {
