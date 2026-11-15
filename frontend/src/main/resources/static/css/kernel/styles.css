@@ -8838,9 +8838,18 @@
     }
 
     .nav-rail-switcher,
+    .nav-rail-actions,
     .nav-rail-mode-switch {
         padding: var(--space-3) 0;
         border-top: var(--border-hairline);
+    }
+
+    /* The actions wrap inside the flyout's width instead of widening it to fit on one line. */
+    .nav-rail-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        contain: inline-size;
     }
 
     /* The org-unit select fills the flyout but must not widen it with a long option label. */
