@@ -29,6 +29,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
+import com.microsoft.playwright.options.AriaRole;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
@@ -37,11 +38,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-/**
- * The layout of the „Bedarf" table on a desktop viewport (REQ-SUP-021): a row's actions share one
- * line, the column headers stay below the page header while the page scrolls, and the last row's
- * „⋯" menu opens upwards inside the table.
- */
+/** Verifies the needs table's responsive layout and row actions (REQ-SUP-021). */
 @Tag("e2e")
 class SupplyNeedsTableLayoutE2eTest {
 
@@ -52,6 +49,10 @@ class SupplyNeedsTableLayoutE2eTest {
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
   private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
+
+  private static final String LONG_MATERIAL_NAME =
+      "Bedarf Layout E2E "
+          + "Rohstoffaufbereitungsspeziallegierungsqualitaetstestmaterialkatalogeintragsonderbestellung";
 
   private static final int NEED_COUNT = 15;
 
@@ -84,26 +85,15 @@ class SupplyNeedsTableLayoutE2eTest {
             "/api/v1/supply/admin/units/" + IRIDIUM_ID,
             "{\"mayRaiseNeeds\":true,\"acceptsDonations\":true,\"version\":null}");
     assertTrue(unit == 200 || unit == 409, "the unit flags must be settable: " + unit);
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
     String materialId =
-        seeder.ensureJobOrderMaterial(
-            USERNAME,
-            PASSWORD,
-            "Bedarf Layout E2E " + UUID.randomUUID().toString().substring(0, 8));
+        seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "Bedarf Layout " + suffix);
     for (int i = 0; i < NEED_COUNT; i++) {
-      int raised =
-          seeder.postForStatus(
-              USERNAME,
-              PASSWORD,
-              "/api/v1/supply/needs",
-              "{\"orgUnitId\":\""
-                  + IRIDIUM_ID
-                  + "\",\"materialId\":\""
-                  + materialId
-                  + "\",\"amount\":"
-                  + (i + 1)
-                  + ",\"priority\":\"NORMAL\",\"purchasable\":false}");
-      assertEquals(201, raised, "a need must be raisable");
+      raiseNeed(seeder, materialId, i + 1, false);
     }
+    String longMaterialId =
+        seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, LONG_MATERIAL_NAME + " " + suffix);
+    raiseNeed(seeder, longMaterialId, 1, true);
   }
 
   /** Releases the browser and the Playwright driver process. */
@@ -121,13 +111,7 @@ class SupplyNeedsTableLayoutE2eTest {
   @Test
   void theNeedsTableKeepsActionsHeadersAndMenusInView() {
     String baseUrl = STACK.baseUrl();
-    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
-    try (BrowserContext context =
-        browser.newContext(
-            new Browser.NewContextOptions()
-                .setIgnoreHTTPSErrors(true)
-                .setStorageStatePath(storageState)
-                .setViewportSize(1440, 900))) {
+    try (BrowserContext context = signedInContext(1440, 900, false)) {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, baseUrl + "/supply/needs?status=OPEN&size=50");
@@ -136,15 +120,7 @@ class SupplyNeedsTableLayoutE2eTest {
         assertThat(rows.first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        assertEquals(
-            Boolean.TRUE,
-            rows.first()
-                .locator(".supply-row-actions")
-                .evaluate(
-                    "(el) => { const r = [...el.children].map((c) => c.getBoundingClientRect());"
-                        + " return r.length === 3 && Math.max(...r.map((x) => x.top)) <"
-                        + " Math.min(...r.map((x) => x.bottom)); }"),
-            "the pledge, edit and menu controls must share one line");
+        assertRowActionsShareOneLine(rows.first());
 
         page.evaluate("() => window.scrollTo(0, 700)");
         assertEquals(
@@ -174,5 +150,104 @@ class SupplyNeedsTableLayoutE2eTest {
         throw failure;
       }
     }
+  }
+
+  /** Checks that a long material name fits at the reference tablet width. */
+  @Test
+  void theTabletKeepsLongMaterialNamesAndRowActionsInsideTheContent() {
+    try (BrowserContext context = signedInContext(810, 1080, true)) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, STACK.baseUrl() + "/supply/needs?status=OPEN&size=50");
+        Locator row =
+            page.getByTestId("supply-need-row")
+                .filter(new Locator.FilterOptions().setHasText(LONG_MATERIAL_NAME))
+                .first();
+        assertThat(row.getByTestId("supply-need-purchasable")).isVisible();
+        assertEquals(
+            Boolean.TRUE,
+            row.evaluate(
+                """
+                (row) => {
+                  const viewportWidth = document.documentElement.clientWidth;
+                  const pageWidth = Math.max(document.documentElement.scrollWidth,
+                                             document.body.scrollWidth);
+                  const table = row.closest('table');
+                  return pageWidth === viewportWidth
+                    && table.getBoundingClientRect().right
+                      <= table.parentElement.getBoundingClientRect().right + 1;
+                }
+                """),
+            "the long name must fit without widening the table or creating page overflow");
+
+        assertRowActionsShareOneLine(row);
+        row.getByTestId("overflow-menu-toggle").tap();
+        row.getByRole(AriaRole.MENUITEM).first().hover();
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "supply-needs-table-tablet");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Raises an open need in the test unit, with a price and reason if purchasing is allowed.
+   *
+   * @param seeder the backend fixture client
+   * @param materialId the needed material
+   * @param amount the required amount
+   * @param purchasable whether the need can be bought
+   */
+  private static void raiseNeed(
+      BackendSeeder seeder, String materialId, int amount, boolean purchasable) {
+    String purchaseFields =
+        purchasable
+            ? "\"purchasable\":true,\"purchaseReason\":\"RARE_SOURCE\",\"maxUnitPrice\":200"
+            : "\"purchasable\":false";
+    int raised =
+        seeder.postForStatus(
+            USERNAME,
+            PASSWORD,
+            "/api/v1/supply/needs",
+            """
+            {"orgUnitId":"%s","materialId":"%s","amount":%d,"priority":"NORMAL",%s}
+            """
+                .formatted(IRIDIUM_ID, materialId, amount, purchaseFields));
+    assertEquals(201, raised, "a need must be raisable");
+  }
+
+  /**
+   * Opens an authenticated session at the given viewport.
+   *
+   * @param width the viewport width in CSS pixels
+   * @param height the viewport height in CSS pixels
+   * @param touch whether the device supports touch
+   * @return the authenticated context
+   */
+  private static BrowserContext signedInContext(int width, int height, boolean touch) {
+    Path storageState =
+        E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
+    return browser.newContext(
+        new Browser.NewContextOptions()
+            .setIgnoreHTTPSErrors(true)
+            .setStorageStatePath(storageState)
+            .setHasTouch(touch)
+            .setViewportSize(width, height));
+  }
+
+  /**
+   * Checks that all row actions share one line.
+   *
+   * @param row the needs table row
+   */
+  private static void assertRowActionsShareOneLine(Locator row) {
+    assertEquals(
+        Boolean.TRUE,
+        row.locator(".supply-row-actions")
+            .evaluate(
+                "(el) => { const r = [...el.children].map((c) => c.getBoundingClientRect());"
+                    + " return r.length === 3 && Math.max(...r.map((x) => x.top)) <"
+                    + " Math.min(...r.map((x) => x.bottom)); }"),
+        "the pledge, edit and menu controls must share one line");
   }
 }

@@ -1,6 +1,9 @@
 @layer base, components, page, utilities;
 
 @layer page {
+    .supply-need-entry-name {
+        overflow-wrap: anywhere;
+    }
     .supply-item-chips {
         display: inline-flex;
         flex-wrap: wrap;
@@ -38,8 +41,12 @@
     }
     .supply-meter {
         width: 100%;
-        min-width: 6rem;
         margin-bottom: var(--space-2);
+    }
+    @media (width > 1024px) {
+        .supply-meter {
+            min-width: 6rem;
+        }
     }
     @media (width <= 768px) {
         .supply-table .supply-meter {

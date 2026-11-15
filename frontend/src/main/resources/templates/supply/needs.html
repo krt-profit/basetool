@@ -61,7 +61,7 @@
                                 <span class="cell-sub" th:text="${n.orgUnitName()}">Spezialkommando ARGON</span>
                             </td>
                             <td th:attr="data-label=#{supply.need.entry}">
-                                <span class="cell-title" th:text="${n.material() != null ? n.material().displayName(#locale) : n.gameItem().displayName(#locale)}">Quantanium</span>
+                                <span class="cell-title supply-need-entry-name" th:text="${n.material() != null ? n.material().displayName(#locale) : n.gameItem().displayName(#locale)}">Quantanium</span>
                                 <span class="cell-sub">
                                     <span th:if="${n.gameItem() != null}" class="supply-item-chips" data-testid="supply-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${n.gameItem()})}"></span>
                                     <span th:if="${n.qualityTier() != null}"
