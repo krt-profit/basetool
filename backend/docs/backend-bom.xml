@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:f10a8ef9-be25-45de-a747-c8bbf4fd3f4a" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:e133d744-5a5d-493b-a43b-2c103a40b414" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-11-14T09:01:18Z</timestamp>
+    <timestamp>2026-11-15T09:25:46Z</timestamp>
     <tools>
       <components>
         <component type="application">
           <author>CycloneDX</author>
           <name>cyclonedx-gradle-plugin</name>
-          <version>3.5.1</version>
+          <version>3.6.1</version>
         </component>
       </components>
     </tools>
-    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.24.2?project_path=%3Abackend">
+    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.25.0?project_path=%3Abackend">
       <group>de.greluc.krt.profit.basetool</group>
       <name>backend</name>
-      <version>1.24.2</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@1.24.2?project_path=%3Abackend</purl>
+      <version>1.25.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@1.25.0?project_path=%3Abackend</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/43578186635</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/43698967177</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -443,28 +443,28 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-26?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-28?type=jar">
       <publisher>com.github.luben</publisher>
       <group>com.github.luben</group>
       <name>zstd-jni</name>
-      <version>1.5.7-26</version>
+      <version>1.5.7-28</version>
       <description>JNI bindings for Zstd native library that provides fast and high compression lossless algorithm for Java and all JVM languages.</description>
       <hashes>
-        <hash alg="MD5">f74bbe6e358053c20b67c09f8a68c4ae</hash>
-        <hash alg="SHA-1">43a27830588c690f1e09a3f30a524519cdaa65af</hash>
-        <hash alg="SHA-256">2d03193dd02c4495be80b4aad571b78a9a21dd6e2cfeb63ae57451c53a9cd074</hash>
-        <hash alg="SHA-512">65a61d8c3c30c2d701f056374fd7ae4c1160628e46f085474fc7a4cd08bcdd34a352d8bb2953e358a24140c246040cff4ab91989c31752a8bf7bbfb91a966b52</hash>
-        <hash alg="SHA3-256">008b6e107efb2b64269b7903c8c4ceac8b45c4da2e5f2523b5467e55297bd973</hash>
-        <hash alg="SHA3-512">0c5a4be5bacf62e94c4ca4ff89e193cb3169765199325614a7592a81d925e9792055e1afc223d7a6eede1385dc67fd0b8682c64f224920f6c4916f40cb8425af</hash>
-        <hash alg="SHA-384">49c023051b85bfc20c8a1c78617da5fd9181f25b27b9acaef3457791ca3aad7e80499656f5cf59a740050a93916212d3</hash>
-        <hash alg="SHA3-384">8f223c324f14a22f1b575b421a5ca79ae01f2548d560ec6464a0f860649bdb3516224bc8018524f68549f29503a97923</hash>
+        <hash alg="MD5">badb1802cc3bd6bd0ad595074c277586</hash>
+        <hash alg="SHA-1">51aed4564b131034da61b7bc41ecc2c55673704d</hash>
+        <hash alg="SHA-256">95506ee277e830852658b65713b714262a6171121c7e45f09300eb109f44a038</hash>
+        <hash alg="SHA-512">9e6cd745e667457fef35f929d8f3cf9414711901466e54aa7edde6fea0dd86a2223b2d8a17baf7dcd3e71d285d9457f04f6cddb393dc4f39b41dcd53a315e35b</hash>
+        <hash alg="SHA3-256">614cf1a37f7b63bf3b21484aaf4536b0716c67f54d1ddc03cd1ce5ebd9d282c5</hash>
+        <hash alg="SHA3-512">cd232f190708ba86ceb251917a0f6366377a4c457201011805cc381ec5d2518ceb4f5138921f37db8a30aad19660c596785f603afd074929198be6291b81fb0b</hash>
+        <hash alg="SHA-384">f8b76e992f71dec46287ebb105b7594db4ef9c43a4a95ab831e0c414e1b53500975e3e4ffe4bbb180f96658b2a687fef</hash>
+        <hash alg="SHA3-384">0e7346eb7fe48be41a6427de773dad4cf5f87e2abd37a8665fe8af6f24deecf8ba9b405c359058f8db050fc53d87ab46</hash>
       </hashes>
       <licenses>
         <license>
           <id>BSD-2-Clause</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.github.luben/zstd-jni@1.5.7-26?type=jar</purl>
+      <purl>pkg:maven/com.github.luben/zstd-jni@1.5.7-28?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -850,21 +850,21 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.24.2?project_path=%3Alogging-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>logging-support</name>
-      <version>1.24.2</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.24.2?project_path=%3Alogging-support</purl>
+      <version>1.25.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.24.2?project_path=%3Atechnical-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>technical-support</name>
-      <version>1.24.2</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.24.2?project_path=%3Atechnical-support</purl>
+      <version>1.25.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -889,7 +889,7 @@
       <licenses>
         <license>
           <id>MIT</id>
-          <url>https://opensource.org/license/mit/</url>
+          <url>https://opensource.org/license/MIT</url>
         </license>
       </licenses>
       <purl>pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar</purl>
@@ -2317,7 +2317,7 @@
         </license>
         <license>
           <id>MIT</id>
-          <url>https://opensource.org/license/mit/</url>
+          <url>https://opensource.org/license/MIT</url>
         </license>
       </licenses>
       <purl>pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar</purl>
@@ -2349,7 +2349,7 @@
       <licenses>
         <license>
           <id>BSD-3-Clause</id>
-          <url>https://opensource.org/licenses/BSD-3-Clause</url>
+          <url>https://opensource.org/license/BSD-3-Clause</url>
         </license>
       </licenses>
       <purl>pkg:maven/org.antlr/antlr4-runtime@4.13.2?type=jar</purl>
@@ -2616,76 +2616,76 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-core@13.12.2?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-core</name>
-      <version>13.12.1</version>
+      <version>13.12.2</version>
       <hashes>
-        <hash alg="MD5">b89983ecf6a1bb0e149a707f27fbadca</hash>
-        <hash alg="SHA-1">48cec5b95885aaef5454fe00e758bbed6fc3f528</hash>
-        <hash alg="SHA-256">77b263c78a71b6ca23c014048e975db4600d6c4a0d54790da18007a665af356d</hash>
-        <hash alg="SHA-512">9950a94f092e61c761ecbf36380382283bd9178a93eea06f2fc6286b16a56b933d3c99bdb20b535735cb29b94ff9207479fbb4c8202ff0e9433dd915d5695291</hash>
-        <hash alg="SHA3-256">bc2685040ed85ab8b743af80c03c290b75f8d7a6efc73d49b227f8703f57ca1d</hash>
-        <hash alg="SHA3-512">5b33abde95ead93cd6ee5c07541ab2c513c1cb25f59f70e504359a45f34d05578ca9996000a4a41c304132b72ed27f1b06ac7275a5ab080aae5ff5c129a92aa9</hash>
-        <hash alg="SHA-384">b6dad9e3649671bd0972762b9100c8310a8fd7eb33e4c774da62553447b8246902937414f85bc4dd1c137a026253dab6</hash>
-        <hash alg="SHA3-384">4630eedde447588dbd5cb1b423d6816a2010b92cd2e664e5882d3f3c7c2cfd425387cb5d29e7d8a22aed9c2c23086942</hash>
+        <hash alg="MD5">8458e6d94e63af53a3e0f36c97bc3618</hash>
+        <hash alg="SHA-1">2639650c4ea25b8d7d1ecb9e761fd6d14fbf49c3</hash>
+        <hash alg="SHA-256">3c86535d095eeaf53fda16cdd9bdbf9f9fdfb4b0f8aebd816b04069d8aab56a3</hash>
+        <hash alg="SHA-512">47f08c4bd50146814b526de3fbacb6325584f61d1a59bd5af9177c014632b3d887126ecd69437644435badf1b16bdb393cd30a7f62c7f41f9db0b232630d6030</hash>
+        <hash alg="SHA3-256">918d02d89de0e200ec1788143b15d2684f32d1c42cc25dc37aba1eae1d4973c7</hash>
+        <hash alg="SHA3-512">5b4b9a04c0facb4539b723b0decfb30ce42832b9a669e5f61cde6123b967babbefa321814a3ce327a27438f35c7c280ec0f514f3fd341698e7a15fe8e2eb55b4</hash>
+        <hash alg="SHA-384">c286f15fd66e98b7d301c2fa688da65b71db7832e4482b7687ae1b94d0b38224722e11bb3ec1b4f4c986206f2bd5e56e</hash>
+        <hash alg="SHA3-384">345af03d409fc8d36e3916d6f24e094d9fac90b8615596135938faa71f0d8c7d11b7fcbe370f3be2004207dc0b4bdd65</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-core@13.12.2?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.1?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.2?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-database-cockroachdb</name>
-      <version>13.12.1</version>
+      <version>13.12.2</version>
       <hashes>
-        <hash alg="MD5">9d4b727b3bc5d5af9f44c4c5605297e7</hash>
-        <hash alg="SHA-1">d0b5cf410d858d6710f0226ae35051246e7558a9</hash>
-        <hash alg="SHA-256">0fae3e3225df7b224fb09d0612679b451f77cdd111937b23554cf06a896e9dc5</hash>
-        <hash alg="SHA-512">6df30658939f3d8682fe43a34782521ee667c94607e2baa4611474a33f09582c394ef8842f46ddab8cdad6cb464c36fb7386628d250e421418b8d62aedd25a42</hash>
-        <hash alg="SHA3-256">f18381b53e019c51df28c4f0c65757197995fca0bdfda69e87ab6b8f3fdefb42</hash>
-        <hash alg="SHA3-512">d1546a95660bdce36249c8c46cd8ba41ab4eaa763dd7f8a26a1629afba0ebd09cdb3092268c2341074ab1a30938be03ae2a3843967c74fce9a54f5ce05b9889a</hash>
-        <hash alg="SHA-384">1f58beec4a64bd2117068407fbe63ca2ab361db0cdce1c067c176763213e3ef13ca3742eb9dab925f368fcb300f550ce</hash>
-        <hash alg="SHA3-384">8acaf26861f9cd499d2a3f5062cf8156ac240cf0f7a45af98bd9bcc3e828d7f6001f2f43b0dcc667f31e66b231d9cbae</hash>
+        <hash alg="MD5">b185d53d69d6b00c88a3de2c8773f835</hash>
+        <hash alg="SHA-1">8c41cd8e660d9879f450597b6401b7f6526c79e4</hash>
+        <hash alg="SHA-256">e4461be6bfa2e977eaa4204c5afcb366462233ae762dcb629ac3e2944891c6a9</hash>
+        <hash alg="SHA-512">9dfc8a5b6d36f1c3fbd74f0467d5ce9c0b2642c92b00f04ba04f64a80fcc542ad30f258612100043c103677eae965d3af39c7be8700011997e511afac6f602d7</hash>
+        <hash alg="SHA3-256">4f8135395793b2e4400328b56923438d257e940d1e35be20cba308115a392348</hash>
+        <hash alg="SHA3-512">c3dcb5871a135c33156edd1de0d1d2e51a3a865b66897624f8dd02e4e8c4e4a01d151ac9def68eabfebbfd35678b8ba0e5a212925209bb30ccf3b1a8c68e4b5c</hash>
+        <hash alg="SHA-384">12cb36d97f4205c504278b78529c0694d3dd34caa19b0773f77470e8db66e4665520a4b0e37414c9628ab1387904ba5a</hash>
+        <hash alg="SHA3-384">9c28136b8734a78a103d5c80ff0a8bf91ed469303e91f63fedf69491714aef81a759e470935e7176125bf7044a846fa4</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.1?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.2?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.1?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.2?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-database-postgresql</name>
-      <version>13.12.1</version>
+      <version>13.12.2</version>
       <hashes>
-        <hash alg="MD5">a6d76ec97b2f84f7c92a4e9bf116c53e</hash>
-        <hash alg="SHA-1">89674fefba765330a7d6766a8e03b235270cee0c</hash>
-        <hash alg="SHA-256">79128190d08d23008c9d42c71720b4be9eb40026f518e379a11ffde7f5a60538</hash>
-        <hash alg="SHA-512">b0e136c7b37e1b91aa2b88383832e8642d2a94a470128c0dcee9e5effb08f2abea638118c1f3b4904f1b4227800ef40b86a84e2e3b8e81be468bf31f307a7b57</hash>
-        <hash alg="SHA3-256">8bba8cd3ff89903f8c5aaf27deb8917bb938cc2124be62c47a2e259d20f66e62</hash>
-        <hash alg="SHA3-512">5d8a54fc2d90583b900bc73dc29d79c9601984d00e5ef245e22dccffe01c375219caf8eecc7a75c679f79c1992fe52ee36b11e4831e558f694f7d02a32091db9</hash>
-        <hash alg="SHA-384">15dc8ad0a8de4502e9ede5f87b5c8c1ab74f73c019416ae8ece88b96e05f214b651db3761df54f41395e2ec8694f35ca</hash>
-        <hash alg="SHA3-384">163ea04fa31333ca177c1f3d748a35ca015496471eb4976943e900b6d0cffdcd0cc4008725e32c3bc99a5040c864e920</hash>
+        <hash alg="MD5">bec1cbc20403ef9c749408bd3ce96c77</hash>
+        <hash alg="SHA-1">a721db723af4071704ea7070bb3a6e21a036108c</hash>
+        <hash alg="SHA-256">ba29d6894e8fd59afadc832a6791f52d61139bee03483ea211e209e0d0201fa2</hash>
+        <hash alg="SHA-512">60b18bc7f6c1270b1aa1be290ec3387ae05d517e6cbeb7d7f6d1e8e27f6295023dca622c13cfbe7daf5fce4d6ca0ebf0915e87fc7fb05cb47c30b13aa99c7ed0</hash>
+        <hash alg="SHA3-256">87f2aa8e3aee9de57402edb953a299c1c7430c4d903754f15cd85e831a5bbc13</hash>
+        <hash alg="SHA3-512">5562b8d194eb89d466a27b80e05de13ed8d7e420c33b889580436dc0781587811910c6eb8b4e0df25bfcc0de41d18c85265f230e5531f97946e886a16b4fdd23</hash>
+        <hash alg="SHA-384">6d4998b290d66f6fcc01c9d50edeaf675456fe960c845f904a6b9768b1957c8c4a1a9dd98587f3a0d1e51723e6ad6b09</hash>
+        <hash alg="SHA3-384">8a5bb534fb4e82a3d48903bcf6816bd3be9d63d5756a80250f5088dde3a34b91f6c76eb55bc07cad46042cb659764e38</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.1?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.2?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -2790,7 +2790,7 @@
         </license>
         <license>
           <id>BSD-2-Clause</id>
-          <url>https://opensource.org/licenses/BSD-2-Clause</url>
+          <url>https://opensource.org/license/BSD-2-Clause</url>
         </license>
       </licenses>
       <purl>pkg:maven/org.hdrhistogram/HdrHistogram@2.2.2?type=jar</purl>
@@ -3122,7 +3122,7 @@
       <licenses>
         <license>
           <id>BSD-2-Clause</id>
-          <url>https://opensource.org/licenses/BSD-2-Clause</url>
+          <url>https://opensource.org/license/BSD-2-Clause</url>
         </license>
       </licenses>
       <purl>pkg:maven/org.postgresql/postgresql@42.7.14?type=jar</purl>
@@ -3224,7 +3224,7 @@
       <licenses>
         <license>
           <id>MIT</id>
-          <url>https://opensource.org/license/mit/</url>
+          <url>https://opensource.org/license/MIT</url>
         </license>
       </licenses>
       <purl>pkg:maven/org.slf4j/jul-to-slf4j@2.0.20?type=jar</purl>
@@ -3251,7 +3251,7 @@
       <licenses>
         <license>
           <id>MIT</id>
-          <url>https://opensource.org/license/mit/</url>
+          <url>https://opensource.org/license/MIT</url>
         </license>
       </licenses>
       <purl>pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar</purl>
@@ -6141,7 +6141,7 @@
       <licenses>
         <license>
           <id>MIT</id>
-          <url>https://opensource.org/license/mit/</url>
+          <url>https://opensource.org/license/MIT</url>
         </license>
       </licenses>
       <purl>pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar</purl>
@@ -6322,7 +6322,7 @@
     <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar">
       <dependency ref="pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-26?type=jar"/>
+    <dependency ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-28?type=jar"/>
     <dependency ref="pkg:maven/com.google.errorprone/error_prone_annotations@2.52.0?type=jar"/>
     <dependency ref="pkg:maven/com.google.guava/failureaccess@1.0.3?type=jar"/>
     <dependency ref="pkg:maven/com.google.guava/guava@33.8.0-jre?type=jar">
@@ -6353,18 +6353,18 @@
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.3.6?type=jar"/>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.24.2?project_path=%3Abackend">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.25.0?project_path=%3Abackend">
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar"/>
       <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar"/>
-      <dependency ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-26?type=jar"/>
+      <dependency ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-28?type=jar"/>
       <dependency ref="pkg:maven/com.google.guava/guava@33.8.0-jre?type=jar"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.24.2?project_path=%3Alogging-support"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.24.2?project_path=%3Atechnical-support"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support"/>
       <dependency ref="pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.2?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.1?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.2?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.2?type=jar"/>
       <dependency ref="pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar"/>
       <dependency ref="pkg:maven/org.postgresql/postgresql@42.7.14?type=jar"/>
       <dependency ref="pkg:maven/org.semver4j/semver4j@6.0.0?type=jar"/>
@@ -6383,11 +6383,11 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.2?type=jar"/>
       <dependency ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.3.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.24.2?project_path=%3Alogging-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support">
       <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.24.2?project_path=%3Atechnical-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support">
       <dependency ref="pkg:maven/io.micrometer/micrometer-observation@1.17.2?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar">
@@ -6608,13 +6608,13 @@
       <dependency ref="pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar"/>
       <dependency ref="pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar"/>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.1?type=jar">
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar"/>
+    <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.2?type=jar"/>
+    <dependency ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.2?type=jar">
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.2?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.1?type=jar">
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.1?type=jar"/>
+    <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.2?type=jar">
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.2?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.2?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.9?type=jar">
       <dependency ref="pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar"/>
