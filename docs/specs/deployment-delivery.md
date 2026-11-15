@@ -2594,7 +2594,12 @@ that has no entry at all, before it is used.
   `--require-hashes` requirement files under `.github/requirements/`, markdownlint-cli is installed
   with `npm ci` from `.github/tools/markdownlint/package-lock.json`, and the Ansible collections are
   exact versions. Galaxy publishes no hash a requirements file could pin, so the collections are
-  version-pinned only.
+  version-pinned only. Each requirement file is compiled from the `<name>.in` beside it and keeps
+  uv's header, from which Dependabot's `uv` entry takes `--universal` and the Python version when
+  it recompiles the file; Dependabot's npm entry covers the markdownlint lockfile. The pins it
+  cannot see (tool binaries in workflow `env`, the Redoc bundle, cosign's installer default, the
+  cortex-tools image, the collections) are listed in [`dependency-pins.md`](../dependency-pins.md)
+  with how each one moves.
 - **`-sources.jar`, `-javadoc.jar` and the Gradle distribution's `gradle-<version>-src.zip` are
   trusted** by pattern: IDE downloads, never on a build classpath.
 - **The change that alters the graph carries the regenerated file**, produced by
