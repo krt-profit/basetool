@@ -69,12 +69,14 @@ function initConnectedAppsConfirm() {
      * @param {string} id
      */
     function show(id) {
-        ['cac-loading', 'cac-preview', 'cac-missing', 'cac-outcome'].forEach((other) => {
-            const element = document.getElementById(other);
-            if (element) {
-                element.hidden = other !== id;
-            }
-        });
+        ['cac-loading', 'cac-preview', 'cac-missing', 'cac-failed', 'cac-outcome'].forEach(
+            (other) => {
+                const element = document.getElementById(other);
+                if (element) {
+                    element.hidden = other !== id;
+                }
+            },
+        );
     }
 
     /**
@@ -117,32 +119,53 @@ function initConnectedAppsConfirm() {
         return false;
     }
 
+    /**
+     * Shows the retryable failure state; truthy, so krtFetch adds no toast of its own.
+     * @returns {boolean}
+     */
+    function failed() {
+        show('cac-failed');
+        return true;
+    }
+
+    /** Loads the preview; every failure leaves the loading state for a closing or retryable one. */
+    function load() {
+        show('cac-loading');
+        krtFetch.write({
+            method: 'POST',
+            url: `${BASE}/load`,
+            payload: { handoffId },
+            toast: false,
+            errorMessage: i18n.error,
+            onError: (/** @type {number} */ status) => refusal(status) || failed(),
+            onNetworkError: failed,
+            onSuccess(result) {
+                const summary = document.getElementById('cac-summary');
+                if (summary) {
+                    summary.textContent = format(i18n.summary, [
+                        result.clientName,
+                        i18n.resources[result.resource] || result.resource,
+                        result.applied,
+                        result.unchanged,
+                        result.notApplied,
+                    ]);
+                }
+                show('cac-preview');
+            },
+        });
+    }
+
     if (!handoffId) {
         show('cac-missing');
         return;
     }
 
-    krtFetch.write({
-        method: 'POST',
-        url: `${BASE}/load`,
-        payload: { handoffId },
-        toast: false,
-        errorMessage: i18n.error,
-        onError: refusal,
-        onSuccess(result) {
-            const summary = document.getElementById('cac-summary');
-            if (summary) {
-                summary.textContent = format(i18n.summary, [
-                    result.clientName,
-                    i18n.resources[result.resource] || result.resource,
-                    result.applied,
-                    result.unchanged,
-                    result.notApplied,
-                ]);
-            }
-            show('cac-preview');
-        },
-    });
+    load();
+
+    const retryBtn = document.getElementById('cac-retry');
+    if (retryBtn) {
+        retryBtn.addEventListener('click', load);
+    }
 
     const confirmBtn = document.getElementById('cac-confirm');
     if (confirmBtn) {

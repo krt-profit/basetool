@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -42,8 +43,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeRequestDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeResultDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.HandoffKind;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -153,15 +156,17 @@ class ConnectedAppsConfirmControllerMvcTest {
     Instant stagedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
     stubStaged(stagedAt);
     ConnectedAppMassChangeRequestDto expected = request(stagedAt);
-    when(backendApiClient.post(
+    when(backendApiClient.postWithin(
             eq("/api/v1/connected-apps/mass-changes/preview"),
             eq(expected),
-            eq(ConnectedAppMassChangeResultDto.class)))
+            eq(ConnectedAppMassChangeResultDto.class),
+            any(Duration.class)))
         .thenReturn(new ConnectedAppMassChangeResultDto("VerseKit", "blueprints", true, 1, 0, 0));
-    when(backendApiClient.post(
+    when(backendApiClient.postWithin(
             eq("/api/v1/connected-apps/mass-changes/confirm"),
             eq(expected),
-            eq(ConnectedAppMassChangeResultDto.class)))
+            eq(ConnectedAppMassChangeResultDto.class),
+            any(Duration.class)))
         .thenReturn(new ConnectedAppMassChangeResultDto("VerseKit", "blueprints", false, 1, 0, 0));
     MockHttpSession session = new MockHttpSession();
 
@@ -173,10 +178,47 @@ class ConnectedAppsConfirmControllerMvcTest {
     step("apply", session).andExpect(status().isNotFound());
 
     verify(backendApiClient)
-        .post(
+        .postWithin(
             eq("/api/v1/connected-apps/mass-changes/confirm"),
             eq(expected),
-            eq(ConnectedAppMassChangeResultDto.class));
+            eq(ConnectedAppMassChangeResultDto.class),
+            any(Duration.class));
+  }
+
+  /**
+   * A load that failed after the handoff was consumed can be retried: the session previews the
+   * change set it keeps, which the confirmation then applies once.
+   *
+   * @throws Exception if a request fails
+   */
+  @Test
+  void aRepeatedLoadPreviewsTheChangeSetThisSessionKeeps() throws Exception {
+    Instant stagedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    stubStaged(stagedAt);
+    ConnectedAppMassChangeRequestDto expected = request(stagedAt);
+    when(backendApiClient.postWithin(
+            eq("/api/v1/connected-apps/mass-changes/preview"),
+            eq(expected),
+            eq(ConnectedAppMassChangeResultDto.class),
+            any(Duration.class)))
+        .thenThrow(new BackendServiceException("timed out", null, 504))
+        .thenReturn(new ConnectedAppMassChangeResultDto("VerseKit", "blueprints", true, 1, 0, 0));
+    MockHttpSession session = new MockHttpSession();
+
+    step("load", session).andExpect(status().is5xxServerError());
+    when(ingestHandoffService.consume(eq(SUB), eq(HANDOFF), eq(HandoffKind.MASS_CHANGE), any()))
+        .thenReturn(Optional.empty());
+    step("load", session)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.clientName").value("VerseKit"));
+    step("load", new MockHttpSession()).andExpect(status().isNotFound());
+
+    verify(backendApiClient, times(2))
+        .postWithin(
+            eq("/api/v1/connected-apps/mass-changes/preview"),
+            eq(expected),
+            eq(ConnectedAppMassChangeResultDto.class),
+            any(Duration.class));
   }
 
   @Test
@@ -184,7 +226,8 @@ class ConnectedAppsConfirmControllerMvcTest {
     Instant stagedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
     stubStaged(stagedAt);
     MockHttpSession session = new MockHttpSession();
-    when(backendApiClient.post(anyString(), any(), eq(ConnectedAppMassChangeResultDto.class)))
+    when(backendApiClient.postWithin(
+            anyString(), any(), eq(ConnectedAppMassChangeResultDto.class), any(Duration.class)))
         .thenReturn(new ConnectedAppMassChangeResultDto("VerseKit", "blueprints", true, 1, 0, 0));
     String hostile =
         "{\"handoffId\":\""
@@ -198,10 +241,11 @@ class ConnectedAppsConfirmControllerMvcTest {
     stepWith("apply", session, hostile).andExpect(status().isOk());
 
     verify(backendApiClient)
-        .post(
+        .postWithin(
             eq("/api/v1/connected-apps/mass-changes/confirm"),
             eq(request(stagedAt)),
-            eq(ConnectedAppMassChangeResultDto.class));
+            eq(ConnectedAppMassChangeResultDto.class),
+            any(Duration.class));
   }
 
   @Test
@@ -220,7 +264,7 @@ class ConnectedAppsConfirmControllerMvcTest {
             "{\"handoffId\":\"" + HANDOFF + "\",\"stagedAt\":\"" + Instant.now() + "\"}")
         .andExpect(status().isNotFound());
 
-    verify(backendApiClient, never()).post(anyString(), any(), any());
+    verify(backendApiClient, never()).postWithin(anyString(), any(), any(), any());
   }
 
   @Test
@@ -234,7 +278,7 @@ class ConnectedAppsConfirmControllerMvcTest {
     step("apply", session).andExpect(status().isNotFound());
 
     verify(backendApiClient, never())
-        .post(eq("/api/v1/connected-apps/mass-changes/confirm"), any(), any());
+        .postWithin(eq("/api/v1/connected-apps/mass-changes/confirm"), any(), any(), any());
   }
 
   @Test
@@ -253,7 +297,7 @@ class ConnectedAppsConfirmControllerMvcTest {
     stubStaged(null);
     step("load", new MockHttpSession()).andExpect(status().isNotFound());
 
-    verify(backendApiClient, never()).post(anyString(), any(), any());
+    verify(backendApiClient, never()).postWithin(anyString(), any(), any(), any());
   }
 
   @Test
@@ -268,7 +312,7 @@ class ConnectedAppsConfirmControllerMvcTest {
 
     step("apply", session).andExpect(status().isNotFound());
 
-    verify(backendApiClient, never()).post(anyString(), any(), any());
+    verify(backendApiClient, never()).postWithin(anyString(), any(), any(), any());
     assertThat((Map<?, ?>) session.getAttribute(ConnectedAppsConfirmRelayController.SESSION_KEY))
         .isEmpty();
   }

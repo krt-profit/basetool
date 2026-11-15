@@ -45,6 +45,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.netty.http.client.HttpClientRequest;
 
 /**
  * WebClient wrapper for the backend REST API: exposes typed overloads for every HTTP verb, each
@@ -345,6 +346,40 @@ public class BackendApiClient {
         HttpMethod.POST,
         uriTemplate,
         () -> withOptionalBody(webClient.post().uri(uriTemplate, uriVariables), body),
+        spec -> spec.bodyToMono(responseType));
+  }
+
+  /**
+   * POST against the authenticated backend within an explicit response budget, which replaces both
+   * the client's response timeout and the {@code backendApi} time limiter for this request, for an
+   * operation known to outlast them.
+   *
+   * @param uri the backend path, sent as-is
+   * @param body the payload
+   * @param responseType the decoded response class
+   * @param responseBudget how long the response, its body included, may take
+   * @param <T> the request-body type
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
+  public <T, R> R postWithin(
+      @NotNull String uri,
+      @NotNull T body,
+      @NotNull Class<R> responseType,
+      @NotNull Duration responseBudget) {
+    return exchange(
+        HttpMethod.POST,
+        uri,
+        () ->
+            webClient
+                .post()
+                .uri(uri)
+                .attribute(BackendCallPolicy.RESPONSE_BUDGET, responseBudget)
+                .httpRequest(request -> {
+                  HttpClientRequest nativeRequest = request.getNativeRequest();
+                  nativeRequest.responseTimeout(responseBudget);
+                })
+                .bodyValue(body),
         spec -> spec.bodyToMono(responseType));
   }
 
