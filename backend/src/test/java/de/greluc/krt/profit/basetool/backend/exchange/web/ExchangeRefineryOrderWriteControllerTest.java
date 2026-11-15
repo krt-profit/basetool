@@ -104,6 +104,9 @@ class ExchangeRefineryOrderWriteControllerTest {
   private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";
   private static final String KEY = "Kx9_" + "w".repeat(39);
 
+  /** The longest method name the published v1 schemas carry; a longer one is cut to it. */
+  private static final int PUBLISHED_NAME = 200;
+
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
@@ -134,6 +137,7 @@ class ExchangeRefineryOrderWriteControllerTest {
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> materials = new ArrayList<>();
   private final List<UUID> missions = new ArrayList<>();
+  private final List<UUID> methods = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -177,6 +181,7 @@ class ExchangeRefineryOrderWriteControllerTest {
       jdbc.update("DELETE FROM app_user WHERE id = ?", id);
     }
     missions.forEach(id -> jdbc.update("DELETE FROM mission WHERE id = ?", id));
+    methods.forEach(id -> jdbc.update("DELETE FROM refining_method WHERE id = ?", id));
     jdbc.update("DELETE FROM exchange_client WHERE client_id IN (?, ?)", client, otherClient);
     for (UUID id : locations) {
       UUID city = jdbc.queryForObject("SELECT city_id FROM location WHERE id = ?", UUID.class, id);
@@ -312,6 +317,33 @@ class ExchangeRefineryOrderWriteControllerTest {
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM refinery_order WHERE owner_id = ?", Integer.class, member))
         .isZero();
+  }
+
+  @Test
+  void aMethodWithoutCodeIsFoundByTheNameTheExchangeCutItTo() throws Exception {
+    String cut = cutName("Xch Cut Method ");
+    UUID method = method(cut + " beyond the published length");
+
+    changes(client, createWithMethod("m-1", cut)).andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT refining_method_id FROM refinery_order WHERE owner_id = ?",
+                UUID.class,
+                member))
+        .containsExactly(method);
+  }
+
+  @Test
+  void twoMethodsTheExchangeCutsToOneNameAreAmbiguous() throws Exception {
+    String cut = cutName("Xch Shared Method ");
+    method(cut + " first");
+    method(cut + " second");
+
+    changes(client, createWithMethod("m-2", cut))
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].result").value("ambiguous"))
+        .andExpect(jsonPath("$.results[0].reason").value("AMBIGUOUS"));
   }
 
   @Test
@@ -1652,6 +1684,52 @@ class ExchangeRefineryOrderWriteControllerTest {
         + location
         + (goods == null ? "" : ", \"goods\": " + goods)
         + "}";
+  }
+
+  /**
+   * A running create at the test refinery in the member's unit, with one good of the test ore and
+   * the refining method named by the given name only.
+   *
+   * @param key the client key
+   * @param methodName the method's name as the client sends it
+   * @return the op
+   */
+  private @NotNull String createWithMethod(@NotNull String key, @NotNull String methodName) {
+    return "{\"op\": \"create\", \"clientKey\": \""
+        + key
+        + "\", \"orgUnit\": {\"id\": \""
+        + unit
+        + "\"}, \"location\": "
+        + refineryRef()
+        + ", \"method\": {\"name\": \""
+        + methodName
+        + "\"}, \"status\": \"IN_PROGRESS\", \"goods\": ["
+        + good(500, 400)
+        + "]}";
+  }
+
+  /**
+   * Inserts a refining method without a code, which a client can name only by its name.
+   *
+   * @param name the name
+   * @return its id
+   */
+  private @NotNull UUID method(@NotNull String name) {
+    UUID id = UUID.randomUUID();
+    jdbc.update("INSERT INTO refining_method (id, version, name) VALUES (?, 0, ?)", id, name);
+    methods.add(id);
+    return id;
+  }
+
+  /**
+   * Builds a distinct name of exactly the 200 characters the exchange cuts a longer name to.
+   *
+   * @param prefix the distinctive start of the name
+   * @return the prefix, a random tag and {@code x} up to 200 characters
+   */
+  private static @NotNull String cutName(@NotNull String prefix) {
+    String start = prefix + UUID.randomUUID().toString().substring(0, 8) + " ";
+    return start + "x".repeat(PUBLISHED_NAME - start.length());
   }
 
   /**

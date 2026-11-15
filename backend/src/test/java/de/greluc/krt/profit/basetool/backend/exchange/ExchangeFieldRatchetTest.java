@@ -41,6 +41,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBluep
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintDraftDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeHomeLocationChoiceRequest;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeHomeLocationChosenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationLabelRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
@@ -50,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgSt
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockTargetsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryDraftRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderPageDto;
@@ -144,6 +147,13 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeOrgStockMembersDto.class, "org-stock-members.schema.json"),
           Map.entry(ExchangeOrgStockTargetsDto.class, "org-stock-targets.schema.json"),
           Map.entry(ExchangeOrgUnitListDto.class, "org-unit-list.schema.json"),
+          Map.entry(ExchangePatchChangeDto.class, "patch-change.schema.json"),
+          Map.entry(
+              ExchangeHomeLocationChoiceRequest.class,
+              "patch-change.schema.json#/$defs/homeLocationChoice"),
+          Map.entry(
+              ExchangeHomeLocationChosenDto.class,
+              "patch-change.schema.json#/$defs/homeLocationChosen"),
           Map.entry(ExchangeStoreChoiceReceiversDto.class, "store-choice-receivers.schema.json"),
           Map.entry(ExchangeStoreChoiceJobOrdersDto.class, "store-choice-job-orders.schema.json"),
           Map.entry(ExchangeBlueprintDraftDto.class, "blueprint-draft.schema.json"),

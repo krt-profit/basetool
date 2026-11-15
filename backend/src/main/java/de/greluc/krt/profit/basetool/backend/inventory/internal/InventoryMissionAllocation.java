@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -50,6 +51,7 @@ import lombok.ToString;
  * entry or the mission removes the slice; the entry survives a mission deletion.
  */
 @Entity
+@EntityListeners(InventorySliceRelocationListener.class)
 @Table(
     name = "inventory_item_mission_allocation",
     uniqueConstraints =
@@ -62,7 +64,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class InventoryMissionAllocation extends AbstractEntity<UUID> {
+public class InventoryMissionAllocation extends AbstractEntity<UUID> implements StockRowSlice {
 
   @Getter(onMethod_ = @__(@Override))
   @Id

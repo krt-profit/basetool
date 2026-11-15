@@ -31,13 +31,17 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarShipOriginService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOriginRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOriginResultDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
@@ -66,6 +70,7 @@ import org.springframework.web.multipart.MultipartFile;
 class HangarControllerTest {
 
   @Mock private HangarService hangarService;
+  @Mock private HangarShipOriginService shipOriginService;
   @Mock private HangarImportService hangarImportService;
   @Mock private UserService userService;
   @Mock private ShipMapper shipMapper;
@@ -77,12 +82,62 @@ class HangarControllerTest {
   void setUp() {
     controller =
         new HangarController(
-            hangarService, hangarImportService, userService, shipMapper, hangarAccessPolicy);
+            hangarService,
+            shipOriginService,
+            hangarImportService,
+            userService,
+            shipMapper,
+            hangarAccessPolicy);
+  }
+
+  @Test
+  void getMyShips_passesTheOriginFilterThrough() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(hangarService.getMyShipsFiltered(
+            eq(ownerId), isNull(), isNull(), eq(ShipOrigin.UNKNOWN), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    controller.getMyShips(jwt, 0, 1, null, null, ShipOrigin.UNKNOWN);
+
+    verify(hangarService)
+        .getMyShipsFiltered(
+            eq(ownerId), isNull(), isNull(), eq(ShipOrigin.UNKNOWN), any(Pageable.class));
+  }
+
+  @Test
+  void bulkChangeMyShipsOrigin_takesTheOwnerFromTheJwt() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    List<UUID> ships = List.of(UUID.randomUUID());
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(shipOriginService.bulkChangeOrigin(ownerId, ships, ShipOrigin.IN_GAME))
+        .thenReturn(new ShipBulkOriginResultDto(1, 0));
+
+    ShipBulkOriginResultDto result =
+        controller.bulkChangeMyShipsOrigin(
+            jwt, new ShipBulkOriginRequestDto(ships, ShipOrigin.IN_GAME));
+
+    assertThat(result).isEqualTo(new ShipBulkOriginResultDto(1, 0));
   }
 
   private static ShipDto shipDto(String name) {
     return new ShipDto(
-        UUID.randomUUID(), name, null, "LTI", null, true, null, null, 1L, 0L, null, null);
+        UUID.randomUUID(),
+        name,
+        null,
+        "LTI",
+        null,
+        true,
+        null,
+        null,
+        1L,
+        0L,
+        null,
+        null,
+        null,
+        false);
   }
 
   private static Jwt jwt(String sub) {
@@ -103,16 +158,18 @@ class HangarControllerTest {
     ShipDto d1 = shipDto("Aurora");
     ShipDto d2 = shipDto("Cutlass");
     Page<Ship> page = new PageImpl<>(List.of(s1, s2), PageRequest.of(0, 20), 2);
-    when(hangarService.getMyShipsFiltered(eq(ownerId), isNull(), isNull(), any(Pageable.class)))
+    when(hangarService.getMyShipsFiltered(
+            eq(ownerId), isNull(), isNull(), isNull(), any(Pageable.class)))
         .thenReturn(page);
     when(shipMapper.toOwnerDto(s1)).thenReturn(d1);
     when(shipMapper.toOwnerDto(s2)).thenReturn(d2);
 
-    PageResponse<ShipDto> result = controller.getMyShips(jwt, 0, 20, null, null);
+    PageResponse<ShipDto> result = controller.getMyShips(jwt, 0, 20, null, null, null);
 
     ArgumentCaptor<UUID> ownerCaptor = ArgumentCaptor.forClass(UUID.class);
     verify(hangarService)
-        .getMyShipsFiltered(ownerCaptor.capture(), isNull(), isNull(), any(Pageable.class));
+        .getMyShipsFiltered(
+            ownerCaptor.capture(), isNull(), isNull(), isNull(), any(Pageable.class));
     assertThat(ownerCaptor.getValue()).isEqualTo(ownerId);
     assertThat(result.content()).containsExactly(d1, d2);
     assertThat(result.totalElements()).isEqualTo(2L);
@@ -139,13 +196,13 @@ class HangarControllerTest {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     Page<Ship> page = new PageImpl<>(List.of());
     when(hangarService.getMyShipsFiltered(
-            eq(ownerId), eq("Cutlass"), isNull(), any(Pageable.class)))
+            eq(ownerId), eq("Cutlass"), isNull(), isNull(), any(Pageable.class)))
         .thenReturn(page);
 
-    controller.getMyShips(jwt, 0, 50, "Cutlass", null);
+    controller.getMyShips(jwt, 0, 50, "Cutlass", null, null);
 
     verify(hangarService)
-        .getMyShipsFiltered(eq(ownerId), eq("Cutlass"), isNull(), any(Pageable.class));
+        .getMyShipsFiltered(eq(ownerId), eq("Cutlass"), isNull(), isNull(), any(Pageable.class));
   }
 
   /** The optional fitted filter reaches the service unchanged next to the search term. */
@@ -156,13 +213,14 @@ class HangarControllerTest {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     Page<Ship> page = new PageImpl<>(List.of());
     when(hangarService.getMyShipsFiltered(
-            eq(ownerId), isNull(), eq(Boolean.FALSE), any(Pageable.class)))
+            eq(ownerId), isNull(), eq(Boolean.FALSE), isNull(), any(Pageable.class)))
         .thenReturn(page);
 
-    controller.getMyShips(jwt, 0, 50, null, Boolean.FALSE);
+    controller.getMyShips(jwt, 0, 50, null, Boolean.FALSE, null);
 
     verify(hangarService)
-        .getMyShipsFiltered(eq(ownerId), isNull(), eq(Boolean.FALSE), any(Pageable.class));
+        .getMyShipsFiltered(
+            eq(ownerId), isNull(), eq(Boolean.FALSE), isNull(), any(Pageable.class));
   }
 
   @Test
@@ -192,7 +250,7 @@ class HangarControllerTest {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     ShipRequestDto request =
-        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L, null);
+        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L, null, null);
     Ship created = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -211,7 +269,7 @@ class HangarControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID shipId = UUID.randomUUID();
     ShipRequestDto request =
-        new ShipRequestDto("Cutlass II", UUID.randomUUID(), "1", null, false, 5L, null);
+        new ShipRequestDto("Cutlass II", UUID.randomUUID(), "1", null, false, 5L, null, null);
     Ship updated = new Ship();
     ShipDto dto = shipDto("Cutlass II");
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -269,7 +327,7 @@ class HangarControllerTest {
   void addUserShip_admin_passesPathUserIdAndRequestToService() {
     UUID targetUser = UUID.randomUUID();
     ShipRequestDto request =
-        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L, null);
+        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L, null, null);
     Ship created = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(hangarService.addShipByAdmin(targetUser, request)).thenReturn(created);
@@ -286,7 +344,7 @@ class HangarControllerTest {
     UUID targetUser = UUID.randomUUID();
     UUID shipId = UUID.randomUUID();
     ShipRequestDto request =
-        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 1L, null);
+        new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 1L, null, null);
     Ship updated = new Ship();
     ShipDto dto = shipDto("Cutlass");
     when(hangarService.updateShipByAdmin(targetUser, shipId, request)).thenReturn(updated);

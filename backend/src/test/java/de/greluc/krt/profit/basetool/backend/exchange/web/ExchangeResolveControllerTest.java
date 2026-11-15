@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangePublishedSchemas;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -78,6 +79,14 @@ class ExchangeResolveControllerTest {
   private static final int WIDGET_UEX_ID = 990_002;
   private static final int RESOLVIUM_COMMODITY = 990_003;
   private static final int HAULER_UEX_ID = 990_004;
+  private static final int LONGEST_COMMODITY = 990_005;
+  private static final int LONGEST_HAULER_UEX_ID = 990_006;
+
+  /** The longest name the catalogue stores for an item, a material or a ship type. */
+  private static final int STORED_NAME = 255;
+
+  /** The longest name the published {@code item-ref} schema allows. */
+  private static final int PUBLISHED_NAME = 200;
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
@@ -268,6 +277,39 @@ class ExchangeResolveControllerTest {
   }
 
   @Test
+  void anItemNameLongerThanTheContractAllowsIsCutToItsLength() throws Exception {
+    GameItem longest =
+        gameItemRepository.saveAndFlush(item(atStoredLength("Xch Longest Item "), null));
+
+    assertResolvedCut(
+        "{\"kind\":\"ITEM\",\"refs\":[{\"bt\":\"%s\"}]}".formatted(longest.getId()),
+        longest.getName());
+  }
+
+  @Test
+  void aMaterialNameLongerThanTheContractAllowsIsCutToItsLength() throws Exception {
+    Material longest = material(atStoredLength("Xch Longest Material "), true);
+    longest.setIdCommodity(LONGEST_COMMODITY);
+    materialRepository.saveAndFlush(longest);
+
+    assertResolvedCut(
+        "{\"kind\":\"MATERIAL\",\"refs\":[{\"uexId\":%d}]}".formatted(LONGEST_COMMODITY),
+        longest.getName());
+  }
+
+  @Test
+  void aShipTypeNameLongerThanTheContractAllowsIsCutToItsLength() throws Exception {
+    ShipType longest = new ShipType();
+    longest.setName(atStoredLength("Xch Longest Hauler "));
+    longest.setUexVehicleId(LONGEST_HAULER_UEX_ID);
+    shipTypeRepository.saveAndFlush(longest);
+
+    assertResolvedCut(
+        "{\"kind\":\"SHIP_TYPE\",\"refs\":[{\"uexId\":%d}]}".formatted(LONGEST_HAULER_UEX_ID),
+        longest.getName());
+  }
+
+  @Test
   void moreThanFiveHundredReferencesAreRefused() throws Exception {
     StringBuilder refs = new StringBuilder();
     for (int i = 0; i < 501; i++) {
@@ -297,6 +339,38 @@ class ExchangeResolveControllerTest {
                             token.subject(MEMBER.toString()).claim("azp", "basetool-frontend"))
                         .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isForbidden());
+  }
+
+  /**
+   * Resolves one reference and checks that its entry carries the stored name cut to the published
+   * length and that the answer matches the published schema the gateway checks it with.
+   *
+   * @param body the JSON body with one reference
+   * @param stored the name the catalogue stores for the entry
+   * @throws Exception if the request fails
+   */
+  private void assertResolvedCut(@NotNull String body, @NotNull String stored) throws Exception {
+    String answer =
+        mockMvc
+            .perform(relayed(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.results[0].status").value("resolved"))
+            .andExpect(jsonPath("$.results[0].ref.name").value(stored.substring(0, PUBLISHED_NAME)))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    ExchangePublishedSchemas.assertMatches("resolve-response.schema.json", answer, body);
+  }
+
+  /**
+   * Pads a name to the longest length the catalogue stores.
+   *
+   * @param prefix the distinctive start of the name
+   * @return the prefix padded with {@code x} to {@value #STORED_NAME} characters
+   */
+  private static @NotNull String atStoredLength(@NotNull String prefix) {
+    return prefix + "x".repeat(STORED_NAME - prefix.length());
   }
 
   /**

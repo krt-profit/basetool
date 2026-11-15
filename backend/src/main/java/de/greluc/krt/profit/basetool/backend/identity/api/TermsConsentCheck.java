@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.backend.identity.api;
 import java.util.UUID;
 
 /**
- * The Terms-of-Use acceptance check (REQ-SEC-028), declared in the {@code support} leaf so {@code
- * identity.api.TermsAcceptanceAccessFilter} can use it without depending on {@code service}
- * (ADR-0047).
+ * The Terms-of-Use acceptance check (REQ-SEC-028) the consent gate {@link TermsAcceptanceGate}
+ * asks, implemented by the identity module's acceptance service (ADR-0047).
  */
 @FunctionalInterface
 public interface TermsConsentCheck {

@@ -24,9 +24,11 @@ import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -57,7 +59,8 @@ class NotificationRenderCodesTest {
         new BackendSideChannels(mock(WebClient.class), null),
         mock(OAuth2AuthorizedClientManager.class),
         new SimpleMeterRegistry(),
-        SecurityConfig.roleHierarchy());
+        SecurityConfig.roleHierarchy(),
+        new SessionGates(List.of()));
   }
 
   private static Map<String, String> params(String code) {
@@ -98,7 +101,8 @@ class NotificationRenderCodesTest {
             new BackendSideChannels(mock(WebClient.class), null),
             mock(OAuth2AuthorizedClientManager.class),
             new SimpleMeterRegistry(),
-            SecurityConfig.roleHierarchy());
+            SecurityConfig.roleHierarchy(),
+            new SessionGates(List.of()));
 
     assertEquals("Code X1", controller.render("PLAIN", params, Locale.GERMAN));
   }

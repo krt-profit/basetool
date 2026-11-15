@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.hangar.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -29,7 +30,9 @@ import java.util.UUID;
  * Frontend mirror of the backend {@code ShipRequestDto}; must match it field for field.
  *
  * <p>{@code owningOrgUnitId} is the owning-org-unit picker output; {@code null} lets the backend
- * stamp it, otherwise it is validated against the target user's memberships.
+ * stamp it, otherwise it is validated against the target user's memberships. {@code origin} is
+ * {@code PLEDGE} or {@code IN_GAME}, required on an add; {@code null} on an edit keeps the stored
+ * origin (REQ-HANGAR-017).
  */
 @DtoMirror
 public record ShipRequestDto(
@@ -43,4 +46,5 @@ public record ShipRequestDto(
     UUID locationId,
     boolean fitted,
     Long version,
-    UUID owningOrgUnitId) {}
+    UUID owningOrgUnitId,
+    @BackendEnumAsString("hangar.ship.origin") String origin) {}

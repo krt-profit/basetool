@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.CheckoutType;
@@ -86,7 +87,9 @@ class InventoryPageControllerTest {
     controller =
         new InventoryPageController(inventoryClient, catalogs, mock(ItemPickerLabels.class));
     listController = new InventoryListPageController(inventoryClient, catalogs);
-    inputController = new InventoryInputPageController(inventoryClient, PARALLEL, catalogs);
+    inputController =
+        new InventoryInputPageController(
+            inventoryClient, PARALLEL, catalogs, mock(HomeLocationPreferenceReader.class));
     writeController =
         new InventoryWriteController(inventoryClient, inputController, listController);
   }
@@ -1149,7 +1152,7 @@ class InventoryPageControllerTest {
     UUID locationId = UUID.randomUUID();
     LocationReferenceDto location = new LocationReferenceDto(locationId, "Everus Harbor");
     InventoryStackDto stack =
-        new InventoryStackDto(null, location, 700, false, false, null, 10.0, 700.0, 700, 1);
+        new InventoryStackDto(null, location, 700, false, false, null, 10.0, 700.0, 700, 1, false);
     GroupedInventoryDto group =
         new GroupedInventoryDto(null, null, 10.0, 700.0, 700, List.of(stack));
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(group));
@@ -1211,7 +1214,8 @@ class InventoryPageControllerTest {
             700.0,
             700,
             List.of(
-                new InventoryStackDto(null, picked, 700, false, false, null, 10.0, 700.0, 700, 1)));
+                new InventoryStackDto(
+                    null, picked, 700, false, false, null, 10.0, 700.0, 700, 1, false)));
     GroupedInventoryDto unfiltered =
         new GroupedInventoryDto(
             null,
@@ -1220,8 +1224,10 @@ class InventoryPageControllerTest {
             700.0,
             700,
             List.of(
-                new InventoryStackDto(null, picked, 700, false, false, null, 10.0, 700.0, 700, 1),
-                new InventoryStackDto(null, other, 700, false, false, null, 20.0, 700.0, 700, 1)));
+                new InventoryStackDto(
+                    null, picked, 700, false, false, null, 10.0, 700.0, 700, 1, false),
+                new InventoryStackDto(
+                    null, other, 700, false, false, null, 20.0, 700.0, 700, 1, false)));
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(invocation -> {
           String url = invocation.getArgument(0);

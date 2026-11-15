@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipProductionStatus;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -255,7 +256,7 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(owned(type, 3));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(imported(owned(type, 3)));
 
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
 
@@ -1741,7 +1742,7 @@ class HangarImportServiceTest {
     UUID userId = UUID.randomUUID();
     User user = userWithId(userId);
     ShipType cat = shipTypeWithName("Caterpillar");
-    List<Ship> hangar = owned(cat, 1);
+    List<Ship> hangar = imported(owned(cat, 1));
     Ship ship = hangar.getFirst();
     ship.setPledgeId("3001");
     ship.setPledgeDate(LocalDate.of(2020, 6, 2));
@@ -1854,6 +1855,72 @@ class HangarImportServiceTest {
       ships.add(ship);
     }
     return ships;
+  }
+
+  /** The ships with their origin locked, as an earlier import leaves them. */
+  private static List<Ship> imported(List<Ship> ships) {
+    ships.forEach(ship -> ship.setOriginLocked(true));
+    return ships;
+  }
+
+  @Test
+  void importShips_createdShipsArePledgedAndLocked() {
+    UUID userId = UUID.randomUUID();
+    ShipType type = shipTypeWithName("aurora mr");
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(userWithId(userId)));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    hangarImportService.importShips(
+        userId, multipartFile("[{\"name\":\"aurora mr\",\"shipname\":\"\",\"type\":\"ship\"}]"));
+
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getOrigin()).isEqualTo(ShipOrigin.PLEDGE);
+    assertThat(captor.getValue().isOriginLocked()).isTrue();
+  }
+
+  @Test
+  void importShips_matchedShipOfUnknownOrigin_isLockedWithoutTouchingItsChoice() {
+    UUID userId = UUID.randomUUID();
+    ShipType type = shipTypeWithName("aurora mr");
+    List<Ship> hangar = owned(type, 1);
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(userWithId(userId)));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
+
+    FleetviewImportResponseDto result =
+        hangarImportService.importShips(
+            userId,
+            multipartFile("[{\"name\":\"aurora mr\",\"shipname\":\"\",\"type\":\"ship\"}]"));
+
+    assertThat(result.updatedCount()).isEqualTo(1);
+    assertThat(hangar.getFirst().isOriginLocked()).isTrue();
+    assertThat(hangar.getFirst().getOrigin()).isEqualTo(ShipOrigin.UNKNOWN);
+    assertThat(hangar.getFirst().effectiveOrigin()).isEqualTo(ShipOrigin.PLEDGE);
+  }
+
+  @Test
+  void importShips_neverMatchesAShipBoughtInGame() {
+    UUID userId = UUID.randomUUID();
+    ShipType type = shipTypeWithName("aurora mr");
+    List<Ship> hangar = owned(type, 1);
+    Ship inGame = hangar.getFirst();
+    inGame.setOrigin(ShipOrigin.IN_GAME);
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(userWithId(userId)));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    FleetviewImportResponseDto result =
+        hangarImportService.importShips(
+            userId,
+            multipartFile("[{\"name\":\"aurora mr\",\"shipname\":\"\",\"type\":\"ship\"}]"));
+
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.duplicateCount()).isZero();
+    assertThat(inGame.isOriginLocked()).isFalse();
+    assertThat(inGame.effectiveOrigin()).isEqualTo(ShipOrigin.IN_GAME);
   }
 
   /** The two lists one after the other. */

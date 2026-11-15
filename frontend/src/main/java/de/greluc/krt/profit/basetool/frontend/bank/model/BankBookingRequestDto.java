@@ -84,6 +84,8 @@ import org.jetbrains.annotations.Nullable;
  * @param callerMayConfirm on the staff queue, whether the caller may confirm this request now;
  *     {@code null} on every other read (REQ-BANK-023)
  * @param linked frozen and final evidence of an order-linked request, or {@code null}
+ * @param cancelledByPatchLabel the current label of the patch change whose currency wipe cancelled
+ *     the request, or {@code null} for every other request (REQ-PATCH-042)
  */
 @DtoMirror
 public record BankBookingRequestDto(
@@ -126,7 +128,8 @@ public record BankBookingRequestDto(
     @Nullable String clientName,
     Long version,
     @Nullable Boolean callerMayConfirm,
-    @Nullable LinkedBankRequestDetails linked) {
+    @Nullable LinkedBankRequestDetails linked,
+    @Nullable String cancelledByPatchLabel) {
 
   /**
    * Whether the staff queue offers this caller the confirm action; an unjudged row offers none.

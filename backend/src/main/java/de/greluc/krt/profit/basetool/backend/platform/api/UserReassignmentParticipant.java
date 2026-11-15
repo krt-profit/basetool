@@ -24,13 +24,14 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * A module's part of the admin account merge (REQ-SEC-045): it names the member-referencing columns
+ * A module's part of the admin account merge (REQ-SEC-046): it names the member-referencing columns
  * its module holds, those that follow the member and those that stay with the act, and moves the
  * former from the source account to the target, inside the merge's transaction.
  *
- * <p>The orchestrator asks every participant to {@link #assertMergeable} first, then runs {@link
- * #reassign} by {@link #position()} and reports the moved rows in that order. Implementations join
- * the caller's transaction ({@code MANDATORY}).
+ * <p>The orchestrator lets every {@link PreparedUserReassignmentParticipant} take its locks before
+ * it locks the two account rows, then asks every participant to {@link #assertMergeable}, then runs
+ * {@link #reassign} by {@link #position()} and reports the moved rows in that order.
+ * Implementations join the caller's transaction ({@code MANDATORY}).
  */
 @ObserverSpi
 public interface UserReassignmentParticipant {

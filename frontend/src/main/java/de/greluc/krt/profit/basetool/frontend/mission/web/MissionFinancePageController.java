@@ -103,10 +103,11 @@ public class MissionFinancePageController {
               id, form.getParticipantId(), form.getNote(), form.getType(), form.getAmount()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "addFinanceEntry", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.add");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Add finance entry failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.add");
     }
@@ -148,10 +149,11 @@ public class MissionFinancePageController {
               form.getNote(), form.getType(), form.getAmount(), form.getVersion()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "updateFinanceEntry", entryId, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.update");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update finance entry failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.update");
     }
@@ -176,10 +178,11 @@ public class MissionFinancePageController {
       missionClient.deleteFinanceEntry(id, entryId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.delete");
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Delete finance entry failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.delete");
     }

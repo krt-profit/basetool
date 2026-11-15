@@ -67,6 +67,27 @@
         "CANCELED"
       ]
     },
+    "canceledByPatch": {
+      "type": "object",
+      "description": "The patch change that cancelled the order because the game patch ended it. Present only on a CANCELED order a patch change cancelled.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The patch change's id, the same in every feed entry the patch change caused."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "The patch label, e.g. 4.4; an admin may correct it later."
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
+    },
     "location": {
       "$ref": "location-ref.schema.json",
       "description": "The refinery the order runs at."

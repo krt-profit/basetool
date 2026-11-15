@@ -175,6 +175,11 @@ it — the web's requests too — as a snapshot followed by the change feed of R
   `splitPercent`, each `null` where it does not apply. Money and the split percent
   are JSON integers. No staff note, no staff identities (requester, decider or approver handles), no
   counterparty, no purpose and no `callerMayConfirm`.
+- **Patch change.** A request a patch change's currency wipe cancelled also carries
+  `cancelledByPatch: {id, label}`, the patch change with its current label, read once per page;
+  every other request leaves the field out, so the item keeps its allow-list
+  ([REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled)).
+  The field is additive and not required by the schema.
 - **The cap.** Every page, snapshot and feed alike, carries `openRequestCap`, the configured
   `app.bank.exchange.open-request-cap` (REQ-BXCH-004); the client counts the `PENDING` items
   itself. The field is additive and not required by the schema, so a tolerant reader ignores it;
@@ -195,6 +200,8 @@ it — the web's requests too — as a snapshot followed by the change feed of R
   (`ExchangeBankRequestFeedTest`).
 - [x] Snapshot and feed pages carry `openRequestCap` as the configured cap
   (`ExchangeBankRequestsTest`, `ExchangeBankRequestFeedTest`).
+- [x] A request a currency wipe cancelled carries `cancelledByPatch` from one label read per page,
+  every other request leaves it out (`ExchangeBankRequestServiceTest`).
 - [x] Every write of a request, a renamed account and a new unit shorthand are sequenced under the
   requester (`ExchangeChangeFeedTriggerIntegrationTest`).
 - [x] Every answer validates against `page.schema.json#/$defs/bankRequestPage`; the route, schema,

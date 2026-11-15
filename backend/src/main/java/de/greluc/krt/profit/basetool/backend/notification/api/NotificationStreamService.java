@@ -161,6 +161,29 @@ public class NotificationStreamService {
   }
 
   /**
+   * Completes every live stream of the given recipients, so their clients reconnect through the
+   * request gates and meet one that took effect meanwhile, such as the home-location gate
+   * (REQ-PATCH-029).
+   *
+   * @param recipientUserIds the recipients whose connections to close
+   */
+  public void reconnect(@NotNull Collection<UUID> recipientUserIds) {
+    for (UUID recipientUserId : recipientUserIds) {
+      Queue<SseEmitter> emitters = emittersBySub.remove(recipientUserId);
+      if (emitters == null) {
+        continue;
+      }
+      for (SseEmitter emitter : emitters) {
+        try {
+          emitter.complete();
+        } catch (RuntimeException e) {
+          log.debug("SSE emitter completion raced its own teardown", e);
+        }
+      }
+    }
+  }
+
+  /**
    * Sends a named {@code heartbeat} event to all live emitters, keeping idle connections open and
    * giving clients a liveness signal (REQ-NOTIF-010); dead emitters are dropped.
    */

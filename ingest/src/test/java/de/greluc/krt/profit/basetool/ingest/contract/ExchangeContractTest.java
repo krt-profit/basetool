@@ -84,6 +84,8 @@ class ExchangeContractTest {
           "/exchange/v1/me/refinery-orders/changes",
           "/exchange/v1/me/org-demand",
           "/exchange/v1/me/org-units",
+          "/exchange/v1/me/patch-change",
+          "/exchange/v1/me/patch-change/home-location",
           "/exchange/v1/org-stock",
           "/exchange/v1/org-stock/changes",
           "/exchange/v1/org-stock/members",

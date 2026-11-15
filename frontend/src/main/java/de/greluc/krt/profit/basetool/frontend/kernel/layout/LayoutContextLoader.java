@@ -156,6 +156,7 @@ public class LayoutContextLoader {
           response.capabilities() != null ? response.capabilities() : CapabilitiesResponse.NONE,
           response.unreadNotifications());
     } catch (Exception ex) {
+      // Chrome renders on the pages a session gate leaves open, so a gate refusal degrades it.
       SectionFallback.rethrowIfReauthenticationRequired(ex);
       log.debug("Failed to resolve the layout context", ex);
       return LayoutContext.NONE;

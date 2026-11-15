@@ -44,6 +44,8 @@ import org.jetbrains.annotations.Nullable;
  * @param needId the need the donation is credited to, or {@code null}
  * @param status the lifecycle state
  * @param declineReason why it was declined, or {@code null}
+ * @param withdrawnByPatchLabel the current label of the patch change whose wipe withdrew the
+ *     pledge, or {@code null} for every other donation (REQ-SUP-010)
  * @param donorName the donor's display name, or {@code null} when hidden or not recorded
  * @param donorIsMe whether the caller is the donor
  * @param fromStock whether the pledge is earmarked on a Lager row
@@ -66,6 +68,7 @@ public record DonationDto(
     @Nullable UUID needId,
     DonationStatus status,
     @Nullable DeclineReason declineReason,
+    @Nullable String withdrawnByPatchLabel,
     @Nullable String donorName,
     boolean donorIsMe,
     boolean fromStock,

@@ -113,6 +113,16 @@ function initProfile() {
                 return { withholdName: checkbox ? checkbox.checked : false, version };
             },
         },
+        {
+            formId: 'profile-home-location-form',
+            ownVersion: true,
+            payload(form, version) {
+                const select = /** @type {HTMLSelectElement | null} */ (
+                    form.querySelector('select[name="homeLocationId"]')
+                );
+                return { homeLocationId: select && select.value ? select.value : null, version };
+            },
+        },
     ];
 
     const settings = document.getElementById('profile-settings');

@@ -27,7 +27,8 @@ import org.jetbrains.annotations.NotNull;
  * Tells the owner of a purpose how its purpose-bound booking request ended, inside the bank's own
  * transaction (REQ-BANK-063): the owner's state equals the request's state when the transaction
  * commits, and a failing observer rolls the bank's decision back. Implemented by the module that
- * owns the kind; every method joins the caller's transaction ({@code MANDATORY}).
+ * owns the kind; every method joins the caller's transaction ({@code MANDATORY}). The bank calls
+ * {@link #beforeDecision} before it locks the request and the outcome methods after.
  */
 @ObserverSpi
 public interface BookingRequestPurposeObserver {
@@ -39,6 +40,15 @@ public interface BookingRequestPurposeObserver {
    */
   @NotNull
   BankPurposeKind kind();
+
+  /**
+   * Takes the owner's lock on a purpose before the bank locks one of its requests, so a decision of
+   * the bank and the owner's own writes both lock the owner first and the request second
+   * (REQ-BANK-063). Called again for a purpose whose lock the transaction already holds.
+   *
+   * @param purposeRef the owner's reference stored on the request
+   */
+  void beforeDecision(@NotNull UUID purposeRef);
 
   /**
    * A purpose-bound request was confirmed and booked.

@@ -86,7 +86,9 @@ public class AdminExchangeClientsPageController {
           "exchange.drafts.refinery",
           "exchange.bank.read",
           "exchange.bank.request",
-          "exchange.bank.queue");
+          "exchange.bank.queue",
+          "exchange.patch.read",
+          "exchange.patch.write");
 
   /** Talks to the backend. */
   private final ExchangeBackendClient exchangeClient;

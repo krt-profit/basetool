@@ -338,6 +338,7 @@ class InventoryCheckoutServiceBulkRebookTest {
             source.getQuality(),
             false,
             false,
+            null,
             null))
         .thenReturn(List.of(target));
 

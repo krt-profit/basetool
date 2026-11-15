@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.navigation.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import java.util.Optional;
@@ -35,7 +36,9 @@ import org.springframework.web.context.request.RequestContextHolder;
  * Reads the caller's stored navigation preferences once per request, so the favourites and the
  * appearance of one page share a single backend call (REQ-UI-032).
  *
- * <p>Fails closed: a failed read yields an empty result, which renders the defaults.
+ * <p>Fails closed: a failed read yields an empty result, which renders the defaults. A session
+ * gate's refusal is such a failure, because the layout also renders on the pages a gate leaves
+ * open; only a lost session propagates (ADR-0385).
  */
 @Slf4j
 @Component
@@ -87,6 +90,7 @@ public class NavigationPreferencesLoader {
     } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug("Failed to read the navigation preferences", e);
       return Optional.empty();
     }

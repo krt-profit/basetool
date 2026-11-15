@@ -34,7 +34,9 @@
                 </thead>
                 <tbody>
                     <tr th:each="item : ${items}" data-testid="inventory-game-item-row">
-                        <td><span class="cell-title" th:text="${item.user.effectiveName}">Username</span></td>
+                        <td><span class="cell-title" th:text="${item.user.effectiveName}">Username</span>
+                            <span th:if="${item.relocationPending}" class="chip chip--warning" data-testid="relocation-pending-chip"
+                                  th:title="#{patchChange.relocationPending.title}" th:text="#{patchChange.relocationPending.chip}">Umzug ausstehend</span></td>
                         <td th:attr="data-label=#{inventory.items.drilldown.col.location}" th:text="${item.location.name}">Ort</td>
                         <td class="num" th:attr="data-label=#{inventory.items.drilldown.col.amount}"><span th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}">10</span> <span th:text="#{material.quantity.piece}">St&uuml;ck</span></td>
                     </tr>

@@ -70,14 +70,45 @@ elsewhere — drop it locally.
 
 ## Tombstones and never re-adding
 
-A tombstone's `removedBy` names who removed the entry: `{channel, clientId?, installationId?}`, with
-`channel` one of `web`, `app`, `client` and `system`, and for `client` the client's id and its
-installation's `installationId`; a channel you do not know counts as a removal elsewhere
+A tombstone's `removedBy` names who removed the entry:
+`{channel, clientId?, installationId?, patchChange?}`, with `channel` one of `web`, `app`, `client`,
+`system` and `patch`, for `client` the client's id and its installation's `installationId`, and for
+`patch` the `patchChange` `{id, label}` whose trigger removed the entry: a Star Citizen patch change
+an admin recorded for everyone. It touches only what was created or started before the patch went
+live, and its `id` names every entry it changed, so you can take it over in one step. A channel you
+do not know counts as a removal elsewhere
 ([reading tolerantly](versioning.md#reading-tolerantly)). When `installationId` is your own, it is
 your own removal. Any other tombstone means the member removed the entry elsewhere: remove it locally
 and **do not add it back**. The server refuses such an add per op with `REMOVED_ELSEWHERE` while the
 tombstone lives (90 days). If you believe the entry should come back, ask the member; only after they
 agree resend the op with `override: true`.
+
+## Patch changes
+
+When a patch change asks the members for a new home location, the Basetool relocates each member's
+stock and ships once the member has chosen, in the Basetool or through the
+[patch-change resource](resources/patch-change.md). **The server is the only relocator:** do not
+move synced lots or ships to a home location yourself; follow the result in the feeds. The same
+resource lists what the patch change wiped, so you can apply the same list to your own items.
+
+- Only lots and ships **created before the patch went live** move. Stock booked or ships added later
+  stay where they are.
+- A relocated lot reaches the stock feed as a **tombstone for the old key** plus an **item for the
+  new key**. The new key's item also includes stock that already lay at the home location. Every
+  entry names the channel `patch` and the patch change's `id`, so you can take the relocation over
+  in one step. A moved ship arrives as an item with its new location and a new `version`.
+- Until the member has chosen, those lots and ships are **locked**. A change set that writes one of
+  them answers `409 RELOCATION_PENDING` and writes nothing: from the member's own client, and from
+  another member's client on a pool lot the member holds. Reads and booking **new** stock still
+  work. Pause the stock and ship sync, keep the local changes and ask the member to choose the home
+  location, in the Basetool or through the patch-change resource; then pull and push again.
+- After the move or a wipe, a push against an old lot gets `REMOVED_ELSEWHERE` whatever its
+  `expectedQuantity`, and an `upsert` of a wiped ship as well; the result item names the patch
+  change's `id`. Drop your pending change for that lot or ship and pull. A lot that kept rows from
+  after the live time is no removed lot: a stale op on it is `VERSION_CONFLICT`.
+- An org-stock op on an entry the patch change wiped gets `REMOVED_ELSEWHERE`, and a stale op on an
+  entry it moved gets `VERSION_CONFLICT`; both name the patch change. The Basetool judges each entry
+  by its own last change ([org stock](resources/org-stock.md#the-result)).
 
 ## Full resync after a cursor expired
 

@@ -161,4 +161,32 @@ public class Ship extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   @Nullable
   private Boolean giftable;
+
+  /**
+   * The origin the owner or an admin chose, part of the row {@code @Version} (REQ-HANGAR-017). It
+   * counts only while the ship is not {@link #originLocked}; read it through {@link
+   * #effectiveOrigin()}.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "origin", nullable = false, length = 16)
+  private ShipOrigin origin = ShipOrigin.UNKNOWN;
+
+  /**
+   * Whether a file import or a pledge id fixed the origin to {@link ShipOrigin#PLEDGE}. Written
+   * only by the import and outside the row {@code @Version}, so an import never 409s an edit
+   * (ADR-0295).
+   */
+  @Column(name = "origin_locked", nullable = false)
+  @OptimisticLock(excluded = true)
+  private boolean originLocked;
+
+  /**
+   * Returns the origin the ship reads as everywhere: {@link ShipOrigin#PLEDGE} while it is locked,
+   * the chosen origin otherwise.
+   *
+   * @return the effective origin
+   */
+  public ShipOrigin effectiveOrigin() {
+    return ShipOrigin.effective(origin, originLocked);
+  }
 }

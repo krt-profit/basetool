@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetRes
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.ArrayList;
@@ -87,6 +88,7 @@ public class DashboardReader {
     } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Failed to read the {} dashboard", mode, e);
       return DashboardView.notLoaded(mode);
     }

@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyBlueprintSharingResponse;
+import de.greluc.krt.profit.basetool.frontend.identity.model.MyHomeLocationResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyPayoutPreferenceResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
@@ -66,7 +67,7 @@ class ProfileSettingsPatternRenderTest {
 
   /**
    * Renders {@code /profile} in German for a member with a description, the {@code DONATE} payout
-   * preference and a stored RSI handle.
+   * preference, a stored RSI handle and no home location chosen.
    *
    * @return the rendered HTML
    * @throws Exception if the request fails
@@ -103,6 +104,8 @@ class ProfileSettingsPatternRenderTest {
         .thenReturn(new NameWithholdingResponse(true, 7L));
     when(backendApiClient.get("/api/v1/users/me/rsi-handle", MyRsiHandleResponse.class))
         .thenReturn(new MyRsiHandleResponse("Valk_RSI", 7L));
+    when(backendApiClient.get("/api/v1/users/me/home-location", MyHomeLocationResponse.class))
+        .thenReturn(new MyHomeLocationResponse(null, 0L));
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc
         .perform(get("/profile").with(oidcLogin()).locale(Locale.GERMAN))
@@ -133,6 +136,7 @@ class ProfileSettingsPatternRenderTest {
         .contains("href=\"#profile-section-payout\"")
         .contains("href=\"#profile-section-blueprints\"")
         .contains("href=\"#profile-section-name-withholding\"")
+        .contains("href=\"#profile-section-home-location\"")
         .contains("href=\"#profile-security-card\"")
         .contains("href=\"#profile-export-card\"")
         .contains("href=\"#profile-deletion-card\"")
@@ -141,9 +145,9 @@ class ProfileSettingsPatternRenderTest {
         .contains("id=\"profile-deletion-card\"");
   }
 
-  /** The five sections keep their forms and endpoints and share one save bar that starts hidden. */
+  /** The six sections keep their forms and endpoints and share one save bar that starts hidden. */
   @Test
-  void rendersFiveSectionsAndOneHiddenSaveBar() throws Exception {
+  void rendersSixSectionsAndOneHiddenSaveBar() throws Exception {
     String html = render();
 
     assertThat(html)
@@ -159,9 +163,11 @@ class ProfileSettingsPatternRenderTest {
         .contains(">4 · Blaupausen-Verfügbarkeit<")
         .containsPattern(
             "id=\"profile-name-withholding-form\"[^>]*action=\"/profile/name-withholding\"")
-        .contains(">5 · Verbundene Anwendungen<");
-    assertThat(html.split("class=\"form-section\"", -1)).hasSize(6);
-    assertThat(NOSCRIPT_SAVE.matcher(html).results().count()).isEqualTo(5);
+        .contains(">5 · Verbundene Anwendungen<")
+        .containsPattern("id=\"profile-home-location-form\"[^>]*action=\"/profile/home-location\"")
+        .contains(">6 · Meine Home Location<");
+    assertThat(html.split("class=\"form-section\"", -1)).hasSize(7);
+    assertThat(NOSCRIPT_SAVE.matcher(html).results().count()).isEqualTo(6);
     assertThat(html)
         .containsPattern("class=\"form-actions--sticky profile-save-bar\"[^>]*hidden")
         .contains("data-testid=\"profile-save\"")

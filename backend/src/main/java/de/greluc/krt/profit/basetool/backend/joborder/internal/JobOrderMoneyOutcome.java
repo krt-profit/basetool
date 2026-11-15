@@ -53,6 +53,8 @@ import org.jetbrains.annotations.Nullable;
  * @param activeLinkedRevision whether this revision is the current linked attempt
  * @param clarificationResolved whether a targeted correction resolved a real-payment reversal
  * @param accountHoldingId the credited or debited order-local Bank account holding
+ * @param patchLabel the current label of the patch change whose currency wipe booked the shortage
+ *     or cancelled the attempt, or {@code null}
  */
 public record JobOrderMoneyOutcome(
     UUID operationId,
@@ -80,7 +82,8 @@ public record JobOrderMoneyOutcome(
     @Nullable String counterpartyName,
     @Nullable Boolean activeLinkedRevision,
     @Nullable Boolean clarificationResolved,
-    @Nullable UUID accountHoldingId) {
+    @Nullable UUID accountHoldingId,
+    @Nullable String patchLabel) {
 
   static JobOrderMoneyOutcome of(
       JobOrderMoneyOperation operation,
@@ -89,7 +92,8 @@ public record JobOrderMoneyOutcome(
       @Nullable String recipientName,
       @Nullable UUID peerOrderId,
       List<JobOrderMoneyCorrectionView> corrections,
-      @Nullable JobOrderMoneyCorrectionBasisView correctionBasis) {
+      @Nullable JobOrderMoneyCorrectionBasisView correctionBasis,
+      @Nullable String patchLabel) {
     return new JobOrderMoneyOutcome(
         operation.getOperationId(),
         operation.getHolderId(),
@@ -116,6 +120,7 @@ public record JobOrderMoneyOutcome(
         null,
         null,
         null,
-        operation.getAccountHoldingId());
+        operation.getAccountHoldingId(),
+        patchLabel);
   }
 }

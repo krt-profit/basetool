@@ -33,6 +33,8 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MyRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileBlueprintSharingForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileDescriptionForm;
+import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileHomeLocationForm;
+import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileHomeLocationSection;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileRsiHandleForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDescriptionRequest;
@@ -75,8 +77,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Controller of the user profile page ({@code /profile}) and its editable fields: description,
- * display name, default payout preference, blueprint sharing and the name withholding from
- * connected applications.
+ * display name, default payout preference, blueprint sharing, the name withholding from connected
+ * applications and, saved by {@link ProfileHomeLocationController}, the home location.
  *
  * <p>Renders from token claims overlaid with {@code /api/v1/users/me}, and still renders from the
  * token alone when the backend is unreachable.
@@ -96,6 +98,9 @@ public class ProfileController {
 
   /** Reads and writes the member's name withholding from connected applications. */
   private final ExchangeBackendClient exchangeClient;
+
+  /** Reads the member's home-location setting and the curated home locations. */
+  private final HomeLocationPreferenceReader homeLocationReader;
 
   private final MessageSource messageSource;
 
@@ -142,7 +147,7 @@ public class ProfileController {
         }
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.warn(
           "Could not load the caller's user row for the profile page; showing token claims", e);
     }
@@ -158,7 +163,7 @@ public class ProfileController {
         payoutVersion = pref.version();
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Could not load the default payout preference; defaulting the selector to PAYOUT", e);
     }
@@ -176,7 +181,7 @@ public class ProfileController {
         }
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Could not load the global blueprint-sharing flag; defaulting the toggle to off", e);
     }
@@ -191,7 +196,7 @@ public class ProfileController {
         withholdingVersion = withholding.version();
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug("Could not load the name withholding; defaulting the toggle to off", e);
     }
 
@@ -202,23 +207,12 @@ public class ProfileController {
         rsiHandle = handle.rsiHandle();
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.debug("Could not load the RSI handle; the field starts empty", e);
     }
 
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
-
-    AdminDeletionRequestDto deletionRequest = null;
-    boolean deletionRequestUnavailable = false;
-    try {
-      deletionRequest = identityClient.myDeletionRequest();
-    } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
-      log.debug("Could not load the member's deletion request; the card says so", e);
-      deletionRequestUnavailable = true;
-    }
-    model.addAttribute("deletionRequest", deletionRequest);
-    model.addAttribute("deletionRequestUnavailable", deletionRequestUnavailable);
+    addDeletionRequest(model);
 
     model.addAttribute(
         "initials",
@@ -260,7 +254,45 @@ public class ProfileController {
           new ProfileRsiHandleForm(rsiHandle, version != null ? version : 0L));
     }
 
+    addHomeLocationSection(model);
     return "identity/profile";
+  }
+
+  /**
+   * Adds the member's erasure request to the deletion card, or the flag that it cannot be read.
+   *
+   * @param model the profile model
+   */
+  private void addDeletionRequest(@NotNull Model model) {
+    AdminDeletionRequestDto deletionRequest = null;
+    boolean deletionRequestUnavailable = false;
+    try {
+      deletionRequest = identityClient.myDeletionRequest();
+    } catch (Exception e) {
+      SectionFallback.rethrowHandOff(e);
+      log.debug("Could not load the member's deletion request; the card says so", e);
+      deletionRequestUnavailable = true;
+    }
+    model.addAttribute("deletionRequest", deletionRequest);
+    model.addAttribute("deletionRequestUnavailable", deletionRequestUnavailable);
+  }
+
+  /**
+   * Adds the section "my home location": whether it could be read and, when it could, the curated
+   * options and the form with the stored choice and its own version.
+   *
+   * @param model the profile model
+   */
+  private void addHomeLocationSection(@NotNull Model model) {
+    ProfileHomeLocationSection homeLocation = homeLocationReader.profileSection();
+    model.addAttribute("homeLocationAvailable", homeLocation.available());
+    if (!homeLocation.available()) {
+      return;
+    }
+    model.addAttribute("homeLocationOptions", homeLocation.options());
+    model.addAttribute(
+        "profileHomeLocationForm",
+        new ProfileHomeLocationForm(homeLocation.homeLocationId(), homeLocation.version()));
   }
 
   /**
@@ -296,6 +328,7 @@ public class ProfileController {
               form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -304,7 +337,7 @@ public class ProfileController {
       }
       return "redirect:/profile";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       return "redirect:/profile";
@@ -340,6 +373,7 @@ public class ProfileController {
               form.displayName() == null ? "" : form.displayName(),
               form.version() == null ? 0L : form.version()));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("AJAX profile description update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -387,6 +421,7 @@ public class ProfileController {
               form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -395,7 +430,7 @@ public class ProfileController {
       }
       return "redirect:/profile";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       return "redirect:/profile";
@@ -435,6 +470,7 @@ public class ProfileController {
               new MyPayoutPreferenceRequest(
                   preference, form.version() == null ? 0L : form.version()));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("AJAX payout-preference update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -478,6 +514,7 @@ public class ProfileController {
               form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -486,7 +523,7 @@ public class ProfileController {
       }
       return "redirect:/profile";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       return "redirect:/profile";
@@ -522,6 +559,7 @@ public class ProfileController {
               new MyBlueprintSharingRequest(
                   form.shareBlueprintsGlobally(), form.version() == null ? 0L : form.version()));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("AJAX blueprint-sharing update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -565,6 +603,7 @@ public class ProfileController {
               form.withholdName(), form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Name-withholding update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -572,7 +611,7 @@ public class ProfileController {
         redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Name-withholding update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
     }
@@ -609,6 +648,7 @@ public class ProfileController {
               form.version() == null ? 0L : form.version()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("RSI handle update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -618,7 +658,7 @@ public class ProfileController {
         redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("RSI handle update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
     }
@@ -652,7 +692,7 @@ public class ProfileController {
         return me.version();
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.warn("Could not re-read the caller's user-row version; assuming the next one", e);
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;

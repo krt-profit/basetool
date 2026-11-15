@@ -310,6 +310,24 @@ class NavigationMenuTest {
     assertThat(menu.pageTabs("refinery.orders", "/refinery-orders")).isEmpty();
   }
 
+  /**
+   * A sub-page below another tab's path keeps the tab its page head names: the patch-change page
+   * lies below the general settings tab's path and belongs to the danger zone (REQ-PATCH-008).
+   */
+  @Test
+  void aSubPageKeepsTheTabItsPageHeadNames() {
+    NavigationMenu menu = resolve(Set.of("ADMIN"), Set.of());
+
+    assertThat(menu.pageTabs("admin.dangerzone", "/admin/settings/patch-change"))
+        .filteredOn(NavigationMenu.PageTab::current)
+        .extracting(tab -> tab.entry().key())
+        .containsExactly("admin.dangerzone");
+    assertThat(menu.pageTabs("admin.dangerzone", "/admin/settings"))
+        .filteredOn(NavigationMenu.PageTab::current)
+        .extracting(tab -> tab.entry().key())
+        .containsExactly("admin.settings.general");
+  }
+
   /** A member gets neither the hub, the admin links nor an admin tab bar. */
   @Test
   void memberGetsNoAdminHubOrTabs() {

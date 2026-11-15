@@ -370,7 +370,7 @@ account check; the others have none.
 one: public, device grant only, consent required, DPoP-bound tokens, no redirect URI, every
 `exchange.*` scope and `offline_access` optional. Its Web Origins are `*`, as for an approved
 extension with a Firefox build, so a browser extension can sign in with it. The registry lists it
-`ACTIVE` with every capability and the default limits.
+`ACTIVE` with every capability, the three bank scopes included, and the default limits.
 
 `sandbox-suspended-client` has the same shape, but the registry lists it `SUSPENDED`, with only
 `exchange.connect` and `exchange.blueprints.read`: every call with its token is refused with
@@ -412,6 +412,10 @@ exchange off. The gateway sees a change within about 5 seconds.
   gateway's registry mirror within 10 s and the gateway re-reads the mirror at most every 5 s, so
   for up to about 15 s after `up` every call answers `503 EXCHANGE_DISABLED` with `Retry-After`.
   Honour it, as a client must in production too.
+- **The bank switch is on.** The seed switches the [bank](resources/bank.md) on for connected
+  applications as well, so the bank routes answer instead of `503 BANK_EXCHANGE_DISABLED`. To see
+  that refusal, sign in as `sandbox-admin` and switch it off under *Kartellbank in the data
+  exchange* on the client registry page.
 
 ## Test scenarios
 

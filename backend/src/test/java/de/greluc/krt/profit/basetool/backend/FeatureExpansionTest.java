@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepo
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -229,7 +230,14 @@ class FeatureExpansionTest {
   void testShipWithLocation() throws Exception {
     ShipRequestDto req =
         new ShipRequestDto(
-            "Located Ship", fighter.getId(), "LTI", stanton.getId(), false, null, null);
+            "Located Ship",
+            fighter.getId(),
+            "LTI",
+            stanton.getId(),
+            false,
+            null,
+            null,
+            ShipOrigin.PLEDGE);
 
     String response =
         mockMvc

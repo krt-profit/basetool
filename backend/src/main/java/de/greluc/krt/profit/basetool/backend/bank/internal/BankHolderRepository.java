@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -71,6 +73,27 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
    */
   @Query("SELECT h FROM BankHolder h LEFT JOIN FETCH h.user")
   List<BankHolder> findAllWithUser();
+
+  /**
+   * Locks every holder in id order, for a wipe reset that reads and offsets every holder's custody
+   * (REQ-BANK-013, REQ-PATCH-041). A reset takes it after its account locks.
+   *
+   * @return every holder, locked, in id order
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT h FROM BankHolder h ORDER BY h.id")
+  List<BankHolder> findAllForUpdateOrderById();
+
+  /**
+   * Locks the given holders in id order, for a booking that moves their custody (REQ-BANK-031). The
+   * booking takes it after its account locks.
+   *
+   * @param ids the holders; must not be empty
+   * @return the holders that exist, locked, in id order
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT h FROM BankHolder h WHERE h.id IN :ids ORDER BY h.id")
+  List<BankHolder> findAllByIdForUpdateOrderById(@Param("ids") Collection<UUID> ids);
 
   /**
    * Returns the holder rows linked to any of the given users, for the auto-registration reconcile

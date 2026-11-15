@@ -233,7 +233,7 @@ public class MissionPageController {
       List<T> options = load.join();
       model.addAttribute(attribute, options != null ? options : List.of());
     } catch (CompletionException e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.warn("Could not load the mission option list {}", attribute, e.getCause());
       failures.add(OPTION_LIST_KEY_PREFIX + attribute);
       model.addAttribute(attribute, List.of());
@@ -670,6 +670,7 @@ public class MissionPageController {
       List<MissionParticipantDto> result = missionClient.unassignedParticipants(id);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Get unassigned participants (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),

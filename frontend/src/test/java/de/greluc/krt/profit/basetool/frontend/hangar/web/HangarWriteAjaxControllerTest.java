@@ -34,8 +34,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.util.Collections;
@@ -82,7 +85,7 @@ class HangarWriteAjaxControllerTest {
     String body =
         "{\"name\":\"My Titan\",\"shipTypeId\":\""
             + UUID.randomUUID()
-            + "\",\"insurance\":\"LTI\",\"locationId\":null,\"fitted\":false}";
+            + "\",\"insurance\":\"LTI\",\"locationId\":null,\"fitted\":false,\"origin\":\"PLEDGE\"}";
 
     mockMvc
         .perform(
@@ -304,13 +307,121 @@ class HangarWriteAjaxControllerTest {
 
   @Test
   @WithMockUser
+  void addShipAjax_withoutAChosenOrigin_returns422AndDoesNotCallBackend() throws Exception {
+    for (String origin : List.of("", ",\"origin\":\"UNKNOWN\"", ",\"origin\":\"BOUGHT\"")) {
+      mockMvc
+          .perform(
+              post("/hangar/add")
+                  .header("X-Requested-With", "XMLHttpRequest")
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      "{\"shipTypeId\":\""
+                          + UUID.randomUUID()
+                          + "\",\"insurance\":\"LTI\",\"fitted\":false"
+                          + origin
+                          + "}"))
+          .andExpect(status().is(422))
+          .andExpect(jsonPath("$.code").value("VALIDATION"));
+    }
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(ShipDto.class));
+  }
+
+  @Test
+  @WithMockUser
+  void addShipAjax_forwardsTheChosenOrigin_andAnUpdateWithoutOneKeepsIt() throws Exception {
+    UUID type = UUID.randomUUID();
+    UUID id = UUID.randomUUID();
+    String ship = "{\"shipTypeId\":\"" + type + "\",\"insurance\":\"LTI\",\"fitted\":false";
+
+    mockMvc
+        .perform(
+            post("/hangar/add")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ship + ",\"origin\":\"IN_GAME\"}"))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(
+            post("/hangar/" + id + "/update")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ship + ",\"version\":2}"))
+        .andExpect(status().isNoContent());
+
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/hangar/ships"),
+            eq(new ShipRequestDto(null, type, "LTI", null, false, null, null, "IN_GAME")),
+            eq(ShipDto.class));
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/hangar/ships/{id}"),
+            eq(new ShipRequestDto(null, type, "LTI", null, false, 2L, null, null)),
+            eq(ShipDto.class),
+            eq(id));
+  }
+
+  @Test
+  @WithMockUser
+  void bulkChangeShipOriginAjax_valid_forwardsTheSelectionAndReturnsTheCounts() throws Exception {
+    UUID first = UUID.randomUUID();
+    when(backendApiClient.post(
+            eq("/api/v1/hangar/ships/bulk-origin"), any(), eq(ShipBulkOriginResultDto.class)))
+        .thenReturn(new ShipBulkOriginResultDto(1, 0));
+
+    mockMvc
+        .perform(
+            post("/hangar/bulk-origin")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shipIds\":[\"" + first + "\"],\"origin\":\"IN_GAME\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(1));
+
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/hangar/ships/bulk-origin"),
+            eq(new ShipBulkOriginRequestDto(List.of(first), "IN_GAME")),
+            eq(ShipBulkOriginResultDto.class));
+  }
+
+  @Test
+  @WithMockUser
+  void bulkChangeShipOriginAjax_emptyOrUnknown_returns422AndDoesNotCallBackend() throws Exception {
+    for (String body :
+        List.of(
+            "{\"shipIds\":[],\"origin\":\"PLEDGE\"}",
+            "{\"shipIds\":[\"" + UUID.randomUUID() + "\"],\"origin\":\"UNKNOWN\"}",
+            "{\"shipIds\":[\"" + UUID.randomUUID() + "\"]}")) {
+      mockMvc
+          .perform(
+              post("/hangar/bulk-origin")
+                  .header("X-Requested-With", "XMLHttpRequest")
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().is(422))
+          .andExpect(jsonPath("$.code").value("VALIDATION"));
+    }
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(ShipBulkOriginResultDto.class));
+  }
+
+  @Test
+  @WithMockUser
   void addShip_withoutAjaxHeader_routesToClassicRedirectFallback() throws Exception {
     mockMvc
         .perform(
             post("/hangar/add")
                 .with(csrf())
                 .param("shipTypeId", UUID.randomUUID().toString())
-                .param("insurance", "LTI"))
+                .param("insurance", "LTI")
+                .param("origin", "IN_GAME"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/hangar"));
   }

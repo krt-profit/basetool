@@ -185,8 +185,8 @@ public class OpenApiProblemDetailsConfig {
 
   /**
    * Registers the {@code ProblemDetail} schema with the body's contract fields: the RFC 7807
-   * members, {@code code} with the registered values, {@code correlationId}, {@code errors} and
-   * {@code fieldErrors}.
+   * members, {@code code} with the registered values, {@code correlationId}, {@code errors}, {@code
+   * fieldErrors} and the session gates' {@code sessionGate}.
    *
    * @param openApi the document under construction
    */
@@ -240,6 +240,13 @@ public class OpenApiProblemDetailsConfig {
         "correlationId", typed("string", null, "Finds the request in the server log."));
     problem.addProperty("errors", errors);
     problem.addProperty("fieldErrors", fieldErrors);
+    problem.addProperty(
+        "sessionGate",
+        typed(
+            "boolean",
+            null,
+            "true on the 403 of a session gate, a step the member must take first (REQ-SEC-028,"
+                + " ADR-0385); absent on every other problem."));
     components.addSchemas(PROBLEM_SCHEMA, problem);
   }
 

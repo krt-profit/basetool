@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPatchLabels;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
@@ -55,6 +57,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
@@ -124,8 +127,9 @@ class BankPurposeBoundRequestServiceTest {
             userRepository,
             orgUnitMembershipQueryService,
             eventPublisher,
-            purposeObservers,
+            new BankPurposeObservers(purposeObservers),
             new BankRequestClientNames(clientDirectory),
+            new BankRequestPatchLabels(mock(BankPatchLabels.class)),
             mock(BankLinkedDecisions.class),
             mock(BankLinkedBookings.class),
             mock(BankLinkedRequestLiveSync.class),
@@ -164,6 +168,15 @@ class BankPurposeBoundRequestServiceTest {
       request.setPurposeRef(dealId);
     }
     return request;
+  }
+
+  /**
+   * Builds the purpose the purpose-bound fixtures carry.
+   *
+   * @return the deal's purpose
+   */
+  private BankPurpose purpose() {
+    return new BankPurpose(BankPurposeKind.PURCHASING_DEAL, dealId);
   }
 
   @Test
@@ -315,6 +328,53 @@ class BankPurposeBoundRequestServiceTest {
 
     assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.CANCELLED);
     verify(observer).onCancelled(requestId, dealId);
+  }
+
+  @Test
+  void aConfirmationLetsTheOwnerLockThePurposeBeforeItLocksTheRequest() {
+    BankBookingRequest request = pending(BankBookingRequestType.DEPOSIT, true);
+    UUID holderId = confirmSetup(request, UUID.randomUUID(), UUID.randomUUID());
+    when(requestRepository.findPurposeById(requestId)).thenReturn(Optional.of(purpose()));
+
+    service.confirm(requestId, holderId, null, false, null, 0L);
+
+    InOrder order = inOrder(observer, requestRepository);
+    order.verify(observer).beforeDecision(dealId);
+    order.verify(requestRepository).findByIdForUpdate(requestId);
+  }
+
+  @Test
+  void aRejectionLetsTheOwnerLockThePurposeBeforeItLocksTheRequest() {
+    BankBookingRequest request = pending(BankBookingRequestType.DEPOSIT, true);
+    UUID decider = UUID.randomUUID();
+    when(requestRepository.findPurposeById(requestId)).thenReturn(Optional.of(purpose()));
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(bankCaller.actor())
+        .thenReturn(
+            TestBankActor.of(decider)
+                .roles(Roles.BANK_EMPLOYEE)
+                .grant(accountId, false, false, false)
+                .build());
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
+
+    service.reject(requestId, "duplicate", 0L);
+
+    InOrder order = inOrder(observer, requestRepository);
+    order.verify(observer).beforeDecision(dealId);
+    order.verify(requestRepository).findByIdForUpdate(requestId);
+  }
+
+  @Test
+  void aRequestersCancellationLetsTheOwnerLockThePurposeBeforeItLocksTheRequest() {
+    BankBookingRequest request = pending(BankBookingRequestType.DEPOSIT, true);
+    when(requestRepository.findPurposeById(requestId)).thenReturn(Optional.of(purpose()));
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+
+    service.cancelOwn(requester, requestId, 0L);
+
+    InOrder order = inOrder(observer, requestRepository);
+    order.verify(observer).beforeDecision(dealId);
+    order.verify(requestRepository).findByIdForUpdate(requestId);
   }
 
   @Test

@@ -50,7 +50,8 @@ public final class AuditDomains {
           "CONNECTED_APPS",
           "SUPPLY",
           "PURCHASING",
-          "CATALOGUE");
+          "CATALOGUE",
+          "PATCH_CHANGE");
 
   /** Non-instantiable holder of the shared tab list. */
   private AuditDomains() {}

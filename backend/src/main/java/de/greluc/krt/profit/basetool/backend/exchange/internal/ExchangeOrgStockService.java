@@ -297,7 +297,7 @@ public class ExchangeOrgStockService {
       missionEarmarks.add(
           new ExchangeOrgStockEntryDto.MissionEarmark(
               slice.missionId().toString(),
-              slice.name() == null ? null : ExchangeStockFeedService.cut(slice.name()),
+              slice.name() == null ? null : ExchangeNames.cut(slice.name()),
               quantity(slice.amount(), quantityUnit)));
     }
     return new ExchangeOrgStockEntryDto(
@@ -306,9 +306,7 @@ public class ExchangeOrgStockService {
         hidden
             ? ExchangeOrgStockEntryDto.Holder.WITHHELD
             : new ExchangeOrgStockEntryDto.Holder(
-                false,
-                ExchangeStockFeedService.cut(entry.holderName()),
-                refs.apply(entry.holderId())),
+                false, ExchangeNames.cut(entry.holderName()), refs.apply(entry.holderId())),
         quantity(entry.amount(), quantityUnit),
         hidden ? null : entry.note(),
         List.copyOf(jobOrderEarmarks),

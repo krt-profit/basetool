@@ -1,0 +1,27 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .mhl-heading {
+        margin: 0;
+    }
+    .mhl-alert {
+        max-width: none;
+        margin: 0;
+    }
+    .mhl-form {
+        max-width: var(--content-max-form);
+    }
+    .mhl-form > .btn {
+        align-self: flex-start;
+        white-space: normal;
+    }
+    .mhl-form .form-hint {
+        margin: 0;
+    }
+
+    @media (width <= 768px) {
+        .mhl-form > .btn {
+            align-self: stretch;
+        }
+    }
+}

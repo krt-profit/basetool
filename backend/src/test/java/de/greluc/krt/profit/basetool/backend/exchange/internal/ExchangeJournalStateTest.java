@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
@@ -246,7 +247,7 @@ class ExchangeJournalStateTest {
                   + typeId
                   + "\",\"name\":\"Kestrel\",\"insurance\":\"LTI\",\"location\":\""
                   + locationId
-                  + "\",\"fitted\":true,\"orgUnit\":null}");
+                  + "\",\"fitted\":true,\"origin\":\"UNKNOWN\",\"orgUnit\":null}");
     }
 
     @Test
@@ -271,7 +272,7 @@ class ExchangeJournalStateTest {
       assertThat(journal.read(none).orgUnit())
           .isEqualTo(new ExchangeShipJournal.RecordedOrgUnit(null));
       assertThat(journal.read(older).synced())
-          .isEqualTo(new ExchangeShipJournal.State(typeId, null, "6", null, false, null));
+          .isEqualTo(new ExchangeShipJournal.State(typeId, null, "6", null, false, null, null));
     }
 
     @Test
@@ -293,7 +294,8 @@ class ExchangeJournalStateTest {
       verify(commands)
           .addShipForClientInOrgUnit(
               MEMBER,
-              new ShipRequestDto("Kestrel", typeId, "LTI", locationId, true, null, null),
+              new ShipRequestDto(
+                  "Kestrel", typeId, "LTI", locationId, true, null, null, ShipOrigin.UNKNOWN),
               unitId);
     }
 
@@ -338,7 +340,31 @@ class ExchangeJournalStateTest {
           .updateShip(
               MEMBER,
               shipId,
-              new ShipRequestDto("Kestrel", typeId, "LTI", locationId, true, null, null));
+              new ShipRequestDto(
+                  "Kestrel", typeId, "LTI", locationId, true, null, null, ShipOrigin.UNKNOWN));
+    }
+
+    @Test
+    void aShipAnImportLockedSinceKeepsItsOriginOnUndo() {
+      latestChangeIsTheClients(ExchangeResource.SHIP);
+      Ship current = ship(null);
+      current.setOriginLocked(true);
+      UUID shipId = UUID.randomUUID();
+      when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.of(current));
+      when(types.existsById(typeId)).thenReturn(true);
+      Ship earlier = ship(null);
+      earlier.setOrigin(ShipOrigin.IN_GAME);
+      String before = json(ExchangeShipJournal.State.of(earlier).toJournal());
+
+      journal.restore(
+          scope(Set.of()),
+          List.of(entry(ExchangeJournalAction.SHIP_UPSERT, shipId.toString(), before, "{}")));
+
+      verify(commands)
+          .updateShip(
+              MEMBER,
+              shipId,
+              new ShipRequestDto("Kestrel", typeId, "LTI", locationId, true, null, null, null));
     }
 
     /**
@@ -371,7 +397,7 @@ class ExchangeJournalStateTest {
 
       verify(commands)
           .addShipForClient(
-              MEMBER, new ShipRequestDto("Old", typeId, "LTI", null, false, null, null));
+              MEMBER, new ShipRequestDto("Old", typeId, "LTI", null, false, null, null, null));
     }
 
     @Test

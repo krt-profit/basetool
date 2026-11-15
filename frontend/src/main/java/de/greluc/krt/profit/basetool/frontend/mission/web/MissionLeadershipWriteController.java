@@ -27,6 +27,7 @@ import static de.greluc.krt.profit.basetool.frontend.mission.web.MissionWriteVal
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.SetPartyLeadRequest;
@@ -92,6 +93,7 @@ public class MissionLeadershipWriteController {
               version != null ? version : 0L));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
       String toastKey =
           (e.getStatusCode() == 409)
@@ -172,6 +174,7 @@ public class MissionLeadershipWriteController {
       log.debug("SUCCESS - Manager {} added to mission {}", userUuid, missionUuid);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "BACKEND ERROR adding manager for mission {} and user {}: Status={}, Message={},"
               + " Readable={}",
@@ -265,6 +268,7 @@ public class MissionLeadershipWriteController {
       MissionDto mission = missionClient.mission(id);
       return ResponseEntity.ok(mission);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       if (e.getStatusCode() == 409) {
         log.debug("Owner change for mission {} conflicted with a concurrent change", id);
         return propagateBackendError(e);

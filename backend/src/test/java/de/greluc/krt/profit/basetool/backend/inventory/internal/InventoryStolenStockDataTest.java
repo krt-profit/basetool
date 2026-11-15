@@ -255,7 +255,14 @@ class InventoryStolenStockDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), 600, false, false, iridium.getId());
+            user.getId(),
+            material.getId(),
+            location.getId(),
+            600,
+            false,
+            false,
+            iridium.getId(),
+            null);
 
     assertThat(group).extracting(InventoryItem::getId).containsExactly(legit.getId());
   }

@@ -192,6 +192,7 @@ public class AuditService implements AuditRecorder {
       case SUPPLY -> AuditEventType.SUPPLY_AUDIT_PURGED;
       case PURCHASING -> AuditEventType.PURCHASING_AUDIT_PURGED;
       case CATALOGUE -> AuditEventType.CATALOGUE_AUDIT_PURGED;
+      case PATCH_CHANGE -> AuditEventType.PATCH_CHANGE_AUDIT_PURGED;
     };
   }
 

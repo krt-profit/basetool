@@ -355,8 +355,9 @@ listed with its reason. The entries an op created or changed reach you through t
 | Reason | Op | Meaning |
 | --- | --- | --- |
 | `NOT_PERMITTED` | all | The pool, or the `toUnit` of a `move-holder` or `move-pool`, is not one of the member's Logistician units; the entry is unknown, personal or in another pool; or a `move-holder` names the entry's own holder for another pool. |
+| `REMOVED_ELSEWHERE` | all but `book-in` | A patch change wiped the entry: it is gone, and its last change in the pool was the patch change's. The result item names the patch change in `patchChange` ([patch change](patch-change.md#pushing-against-what-a-patch-change-removed)). Drop the pending op and pull. Every other gone entry stays `NOT_PERMITTED`. |
 | `HOLDER_UNKNOWN` | `book-in`, `move-holder`, `move-pool` | `holder` is not on the roster of the receiving unit: not a direct member, withholding their name, or not a ref of your client; for `move-pool`, the entry's holder is not a direct member of `toUnit`. Read the roster again. |
-| `VERSION_CONFLICT` | all but `book-in` | The entry changed since you read it; an earlier op of the same change set counts. Pull the feed and retry. |
+| `VERSION_CONFLICT` | all but `book-in` | The entry changed since you read it; an earlier op of the same change set counts. Pull the feed and retry. When the entry's own last change was a patch change's, typically the relocation that moved it to the holder's new home location, the result item names it in `patchChange`. |
 | `INSUFFICIENT_STOCK` | `book-out`, `sell`, moves, `stolen` | The entry holds less than `quantity`. |
 | `STOCK_EARMARKED` | `book-out`, `sell`, moves, `stolen` | The part of `quantity` that `fromJobOrders` and `fromMissions` do not cover is earmarked, or pledged as a donation; for a partial `stolen` or `move-pool`, the rest of the entry would hold less than its earmarks; a whole `move-pool` of an entry pledged as a donation. |
 | `STOCK_OFFERED` | `stolen`, `move-pool` | The rest of the entry after a partial `stolen` or `move-pool` would hold less than it offers on the Basetool's material exchange. |

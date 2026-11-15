@@ -30,6 +30,10 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>On create, {@link #owningOrgUnitId} is validated against the target user's memberships; when
  * {@code null} the user's single membership is stamped. It is ignored on update.
+ *
+ * <p>{@link #origin} is required on a create from the web form, where it must be {@code PLEDGE} or
+ * {@code IN_GAME}; a connected application's create without one stores {@code UNKNOWN}. On update,
+ * {@code null} keeps the stored origin (REQ-HANGAR-017).
  */
 public record ShipRequestDto(
     @Nullable String name,
@@ -42,4 +46,5 @@ public record ShipRequestDto(
     @Nullable UUID locationId,
     boolean fitted,
     @Nullable Long version,
-    @Nullable UUID owningOrgUnitId) {}
+    @Nullable UUID owningOrgUnitId,
+    @Nullable ShipOrigin origin) {}

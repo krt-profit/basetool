@@ -65,6 +65,7 @@
                                 <th:block th:replace="~{supply/fragments/status-chip :: chip(kind='donation', status=${d.status()})}"></th:block>
                                 <span class="cell-sub" th:if="${d.declineReason() != null}"
                                       th:text="#{'supply.donation.reason.' + ${d.declineReason()}}">Falscher Gegenstand</span>
+                                <th:block th:replace="~{supply/fragments/status-chip :: withdrawnByPatch(label=${d.withdrawnByPatchLabel()})}"></th:block>
                             </td>
                             <td class="cell-actions">
                                 <div class="supply-row-actions">

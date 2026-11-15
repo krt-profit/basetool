@@ -5112,6 +5112,55 @@
         }
       ],
       "description": "Stored changes of the active org unit: unit is a choice of one org unit, all a choice of all of a member's org units. Counted, not audited (REQ-ORG-031, REQ-OBS-011)."
+    },
+    {
+      "id": 109,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 352
+      },
+      "type": "timeseries",
+      "title": "Members still to relocate after a patch change",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "basetool_patch_change_relocations_pending",
+          "refId": "A",
+          "legendFormat": "pending relocations",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Members who must still choose a new home location in the open home-location phase of a patch change, 0 while none is open (REQ-PATCH-028, REQ-OBS-011). A trend for the admins, not an alert."
     }
   ]
 }

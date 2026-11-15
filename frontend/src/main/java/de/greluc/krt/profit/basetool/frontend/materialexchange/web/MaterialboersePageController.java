@@ -646,6 +646,7 @@ public class MaterialboersePageController {
       Object result = call.run();
       return ResponseEntity.ok(result == null ? Map.of() : result);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.warn("{}: status={}, code={}", logMessage, e.getStatusCode(), e.getProblemCode());
       Map<String, Object> payload = new HashMap<>();
       payload.put("code", e.getProblemCode());

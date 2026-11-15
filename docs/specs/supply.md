@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-14.
 > **Owner area:** SUP · **Related ADRs:** [ADR-0252](../adr/0252-stockcommands-gains-the-pool-and-donation-commands.md),
 > [ADR-0253](../adr/0253-material-supply-and-purchasing-are-two-modules.md),
 > [ADR-0320](../adr/0320-a-need-shows-its-linked-orders-stock-and-only-donations-and-purchases-cover-it.md),
@@ -198,7 +198,25 @@ The receiving unit declines a pledge with a reason code (`WRONG_ITEM`, `NOT_NEED
 `QUALITY_TOO_LOW`, `DONOR_ABSENT`, `OTHER`); the donor withdraws an unreceived pledge. Both release the
 earmark.
 
-**Enforced by:** `SupplyDonationServiceTest` · **Code:** `supply/internal/SupplyDonationService`
+A patch change's wipe withdraws every pledge earmarked on a row it deletes
+([REQ-PATCH-013](patch-change.md#req-patch-013--what-depends-on-a-wiped-row-goes-with-it)): the
+pledge is withdrawn as its donor would withdraw it, with the usual notice, and keeps the patch
+change as its reason (`supply_donation.withdrawn_by_patch_change`, V423), which only a withdrawn
+donation holds; the earmark goes with the row. The supply trail records one summary event per
+trigger (`DONATIONS_WITHDRAWN_BY_PATCH`).
+
+„Meine Spenden" and „Eingehende Spenden" show that reason: beneath the status „Zurückgezogen" such a
+pledge names the patch change by its current label („Patchwechsel 4.4"); a pledge its donor
+withdrew shows the status alone. The donation DTO carries the label (`withdrawnByPatchLabel`),
+which the mapper reads once per page through `supply.api.SupplyPatchLabels`, a port the
+patch-change module implements. The lists refresh in place through the rooms the wipe publishes
+(REQ-SUP-018, REQ-PATCH-018).
+
+**Enforced by:** `SupplyDonationServiceTest`, `SupplyPatchWipeServiceTest`,
+`PatchChangeWipeIntegrationTest`, `SupplyMapperTest`, `SupplyWithdrawalReasonRenderTest` ·
+**Code:** `supply/internal/SupplyDonationService`, `supply/internal/SupplyPatchWipeService`,
+`supply/internal/SupplyMapper`, `supply/api/SupplyPatchLabels`,
+`templates/supply/fragments/status-chip.html`
 
 ### REQ-SUP-011 — Recorded donation
 

@@ -27,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
  * @param ownerName the owner's effective name, or {@code Unknown}
  * @param locationName the ship's location, or {@code null} when it has none
  * @param fitted whether the ship is fitted
+ * @param relocationPending whether a pending relocation locks the ship (REQ-PATCH-023)
  */
 public record SquadronShipDetailDto(
-    String ownerName, @Nullable String locationName, boolean fitted) {}
+    String ownerName, @Nullable String locationName, boolean fitted, boolean relocationPending) {}

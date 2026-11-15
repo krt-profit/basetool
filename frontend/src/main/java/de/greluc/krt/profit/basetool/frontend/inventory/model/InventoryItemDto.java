@@ -38,7 +38,9 @@ import java.util.UUID;
  * <p>The quantity is split across job orders and missions ({@code *Allocations}, unassigned {@code
  * *Rest}; REQ-INV-027). A material row carries {@code material} and {@code quality}; a game-item
  * row carries {@code gameItem} with {@code null} material and quality (REQ-INV-029). {@code stolen}
- * is the „gestohlen" marker (REQ-INV-053).
+ * is the „gestohlen" marker (REQ-INV-053). {@code relocationPending} marks a row a pending
+ * relocation locks and {@code relocationLocked} says the lock refuses the caller's write
+ * (REQ-PATCH-023).
  */
 @DtoMirror
 public record InventoryItemDto(
@@ -60,10 +62,12 @@ public record InventoryItemDto(
     SquadronReferenceDto owningSquadron,
     Long version,
     Boolean canEdit,
-    Instant createdAt) {
+    Instant createdAt,
+    boolean relocationPending,
+    boolean relocationLocked) {
 
   /**
-   * Creates a row that carries no donation pledge.
+   * Creates a row that carries no donation pledge and no relocation marker.
    *
    * @param id the row id
    * @param user the holder
@@ -122,6 +126,8 @@ public record InventoryItemDto(
         owningSquadron,
         version,
         canEdit,
-        createdAt);
+        createdAt,
+        false,
+        false);
   }
 }

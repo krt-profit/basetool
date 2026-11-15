@@ -30,14 +30,15 @@ import {
     presetUnitSelect,
     reportBulkUnitOutcome,
 } from '/js/hangar/ship-unit-change.js';
+import { bindOriginField, bulkChangeOrigin } from '/js/hangar/ship-origin.js';
 
 const RESULTS = '#member-hangar-results';
 
 /**
- * Wires the admin member hangar: the add, edit and delete dialogs (REQ-HANGAR-011) and the unit
- * change of one ship or a selection (REQ-HANGAR-012) write through the member's admin paths, swap
- * the ship list in place and tell the member's open hangar pages through hangar:{memberId}; a
- * change made there refreshes this list the same way.
+ * Wires the admin member hangar: the add, edit and delete dialogs (REQ-HANGAR-011), the unit
+ * change of one ship or a selection (REQ-HANGAR-012) and the origin of a selection (REQ-HANGAR-018)
+ * write through the member's admin paths, swap the ship list in place and tell the member's open
+ * hangar pages through hangar:{memberId}; a change made there refreshes this list the same way.
  */
 function initMemberHangar() {
     const root = document.getElementById('member-hangar');
@@ -144,6 +145,7 @@ function initMemberHangar() {
     months.addEventListener('input', insuranceValue);
 
     const ownerSlot = document.getElementById('member-ship-owner-picker-slot');
+    const originField = bindOriginField(shipForm);
 
     /**
      * Shows the owner picker in the add dialog only; an edit never changes the unit.
@@ -220,6 +222,7 @@ function initMemberHangar() {
         field('member-ship-fitted').checked = false;
         field('member-ship-version').value = '';
         setInsurance('');
+        originField.reset();
         modalDeleteBtn.hidden = true;
         showOwnerPicker(true);
         krtModal.open(shipModal);
@@ -240,6 +243,10 @@ function initMemberHangar() {
         field('member-ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
         field('member-ship-version').value = btn.getAttribute('data-version') ?? '';
         setInsurance(btn.getAttribute('data-ins'));
+        originField.show(
+            btn.getAttribute('data-origin') || '',
+            btn.getAttribute('data-origin-locked') === 'true',
+        );
         modalDeleteBtn.setAttribute('data-action', action.replace(/\/update$/, '/delete'));
         modalDeleteBtn.hidden = false;
         showOwnerPicker(false);
@@ -280,6 +287,7 @@ function initMemberHangar() {
                     fitted: field('member-ship-fitted').checked,
                     version: isUpdate && versionRaw ? Number(versionRaw) : null,
                     owningOrgUnitId: !isUpdate && owner && owner.value ? owner.value : null,
+                    origin: originField.read(),
                 },
                 successMessage: message(isUpdate ? 'updateSuccess' : 'addSuccess'),
                 errorMessage: message(isUpdate ? 'updateError' : 'addError'),
@@ -411,6 +419,32 @@ function initMemberHangar() {
     }
 
     krtEvents.on('click', 'member-hangar-open-bulk-unit', openBulkUnitModal);
+
+    krtEvents.on('click', 'member-hangar-bulk-origin', (btn) => {
+        const shipIds = shipChecks()
+            .filter((c) => selectedShips.has(c.value))
+            .map((c) => c.value);
+        const bulkOriginAction = message('bulkOriginAction');
+        if (shipIds.length === 0) return;
+        bulkChangeOrigin({
+            url: safeSameOriginUrl(bulkOriginAction, bulkOriginAction),
+            shipIds,
+            origin: btn.getAttribute('data-origin') || '',
+            texts: {
+                none: message('bulkOriginNone'),
+                success: message('bulkOriginSuccess'),
+                partial: message('bulkOriginSuccessPartial'),
+                error: message('bulkOriginError'),
+            },
+            conflict,
+            button: /** @type {HTMLButtonElement} */ (btn),
+            onDone() {
+                selectedShips.clear();
+                renderSelection();
+                afterWrite();
+            },
+        });
+    });
 
     if (unitModal) {
         unitModal.querySelectorAll('.close-member-ship-unit').forEach((el) => {

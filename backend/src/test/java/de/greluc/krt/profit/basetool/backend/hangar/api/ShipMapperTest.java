@@ -221,4 +221,26 @@ class ShipMapperTest {
 
     assertNull(mapper.toOwnerDto(ship).pledge());
   }
+
+  @Test
+  void toDto_leavesOutTheOrigin_whileToOwnerDtoCarriesIt() {
+    Ship ship = new Ship();
+    ship.setId(UUID.randomUUID());
+    ship.setInsurance("LTI");
+    ship.setOrigin(ShipOrigin.IN_GAME);
+
+    assertNull(mapper.toDto(ship).origin());
+    assertEquals(new ShipOriginDto(ShipOrigin.IN_GAME, false), mapper.toOwnerDto(ship).origin());
+  }
+
+  @Test
+  void toOwnerDto_ofALockedShip_readsPledgeWhateverWasChosen() {
+    Ship ship = new Ship();
+    ship.setId(UUID.randomUUID());
+    ship.setInsurance("LTI");
+    ship.setOrigin(ShipOrigin.UNKNOWN);
+    ship.setOriginLocked(true);
+
+    assertEquals(new ShipOriginDto(ShipOrigin.PLEDGE, true), mapper.toOwnerDto(ship).origin());
+  }
 }

@@ -36,7 +36,9 @@ import org.jetbrains.annotations.Nullable;
  * (REQ-INV-029). The allocation lists and rest figures carry the job-order and mission splits
  * (REQ-INV-027); {@code stolen} is the „gestohlen" marker (REQ-INV-053); {@code canEdit} is the
  * server's answer whether the caller may write this row, scope and then owner or
- * Logistician-or-above (REQ-SEC-047).
+ * Logistician-or-above (REQ-SEC-047). {@code relocationPending} marks a row a pending relocation
+ * locks and {@code relocationLocked} says the lock refuses the caller (REQ-PATCH-023); both are set
+ * on the lists of other holders' rows and {@code false} everywhere else.
  */
 public record InventoryItemDto(
     UUID id,
@@ -57,10 +59,12 @@ public record InventoryItemDto(
     @Nullable SquadronReferenceDto owningSquadron,
     Long version,
     Boolean canEdit,
-    Instant createdAt) {
+    Instant createdAt,
+    boolean relocationPending,
+    boolean relocationLocked) {
 
   /**
-   * Creates a projection of a row that carries no donation pledge.
+   * Creates a projection of a row that carries no donation pledge and no relocation marker.
    *
    * @param id the row id
    * @param user the holder
@@ -119,7 +123,9 @@ public record InventoryItemDto(
         owningSquadron,
         version,
         canEdit,
-        createdAt);
+        createdAt,
+        false,
+        false);
   }
 
   /**
@@ -150,7 +156,9 @@ public record InventoryItemDto(
         owningSquadron,
         newVersion,
         canEdit,
-        createdAt);
+        createdAt,
+        relocationPending,
+        relocationLocked);
   }
 
   /**
@@ -180,6 +188,41 @@ public record InventoryItemDto(
         owningSquadron,
         version,
         canEdit,
-        createdAt);
+        createdAt,
+        relocationPending,
+        relocationLocked);
+  }
+
+  /**
+   * Returns a copy of this projection with the relocation markers replaced.
+   *
+   * @param pending whether a pending relocation locks the row
+   * @param locked whether the lock refuses the caller's write to the row
+   * @return a copy of this DTO carrying the markers
+   */
+  @NotNull
+  public InventoryItemDto withRelocation(boolean pending, boolean locked) {
+    return new InventoryItemDto(
+        id,
+        user,
+        material,
+        gameItem,
+        location,
+        quality,
+        amount,
+        personal,
+        stolen,
+        jobOrderAllocations,
+        jobOrderRest,
+        missionAllocations,
+        missionRest,
+        donationAllocations,
+        note,
+        owningSquadron,
+        version,
+        canEdit,
+        createdAt,
+        pending,
+        locked);
   }
 }

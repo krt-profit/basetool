@@ -32,18 +32,19 @@ import org.jetbrains.annotations.Nullable;
  * @param guid a blueprint product's produced-item GUID, or {@code null} for every other entry
  * @param bt the Basetool key: for a blueprint the same opaque key as the feed entry, deprecated in
  *     favour of {@code guid}; for a material or item its id
- * @param name the display name
+ * @param name the display name, or {@code null} only for a patch change's wipe exception whose
+ *     entry the catalogue no longer holds (REQ-PATCH-050)
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record ExchangeItemRefDto(@Nullable UUID guid, @NotNull String bt, @NotNull String name) {
+public record ExchangeItemRefDto(@Nullable UUID guid, @NotNull String bt, @Nullable String name) {
 
   /**
    * Creates an entry without a produced-item GUID.
    *
    * @param bt the Basetool key
-   * @param name the display name
+   * @param name the display name, or {@code null} for an entry the catalogue no longer holds
    */
-  public ExchangeItemRefDto(@NotNull String bt, @NotNull String name) {
+  public ExchangeItemRefDto(@NotNull String bt, @Nullable String name) {
     this(null, bt, name);
   }
 }

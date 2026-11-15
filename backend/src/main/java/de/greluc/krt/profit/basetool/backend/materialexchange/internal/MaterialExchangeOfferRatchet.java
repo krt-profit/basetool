@@ -153,7 +153,7 @@ public class MaterialExchangeOfferRatchet implements StockChangeObserver {
    *
    * @param offers the offers about to be removed
    */
-  private void announceGone(@NotNull List<OfferStock> offers) {
+  void announceGone(@NotNull List<OfferStock> offers) {
     if (offers.isEmpty()) {
       return;
     }

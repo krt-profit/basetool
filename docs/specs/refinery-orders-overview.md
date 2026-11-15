@@ -233,6 +233,11 @@ into. Two consequences bind:
 
 ### REQ-REFINERY-022 — A stored refinery order is stored exactly once
 
+> [!note] Amended 2026-11-14 (REQ-PATCH-033) — the store dialog starts at the home location
+> Every item of the „Einlagern" dialog starts at the location of the member's profile setting „Meine
+> Home Location", and at the order's refinery only without one
+> ([REQ-PATCH-033](patch-change.md#req-patch-033--the-home-location-prefills-the-location-of-three-forms)).
+
 Storing an order books its output as inventory rows and writes one `INVENTORY_RECEIVED_FROM_REFINERY`
 event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most once per order.
 
@@ -375,6 +380,12 @@ VerseKit-specific: the name shown is the client's display name from the registry
   is their `updated_at`. The web's create, update, cancel and store record a web change. The read
   DTOs carry it as `provenance` with each client named by its registry display name, or by its id
   once the registry no longer holds it; a page of orders reads the names in one query.
+- **Patch change** ([REQ-PATCH-006](patch-change.md#req-patch-006--the-refinery-effect-ends-the-running-orders-started-before-the-live-time)):
+  when an admin's patch change ends the running orders started before its live time, each is
+  cancelled as a web change (the admin acted in the web), advances its game-data counter
+  (REQ-REFINERY-029) and keeps the patch change as its cancel reason
+  (`refinery_order.canceled_by_patch_change`, migration `V420`), which any later status drops. The
+  web shows only the status `CANCELED`; the exchange feed adds `canceledByPatch` (REQ-PATCH-007).
 - **Privacy:** the member's data export lists the provenance and the pickup marker of each own
   order in `refineryOrdersOwned` (REQ-SEC-058). The sources are codes and the clients are registry
   client ids the server writes, so the Personensuche lists the five text columns as exempt

@@ -63,8 +63,13 @@ function reply(status, body, headers = {}, redirected = false) {
 
 const JSON_TYPE = { 'Content-Type': 'application/json' };
 
-/** Builds a fresh script context whose fetch answers from `script`, one entry per call. */
-function harness(script = []) {
+/**
+ * Builds a fresh script context whose fetch answers from `script`, one entry per call.
+ *
+ * @param {Array<unknown>} script the answers, one per fetch
+ * @param {{ gatePage?: boolean }} [page] whether the server rendered the page as a gate's page
+ */
+function harness(script = [], page = {}) {
     const calls = [];
     const navigations = [];
     const storage = new Map();
@@ -93,6 +98,7 @@ function harness(script = []) {
             dispatchEvent() {},
             createElement: () => ({ setAttribute() {} }),
             head: { appendChild() {} },
+            body: { dataset: page.gatePage ? { sessionGatePage: 'true' } : {} },
         },
         fetch(url, init) {
             calls.push({ url, init });
@@ -128,7 +134,7 @@ function harness(script = []) {
     return {
         krtFetch: context.krtFetch,
         reauth: vm.runInContext('krtReauth', context),
-        terms: vm.runInContext('krtTermsGate', context),
+        terms: vm.runInContext('krtSessionGate', context),
         calls,
         navigations,
         errors,
@@ -173,6 +179,15 @@ await test('the terms gate takes over a gated read', async () => {
     const h = harness([reply(403, '', { 'X-Terms-Acceptance-Required': '/terms' })]);
     assert.equal(await h.krtFetch.get('/a'), null);
     assert.deepEqual(h.navigations, ['/terms']);
+});
+
+await test('a page rendered as a gate page keeps the browser where it is', async () => {
+    const h = harness([reply(403, '', { 'X-Home-Location-Required': '/home-location' })], {
+        gatePage: true,
+    });
+    assert.equal(await h.krtFetch.get('/a'), null);
+    assert.equal(h.terms.redirect('/home-location'), true);
+    assert.deepEqual(h.navigations, []);
 });
 
 await test('a redirected answer is refused, not parsed', async () => {

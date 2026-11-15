@@ -39,11 +39,14 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.StubSessionGate;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -63,6 +66,7 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
@@ -91,7 +95,8 @@ class NotificationPageControllerStreamTest {
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry(),
-            SecurityConfig.roleHierarchy());
+            SecurityConfig.roleHierarchy(),
+            new SessionGates(List.of()));
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -119,7 +124,8 @@ class NotificationPageControllerStreamTest {
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry(),
-            SecurityConfig.roleHierarchy());
+            SecurityConfig.roleHierarchy(),
+            new SessionGates(List.of()));
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -148,7 +154,8 @@ class NotificationPageControllerStreamTest {
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry(),
-            SecurityConfig.roleHierarchy());
+            SecurityConfig.roleHierarchy(),
+            new SessionGates(List.of()));
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -179,7 +186,8 @@ class NotificationPageControllerStreamTest {
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry(),
-            SecurityConfig.roleHierarchy());
+            SecurityConfig.roleHierarchy(),
+            new SessionGates(List.of()));
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -237,7 +245,8 @@ class NotificationPageControllerStreamTest {
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             registry,
-            SecurityConfig.roleHierarchy());
+            SecurityConfig.roleHierarchy(),
+            new SessionGates(List.of()));
     controller.registerRelayGauge();
 
     HttpServletRequest request = mock(HttpServletRequest.class);
@@ -283,7 +292,8 @@ class NotificationPageControllerStreamTest {
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry(),
-            SecurityConfig.roleHierarchy()) {
+            SecurityConfig.roleHierarchy(),
+            new SessionGates(List.of())) {
           @Override
           protected SseEmitter newEmitter() {
             return mockEmitter;
@@ -365,8 +375,44 @@ class NotificationPageControllerStreamTest {
     verify(mockEmitter, times(2)).complete();
   }
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
+  @Test
+  void stream_whenTheBackendRefusesForASessionGate_handsTheBrowserOffToThatGatesPage()
+      throws Exception {
+    SseEmitter mockEmitter = mock(SseEmitter.class);
+    SessionGates gates =
+        new SessionGates(
+            List.of(
+                new StubSessionGate("/first", "X-First", "first-gate", "FIRST_REQUIRED"),
+                new StubSessionGate("/second", "X-Second", "second-gate", "SECOND_REQUIRED")));
+    WebClientResponseException refusal =
+        WebClientResponseException.create(
+            403,
+            "Forbidden",
+            HttpHeaders.EMPTY,
+            "{\"code\":\"SECOND_REQUIRED\"}".getBytes(StandardCharsets.UTF_8),
+            StandardCharsets.UTF_8);
+
+    streamWith(mockEmitter, Flux.error(refusal), gates);
+
+    ArgumentCaptor<SseEmitter.SseEventBuilder> sent =
+        ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+    verify(mockEmitter, times(2)).send(sent.capture());
+    String handOff =
+        sent.getAllValues().get(1).build().stream()
+            .map(data -> String.valueOf(data.getData()))
+            .collect(Collectors.joining());
+    assertTrue(handOff.contains("event:second-gate"), handOff);
+    assertTrue(handOff.contains("/second"), handOff);
+    verify(mockEmitter).complete();
+  }
+
   private static void streamWith(SseEmitter emitter, Flux<ServerSentEvent<String>> upstream) {
+    streamWith(emitter, upstream, new SessionGates(List.of()));
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static void streamWith(
+      SseEmitter emitter, Flux<ServerSentEvent<String>> upstream, SessionGates gates) {
     WebClient sseWebClient = mock(WebClient.class);
     OAuth2AuthorizedClientManager authorizedClientManager =
         mock(OAuth2AuthorizedClientManager.class);
@@ -377,7 +423,8 @@ class NotificationPageControllerStreamTest {
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry(),
-            SecurityConfig.roleHierarchy()) {
+            SecurityConfig.roleHierarchy(),
+            gates) {
           @Override
           protected SseEmitter newEmitter() {
             return emitter;

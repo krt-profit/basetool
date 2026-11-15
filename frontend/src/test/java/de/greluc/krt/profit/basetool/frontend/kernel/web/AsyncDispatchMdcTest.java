@@ -30,6 +30,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.LoggingProperties;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -142,7 +143,8 @@ class AsyncDispatchMdcTest {
         MockMvcBuilders.standaloneSetup(controller)
             .addFilters(
                 new CorrelationIdFilter(props),
-                new ActiveSquadronContextFilter(new ActiveOrgUnitRestore(Optional::empty)))
+                new ActiveSquadronContextFilter(
+                    new ActiveOrgUnitRestore(Optional::empty, new SessionGates(List.of()))))
             .build();
   }
 

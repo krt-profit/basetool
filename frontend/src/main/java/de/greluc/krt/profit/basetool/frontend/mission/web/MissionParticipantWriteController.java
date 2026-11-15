@@ -25,6 +25,7 @@ import static de.greluc.krt.profit.basetool.frontend.mission.web.MissionWriteVal
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddExternalParticipantRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDto;
@@ -97,6 +98,7 @@ public class MissionParticipantWriteController {
       missionClient.addParticipant(id, request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
       String toastKey =
           (e.getStatusCode() == 409)
@@ -123,6 +125,7 @@ public class MissionParticipantWriteController {
       missionClient.checkInParticipant(id, participantId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "checkInParticipant", participantId, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.participant.update");
     }
@@ -145,6 +148,7 @@ public class MissionParticipantWriteController {
       missionClient.checkOutParticipant(id, participantId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "checkOutParticipant", participantId, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.participant.update");
     }
@@ -195,6 +199,7 @@ public class MissionParticipantWriteController {
       missionClient.deleteParticipant(id, participantId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "deleteParticipant", participantId, e);
       return "redirect:/missions/" + id + "?error=error.mission.participant.delete";
     }
@@ -237,6 +242,7 @@ public class MissionParticipantWriteController {
       missionClient.updateParticipant(id, participantId, request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Update participant failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.participant.update");
     }

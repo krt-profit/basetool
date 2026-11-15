@@ -114,6 +114,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `HANGAR_FITTED_RESET_FOR_OWNER` | `HANGAR_FITTED_RESET` | V280 | `EVENT_RECIPIENT` (the owner); one per owner per reset | REQ-HANGAR-007 |
 | `HANGAR_CHANGED_BY_ADMIN` | `HANGAR_CHANGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (the member); coded `changeCode` | REQ-HANGAR-008 |
 | `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | V291 | `EVENT_RECIPIENT` (the member); one per bulk action that moved several ships, with the `count` | REQ-HANGAR-008, REQ-HANGAR-012 |
+| `HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN` | `HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN` | V419 | `EVENT_RECIPIENT` (the member); one per bulk action that changed the origin of several ships, with the `count`, never the origin | REQ-HANGAR-008, REQ-HANGAR-018 |
 | `BLUEPRINT_CHANGED_BY_ADMIN` | `BLUEPRINT_CHANGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (the member); coded `changeCode` | REQ-HANGAR-008 |
 | `BLUEPRINT_PURGED_BY_ADMIN` | `BLUEPRINT_PURGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (each member who lost blueprints); one per member per purge | REQ-HANGAR-008 |
 | `EXCHANGE_CLIENT_SUSPENDED` | `EXCHANGE_CLIENT_SUSPENDED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); replaces a suspension and an activation | REQ-XCH-040 |
@@ -1409,7 +1410,7 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF`, `BANK_EXCHANGE_SWITCHED_ON`, `BANK_EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
 | `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory?storage=my` (the notice names a source row, not the recipient's) |
 | `INVENTORY_STOCK_LEVEL_LOW` | `/inventory/stock-levels` |
-| `HANGAR_SHIP_ASSIGNED`, `HANGAR_FITTED_RESET`, `HANGAR_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `/hangar` |
+| `HANGAR_SHIP_ASSIGNED`, `HANGAR_FITTED_RESET`, `HANGAR_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN` | `/hangar` |
 | `BLUEPRINT_CHANGED_BY_ADMIN`, `BLUEPRINT_PURGED_BY_ADMIN` | `/personal-inventory/blueprints` |
 | `ACCOUNT_DELETION_REQUEST_DECLINED` | `/profile#profile-deletion-host` |
 | `ACCOUNT_DELETION_REQUESTED` | admins: `/admin/deletion-requests?focus={member id}` |

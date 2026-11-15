@@ -36,6 +36,8 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param createdBy the client marker, or {@code null} for an order created in the web
  * @param versions the counters of the order's two sections
  * @param status {@code OPEN}, {@code IN_PROGRESS}, {@code COMPLETED} or {@code CANCELED}
+ * @param canceledByPatch the patch change that cancelled the order, or {@code null} for an order no
+ *     patch change ended (REQ-PATCH-007)
  * @param location the refinery's location
  * @param method the refining method, or {@code null} when none is set
  * @param startedAt when the run started, or {@code null}
@@ -57,6 +59,7 @@ public record ExchangeRefineryOrderDto(
     @Nullable Creator createdBy,
     @NotNull Versions versions,
     @NotNull String status,
+    @Nullable ExchangePatchChangeRefDto canceledByPatch,
     @NotNull ExchangeLocationDto location,
     @Nullable Method method,
     @Nullable Instant startedAt,

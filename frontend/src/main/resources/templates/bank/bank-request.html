@@ -86,6 +86,11 @@
                     <span class="bank-detail-label" th:text="#{bank.request.field.reason}">Grund</span>
                     <span class="bank-detail-value" th:text="${r.rejectReason()}">Falscher Betrag</span>
                 </div>
+                <div class="bank-detail-item" th:if="${r.cancelledByPatchLabel() != null}">
+                    <span class="bank-detail-label" th:text="#{bank.request.field.reason}">Grund</span>
+                    <span class="bank-detail-value" data-testid="bank-request-page-cancelled-by-patch"
+                          th:text="#{bank.request.cancelledByPatch(${r.cancelledByPatchLabel()})}">Patchwechsel 4.4</span>
+                </div>
             </div>
 
             <div class="cluster" th:if="${pending}">

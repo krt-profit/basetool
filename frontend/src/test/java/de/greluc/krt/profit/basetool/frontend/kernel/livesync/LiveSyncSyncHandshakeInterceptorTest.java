@@ -25,7 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.security.TermsGateHandoff;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateHandoff;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -249,14 +249,15 @@ class LiveSyncSyncHandshakeInterceptorTest {
   @Test
   void relaysTheConsentGateMarkAndStillProceeds() {
     MockHttpServletRequest servletRequest = new MockHttpServletRequest();
-    TermsGateHandoff.mark(servletRequest, "/terms/accept");
+    SessionGateHandoff.mark(servletRequest, "/terms/accept");
 
     boolean proceed =
         interceptor.beforeHandshake(
             new ServletServerHttpRequest(servletRequest), response, wsHandler, attributes);
 
     assertThat(proceed).isTrue();
-    assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_TERMS_GATE)).isEqualTo("/terms/accept");
+    assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_SESSION_GATE))
+        .isEqualTo("/terms/accept");
   }
 
   /** An unmarked handshake — the overwhelmingly common case — carries no gate attribute. */
@@ -264,7 +265,7 @@ class LiveSyncSyncHandshakeInterceptorTest {
   void unmarkedHandshakeCarriesNoConsentGateAttribute() {
     interceptor.beforeHandshake(request, response, wsHandler, attributes);
 
-    assertThat(attributes).doesNotContainKey(LiveSyncWebSocketHandler.ATTR_TERMS_GATE);
+    assertThat(attributes).doesNotContainKey(LiveSyncWebSocketHandler.ATTR_SESSION_GATE);
   }
 
   @Test
