@@ -5,7 +5,7 @@ export MSYS2_ARG_CONV_EXCL='/rules'
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RULES_DIR="${REPO_ROOT}/monitoring/loki/rules"
-IMAGE="grafana/cortex-tools:latest@sha256:ed86004a3d5eb7a8351fd1fa9c2a8f4f70c6b133eb57846c55aef9e4f485da0c"
+IMAGE="grafana/cortex-tools:v0.11.3@sha256:ed86004a3d5eb7a8351fd1fa9c2a8f4f70c6b133eb57846c55aef9e4f485da0c"
 
 [[ -d "${RULES_DIR}" ]] || { echo "FAIL: ${RULES_DIR} does not exist"; exit 1; }
 

@@ -51,6 +51,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
   PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref_type == 'tag') }}
+  TRIVY_VERSION: v0.76.2
 
 jobs:
   ref-guard:
@@ -187,6 +188,7 @@ jobs:
       - name: secrets / Scan the image for secrets
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
+          version: ${{ env.TRIVY_VERSION }}
           image-ref: basetool-sandbox-${{ matrix.image }}:check
           scanners: secret
           exit-code: '1'

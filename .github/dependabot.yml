@@ -80,3 +80,33 @@ updates:
       - dependencies
     commit-message:
       prefix: "chore(npm)"
+
+  - package-ecosystem: npm
+    directory: /.github/tools/markdownlint
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(npm)"
+
+  - package-ecosystem: uv
+    directory: /.github/requirements
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      ci-python-tools:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "ansible-core"
+        versions: [">= 2.22"]
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(pip)"

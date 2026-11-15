@@ -380,8 +380,9 @@ entry does no harm).
   `./gradlew --write-verification-metadata sha256 <the failing task>` on the
   machine that fails, compare each added SHA against the file on Maven Central
   (its published `.sha1` must match too), and commit the additions.
-- **Dependabot** only manages GitHub Actions, Docker images and the frontend's
-  npm packages here, none of which Gradle resolves. A compose image bump is
+- **Dependabot** only manages GitHub Actions, Docker images, the npm packages of
+  the frontend and of the markdownlint tool and the CI's Python tools here, none
+  of which Gradle resolves. A compose image bump is
   completed on its branch by `dependabot-compose.yml`, which commits the
   regenerated Quadlet units (ADR-0215). A Dependabot *security
   update* for a Gradle dependency, should one ever be opened, fails verification
@@ -429,14 +430,19 @@ all, and on every pull request, where *Dependency review* compares against it.
 Tools a workflow installs outside Gradle are pinned by hash too: Python
 packages come from `--require-hashes` requirement files in
 [`.github/requirements/`](.github/requirements/) (zizmor, PyYAML,
-ansible-core with ansible-lint), regenerated with
-`uv pip compile <in> --universal --generate-hashes --python-version 3.12 --no-header --no-annotate -o .github/requirements/<name>.txt`
-from a one-line input such as `ansible-core==2.21.6` plus `ansible-lint==26.11.0`;
-markdownlint-cli comes from the lockfile in
-[`.github/tools/markdownlint/`](.github/tools/markdownlint/) through `npm ci`
-(bump with `npm install --package-lock-only` there); the Ansible collections in
+ansible-core with ansible-lint), each compiled from the `<name>.in` beside it
+(the top-level pins, such as `ansible-core==2.21.6` plus `ansible-lint==26.11.0`) with
+`uv pip compile .github/requirements/<name>.in --universal --generate-hashes --python-version 3.12 --no-annotate -o .github/requirements/<name>.txt`.
+Keep the header uv writes: Dependabot's `uv` entry recompiles a `.txt` from its
+`.in` and reads `--universal` and `--python-version` from that header, so a file
+without it would be recompiled for another Python. markdownlint-cli comes from
+the lockfile in [`.github/tools/markdownlint/`](.github/tools/markdownlint/)
+through `npm ci` (Dependabot proposes its bumps; by hand,
+`npm install --package-lock-only` there); the Ansible collections in
 `ansible/requirements.yml` are exact versions. No workflow runs `npx --yes`
-or an unpinned `pip install`.
+or an unpinned `pip install`. The pins Dependabot cannot see are listed, with how
+each one moves, in [`docs/dependency-pins.md`](docs/dependency-pins.md) →
+*Pins outside Dependabot*.
 
 Workflow changes follow the same bar as code: every `uses:` pinned to a full
 commit SHA (the repository's Actions policy refuses anything else), every
