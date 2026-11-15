@@ -1023,9 +1023,9 @@ done
 docker rm -f bb-lint
 
 # Alloy — format check + validate. `validate` exits 0 even on failure: read its output.
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.21.3 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.22.0 \
   fmt --test /cfg/config.alloy
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.21.3 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.22.0 \
   validate /cfg/config.alloy
 # The shipper-side masks (CI: repo-lint -> alloy-log-masking)
 python3 scripts/check-alloy-log-masking.py
