@@ -17,18 +17,17 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.14.0",
+    "eslint": "^10.15.0",
     "eslint-plugin-no-unsanitized": "^4.1.5",
     "globals": "^17.14.0",
     "htmlhint": "^1.9.2",
     "postcss-html": "^2.0.0",
-    "prettier": "^3.9.10",
+    "prettier": "^3.10.1",
     "stylelint": "^18.0.0",
     "stylelint-config-standard": "^41.0.0",
     "typescript": "^7.0.2"
   },
   "overrides": {
-    "glob": "^14.0.4",
-    "minimatch": "^11.0.5"
+    "glob": "^14.0.6"
   }
 }
