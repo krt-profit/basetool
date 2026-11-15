@@ -1,32 +1,32 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:6a74e17f-f74f-4a98-a1fd-eab0c96ca22a",
+  "serialNumber" : "urn:uuid:88c1d8cc-0e16-4aaa-924f-5c1c8d21145c",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-11-14T09:01:18Z",
+    "timestamp" : "2026-11-15T09:25:45Z",
     "tools" : {
       "components" : [
         {
           "type" : "application",
           "author" : "CycloneDX",
           "name" : "cyclonedx-gradle-plugin",
-          "version" : "3.5.1"
+          "version" : "3.6.1"
         }
       ]
     },
     "component" : {
       "type" : "application",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.24.2?project_path=%3Afrontend",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.25.0?project_path=%3Afrontend",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "frontend",
-      "version" : "1.24.2",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.24.2?project_path=%3Afrontend",
+      "version" : "1.25.0",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.25.0?project_path=%3Afrontend",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/43578186635"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/43698967177"
         },
         {
           "type" : "vcs",
@@ -1244,11 +1244,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.24.2?project_path=%3Alogging-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "logging-support",
-      "version" : "1.24.2",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.24.2?project_path=%3Alogging-support",
+      "version" : "1.25.0",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support",
       "modified" : false,
       "properties" : [
         {
@@ -1259,11 +1259,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.24.2?project_path=%3Atechnical-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "technical-support",
-      "version" : "1.24.2",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.24.2?project_path=%3Atechnical-support",
+      "version" : "1.25.0",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support",
       "modified" : false,
       "properties" : [
         {
@@ -2214,7 +2214,7 @@
         {
           "license" : {
             "id" : "MIT",
-            "url" : "https://opensource.org/license/mit/"
+            "url" : "https://opensource.org/license/MIT"
           }
         }
       ],
@@ -5561,7 +5561,7 @@
         {
           "license" : {
             "id" : "MIT",
-            "url" : "https://opensource.org/license/mit/"
+            "url" : "https://opensource.org/license/MIT"
           }
         }
       ],
@@ -6120,7 +6120,7 @@
         {
           "license" : {
             "id" : "BSD-2-Clause",
-            "url" : "https://opensource.org/licenses/BSD-2-Clause"
+            "url" : "https://opensource.org/license/BSD-2-Clause"
           }
         }
       ],
@@ -6183,7 +6183,7 @@
         {
           "license" : {
             "id" : "BSD-2-Clause",
-            "url" : "https://opensource.org/licenses/BSD-2-Clause"
+            "url" : "https://opensource.org/license/BSD-2-Clause"
           }
         }
       ],
@@ -6574,7 +6574,7 @@
         {
           "license" : {
             "id" : "BSD-3-Clause",
-            "url" : "https://opensource.org/licenses/BSD-3-Clause"
+            "url" : "https://opensource.org/license/BSD-3-Clause"
           }
         }
       ],
@@ -6708,7 +6708,7 @@
         {
           "license" : {
             "id" : "MIT",
-            "url" : "https://opensource.org/license/mit/"
+            "url" : "https://opensource.org/license/MIT"
           }
         }
       ],
@@ -6766,7 +6766,7 @@
         {
           "license" : {
             "id" : "MIT",
-            "url" : "https://opensource.org/license/mit/"
+            "url" : "https://opensource.org/license/MIT"
           }
         }
       ],
@@ -12505,7 +12505,7 @@
         {
           "license" : {
             "id" : "MIT",
-            "url" : "https://opensource.org/license/mit/"
+            "url" : "https://opensource.org/license/MIT"
           }
         }
       ],
@@ -12872,13 +12872,13 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.24.2?project_path=%3Afrontend",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.25.0?project_path=%3Afrontend",
       "dependsOn" : [
         "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
         "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.23.0?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
-        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.24.2?project_path=%3Alogging-support",
-        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.24.2?project_path=%3Atechnical-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support",
         "pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar",
         "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
         "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
@@ -12902,14 +12902,14 @@
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.24.2?project_path=%3Alogging-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support",
       "dependsOn" : [
         "pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.24.2?project_path=%3Atechnical-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support",
       "dependsOn" : [
         "pkg:maven/io.micrometer/micrometer-observation@1.17.2?type=jar"
       ]

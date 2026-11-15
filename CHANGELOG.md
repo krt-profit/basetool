@@ -2,6 +2,119 @@
 
 ## [Unreleased]
 
+## [v1.25.0](https://github.com/krt-profit/basetool/releases/tag/v1.25.0) - 2026-11-15
+
+### Added
+
+- **Patchwechsel.** Admins erfassen einen Star-Citizen-Patch einmal für alle Einheiten: Bezeichnung, Live-Zeit, Patch-Art und Optionen, mit Live-Vorschau, Bestätigung per Eingabe der Bezeichnung und Historie. Laufende Raffinerieaufträge, die vor der Live-Zeit gestartet wurden, werden dabei storniert; Auditbereich „Patchwechsel“ (REQ-PATCH-001…009).
+
+- **Lager.** Solange der Umzug eines Mitglieds aussteht, wird sein Bestand von vor dem Live-Gang nicht mit neuen Buchungen zusammengeführt; danach wieder wie gewohnt (REQ-PATCH-004).
+
+- **Exchange.** Änderungen eines Patchwechsels tragen die Quelle `patch` mit Id und Bezeichnung; stornierte Raffinerieaufträge zeigen `canceledByPatch` (REQ-PATCH-007).
+
+- **Hangar: Herkunft eines Schiffs.** Jedes Schiff ist jetzt „Gepledged", „Ingame gekauft" oder „Herkunft unbekannt"; ein späterer Patch-Wipe entfernt nur ingame gekaufte Schiffe. Beim Hinzufügen ist die Wahl Pflicht, im Bearbeiten-Dialog und über die Auswahlleiste („Als gepledged markieren" / „Als ingame gekauft markieren") änderbar, auch für Admins im Mitglieder-Hangar. Importierte Schiffe und Schiffe mit Pledge-ID sind fest als gepledged; ein Hinweis zählt Schiffe mit unbekannter Herkunft, ein Schalter filtert sie.
+
+- **Exchange: `origin` am Schiff.** Verbundene Anwendungen lesen und schreiben die Herkunft eigener Schiffe (`PLEDGE`, `IN_GAME`, `UNKNOWN`); ein importiertes Schiff liest immer `PLEDGE` und lehnt anderes mit `ORIGIN_LOCKED` ab. Pledge-ID, Datum und Preis bleiben weiterhin privat.
+
+- **Patchwechsel: Währungs-Wipe.** Die Option setzt die Kartellbank auf ihre Salden zur Live-Zeit zurück, spätere Buchungen bleiben; offene Bankanträge und Bankvorgänge von Aufträgen von davor werden storniert, und ein stornierter Bankantrag nennt unter seinem Status den Patchwechsel als Grund. aUEC-Bestände, die es zur Live-Zeit gab, werden als Fehlbetrag mit der Patch-Bezeichnung ausgebucht, Zusagen von davor enden; Vorschau und Auditereignisse inklusive (REQ-PATCH-040…046, ADR-0384).
+
+- **Patchwechsel: Wipe.** Ein Patchwechsel löscht jetzt, was der Patch im Spiel gelöscht hat: Lagerposten aller Mitglieder (eigene, Pool und persönliche) nach Wipe-Gruppen über Katalogtypen, dazu Ausnahmen für einzelne Items oder Materialien zum Behalten oder zusätzlichen Löschen, und Ingame gekaufte Schiffe. Betroffen ist nur, was vor der Live-Zeit angelegt wurde; die Vorschau zählt jede Gruppe und jede Ausnahme (REQ-PATCH-010…018).
+
+- **Abhängiges.** Materialbörsen-Angebote auf gelöschtem Bestand enden mit der gewohnten Nachricht, Spendenzusagen werden zurückgezogen und nennen in „Meine Spenden“ und „Eingehende Spenden“ den Patchwechsel als Grund, Vormerkungen für Aufträge entfallen; Aufträge mit ungültiger Zuständigkeit blockieren den Wipe nicht (ADR-0382).
+
+- **Patchwechsel: neue Home Location.** Fragt ein Patchwechsel nach der Home Location, wählt jedes Mitglied, dessen Konto vor dem Live-Gang bestand, beim nächsten Aufruf seine neue Home Location; danach ziehen seine Lagerposten (eigene und für Einheiten gehaltene) und Schiffe von vor dem Live-Gang einmalig dorthin um, Zweckbindungen, Spenden und Angebote bleiben erhalten.
+
+- **Nach der Wahl.** Die Seite zeigt, wohin und was umgezogen ist, und führt mit „Weiter zum Basetool“ zurück; sie springt nicht von selbst weg. Fragt ein neuer Patchwechsel, leitet schon die erste abgelehnte Anfrage auf die Abfrage.
+
+- **Umzugssperre.** Bis zur Wahl sind diese Posten und Schiffe für andere gesperrt: Lager und Hangar zeigen sie als „Umzug ausstehend“ mit gesperrten Aktionen, verbundene Anwendungen erhalten `409 RELOCATION_PENDING`, neue Buchungen bleiben möglich.
+
+- **Admin.** Admins wählen im neuen Mitglieder-Reiter „Home Location“ für ein Mitglied, beenden eine laufende Abfrage in der Patchwechsel-Historie vorzeitig, und die Kennzahl `basetool_patch_change_relocations_pending` zeigt, wer noch umziehen muss.
+
+- **Profil: Meine Home Location.** Im Profil wählst du deine Home Location aus den gepflegten Home Locations; sie füllt den Lagerort beim Einbuchen, beim Einlagern aus der Raffinerie und beim Anlegen eines Schiffs vor und verschiebt nichts. Deine Wahl bei einem Patchwechsel überschreibt sie, jede Änderung steht im Audit-Log „Patchwechsel“.
+
+- **Patchwechsel für verbundene Anwendungen.** Mit der Fähigkeit `exchange.patch.read` liest eine verbundene Anwendung wie VerseKit den letzten Patchwechsel mit seinen Optionen, der Wipe-Liste samt Katalogtypen und Ausnahmen sowie deine Home-Location-Abfrage mit Vorschau; mit `exchange.patch.write` wählt sie deine neue Home Location nach denselben Regeln wie im Basetool und löst den Umzug aus.
+
+- **Gegen den Patchwechsel geschrieben.** Schreibt eine Anwendung auf einen Lagerposten oder ein Schiff, das ein Patchwechsel verschoben oder gelöscht hat, erhält sie `REMOVED_ELSEWHERE` mit der Kennung des Patchwechsels und übernimmt das Ergebnis, statt nachzufragen. Ist der Posten nur zum Teil umgezogen oder das Schiff verschoben, nennt auch der `VERSION_CONFLICT` den Patchwechsel.
+
+- **Missionsvorlagen.** Eine Vorlage kann jetzt auch Beschreibung, TS-Zeit, geplanten Start und
+  geplantes Ende (als Uhrzeiten), Treffpunkt, Sichtbarkeit und Frequenzen vorgeben. Jeder
+  Bestandteil ist optional: Im Editor fügst du nur hinzu, was die Vorlage vorgeben soll.
+
+- **Einsatz anlegen.** Beim Wählen einer Vorlage entscheidest du in einem Dialog, welche Teile du
+  übernimmst; Teile, die Eingaben ersetzen würden, sind markiert. Frequenzen lassen sich jetzt
+  direkt beim Anlegen eintragen (Migration `V431`).
+
+### Changed
+
+- Auftragsdetail: Das Umschreiben der verantwortlichen Einheit ist aus dem Kopfbereich in einen eigenen Dialog „Verantwortung umschreiben“ im „…“-Menü gewandert.
+
+- Auftragsdetail: Die Staffelunterstützung ist ein einklappbares Panel, das in der Kopfzeile die aktiven Staffeln zeigt und sich den Auf/Zu-Zustand im Browser merkt.
+
+- **Gemeinsames Lager gegen den Patchwechsel geschrieben.** Schreibt eine verbundene Anwendung auf einen Eintrag im gemeinsamen Lager einer Einheit, den ein Patchwechsel gelöscht hat, erhält sie `REMOVED_ELSEWHERE` mit der Kennung des Patchwechsels statt `NOT_PERMITTED`. Hat der Umzug den Eintrag verschoben, nennt der `VERSION_CONFLICT` den Patchwechsel ebenfalls. Maßgeblich ist die letzte Änderung genau dieses Eintrags.
+
+- **Abhängigkeiten.** Flyway 13.12.2, zstd-jni 1.5.7-28 und Loki 3.7.10 sowie aktuelle Build- und
+  Prüfwerkzeuge (Node.js 26.13.1, Trivy 0.76.2, CycloneDX 3.6.1, Playwright 1.65). Keine Änderung
+  an Oberfläche oder Konfiguration.
+
+### Fixed
+
+- **Exchange-Sandbox: Bank-Fähigkeiten.** Der Testclient der Sandbox hat jetzt auch `exchange.bank.read`, `exchange.bank.request` und `exchange.bank.queue`, wie die Sandbox-Seite verspricht, und der Seed schaltet die Kartellbank für verbundene Anwendungen ein.
+
+- **Zustimmung und Home Location.** Trifft ein Seitenabschnitt auf die noch fehlende Zustimmung zu den Nutzungsbedingungen oder die noch offene Wahl der Home Location, führt die Seite sofort zur Zustimmung bzw. zur Abfrage, statt den Abschnitt leer anzuzeigen.
+
+- „⋯“-Menüs ragen auf dem Smartphone nicht mehr über den Bildschirmrand, wenn ihr Knopf mitten in der Zeile sitzt – etwa „Verantwortung umschreiben“ im Auftragsdetail.
+
+- **Dashboard.** Kann ein Widget nicht geladen werden, sitzt der Knopf „Erneut versuchen“ nicht mehr
+  am Rand der Box, sondern mit demselben Abstand wie der Hinweistext darüber.
+
+- **Zustimmung und Home Location.** Auch Speichern per AJAX, Formular-Rückfälle und parallel geladene Seitenteile führen beim ersten abgewiesenen Aufruf sofort zur Zustimmung bzw. zur Abfrage der Home Location, und eine neue Live-Sync-Verbindung prüft beide Schritte frisch, statt einer bis zu einer Minute alten Freigabe zu vertrauen.
+
+- **Profil: Meine Home Location.** Kann die gespeicherte Home Location nicht gelesen werden, zeigt der Abschnitt das an und bietet kein Formular, statt „keine Wahl“ anzuzeigen und beim Speichern einen Konflikt zu melden.
+
+- **Einkauf und Bank.** Wird ein Deal storniert, während die Bank über einen seiner Anträge entscheidet, blockieren sich die beiden nicht mehr gegenseitig; sie laufen nacheinander durch.
+
+- **Bank-Reset.** Eine gebührenfreie Umbuchung zwischen Verwahrern, die gleichzeitig mit dem Wipe-Reset gebucht wird, wartet auf ihn, sodass der Reset die Bestände genau auf null setzt.
+
+- **Home-Location-Abfrage ohne gepflegte Home Location.** Ein Patchwechsel mit Home-Location-Abfrage lässt sich nur auslösen, wenn mindestens eine Home Location gepflegt ist. Verschwindet die letzte während einer laufenden Abfrage, erreicht ein Admin trotz Abfrage die Patchwechsel-Seite zum Beenden und die Pflege der Locations (REQ-PATCH-063).
+
+- **Wahl gehört zur angezeigten Abfrage.** Die Wahl der Home Location nennt die Abfrage, die die Seite zeigte; hat inzwischen ein neuer Patchwechsel neu gefragt, wird sie mit `409 HOME_LOCATION_PHASE_CHANGED` abgelehnt und die Abfrage neu geladen, im Basetool wie bei verbundenen Anwendungen (Pflichtfeld `patchChange`, REQ-PATCH-062).
+
+- **Umzugssperre für Zweckbindungen.** Andere Mitglieder können die Auftrags- und Missions-Zweckbindungen eines gesperrten Lagerpostens nicht mehr ändern oder entfernen (REQ-PATCH-023).
+
+- **Sperre und Patchwechsel ohne Lücke.** Schreibvorgänge, die die Umzugssperre prüfen, lesen die Abfrage frisch und können nicht mehr mit einem gleichzeitigen Patchwechsel überkreuzen; während ein Patchwechsel eingetragen wird, lehnen sie mit 409 ab (REQ-PATCH-064).
+
+- **SC-Wiki-Abgleich.** Ein Schiffstyp, dessen Spiel-UUID das Wiki nicht mehr führt, folgt dem
+  Wiki-Fahrzeug mit seiner P4K-GUID. Ein Name, den ein verschwundenes Fahrzeug einer anderen Klasse
+  belegt, wird nur noch gemeldet und lässt den nächtlichen Abgleich nicht mehr fehlschlagen.
+
+- **Lager-Zuordnungen lassen das Material unberührt.** Eine Zuordnung eines Lagerpostens zu einem Auftrag oder Einsatz und das Setzen von „Geliefert“ erhöhen nur noch die Version des Postens, nicht mehr die seines Materials. Eine gleichzeitige Material-Bearbeitung bekommt daher keinen falschen Versionskonflikt mehr, und ein Material ohne Version lässt diese Schreibvorgänge nicht mehr scheitern (REQ-INV-027).
+
+- **Währungs-Wipe nach einem Wipe-Reset.** Wurde die Kartellbank zwischen der Live-Zeit eines Patchwechsels und seiner Erfassung schon per Wipe-Reset auf null gesetzt, bucht der Währungs-Wipe nichts mehr aus: Ein- und Auszahlungen nach diesem Reset bleiben auf Konten und Haltern stehen, und kein Konto zählt als bei null gestoppt (REQ-PATCH-041, ADR-0384).
+
+- **Exchange: lange Katalognamen brechen keine Antwort mehr.** `catalog/locations` und `catalog/resolve` kürzen den Namen eines Lagerorts, Gegenstands, Materials oder Schiffstyps auf die 200 Zeichen, die das v1-Schema erlaubt, wie es die Feeds schon tun. Ein längerer Name ließ bisher die ganze Antwort mit `502` scheitern (REQ-XCH-026).
+
+- **Exchange: ein gekürzter Name findet seinen Lagerort wieder.** Schickt eine verbundene Anwendung den auf 200 Zeichen gekürzten Namen eines Lagerorts oder einer Raffineriemethode zurück, landet die Buchung beim richtigen Eintrag, sofern kein Eintrag genau so heißt und nur einer auf diesen Namen gekürzt wird (REQ-XCH-026).
+
+- **Zustimmung und Home Location.** Auch die übrigen Speicher- und Ladeaktionen der Seiten (Missionen, Lager, Aufträge, Raffinerie, Hangar, Profil, Mitglieder- und Admin-Seiten) führen beim ersten abgewiesenen Aufruf sofort zur Zustimmung zu den Nutzungsbedingungen bzw. zur Abfrage der Home Location, statt eine Fehlermeldung oder einen leeren Bereich zu zeigen.
+
+- **Rechtliche Seiten bleiben lesbar.** Impressum, Datenschutz, Nutzungsbedingungen und Open-Source-Lizenzen öffnen sich auch, solange die Zustimmung oder die Wahl der Home Location aussteht, und leiten nicht mehr zur Abfrage weiter; Seitenleiste und Navigation zeigen dort nur ihre Grundansicht.
+
+- **Konten-Zusammenführung ohne Deadlock.** Die Admin-Zusammenführung zweier Konten nimmt die Sperre der Auftrags-Geldkonten jetzt vor den beiden Kontozeilen, in derselben Reihenfolge wie jede Geldbuchung und ihre Benachrichtigung. Läuft gerade eine Geldbenachrichtigung für eines der Konten, scheitert die Zusammenführung nicht mehr an einem Datenbank-Deadlock (REQ-SEC-046).
+
+- **aUEC-Aufträge: Bankkonto bleibt vorbelegt.** Aktualisiert sich der Geldbereich eines Auftrags live, während der Dialog „aUEC bereitstellen“ gerade die Bankkonten lädt, ist das Konto der verantwortlichen Einheit trotzdem vorgewählt statt „Bitte wählen“ (REQ-ORDERS-067).
+
+- **Einsatz auf dem Handy.** Eine lange Faktenleiste (z. B. mit Endzeit und Treffpunkt) machte die
+  ganze Einsatzseite breiter als das Display; jetzt scrollt nur die Leiste seitlich.
+
+### Security
+
+- **Monitoring.** Grafana meldet nur noch über Keycloak an: das Formular mit Nutzername und Passwort
+  ist abgeschaltet, `/login` leitet direkt zu Keycloak weiter.
+
+- **Sicherheitsupdates für Datenbank, Login und Monitoring.** PostgreSQL 18.7 (rund 50 behobene
+  CVEs), Grafana 13.3.1 (sechs CVEs) und ein neu gebautes Keycloak-26.8.2-Image. Für Mitglieder
+  ändert sich nichts; wirkt nach dem nächsten Deploy.
+
 ## [v1.24.2](https://github.com/krt-profit/basetool/releases/tag/v1.24.2) - 2026-11-14
 
 ### Fixed
