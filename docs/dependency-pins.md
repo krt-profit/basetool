@@ -1,6 +1,6 @@
 # Dependency pins, holds and floors
 
-> **Doc type:** Living reference — kept in sync with `main`. Last reviewed: 2026-11-09.
+> **Doc type:** Living reference — kept in sync with `main`. Last reviewed: 2026-11-15.
 
 This file records why a dependency version is **held** behind upstream, **pinned** to match another
 component, or **floored** / overridden for a security advisory — the standing reasons the version
