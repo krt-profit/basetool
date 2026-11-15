@@ -15,6 +15,7 @@ permissions: {}
 env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
+  TRIVY_VERSION: v0.76.2
 
 jobs:
   ref-guard:
@@ -369,6 +370,7 @@ jobs:
         env:
           TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
+          version: ${{ env.TRIVY_VERSION }}
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.build.outputs.digest }}
           format: sarif
           output: trivy-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}.sarif
