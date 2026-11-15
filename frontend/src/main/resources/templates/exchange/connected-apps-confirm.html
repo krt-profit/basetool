@@ -28,6 +28,13 @@
             </div>
         </div>
         <div id="cac-missing" class="alert alert-warning" hidden th:text="#{connectedApps.confirmMass.missing}">Diese &Auml;nderung ist abgelaufen.</div>
+        <div id="cac-failed" class="cac-failed" data-testid="cac-failed" hidden>
+            <p class="alert alert-warning" th:text="#{connectedApps.confirmMass.failed}">Die &Auml;nderung lie&szlig; sich gerade nicht laden.</p>
+            <div class="cac-actions">
+                <button type="button" class="btn btn-primary" id="cac-retry" data-testid="cac-retry"
+                        th:text="#{connectedApps.confirmMass.retry}">Erneut versuchen</button>
+            </div>
+        </div>
         <div id="cac-outcome" class="alert alert-info" hidden data-testid="cac-outcome"></div>
     </div>
 </main>

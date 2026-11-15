@@ -1642,6 +1642,16 @@ then previews the batch as a dry run and, on „Bestätigen", applies it without
 again, in one transaction recorded in the change log as the installation's own write and audited as
 `EXCHANGE_MASS_CHANGE_CONFIRMED` (`POST /api/v1/connected-apps/mass-changes/preview|confirm`,
 member session only). „Verwerfen" drops it; a batch confirmed or dropped once is gone.
+
+The preview and the confirmation run as long as the gateway's relay of the same batch may take:
+the frontend calls both within a 30-second budget (`ExchangeBackendClient.MASS_CHANGE_RESPONSE_BUDGET`,
+the gateway's exchange read timeout) instead of its default backend time limit, so a held batch of
+up to 500 ops is previewed rather than timed out. The page never stays on „Wird geladen …": a
+preview the backend refuses with `404` or `403` shows the expired or refused state, and any other
+failure — a timeout, an unavailable backend, a lost connection — shows a retryable message with
+„Erneut versuchen". A repeated load of a handoff this session already consumed previews the batch
+the session keeps for it, within its staging lifetime; another session gets `404`
+(`ConnectedAppsConfirmControllerMvcTest.aRepeatedLoadPreviewsTheChangeSetThisSessionKeeps`).
 *Corrected 2026-09-27 (security review L3): the session kept a loaded batch as long as the session
 lived and the backend only looked for disconnects in the 30 minutes before the confirmation, so a
 batch loaded before a disconnect could still be confirmed hours later.*
