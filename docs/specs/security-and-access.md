@@ -4607,6 +4607,10 @@ because it is anonymous access in the brief's sense.
   `__Host-SESSION` (formerly `SESSION`) cookie, `verifyNoInteractions(backendApiClient)`.
 - [x] A read endpoint without a method- or class-level `@PreAuthorize` fails the build, like a write.
 
+`AnonymousSurfaceE2eTest` checks the first anonymous deep-link redirect with the browser context's
+HTTP client. The browser uses the shared session cookie and must reach the saved deep link after
+interactive login.
+
 **Enforced by:** `AnonymousSurfaceSweepTest` (three passes over every mapping, plus `HEAD`) ·
 `AnonymousSurfaceSweepMvcTest` (the frontend, navigation and background shapes) ·
 `EndpointEnumerationTest` (the enumeration both sweeps ask the dispatcher with, shared since #1804 —

@@ -39,6 +39,18 @@
             box-shadow: inset 0 -2px 0 var(--color-primary);
         }
     }
+    @media (768px < width <= 1024px) {
+        .supply-table :is(th, td) {
+            padding-inline: var(--space-3);
+        }
+        .supply-table th,
+        .supply-table .cell-sub .chip {
+            white-space: normal;
+        }
+        .supply-table .cell-sub .chip {
+            overflow-wrap: anywhere;
+        }
+    }
     .supply-meter {
         width: 100%;
         margin-bottom: var(--space-2);

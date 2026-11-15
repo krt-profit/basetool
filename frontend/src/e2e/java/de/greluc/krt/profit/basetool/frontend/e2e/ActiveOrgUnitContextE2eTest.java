@@ -123,7 +123,7 @@ class ActiveOrgUnitContextE2eTest {
         assertThat(group(page, staffelMaterialId)).isVisible(visible());
         assertThat(group(page, skMaterialId)).isVisible(visible());
 
-        pin(page, staffelId);
+        E2eSupport.pinOrgUnit(page, staffelId);
         E2eSupport.navigate(page, STACK.baseUrl() + LAGER);
         assertThat(page.locator(SWITCHER)).hasValue(staffelId);
         assertThat(group(page, staffelMaterialId)).isVisible(visible());
@@ -148,13 +148,13 @@ class ActiveOrgUnitContextE2eTest {
       try {
         E2eSupport.login(page, STACK.baseUrl(), BOTH_USER, BOTH_PASSWORD);
         E2eSupport.navigate(page, STACK.baseUrl() + LAGER);
-        pin(page, skId);
+        E2eSupport.pinOrgUnit(page, skId);
         E2eSupport.navigate(page, STACK.baseUrl() + LAGER);
         assertThat(page.locator(SWITCHER)).hasValue(skId);
         assertThat(group(page, skMaterialId)).isVisible(visible());
         assertThat(group(page, staffelMaterialId)).hasCount(0);
 
-        pin(page, "");
+        E2eSupport.pinOrgUnit(page, "");
         E2eSupport.navigate(page, STACK.baseUrl() + LAGER);
         assertThat(page.locator(SWITCHER)).hasValue("");
         assertThat(group(page, staffelMaterialId)).isVisible(visible());
@@ -174,7 +174,7 @@ class ActiveOrgUnitContextE2eTest {
     try (BrowserContext first = newContext()) {
       Page page = first.newPage();
       E2eSupport.login(page, STACK.baseUrl(), BOTH_USER, BOTH_PASSWORD);
-      pin(page, staffelId);
+      E2eSupport.pinOrgUnit(page, staffelId);
     }
     try (BrowserContext second = newContext()) {
       Page tabA = second.newPage();
@@ -187,7 +187,7 @@ class ActiveOrgUnitContextE2eTest {
 
         tabB = second.newPage();
         E2eSupport.navigate(tabB, STACK.baseUrl() + LAGER);
-        pin(tabB, "");
+        E2eSupport.pinOrgUnit(tabB, "");
 
         assertThat(tabA.locator(SWITCHER))
             .hasValue("", new LocatorAssertions.HasValueOptions().setTimeout(TIMEOUT_MILLIS));
@@ -214,23 +214,6 @@ class ActiveOrgUnitContextE2eTest {
 
   private static Locator group(Page page, String materialId) {
     return page.locator("div.tree-row--group[data-material-id='" + materialId + "']");
-  }
-
-  /**
-   * Switches the active org unit through the sidebar switcher's form and waits for the switch to be
-   * answered; an empty id chooses „Alle meine Org-Einheiten".
-   *
-   * @param page a page that renders the sidebar
-   * @param orgUnitId the org unit to choose, or {@code ""}
-   */
-  private static void pin(Page page, String orgUnitId) {
-    page.waitForResponse(
-        response -> response.url().contains("/me/active-org-unit"),
-        () ->
-            page.evaluate(
-                "(id) => { const s = document.getElementById('squadron-switcher-select'); s.value ="
-                    + " id; document.getElementById('squadron-switcher-form').submit(); }",
-                orgUnitId));
   }
 
   /** Stores „Alle meine Org-Einheiten" as {@code test-both}'s choice through the backend. */

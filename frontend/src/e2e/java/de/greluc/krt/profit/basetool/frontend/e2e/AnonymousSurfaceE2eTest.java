@@ -242,7 +242,7 @@ class AnonymousSurfaceE2eTest {
           browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
         Page page = context.newPage();
         try {
-          E2eSupport.navigate(page, baseUrl + deepLink.getKey());
+          E2eSupport.assertLoginRedirect(context, baseUrl + deepLink.getKey());
           E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
 
           String url = page.url();
