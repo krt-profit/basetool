@@ -160,6 +160,7 @@
             padding-block: var(--space-2);
         }
         .mission-head-sticky .facts-bar {
+            position: relative;
             flex-wrap: nowrap;
             overflow-x: auto;
             scrollbar-width: none;
