@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
@@ -31,9 +35,11 @@ import com.microsoft.playwright.Response;
 import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.Cookie;
 import com.microsoft.playwright.options.LoadState;
+import com.microsoft.playwright.options.RequestOptions;
 import com.microsoft.playwright.options.WaitUntilState;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -504,6 +510,57 @@ final class E2eSupport {
    */
   static void settle(Page page) {
     page.evaluate("() => fetch('/impressum', { cache: 'no-store' }).then((r) => r.status)");
+  }
+
+  /**
+   * Submits the sidebar switcher form to set the session's active org unit at any viewport.
+   *
+   * @param page a page that renders the switcher form
+   * @param orgUnitId the unit to select, or an empty string for all available units
+   */
+  static void pinOrgUnit(Page page, String orgUnitId) {
+    Locator switcher = page.locator("#squadron-switcher-select");
+    page.waitForResponse(
+        response ->
+            response.url().endsWith("/me/active-org-unit")
+                && response.request().method().equals("POST"),
+        () ->
+            switcher.evaluate(
+                """
+                (select, id) => {
+                    select.value = id;
+                    if (select.selectedIndex === -1) throw new Error('Org unit is not selectable: ' + id);
+                    select.form.submit();
+                }
+                """,
+                orgUnitId));
+  }
+
+  /**
+   * Checks the first login redirect and preserves its cookies in the browser context.
+   *
+   * @param context a browser context without login cookies
+   * @param url the protected page to request as a navigation
+   */
+  static void assertLoginRedirect(BrowserContext context, String url) {
+    APIResponse response =
+        context
+            .request()
+            .get(
+                url,
+                RequestOptions.create().setHeader("Sec-Fetch-Mode", "navigate").setMaxRedirects(0));
+    try {
+      assertEquals(302, response.status(), "a protected navigation must redirect to login");
+      String location = response.headers().get("location");
+      assertNotNull(location, "the login redirect must have a destination");
+      URI requestedPage = URI.create(url);
+      assertEquals(
+          requestedPage.resolve("/oauth2/authorization/keycloak?prompt=none"),
+          requestedPage.resolve(location),
+          "the first login redirect must initiate silent SSO");
+    } finally {
+      response.dispose();
+    }
   }
 
   /**

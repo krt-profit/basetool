@@ -1106,6 +1106,9 @@ every switch is stored per member, and a new session starts from the stored choi
 `orgunit.web.MeFrontendController`, `V409__create_member_active_org_unit.sql` · **ADR:** ADR-0374 ·
 **Related:** REQ-ORG-008, REQ-ORG-032, REQ-AUDIT-001, REQ-DATA-021, REQ-OBS-011
 
+E2E fixtures that need a pinned browser session submit the switcher form through
+`E2eSupport.pinOrgUnit`, so the setup works with collapsed navigation at every viewport.
+
 ### REQ-ORG-032 — One pin rule for every surface
 
 A member's active org unit (the pin of REQ-ORG-008) means the same on every surface: the lists, the

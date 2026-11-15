@@ -293,13 +293,7 @@ class DashboardSupplyNeedsE2eTest {
    */
   private static void pinOrgUnit(Page page, String orgUnitId) {
     E2eSupport.navigate(page, STACK.baseUrl() + "/");
-    page.waitForResponse(
-        response -> response.url().contains("/me/active-org-unit"),
-        () ->
-            page.evaluate(
-                "(id) => { const s = document.getElementById('squadron-switcher-select'); s.value ="
-                    + " id; document.getElementById('squadron-switcher-form').submit(); }",
-                orgUnitId));
+    E2eSupport.pinOrgUnit(page, orgUnitId);
     E2eSupport.navigate(page, STACK.baseUrl() + "/");
   }
 

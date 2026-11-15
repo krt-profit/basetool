@@ -58,11 +58,13 @@ class MaterialContributionE2eTest {
   private static final String ADMIN_PASSWORD = "test-admin-pw";
   private static final String ACTOR = "test-officer";
   private static final String ACTOR_PASSWORD = "test-officer-pw";
+  private static final String ACTIVE_CHOICE = "/api/v1/org-units/me/active-choice";
   private static Playwright playwright;
   private static Browser browser;
   private static BackendSeeder seeder;
   private static String membershipPath;
   private static JsonArray originalStaffeln;
+  private static JsonObject originalActiveChoice;
   private static String unit;
   private static String responsible;
   private static String material;
@@ -76,6 +78,9 @@ class MaterialContributionE2eTest {
     if (!STACK.managesStack())
       throw new IllegalStateException("Requires the isolated managed E2E stack");
     seeder = new BackendSeeder();
+    originalActiveChoice =
+        JsonParser.parseString(seeder.getBody(ACTOR, ACTOR_PASSWORD, ACTIVE_CHOICE))
+            .getAsJsonObject();
     String actor = seeder.getUserId(ACTOR, ACTOR_PASSWORD);
     membershipPath = "/api/v1/org-units/members/" + actor + "/memberships";
     JsonArray memberships =
@@ -149,11 +154,17 @@ class MaterialContributionE2eTest {
     browser = E2eSupport.launchBrowser(playwright, true);
   }
 
-  /** Restores the actor's original grants and releases browser resources. */
+  /** Restores the actor's grants and active unit, then releases browser resources. */
   @AfterAll
   static void tearDown() {
     try {
       if (originalStaffeln != null) replaceStaffeln(originalStaffeln);
+      if (originalActiveChoice != null) {
+        JsonObject choice = new JsonObject();
+        choice.add("orgUnitId", originalActiveChoice.get("orgUnitId"));
+        assertEquals(
+            200, seeder.putForStatus(ACTOR, ACTOR_PASSWORD, ACTIVE_CHOICE, choice.toString()));
+      }
     } finally {
       if (browser != null) browser.close();
       if (playwright != null) playwright.close();
@@ -980,12 +991,9 @@ class MaterialContributionE2eTest {
     E2eSupport.navigate(page, STACK.baseUrl() + path);
     Locator select = page.locator("#squadron-switcher-select");
     if (select.count() > 0) {
-      page.waitForResponse(
-          response ->
-              response.url().endsWith("/me/active-org-unit")
-                  && response.request().method().equals("POST"),
-          () -> select.selectOption(unit));
+      E2eSupport.pinOrgUnit(page, unit);
       E2eSupport.navigate(page, STACK.baseUrl() + path);
+      assertThat(select).hasValue(unit);
     }
   }
 

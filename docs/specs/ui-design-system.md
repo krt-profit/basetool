@@ -2795,6 +2795,8 @@ buttons. „Aufträge zu bearbeiten" links to the „Zu bearbeiten" segment of t
 the refinery. „Aufträge zu bearbeiten" and „Materialbedarf" appear in the catalogue for a caller
 with access to the order area. „Bank" has no unit option — its set ignores the context, only its order uses it — and is
 not part of the default. A new option is a change to this table.
+Titles in linked widget rows wrap within the widget, including material and item
+names without spaces.
 
 **Availability.**
 

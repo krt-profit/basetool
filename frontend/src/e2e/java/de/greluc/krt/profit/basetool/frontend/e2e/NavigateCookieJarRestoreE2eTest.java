@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
@@ -91,8 +90,7 @@ class NavigateCookieJarRestoreE2eTest {
         assertTrue(!jar.isEmpty(), "the signed-in context holds cookies");
 
         context.clearCookies();
-        E2eSupport.navigate(page, baseUrl + MEMBER_PAGE);
-        assertNotEquals(MEMBER_PAGE, path(page), "a wiped jar must lose the session");
+        E2eSupport.assertLoginRedirect(context, baseUrl + MEMBER_PAGE);
 
         context.clearCookies();
         E2eSupport.restoreLostCookieJar(context, jar, 1, baseUrl + MEMBER_PAGE);

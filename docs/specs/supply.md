@@ -321,8 +321,9 @@ scrolls, and above 768 px a row's actions sit side by side on one line. The tabl
 content, so a row's „⋯" menu is never cut off by the table; it opens upwards when it does not fit
 below (REQ-UI-027).
 
-The needs table wraps long material and item names, including names without spaces, so the table
-fits the content area at tablet width and the page does not scroll sideways (REQ-UI-009).
+The needs table wraps long material and item names, including names without spaces. At tablet
+width it reduces horizontal cell padding and lets headings and badges wrap so the table fits the
+content area without horizontal page scrolling (REQ-UI-009).
 
 **Enforced by:** `SupplyNeedsTableLayoutE2eTest` · **Code:** `static/css/pages/supply/supply.css`,
 `static/js/kernel/krt-overflow-menu.js`, `static/js/kernel/common-handlers.js`
