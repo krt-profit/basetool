@@ -61,8 +61,9 @@
     }
 
     .mission-template-metadata,
+    .mission-template-basics,
     .mission-template-plan,
-    .mission-template-secondary {
+    .mission-template-column {
         display: grid;
         gap: var(--space-3);
         grid-template-columns: minmax(0, 1fr);
@@ -70,6 +71,7 @@
     }
 
     .mission-template-metadata,
+    .mission-template-basics,
     .mission-template-plan {
         padding: var(--space-4);
     }
@@ -78,8 +80,117 @@
         max-inline-size: var(--content-max-form);
     }
 
+    .mission-template-basics,
     .mission-template-plan {
         padding-block-start: 0;
+    }
+
+    .mission-template-basics:not(:has(> :not([hidden]))),
+    .mission-template-plan:not(:has(.mission-template-section:not([hidden]))),
+    .mission-template-column:not(:has(> :not([hidden]))) {
+        display: none;
+    }
+
+    .mission-template-parts {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        padding: 0 var(--space-4) var(--space-3);
+    }
+
+    .mission-template-parts[hidden],
+    .mission-template-parts > [hidden],
+    .mission-template-parts-empty[hidden] {
+        display: none;
+    }
+
+    .mission-template-parts-label {
+        margin-inline-end: var(--space-1);
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .mission-template-parts .btn {
+        font-size: var(--fs-2xs);
+    }
+
+    .mission-template-parts-empty {
+        margin: 0 var(--space-4) var(--space-4);
+        padding: var(--space-3);
+        border: 1px dashed var(--control-border);
+        border-radius: var(--radius-tile);
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-sm);
+    }
+
+    .mission-template-section-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-1);
+        margin-inline-start: auto;
+    }
+
+    .mission-template-part-remove {
+        inline-size: var(--template-control-height);
+        min-inline-size: var(--template-control-height);
+        min-block-size: var(--template-control-height);
+    }
+
+    .mission-template-section-head > .mission-template-part-remove {
+        margin-inline-start: auto;
+    }
+
+    .mission-template-part-body {
+        display: grid;
+        gap: var(--space-2);
+        margin: 0;
+        padding: var(--space-2) var(--space-3) var(--space-3);
+        border-block-start: var(--border-hairline);
+    }
+
+    .mission-template-part-body textarea {
+        inline-size: 100%;
+        min-block-size: 6rem;
+        margin: 0;
+        resize: vertical;
+    }
+
+    .mission-template-part-body .form-hint,
+    .mission-template-part-body .krt-switch {
+        margin: 0;
+    }
+
+    .mission-template-times {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: end;
+    }
+
+    @container mission-template-section (width >= 26rem) {
+        .mission-template-times {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    .mission-template-times > label {
+        display: grid;
+        gap: var(--space-1);
+        margin: 0;
+    }
+
+    .mission-template-times > label > span {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .mission-template-times > .form-hint {
+        grid-column: 1 / -1;
     }
 
     @container mission-template-editor (width >= 32rem) {
@@ -88,9 +199,21 @@
         }
     }
 
+    @container mission-template-editor (width >= 48rem) {
+        .mission-template-basics {
+            grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
+        }
+
+        .mission-template-part--wide {
+            grid-column: 1 / -1;
+        }
+    }
+
     @media (width > 1024px) {
         @container mission-template-editor (width >= 54rem) {
-            .mission-template-plan {
+            .mission-template-plan:has(> .mission-template-column:first-child > :not([hidden])):has(
+                    > .mission-template-column:last-child > :not([hidden])
+                ) {
                 grid-template-columns: minmax(0, 1.27fr) minmax(0, 1fr);
             }
         }
@@ -319,6 +442,55 @@
 
         .mission-template-unit-name {
             grid-column: 2;
+        }
+    }
+
+    .mission-template-row label[hidden] {
+        display: none;
+    }
+
+    .mission-template-frequency-grid > :not(.mission-template-position) {
+        grid-column: 2;
+    }
+
+    @container mission-template-section (width >= 26rem) {
+        .mission-template-frequency-grid {
+            grid-template-columns:
+                var(--template-position-width) minmax(12rem, 1.2fr) minmax(0, 1fr)
+                minmax(5.5rem, 0.6fr) var(--template-actions-width);
+            align-items: end;
+        }
+
+        .mission-template-frequency-grid > :not(.mission-template-position) {
+            grid-column: auto;
+        }
+
+        .mission-template-frequency-grid:has([data-frequency-name][hidden]) > label:first-of-type {
+            grid-column: span 2;
+        }
+
+        .mission-template-frequency-grid .mission-template-position {
+            grid-row: auto;
+            align-self: center;
+            padding: 0;
+        }
+    }
+
+    @media (width <= 1024px), (pointer: coarse) {
+        @container mission-template-section (26rem <= width < 44rem) {
+            .mission-template-frequency-grid {
+                grid-template-columns: var(--template-position-width) repeat(2, minmax(0, 1fr));
+            }
+
+            .mission-template-frequency-grid .mission-template-position {
+                grid-row: span 2;
+                align-self: start;
+                padding-block-start: var(--space-4);
+            }
+
+            .mission-template-frequency-grid > .mission-template-row-actions {
+                justify-self: end;
+            }
         }
     }
 

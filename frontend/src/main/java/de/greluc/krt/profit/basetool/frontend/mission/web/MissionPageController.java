@@ -483,6 +483,7 @@ public class MissionPageController {
               null,
               null,
               null,
+              null,
               true,
               true,
               true));
@@ -602,6 +603,7 @@ public class MissionPageController {
               null,
               null,
               null,
+              null,
               true,
               true,
               true));
@@ -628,6 +630,13 @@ public class MissionPageController {
         "createShipTypes",
         SectionFallback.load(
             log, "create-ship-types", () -> contentOf(missionClient.shipTypes()), List.of()));
+    model.addAttribute(
+        "createFrequencyTypes",
+        SectionFallback.load(
+            log,
+            "create-frequency-types",
+            () -> contentOf(missionClient.frequencyTypes()),
+            List.of()));
     return "mission/mission-detail";
   }
 

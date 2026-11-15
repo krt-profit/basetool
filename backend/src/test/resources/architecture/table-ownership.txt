@@ -109,6 +109,7 @@ mission_participant mission
 mission_participant_org_unit mission
 mission_step mission
 mission_template mission
+mission_template_frequency mission
 mission_template_objective mission
 mission_template_step mission
 mission_template_unit mission

@@ -58,11 +58,13 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.AddCustomFrequencyRe
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddExternalParticipantRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddFrequencyRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddUnitRequest;
+import de.greluc.krt.profit.basetool.frontend.mission.model.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionCrewDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplatePlan;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateCustomFrequencyRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateMissionOwnerRequest;
@@ -75,6 +77,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -208,6 +211,40 @@ class MissionPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.targetUrl").value("/missions/" + missionId + "?tab=verw"));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void createMissionAjaxForwardsTheTypedAndCustomDraftFrequencies() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID typeId = UUID.randomUUID();
+    when(backendApiClient.post(eq("/api/v1/missions"), any(), eq(MissionDto.class)))
+        .thenReturn(minimalMission(missionId));
+
+    mockMvc
+        .perform(
+            post("/missions/ajax")
+                .param("name", "Draft mission")
+                .param("status", "PLANNED")
+                .param(
+                    "frequenciesJson",
+                    "[{\"frequencyTypeId\":\""
+                        + typeId
+                        + "\",\"name\":null,\"value\":123.45},"
+                        + "{\"frequencyTypeId\":null,\"name\":\"Ground\",\"value\":7}]")
+                .with(csrf()))
+        .andExpect(status().isCreated());
+
+    ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
+    verify(backendApiClient).post(eq("/api/v1/missions"), body.capture(), eq(MissionDto.class));
+    assertThat(body.getValue())
+        .isInstanceOfSatisfying(
+            CreateMissionRequest.class,
+            request ->
+                assertThat(request.plannedFrequencies())
+                    .containsExactly(
+                        new MissionTemplatePlan.Frequency(typeId, null, new BigDecimal("123.45")),
+                        new MissionTemplatePlan.Frequency(null, "Ground", new BigDecimal("7"))));
   }
 
   @Test

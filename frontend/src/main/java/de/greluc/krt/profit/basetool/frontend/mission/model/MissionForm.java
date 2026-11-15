@@ -37,8 +37,8 @@ import java.util.UUID;
  * <p>{@code owningOrgUnitId} is the owner-picker output, resolved by the backend (REQ-ORG-016);
  * {@code null} leaves the stamp to the resolver.
  *
- * <p>{@code objectivesJson}, {@code stepsJson} and {@code unitsJson} carry the optional planning
- * rows as JSON arrays and are used only on create.
+ * <p>{@code objectivesJson}, {@code stepsJson}, {@code unitsJson} and {@code frequenciesJson} carry
+ * the optional planning rows as JSON arrays and are used only on create.
  *
  * <p>{@code dirtyCore} / {@code dirtySchedule} / {@code dirtyFlags} mark which header sections the
  * user touched, so the edit save skips untouched ones (REQ-FE-014); {@code null} means "save this
@@ -67,6 +67,7 @@ public record MissionForm(
     @Size(max = 65535) String objectivesJson,
     @Size(max = 65535) String stepsJson,
     @Size(max = 65535) String unitsJson,
+    @Size(max = 65535) String frequenciesJson,
     UUID templateId,
     Long templateVersion,
     Boolean dirtyCore,

@@ -86,13 +86,19 @@ export function createMissionPlanningRows(list, template, { liveRegion, hiddenSh
                 return;
             }
             const text = value == null ? '' : String(value);
+            const unknownLabel =
+                key === 'shipTypeId'
+                    ? hiddenShipType
+                    : field instanceof HTMLSelectElement
+                      ? field.dataset.unknownLabel
+                      : undefined;
             if (
-                key === 'shipTypeId' &&
+                unknownLabel !== undefined &&
                 text &&
                 field instanceof HTMLSelectElement &&
                 !Array.from(field.options).some((option) => option.value === text)
             ) {
-                field.add(new Option(hiddenShipType, text));
+                field.add(new Option(unknownLabel, text));
             }
             field.value = text;
         });

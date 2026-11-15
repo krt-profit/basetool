@@ -24,8 +24,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.mission.model.CreateMissionTemplateRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateOwnerDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplatePlan;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateMissionTemplateRequest;
+import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -78,11 +81,27 @@ class MissionTemplateBackendClientTest {
               client
                   .create(
                       new CreateMissionTemplateRequest(
-                          OWNER, "Patrol", List.of(), List.of(), List.of()))
+                          OWNER,
+                          "Patrol",
+                          null,
+                          "Port Olisar",
+                          null,
+                          LocalTime.of(19, 30),
+                          null,
+                          null,
+                          List.of(
+                              new MissionTemplatePlan.Frequency(
+                                  null, "Ground", new BigDecimal("123.45"))),
+                          List.of(),
+                          List.of(),
+                          List.of()))
                   .id())
           .isEqualTo(ID);
       assertThat(backend.expect("POST", BASE).getBody().readUtf8())
-          .contains("\"owningOrgUnitId\":\"" + OWNER + "\"");
+          .contains("\"owningOrgUnitId\":\"" + OWNER + "\"")
+          .contains("\"meetingPoint\":\"Port Olisar\"")
+          .contains("\"meetingTime\":\"19:30")
+          .contains("\"name\":\"Ground\"", "\"value\":123.45");
 
       backend.answerJson(template(1));
       assertThat(
@@ -90,7 +109,8 @@ class MissionTemplateBackendClientTest {
                   .update(
                       ID,
                       new UpdateMissionTemplateRequest(
-                          0L, "Patrol", List.of(), List.of(), List.of()))
+                          0L, "Patrol", null, null, true, null, null, null, List.of(), List.of(),
+                          List.of(), List.of()))
                   .version())
           .isEqualTo(1);
       assertThat(backend.expect("PUT", BASE + "/" + ID).getBody().readUtf8())
@@ -135,8 +155,8 @@ class MissionTemplateBackendClientTest {
 
   private static String template(long version) {
     return """
-    {"id":"%s","owningOrgUnitId":"%s","name":"Patrol","version":%d,
-     "objectives":[],"steps":[],"units":[]}
+    {"id":"%s","owningOrgUnitId":"%s","name":"Patrol","version":%d,"meetingTime":"19:30:00",
+     "frequencies":[],"objectives":[],"steps":[],"units":[]}
     """
         .formatted(ID, OWNER, version);
   }

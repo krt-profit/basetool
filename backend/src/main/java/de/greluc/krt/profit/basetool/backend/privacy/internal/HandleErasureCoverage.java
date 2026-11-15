@@ -216,6 +216,7 @@ public final class HandleErasureCoverage {
               "A display-name snapshot of the notification's organisational unit."),
           notTheMember("org_unit.shorthand", "An organisational unit's short form."),
           notTheMember("mission_frequency.name", "A radio frequency's label."),
+          notTheMember("mission_template_frequency.name", "A template radio frequency's label."),
           notTheMember(
               "mission_unit.name",
               "A unit within a mission -- a formation label from the mission plan rather than"
@@ -249,6 +250,8 @@ public final class HandleErasureCoverage {
           byHand("mission_step.title", "Prose on a surviving mission."),
           byHand("mission_step.meta", "Prose on a surviving mission."),
           byHand("mission_template.name", "Name on a template owned by an org unit."),
+          byHand("mission_template.description", "Prose on an org unit's mission template."),
+          byHand("mission_template.meeting_point", "Prose on an org unit's mission template."),
           byHand("mission_template_objective.title", "Prose on an org unit's mission template."),
           byHand("mission_template_step.title", "Prose on an org unit's mission template."),
           byHand("mission_template_step.meta", "Prose on an org unit's mission template."),

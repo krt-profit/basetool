@@ -110,8 +110,11 @@ class MissionTemplateEditorE2eTest {
           Locator objectives = writer.locator("[data-template-rows='objectives']");
           Locator titles = objectives.locator("input[name='title']");
           Locator objectiveCount = writer.locator("[data-template-count='objectives']");
-          assertThat(objectiveCount).hasText("0");
-          writer.locator("[data-template-add='objectives']").click();
+          assertThat(writer.locator("[data-template-parts-empty]")).isVisible();
+          assertThat(writer.locator("[data-template-part='objectives']")).isHidden();
+          writer.locator("[data-template-part-add='objectives']").click();
+          assertThat(writer.locator("[data-template-part-add='objectives']")).isHidden();
+          assertThat(writer.locator("[data-template-parts-empty]")).isHidden();
           titles.first().fill("Rally at the jump point");
           assertThat(objectiveCount).hasText("1");
           writer.locator("[data-template-add='objectives']").click();
@@ -128,6 +131,10 @@ class MissionTemplateEditorE2eTest {
               .hasAttribute("aria-disabled", "true");
           assertThat(writer.locator("#mission-template-form").getByTestId("reorder-live"))
               .containsText("Scout ahead");
+          writer.locator("[data-template-part-add='steps']").click();
+          writer.locator("[data-template-rows='steps'] input[name='title']").fill("Hold");
+          writer.locator("[data-template-part-add='units']").click();
+          writer.locator("[data-template-rows='units'] input[name='name']").fill("Scout");
           assertResponsiveLayout(writer, objectives.locator("[data-planning-row]").first());
           writer.getByTestId("mission-template-save").click();
           assertThat(writer.locator("#mission-template-editor")).isHidden();
@@ -179,11 +186,16 @@ class MissionTemplateEditorE2eTest {
         editor.locator("#mission-template-scope").selectOption(iridium);
         editor.getByTestId("mission-template-create").click();
         editor.locator("#mission-template-name").fill(template);
-        editor.locator("[data-template-add='objectives']").click();
+        editor.locator("[data-template-part-add='schedule']").click();
+        editor.locator("input[name='plannedStartTime']").fill("20:00");
+        editor.locator("input[name='plannedEndTime']").fill("01:00");
+        editor.locator("[data-template-part-add='meetingPoint']").click();
+        editor.locator("input[name='meetingPoint']").fill("Port Olisar");
+        editor.locator("[data-template-part-add='objectives']").click();
         editor.locator("[data-template-rows='objectives'] input").fill("Rally");
-        editor.locator("[data-template-add='steps']").click();
+        editor.locator("[data-template-part-add='steps']").click();
         editor.locator("[data-template-rows='steps'] input[name='title']").fill("Hold");
-        editor.locator("[data-template-add='units']").click();
+        editor.locator("[data-template-part-add='units']").click();
         editor.locator("[data-template-rows='units'] input[name='name']").fill("Scout");
         editor.getByTestId("mission-template-save").click();
         assertThat(editor.locator("#mission-template-editor")).isHidden();
@@ -211,16 +223,39 @@ class MissionTemplateEditorE2eTest {
         assertThat(
                 select.locator("option").filter(new Locator.FilterOptions().setHasText(template)))
             .hasCount(1);
+        Locator dialog = planner.locator("#mission-template-apply-modal");
+        Locator applySubmit = planner.getByTestId("mission-template-apply-submit");
         select.selectOption(new SelectOption().setLabel(template));
-        planner.locator(".krt-confirm-cancel").click();
+        assertThat(dialog.locator("[data-apply-part='objectives'] [data-apply-replaces]"))
+            .isVisible();
+        assertThat(dialog.locator("[data-apply-part='description']")).isHidden();
+        dialog.locator("[data-modal-dismiss]").click();
         assertThat(goal).hasValue("Manual first");
+        assertThat(select).hasValue("");
 
         select.selectOption(new SelectOption().setLabel(template));
-        planner.locator(".krt-confirm-ok").click();
+        dialog.locator("[data-apply-part='units'] input").uncheck();
+        applySubmit.click();
         assertThat(goal).hasValue("Rally");
         assertThat(planner.locator("#mission-create-step-list .ae-title")).hasValue("Hold");
+        assertThat(planner.locator("#mission-create-unit-list [data-planning-row]")).hasCount(0);
+        assertThat(planner.locator("#mission-meeting-point")).hasValue("Port Olisar");
+        assertThat(planner.getByTestId("mission-start-time")).hasValue("20:00");
+        Locator end = planner.locator("#plannedEndTime").locator("xpath=..");
+        assertThat(end.locator(".date-part"))
+            .hasValue(java.time.LocalDate.now().plusDays(8).toString());
+        assertThat(end.locator(".time-part")).hasValue("01:00");
+
+        select.selectOption("");
+        select.selectOption(new SelectOption().setLabel(template));
+        assertThat(dialog.locator("[data-apply-part='units'] [data-apply-replaces]")).isHidden();
+        for (String part : new String[] {"schedule", "meetingPoint", "objectives", "steps"}) {
+          dialog.locator("[data-apply-part='" + part + "'] input").uncheck();
+        }
+        applySubmit.click();
         Locator unit = planner.locator("#mission-create-unit-list [data-plan-field='name']");
         assertThat(unit).hasValue("Scout");
+        assertThat(goal).hasValue("Rally");
         unit.fill("Pathfinder");
 
         Locator calendarLink = planner.locator("#mission-calendar-link");
@@ -242,7 +277,7 @@ class MissionTemplateEditorE2eTest {
         assertThat(planner.getByTestId("mission-name-input")).hasValue(mission);
         owner.selectOption(iridium);
         select.selectOption(new SelectOption().setLabel(template));
-        planner.locator(".krt-confirm-ok").click();
+        applySubmit.click();
         assertThat(unit).hasValue("Scout");
         unit.fill("Pathfinder");
 
@@ -263,7 +298,7 @@ class MissionTemplateEditorE2eTest {
         assertThat(planner.getByTestId("mission-name-input")).hasValue(mission);
 
         planner.locator("#mission-create-template-reapply").click();
-        planner.locator(".krt-confirm-ok").click();
+        applySubmit.click();
         assertThat(goal).hasValue("Rally again");
         assertThat(unit).hasValue("Scout");
         unit.fill("Pathfinder");
@@ -333,6 +368,11 @@ class MissionTemplateEditorE2eTest {
           E2eSupport.navigate(page, missionUrl);
           page.getByTestId("mission-save-as-template").click();
           assertThat(name).hasValue(sourceName);
+          assertThat(editor.locator("[data-template-part='visibility']")).isVisible();
+          assertThat(editor.locator("#mission-template-internal")).not().isChecked();
+          assertThat(editor.locator("input[name='plannedStartTime']"))
+              .hasValue(Pattern.compile("^\\d{2}:\\d{2}$"));
+          assertThat(editor.locator("[data-template-part='description']")).isHidden();
           assertThat(editor.locator("[data-template-rows='objectives'] input").nth(0))
               .hasValue("Survey wreck");
           assertThat(editor.locator("[data-template-rows='objectives'] select").nth(0))

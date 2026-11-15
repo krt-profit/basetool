@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -37,6 +38,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -46,6 +49,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -71,6 +75,7 @@ public class MissionTemplateService {
   private final LiveSyncPublisher liveSync;
   private final OrgUnitRepository orgUnits;
   private final ShipTypeRepository shipTypes;
+  private final FrequencyTypeRepository frequencyTypes;
   private final AccessGateService accessGate;
   private final RequestScopeResolver requestScope;
 
@@ -95,7 +100,7 @@ public class MissionTemplateService {
   @Transactional
   public MissionTemplateDto create(CreateMissionTemplateRequest request) {
     OrgUnit owner = requireOwner(request.owningOrgUnitId());
-    MissionTemplatePlan plan = normalize(request.objectives(), request.steps(), request.units());
+    MissionTemplatePlan plan = normalize(request.plan());
     MissionTemplate template = new MissionTemplate(owner, request.name().strip(), plan);
     templates.save(template);
     flush();
@@ -126,7 +131,7 @@ public class MissionTemplateService {
     MissionTemplate template = requireTemplate(templates.lock(id));
     OptimisticLock.checkRequired(
         template.getVersion(), request.version(), MissionTemplate.class, id);
-    MissionTemplatePlan plan = normalize(request.objectives(), request.steps(), request.units());
+    MissionTemplatePlan plan = normalize(request.plan());
     if (template.replace(request.name().strip(), plan)) {
       flush();
       recordChange(template, AuditEventType.MISSION_TEMPLATE_UPDATED);
@@ -230,12 +235,9 @@ public class MissionTemplateService {
     return managerUnits.contains(owner) || accessGate.canActAsOfficerIn(owner);
   }
 
-  private MissionTemplatePlan normalize(
-      List<MissionTemplatePlan.Objective> objectives,
-      List<MissionTemplatePlan.Step> steps,
-      List<MissionTemplatePlan.Unit> units) {
+  private MissionTemplatePlan normalize(MissionTemplatePlan plan) {
     Set<UUID> shipTypeIds =
-        units.stream()
+        plan.units().stream()
             .map(MissionTemplatePlan.Unit::shipTypeId)
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
@@ -243,15 +245,22 @@ public class MissionTemplateService {
       throw new NotFoundException("ShipType not found");
     }
     return new MissionTemplatePlan(
-        objectives.stream()
+        StringNormalization.trimToNull(plan.description()),
+        StringNormalization.trimToNull(plan.meetingPoint()),
+        plan.isInternal(),
+        toMinutes(plan.meetingTime()),
+        toMinutes(plan.plannedStartTime()),
+        toMinutes(plan.plannedEndTime()),
+        MissionFrequencyRows.normalize(plan.frequencies(), frequencyTypes),
+        plan.objectives().stream()
             .map(row -> new MissionTemplatePlan.Objective(row.title().strip(), row.kind()))
             .toList(),
-        steps.stream()
+        plan.steps().stream()
             .map(row ->
                 new MissionTemplatePlan.Step(
                     row.title().strip(), StringNormalization.trimToNull(row.meta())))
             .toList(),
-        units.stream()
+        plan.units().stream()
             .map(row ->
                 new MissionTemplatePlan.Unit(
                     row.name().strip(),
@@ -260,6 +269,11 @@ public class MissionTemplateService {
                     row.highValueUnit(),
                     MissionUnitFrequency.normalize(row.frequency())))
             .toList());
+  }
+
+  @Contract("null -> null; !null -> !null")
+  private static @Nullable LocalTime toMinutes(@Nullable LocalTime time) {
+    return time == null ? null : time.truncatedTo(ChronoUnit.MINUTES);
   }
 
   private OrgUnit requireOwner(UUID id) {

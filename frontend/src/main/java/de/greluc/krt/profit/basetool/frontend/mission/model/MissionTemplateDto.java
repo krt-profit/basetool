@@ -20,16 +20,25 @@
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Editable mission template with its current revision.
+ * Editable mission template with its current revision; a {@code null} value or an empty list is a
+ * part the template leaves to the planner.
  *
  * @param id the template id
  * @param owningOrgUnitId the owning org unit
  * @param name the template name
  * @param version the expected revision for the next edit
+ * @param description the optional Markdown description
+ * @param meetingPoint the optional meeting point
+ * @param isInternal the optional visibility
+ * @param meetingTime the optional TeamSpeak meeting time of day
+ * @param plannedStartTime the optional planned start time of day
+ * @param plannedEndTime the optional planned end time of day
+ * @param frequencies the ordered mission-wide radio channels
  * @param objectives the ordered goals
  * @param steps the ordered procedure
  * @param units the ordered unit slots
@@ -40,6 +49,13 @@ public record MissionTemplateDto(
     UUID owningOrgUnitId,
     String name,
     long version,
+    String description,
+    String meetingPoint,
+    Boolean isInternal,
+    LocalTime meetingTime,
+    LocalTime plannedStartTime,
+    LocalTime plannedEndTime,
+    List<MissionTemplatePlan.Frequency> frequencies,
     List<MissionTemplatePlan.Objective> objectives,
     List<MissionTemplatePlan.Step> steps,
     List<MissionTemplatePlan.Unit> units) {}

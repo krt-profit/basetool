@@ -116,6 +116,7 @@ class MissionServiceSectionPatchTest {
             mock(MissionNotificationPublisher.class),
             mock(MissionVisibility.class),
             null,
+            null,
             null);
     missionId = UUID.randomUUID();
     existing = new Mission();

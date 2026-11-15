@@ -19,31 +19,74 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
-import { showKrtConfirm } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { createMissionDraftRows } from '/js/mission/mission-create-rows.js';
+import { createMissionScheduleDraft } from '/js/mission/mission-create-schedule.js';
+import { createTemplateApplyDialog } from '/js/mission/mission-create-template-apply.js';
+import { bindFrequencyRows } from '/js/mission/mission-frequency-rows.js';
+import { TEMPLATE_PARTS } from '/js/mission/mission-template-parts.js';
 
 /** @typedef {ApiDto<'MissionTemplateDto'>} MissionTemplate */
 /** @typedef {ApiDto<'PageResponseMissionTemplateSummaryDto'>} TemplateChoicePage */
+/** @typedef {typeof TEMPLATE_PARTS[number]} TemplatePart */
+
+/** The draft row sections with the carrier each one serializes into. */
+const SECTIONS = /** @type {const} */ ({
+    objective: 'mission-objectives-json',
+    step: 'mission-steps-json',
+    unit: 'mission-units-json',
+    frequency: 'mission-frequencies-json',
+});
+
+/** @typedef {keyof typeof SECTIONS} DraftSection */
+
+/** The draft row section each list part of a template fills. */
+const PART_SECTIONS = /** @type {const} */ ({
+    frequencies: 'frequency',
+    objectives: 'objective',
+    steps: 'step',
+    units: 'unit',
+});
 
 /** Binds the template preview and the editable planning rows of the mission create form. */
 function initMissionCreate() {
     const formElement = document.getElementById('mission-form');
     const selector = document.getElementById('mission-create-template-select');
     const more = document.getElementById('mission-create-template-more');
+    const applyOverlay = document.getElementById('mission-template-apply-modal');
+    const applyForm = document.getElementById('mission-template-apply-form');
     if (
         !(formElement instanceof HTMLFormElement) ||
         !(selector instanceof HTMLSelectElement) ||
-        !(more instanceof HTMLButtonElement)
+        !(more instanceof HTMLButtonElement) ||
+        !applyOverlay ||
+        !(applyForm instanceof HTMLFormElement)
     )
         return;
     const loadMore = more;
     const form = formElement;
     const select = selector;
+    const frequencyRow = /** @type {HTMLTemplateElement} */ (
+        document.getElementById('mission-create-frequency-row')
+    );
+    const frequencyKind = /** @type {HTMLSelectElement} */ (
+        frequencyRow.content.querySelector('select[data-frequency-kind]')
+    );
+    const frequencyTypes = new Map(
+        Array.from(frequencyKind.options, (option) => [option.value, option.text.trim()]),
+    );
+    const applyDialog = createTemplateApplyDialog(
+        applyOverlay,
+        applyForm,
+        (id) => frequencyTypes.get(id) || '',
+    );
 
     const labels = select.dataset;
     const owner = /** @type {HTMLSelectElement | null} */ (
         form.querySelector('select[name="owningOrgUnitId"]')
+    );
+    const ownerHint = /** @type {HTMLElement} */ (
+        document.getElementById('mission-create-template-owner-hint')
     );
     const templateId = /** @type {HTMLInputElement} */ (form.elements.namedItem('templateId'));
     const templateVersion = /** @type {HTMLInputElement} */ (
@@ -59,11 +102,21 @@ function initMissionCreate() {
     const reapply = /** @type {HTMLButtonElement} */ (
         document.getElementById('mission-create-template-reapply')
     );
+    const description = /** @type {HTMLTextAreaElement | null} */ (
+        form.querySelector('textarea[name="description"]')
+    );
+    const meetingPoint = /** @type {HTMLInputElement | null} */ (
+        form.querySelector('input[name="meetingPoint"]')
+    );
+    const internal = /** @type {HTMLInputElement | null} */ (
+        form.querySelector('input[name="isInternal"][type="checkbox"]')
+    );
+    const schedule = createMissionScheduleDraft(form);
 
-    const sections = /** @type {const} */ (['objective', 'step', 'unit']);
     const liveRegion = /** @type {HTMLElement | null} */ (
         form.querySelector('[data-reorder-live]')
     );
+    const sections = /** @type {DraftSection[]} */ (Object.keys(SECTIONS));
     const rows = Object.fromEntries(
         sections.map((section) => [
             section,
@@ -74,9 +127,7 @@ function initMissionCreate() {
                 /** @type {HTMLTemplateElement} */ (
                     document.getElementById(`mission-create-${section}-row`)
                 ),
-                /** @type {HTMLInputElement} */ (
-                    document.getElementById(`mission-${section}s-json`)
-                ),
+                /** @type {HTMLInputElement} */ (document.getElementById(SECTIONS[section])),
                 {
                     liveRegion,
                     hiddenShipType: labels.hiddenShipType || '',
@@ -85,6 +136,8 @@ function initMissionCreate() {
             ),
         ]),
     );
+    const frequencies = bindFrequencyRows(rows.frequency.list, frequencyRow);
+    frequencies.sync();
 
     let choiceGeneration = 0;
     let nextChoicePage = 0;
@@ -116,6 +169,7 @@ function initMissionCreate() {
         );
         select.value = hasChoice ? templateId.value : '';
         reapply.hidden = !hasChoice || !templateId.value;
+        ownerHint.hidden = !owner || owner.value !== '';
     }
 
     /**
@@ -212,7 +266,87 @@ function initMissionCreate() {
     }
 
     /**
-     * Applies the selected revision after confirming replacement of existing rows.
+     * @param {TemplatePart} part a part the template sets
+     * @returns {boolean} whether the create form has a field that takes it
+     */
+    function available(part) {
+        switch (part) {
+            case 'description':
+                return description !== null;
+            case 'schedule':
+                return schedule !== null;
+            case 'meetingPoint':
+                return meetingPoint !== null;
+            case 'visibility':
+                return internal !== null && !internal.disabled;
+            case 'frequencies':
+            case 'objectives':
+            case 'steps':
+            case 'units':
+                return true;
+        }
+    }
+
+    /**
+     * @param {MissionTemplate} template the previewed template
+     * @param {TemplatePart} part a part the template sets
+     * @returns {boolean} whether applying the part overwrites what the planner entered
+     */
+    function replaces(template, part) {
+        switch (part) {
+            case 'description':
+                return Boolean(description?.value.trim());
+            case 'schedule':
+                return schedule?.hasEntries(template) ?? false;
+            case 'meetingPoint':
+                return Boolean(meetingPoint?.value.trim());
+            case 'visibility':
+                return internal?.checked !== Boolean(template.isInternal);
+            case 'frequencies':
+            case 'objectives':
+            case 'steps':
+            case 'units':
+                return rows[PART_SECTIONS[part]].list.childElementCount > 0;
+        }
+    }
+
+    /**
+     * Copies the chosen parts of a template into the editable draft.
+     *
+     * @param {MissionTemplate} template the previewed template
+     * @param {TemplatePart[]} parts the parts the planner ticked
+     */
+    function applyParts(template, parts) {
+        for (const part of TEMPLATE_PARTS.filter((known) => parts.includes(known))) {
+            switch (part) {
+                case 'description':
+                    if (description) description.value = template.description || '';
+                    break;
+                case 'schedule':
+                    schedule?.apply(template);
+                    break;
+                case 'meetingPoint':
+                    if (meetingPoint) meetingPoint.value = template.meetingPoint || '';
+                    break;
+                case 'visibility':
+                    if (internal) {
+                        internal.checked = Boolean(template.isInternal);
+                        internal.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    break;
+                case 'frequencies':
+                case 'objectives':
+                case 'steps':
+                case 'units':
+                    rows[PART_SECTIONS[part]].fill(template[part] || []);
+                    break;
+            }
+        }
+        frequencies.sync();
+    }
+
+    /**
+     * Previews the selected revision and applies the parts the planner chooses.
      *
      * @param {string} id the selected template id
      */
@@ -228,16 +362,9 @@ function initMissionCreate() {
                 { signal: request.signal },
             );
             if (request.signal.aborted) return;
-            if (Object.values(rows).some(({ list }) => list.childElementCount > 0)) {
-                const accepted = await showKrtConfirm(
-                    labels.replaceTitle || '',
-                    labels.replace || '',
-                );
-                if (!accepted || request.signal.aborted) return;
-            }
-            rows.objective.fill(data.objectives || []);
-            rows.step.fill(data.steps || []);
-            rows.unit.fill(data.units || []);
+            const parts = await applyDialog.choose(data, available, (part) => replaces(data, part));
+            if (!parts || request.signal.aborted) return;
+            applyParts(data, parts);
             templateId.value = id;
             templateVersion.value = String(data.version);
             stale.hidden = true;
@@ -284,17 +411,22 @@ function initMissionCreate() {
         const trigger = button?.dataset.trigger;
         if (!trigger) return;
         const [, section, action] = trigger.split('-');
-        if (!sections.some((known) => trigger.startsWith(`create-${known}-`))) return;
-        const editor = rows[section];
+        const editor = sections.find((known) => trigger.startsWith(`create-${known}-`));
+        if (!editor || editor !== section) return;
         if (action === 'add') {
-            editor.add().querySelector('input')?.focus();
+            const row =
+                editor === 'frequency'
+                    ? rows.frequency.add({ frequencyTypeId: frequencies.nextType() })
+                    : rows[editor].add();
+            /** @type {HTMLElement | null} */ (row.querySelector('input, select'))?.focus();
         } else if (action === 'delete') {
             const row = button?.closest('[data-planning-row]');
             if (!row) return;
-            editor.remove(row);
+            rows[editor].remove(row);
         } else {
             return;
         }
+        if (editor === 'frequency') frequencies.sync();
         form.dispatchEvent(new Event('input', { bubbles: true }));
     });
 
