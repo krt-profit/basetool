@@ -36,6 +36,15 @@ public interface OrderLinkedStockWriteObserver {
   void beforeOrderLinkedStockWrite(@NotNull Collection<UUID> orderIds);
 
   /**
+   * Stabilizes the orders earmarked on stock a game patch removed, which REQ-ORDERS-055 excepts
+   * from the responsibility check (REQ-PATCH-014, ADR-0382): takes the shared hierarchy lock and
+   * requires the orders to exist, whatever their responsibility.
+   *
+   * @param orderIds the actually affected orders
+   */
+  void beforeGameFactStockLoss(@NotNull Collection<UUID> orderIds);
+
+  /**
    * Locks every affected material capacity scope before stock lots or rows are locked.
    *
    * @param scopes the complete current and requested material scopes
@@ -55,6 +64,14 @@ public interface OrderLinkedStockWriteObserver {
    * @param scopes the actual material scopes found under stock locks
    */
   void assertOrderLinkedMaterialWrite(@NotNull Collection<OrderMaterialScope> scopes);
+
+  /**
+   * Rejects unplanned material scopes of a game-fact stock loss after stock locks, like {@link
+   * #assertOrderLinkedMaterialWrite} but without the responsibility check (ADR-0382).
+   *
+   * @param scopes the actual material scopes found under stock locks
+   */
+  void assertGameFactMaterialLoss(@NotNull Collection<OrderMaterialScope> scopes);
 
   /**
    * Announces actual final changes to linked stock after the complete physical action. Every scope

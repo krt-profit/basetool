@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — requirements accepted by the owner, built except where a status line
 > says otherwise (epic [#2078](https://github.com/krt-profit/basetool/issues/2078)). Last reviewed:
-> 2026-11-12.
+> 2026-11-13.
 > **Owner area:** XCH · **Related ADRs:** [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > [ADR-0217](../adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md),
 > [ADR-0218](../adr/0218-exchange-sync-semantics.md),
@@ -12,7 +12,8 @@
 > [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md),
 > [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
 > [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md),
-> [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md)
+> [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md),
+> [ADR-0386](../adr/0386-the-coarse-ship-origin-is-exchanged.md)
 > **The bank on the exchange:** its route family, switch, limits and refusal codes live in
 > [`bank-exchange.md`](bank-exchange.md) (`REQ-BXCH-*`, [ADR-0354](../adr/0354-bank-resources-on-the-exchange.md)).
 
@@ -71,6 +72,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/me/store-choices/receivers` · `…/job-orders?material=` | `exchange.refinery.store` | REQ-XCH-054 |
 | `GET /exchange/v1/me/org-demand` | `exchange.demand.read` (+ `exchange.demand.details`) | REQ-XCH-018, REQ-XCH-047 |
 | `GET /exchange/v1/me/org-units` | `exchange.orgunits.read` | REQ-XCH-048 |
+| `GET /exchange/v1/me/patch-change` · `POST …/home-location` | `exchange.patch.read` / `.write` (`.write` granted only with `.read`) | REQ-PATCH-050…053 ([patch-change.md](patch-change.md)) |
 | `GET /exchange/v1/org-stock` | `exchange.orgstock.read` (+ `exchange.orgstock.details`) | REQ-XCH-042, REQ-XCH-043 |
 | `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `GET /exchange/v1/org-stock/members?unit=` · `…/targets?unit=&material=` | `exchange.orgstock.write` | REQ-XCH-045 |
@@ -847,7 +849,8 @@ several is the answer, so an ambiguous `scRecord` still yields to a name that re
 lists at most ten candidates as `{bt, name}`; fuzzy suggestions are always `ambiguous`, even when
 there is only one, because they are never taken without the member. `LOC_KEY_UNRESOLVED` points at
 `/refs/<i>/locKey` of every reference that carries a `locKey` and whose keys, `locKey` included, did
-not resolve; a response carries at most 50 warnings. Per catalogue:
+not resolve; a response carries at most 50 warnings. The `name` of every entry, resolved or a
+candidate, is cut to the 200 characters `item-ref` allows (REQ-XCH-026). Per catalogue:
 
 | `kind` | `bt` | `scRecord` | `scGuid` | `uexId` | `locKey` | `name` |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -891,8 +894,10 @@ served by the gateway with WP 3.2 (#2082); ship-type order of ADR-0341 built (#3
 feed is sequenced at the database level, so writes that bypass the services — default-grant
 provisioning, „delete all", admin purge, user deletion, org re-stamping, owner reassignment and a
 change of the default blueprint set — appear in it. Removals leave tombstones with `removedBy`
-(`web`, `app`, `client` with client id and installation id, `system`) and `removedAt`, kept 90 days
-and purged nightly. A cursor older than the tombstones answers `410 CURSOR_EXPIRED`.
+(`web`, `app`, `client` with client id and installation id, `system`, and `patch` with the patch
+change `{id, label}`, [REQ-PATCH-007](patch-change.md#req-patch-007--the-exchange-feeds-name-the-patch-change-behind-a-change))
+and `removedAt`, kept 90 days and purged nightly. A cursor older than the tombstones answers
+`410 CURSOR_EXPIRED`.
 
 The sequence is `exchange_change` (ADR-0224): an `AFTER` row trigger on every synced table records
 `(member, resource, key)` with its writing transaction's id and a sequence number, and the feed reads
@@ -900,7 +905,9 @@ each changed key's current state, or a tombstone when it is gone. A feed positio
 seq)`, and a reader passes only transactions below the oldest one still running, so an entry committed
 late can never land behind a position a client has already passed. Who wrote it comes from the transaction variable
 `basetool.change_source`, which the backend's transaction manager sets at the start of every writing
-transaction (`web`, `app`, `client|<id>|<installation key>`, otherwise `system`). A nightly job
+transaction (`web`, `app`, `client|<id>|<installation key>`, `patch|<patch change id>` for a patch
+change's trigger, otherwise `system`); a `patch` entry keeps the patch change in
+`exchange_change.source_patch_change` (`V421`), and the feed reads its current label. A nightly job
 (`exchange_change_retention`, 03:30 UTC) purges entries older than 90 days and records the highest
 purged position as the horizon, below which a cursor has expired.
 
@@ -953,6 +960,9 @@ when that write lowered or removed an offer (REQ-FE-015). A rolled-back write ra
 An `add` of an entry that has a live tombstone is refused per op with `REMOVED_ELSEWHERE`,
 whichever installation or channel removed it. A client may send `override: true` only after asking
 the member; the override is journaled.
+
+A lot or ship a patch change moved or wiped is refused the same way whatever the op's
+`expectedQuantity`, and the result item names the patch change (amendment, REQ-PATCH-053).
 
 **Acceptance**
 
@@ -1194,8 +1204,9 @@ refused `400` (`ExchangeStockChangeSetValidationTest`, `ExchangeStockWriteContro
 The backend applies a change set at `POST /api/v1/exchange/me/stock/changes`
 (`exchange.stock.write`) in one transaction. Each op resolves its material — a material first, an
 item otherwise — and its place, its starmap `guid` first, then the UEX link, then the exact name of
-a non-hidden location, a value that matches nothing falling through to the next
-(`LOCATION_UNKNOWN`; REQ-XCH-018), checks both units against the material's (`UNIT_MISMATCH`);
+a non-hidden location, then the name the exchange cut its longer name to (REQ-XCH-026), a value
+that matches nothing falling through to the next (`LOCATION_UNKNOWN`; REQ-XCH-018), checks both
+units against the material's (`UNIT_MISMATCH`);
 then every lot the batch names is locked before any op compares `expectedQuantity` (`VERSION_CONFLICT`): first a
 transaction-scoped advisory lock per member and lot key, all of them in ascending order of the
 lock key, then the lots' rows in the order of the lots' keys, each lot's rows in id order
@@ -1230,8 +1241,8 @@ lowers or removes is audited by that book-out (`MARKET_OFFER_REDUCED`, `MARKET_O
 
 `link` attaches a client ship to an existing server ship; `upsert` and `remove` carry the ship's
 `version`. A client links before it creates, so a Fleetview import is never duplicated. Purchase
-data is never sent. Detaching a ship from a mission by removal is reported in
-`detachedFromMissions` and audited (`MISSION_UNIT_UPDATED`). Writes are audited in the Hangar domain
+data is never sent; the one exception is the coarse ship origin (REQ-XCH-057, ADR-0386).
+Detaching a ship from a mission by removal is reported in `detachedFromMissions` and audited (`MISSION_UNIT_UPDATED`). Writes are audited in the Hangar domain
 with the external client. A ship's `name` is optional and up to 255 characters, as in the web: an
 unnamed ship is sent without it, and an upsert may leave it out (owner decision 2026-09-27). An
 `upsert` sets the ship as sent: a `name` or `location` it leaves out is cleared, and only an absent
@@ -1257,8 +1268,9 @@ applies.
   *`ExchangeShipWriteControllerTest`.*
 - [x] A batch naming another member's ship never locks its row: the owner's concurrent edit does not
   hold it up. *`ExchangeShipWriteControllerTest`.*
-- [x] The feed carries the member's own ships only, without purchase data, and answers a ship given
-  to another member as a tombstone. *`ExchangeShipControllerTest`.*
+- [x] The feed carries the member's own ships only, without purchase data beyond the coarse origin
+  (REQ-XCH-057), and answers a ship given to another member as a tombstone.
+  *`ExchangeShipControllerTest`.*
 - [x] A ship carries its org unit and `orgUnitVersion`, a ship without one no `orgUnit`; a change
   of a ship's unit, and a rename of a unit, bring its ships into the next delta pull and no other
   ship. *`ExchangeShipControllerTest`, `ExchangeWireContractTest`.*
@@ -1316,7 +1328,7 @@ per-order breakdown and no low-count suppression; a client may cache it for up t
 approved for `exchange.demand.details` adds a per-order breakdown for the member's Logistician
 units (REQ-XCH-047, ADR-0257); without it the answer is exactly as described here.
 `GET /exchange/v1/catalog/locations` lists the non-hidden `location` rows with their UEX link and
-their starmap `guid`.
+their starmap `guid`, each `name` cut to the 200 characters `location` allows (REQ-XCH-026).
 
 The backend serves the location list as `GET /api/v1/exchange/catalog/locations` (any exchange
 scope), one query, a city link winning over a space-station link.
@@ -1330,9 +1342,10 @@ place does: the location list and the `location` of the stock, org-stock and shi
 {kind, id}` stays and is not deprecated. The name a place carries is `location.name`, the curated
 name, never the P4K name of the starmap object, which is a game text (ADR-0344). The write resolver
 (`ExchangeLocationResolver`, REQ-XCH-016, REQ-XCH-017, REQ-XCH-042) tries `guid`, then `uex`, then
-the exact name, always among the non-hidden, non-reference-only places; a value that matches
-nothing falls through to the next, and among several places with one `guid` a place linked to the
-object itself wins, then the name decides.
+the exact name, then the name the exchange cut a longer name to (REQ-XCH-026), always among the
+non-hidden, non-reference-only places; a value that matches nothing falls through to the next, and
+among several places with one `guid` a place linked to the object itself wins, then the name
+decides.
 
 **A change of what a place's reference serialises to re-announces the entries that carry it.**
 When the `name`, `uex` or `guid` of a place changes — its curated name, its city or space station,
@@ -1927,6 +1940,11 @@ A client that cannot set its `User-Agent` — a Chromium browser extension — s
 
 ### REQ-XCH-025 — Errors are problem+json with a stable code
 
+> [!note] Amended 2026-11-14 (REQ-PATCH-023) — `RELOCATION_PENDING` passes through
+> A change set that writes a stock lot or ship a pending relocation locks is refused by the backend
+> with `409 RELOCATION_PENDING` and nothing is written; the relay passes the code with its fixed
+> detail (`ExchangeRelay.DETAILS`), and the registry and the sync guide name it
+> ([REQ-PATCH-023](patch-change.md#req-patch-023--the-relocation-lock)).
 Every error is RFC 9457 problem+json with a `code` from the registry in `docs/exchange/errors.md`,
 each with its HTTP status and the client action it requires. Codes are never reused or repurposed.
 The gateway's gates count their refusals on `basetool_ingest_exchange_refused_total` with the code
@@ -2008,6 +2026,28 @@ Change-set sanitization removes every undeclared field independently of the fift
 reporting cap. Unknown fields in later operations are removed too. The pointer-length check
 examines all undeclared fields before relay, including fields beyond the warning cap.
 
+**No answer carries a string longer than its v1 schema allows.** A schema is never widened to fit
+what the database stores; the backend cuts the value instead. Every display name of a place or a
+catalogue entry — a location, an item, a material, a ship type, a blueprint product, a refining
+method — and of a holder, a mission earmark or a client is cut to the 200 characters `location`,
+`item-ref` and the other v1 schemas allow, never inside a surrogate pair (`ExchangeNames.cut`), in
+the location list, the resolver, every feed and the patch-change read. The database stores those
+names with up to 255 characters, and one longer name would otherwise fail the whole answer at the
+gateway with `502 BACKEND_RELAY_FAILED`. Every other bounded string an answer carries is stored with
+at most its schema's length.
+
+**A cut name a client sends back finds the entry it was cut from.** Where a read gives a client a
+cut name as the only key it can write back — a place without starmap `guid` or `uex` link, a
+refining method without `code` — a write tries the exact name first and then, for a name of 200
+characters (199 where the cut stopped before a surrogate pair), the one entry whose longer name cuts
+to it (`ExchangeNames.cutTo`; `ExchangeLocationResolver`, `ExchangeRefineryOrderReferences`). When
+several entries cut to the name, the step finds none: a place answers `LOCATION_UNKNOWN` and a
+method `AMBIGUOUS`, their resolvers' answers for an unknown place and for several methods; when no
+entry does, `LOCATION_UNKNOWN` and `UNMATCHED` as before. No other write resolves a name the reads
+cut: every item, material, ship-type and blueprint reference a read sends carries its `bt` (and a
+blueprint its `guid`), which the resolver tries before the name, and missions, holders and org
+units are written by id or `ref`.
+
 **The release baseline is mandatory in CI.** The *Fetch the previous release's exchange schemas*
 step of `ci.yml` copies the newest `vX.Y.Z` tag's v1 schemas to `ingest/build/exchange-baseline/`,
 which `ingest/build.gradle.kts` passes to the tests as `-Dexchange.baseline`. The step fails the job
@@ -2027,6 +2067,16 @@ reason to skip. A local build fetches no baseline, and the comparison skips.
 - [x] A narrowing the owner accepts as a correction is listed by its exact comparison message, with
   its reason, in `ExchangeContractTest.ACCEPTED_NARROWINGS`; any other narrowing still fails, and the
   entry is proven to match exactly what the comparison reports for it.
+- [x] A location, item, material or ship-type name of 255 characters reaches the client cut to 200
+  from the location list and from `catalog/resolve`, and the answer matches its published schema;
+  the cut never splits a surrogate pair. *`ExchangeCatalogControllerTest`,
+  `ExchangeResolveControllerTest`, `ExchangeNamesTest`; `ExchangeControllerTest` relays a location
+  list at the bound and refuses one beyond it with `502 BACKEND_RELAY_FAILED`.*
+- [x] A write that names a place without `guid` or `uex` link, or a refining method without code,
+  by the cut name of its longer name reaches that entry; two entries cutting to one name are
+  refused, a place with `LOCATION_UNKNOWN` and a method with `AMBIGUOUS`; an exact name wins.
+  *`ExchangeStockWriteControllerTest`, `ExchangeRefineryOrderWriteControllerTest`,
+  `ExchangeNamesTest`.*
 
 > [!note] 2026-10-03 — `refinery-draft` requires at least one order
 > `refinery-draft.schema.json` gains `"minItems": 1` on `orders`, and the fixture
@@ -2046,8 +2096,8 @@ reason to skip. A local build fetches no baseline, and the comparison skips.
 > `ACCEPTED_NARROWINGS`.
 
 **Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest`, the
-*Fetch the previous release's exchange schemas* step of `ci.yml` · **Status:** implemented —
-WP 0.2 (#2080)
+*Fetch the previous release's exchange schemas* step of `ci.yml`, `ExchangeNamesTest` ·
+**Status:** implemented — WP 0.2 (#2080)
 
 ### REQ-XCH-027 — Approved clients meet the client security requirements
 
@@ -2288,6 +2338,9 @@ admin suspension), `ExchangeSyncE2eTest` (corpus round trip, confirmed mass chan
       and the DPoP-signed call it shares with the smoke test live in `scripts/sandbox_client.py`.
       `docker-compose.sandbox-load.yml` adds the management ports, which the metrics need, and
       makes the budget and the answers' lifetime settable.*
+- [x] The seed grants `sandbox-client` every capability the registry knows, the bank scopes
+      included, and switches the exchange and the bank route family on (REQ-BXCH-006).
+      *`SandboxSeedCapabilitiesTest` compares the seeded capabilities with `ExchangeCapability`.*
 
 **Status:** built — local sandbox, the image pipeline, its smoke job and the E2E stack with the
 gateway, WP 2.3 (#2099)
@@ -2620,7 +2673,7 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 31 relay operations on 29 backend
+byte-identical (D-05 of the domain modularisation plan): the 33 relay operations on 31 backend
 paths (with the refinery-order feed, change set and store choices of REQ-XCH-051…056, the three
 bank reads of REQ-BXCH-002, the own requests of REQ-BXCH-003, their writes of REQ-BXCH-004 and
 the staff queue of REQ-BXCH-005), their parameters, request and answer shapes, the relayed codes
@@ -2651,7 +2704,7 @@ contract allows.
   key thumbprint, connection time, correlation id, DPoP nonce, idempotency key, trace context,
   the rate-limit counters). A difference writes the observed answer under
   `ingest/build/exchange-golden/` for review; a deliberate change replaces the golden in the same
-  pull request. The test also asserts that the backend stub received exactly the 31 relay
+  pull request. The test also asserts that the backend stub received exactly the 33 relay
   operations.
 - **Security filter order.** `SecurityFilterChainOrderTest` and
   `SecurityFilterChainProductionShapeTest` pin, through `FilterChainProxy`, the gateway's chains in
@@ -2679,7 +2732,7 @@ Every guard is proven able to fail by a planted violation in its own test.
   answer validates against its published schema.
   *`ExchangeWireContractTest`.*
 - [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
-  seam's 31 operations. *`ExchangeGoldenAnswerTest`.*
+  seam's 33 operations. *`ExchangeGoldenAnswerTest`.*
 - [x] The gateway's security filter chains hold exactly the pinned filters in order.
   *`SecurityFilterChainOrderTest`, `SecurityFilterChainProductionShapeTest`.*
 - [x] A pull request touching the exchange path without the `e2e` label fails.
@@ -2693,13 +2746,13 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 31 relay operations with their gateway route, backend path, capability, paging and published
-  schemas — against the backend's fifteen exchange controllers and their `@exchangeGate`
+- the 33 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's sixteen exchange controllers and their `@exchangeGate`
   expressions, `ActingMemberFilter`'s 29 paths (each exact but for a whole `{id}` segment, as in
   the bank reads), the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the twenty-one capability scopes (`exchange.orgstock.details` and
+- the five relay headers, the twenty-three capability scopes (`exchange.orgstock.details` and
   `exchange.demand.details` the two that gate no route of their own; `exchange.bank.request` the one no
   route serves yet), the gate codes with their statuses, the
   codes the gateway passes through (the shared `NOT_FOUND` of REQ-BXCH-002 and `NOT_BANK_STAFF` of REQ-BXCH-005 among them) and the
@@ -2752,7 +2805,7 @@ G-18)
 > this requirement, the app leaves the readers of `openapi.json`, and the opening paragraph counts
 > the 31 relay operations `ExchangeFence.RELAY_OPERATIONS` holds, not 20; git keeps the text.
 
-The backend operations the gateway relays to — the 31 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 33 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
 of 2026-10-02). The published `openapi.json`, which the frontend generates its test types from,
@@ -2767,7 +2820,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  31 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
+  33 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
   requirement, and no dangling reference; of `openapi.json` no relay path and no dangling reference
   (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2780,8 +2833,8 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 31 relay operations and 135 schemas; `openapi.json` holds
-  none of them and the 115 schemas only they reach left it; the union of both is the generated
+- [x] The relay document holds exactly the 33 relay operations and 149 schemas; `openapi.json` holds
+  none of them and the 129 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
   editing the committed file and running the generator with `CI=true`.
@@ -3035,7 +3088,9 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   REQ-XCH-016 for the material, the place and the unit. The Lager decides its own refusals
   (`PoolEntryCommands`); every holder lot the batch touches takes its advisory lock first, then all
 their rows are locked in ascending id order (ADR-0229). `dryRun`
-  checks every op without writing.
+  checks every op without writing. An op on an entry a patch change wiped is `REMOVED_ELSEWHERE`
+  instead of `NOT_PERMITTED`. Such an op, and a `VERSION_CONFLICT` on an entry whose own last
+  change was a patch change's, name the patch change in `patchChange` (amendment, REQ-PATCH-057).
 - **Wire shape.** `change-set.schema.json#/$defs/orgStockChangeSet`; the answer is
   `change-result.schema.json`. Ids of units, entries, job orders and missions are the ones the org
   stock serves.
@@ -3372,7 +3427,9 @@ REQ-XCH-013.
   org unit as an id, the client marker (the creating client's name, or none for an order the web
   created) and the two section counters `gameData` and `finances` (REQ-REFINERY-029).
   `clientKey` is carried only to the client that created the order; every other client sees the
-  marker without it.
+  marker without it. An order a patch change cancelled carries `canceledByPatch` `{id, label}`
+  ([REQ-PATCH-006](patch-change.md#req-patch-006--the-refinery-effect-ends-the-running-orders-started-before-the-live-time),
+  REQ-PATCH-007).
 - **Tombstones**: on a hard delete (REQ-XCH-055) and when the order moves to another owner (user
   deletion, `REFINERY_ORDERS_REASSIGNED`), with the usual `removedBy` and `removedAt`, and the
   `clientKey` for the creating client. A cancel is a status change, not a tombstone. A change of the
@@ -3444,9 +3501,10 @@ web.
   set refused is `PRECEDING_OP_REJECTED`. A key whose order is gone may be used again: the new order
   takes it over, and the removed order's tombstone keeps naming it (REQ-XCH-051).
 - **References.** The location, the refining method and a good's material are `ref`s resolved
-  **exactly**, as the stock ops resolve theirs (REQ-XCH-016): a location by starmap `guid`, UEX id or
-  exact name, a method by its code or exact name, a material by `bt`, `scGuid`, `uexId` or exact
-  name. Nothing is matched fuzzily, because no member reviews a direct write: an unknown reference is
+  **exactly**, as the stock ops resolve theirs (REQ-XCH-016): a location by starmap `guid`, UEX id,
+  exact name or the name the exchange cut its longer name to, a method by its code, exact name or
+  cut name (REQ-XCH-026), a material by `bt`, `scGuid`, `uexId` or exact name. Nothing is matched
+  fuzzily, because no member reviews a direct write: an unknown reference is
   `UNMATCHED`, one naming several entries `AMBIGUOUS`, a place without a location
   `LOCATION_UNKNOWN`. The location must be a refinery the web's picker offers (REQ-REFINERY-020),
   else `NOT_A_REFINERY`; a good's input material must be `RAW` or manual-raw, else
@@ -3817,6 +3875,49 @@ bulk undo. `ExchangeRefineryOrderStateTest` pins the journal state's JSON shape.
 cancel and delete), #3170 (undo of a pickup without store lines), #3171 (undo of a pickup with
 store lines)
 
+### REQ-XCH-057 — The member's own client reads and writes a ship's coarse origin
+
+Every ship of `GET /exchange/v1/me/ships` carries `origin`: `PLEDGE`, `IN_GAME` or `UNKNOWN`, the
+ship origin of REQ-HANGAR-017 as the ship reads it. A ship locked to `PLEDGE` — one from a hangar
+file import or with a pledge id — always reads `PLEDGE`, whatever was chosen before. The narrow
+exception to "purchase data is never sent" (REQ-XCH-017) is this one value: a pledge id, a purchase
+date or a price never leaves the Basetool (ADR-0386, which narrows ADR-0295).
+
+- **Write.** An `upsert` may send `origin`. Leaving it out keeps the stored origin, and a create
+  without it stores `UNKNOWN` (#3250). A change of the origin goes through the Hangar's own update,
+  is part of the ship's `version` like a web edit, and is audited as `HANGAR_SHIP_UPDATED` with the
+  field name `origin` and the client, never the value (REQ-HANGAR-004).
+- **Lock.** On a locked ship another value than `PLEDGE` rejects that op with `ORIGIN_LOCKED`; the
+  rest of the batch still applies. `PLEDGE` changes nothing.
+- **Feed.** The lock is written outside the ship's `version` (ADR-0295), but the import's write
+  brings the ship into the feed, so a client learns the new `PLEDGE` without a new snapshot.
+  `V418` writes every ship once, so each ship is in the feed again with its origin.
+- **Journal and undo.** The ship journal state records the origin (REQ-XCH-022); an undo restores
+  it, except on a ship an import locked since, and an older state without it keeps the stored one.
+- **Scope.** No new scope: `exchange.hangar.read` reads it and `exchange.hangar.write` writes it.
+  Additive in `v1` (REQ-XCH-026), with one dated entry in the Exchange changelog.
+
+**Acceptance**
+
+- [x] The snapshot and the feed carry `origin`; a locked ship reads `PLEDGE` and comes into the
+  feed when an import locks it, without a new `version`. *`ExchangeShipControllerTest`.*
+- [x] A create takes the sent origin or `UNKNOWN`; an origin change moves the `version`, and an
+  update without `origin` keeps it. *`ExchangeShipWriteControllerTest`.*
+- [x] A locked ship rejects another origin with `ORIGIN_LOCKED` and takes `PLEDGE` as no change.
+  *`ExchangeShipWriteControllerTest`.*
+- [x] The journal state records the origin; an undo restores it except on a ship locked since.
+  *`ExchangeJournalStateTest`.*
+- [x] `origin` is published in `ship.schema.json` and the ship `upsert` of
+  `change-set.schema.json`, with its field class. *`ExchangeFieldRatchetTest`,
+  `ExchangeSchemasTest`.*
+
+**Enforced by:** `ExchangeShipControllerTest`, `ExchangeShipWriteControllerTest`,
+`ExchangeJournalStateTest`, `ExchangeFieldRatchetTest` · **Code:** `ExchangeShipFeedService`,
+`ExchangeShipWriteService`, `ExchangeShipJournal`, `ShipRepository#EXCHANGE_SHIPS`,
+`ship.schema.json`, `change-set.schema.json`, `V418__add_ship_origin.sql` · **Docs:**
+[`docs/exchange/resources/ships.md`](../exchange/resources/ships.md) · **Issues:** #3329 (epic
+#3328), decisions #3250 and #3255
+
 ## Threat model
 
 | Threat | Countered by |
@@ -3839,6 +3940,7 @@ store lines)
 | A single open order recognisable in the org demand feed | withheld unless the member passes the web's job-order gate (`canViewJobOrders`, under the reduced authorities); membership-only scope, catalogue fields only, no requester, title or free text; no low-count suppression, 7-day client cache (REQ-XCH-018) — accepted risk (ADR-0220 and its 2026-09-28 amendment); the per-order details go only to a Logistician of the responsible unit under their own capability (REQ-XCH-047, ADR-0257) |
 | Members' names and notes on a third-party program's PC | only for a Logistician of the pool, under `exchange.orgstock.details`, membership-only scope, 7-day client cache; each member can withhold their name; a per-client pseudonym instead of the user id (REQ-XCH-043/-044) — accepted (ADR-0257) |
 | A faulty or malicious client release changing other members' shared stock | only a Logistician of the pool, only shared rows of that pool, through the Lager's services with web rules; journal, the writer's and the admin's undo, the guard per writer and pool, audit naming writer and client (REQ-XCH-045/-046) — accepted (ADR-0257) |
+| A client learning which of the member's ships were bought with real money | only the coarse `origin`, never a pledge id, date or price; the member's own ships under their own capability and consent (REQ-XCH-057) — accepted (ADR-0386) |
 | A client learning which units a member belongs to | the member's own direct memberships only, under their own capability and the member's consent; unit names and kinds, no other member, no roles or flags (REQ-XCH-048) — accepted |
 | Correlating members across clients | the holder `ref` is an HMAC under a per-client salt that never leaves the backend (REQ-XCH-043) |
 | Silent removal of Materialbörse offers by a sync book-out | reported and audited, not undoable — accepted (REQ-XCH-016/-022) |

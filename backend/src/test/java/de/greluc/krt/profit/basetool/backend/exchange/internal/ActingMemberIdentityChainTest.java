@@ -298,7 +298,8 @@ class ActingMemberIdentityChainTest {
 
   /**
    * The consent gate judges the acting member and refuses with {@code TERMS_NOT_ACCEPTED} when they
-   * have not accepted; asserted on the code because every gate in the chain answers 403.
+   * have not accepted; asserted on the code because every gate in the chain answers 403, and on the
+   * session-gate marker every gate refusal carries.
    */
   @Test
   void refusesAnActingMemberWhoHasNotAcceptedTheTerms() throws Exception {
@@ -306,7 +307,8 @@ class ActingMemberIdentityChainTest {
     mockMvc
         .perform(exchangeDraft())
         .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("TERMS_NOT_ACCEPTED"));
+        .andExpect(jsonPath("$.code").value("TERMS_NOT_ACCEPTED"))
+        .andExpect(jsonPath("$.sessionGate").value(true));
 
     verify(refineryImportService, org.mockito.Mockito.never()).buildDraft(any(), any());
   }

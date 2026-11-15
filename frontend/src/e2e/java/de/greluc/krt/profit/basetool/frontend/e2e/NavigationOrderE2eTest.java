@@ -172,6 +172,19 @@ class NavigationOrderE2eTest {
         page.locator("[data-favourites-state]").getAttribute("data-order-member-version"));
   }
 
+  private static int favouritesVersion(Page page) {
+    return Integer.parseInt(page.locator("[data-favourites-state]").getAttribute("data-version"));
+  }
+
+  /**
+   * Waits until the favourites save that followed a move has been accepted, so a reload or a
+   * navigation does not overtake the request still in flight.
+   */
+  private static void awaitFavouritesSaved(Page page, int versionBeforeMove) {
+    assertThat(page.locator("[data-favourites-state]"))
+        .hasAttribute("data-version", String.valueOf(versionBeforeMove + 1));
+  }
+
   /**
    * The down button of a link moves it in place, keeps the focus on the same button, announces the
    * move and persists it across a reload; the page is not reloaded.
@@ -220,6 +233,7 @@ class NavigationOrderE2eTest {
             page.reload();
             startEditing(page);
             assertEquals(List.of("missions.list", "hangar.overview"), keys(page, FAVOURITE_KEYS));
+            int version = favouritesVersion(page);
 
             Locator down =
                 page.locator(
@@ -229,6 +243,7 @@ class NavigationOrderE2eTest {
             awaitKeys(page, FAVOURITE_KEYS, List.of("hangar.overview", "missions.list"));
             assertThat(down).isFocused();
             assertThat(page.getByTestId("nav-live")).containsText("verschoben");
+            awaitFavouritesSaved(page, version);
 
             page.reload();
             assertEquals(List.of("hangar.overview", "missions.list"), keys(page, FAVOURITE_KEYS));
@@ -237,9 +252,11 @@ class NavigationOrderE2eTest {
 
             E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
             startEditing(page);
+            int versionBeforeKeyMove = favouritesVersion(page);
             page.locator(FAVOURITE_ROW.formatted("missions.list") + " a.nav-link").focus();
             page.keyboard().press("Alt+ArrowUp");
             awaitKeys(page, FAVOURITE_KEYS, List.of("missions.list", "hangar.overview"));
+            awaitFavouritesSaved(page, versionBeforeKeyMove);
           } finally {
             E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
             page.evaluate(SET_FAVOURITES, List.of());

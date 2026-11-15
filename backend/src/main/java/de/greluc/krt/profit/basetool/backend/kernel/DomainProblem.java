@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.kernel;
 
-import java.util.Locale;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 
@@ -84,7 +83,7 @@ public abstract non-sealed class DomainProblem extends AppException {
   @NotNull
   @Override
   public String typeSuffix() {
-    return code().toLowerCase(Locale.ROOT).replace('_', '-');
+    return ProblemCode.typeSuffixOf(code());
   }
 
   /**
@@ -95,7 +94,7 @@ public abstract non-sealed class DomainProblem extends AppException {
   @NotNull
   @Override
   public String titleKey() {
-    return keyBase() + ".title";
+    return ProblemCode.keyBaseOf(code()) + ".title";
   }
 
   /**
@@ -106,16 +105,6 @@ public abstract non-sealed class DomainProblem extends AppException {
   @NotNull
   @Override
   public String detailKey() {
-    return keyBase() + ".detail";
-  }
-
-  /**
-   * The bundle-key prefix the title and detail keys extend.
-   *
-   * @return {@code problem.<code in lower case>}
-   */
-  @NotNull
-  private String keyBase() {
-    return "problem." + code().toLowerCase(Locale.ROOT);
+    return ProblemCode.keyBaseOf(code()) + ".detail";
   }
 }

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.navigation.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.navigation.client.NavigationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
@@ -59,7 +60,9 @@ import org.springframework.stereotype.Component;
  * context does not offer stays and renders greyed.
  *
  * <p>Fails closed: a failed read yields {@link NavigationPersonalisation#NOT_LOADED}, which renders
- * no favourite, hides no page and disables the controls.
+ * no favourite, hides no page and disables the controls. A session gate's refusal is such a
+ * failure, because the layout also renders on the pages a gate leaves open; only a lost session
+ * propagates (ADR-0385).
  */
 @Slf4j
 @Component
@@ -100,6 +103,7 @@ public class NavigationPreferencesReader {
     } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug("Failed to read the navigation preferences", e);
       return NavigationPersonalisation.NOT_LOADED;
     }

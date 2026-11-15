@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorMapper;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -38,6 +39,10 @@ import org.springframework.web.server.ResponseStatusException;
  * Relays a backend {@link BackendServiceException} to the browser as {@code
  * application/problem+json}, preserving the backend's status, stable {@code code}, and when present
  * {@code detail} and {@code correlationId}, for {@code krtFetch}.
+ *
+ * <p>A session gate's refusal is not relayed: outside a gate's own page it propagates, so {@link
+ * GlobalExceptionHandler} discards the gate's cached verdict and answers with the gate's header
+ * (ADR-0385). A lost session propagates as well.
  */
 public final class BackendErrorResponses {
 
@@ -61,13 +66,15 @@ public final class BackendErrorResponses {
   /**
    * Runs an AJAX handler's backend call and maps failures uniformly: a {@link
    * BackendServiceException} is logged at DEBUG and relayed via {@link #propagateBackendError}, a
-   * {@link ReauthenticationRequiredException} propagates to the global handler, any other exception
-   * is logged at ERROR and answered with an empty {@code 500}.
+   * {@link ReauthenticationRequiredException} and a session gate's refusal propagate to the global
+   * handler, any other exception is logged at ERROR and answered with an empty {@code 500}.
    *
    * @param log the calling controller's logger
    * @param operation a short label of the attempted operation for the log line
    * @param action the backend call plus success-response build to run
    * @return the {@code action}'s response, a relayed {@code problem+json}, or an empty {@code 500}
+   * @throws SessionGateRefusalException when a session gate holds the user, outside a gate's own
+   *     page
    */
   @NotNull
   public static ResponseEntity<Object> relay(
@@ -80,7 +87,7 @@ public final class BackendErrorResponses {
     } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("{} failed unexpectedly", operation, e);
       return ResponseEntity.internalServerError().build();
     }
@@ -90,18 +97,22 @@ public final class BackendErrorResponses {
    * Runs a backend call from a proxy whose callers read the HTTP status (a {@code fetch} that tests
    * {@code response.ok}, a download link): a {@link BackendServiceException} is rethrown as a
    * {@link ResponseStatusException} with the backend's status, so the global handler answers with
-   * that status for JSON and HTML callers alike. A {@link ReauthenticationRequiredException} and
-   * every other exception propagate unchanged.
+   * that status for JSON and HTML callers alike. A session gate's refusal outside a gate's own
+   * page, a {@link ReauthenticationRequiredException} and every other exception propagate
+   * unchanged.
    *
    * @param call the backend call, normally through {@code BackendApiClient#execute}
    * @param <T> the call's result type
    * @return the call's result
    * @throws ResponseStatusException carrying the backend status when the backend call failed
+   * @throws SessionGateRefusalException when a session gate holds the user, outside a gate's own
+   *     page
    */
   public static <T> T withBackendStatus(@NotNull Supplier<T> call) {
     try {
       return call.get();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       throw new ResponseStatusException(
           HttpStatusCode.valueOf(e.getStatusCode()), "The backend request failed.", e);
     }
@@ -110,14 +121,18 @@ public final class BackendErrorResponses {
   /**
    * Builds a {@code problem+json} {@link ResponseEntity} mirroring the backend failure: the backend
    * HTTP status, the stable problem {@code code}, and the optional {@code detail}/{@code
-   * correlationId} (each omitted when blank/absent).
+   * correlationId} (each omitted when blank/absent). A session gate's refusal is relayed only on a
+   * gate's own page and propagates everywhere else.
    *
    * @param e the backend failure to relay
    * @return a {@link ResponseEntity} carrying the backend status and an {@code
    *     application/problem+json} body
+   * @throws SessionGateRefusalException when {@code e} is a session gate's refusal, outside a
+   *     gate's own page
    */
   @NotNull
   public static ResponseEntity<Object> propagateBackendError(@NotNull BackendServiceException e) {
+    SectionFallback.rethrowHandOff(e);
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("status", e.getStatusCode());
     body.put("code", e.getProblemCode());

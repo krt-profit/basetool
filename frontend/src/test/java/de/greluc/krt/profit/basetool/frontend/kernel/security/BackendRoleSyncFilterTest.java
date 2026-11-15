@@ -87,7 +87,7 @@ class BackendRoleSyncFilterTest {
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    filter = new BackendRoleSyncFilter(backendApiClient);
+    filter = new BackendRoleSyncFilter(backendApiClient, new SessionGates(List.of()));
 
     request = mock(HttpServletRequest.class);
     response = mock(HttpServletResponse.class);

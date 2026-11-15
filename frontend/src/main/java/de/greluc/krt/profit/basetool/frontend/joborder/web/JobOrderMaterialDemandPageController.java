@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandRowDt
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -87,6 +88,7 @@ public class JobOrderMaterialDemandPageController {
     try {
       demand = jobOrderClient.materialDemand();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.warn("Could not load the cross-order material demand: {}", e.getMessage());
     }
     if (demand == null) {

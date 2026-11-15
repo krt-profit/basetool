@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddCrewRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.AddUnitRequest;
@@ -92,6 +93,7 @@ public class MissionUnitWriteController {
               name, shipTypeId, shipId, highValueUnit, frequency, responsibleUserId, note));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Add unit failed", e);
       return "redirect:/missions/" + id + "?error=error.mission.unit.add";
     }
@@ -124,6 +126,7 @@ public class MissionUnitWriteController {
               name, shipTypeId, shipId, highValueUnit, frequency, responsibleUserId, note, null));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Update unit failed", e);
       return "redirect:/missions/" + id + "?error=error.mission.unit.update";
     }
@@ -146,6 +149,7 @@ public class MissionUnitWriteController {
       missionClient.deleteUnit(id, unitId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Delete unit failed", e);
       return "redirect:/missions/" + id + "?error=error.mission.unit.delete";
     }
@@ -182,6 +186,7 @@ public class MissionUnitWriteController {
                   : null));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Add crew failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.crew.add");
     }
@@ -221,6 +226,7 @@ public class MissionUnitWriteController {
               null));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Update crew failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.crew.update");
     }
@@ -244,6 +250,7 @@ public class MissionUnitWriteController {
       missionClient.deleteCrew(id, unitId, crewId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Delete crew failed", e);
       return "redirect:/missions/" + id + "?error=error.mission.crew.delete";
     }

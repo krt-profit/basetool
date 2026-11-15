@@ -28,9 +28,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.RegistrationStatusDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.web.TermsGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
@@ -72,7 +74,7 @@ class BackendRoleSyncReauthenticationTest {
   @BeforeEach
   void setUp() {
     backend = mock(BackendApiClient.class);
-    filter = new BackendRoleSyncFilter(backend);
+    filter = new BackendRoleSyncFilter(backend, new SessionGates(List.of()));
     chain = mock(FilterChain.class);
     var authorities = List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"));
     var principal =
@@ -162,15 +164,16 @@ class BackendRoleSyncReauthenticationTest {
     when(backend.get("/api/v1/terms/status", TermsStatusDto.class))
         .thenThrow(Failure.WRAPPED.create());
     MockHttpServletResponse response = new MockHttpServletResponse();
-    var consent = new TermsAcceptanceGateFilter(backend, new MockEnvironment());
+    var consent =
+        new SessionGateFilter(
+            new SessionGates(List.of(new TermsGate(new IdentityBackendClient(backend)))),
+            new MockEnvironment());
 
     consent.doFilter(request, response, chain);
 
     assertHandoff(format, response);
-    assertThat(request.getSession().getAttribute(TermsAcceptanceGateFilter.SESSION_ACCEPTED))
-        .isNull();
-    assertThat(request.getSession().getAttribute(TermsAcceptanceGateFilter.SESSION_CHECKED_AT))
-        .isNull();
+    assertThat(request.getSession().getAttribute("krt.terms.accepted")).isNull();
+    assertThat(request.getSession().getAttribute("krt.terms.checkedAt")).isNull();
     verify(chain, never()).doFilter(any(), any());
   }
 

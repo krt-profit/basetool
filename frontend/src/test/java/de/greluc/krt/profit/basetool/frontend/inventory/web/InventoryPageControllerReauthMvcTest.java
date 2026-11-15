@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
+import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ItemPickerLabels;
@@ -52,7 +53,8 @@ class InventoryPageControllerReauthMvcTest {
     mockMvc =
         ReauthPageMvc.standalone(
             new InventoryPageController(client, catalogs, mock(ItemPickerLabels.class)),
-            new InventoryInputPageController(client, PARALLEL, catalogs));
+            new InventoryInputPageController(
+                client, PARALLEL, catalogs, mock(HomeLocationPreferenceReader.class)));
     ReauthPageMvc.signInMember();
   }
 

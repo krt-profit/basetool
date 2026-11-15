@@ -107,6 +107,7 @@
                     <span th:if="${!pending and approvalOpen}"
                           class="chip chip--muted" data-testid="bank-request-approval-pending"
                           th:text="#{bank.approvalLimit.overLimit}">&Uuml;ber Limit</span>
+                    <th:block th:replace="~{bank/fragments/bank-request-reason :: cancelledByPatch(label=${r.cancelledByPatchLabel()})}"></th:block>
                 </td>
                 <td class="cell-actions">
                     <div class="bank-req-actions">

@@ -93,7 +93,7 @@ public class AdminBankPageController {
         redirectAttributes.addFlashAttribute("wipeResult", result);
       }
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Bank wipe reset failed", e);
       redirectAttributes.addFlashAttribute("error", "admin.bank.wipe.error.failed");
     }

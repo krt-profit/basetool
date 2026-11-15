@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.identity.web;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -58,6 +59,7 @@ public class TermsController {
     try {
       model.addAttribute("terms", identityClient.publicTermsDocument());
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Terms document unavailable; rendering the notice instead", e);
       model.addAttribute("terms", null);
     }

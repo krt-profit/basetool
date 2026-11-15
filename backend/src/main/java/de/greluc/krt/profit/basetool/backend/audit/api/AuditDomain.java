@@ -100,5 +100,12 @@ public enum AuditDomain {
    * delete and the P4K import. The subject is the row or the P4K run or job, labelled by its
    * display name; there is no target user and the details carry no admin free text.
    */
-  CATALOGUE
+  CATALOGUE,
+
+  /**
+   * Patch changes (Patchwechsel, REQ-PATCH-009): an admin's trigger and label correction. The
+   * subject is the patch change labelled by its patch label; there is no target user and the
+   * details carry enums, instants and counts only.
+   */
+  PATCH_CHANGE
 }

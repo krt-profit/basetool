@@ -209,6 +209,7 @@ public class AdminMaterialsPageController {
       MaterialDto updatedMaterial = catalogueClient.material(id);
       return ResponseEntity.ok(updatedMaterial);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "PUT /api/v1/materials", id, e);
       return ResponseEntity.status(500).build();
     }
@@ -230,6 +231,7 @@ public class AdminMaterialsPageController {
       cacheEviction.evict(CacheDomain.MATERIAL);
       return ResponseEntity.ok(created);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.warn(
           "Ajax create material rejected by backend: status={}, code={}, detail={}",
           e.getStatusCode(),

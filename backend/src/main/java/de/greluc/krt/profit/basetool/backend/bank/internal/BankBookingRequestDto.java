@@ -84,6 +84,8 @@ import org.jetbrains.annotations.Nullable;
  *     (pending, and the capability the confirm endpoint requires); {@code null} on every other read
  *     (REQ-BANK-023)
  * @param linked frozen and final evidence of an order-linked request, or {@code null}
+ * @param cancelledByPatchLabel the current label of the patch change whose currency wipe cancelled
+ *     the request, or {@code null} for every other request (REQ-PATCH-042)
  */
 public record BankBookingRequestDto(
     UUID id,
@@ -125,7 +127,8 @@ public record BankBookingRequestDto(
     @Nullable String clientName,
     Long version,
     @Nullable Boolean callerMayConfirm,
-    @Nullable LinkedBankRequestDetails linked) {
+    @Nullable LinkedBankRequestDetails linked,
+    @Nullable String cancelledByPatchLabel) {
 
   /**
    * Returns this request with {@link #staffNote} blanked, the requester-facing projection
@@ -178,7 +181,8 @@ public record BankBookingRequestDto(
         clientName,
         version,
         callerMayConfirm,
-        linked);
+        linked,
+        cancelledByPatchLabel);
   }
 
   /**

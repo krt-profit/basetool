@@ -14,6 +14,7 @@ or any client.
 | `createdBy` | `{clientId, name}` of the client that created the order; absent for an order created in the web. |
 | `versions` | `{gameData, finances}`, the counters of the order's two sections (see below). |
 | `status` | `OPEN`, `IN_PROGRESS`, `COMPLETED` or `CANCELED`. |
+| `canceledByPatch` | `{id, label}` of the [patch change](#orders-a-patch-ended) that cancelled the order; absent otherwise. |
 | `location` | `{name, uex?, guid?}` of the refinery the order runs at. |
 | `method` | `{code?, name}` of the refining method; absent when none is set. |
 | `startedAt` | When the run started; absent when not set. |
@@ -55,6 +56,17 @@ tombstones as [blueprints](blueprints.md#reading-the-set--get-exchangev1mebluepr
 - A **tombstone** means the order is gone for the member: deleted, or moved to another member. A
   cancelled order is not removed; it arrives with the status `CANCELED`. The tombstone of an order
   your client created carries its `clientKey` too, so you can drop it by your own key.
+
+### Orders a patch ended
+
+When a Star Citizen patch ends the running refinery jobs, an admin records the patch change once
+for everyone. Every `OPEN` or `IN_PROGRESS` order that started before the patch went live (an order
+without `startedAt` counts from its creation, one without either time as started before) is then
+cancelled: it arrives in the feed with the
+status `CANCELED` and `canceledByPatch: {id, label}`, for example
+`{"id": "3f0c…", "label": "4.4"}`. Orders started after the patch went live stay as they are. Close
+the order on your side as cancelled; nothing was deleted and no yield was booked. An admin may
+correct `label` later; `id` stays the same in every feed entry the patch change caused.
 
 An order is in the feed again when one of its goods changes, once per page however many goods
 changed. It is also in the feed again when the `name`, `uex` or `guid` of its `location` changes,
@@ -133,7 +145,9 @@ an op is ignored: the server reports it as an `UNKNOWN_FIELD` warning and the op
 - **Location.** A [place](../formats.md#place--location-ref), resolved exactly. It must be a
   refinery the web offers for refinery orders, else `NOT_A_REFINERY`; a place without a location
   is `LOCATION_UNKNOWN`.
-- **Method.** `{code}` or `{name}`, resolved by its code first, then by its exact name.
+- **Method.** `{code}` or `{name}`, resolved by its code first, then by its exact name, then by the
+  `name` the feed cut to 200 characters for a longer one. A code or a cut name that several methods
+  share is `AMBIGUOUS`; nothing matching is `UNMATCHED`.
 - **Status.** `OPEN`, the default of a create, or `IN_PROGRESS`. `COMPLETED` comes only from a
   `pickup`, and `CANCELED` is not written here. An order whose yield was booked into stock keeps
   its status: changing it is `ORDER_STORED`.

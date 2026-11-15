@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
-import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestUpdatedEvent;
@@ -55,13 +54,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -91,8 +88,9 @@ public class BankBookingRequestService {
   private final UserRepository userRepository;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final ApplicationEventPublisher eventPublisher;
-  private final ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
+  private final BankPurposeObservers purposeObservers;
   private final BankRequestClientNames clientNames;
+  private final BankRequestPatchLabels patchLabels;
   private final BankLinkedDecisions linkedDecisions;
   private final BankLinkedBookings linkedBookings;
   private final BankLinkedRequestLiveSync linkedLiveSync;
@@ -250,7 +248,7 @@ public class BankBookingRequestService {
       throw new NotFoundException("Booking request not found");
     }
     requireVersion(request, update.version());
-    requirePending(request);
+    request.requirePending();
     if (request.isOwnerApprovalGranted()) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_REQUEST_ALREADY_APPROVED,
@@ -364,8 +362,10 @@ public class BankBookingRequestService {
             .toList();
 
     Function<BankBookingRequest, String> names = clientNames.forRequests(shown);
+    Function<BankBookingRequest, String> patches = patchLabels.forRequests(shown);
     return shown.stream()
-        .map(request -> BankBookingRequestDtos.of(request, names.apply(request), null))
+        .map(request ->
+            BankBookingRequestDtos.of(request, names.apply(request), null, patches.apply(request)))
         .toList();
   }
 
@@ -421,6 +421,7 @@ public class BankBookingRequestService {
       @NotNull UUID requestId,
       long version,
       @Nullable BankLinkedDecisions.Prepared linked) {
+    lockPurposeOwner(requestId);
     BankBookingRequest request = lockRequest(requestId);
     if (!policy.ownsRequest(requester, request)
         || (linked == null && request.getLinkedAttempt() != null)) {
@@ -433,8 +434,9 @@ public class BankBookingRequestService {
 
   /**
    * Cancels a pending request on behalf of the module that raised it for a purpose (REQ-BANK-061),
-   * for example because the deal it pays for was cancelled. Joins the caller's transaction, skips
-   * the requester check and tells the purpose observer like any other cancellation.
+   * for example because the deal it pays for was cancelled. Joins the caller's transaction, which
+   * already holds the owner's lock, skips the requester check and tells the purpose observer like
+   * any other cancellation.
    *
    * @param requestId the request to cancel
    * @param kind the purpose kind the request must carry
@@ -497,10 +499,7 @@ public class BankBookingRequestService {
   private static BankBookingRequest requireFailedAttempt(
       BankBookingRequest request, BankLinkedAttempt attempt) {
     BankLinkedAttemptRecord previous = request.getLinkedAttempt();
-    if (previous == null
-        || !previous.getId().equals(attempt.id())
-        || previous.getPurposeKind() != attempt.purpose().kind()
-        || !previous.getPurposeRef().equals(attempt.purpose().ref())) {
+    if (previous == null || !previous.identifies(attempt)) {
       throw new NotFoundException("Booking request not found");
     }
     if (request.getStatus() != BankBookingRequestStatus.REJECTED
@@ -522,7 +521,7 @@ public class BankBookingRequestService {
       @NotNull BankBookingRequest request,
       @Nullable UUID actor,
       @Nullable BankLinkedDecisions.Prepared linked) {
-    requirePending(request);
+    request.requirePending();
     request.setStatus(BankBookingRequestStatus.CANCELLED);
     request.setDecidedAt(Instant.now());
     bankAuditService.record(
@@ -538,29 +537,9 @@ public class BankBookingRequestService {
       linkedLiveSync.changed();
     } else {
       eventPublisher.publishEvent(event);
-      notifyPurposeObserver(request, (observer, ref) -> observer.onCancelled(request.getId(), ref));
+      purposeObservers.notify(
+          request, (observer, ref) -> observer.onCancelled(request.getId(), ref));
     }
-  }
-
-  /**
-   * Tells the observer that owns the request's purpose kind how the request ended, inside the
-   * bank's transaction (REQ-BANK-063); nothing for a request without a purpose.
-   *
-   * @param request the request that just reached its terminal state
-   * @param call the observer call, given the observer and the stored purpose reference
-   */
-  private void notifyPurposeObserver(
-      @NotNull BankBookingRequest request,
-      @NotNull BiConsumer<BookingRequestPurposeObserver, UUID> call) {
-    BankPurposeKind kind = request.getPurposeKind();
-    UUID ref = request.getPurposeRef();
-    if (kind == null || ref == null) {
-      return;
-    }
-    purposeObservers
-        .orderedStream()
-        .filter(observer -> observer.kind() == kind)
-        .forEach(observer -> call.accept(observer, ref));
   }
 
   /**
@@ -584,11 +563,13 @@ public class BankBookingRequestService {
     BankStaffRights rights = staffRights();
     Page<BankBookingRequest> page = pageQueue(statuses, pageable, rights);
     Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
+    Function<BankBookingRequest, String> patches = patchLabels.forRequests(page.getContent());
     return page.map(request ->
         BankBookingRequestDtos.of(
             request,
             names.apply(request),
-            BankBookingRequestDtos.callerMayConfirm(request, rights)));
+            BankBookingRequestDtos.callerMayConfirm(request, rights),
+            patches.apply(request)));
   }
 
   /**
@@ -678,11 +659,12 @@ public class BankBookingRequestService {
       boolean ownerApprovalConfirmed,
       @Nullable String staffNote,
       long version) {
-    BankLinkedDecisions.Prepared linked =
+    final BankLinkedDecisions.Prepared linked =
         linkedDecisions.forRequest(requestId, Action.CONFIRM, null);
+    lockPurposeOwner(requestId);
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
-    requirePending(request);
+    request.requirePending();
     if (linked != null) {
       linkedBookings.lockConfirmationAccounts(request);
     } else if (holderId == null) {
@@ -709,7 +691,7 @@ public class BankBookingRequestService {
     UUID decider = authHelperService.currentUserId().orElse(null);
     eventPublisher.publishEvent(
         confirmation.record(request, holder, transaction, staffNote, decider));
-    notifyPurposeObserver(
+    purposeObservers.notify(
         request,
         (observer, ref) -> observer.onConfirmed(request.getId(), ref, transaction.getId()));
     return toDto(request);
@@ -773,11 +755,12 @@ public class BankBookingRequestService {
   @Transactional
   public BankBookingRequestDto reject(
       @NotNull UUID requestId, @NotNull String reason, long version) {
-    BankLinkedDecisions.Prepared linked =
+    final BankLinkedDecisions.Prepared linked =
         linkedDecisions.forRequest(requestId, Action.REJECT, null);
+    lockPurposeOwner(requestId);
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
-    requirePending(request);
+    request.requirePending();
     UUID accountId = request.accountId();
     BankStaffRights rights = linked == null ? staffRights() : linkedDecisions.rights();
     if (accountId == null ? !rights.staff() : !rights.canSee(accountId)) {
@@ -810,7 +793,8 @@ public class BankBookingRequestService {
       linkedLiveSync.changed();
     } else {
       eventPublisher.publishEvent(event);
-      notifyPurposeObserver(request, (observer, ref) -> observer.onRejected(request.getId(), ref));
+      purposeObservers.notify(
+          request, (observer, ref) -> observer.onRejected(request.getId(), ref));
     }
     return toDto(request);
   }
@@ -831,7 +815,7 @@ public class BankBookingRequestService {
   @Transactional(propagation = Propagation.MANDATORY)
   public BankBookingRequestDto applyOwnerApprovalWithinTransaction(
       @NotNull BankBookingRequest request, boolean granted) {
-    requirePending(request);
+    request.requirePending();
     if (granted) {
       requireSecondPerson(request, staffRights());
     }
@@ -891,6 +875,18 @@ public class BankBookingRequestService {
   }
 
   /**
+   * Lets the owner of a purpose-bound request lock its purpose before the request is locked, so a
+   * Bank decision and the owner's own cancellation lock in one order (REQ-BANK-063).
+   *
+   * @param requestId the request about to be locked
+   */
+  private void lockPurposeOwner(@NotNull UUID requestId) {
+    requestRepository
+        .findPurposeById(requestId)
+        .ifPresent(purpose -> purposeObservers.beforeDecisions(List.of(purpose)));
+  }
+
+  /**
    * Loads and pessimistically locks a request for a decision, or fails with 404.
    *
    * @param requestId the request id
@@ -913,22 +909,6 @@ public class BankBookingRequestService {
   private void requireVersion(@NotNull BankBookingRequest request, long version) {
     OptimisticLock.checkRequired(
         request.getVersion(), version, BankBookingRequest.class, request.getId());
-  }
-
-  /**
-   * Rejects a decision on a request that is no longer pending (already
-   * confirmed/rejected/cancelled) — blocks double-decisions (REQ-BANK-023).
-   *
-   * @param request the locked request
-   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when not pending
-   */
-  private void requirePending(@NotNull BankBookingRequest request) {
-    if (request.getStatus() != BankBookingRequestStatus.PENDING) {
-      throw new BankConflictException(
-          BankConflictException.CODE_BANK_REQUEST_NOT_PENDING,
-          "The booking request is no longer pending",
-          Map.of("status", request.getStatus().name()));
-    }
   }
 
   /**
@@ -956,12 +936,13 @@ public class BankBookingRequestService {
    */
   @NotNull
   private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
-    return BankBookingRequestDtos.of(request, clientNames.nameOf(request), null);
+    return BankBookingRequestDtos.of(
+        request, clientNames.nameOf(request), null, patchLabels.labelOf(request));
   }
 
   /**
    * Maps a page of request entities as {@link #toDto(BankBookingRequest)} does, naming every row's
-   * client from one registry read.
+   * client from one registry read and every cancelling patch change from one label read.
    *
    * @param page the page of request entities
    * @return the page of wire DTOs
@@ -969,6 +950,8 @@ public class BankBookingRequestService {
   @NotNull
   private Page<BankBookingRequestDto> toDtos(@NotNull Page<BankBookingRequest> page) {
     Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
-    return page.map(request -> BankBookingRequestDtos.of(request, names.apply(request), null));
+    Function<BankBookingRequest, String> patches = patchLabels.forRequests(page.getContent());
+    return page.map(request ->
+        BankBookingRequestDtos.of(request, names.apply(request), null, patches.apply(request)));
   }
 }

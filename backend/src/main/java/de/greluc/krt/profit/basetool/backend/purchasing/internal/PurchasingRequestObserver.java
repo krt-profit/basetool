@@ -31,7 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Hears of the end of every purpose-bound booking request of a deal and mirrors it onto the tranche
- * or the settlement it belongs to, inside the bank's transaction (REQ-PUR-014).
+ * or the settlement it belongs to, inside the bank's transaction (REQ-PUR-014). The bank lets it
+ * lock the deal before the request, so every path locks the deal first (REQ-PUR-026).
  */
 @Component
 @RequiredArgsConstructor
@@ -39,6 +40,7 @@ class PurchasingRequestObserver implements BookingRequestPurposeObserver {
 
   private final PurchasingDealTrancheRepository trancheRepository;
   private final PurchasingDealSettlementRepository settlementRepository;
+  private final PurchasingDealService dealService;
   private final PurchasingTrancheService trancheService;
   private final PurchasingSettlementService settlementService;
 
@@ -46,6 +48,18 @@ class PurchasingRequestObserver implements BookingRequestPurposeObserver {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull BankPurposeKind kind() {
     return BankPurposeKind.PURCHASING_DEAL;
+  }
+
+  /**
+   * Locks the deal the request pays for, as a cancellation of the deal does before it cancels its
+   * requests (REQ-PUR-026).
+   *
+   * @param purposeRef the deal
+   */
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void beforeDecision(@NotNull UUID purposeRef) {
+    dealService.lock(purposeRef);
   }
 
   @Override

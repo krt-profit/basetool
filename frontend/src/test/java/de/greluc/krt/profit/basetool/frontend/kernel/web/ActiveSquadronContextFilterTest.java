@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import jakarta.servlet.DispatcherType;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -40,7 +42,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
 class ActiveSquadronContextFilterTest {
 
   private final ActiveSquadronContextFilter filter =
-      new ActiveSquadronContextFilter(new ActiveOrgUnitRestore(Optional::empty));
+      new ActiveSquadronContextFilter(
+          new ActiveOrgUnitRestore(Optional::empty, new SessionGates(List.of())));
 
   @AfterEach
   void cleanUp() {

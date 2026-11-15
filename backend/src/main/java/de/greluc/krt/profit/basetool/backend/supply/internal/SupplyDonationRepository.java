@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.UuidArrayLiteral;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
@@ -26,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -48,6 +50,53 @@ public interface SupplyDonationRepository
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT d FROM SupplyDonation d WHERE d.id = :id")
   Optional<SupplyDonation> findByIdForUpdate(@Param("id") UUID id);
+
+  /**
+   * Counts the pledges earmarked on the given Lager rows.
+   *
+   * @param inventoryItemIds the rows, a {@code uuid[]} literal ({@link UuidArrayLiteral})
+   * @return the number of pledged donations
+   */
+  @Query(
+      value =
+          "SELECT COUNT(*) FROM supply_donation WHERE status = 'PLEDGED'"
+              + " AND source_inventory_item_id = ANY(CAST(:ids AS UUID[]))",
+      nativeQuery = true)
+  long countPledgedOnRowArray(@Param("ids") String inventoryItemIds);
+
+  /**
+   * Locks the pledges earmarked on the given Lager rows in ascending id order.
+   *
+   * @param inventoryItemIds the rows, a {@code uuid[]} literal ({@link UuidArrayLiteral})
+   * @return the ids of the locked pledges
+   */
+  @Query(
+      value =
+          "SELECT id FROM supply_donation WHERE status = 'PLEDGED'"
+              + " AND source_inventory_item_id = ANY(CAST(:ids AS UUID[])) ORDER BY id FOR UPDATE",
+      nativeQuery = true)
+  List<UUID> lockPledgedOnRowArray(@Param("ids") String inventoryItemIds);
+
+  /**
+   * Counts the pledges earmarked on the given Lager rows, binding the rows as one array parameter.
+   *
+   * @param inventoryItemIds the rows
+   * @return the number of pledged donations
+   */
+  default long countPledgedOnRows(@NotNull Collection<UUID> inventoryItemIds) {
+    return countPledgedOnRowArray(UuidArrayLiteral.of(inventoryItemIds));
+  }
+
+  /**
+   * Locks the pledges earmarked on the given Lager rows in ascending id order, binding the rows as
+   * one array parameter.
+   *
+   * @param inventoryItemIds the rows
+   * @return the ids of the locked pledges
+   */
+  default List<UUID> lockPledgedOnRows(@NotNull Collection<UUID> inventoryItemIds) {
+    return lockPledgedOnRowArray(UuidArrayLiteral.of(inventoryItemIds));
+  }
 
   /**
    * Counts the donations in a state, for the business gauge.

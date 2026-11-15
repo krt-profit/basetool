@@ -1,0 +1,57 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.patchchange.internal;
+
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipPatchWipe;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.stereotype.Component;
+
+/**
+ * The ship wipe of a patch change (REQ-PATCH-015): when the in-game ships are selected, every
+ * member's ships bought in-game and created before the live time go through the ordinary deletion
+ * path.
+ */
+@Component
+@RequiredArgsConstructor
+class ShipWipeEffect implements PatchEffect {
+
+  private final WipeSurvey survey;
+  private final ShipPatchWipe ships;
+
+  @Override
+  public @NotNull PatchCounts preview(@NotNull PatchChangePlan plan) {
+    if (!plan.options().wipeGroups().contains(WipeGroup.IN_GAME_SHIPS)) {
+      return PatchCounts.none();
+    }
+    return PatchCounts.of(PatchCount.IN_GAME_SHIPS_WIPED, survey.survey(plan).ships().ships());
+  }
+
+  @Override
+  public @NotNull PatchCounts apply(@NotNull PatchChangeRun run) {
+    if (!run.plan().options().wipeGroups().contains(WipeGroup.IN_GAME_SHIPS)) {
+      return PatchCounts.none();
+    }
+    return PatchCounts.of(
+        PatchCount.IN_GAME_SHIPS_WIPED,
+        ships.wipe(run.plan().liveAt(), run.patchChangeId(), run.label()).ships());
+  }
+}

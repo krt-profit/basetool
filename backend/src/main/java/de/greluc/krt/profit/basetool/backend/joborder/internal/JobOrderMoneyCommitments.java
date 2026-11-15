@@ -146,6 +146,19 @@ class JobOrderMoneyCommitments {
     return ended;
   }
 
+  /**
+   * Ends a commitment for a patch change's currency wipe (REQ-PATCH-045); its credited part stays
+   * as history. The wipe audits once for all orders and notifies nobody, so this records the change
+   * alone.
+   *
+   * @param commitment the open commitment of a locked order
+   */
+  void endForCurrencyWipe(JobOrderMoneyCommitment commitment) {
+    BigDecimal before = commitment.getOutstanding();
+    commitment.end();
+    changes.save(new JobOrderMoneyCommitmentChange(commitment, Reason.CURRENCY_WIPE, before, null));
+  }
+
   void end(JobOrderMoneyCommitment commitment, Reason reason) {
     BigDecimal before = commitment.getOutstanding();
     commitment.end();

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -105,6 +106,22 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
       AND NOT EXISTS (SELECT 1 FROM BankAuditEvent e WHERE e.transactionId = t.id)
       """)
   List<UUID> findTransactionsWithoutAuditEvent();
+
+  /**
+   * Probes whether a wipe reset took effect at or after an instant, the reset that leaves a
+   * currency wipe with that live time nothing to offset (REQ-PATCH-041). A patch change's reset
+   * takes effect at its live time, the standalone reset when it is recorded.
+   *
+   * @param since inclusive lower bound
+   * @return {@code true} when a {@code WIPE_RESET} took effect at or after {@code since}
+   */
+  @Query(
+      """
+      SELECT COUNT(t) > 0 FROM BankTransaction t WHERE t.type =
+      de.greluc.krt.profit.basetool.backend.bank.internal.BankTransactionType.WIPE_RESET
+      AND COALESCE(t.effectiveAt, t.createdAt) >= :since
+      """)
+  boolean existsWipeResetTakingEffectSince(@Param("since") Instant since);
 
   /**
    * Replaces this member's counterparty handle snapshot with the erasure sentinel for a granted

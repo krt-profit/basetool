@@ -121,6 +121,7 @@ public class RefineryImportProxyController {
       redirectAttributes.addFlashAttribute("importRowsSkipped", draft.rowsSkipped());
       return "redirect:/refinery-orders/create";
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       String detail = e.getProblemDetail();
       if (detail != null && !detail.isBlank()) {
         redirectAttributes.addFlashAttribute("importErrorText", detail);
@@ -129,7 +130,7 @@ public class RefineryImportProxyController {
       }
       return "redirect:/refinery-orders/create";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Refinery import relay failed", e);
       redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.failed");
       return "redirect:/refinery-orders/create";

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:fragment="page" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{kernel/fragments/head :: head(titleContent=${pageTitle}, additionalLinks=${pageLinks})}"></head>
-<body th:data-show-modal="${pageShowModal}" th:data-nav-mode="${navigationAppearance != null} ? ${navigationAppearance.modeAttribute()} : null">
+<body th:data-show-modal="${pageShowModal}" th:data-nav-mode="${navigationAppearance != null} ? ${navigationAppearance.modeAttribute()} : null"
+      th:data-session-gate-page="${sessionGatePage == true} ? 'true' : null">
 <th:block th:unless="${pageBare}">
     <th:block th:replace="~{kernel/fragments/sidebar :: sidebar}" />
 

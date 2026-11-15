@@ -132,8 +132,8 @@ final class LiveSyncSessionRegistry {
    * LiveSyncWebSocketHandler#MAX_SOCKETS_PER_USER}, wraps it in its backpressure decorator and
    * seeds an empty subscription set.
    *
-   * <p>Refuses and closes a socket without accepted Terms of Use ({@link
-   * LiveSyncWebSocketHandler#ATTR_TERMS_GATE}, REQ-SEC-028), without a resolvable principal, or
+   * <p>Refuses and closes a socket a session gate holds ({@link
+   * LiveSyncWebSocketHandler#ATTR_SESSION_GATE}, REQ-SEC-028), without a resolvable principal, or
    * over the per-user cap.
    *
    * @param session the freshly opened session
@@ -141,7 +141,7 @@ final class LiveSyncSessionRegistry {
    */
   void open(@NotNull WebSocketSession session) throws IOException {
     String consentUrl =
-        (String) session.getAttributes().get(LiveSyncWebSocketHandler.ATTR_TERMS_GATE);
+        (String) session.getAttributes().get(LiveSyncWebSocketHandler.ATTR_SESSION_GATE);
     if (consentUrl != null) {
       log.debug("Live-sync /ws/sync socket refused (Terms of Use not accepted)");
       socketRejectedCounter(MetricNames.SOCKET_REJECTED_TERMS_GATE).increment();

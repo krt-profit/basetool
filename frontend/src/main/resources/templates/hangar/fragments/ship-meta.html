@@ -2,7 +2,12 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="shipMeta(ship)">
-    <span class="hangar-row__meta" th:if="${ship.productionStatus != null or ship.pledge != null}">
+    <span class="hangar-row__meta" th:if="${ship.productionStatus != null or ship.pledge != null or ship.origin != null}">
+        <span th:if="${ship.origin != null}" class="chip" data-testid="hangar-ship-origin"
+              th:with="originKey=${'hangar.ship.origin.' + ship.origin.value}"
+              th:classappend="${ship.origin.value == 'IN_GAME'} ? 'chip--warning' : (${ship.origin.value == 'PLEDGE'} ? 'chip--primary' : 'chip--muted')"
+              th:attr="title=${ship.origin.locked} ? #{hangar.ship.origin.locked} : null,data-origin=${ship.origin.value}"
+              th:text="#{${originKey}}">Gepledged</span>
         <span th:if="${ship.productionStatus != null}" class="chip" data-testid="hangar-ship-production"
               th:classappend="${ship.productionStatus == 'IN_CONCEPT'} ? 'chip--warning' : (${ship.productionStatus == 'IN_PRODUCTION'} ? 'chip--info' : 'chip--success')"
               th:text="#{${'hangar.ship.production.' + ship.productionStatus}}">Flugf&auml;hig</span>

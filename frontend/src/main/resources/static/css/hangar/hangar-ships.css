@@ -132,7 +132,8 @@
         }
     }
     .form-group label:not(.krt-segmented__item),
-    .ship-insurance > legend {
+    .ship-insurance > legend,
+    .ship-origin > legend {
         display: block;
         margin-bottom: 0.5rem;
         font-family: var(--font-body);
@@ -147,12 +148,14 @@
     .form-group:has(> .ship-fitted-label) {
         align-items: center;
     }
-    .ship-insurance {
+    .ship-insurance,
+    .ship-origin {
         min-width: 0;
         padding: 0;
         border: 0;
     }
-    .ship-insurance > legend {
+    .ship-insurance > legend,
+    .ship-origin > legend {
         padding: 0;
     }
     .ship-insurance > legend::after {

@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeWrites;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -34,8 +36,9 @@ import org.springframework.stereotype.Component;
  * Names who is writing, in the form the change-feed triggers read from the transaction variable
  * {@value #VARIABLE} (REQ-XCH-013, ADR-0224).
  *
- * <p>The value is {@code web}, {@code app}, {@code system}, or {@code client|<clientId>|<key>} for
- * a request an exchange client relayed.
+ * <p>The value is {@code web}, {@code app}, {@code system}, {@code client|<clientId>|<key>} for a
+ * request an exchange client relayed, or {@code patch|<patchChangeId>} for a patch change's
+ * trigger.
  */
 @Component
 @RequiredArgsConstructor
@@ -69,10 +72,15 @@ public class ChangeSource {
   /**
    * Returns the source of the current thread's writes.
    *
-   * @return the client a confirmed write runs for, else the source for the current authentication,
+   * @return {@code patch|<patchChangeId>} while a patch change's trigger writes (REQ-PATCH-007),
+   *     else the client a confirmed write runs for, else the source for the current authentication,
    *     {@code system} when there is none
    */
   public @NotNull String current() {
+    Optional<UUID> patchChange = PatchChangeWrites.current();
+    if (patchChange.isPresent()) {
+      return "patch|" + patchChange.get();
+    }
     if (ON_BEHALF.isBound()) {
       return ON_BEHALF.get();
     }

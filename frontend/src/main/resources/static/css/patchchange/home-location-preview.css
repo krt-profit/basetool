@@ -1,0 +1,14 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .hl-preview tr.is-staying td,
+    .hl-preview tr.is-staying .cell-title {
+        color: var(--color-gray-2-text);
+    }
+    .hl-preview [data-hl-stays] {
+        margin-left: var(--space-2);
+    }
+    .hl-preview [data-hl-stays][hidden] {
+        display: none;
+    }
+}

@@ -94,8 +94,7 @@ public class ExchangeOrgStockRoster {
           new Holder(
               refs.apply(user.getId()),
               user.getId(),
-              ExchangeStockFeedService.cut(
-                  Objects.requireNonNullElse(user.getEffectiveName(), ""))));
+              ExchangeNames.cut(Objects.requireNonNullElse(user.getEffectiveName(), ""))));
     }
     holders.sort(
         Comparator.comparing(Holder::name, String.CASE_INSENSITIVE_ORDER)

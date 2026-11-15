@@ -57,6 +57,12 @@ public final class ExchangeRoutes {
   /** The member's ship feed below {@link #GATEWAY}. */
   public static final String MEMBER_SHIPS = MEMBER + "ships";
 
+  /** The member's patch-change read below {@link #GATEWAY} (REQ-PATCH-050). */
+  public static final String MEMBER_PATCH_CHANGE = MEMBER + "patch-change";
+
+  /** The member's home-location choice below {@link #MEMBER_PATCH_CHANGE} (REQ-PATCH-052). */
+  public static final String HOME_LOCATION = "/home-location";
+
   /** The member's refinery-order feed below {@link #GATEWAY}. */
   public static final String MEMBER_REFINERY_ORDERS = MEMBER + "refinery-orders";
 
@@ -97,6 +103,11 @@ public final class ExchangeRoutes {
               "exchange.refinery.store"),
           route(HttpMethod.GET, "/exchange/v1/me/org-demand", "exchange.demand.read"),
           route(HttpMethod.GET, "/exchange/v1/me/org-units", "exchange.orgunits.read"),
+          route(HttpMethod.GET, GATEWAY + MEMBER_PATCH_CHANGE, "exchange.patch.read"),
+          write(
+              HttpMethod.POST,
+              GATEWAY + MEMBER_PATCH_CHANGE + HOME_LOCATION,
+              "exchange.patch.write"),
           route(HttpMethod.GET, "/exchange/v1/org-stock", "exchange.orgstock.read"),
           write(HttpMethod.POST, "/exchange/v1/org-stock/changes", "exchange.orgstock.write"),
           route(HttpMethod.GET, "/exchange/v1/org-stock/members", "exchange.orgstock.write"),

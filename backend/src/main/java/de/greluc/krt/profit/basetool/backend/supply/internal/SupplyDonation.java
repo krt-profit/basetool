@@ -121,6 +121,14 @@ public class SupplyDonation extends AbstractEntity<UUID> {
   @Nullable
   private DeclineReason declineReason;
 
+  /**
+   * The patch change whose wipe withdrew the pledge as its reason, or {@code null}; only a
+   * withdrawn donation holds one (REQ-PATCH-013).
+   */
+  @Column(name = "withdrawn_by_patch_change")
+  @Nullable
+  private UUID withdrawnByPatchChange;
+
   /** The member who confirmed the receipt. */
   @Column(name = "received_by")
   @Nullable

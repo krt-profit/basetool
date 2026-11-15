@@ -72,6 +72,12 @@ class ExchangeControllerTest {
   private static final String TOKEN = "controller-token";
   private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
+  /** The longest name the published {@code location} schema allows. */
+  private static final int PUBLISHED_NAME = 200;
+
+  /** The longest name the Basetool's catalogue stores for a location. */
+  private static final int STORED_NAME = 255;
+
   @Autowired private WebApplicationContext context;
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -217,6 +223,50 @@ class ExchangeControllerTest {
         .andExpect(jsonPath("$.items[0].name").value("Area18"));
     verify(relay).countPassedOn(ExchangeTestSupport.CLIENT);
     verify(relay, never()).countContractBroken(anyString());
+  }
+
+  @Test
+  void aLocationNameCutToTheContractsLengthPassesThrough() throws Exception {
+    String name = "L".repeat(PUBLISHED_NAME);
+    when(relay.forward(
+            eq(HttpMethod.GET), eq("/api/v1/exchange/catalog/locations"), any(), any(), any()))
+        .thenReturn(ok("{\"items\":[{\"name\":\"" + name + "\"}]}"));
+
+    ExchangeTestSupport.call(
+            mockMvc,
+            key,
+            TOKEN,
+            HttpMethod.GET,
+            "/exchange/v1/catalog/locations",
+            null,
+            "VerseKit/2.1.0")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].name").value(name));
+    verify(relay).countPassedOn(ExchangeTestSupport.CLIENT);
+  }
+
+  @Test
+  void aLocationNameLongerThanTheContractAllowsFailsTheWholeList() throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.GET), eq("/api/v1/exchange/catalog/locations"), any(), any(), any()))
+        .thenReturn(
+            ok(
+                "{\"items\":[{\"name\":\"Area18\"},{\"name\":\""
+                    + "L".repeat(STORED_NAME)
+                    + "\"}]}"));
+
+    ExchangeTestSupport.call(
+            mockMvc,
+            key,
+            TOKEN,
+            HttpMethod.GET,
+            "/exchange/v1/catalog/locations",
+            null,
+            "VerseKit/2.1.0")
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value("BACKEND_RELAY_FAILED"))
+        .andExpect(jsonPath("$.items").doesNotExist());
+    verify(relay).countContractBroken(ExchangeTestSupport.CLIENT);
   }
 
   @Test

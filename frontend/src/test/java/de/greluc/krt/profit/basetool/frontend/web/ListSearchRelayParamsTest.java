@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.MissionManagerGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
@@ -232,7 +233,8 @@ class ListSearchRelayParamsTest {
   private static MockMvc standalone(Object controller) {
     return MockMvcBuilders.standaloneSetup(controller)
         .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
-        .setControllerAdvice(new GlobalExceptionHandler(new StaticMessageSource()))
+        .setControllerAdvice(
+            new GlobalExceptionHandler(new StaticMessageSource(), new SessionGates(List.of())))
         .build();
   }
 

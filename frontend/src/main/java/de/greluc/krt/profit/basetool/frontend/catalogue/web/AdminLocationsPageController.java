@@ -165,6 +165,7 @@ public class AdminLocationsPageController {
       cacheEviction.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Toggle location visibility failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -173,7 +174,7 @@ public class AdminLocationsPageController {
       }
       return "redirect:/admin/locations";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Toggle location visibility failed", e);
       return "redirect:/admin/locations?error=ToggleVisibilityFailed";
     }
@@ -211,6 +212,7 @@ public class AdminLocationsPageController {
       cacheEviction.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Toggle home-location failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -219,7 +221,7 @@ public class AdminLocationsPageController {
       }
       return "redirect:/admin/locations";
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Toggle home-location failed", e);
       return "redirect:/admin/locations?error=ToggleHomeLocationFailed";
     }

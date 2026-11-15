@@ -81,6 +81,15 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
   }
 
   @Override
+  public void cancelForCurrencyWipe(
+      @NotNull UUID requestId,
+      @NotNull UUID attemptId,
+      @NotNull UUID purposeRef,
+      @NotNull UUID patchChangeId) {
+    bank.cancelForCurrencyWipe(requestId, attempt(attemptId, purposeRef), patchChangeId);
+  }
+
+  @Override
   public void requireCustodian(@NotNull UUID custodianId, @NotNull UUID userId) {
     bank.requireCustodianUser(custodianId, userId);
   }

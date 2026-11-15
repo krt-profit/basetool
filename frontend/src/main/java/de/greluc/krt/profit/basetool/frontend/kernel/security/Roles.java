@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.kernel.security;
 
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.security.core.Authentication;
 
 /**
  * Role-code constants for the frontend; they must stay identical to the backend's {@code
@@ -54,6 +56,19 @@ public final class Roles {
   @NotNull
   public static String authority(String code) {
     return ROLE_PREFIX + code;
+  }
+
+  /**
+   * Tells whether an authentication carries the {@code ROLE_ADMIN} authority directly.
+   *
+   * @param authentication the authentication, or {@code null} when none is bound
+   * @return {@code true} for an admin
+   */
+  public static boolean isAdmin(@Nullable Authentication authentication) {
+    return authentication != null
+        && authentication.getAuthorities().stream()
+            .map(Object::toString)
+            .anyMatch(authority(ADMIN)::equals);
   }
 
   /**

@@ -78,6 +78,7 @@
       "hangar/hangar-squadron.js",
       "hangar/hangar.js",
       "hangar/member-hangar.js",
+      "hangar/ship-origin.js",
       "hangar/ship-type-picker.js",
       "hangar/ship-unit-change.js"
     ],
@@ -249,6 +250,18 @@
       "orgunit/admin-org-structure.js",
       "orgunit/special-command-detail.js",
       "orgunit/special-commands.js"
+    ],
+    "patchchange": [
+      "patchchange/admin-member-home-location.js",
+      "patchchange/admin-patch-change.js",
+      "patchchange/home-location-common.js",
+      "patchchange/home-location.js",
+      "patchchange/patch-change-form.js",
+      "patchchange/patch-change-history.js",
+      "patchchange/patch-change-home-locations.js",
+      "patchchange/patch-change-messages.js",
+      "patchchange/patch-change-phase.js",
+      "patchchange/patch-change-wipe.js"
     ],
     "personalinventory": [
       "personalinventory/admin-personal-blueprints-purge.js",

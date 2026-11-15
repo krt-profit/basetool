@@ -103,6 +103,8 @@ body:
         - label: exchange.bank.read
         - label: exchange.bank.request
         - label: exchange.bank.queue
+        - label: exchange.patch.read
+        - label: exchange.patch.write
 
   - type: textarea
     id: purpose

@@ -49,4 +49,10 @@ public class ShipForm {
    * resolver auto-stamps the single membership).
    */
   private UUID owningOrgUnitId;
+
+  /**
+   * The ship's origin, {@code PLEDGE} or {@code IN_GAME}; required on an add, {@code null} on an
+   * edit keeps the stored origin (REQ-HANGAR-017).
+   */
+  private String origin;
 }

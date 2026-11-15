@@ -80,6 +80,7 @@ public class BankLedgerService {
   private final BankPostingWriter writer;
   private final BankBookingGuards guards;
   private final BankLinkedDecisions linkedDecisions;
+  private final BankWipeResetBooking resetBooking;
 
   /**
    * Books a deposit (REQ-BANK-004): one positive account leg on the receiving account and one
@@ -610,7 +611,8 @@ public class BankLedgerService {
    *
    * <p>A non-zero fee {@code round(amount × rate)} reduces the source holder by {@code amount +
    * fee} and is debited from the KRT ({@code CARTEL}) account, which is locked and
-   * overdraft-guarded.
+   * overdraft-guarded. Both holders are locked after it, so the Umbuchung and a wipe reset take
+   * turns even without a fee.
    *
    * @param request validated holder-transfer payload (source and destination holders must differ)
    * @return acknowledgement of the created transaction
@@ -652,9 +654,6 @@ public class BankLedgerService {
           BankConflictException.CODE_BANK_SELF_TRANSFER,
           "Source and destination holder of an Umbuchung must differ");
     }
-    BankHolder sourceHolder = writer.requireHolder(request.sourceHolderId());
-    BankHolder destinationHolder = writer.requireHolder(request.destinationHolderId());
-
     BigDecimal fee =
         submittedFee == null
             ? transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot())
@@ -664,6 +663,10 @@ public class BankLedgerService {
       guards.requireActive(cartel);
       guards.requireAccountCoverage(cartel, fee);
     }
+    Map<UUID, BankHolder> holders =
+        writer.lockHolders(List.of(request.sourceHolderId(), request.destinationHolderId()));
+    BankHolder sourceHolder = writer.requireHolder(holders, request.sourceHolderId());
+    BankHolder destinationHolder = writer.requireHolder(holders, request.destinationHolderId());
 
     Instant now = Instant.now();
     BankTransaction tx =
@@ -790,7 +793,7 @@ public class BankLedgerService {
           now);
     }
     Map<UUID, BankHolder> reversalHolders =
-        writer.loadHolders(holderLegs.stream().map(BankHolderLeg::holderId).toList());
+        writer.lockHolders(holderLegs.stream().map(BankHolderLeg::holderId).toList());
     for (BankHolderLeg leg : holderLegs) {
       BankHolder holder = writer.requireHolder(reversalHolders, leg.holderId());
       writer.persistHolderPosting(reversal, holder, leg.amount().negate(), now);
@@ -812,7 +815,8 @@ public class BankLedgerService {
    * books a negative account leg for every account with a non-zero balance <strong>and</strong> a
    * negative holder leg for every holder with a non-zero global balance, zeroing both dimensions
    * independently. History, statements and audit trail are preserved — nothing is deleted.
-   * Idempotent: on an all-zero bank nothing is booked and the result reports zero.
+   * Idempotent: on an all-zero bank nothing is booked and the result reports zero. It locks the
+   * whole ledger before it reads a balance and takes effect when it is recorded.
    *
    * @return counts and total for the admin notice; one summarizing audit event is written when
    *     anything was zeroed
@@ -820,68 +824,39 @@ public class BankLedgerService {
   @NotNull
   @Transactional
   public BankWipeResetResultDto resetAllBalances() {
-    List<BankAccount> accounts = accountRepository.findAllForUpdateOrderById();
+    List<BankAccount> accounts = writer.lockLedger();
     Map<UUID, BigDecimal> accountBalances =
         accounts.stream()
             .collect(
                 Collectors.toMap(
                     BankAccount::getId, a -> postingRepository.accountBalance(a.getId())));
-    List<BankHolderBalance> holderBalances =
+    Map<UUID, BigDecimal> holderBalances =
         holderPostingRepository.holderTotals().stream()
-            .filter(h -> h.amount().signum() != 0)
-            .toList();
-
-    int accountsReset =
-        (int) accountBalances.values().stream().filter(b -> b.signum() != 0).count();
-    int stashesZeroed = holderBalances.size();
-    if (accountsReset == 0 && stashesZeroed == 0) {
+            .collect(Collectors.toMap(BankHolderBalance::holderId, BankHolderBalance::amount));
+    BankWipeResetBooking.Booked booked =
+        resetBooking.book(accounts, accountBalances, holderBalances, null);
+    if (booked.transactionId() == null) {
       log.info("Bank wipe reset executed: nothing to zero (idempotent no-op).");
       return new BankWipeResetResultDto(0, 0, BigDecimal.ZERO);
-    }
-
-    Instant now = Instant.now();
-    BankTransaction tx =
-        writer.persistTransaction(
-            BankTransactionType.WIPE_RESET,
-            "SC wipe reset",
-            null,
-            null,
-            null,
-            BigDecimal.ZERO,
-            now,
-            null);
-    BigDecimal totalZeroed = BigDecimal.ZERO;
-    for (BankAccount account : accounts) {
-      BigDecimal balance = Objects.requireNonNull(accountBalances.get(account.getId()));
-      if (balance.signum() != 0) {
-        writer.persistAccountPosting(tx, account, balance.negate(), now);
-        totalZeroed = totalZeroed.add(balance);
-      }
-    }
-    Map<UUID, BankHolder> holders =
-        writer.loadHolders(holderBalances.stream().map(BankHolderBalance::holderId).toList());
-    for (BankHolderBalance slice : holderBalances) {
-      BankHolder holder = writer.requireHolder(holders, slice.holderId());
-      writer.persistHolderPosting(tx, holder, slice.amount().negate(), now);
     }
 
     bankAuditService.record(
         BankAuditEventType.WIPE_RESET_EXECUTED,
         null,
-        tx.getId(),
+        booked.transactionId(),
         null,
         "accounts="
-            + accountsReset
+            + booked.accounts()
             + ", stashes="
-            + stashesZeroed
+            + booked.stashes()
             + ", totalZeroed="
-            + totalZeroed.toPlainString());
+            + booked.total().toPlainString());
     log.info(
         "Bank wipe reset executed: accounts={}, stashes={}, totalZeroed={}",
-        accountsReset,
-        stashesZeroed,
-        totalZeroed);
-    return new BankWipeResetResultDto(accountsReset, stashesZeroed, totalZeroed);
+        booked.accounts(),
+        booked.stashes(),
+        booked.total());
+    return new BankWipeResetResultDto(booked.accounts(), booked.stashes(), booked.total());
   }
 
   /**

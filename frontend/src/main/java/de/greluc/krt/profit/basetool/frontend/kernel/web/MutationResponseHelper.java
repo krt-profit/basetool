@@ -25,8 +25,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Runs a Post/Redirect/Get mutation with success or failure feedback (REQ-FE-002). Session loss
- * propagates to the global reauthentication handler.
+ * Runs a Post/Redirect/Get mutation with success or failure feedback (REQ-FE-002). Session loss and
+ * a session gate's refusal propagate to the global handler, which sends the browser to the login or
+ * to the gate.
  */
 @Component
 @Slf4j
@@ -40,7 +41,8 @@ public class MutationResponseHelper {
   }
 
   /**
-   * Runs the mutation and redirects with a success or error toast, propagating session loss.
+   * Runs the mutation and redirects with a success or error toast, propagating session loss and a
+   * session gate's refusal.
    *
    * @param redirectAttributes the flash-attribute carrier for the post-redirect toast
    * @param redirectView the target the browser is redirected to (without the {@code redirect:}
@@ -51,6 +53,8 @@ public class MutationResponseHelper {
    * @return the {@code redirect:}-prefixed view name for {@code redirectView}
    * @throws de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException
    *     when the backend call lost the session
+   * @throws de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException when
+   *     a session gate holds the user, outside a gate's own page
    */
   @NotNull
   public String mutate(
@@ -63,7 +67,7 @@ public class MutationResponseHelper {
       action.run();
       redirectAttributes.addFlashAttribute("successToast", successKey);
     } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
+      SectionFallback.rethrowHandOff(e);
       log.error("Mutation failed, redirecting to {}: {}", redirectView, e.getMessage(), e);
       redirectAttributes.addFlashAttribute("errorToast", errorKey);
     }

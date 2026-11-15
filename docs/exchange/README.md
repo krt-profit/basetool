@@ -37,6 +37,7 @@ the registry grants it to the client.
 | `exchange.refinery.read` / `.write` | reading the member's own refinery orders, and creating, updating, picking up, cancelling and deleting them and their goods |
 | `exchange.refinery.store` | booking a picked-up refinery order's yield into stock, and reading the store choices |
 | `exchange.drafts.blueprints` / `.refinery` | staging blueprints or refinery orders for review in the browser |
+| `exchange.patch.read` / `.write` | reading the latest patch change with its wipe list and the member's home-location prompt, and making the member's home-location choice; `.write` only with `.read` |
 
 `catalog/resolve` and `catalog/locations` are open to any exchange scope.
 
@@ -78,6 +79,8 @@ the registry grants it to the client.
 - [Drafts](resources/drafts.md) — blueprint and refinery drafts reviewed in the browser.
 - [Bank](resources/bank.md) — the Kartellbank accounts the member views, their bookings and
   balance series.
+- [Patch change](resources/patch-change.md) — the latest patch change with its wipe list, and the
+  member's home-location choice after it.
 
 ## Support
 

@@ -328,6 +328,23 @@ public enum LiveSyncTopicClass {
       Set.of(Roles.authority(Roles.ADMIN))),
 
   /**
+   * Global admin room for {@code /admin/settings/patch-change} with the section {@code history}
+   * (the history and the form's previous values), authorized locally by {@code ROLE_ADMIN} ({@link
+   * #requiredAnyRole}). The backend publishes into it after a trigger or a label correction
+   * (REQ-PATCH-008).
+   */
+  PATCH_CHANGE(
+      "patch-change",
+      false,
+      Set.of("history"),
+      false,
+      "patch_change",
+      null,
+      null,
+      null,
+      Set.of(Roles.authority(Roles.ADMIN))),
+
+  /**
    * Global admin room for {@code /admin/starmap}, {@code /admin/shops}, {@code /admin/items} and
    * {@code /admin/p4k-import} with sections {@code starmap} (the objects, their visibility and
    * storage places, and the UEX links), {@code shops} (the shops and their terminal links), {@code

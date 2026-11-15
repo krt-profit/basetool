@@ -147,6 +147,7 @@ class SupplyItemChipsRenderTest {
         null,
         "PLEDGED",
         null,
+        null,
         "Vexx",
         true,
         false,

@@ -219,6 +219,7 @@
                                               th:text="#{__${r.statusLabelKey()}__}">Ausstehend</span>
                                         <span class="reason text-muted" th:if="${r.status() == 'REJECTED' and r.rejectReason() != null}"
                                               th:text="' &mdash; ' + ${r.rejectReason()}"></span>
+                                        <th:block th:replace="~{bank/fragments/bank-request-reason :: cancelledByPatch(label=${r.cancelledByPatchLabel()})}"></th:block>
                                     </td>
                                     <td>
                                         <th:block th:if="${r.linked() != null and r.linked().destinationHolderHandle() != null}">
@@ -437,6 +438,7 @@
                                         <span class="chip"
                                               th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
                                               th:text="#{__${r.statusLabelKey()}__}">Ausstehend</span>
+                                        <th:block th:replace="~{bank/fragments/bank-request-reason :: cancelledByPatch(label=${r.cancelledByPatchLabel()})}"></th:block>
                                     </td>
                                     <td>
                                         <span th:if="${!r.requiresOwnerApproval()}" class="text-muted">&ndash;</span>

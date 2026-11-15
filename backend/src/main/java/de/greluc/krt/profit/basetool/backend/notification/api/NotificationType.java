@@ -392,6 +392,12 @@ public enum NotificationType {
   HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN,
 
   /**
+   * An admin changed the origin of several of the recipient's ships (REQ-HANGAR-018), rendered with
+   * {@code actor} and {@code count}; the origin itself is never named.
+   */
+  HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN,
+
+  /**
    * An admin changed the recipient's blueprints (REQ-HANGAR-008), rendered with {@code actor}, the
    * {@code change} word and {@code subject}.
    */
@@ -599,6 +605,7 @@ public enum NotificationType {
           HANGAR_FITTED_RESET,
           HANGAR_CHANGED_BY_ADMIN,
           HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN,
+          HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN,
           BLUEPRINT_CHANGED_BY_ADMIN,
           BLUEPRINT_PURGED_BY_ADMIN,
           EXCHANGE_CLIENT_SUSPENDED,

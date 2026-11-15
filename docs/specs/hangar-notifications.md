@@ -43,7 +43,8 @@ never its `EVENT_RECIPIENT`.
 ### REQ-HANGAR-007 — A bulk reset of the fitted marks tells each owner
 
 `HangarService#resetAllFittedStatus` counts the fitted ships per owner in the caller's scope before it
-clears them and publishes one `HANGAR_FITTED_RESET_FOR_OWNER` per owner with their count. The default
+clears them and publishes one `HANGAR_FITTED_RESET_FOR_OWNER` per owner with their count; ships the
+relocation lock keeps from the caller (REQ-PATCH-023) are neither cleared nor counted. The default
 rule notifies the owner and excludes the actor, so an officer resetting their own ships hears nothing.
 
 ### REQ-HANGAR-008 — An admin changing a member's hangar or blueprints tells the member
@@ -53,7 +54,9 @@ rule notifies the owner and excludes the actor, so an officer resetting their ow
 the admin member hangar of REQ-HANGAR-011 / -012) publish `HANGAR_CHANGED_BY_ADMIN`;
 `#bulkChangeShipOrgUnitByAdmin` publishes one notice per action — `HANGAR_CHANGED_BY_ADMIN` when one
 ship moved, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` with the `count` when several did, nothing when
-none did; `PersonalBlueprintService#addForUser`,
+none did; `HangarShipOriginService#bulkChangeOriginByAdmin` (REQ-HANGAR-018) likewise publishes
+`HANGAR_CHANGED_BY_ADMIN` (`UPDATED`) for one changed ship and `HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN`
+with the `count` for several, never naming the origin; `PersonalBlueprintService#addForUser`,
 `#addBatchForUser`, `#updateForUser`, `#deleteForUser` and the admin import apply
 (`#announceImportByAdmin`) publish `BLUEPRINT_CHANGED_BY_ADMIN`; the global purge
 `#deleteAllForAllUsers` counts the removable blueprints per owner first and publishes

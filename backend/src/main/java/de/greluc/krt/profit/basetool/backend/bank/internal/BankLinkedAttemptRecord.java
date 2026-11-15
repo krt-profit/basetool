@@ -81,4 +81,16 @@ class BankLinkedAttemptRecord {
     this.fee = fee;
     this.samePlayer = samePlayer;
   }
+
+  /**
+   * Tells whether this record is the given attempt for the same purpose.
+   *
+   * @param attempt the attempt a caller names
+   * @return whether id, purpose kind and purpose reference all match
+   */
+  boolean identifies(@NotNull BankLinkedAttempt attempt) {
+    return id.equals(attempt.id())
+        && purposeKind == attempt.purpose().kind()
+        && purposeRef.equals(attempt.purpose().ref());
+  }
 }

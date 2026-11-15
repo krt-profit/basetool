@@ -34,8 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The identity module's part of the account merge: the roles follow the member, joined with the
- * target's (REQ-SEC-088); the approval history, the erasure requests and the terms acceptance stay
- * with the account.
+ * target's (REQ-SEC-088); the approval history, the erasure requests, the terms acceptance and the
+ * home-location setting stay with the account.
  */
 @Component
 public class IdentityUserReassignment extends OwnedRowsReassignment {
@@ -66,7 +66,8 @@ public class IdentityUserReassignment extends OwnedRowsReassignment {
             "user_approval_event.decided_by_id",
             "deletion_request.user_id",
             "deletion_request.decided_by_id",
-            "terms_acceptance.user_id"));
+            "terms_acceptance.user_id",
+            "member_home_location.user_id"));
     this.userRepository = userRepository;
     this.eventPublisher = eventPublisher;
   }

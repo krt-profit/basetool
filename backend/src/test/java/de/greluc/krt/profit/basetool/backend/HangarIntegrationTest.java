@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -131,7 +132,8 @@ class HangarIntegrationTest {
   @Test
   void testUserManageOwnHangar() throws Exception {
     ShipRequestDto shipReq =
-        new ShipRequestDto("My Fighter", fighter.getId(), "LTI", null, true, null, null);
+        new ShipRequestDto(
+            "My Fighter", fighter.getId(), "LTI", null, true, null, null, ShipOrigin.PLEDGE);
 
     String response =
         mockMvc
@@ -154,7 +156,7 @@ class HangarIntegrationTest {
 
     ShipRequestDto updateReq =
         new ShipRequestDto(
-            "Updated Fighter", fighter.getId(), "LTI", null, true, savedShip.version(), null);
+            "Updated Fighter", fighter.getId(), "LTI", null, true, savedShip.version(), null, null);
     mockMvc
         .perform(
             put("/api/v1/hangar/ships/" + savedShip.id())
@@ -192,7 +194,7 @@ class HangarIntegrationTest {
     ship = shipRepository.save(ship);
 
     ShipRequestDto upReq =
-        new ShipRequestDto("Hacked", fighter.getId(), "LTI", null, false, 0L, null);
+        new ShipRequestDto("Hacked", fighter.getId(), "LTI", null, false, 0L, null, null);
     mockMvc
         .perform(
             put("/api/v1/hangar/ships/" + ship.getId())
@@ -217,7 +219,8 @@ class HangarIntegrationTest {
   @Test
   void testAdminManageUserHangar() throws Exception {
     ShipRequestDto req =
-        new ShipRequestDto("Admin Gift", fighter.getId(), "LTI", null, false, null, null);
+        new ShipRequestDto(
+            "Admin Gift", fighter.getId(), "LTI", null, false, null, null, ShipOrigin.IN_GAME);
 
     String response =
         mockMvc
@@ -245,7 +248,7 @@ class HangarIntegrationTest {
 
     ShipRequestDto upReq =
         new ShipRequestDto(
-            "Admin Updated", fighter.getId(), "LTI", null, false, savedShip.version(), null);
+            "Admin Updated", fighter.getId(), "LTI", null, false, savedShip.version(), null, null);
     mockMvc
         .perform(
             put("/api/v1/hangar/admin/users/" + user1.getId() + "/ships/" + savedShip.id())

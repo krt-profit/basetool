@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The patch change whose currency wipe cancelled a booking request, beneath its status (REQ-PATCH-042); nothing for any other request. */-->
+<span th:fragment="cancelledByPatch(label)" th:if="${label != null}" class="cell-sub"
+      data-testid="bank-request-cancelled-by-patch"
+      th:text="#{bank.request.cancelledByPatch(${label})}">Patchwechsel 4.4</span>
+</body>
+</html>

@@ -138,6 +138,7 @@ class HangarBulkUnitE2eTest {
     page.locator("#ship-type").selectOption(new SelectOption().setLabel("E2E Ship Type"));
     page.locator("#ship-name").fill(name);
     page.getByTestId("segment-insuranceKind-lti").click();
+    page.getByTestId("segment-origin-pledge").click();
     page.evaluate(
         "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
             + " 'none'; } }");

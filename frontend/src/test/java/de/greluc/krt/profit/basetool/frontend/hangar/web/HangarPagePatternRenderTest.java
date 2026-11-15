@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOriginDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipPledgeDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipDetailDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
@@ -130,7 +131,9 @@ class HangarPagePatternRenderTest {
         3L,
         0L,
         null,
-        null);
+        null,
+        null,
+        false);
   }
 
   /**
@@ -180,7 +183,9 @@ class HangarPagePatternRenderTest {
             3L,
             4L,
             null,
-            null);
+            null,
+            null,
+            false);
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
         .thenReturn(page(List.of(assigned), 1L));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
@@ -233,7 +238,9 @@ class HangarPagePatternRenderTest {
                 new BigDecimal("1275.00"),
                 "USD",
                 true,
-                false));
+                false),
+            null,
+            false);
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
         .thenReturn(page(List.of(imported, ship("Plain", "0", false)), 2L));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
@@ -274,7 +281,9 @@ class HangarPagePatternRenderTest {
             3L,
             4L,
             null,
-            null);
+            null,
+            null,
+            false);
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
         .thenReturn(page(List.of(assigned), 1L));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
@@ -360,6 +369,80 @@ class HangarPagePatternRenderTest {
         .contains("data-list-total=\"3\"");
   }
 
+  /**
+   * Each own ship shows its origin as a chip, the edit button carries it for the dialog, the page
+   * counts the ships of unknown origin in a hint and offers the filter, the dialog the origin
+   * choice and the selection bar the two bulk marks (REQ-HANGAR-017, -018).
+   */
+  @Test
+  @WithMockUser
+  void rendersTheOriginChipHintFilterDialogAndBulkMarks() throws Exception {
+    ShipDto bought = withOrigin(ship("Funke", "3", true), new ShipOriginDto("IN_GAME", false));
+    ShipDto imported =
+        withOrigin(ship("Iron Mule", "LTI", true), new ShipOriginDto("PLEDGE", true));
+    when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
+        .thenReturn(page(List.of(bought, imported), 2L));
+    when(backendApiClient.get(eq(MY_SHIPS + "?page=0&size=1&origin=UNKNOWN"), anyTypeRef()))
+        .thenReturn(page(List.of(), 4L));
+    when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
+
+    String html = render("/hangar");
+
+    assertThat(html)
+        .containsPattern("class=\"chip chip--warning\" data-testid=\"hangar-ship-origin\"")
+        .contains(">Ingame gekauft<")
+        .containsPattern("class=\"chip chip--primary\" data-testid=\"hangar-ship-origin\"")
+        .contains("title=\"Aus einem Import – fest als gepledged.\"")
+        .containsPattern("data-origin=\"IN_GAME\"\\s+data-origin-locked=\"false\"")
+        .containsPattern("data-origin=\"PLEDGE\"\\s+data-origin-locked=\"true\"")
+        .containsPattern("id=\"hangar-origin-hint\"[^>]*>Bei 4 Schiff\\(en\\) ist die Herkunft")
+        .contains("data-unknown-origin=\"4\"")
+        .contains("data-testid=\"hangar-origin-unknown-filter\"")
+        .contains("data-testid=\"ship-origin\"")
+        .contains("data-testid=\"segment-origin-pledge\"")
+        .contains("data-testid=\"segment-origin-in_game\"")
+        .contains("data-testid=\"hangar-bulk-origin-pledge\"")
+        .contains("data-testid=\"hangar-bulk-origin-in-game\"");
+  }
+
+  /** The origin filter reaches the backend, stays checked and survives paging. */
+  @Test
+  @WithMockUser
+  void forwardsTheOriginFilter() throws Exception {
+    when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
+        .thenReturn(page(List.of(ship(null, "0", false)), 1L));
+
+    String html = render("/hangar?origin=UNKNOWN");
+
+    verify(backendApiClient).get(eq(MY_SHIPS + "?page=0&size=50&origin=UNKNOWN"), anyTypeRef());
+    assertThat(html).containsPattern("name=\"origin\" value=\"UNKNOWN\"[^>]*checked=\"checked\"");
+  }
+
+  /**
+   * The ship with its origin replaced.
+   *
+   * @param ship the ship
+   * @param origin the origin
+   * @return the ship with that origin
+   */
+  private static @NotNull ShipDto withOrigin(@NotNull ShipDto ship, @NotNull ShipOriginDto origin) {
+    return new ShipDto(
+        ship.id(),
+        ship.name(),
+        ship.shipType(),
+        ship.insurance(),
+        ship.location(),
+        ship.fitted(),
+        ship.owner(),
+        ship.owningSquadron(),
+        ship.version(),
+        ship.owningOrgUnitVersion(),
+        ship.productionStatus(),
+        ship.pledge(),
+        origin,
+        false);
+  }
+
   /** The fitted segment reaches the backend and keeps the counter on the unfiltered total. */
   @Test
   @WithMockUser
@@ -407,8 +490,8 @@ class HangarPagePatternRenderTest {
             4L,
             3L,
             List.of(
-                new SquadronShipDetailDto("Pilot Eins", "Area18", true),
-                new SquadronShipDetailDto("Pilot Zwei", null, false)));
+                new SquadronShipDetailDto("Pilot Eins", "Area18", true, false),
+                new SquadronShipDetailDto("Pilot Zwei", null, false, false)));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef()))
         .thenReturn(page(List.of(cutlass), 1L));
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef())).thenReturn(page(List.of(), 7L));
@@ -434,6 +517,32 @@ class HangarPagePatternRenderTest {
         .doesNotContain("<thead><tr><th>Besitzer");
   }
 
+  /** An owner row whose ship a pending relocation locks carries the „Umzug ausstehend" chip. */
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void marksTheOwnerRowOfAShipAPendingRelocationLocks() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+    SquadronShipOverviewDto cutlass =
+        new SquadronShipOverviewDto(
+            type("Cutlass Black", "Drake"),
+            2L,
+            1L,
+            List.of(
+                new SquadronShipDetailDto("Pilot Eins", "Area18", true, false),
+                new SquadronShipDetailDto("Pilot Zwei", null, false, true)));
+    when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef()))
+        .thenReturn(page(List.of(cutlass), 1L));
+    when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef())).thenReturn(page(List.of(), 0L));
+
+    String html = render("/hangar/squadron");
+
+    assertThat(html)
+        .containsOnlyOnce("data-testid=\"relocation-pending-chip\"")
+        .contains(">Umzug ausstehend<");
+    assertThat(html.indexOf("relocation-pending-chip")).isGreaterThan(html.indexOf("Pilot Zwei"));
+  }
+
   /** A member sees the counts but neither the owner toggle nor the owner rows. */
   @Test
   @WithMockUser
@@ -443,7 +552,7 @@ class HangarPagePatternRenderTest {
             type("Cutlass Black", "Drake"),
             2L,
             1L,
-            List.of(new SquadronShipDetailDto("Pilot Eins", "Area18", true)));
+            List.of(new SquadronShipDetailDto("Pilot Eins", "Area18", true, false)));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef()))
         .thenReturn(page(List.of(cutlass), 1L));
 

@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
@@ -115,7 +116,8 @@ class UserPlainLookupIntegrationTest {
   @Test
   void addShipThroughThePlainLookup_stillReturnsTheOwnersRoles() throws Exception {
     ShipRequestDto request =
-        new ShipRequestDto("Plain lookup ship", shipTypeId, "LTI", null, false, null, null);
+        new ShipRequestDto(
+            "Plain lookup ship", shipTypeId, "LTI", null, false, null, null, ShipOrigin.PLEDGE);
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     mockMvc

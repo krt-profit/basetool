@@ -203,7 +203,8 @@ class BankRequestsPatternRenderTest {
                 UUID.randomUUID(), "orion", new BigDecimal("20000"), null)
             : "AUTHORISATION".equals(type)
                 ? new LinkedBankRequestDetails(null, null, BigDecimal.ZERO, null)
-                : null);
+                : null,
+        null);
   }
 
   /**
