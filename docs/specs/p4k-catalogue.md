@@ -841,30 +841,35 @@ page), whose item references carry a `ManufacturerRefDto` with the GUID.
 
 ## Names
 
-### REQ-P4K-023 — a German name is stored beside the name; every page shows the English game text
+### REQ-P4K-023 — every page shows English catalogue source text
 
-`manufacturer`, `game_item`, `ship_type` and `material` gain `name_de`, written by the P4K import
-only (`name.de`); the commodity categories and starmap objects carry it as well (REQ-P4K-025,
-REQ-P4K-034). Which name a page shows follows one game-text language policy, set by the owner:
-under **English** (in force) every page shows `name`, whatever the page language; under **page
-language** a German page shows `name_de` and falls back to `name`. A ship type's description is
-the English one and falls back to the German one only where no English one exists. Search and
-matching keep running on `name`.
+Every server-rendered page, live fragment and client-rendered catalogue view shows the English
+variant of text imported from p4kx, UEX or the SC Wiki. This applies to names, descriptions and
+source-owned type and category labels. A missing English description leaves the description
+empty. The member catalogue snapshot and its domain slices expose the English source name as
+their display name (issue #3098). Basetool UI text and curated labels, including quality tiers,
+keep their own translations.
 
 **Acceptance**
 
-- [x] Under the English policy, a German and an English page both show `name`, also for a row with
-  `name_de`, and a ship type with both descriptions shows the English one.
-- [x] Under the page-language policy, a German page shows the German name of an item; an English
-  page, and a German page for a row without `name_de`, show `name`.
-- [x] A search for the German name alone finds nothing it would not find by `name`.
+- [x] Pages and live fragments in both languages show the English name whether or not a German
+  name exists, and show a ship type's English description where available.
+- [x] A ship type with only a German description has an empty description on both pages and
+  live fragments.
+- [x] Search and matching keep their existing rules, including German matches where supported.
 
-The import writes `name.de` on every matched row and every row it creates; a blank German text or
-the game's missing-translation marker (a text starting with `!`) is no German name and leaves the
-stored one. The item merge of the SC Wiki / UEX reconciliation moves `name_de` with the P4K GUID.
-The DTOs of manufacturers, ship types, materials and item references carry `nameDe`, and a page
-picks the name through the policy (`LocalisedNames.SHOWN` on server-rendered pages,
-`GAME_TEXT_LANGUAGE` of `krt-localised-name.js` in scripts; both hold the same value). Every page
+The P4K import writes `name_de` for manufacturers, items, ship types, materials, commodity
+categories and starmap objects from `name.de` (REQ-P4K-025, REQ-P4K-034). A blank German text or
+the game's missing-translation marker (a text starting with `!`) leaves the stored value intact.
+The item merge of the SC Wiki / UEX reconciliation moves `name_de` with the P4K GUID. Imports,
+storage and existing API representations keep the German variants. The ship type DTO's
+`descriptionInEnglish` flag indicates the source of its `description` for the display seam.
+
+The display seams set the game-text language to English (`LocalisedNames.SHOWN` in Java and
+`GAME_TEXT_LANGUAGE` in `krt-localised-name.js`). The ship catalogue uses
+`ShipTypeDto.displayDescription()` for the description on the initial page and in the results
+fragment. Only one source value reaches views of commodity category and blueprint names, through
+the corresponding catalogue DTO's canonical English name. Every page
 that names a manufacturer, item, ship or material picks it this way: Ship-Data, the hangars and missions with their pickers, the materials list, overview,
 matrix, profit calculation and detail, the material and item pickers, job orders, supply,
 purchasing, the dashboard widgets, inventory and stock levels, refinery, the material exchange and
@@ -877,7 +882,7 @@ name, and the file exports (the handover report PDF, the purchasing CSV), show `
 `:frontend:testCatalogueAdminJs`,
 `ShipTypeMapperTest`, `ShipDataPageControllerMvcTest`, `ItemPickerLabelsTest`,
 `ItemReconciliationServiceTest` ·
-**ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
+**ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890, #3213
 
 ## Commodities and categories
 
@@ -1401,7 +1406,7 @@ and stops with the ids of any location it cannot resolve.
 
 ### REQ-P4K-037 — a linked place shows its P4K name, and only the curated name reaches the exchange
 
-The UI shows the P4K name of a linked place in the page language (`name_de` / `name`).
+The UI shows the English P4K name of a linked place (REQ-P4K-023).
 `location.name` stays the curated name (from UEX for cities and stations, set by the admin for other
 nodes); it is no game text and the only location name that reaches the exchange. A linked place
 additionally carries `guid` in the exchange, additive in `v1`; `uex:{kind,id}` stays, and the
@@ -1410,13 +1415,13 @@ write resolver tries `guid`, then `uex`, then the exact name (specified in
 
 **Acceptance**
 
-- [x] A German page shows the German P4K name of a linked city; the exchange serves its
+- [x] A German page shows the English P4K name of a linked city; the exchange serves its
   `location.name`.
 
 A place is linked through its own node, else through its city's, else its space station's object;
 an object the sweep stamped or an admin hid gives no `guid`, so the next one in that order does.
 `LocationDto` carries the object's `p4kName` and `p4kNameDe` (read-only); the admin locations page
-shows the one of the page language under the curated name. The storage-place dialog of
+shows the English P4K name under the curated name. The storage-place dialog of
 `/admin/starmap` names the object by its P4K name but opens with an empty name field: the admin
 types the curated name, and no P4K text is copied into `location.name`.
 

@@ -42,6 +42,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -82,18 +84,22 @@ class ShipDataPageControllerMvcTest {
    * @param empty whether both catalogues come back empty
    */
   private void stubCatalogue(boolean empty) {
-    stubCatalogue(empty, null, null);
+    stubCatalogue(empty, null, null, "English ship description");
   }
 
   /**
-   * Stubs one manufacturer and one ship type with German names, or none of either.
+   * Stubs optional catalogue names and a ship description with the API's German fallback.
    *
    * @param empty whether both catalogues come back empty
    * @param manufacturerNameDe the manufacturer's German name, or {@code null}
    * @param shipTypeNameDe the ship type's German name, or {@code null}
+   * @param shipTypeDescriptionEn the ship type's English description, or {@code null}
    */
   private void stubCatalogue(
-      boolean empty, @Nullable String manufacturerNameDe, @Nullable String shipTypeNameDe) {
+      boolean empty,
+      @Nullable String manufacturerNameDe,
+      @Nullable String shipTypeNameDe,
+      @Nullable String shipTypeDescriptionEn) {
     ManufacturerDto manufacturer =
         new ManufacturerDto(
             UUID.randomUUID(),
@@ -110,12 +116,15 @@ class ShipDataPageControllerMvcTest {
             UUID.randomUUID(),
             "Avenger Titan",
             manufacturer,
-            "Titan",
+            shipTypeDescriptionEn == null
+                ? "Nur deutsche Schiffsbeschreibung"
+                : shipTypeDescriptionEn,
             new BigDecimal("8"),
             true,
             null,
             false,
-            shipTypeNameDe);
+            shipTypeNameDe,
+            shipTypeDescriptionEn != null);
     List<ManufacturerDto> manufacturers = empty ? List.of() : List.of(manufacturer);
     List<ShipTypeDto> shipTypes = empty ? List.of() : List.of(shipType);
     PageResponse<ManufacturerDto> manufacturersPage =
@@ -172,7 +181,7 @@ class ShipDataPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void englishNamesShowOnAGermanPage_andAManufacturerWithoutALogoShowsItsBadge() throws Exception {
-    stubCatalogue(false, "Aegis Dynamik", "Avenger Titan DE");
+    stubCatalogue(false, "Aegis Dynamik", "Avenger Titan DE", "English ship description");
 
     String german =
         mockMvc
@@ -192,13 +201,35 @@ class ShipDataPageControllerMvcTest {
     assertThat(german)
         .contains("class=\"cell-title\">Aegis Dynamics</span>")
         .contains("class=\"cell-title\">Avenger Titan</span>")
+        .contains("English ship description")
         .doesNotContain("Aegis Dynamik", "Avenger Titan DE")
         .contains("data-testid=\"manufacturer-badge\"")
         .doesNotContain("data-testid=\"manufacturer-logo\"");
     assertThat(english)
         .contains("class=\"cell-title\">Aegis Dynamics</span>")
         .contains("class=\"cell-title\">Avenger Titan</span>")
+        .contains("English ship description")
         .doesNotContain("Aegis Dynamik");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"de, ''", "en, ''", "de, results", "en, results"})
+  @WithMockUser(roles = "KRT_MEMBER")
+  void shipDescriptionStaysEmptyWhenOnlyGermanExists(String lang, String fragment)
+      throws Exception {
+    stubCatalogue(false, null, null, null);
+
+    String html =
+        mockMvc
+            .perform(get("/ship-data").param("lang", lang).param("fragment", fragment))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"cell-title\">Avenger Titan</span>")
+        .doesNotContain("Nur deutsche Schiffsbeschreibung");
   }
 
   /**
@@ -342,6 +373,7 @@ class ShipDataPageControllerMvcTest {
 
     assertThat(html)
         .contains("data-testid=\"ship-type-row\"")
+        .contains("English ship description")
         .doesNotContain("manufacturer-row")
         .doesNotContain("<html");
   }

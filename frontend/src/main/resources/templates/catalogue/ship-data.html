@@ -69,7 +69,7 @@
                                 <span class="cell-title" th:text="${st.displayName(#locale)}">Name</span>
                                 <span class="cell-sub" th:if="${st.manufacturer != null}" th:insert="~{catalogue/fragments/manufacturer-mark :: mark(${st.manufacturer})}">Hersteller</span>
                             </td>
-                            <td th:attr="data-label=#{ship.shiptype.description}" th:text="${st.description}">Desc</td>
+                            <td th:attr="data-label=#{ship.shiptype.description}" th:text="${st.displayDescription()}">Desc</td>
                             <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                                 <form th:action="@{/ship-data/ship-types/{id}/visibility(id=${st.id})}" method="post"
                                       class="js-visibility-toggle m-0"

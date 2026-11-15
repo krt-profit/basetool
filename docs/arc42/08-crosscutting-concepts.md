@@ -587,6 +587,8 @@ Three rules hold for every exchange route, and each new resource or capability i
   against it; the backend's answers are validated against the published schemas, every gateway
   route has a committed golden answer, the gateway's security filter order is pinned, and a pull
   request touching the exchange path needs the `e2e` label (REQ-XCH-036…-038).
+- **Game-text display** follows [REQ-P4K-023](../specs/p4k-catalogue.md#req-p4k-023--every-page-shows-english-catalogue-source-text)
+  across server and client rendering.
 - **Game texts and game media stay with members.** A column holding a game text carries
   `@GameText` (`@GameMedia` for archive media, on no column today), by content, whichever writer
   fills it. Three guards keep them from third parties: an ArchUnit rule forbids the exchange to call

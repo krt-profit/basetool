@@ -107249,6 +107249,9 @@
           "description" : {
             "type" : "string"
           },
+          "descriptionInEnglish" : {
+            "type" : "boolean"
+          },
           "hidden" : {
             "type" : "boolean"
           },

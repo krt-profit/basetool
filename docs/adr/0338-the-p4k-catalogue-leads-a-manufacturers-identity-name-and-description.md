@@ -42,8 +42,8 @@ abbreviation is never an identity (REQ-DATA-004). The Basetool shows only Englis
    the name or abbreviation, and is never an identity source. A name or code that differs from the
    P4K goes to `external_sync_report`.
 8. **`name_de` for every kind.** A new `name_de` on `manufacturer`, `game_item`, `ship_type` and
-   `material`, written by the P4K import only. The UI shows `name_de` when the page language is
-   German and falls back to `name`. Search and matching keep running on `name`.
+   `material`, written by the P4K import only. The UI follows REQ-P4K-023 and shows catalogue
+   source texts in English on every page. Search and matching keep running on `name`.
 9. **Logos.** Unmodified Fan Kit PNGs ship as static frontend resources, mapped from the P4K GUID
    to the file name by a versioned mapping file; no database column, no upload. They are shown in
    the Ship-Data manufacturer list, the personal and squadron hangar, the ship-type form picker and
@@ -55,7 +55,7 @@ abbreviation is never an identity (REQ-DATA-004). The Basetool shows only Englis
 - A manufacturer has one identity across the sources, and its name follows the game.
 - A renamed manufacturer whose new name another row holds waits on the review list until an admin
   merges the two.
-- German pages show German names for manufacturers, items, ships and commodities.
+- The English display language is independent of the UI language, and German texts stay stored.
 - Logos come from the Fan Kit, not from the game archive, so the rule against archive media does
   not apply to them.
 - The rules go into the P4K catalogue spec, `docs/specs/p4k-catalogue.md`.

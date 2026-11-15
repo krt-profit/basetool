@@ -40,8 +40,8 @@ released object; the contract leaves the decision to the Basetool from `system`,
    cities and stations; any other starmap node becomes a storage place only when an admin creates
    it, and the P4K import never creates storage places. The refinery rule (REQ-REFINERY-020) and
    the exchange `uex` reference keep running through city / station.
-6. **Names.** The UI shows the P4K name of a linked place in the page language (`name_de` /
-   `name`). `location.name` stays the curated name (from UEX for cities and stations, set by the
+6. **Names.** The UI shows the English P4K name of a linked place (REQ-P4K-023).
+   `location.name` stays the curated name (from UEX for cities and stations, set by the
    admin for other nodes); it is not a game text and is the only location name that reaches the
    exchange.
 7. **Exchange.** `uex:{kind,id}` stays and is not deprecated. A linked place additionally carries
