@@ -45,7 +45,10 @@ export function createMissionDraftRows(list, template, carrier, options) {
                     values[name] = field.checked;
                 } else {
                     const text = field.value.trim();
-                    values[name] = name === 'frequency' && text ? Number(text) : text || null;
+                    values[name] =
+                        field.hasAttribute('data-number-input') && text
+                            ? Number(text)
+                            : text || null;
                 }
             });
             return values;

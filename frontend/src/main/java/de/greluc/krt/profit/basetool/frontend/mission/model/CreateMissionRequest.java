@@ -30,8 +30,9 @@ import java.util.UUID;
  * /api/v1/missions}, separate from {@link MissionDto}.
  *
  * <p>{@link #owningOrgUnitId} is the owner picker output (REQ-ORG-016, REQ-ORG-017); {@code null}
- * lets the backend stamp the owner. {@link #objectives} and {@link #steps} carry the optional Ziele
- * and Ablauf rows created with the mission, {@code null} when none.
+ * lets the backend stamp the owner. {@link #objectives}, {@link #steps}, {@link #units} and {@link
+ * #plannedFrequencies} carry the optional planning rows created with the mission, {@code null} when
+ * none.
  */
 @DtoMirror
 public record CreateMissionRequest(
@@ -49,6 +50,7 @@ public record CreateMissionRequest(
     List<NewObjective> objectives,
     List<NewStep> steps,
     List<MissionTemplatePlan.Unit> units,
+    List<MissionTemplatePlan.Frequency> plannedFrequencies,
     TemplateSelection templateSelection) {
 
   /**

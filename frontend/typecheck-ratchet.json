@@ -228,9 +228,13 @@
       "mission/mission-hooks.js",
       "mission/mission-presence.js",
       "mission/mission-create-rows.js",
+      "mission/mission-create-schedule.js",
+      "mission/mission-create-template-apply.js",
       "mission/mission-create.js",
+      "mission/mission-frequency-rows.js",
       "mission/mission-planning-rows.js",
       "mission/mission-template-editor.js",
+      "mission/mission-template-parts.js",
       "mission/mission-templates.js",
       "mission/missions.js"
     ],

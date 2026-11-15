@@ -92711,6 +92711,12 @@
             "type" : "string",
             "format" : "date-time"
           },
+          "plannedFrequencies" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MissionTemplateFrequency"
+            }
+          },
           "plannedStartTime" : {
             "type" : "string",
             "format" : "date-time"
@@ -92741,6 +92747,29 @@
       "CreateMissionTemplateRequest" : {
         "type" : "object",
         "properties" : {
+          "description" : {
+            "type" : "string",
+            "maxLength" : 20000,
+            "minLength" : 0
+          },
+          "frequencies" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MissionTemplateFrequency"
+            }
+          },
+          "isInternal" : {
+            "type" : "boolean"
+          },
+          "meetingPoint" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "meetingTime" : {
+            "type" : "string",
+            "format" : "time-local"
+          },
           "name" : {
             "type" : "string",
             "maxLength" : 255,
@@ -92755,6 +92784,14 @@
           "owningOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "plannedEndTime" : {
+            "type" : "string",
+            "format" : "time-local"
+          },
+          "plannedStartTime" : {
+            "type" : "string",
+            "format" : "time-local"
           },
           "steps" : {
             "type" : "array",
@@ -99782,9 +99819,28 @@
       "MissionTemplateDto" : {
         "type" : "object",
         "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "frequencies" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MissionTemplateFrequency"
+            }
+          },
           "id" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "isInternal" : {
+            "type" : "boolean"
+          },
+          "meetingPoint" : {
+            "type" : "string"
+          },
+          "meetingTime" : {
+            "type" : "string",
+            "format" : "time-local"
           },
           "name" : {
             "type" : "string"
@@ -99798,6 +99854,14 @@
           "owningOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "plannedEndTime" : {
+            "type" : "string",
+            "format" : "time-local"
+          },
+          "plannedStartTime" : {
+            "type" : "string",
+            "format" : "time-local"
           },
           "steps" : {
             "type" : "array",
@@ -99816,6 +99880,26 @@
             "format" : "int64"
           }
         }
+      },
+      "MissionTemplateFrequency" : {
+        "type" : "object",
+        "properties" : {
+          "frequencyTypeId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "value" : {
+            "type" : "number",
+            "maximum" : 999.99,
+            "minimum" : 0
+          }
+        },
+        "required" : [ "value" ]
       },
       "MissionTemplateObjective" : {
         "type" : "object",
@@ -108849,6 +108933,29 @@
       "UpdateMissionTemplateRequest" : {
         "type" : "object",
         "properties" : {
+          "description" : {
+            "type" : "string",
+            "maxLength" : 20000,
+            "minLength" : 0
+          },
+          "frequencies" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MissionTemplateFrequency"
+            }
+          },
+          "isInternal" : {
+            "type" : "boolean"
+          },
+          "meetingPoint" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "meetingTime" : {
+            "type" : "string",
+            "format" : "time-local"
+          },
           "name" : {
             "type" : "string",
             "maxLength" : 255,
@@ -108859,6 +108966,14 @@
             "items" : {
               "$ref" : "#/components/schemas/MissionTemplateObjective"
             }
+          },
+          "plannedEndTime" : {
+            "type" : "string",
+            "format" : "time-local"
+          },
+          "plannedStartTime" : {
+            "type" : "string",
+            "format" : "time-local"
           },
           "steps" : {
             "type" : "array",

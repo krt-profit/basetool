@@ -25,6 +25,29 @@ import { createMissionTemplateEditor } from '/js/mission/mission-template-editor
 
 /** @typedef {ApiDto<'MissionTemplateDto'>} MissionTemplate */
 /** @typedef {MissionTemplate & Required<Pick<MissionTemplate, 'id' | 'owningOrgUnitId' | 'version'>>} EditableTemplate */
+/**
+ * A template draft taken from a mission, whose times are still instants.
+ *
+ * @typedef {{
+ *     template: ApiDto<'CreateMissionTemplateRequest'>,
+ *     meetingTime?: string | null,
+ *     plannedStartTime?: string | null,
+ *     plannedEndTime?: string | null,
+ * }} MissionDraft
+ */
+
+/**
+ * Turns a mission instant into the time of day the viewer sees it at.
+ *
+ * @param {string | null | undefined} instant the ISO instant
+ * @returns {string | undefined} the local `HH:mm`, or undefined when absent or invalid
+ */
+function localTimeOfDay(instant) {
+    const date = instant ? new Date(instant) : null;
+    if (!date || Number.isNaN(date.getTime())) return undefined;
+    const pad = (/** @type {number} */ value) => String(value).padStart(2, '0');
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 const workspace = document.getElementById('mission-template-workspace');
 const panel = document.getElementById('mission-template-editor');
@@ -171,10 +194,13 @@ function setup(workspace, panel, scope, createButton, list, listError) {
     }
 
     if (messages.templateDraft) {
-        const draft = /** @type {ApiDto<'CreateMissionTemplateRequest'>} */ (
-            JSON.parse(messages.templateDraft)
-        );
-        editor.open(scope.value, draft);
+        const draft = /** @type {MissionDraft} */ (JSON.parse(messages.templateDraft));
+        editor.open(scope.value, {
+            ...draft.template,
+            meetingTime: localTimeOfDay(draft.meetingTime),
+            plannedStartTime: localTimeOfDay(draft.plannedStartTime),
+            plannedEndTime: localTimeOfDay(draft.plannedEndTime),
+        });
         const url = new URL(window.location.href);
         url.searchParams.delete('sourceMissionId');
         window.history.replaceState(window.history.state, '', url);

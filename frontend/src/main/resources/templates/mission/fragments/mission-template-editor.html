@@ -3,7 +3,8 @@
 <body>
 <section id="mission-template-editor" class="list-panel mission-template-editor" th:fragment="editor"
          aria-labelledby="mission-template-editor-title" hidden
-         th:attr="data-create-title=#{missionTemplate.create},data-edit-title=#{missionTemplate.edit},data-hidden-ship-type=#{missionTemplate.shipType.hidden}">
+         th:attr="data-create-title=#{missionTemplate.create},data-edit-title=#{missionTemplate.edit},data-hidden-ship-type=#{missionTemplate.shipType.hidden},
+             data-part-remove-confirm=#{missionTemplate.part.remove.confirm},data-part-remove-label=#{missionTemplate.part.remove.action},data-cancel-label=#{general.cancel}">
     <header class="card-head mission-template-editor-head">
         <h2 id="mission-template-editor-title" th:text="#{missionTemplate.create}">Neue Vorlage</h2>
     </header>
@@ -23,35 +24,135 @@
             </label>
         </div>
 
-        <div class="mission-template-plan">
-            <section class="mission-template-section" aria-labelledby="mission-template-objectives-title">
+        <div class="mission-template-parts" role="group" aria-labelledby="mission-template-parts-label" data-template-part-bar>
+            <span class="mission-template-parts-label" id="mission-template-parts-label" th:text="#{missionTemplate.parts.add}">Bestandteil hinzufügen</span>
+            <button type="button" class="btn btn-ghost btn-xs"
+                    th:each="part : ${ {'description', 'schedule', 'meetingPoint', 'visibility', 'frequencies', 'objectives', 'steps', 'units'} }"
+                    th:attr="data-template-part-add=${part}">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{${'missionTemplate.part.' + part}}">Teil</span>
+            </button>
+        </div>
+        <p class="mission-template-parts-empty" data-template-parts-empty th:text="#{missionTemplate.parts.empty}">Diese Vorlage gibt noch nichts vor.</p>
+
+        <div class="mission-template-basics">
+            <section class="mission-template-section mission-template-part--wide" data-template-part="description" hidden
+                     aria-labelledby="mission-template-description-title">
                 <header class="mission-template-section-head">
-                    <h3 class="card-title" id="mission-template-objectives-title">
-                        <span th:text="#{mission.objective.section}">Ziele</span>
-                        <span class="count-badge count-badge--sm" data-template-count="objectives">0</span>
-                    </h3>
-                    <button type="button" class="btn btn-ghost btn-xs" data-template-add="objectives">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                        <span th:text="#{mission.objective.add}">Ziel hinzufügen</span>
-                    </button>
+                    <h3 class="card-title" id="mission-template-description-title" th:text="#{missionTemplate.part.description}">Beschreibung</h3>
+                    <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='description')}"></th:block>
                 </header>
-                <div class="mission-template-columns mission-template-objective-grid" aria-hidden="true">
-                    <span th:text="#{mission.objective.title.placeholder}">Zieltext</span>
-                    <span th:text="#{mission.objective.kind.label}">Klassifizierung</span>
-                </div>
-                <ol class="mission-template-rows" data-template-rows="objectives" role="list"></ol>
+                <label class="mission-template-part-body">
+                    <span class="visually-hidden" th:text="#{mission.description}">Beschreibung</span>
+                    <textarea name="description" rows="4" maxlength="20000"></textarea>
+                    <small class="form-hint" th:text="#{mission.description.markdown_hint}">Markdown wird unterstützt.</small>
+                </label>
             </section>
-            <div class="mission-template-secondary">
-                <section class="mission-template-section" aria-labelledby="mission-template-steps-title">
+            <section class="mission-template-section" data-template-part="schedule" hidden
+                     aria-labelledby="mission-template-schedule-title">
+                <header class="mission-template-section-head">
+                    <h3 class="card-title" id="mission-template-schedule-title" th:text="#{missionTemplate.part.schedule}">Zeiten</h3>
+                    <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='schedule')}"></th:block>
+                </header>
+                <div class="mission-template-part-body mission-template-times">
+                    <label>
+                        <span th:text="#{mission.meeting_time}">Treffen Teamspeak</span>
+                        <input type="time" name="meetingTime">
+                    </label>
+                    <label>
+                        <span th:text="#{mission.planned_start}">Geplanter Start</span>
+                        <input type="time" name="plannedStartTime">
+                    </label>
+                    <label>
+                        <span th:text="#{mission.planned_end}">Geplantes Ende</span>
+                        <input type="time" name="plannedEndTime">
+                    </label>
+                    <small class="form-hint" th:text="#{missionTemplate.schedule.hint}">Nur Uhrzeiten.</small>
+                </div>
+            </section>
+            <section class="mission-template-section" data-template-part="meetingPoint" hidden
+                     aria-labelledby="mission-template-meeting-point-title">
+                <header class="mission-template-section-head">
+                    <h3 class="card-title" id="mission-template-meeting-point-title" th:text="#{missionTemplate.part.meetingPoint}">Treffpunkt</h3>
+                    <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='meetingPoint')}"></th:block>
+                </header>
+                <label class="mission-template-part-body">
+                    <span class="visually-hidden" th:text="#{mission.meeting_point}">Treffpunkt</span>
+                    <input type="text" name="meetingPoint" maxlength="200">
+                </label>
+            </section>
+            <section class="mission-template-section" data-template-part="visibility" hidden
+                     aria-labelledby="mission-template-visibility-title">
+                <header class="mission-template-section-head">
+                    <h3 class="card-title" id="mission-template-visibility-title" th:text="#{missionTemplate.part.visibility}">Sichtbarkeit</h3>
+                    <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='visibility')}"></th:block>
+                </header>
+                <div class="mission-template-part-body">
+                    <label class="krt-switch" for="mission-template-internal">
+                        <input type="checkbox" role="switch" id="mission-template-internal" name="isInternal">
+                        <span th:text="#{mission.is_internal}">Intern</span>
+                    </label>
+                    <small class="form-hint" th:text="#{missionTemplate.visibility.hint}">Eingeschaltet: intern.</small>
+                </div>
+            </section>
+        </div>
+
+        <div class="mission-template-plan">
+            <div class="mission-template-column">
+                <section class="mission-template-section" data-template-part="objectives" hidden
+                         aria-labelledby="mission-template-objectives-title">
+                    <header class="mission-template-section-head">
+                        <h3 class="card-title" id="mission-template-objectives-title">
+                            <span th:text="#{mission.objective.section}">Ziele</span>
+                            <span class="count-badge count-badge--sm" data-template-count="objectives">0</span>
+                        </h3>
+                        <div class="mission-template-section-actions">
+                            <button type="button" class="btn btn-ghost btn-xs" data-template-add="objectives">
+                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                                <span th:text="#{mission.objective.add}">Ziel hinzufügen</span>
+                            </button>
+                            <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='objectives')}"></th:block>
+                        </div>
+                    </header>
+                    <div class="mission-template-columns mission-template-objective-grid" aria-hidden="true">
+                        <span th:text="#{mission.objective.title.placeholder}">Zieltext</span>
+                        <span th:text="#{mission.objective.kind.label}">Klassifizierung</span>
+                    </div>
+                    <ol class="mission-template-rows" data-template-rows="objectives" role="list"></ol>
+                </section>
+                <section class="mission-template-section" data-template-part="frequencies" hidden
+                         aria-labelledby="mission-template-frequencies-title">
+                    <header class="mission-template-section-head">
+                        <h3 class="card-title" id="mission-template-frequencies-title">
+                            <span th:text="#{missionTemplate.part.frequencies}">Frequenzen</span>
+                            <span class="count-badge count-badge--sm" data-template-count="frequencies">0</span>
+                        </h3>
+                        <div class="mission-template-section-actions">
+                            <button type="button" class="btn btn-ghost btn-xs" data-template-add="frequencies">
+                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                                <span th:text="#{mission.frequency.custom.add}">Frequenz hinzufügen</span>
+                            </button>
+                            <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='frequencies')}"></th:block>
+                        </div>
+                    </header>
+                    <ol class="mission-template-rows" data-template-rows="frequencies" role="list"></ol>
+                </section>
+            </div>
+            <div class="mission-template-column">
+                <section class="mission-template-section" data-template-part="steps" hidden
+                         aria-labelledby="mission-template-steps-title">
                     <header class="mission-template-section-head">
                         <h3 class="card-title" id="mission-template-steps-title">
                             <span th:text="#{mission.step.section}">Ablauf</span>
                             <span class="count-badge count-badge--sm" data-template-count="steps">0</span>
                         </h3>
-                        <button type="button" class="btn btn-ghost btn-xs" data-template-add="steps">
-                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                            <span th:text="#{mission.step.add}">Schritt hinzufügen</span>
-                        </button>
+                        <div class="mission-template-section-actions">
+                            <button type="button" class="btn btn-ghost btn-xs" data-template-add="steps">
+                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                                <span th:text="#{mission.step.add}">Schritt hinzufügen</span>
+                            </button>
+                            <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='steps')}"></th:block>
+                        </div>
                     </header>
                     <div class="mission-template-columns mission-template-step-grid" aria-hidden="true">
                         <span th:text="#{mission.step.title.placeholder}">Schritt-Titel</span>
@@ -60,16 +161,20 @@
                     <ol class="mission-template-rows" data-template-rows="steps" role="list"></ol>
                 </section>
 
-                <section class="mission-template-section" aria-labelledby="mission-template-units-title">
+                <section class="mission-template-section" data-template-part="units" hidden
+                         aria-labelledby="mission-template-units-title">
                     <header class="mission-template-section-head">
                         <h3 class="card-title" id="mission-template-units-title">
                             <span th:text="#{missionTemplate.units}">Einheitenplanung</span>
                             <span class="count-badge count-badge--sm" data-template-count="units">0</span>
                         </h3>
-                        <button type="button" class="btn btn-ghost btn-xs" data-template-add="units">
-                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                            <span th:text="#{mission.unit.add}">Einheit hinzufügen</span>
-                        </button>
+                        <div class="mission-template-section-actions">
+                            <button type="button" class="btn btn-ghost btn-xs" data-template-add="units">
+                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                                <span th:text="#{mission.unit.add}">Einheit hinzufügen</span>
+                            </button>
+                            <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='units')}"></th:block>
+                        </div>
                     </header>
                     <ol class="mission-template-rows" data-template-rows="units" role="list"></ol>
                 </section>
@@ -106,6 +211,30 @@
                     <option th:each="kind : ${objectiveKinds}" th:value="${kind}"
                             th:text="#{${'mission.objective.kind.' + #strings.toLowerCase(kind.name())}}">Hauptziel</option>
                 </select>
+            </label>
+            <th:block th:replace="~{mission/fragments/mission-template-editor :: rowActions}"></th:block>
+        </li>
+    </template>
+    <template data-template-row="frequencies">
+        <li class="mission-template-row mission-template-frequency-grid" data-planning-row>
+            <span class="ae-num mission-template-position" aria-hidden="true"></span>
+            <label>
+                <span th:text="#{mission.frequency.row.type}">Frequenztyp</span>
+                <select name="frequencyTypeId" data-frequency-kind th:attr="data-unknown-label=#{mission.frequency.row.hiddenType}">
+                    <option th:each="type : ${frequencyTypes}" th:value="${type.id}" th:text="${type.name}">Kommando</option>
+                    <option value="" th:text="#{mission.frequency.row.custom}">Eigene Bezeichnung</option>
+                </select>
+            </label>
+            <label data-frequency-name>
+                <span th:text="#{mission.frequency.custom.name}">Bezeichnung</span>
+                <input type="text" name="name" maxlength="100" data-reorder-name-field
+                       th:attr="data-reorder-fallback=#{missionTemplate.part.frequencies}"
+                       th:placeholder="#{mission.frequency.custom.name.placeholder}">
+            </label>
+            <label>
+                <span th:text="#{mission.unit.frequency}">Frequenz</span>
+                <input type="text" inputmode="decimal" data-number-input name="value" min="0" max="999.99" step="0.01" required
+                       th:placeholder="#{mission.unit.frequency.placeholder}">
             </label>
             <th:block th:replace="~{mission/fragments/mission-template-editor :: rowActions}"></th:block>
         </li>
@@ -165,5 +294,12 @@
         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
     </button>
 </div>
+<button th:fragment="partRemove(part)" type="button" class="btn btn-quiet-danger btn-icon mission-template-part-remove"
+        th:with="partLabel=#{${'missionTemplate.part.' + part}}"
+        th:attr="data-template-part-remove=${part}"
+        th:aria-label="#{missionTemplate.part.remove(${partLabel})}"
+        th:title="#{missionTemplate.part.remove(${partLabel})}">
+    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg>
+</button>
 </body>
 </html>

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.mission.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.StringNormalization.blankToNull;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
@@ -99,6 +100,9 @@ public class MissionTemplatePageController {
     var ships = owner == null ? null : missions.shipTypes();
     model.addAttribute(
         "shipTypes", ships == null || ships.content() == null ? List.of() : ships.content());
+    model.addAttribute(
+        "frequencyTypes",
+        owner == null ? List.of() : PageResponse.contentOf(missions.frequencyTypes()));
     model.addAttribute("objectiveKinds", MissionObjectiveKind.values());
     return "mission/mission-templates";
   }
@@ -137,12 +141,32 @@ public class MissionTemplatePageController {
    *
    * @param owner a currently manageable destination
    * @param source the visible mission detail
-   * @return the independent draft
+   * @return the independent draft with the mission's times as instants
    */
-  private static CreateMissionTemplateRequest draft(UUID owner, MissionDto source) {
+  private static MissionTemplateDraft draft(UUID owner, MissionDto source) {
+    return new MissionTemplateDraft(
+        template(owner, source),
+        source.meetingTime(),
+        source.plannedStartTime(),
+        source.plannedEndTime());
+  }
+
+  private static CreateMissionTemplateRequest template(UUID owner, MissionDto source) {
     return new CreateMissionTemplateRequest(
         owner,
         source.name(),
+        blankToNull(source.description()),
+        blankToNull(source.meetingPoint()),
+        source.isInternal(),
+        null,
+        null,
+        null,
+        Stream.ofNullable(source.frequencies())
+            .flatMap(List::stream)
+            .map(row ->
+                new MissionTemplatePlan.Frequency(
+                    row.frequencyTypeId(), row.isCustom() ? row.name() : null, row.value()))
+            .toList(),
         Stream.ofNullable(source.objectives())
             .flatMap(List::stream)
             .map(row -> new MissionTemplatePlan.Objective(row.title(), row.kind()))

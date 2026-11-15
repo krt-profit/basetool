@@ -23,13 +23,24 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.time.LocalTime;
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Replaces the editable content of a mission template at a known revision.
  *
+ * <p>A {@code null} value or an empty list leaves that part to the planner.
+ *
  * @param version the expected revision
  * @param name the name within the owning unit
+ * @param description the optional Markdown description
+ * @param meetingPoint the optional meeting point
+ * @param isInternal the optional visibility
+ * @param meetingTime the optional TeamSpeak meeting time of day
+ * @param plannedStartTime the optional planned start time of day
+ * @param plannedEndTime the optional planned end time of day
+ * @param frequencies the ordered mission-wide radio channels, {@code null} for none
  * @param objectives the ordered goals
  * @param steps the ordered procedure
  * @param units the ordered unit plan
@@ -37,6 +48,33 @@ import java.util.List;
 public record UpdateMissionTemplateRequest(
     @NotNull Long version,
     @NotBlank @Size(max = 255) String name,
+    @Nullable @Size(max = 20000) String description,
+    @Nullable @Size(max = 200) String meetingPoint,
+    @Nullable Boolean isInternal,
+    @Nullable LocalTime meetingTime,
+    @Nullable LocalTime plannedStartTime,
+    @Nullable LocalTime plannedEndTime,
+    @Nullable List<MissionTemplatePlan.@NotNull @Valid Frequency> frequencies,
     @NotNull List<MissionTemplatePlan.@NotNull @Valid Objective> objectives,
     @NotNull List<MissionTemplatePlan.@NotNull @Valid Step> steps,
-    @NotNull List<MissionTemplatePlan.@NotNull @Valid Unit> units) {}
+    @NotNull List<MissionTemplatePlan.@NotNull @Valid Unit> units) {
+
+  /**
+   * Collects the submitted parts in editor order.
+   *
+   * @return the unnormalized plan
+   */
+  MissionTemplatePlan plan() {
+    return new MissionTemplatePlan(
+        description,
+        meetingPoint,
+        isInternal,
+        meetingTime,
+        plannedStartTime,
+        plannedEndTime,
+        frequencies == null ? List.of() : frequencies,
+        objectives,
+        steps,
+        units);
+  }
+}

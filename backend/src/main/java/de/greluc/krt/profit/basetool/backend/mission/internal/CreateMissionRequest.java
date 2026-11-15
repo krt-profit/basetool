@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.DtoConstraints;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveKind;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplatePlan.Frequency;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplatePlan.Unit;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -41,8 +42,9 @@ import org.jetbrains.annotations.Nullable;
  *   <li>{@code owner} is stamped from the authenticated caller.
  *   <li>{@code owningSquadron} is resolved from {@link #owningOrgUnitId} through {@link
  *       de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver}.
- *   <li>Managers, participants, frequencies, inventory and refinery have their own endpoints.
- *   <li>Standalone and operation-linked missions may seed units and check a selected template.
+ *   <li>Managers, participants, inventory and refinery have their own endpoints.
+ *   <li>Standalone and operation-linked missions may seed units and mission-wide frequencies
+ *       ({@code plannedFrequencies}) and check a selected template.
  *   <li>{@code objectives} and {@code steps} may be seeded here; ids, order and done-state are
  *       assigned server-side.
  *   <li>{@code actualStartTime} / {@code actualEndTime} are set via {@code /schedule} or on status
@@ -72,6 +74,7 @@ public record CreateMissionRequest(
     @Nullable List<@NotNull @Valid NewObjective> objectives,
     @Nullable List<@NotNull @Valid NewStep> steps,
     @Nullable List<@NotNull @Valid Unit> units,
+    @Nullable List<@NotNull @Valid Frequency> plannedFrequencies,
     @Nullable @Valid TemplateSelection templateSelection) {
 
   /**

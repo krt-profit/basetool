@@ -22,7 +22,10 @@ package de.greluc.krt.profit.basetool.backend.mission.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -34,6 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -86,6 +91,7 @@ class MissionTemplateHttpTest {
   @Autowired private RoleRepository roles;
   @Autowired private PlatformTransactionManager transactionManager;
   @Autowired private OrgUnitMembershipRepository memberships;
+  @Autowired private FrequencyTypeRepository frequencyTypes;
 
   private MockMvc mvc;
 
@@ -112,11 +118,170 @@ class MissionTemplateHttpTest {
         .andExpect(jsonPath("$.version").isNumber())
         .andExpect(jsonPath("$.objectives").isEmpty())
         .andExpect(jsonPath("$.steps").isEmpty())
-        .andExpect(jsonPath("$.units").isEmpty());
+        .andExpect(jsonPath("$.units").isEmpty())
+        .andExpect(jsonPath("$.frequencies").isEmpty())
+        .andExpect(jsonPath("$.description").doesNotExist())
+        .andExpect(jsonPath("$.meetingPoint").doesNotExist())
+        .andExpect(jsonPath("$.isInternal").doesNotExist())
+        .andExpect(jsonPath("$.meetingTime").doesNotExist())
+        .andExpect(jsonPath("$.plannedStartTime").doesNotExist())
+        .andExpect(jsonPath("$.plannedEndTime").doesNotExist());
 
     mvc.perform(get(PATH).with(admin()).param("owningOrgUnitId", owner.toString()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].name").value("Recovery"));
+  }
+
+  @Test
+  void partialTemplateKeepsOnlyItsPartsAndAnIdenticalResubmitKeepsItsRevision() throws Exception {
+    UUID owner = createOwner();
+    UUID channel = createFrequencyType();
+    String parts =
+        """
+        "description":"  Bring **fuel**  ","meetingPoint":" Port Olisar ","isInternal":false,
+        "meetingTime":"19:30","plannedStartTime":"20:00:45",
+        "frequencies":[{"frequencyTypeId":"%s","value":123.4},{"name":" Ground team ","value":7}],
+        "objectives":[],"steps":[],"units":[]
+        """
+            .formatted(channel);
+    MvcResult saved =
+        mvc.perform(
+                post(PATH)
+                    .with(admin())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"owningOrgUnitId":"%s","name":"Patrol",%s}
+                        """
+                            .formatted(owner, parts)))
+            .andExpect(status().isCreated())
+            .andReturn();
+    String id = JsonPath.read(saved.getResponse().getContentAsString(), "$.id");
+    Number version = JsonPath.read(saved.getResponse().getContentAsString(), "$.version");
+
+    mvc.perform(get("/api/v1/missions/template-preview/{id}", id).with(planner(owner)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.description").value("Bring **fuel**"))
+        .andExpect(jsonPath("$.meetingPoint").value("Port Olisar"))
+        .andExpect(jsonPath("$.isInternal").value(false))
+        .andExpect(jsonPath("$.meetingTime").value(startsWith("19:30")))
+        .andExpect(jsonPath("$.plannedStartTime").value(startsWith("20:00")))
+        .andExpect(jsonPath("$.plannedStartTime").value(not(containsString("45"))))
+        .andExpect(jsonPath("$.plannedEndTime").doesNotExist())
+        .andExpect(jsonPath("$.frequencies[0].frequencyTypeId").value(channel.toString()))
+        .andExpect(jsonPath("$.frequencies[0].name").doesNotExist())
+        .andExpect(jsonPath("$.frequencies[0].value").value(123.4))
+        .andExpect(jsonPath("$.frequencies[1].name").value("Ground team"))
+        .andExpect(jsonPath("$.frequencies[1].value").value(7.0));
+
+    mvc.perform(
+            put(PATH + "/{id}", id)
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"version":%s,"name":"Patrol",%s}
+                    """
+                        .formatted(version, parts)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(version.longValue()));
+    expectAuditCount(id, "MISSION_TEMPLATE_UPDATED", 0);
+
+    mvc.perform(
+            put(PATH + "/{id}", id)
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"version":%s,"name":"Patrol",%s,"plannedEndTime":"23:15"}
+                    """
+                        .formatted(version, parts)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(version.longValue() + 1))
+        .andExpect(jsonPath("$.plannedEndTime").value(startsWith("23:15")));
+    expectAuditCount(id, "MISSION_TEMPLATE_UPDATED", 1);
+  }
+
+  @Test
+  void templateFrequenciesNeedOneIdentityAUniqueKnownTypeAndATwoDecimalValue() throws Exception {
+    UUID owner = createOwner();
+    UUID channel = createFrequencyType();
+    List<String> invalid =
+        List.of(
+            "[{\"value\":100}]",
+            "[{\"frequencyTypeId\":\"%s\",\"name\":\"Both\",\"value\":100}]".formatted(channel),
+            "[{\"frequencyTypeId\":\"%1$s\",\"value\":100},{\"frequencyTypeId\":\"%1$s\",\"value\":101}]"
+                .formatted(channel),
+            "[{\"name\":\"Wide\",\"value\":1000}]",
+            "[{\"name\":\"Precise\",\"value\":100.123}]");
+    for (String rows : invalid) {
+      mvc.perform(
+              post(PATH)
+                  .with(admin())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(withFrequencies(owner, rows)))
+          .andExpect(status().isBadRequest());
+    }
+    mvc.perform(
+            post(PATH)
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    withFrequencies(
+                        owner,
+                        "[{\"frequencyTypeId\":\"%s\",\"value\":100}]"
+                            .formatted(UUID.randomUUID()))))
+        .andExpect(status().isNotFound());
+    mvc.perform(get(PATH).with(admin()).param("owningOrgUnitId", owner.toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content").isEmpty());
+  }
+
+  @Test
+  void missionCreateStoresSubmittedFrequenciesAndRejectsARepeatedTypeBeforeWriting()
+      throws Exception {
+    UUID owner = createOwner();
+    UUID channel = createFrequencyType();
+    JwtRequestPostProcessor planner = planner(owner);
+    String draft =
+        """
+        {"name":"%s","status":"PLANNED",
+         "plannedFrequencies":[{"frequencyTypeId":"%s","value":123.4},%s{"name":" Ground team ","value":7}]}
+        """;
+    String rejected = "Repeated channel mission";
+
+    mvc.perform(
+            post("/api/v1/missions")
+                .with(planner)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    draft.formatted(
+                        rejected,
+                        channel,
+                        "{\"frequencyTypeId\":\"%s\",\"value\":125},".formatted(channel))))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/v1/missions").with(planner).param("q", rejected))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content").isEmpty());
+
+    MvcResult created =
+        mvc.perform(
+                post("/api/v1/missions")
+                    .with(planner)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(draft.formatted("Channel mission", channel, "")))
+            .andExpect(status().isOk())
+            .andReturn();
+    String missionId = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
+    mvc.perform(get("/api/v1/missions/{id}", missionId).with(planner))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.frequencies", hasSize(2)))
+        .andExpect(
+            jsonPath("$.frequencies[?(@.frequencyType.id == '%s')].value", channel)
+                .value(contains(123.4)))
+        .andExpect(
+            jsonPath("$.frequencies[?(@.name == 'Ground team')].value").value(contains(7.0)));
+    expectAuditCount(missionId, "MISSION_FREQUENCY_CHANGED", 2);
   }
 
   @Test
@@ -717,5 +882,18 @@ class MissionTemplateHttpTest {
     {"owningOrgUnitId":"%s","name":"%s","objectives":[],"steps":[],"units":[]}
     """
         .formatted(owner, name);
+  }
+
+  private static String withFrequencies(UUID owner, String frequencies) {
+    return """
+    {"owningOrgUnitId":"%s","name":"Channels","frequencies":%s,"objectives":[],"steps":[],"units":[]}
+    """
+        .formatted(owner, frequencies);
+  }
+
+  private UUID createFrequencyType() {
+    FrequencyType type = new FrequencyType();
+    type.setName("Template channel " + UUID.randomUUID());
+    return frequencyTypes.saveAndFlush(type).getId();
   }
 }

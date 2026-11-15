@@ -20,12 +20,23 @@
 package de.greluc.krt.profit.basetool.frontend.mission.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /** Planning rows shared by mission template reads and writes. */
 public final class MissionTemplatePlan {
 
   private MissionTemplatePlan() {}
+
+  /**
+   * A mission-wide radio channel bound to a catalogue frequency type or a custom label.
+   *
+   * @param frequencyTypeId the catalogue frequency type, or {@code null} for a custom channel
+   * @param name the custom channel label, or {@code null} for a typed channel
+   * @param value the frequency value
+   */
+  @DtoMirror
+  public record Frequency(UUID frequencyTypeId, String name, BigDecimal value) {}
 
   /**
    * A classified goal in display order.

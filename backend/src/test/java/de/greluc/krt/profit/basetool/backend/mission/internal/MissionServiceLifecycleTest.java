@@ -108,6 +108,7 @@ class MissionServiceLifecycleTest {
             mock(MissionNotificationPublisher.class),
             mock(MissionVisibility.class),
             null,
+            null,
             null);
   }
 

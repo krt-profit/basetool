@@ -296,7 +296,7 @@ class MissionBackendClientTest {
     CreateMissionRequest create =
         new CreateMissionRequest(
             "Op", null, null, "PLANNED", null, null, null, false, null, null, null, null, null,
-            null, null);
+            null, null, null);
 
     client.setPartyLead(ID, new SetPartyLeadRequest(THIRD, null, 4L));
     client.setOwner(ID, new UpdateMissionOwnerRequest(THIRD, 4L));
@@ -340,7 +340,7 @@ class MissionBackendClientTest {
             + "\"meetingTime\":null,\"plannedStartTime\":null,\"plannedEndTime\":null,"
             + "\"isInternal\":false,\"operationId\":null,\"owningOrgUnitId\":null,"
             + "\"meetingPoint\":null,\"objectives\":null,\"steps\":null,\"units\":null,"
-            + "\"templateSelection\":null}");
+            + "\"plannedFrequencies\":null,\"templateSelection\":null}");
   }
 
   @Test

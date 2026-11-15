@@ -778,10 +778,13 @@ REQ-AUDIT-001. `CreateMissionRequest` stays the create-path security boundary (a
 `objectives` / `steps` are an explicit, `@Valid`-checked addition (non-blank title, valid kind), and
 the id / orderIndex / step done-state remain server-stamped.
 
-**Template and unit planning.** The same form provides an optional template selector and editable
-unit rows for standalone and operation-linked missions. `unitsJson` carries the unit planning
-rows. The applied template ID and version are separate from the editable values. AJAX validation
-and template conflicts keep the open form intact. The scope, conflict behavior and transactional
+**Template, unit and frequency planning.** The same form opens with an optional template selector
+and provides editable unit rows and mission-wide frequency rows for standalone and
+operation-linked missions. `unitsJson` and `frequenciesJson` carry those rows. A frequency row is a
+catalogue frequency type, offered to one row only, or a custom label, and is created with the
+mission and audited as `MISSION_FREQUENCY_CHANGED`, like a frequency set afterwards
+(REQ-MISSION-014). The applied template ID and version are separate from the editable values.
+AJAX validation and template conflicts keep the open form intact. The scope, conflict behavior and transactional
 write rules are specified by [REQ-MISSION-037](mission-templates.md#req-mission-037---apply-editable-template-rows-when-creating-a-mission).
 
 **Landing in the edit mode after create.** A successful create redirects to the new mission's detail page

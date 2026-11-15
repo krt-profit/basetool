@@ -71,8 +71,9 @@ missing one turns the next edit into a spurious 409.
 
 A draft from a readable mission uses the regular mission detail read and saves through the same
 template create request as a blank draft ([REQ-MISSION-036](../specs/mission-templates.md)).
-When creating a mission, the planner can preview a template and submit the edited draft with the
-selected revision checked in the mission create transaction ([REQ-MISSION-037](../specs/mission-templates.md)).
+When creating a mission, the planner can preview a template, choose which of its parts to apply
+and submit the edited draft with the selected revision checked in the mission create transaction
+([REQ-MISSION-037](../specs/mission-templates.md), [ADR-0387](../adr/0387-mission-template-parts-are-optional-and-applied-by-choice.md)).
 
 For a mission template write, the backend publishes to the owning unit's room after commit. The
 list section refreshes while open editors retain their inputs and saved revision

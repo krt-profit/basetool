@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -71,6 +72,9 @@ class MissionDetailPatternRenderTest {
   private static final UUID OPERATION_ID = UUID.fromString("00000000-0000-0000-0000-000000000078");
 
   private static final Pattern MIGRATION_CLASS = Pattern.compile("class=\"[^\"]*krtm-");
+
+  /** A rendered dialog, its own context for a primary action. */
+  private static final Pattern DIALOG = Pattern.compile("<dialog\\b.*?</dialog>", Pattern.DOTALL);
 
   @Autowired private WebApplicationContext context;
 
@@ -413,6 +417,12 @@ class MissionDetailPatternRenderTest {
         .doesNotContain("name=\"actualStartTime\"");
     assertThat(MIGRATION_CLASS.matcher(html).find()).as("no krtm-* class is left").isFalse();
     String main = between(html, "class=\"page-wrapper mission-page\"", "<script");
-    assertThat(count(main, "btn--cta")).as("one primary action on the page").isEqualTo(1);
+    List<String> dialogs = DIALOG.matcher(main).results().map(MatchResult::group).toList();
+    assertThat(count(DIALOG.matcher(main).replaceAll(""), "btn--cta"))
+        .as("one primary action on the page outside its dialogs")
+        .isEqualTo(1);
+    assertThat(dialogs)
+        .as("at most one primary action per dialog")
+        .allSatisfy(dialog -> assertThat(count(dialog, "btn--cta")).isLessThanOrEqualTo(1));
   }
 }

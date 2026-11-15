@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionCrewDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionObjectiveDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionObjectiveKind;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionStepDto;
@@ -45,6 +46,8 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateOwner
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -147,7 +150,24 @@ class MissionTemplatePageControllerMvcTest {
     MissionDto mission = mock(MissionDto.class);
     ShipTypeDto shipType = mock(ShipTypeDto.class);
     when(shipType.id()).thenReturn(shipTypeId);
+    UUID frequencyTypeId = UUID.randomUUID();
     when(mission.name()).thenReturn("Recovery \"<plan>\"");
+    when(mission.description()).thenReturn("Bring **fuel**");
+    when(mission.meetingPoint()).thenReturn("  ");
+    when(mission.isInternal()).thenReturn(true);
+    when(mission.meetingTime()).thenReturn(Instant.parse("2026-11-20T18:30:00Z"));
+    when(mission.plannedStartTime()).thenReturn(Instant.parse("2026-11-20T19:00:00Z"));
+    when(mission.frequencies())
+        .thenReturn(
+            List.of(
+                new MissionFrequencyDto(
+                    UUID.randomUUID(),
+                    new MissionFrequencyDto.FrequencyTypeRef(frequencyTypeId, "Command"),
+                    null,
+                    new BigDecimal("123.40"),
+                    2L),
+                new MissionFrequencyDto(
+                    UUID.randomUUID(), null, "Ground team", new BigDecimal("7.00"), 1L)));
     when(mission.owningSquadron())
         .thenReturn(new SquadronReferenceDto(sourceOwner, "Source", "SOURCE"));
     when(mission.objectives())
@@ -204,14 +224,26 @@ class MissionTemplatePageControllerMvcTest {
             mapper.readTree(
                 """
                 {
-                  "owningOrgUnitId":"%s",
-                  "name":"Recovery \\"<plan>\\"",
-                  "objectives":[{"title":"Survey wreck","kind":"SECONDARY"},{"title":"Recover cargo","kind":"PRIMARY"}],
-                  "steps":[{"title":"Launch","meta":"At 18:00"},{"title":"Extract","meta":null}],
-                  "units":[{"name":"Scout","shipTypeId":"%s","note":"Check landing zone","highValueUnit":true,"frequency":127.46}]
+                  "template":{
+                    "owningOrgUnitId":"%s",
+                    "name":"Recovery \\"<plan>\\"",
+                    "description":"Bring **fuel**",
+                    "meetingPoint":null,
+                    "isInternal":true,
+                    "meetingTime":null,
+                    "plannedStartTime":null,
+                    "plannedEndTime":null,
+                    "frequencies":[{"frequencyTypeId":"%s","name":null,"value":123.40},{"frequencyTypeId":null,"name":"Ground team","value":7.00}],
+                    "objectives":[{"title":"Survey wreck","kind":"SECONDARY"},{"title":"Recover cargo","kind":"PRIMARY"}],
+                    "steps":[{"title":"Launch","meta":"At 18:00"},{"title":"Extract","meta":null}],
+                    "units":[{"name":"Scout","shipTypeId":"%s","note":"Check landing zone","highValueUnit":true,"frequency":127.46}]
+                  },
+                  "meetingTime":"2026-11-20T18:30:00Z",
+                  "plannedStartTime":"2026-11-20T19:00:00Z",
+                  "plannedEndTime":null
                 }
                 """
-                    .formatted(OWNER, shipTypeId)));
+                    .formatted(OWNER, frequencyTypeId, shipTypeId)));
   }
 
   @Test

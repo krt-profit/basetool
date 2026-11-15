@@ -79,6 +79,9 @@ class MissionCreation {
             form.stepsJson(), new TypeReference<List<CreateMissionRequest.NewStep>>() {});
     List<MissionTemplatePlan.Unit> units =
         parseCreateList(form.unitsJson(), new TypeReference<List<MissionTemplatePlan.Unit>>() {});
+    List<MissionTemplatePlan.Frequency> frequencies =
+        parseCreateList(
+            form.frequenciesJson(), new TypeReference<List<MissionTemplatePlan.Frequency>>() {});
     CreateMissionRequest.TemplateSelection selection =
         form.templateId() == null && form.templateVersion() == null
             ? null
@@ -98,6 +101,7 @@ class MissionCreation {
         objectives,
         steps,
         units,
+        frequencies,
         selection);
   }
 

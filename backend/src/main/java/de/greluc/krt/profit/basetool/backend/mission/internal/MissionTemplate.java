@@ -33,6 +33,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OrderColumn;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -65,6 +66,42 @@ class MissionTemplate extends AbstractEntity<UUID> {
   @Column(nullable = false)
   private String name;
 
+  /** The optional Markdown description. */
+  @Getter
+  @Column(columnDefinition = "TEXT")
+  @Nullable
+  private String description;
+
+  /** The optional meeting point. */
+  @Getter
+  @Column(length = 200)
+  @Nullable
+  private String meetingPoint;
+
+  /** The optional visibility; {@code null} leaves it to the planner. */
+  @Getter
+  @Column(name = "is_internal")
+  @Nullable
+  private Boolean isInternal;
+
+  /** The optional TeamSpeak meeting time of day. */
+  @Getter @Nullable private LocalTime meetingTime;
+
+  /** The optional planned start time of day. */
+  @Getter @Nullable private LocalTime plannedStartTime;
+
+  /** The optional planned end time of day. */
+  @Getter @Nullable private LocalTime plannedEndTime;
+
+  /** The mission-wide radio channels in editor order. */
+  @Getter
+  @ElementCollection
+  @CollectionTable(
+      name = "mission_template_frequency",
+      joinColumns = @JoinColumn(name = "template_id"))
+  @OrderColumn(name = "order_index")
+  private List<MissionTemplatePlan.Frequency> frequencies = new ArrayList<>();
+
   /** The goals in editor order. */
   @Getter
   @ElementCollection
@@ -91,26 +128,60 @@ class MissionTemplate extends AbstractEntity<UUID> {
   MissionTemplate(OrgUnit owningOrgUnit, String name, MissionTemplatePlan plan) {
     this.owningOrgUnit = owningOrgUnit;
     this.name = name;
+    applyBasics(plan);
+    frequencies.addAll(plan.frequencies());
     objectives.addAll(plan.objectives());
     steps.addAll(plan.steps());
     units.addAll(plan.units());
   }
 
+  /**
+   * Replaces the name and every part, leaving unchanged row collections untouched.
+   *
+   * @param newName the normalized name
+   * @param plan the normalized replacement parts
+   * @return whether any stored value changed
+   */
   boolean replace(String newName, MissionTemplatePlan plan) {
-    boolean nameChanged = !name.equals(newName);
-    name = newName;
-    boolean objectivesChanged = replaceRows(objectives, plan.objectives());
-    boolean stepsChanged = replaceRows(steps, plan.steps());
-    boolean unitsChanged = replaceRows(units, plan.units());
-    return nameChanged || objectivesChanged || stepsChanged || unitsChanged;
-  }
-
-  private static <T> boolean replaceRows(List<T> existing, List<T> replacement) {
-    if (existing.equals(replacement)) {
+    if (name.equals(newName) && plan().equals(plan)) {
       return false;
     }
-    existing.clear();
-    existing.addAll(replacement);
+    name = newName;
+    applyBasics(plan);
+    replaceRows(frequencies, plan.frequencies());
+    replaceRows(objectives, plan.objectives());
+    replaceRows(steps, plan.steps());
+    replaceRows(units, plan.units());
     return true;
+  }
+
+  private MissionTemplatePlan plan() {
+    return new MissionTemplatePlan(
+        description,
+        meetingPoint,
+        isInternal,
+        meetingTime,
+        plannedStartTime,
+        plannedEndTime,
+        List.copyOf(frequencies),
+        List.copyOf(objectives),
+        List.copyOf(steps),
+        List.copyOf(units));
+  }
+
+  private void applyBasics(MissionTemplatePlan plan) {
+    description = plan.description();
+    meetingPoint = plan.meetingPoint();
+    isInternal = plan.isInternal();
+    meetingTime = plan.meetingTime();
+    plannedStartTime = plan.plannedStartTime();
+    plannedEndTime = plan.plannedEndTime();
+  }
+
+  private static <T> void replaceRows(List<T> existing, List<T> replacement) {
+    if (!existing.equals(replacement)) {
+      existing.clear();
+      existing.addAll(replacement);
+    }
   }
 }

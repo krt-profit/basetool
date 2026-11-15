@@ -120,6 +120,7 @@ public class MissionService implements MissionCommands {
 
   private final MissionTemplateService missionTemplateService;
   private final MissionStructureService missionStructureService;
+  private final MissionCreateFrequencies missionCreateFrequencies;
 
   /**
    * Always throws; listing missions must go through {@link #searchMissions(String, Instant,
@@ -332,7 +333,8 @@ public class MissionService implements MissionCommands {
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when {@code operationId}
    *     does not resolve
    * @throws AccessDeniedException when the caller may not link a mission to {@code operationId}
-   * @throws BadRequestException when the mission is internal but resolves to no owning org unit
+   * @throws BadRequestException when the mission is internal but resolves to no owning org unit, or
+   *     a submitted frequency is neither or both typed and named, or repeats a frequency type
    */
   @Transactional
   public Mission createMission(CreateMissionRequest request) {
@@ -349,6 +351,10 @@ public class MissionService implements MissionCommands {
       missionTemplateService.checkSelection(
           mission.getOwningOrgUnit(), request.templateSelection());
     }
+    final List<MissionTemplatePlan.Frequency> frequencies =
+        request.plannedFrequencies() == null
+            ? List.of()
+            : missionCreateFrequencies.normalize(request.plannedFrequencies());
 
     Mission saved = missionRepository.save(mission);
     auditRecorder.record(
@@ -361,6 +367,9 @@ public class MissionService implements MissionCommands {
     applyCreateTimeline(saved, request);
     if (request.units() != null) {
       request.units().forEach(unit -> missionStructureService.addUnitAtCreate(saved, unit));
+    }
+    if (!frequencies.isEmpty()) {
+      missionCreateFrequencies.attach(saved, frequencies);
     }
     return saved;
   }

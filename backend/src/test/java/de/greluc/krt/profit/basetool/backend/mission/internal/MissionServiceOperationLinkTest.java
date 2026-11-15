@@ -91,6 +91,7 @@ class MissionServiceOperationLinkTest {
             notificationPublisher,
             null,
             null,
+            null,
             null);
   }
 
@@ -308,6 +309,7 @@ class MissionServiceOperationLinkTest {
         null,
         false,
         operationId,
+        null,
         null,
         null,
         null,
