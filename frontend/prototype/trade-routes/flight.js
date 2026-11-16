@@ -74,7 +74,8 @@ function flightPrefix(f, stops) {
   const lost = [];
   f.w.paths.filter((p) => p.fixed || old.indexOf(p.from) < f.pos.idx || bought.includes(`${p.from}|${p.c}`)).forEach((p) => {
     const from = ts.indexOf(p.from);
-    if (ts.indexOf(p.to) > Math.max(from, f.pos.idx - 1)) { fixed.push({ ...p, fixed: true }); return; }
+    const soldBefore = old.indexOf(p.to) >= 0 && old.indexOf(p.to) < f.pos.idx;
+    if (soldBefore || ts.indexOf(p.to) > Math.max(from, f.pos.idx - 1)) { fixed.push({ ...p, fixed: true }); return; }
     const best = ts.slice(Math.max(from, f.pos.idx) + 1).filter((t) => PRICES[t]?.sell?.[p.c]).sort((a, b) => PRICES[b].sell[p.c][0] - PRICES[a].sell[p.c][0])[0];
     if (best) fixed.push({ ...p, to: best, ps: PRICES[best].sell[p.c][0], fixed: true });
     else lost.push({ ...p, why: 'UNSOLD' });
@@ -270,7 +271,10 @@ function flightView2() {
       ${stopTime(stop)}
       <div class="tr-row"><button class="btn btn-ghost btn-xs" data-act="rate" data-route="flight" data-stop="${stop.si}">Stopp bewerten</button>${ro ? '' : '<button class="btn btn-quiet-danger btn-xs" data-act="fl-abandon">Flug abbrechen</button>'}</div></div>`;
     const last = f.pos.idx === e.stops.length - 1;
-    foot = ro ? '<span class="tr-hint">Live mitlesen · Schritte setzen die Crews</span>' : `<button class="btn btn--cta" data-act="${last ? 'fl-finish' : 'fl-next'}">${ic('check')} ${last ? 'Route abschließen' : 'Stopp erledigt'}${open ? ` (${open} offen)` : ''}</button>`;
+    const full = e.stops.length >= ROUTE_LIMIT;
+    if (last && !ro) main += `<div class="tr-fly__append ${full ? 'is-full' : ''}">${ic(full ? 'info' : 'plus')}<span>${full ? `<strong>Routengrenze: höchstens ${ROUTE_LIMIT} Stopps, erledigte mitgezählt.</strong> Anhängen geht nicht mehr. Nach „Route abschließen“ kannst du ab hier weiterbauen.` : '<strong>Letzter geplanter Stopp.</strong> Willst du weiter, häng den nächsten Stopp an: Ladung an Bord und Bargeld gehen fest ein.'}</span></div>`;
+    const append = last && !ro ? `<button class="btn btn-outline" data-act="bd-open" data-ctx="flight" ${full ? 'disabled' : ''} title="${full ? `Routengrenze: höchstens ${ROUTE_LIMIT} Stopps` : 'Kandidaten mit „Mit Weiterflug“ und „Bis hier“'}">${ic('plus')} Nächsten Stopp anhängen</button>` : '';
+    foot = ro ? '<span class="tr-hint">Live mitlesen · Schritte setzen die Crews</span>' : `${append}<button class="btn btn--cta" data-act="${last ? 'fl-finish' : 'fl-next'}">${ic('check')} ${last ? 'Route abschließen' : 'Stopp erledigt'}${open ? ` (${open} offen)` : ''}</button>`;
   } else {
     const leg = e.legs[f.pos.idx];
     const next = e.stops[f.pos.idx + 1];
@@ -291,7 +295,8 @@ function flightDoneView() {
   return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Flug beendet"><div class="tr-fly__inner">
     <div class="tr-fly__next"><div class="tr-fly__eyebrow">${esc(h.outcome)}</div><div class="tr-fly__big">${esc(h.name)}</div>
     <div class="tr-flymoney"><span>Verdient <strong class="${h.earned >= 0 ? 'pos' : 'neg'}">${h.earned < 0 ? '−' : ''}${fmt(Math.abs(h.earned))}</strong></span><span>geplant beim Start <strong>${fmt(h.planned)}</strong> aUEC</span></div>
-    <span class="tr-hint">${h.mission ? 'Der Eintrag bleibt bei der Einsatzroute.' : 'Steht jetzt unter „Meine Flüge“, 90 Tage lang.'} Stimmte etwas nicht? Bewerte die Stopps, damit die nächste Crew es weiß.</span></div></div>
+    <span class="tr-hint">${h.mission ? 'Der Eintrag bleibt bei der Einsatzroute.' : 'Steht jetzt unter „Meine Flüge“, 90 Tage lang.'} Stimmte etwas nicht? Bewerte die Stopps, damit die nächste Crew es weiß.</span></div>
+    ${!h.mission && h.outcome === 'abgeschlossen' && h.w ? `<div class="card tr-fly__onward"><div><div class="tr-cap">Weiterfliegen?</div><span class="tr-hint">Der Planer baut eine neue Route ab ${esc(tname(h.w.stops[h.w.stops.length - 1].t))}, mit den Schiffen und der Anfrage dieses Flugs. Der Laderaum ist leer; nichts wird übernommen. Die neue Route fliegst du als eigenen Flug.</span></div><button class="btn btn-outline" data-act="bd-from-flight" data-val="${h.id}">${ic('plus')} Ab hier weiterbauen</button></div>` : ''}</div>
     <div class="tr-fly__foot">${h.mission ? '' : `<button class="btn btn-ghost" data-act="hist-again" data-val="${h.id}">Nochmal fliegen</button><button class="btn btn-ghost" data-act="hist-save" data-val="${h.id}">Als Route speichern</button>`}<button class="btn btn--cta" data-act="fl-done-close">Schließen</button></div></div>`;
 }
 

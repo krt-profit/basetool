@@ -154,16 +154,12 @@ function longBarControls() {
   let out = '';
   if (state.page === 'edit') {
     out += `${sep}${[3, 6, 10].filter((n) => n <= searchLimit()).map((n) => btn('proto-n', '', n, `n=${n}`, state.request.maxStops === n)).join('')}`;
-    out += `${sep}${btn('proto-long', 'nField', 'A', 'Feld A', L.nField === 'A')}${btn('proto-long', 'nField', 'B', 'Feld B', L.nField === 'B')}`;
-    out += `${sep}${btn('proto-long', 'index', 'A', 'Index A', L.index === 'A')}${btn('proto-long', 'index', 'B', 'Index B', L.index === 'B')}`;
     out += `${sep}${btn('proto-long', 'searchLimit', '10', 'Grenze 10', L.searchLimit === 10)}${btn('proto-long', 'searchLimit', '8', 'Grenze 8', L.searchLimit === 8)}`;
     out += `${sep}${btn('proto-long', 'slot', 'free', 'Platz frei', L.slot === 'free')}${btn('proto-long', 'slot', 'queue', 'wartet', L.slot === 'queue')}${btn('proto-long', 'slot', 'full', 'voll', L.slot === 'full')}`;
   }
   const f = openFlight();
   if (f && f.kind === 'personal') {
-    out += `${sep}${btn('proto-long', 'after', 'A', 'Danach A', L.after === 'A')}${btn('proto-long', 'after', 'B', 'Danach B', L.after === 'B')}`;
-    out += `${sep}${btn('proto-long', 'index', 'A', 'Index A', L.index === 'A')}${btn('proto-long', 'index', 'B', 'Index B', L.index === 'B')}`;
-    out += `<button data-act="proto-flyat" data-val="${Math.min(f.w.stops.length, f.pos.idx + 3)}" title="Abhaken bis zwei Stopps weiter">+2 Stopps</button>`;
+    out += `${sep}<button data-act="proto-flyat" data-val="${Math.min(f.w.stops.length, f.pos.idx + 3)}" title="Abhaken bis zwei Stopps weiter">+2 Stopps</button>`;
   }
   return out;
 }
@@ -216,6 +212,7 @@ function afterRender() {
     url.searchParams.set('slot', state.long.slot);
   }
   history.replaceState(null, '', url);
+  afterBuildRender();
 }
 
 document.addEventListener('click', (ev) => {

@@ -37,6 +37,7 @@ function initEditState() {
   state.ed = { diffView: pick('diff', ['A', 'B'], 'A'), pick: pick('pick', ['dialog', 'inline'], 'dialog'), tick: pick('tick', ['A', 'B'], 'A'), bar: pick('bar', ['A', 'B'], 'A'), conflict: false, conflictNext: false };
   state.request.armistice = true;
   resetEdit(pick('src', ['result', 'saved', 'shared', 'unit', 'mission'], 'result'));
+  initBuildState();
   Object.assign(state, { fl: null, flyOpen: null, flyAdjust: false, flyDone: null, flyEditKey: null, history: FLIGHT_HISTORY_SEED.map((h) => ({ ...h })), histOpen: null, mflights: {}, mflightEnded: {}, mEndedOpen: null });
   const mr = state.missionRoutes[0];
   const ships = mr.fleet.map((k) => ({ ...FLEET_SHIPS[k] }));
@@ -48,7 +49,7 @@ function initEditState() {
   state.mflights[mr.id] = mf;
   state.mflightEnded.M2 = { outcome: 'abgeschlossen', ended: '12.11., 23:10', earned: 1018400, planned: 984000, lines: [['Port Tressler', 'Kauf', 'Distilled Spirits', 380, 380, 1105, 1105], ['Levski', 'Verkauf', 'Distilled Spirits', 380, 380, 1690, 1702], ['Levski', 'Kauf', 'Hephaestanite', 696, 640, 2210, 2230], ['Ruin Station', 'Verkauf', 'Hephaestanite', 696, 640, 2960, 2990]] };
   const fly = params.get('flight');
-  if (fly === 'personal') { const w = state.ed.tabs[0].hist[0].w; startFlight(w, evaluate(w, w.ships).name, 'Berechnete Route'); state.flyOpen = 'personal'; }
+  if (fly === 'personal') { const tb0 = state.ed.tabs[0]; const w = tb0.hist[tb0.at].w; startFlight(w, evaluate(w, w.ships).name, 'Berechnete Route'); state.flyOpen = 'personal'; }
   if (fly === 'M1') state.flyOpen = 'M1';
   applyLongFlightParams();
 }
@@ -410,7 +411,7 @@ function editBarControls() {
     if (state.fl) out += `${btn('proto-ed', 'bar', 'A', 'Leiste A', state.ed.bar === 'A')}${btn('proto-ed', 'bar', 'B', 'Leiste B', state.ed.bar === 'B')}`;
     if (f) out += `<button data-act="proto-other" title="Ein anderes Gerät oder eine andere Crew hakt ab">Anderes Gerät</button><button data-act="proto-fconflict" aria-pressed="${state.ed.conflictNext}" title="Die nächste Änderung im Flug trifft auf einen Konflikt">Konflikt</button>`;
   }
-  return out + longBarControls();
+  return out + longBarControls() + buildBarControls();
 }
 
 document.addEventListener('click', (ev) => {

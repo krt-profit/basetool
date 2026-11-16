@@ -90,7 +90,7 @@ function fShape() {
   const r = state.request;
   return `${stopsField()}
     ${sw('roundTrip', 'Rundreise', 'endet am ersten Stopp')}
-    <div class="tr-grid2"><div class="tr-field"><span class="tr-cap">Startterminal</span>${picker('start', 'terminal', true, 'frei')}</div>
+    <div class="tr-grid2"><div class="tr-field ${state.bd && state.bd.err ? 'tr-field--err' : ''}" id="f-start"><span class="tr-cap">Startterminal</span>${picker('start', 'terminal', true, 'frei')}${state.bd && state.bd.err ? `<span class="field-error" role="alert">${ic('warning')} „Stopp für Stopp bauen“ braucht ein Startterminal: dort beginnt die Route.</span>` : ''}</div>
     <div class="tr-field"><span class="tr-cap">Zielterminal</span>${r.roundTrip ? '<span class="tr-hint">Rundreise: zurück zum Start</span>' : picker('end', 'terminal', true, 'frei')}</div></div>
     <div class="tr-field" style="max-width:220px"><label for="f-runs">Geplante Durchläufe</label><input id="f-runs" type="number" min="1" value="${r.runs}" data-bind="runs"><span class="tr-hint">Plant mit Bestand ÷ Durchläufe</span></div>`;
 }

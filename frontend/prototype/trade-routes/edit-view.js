@@ -152,6 +152,9 @@ function editStopTools(k, s, n) {
  */
 function insertRow(k, pos, append) {
   if (pos <= k.lock) return '';
+  const ap = appendPos(k.w);
+  if (pos === ap) return appendRow(k, pos);
+  if (append) return '';
   const p = state.ed.panel;
   if (state.ed.pick === 'inline' && p && p.kind === 'insert' && p.ctx === k.ctx && p.pos === pos) return `<li class="tr-insert tr-insert--open">${insertPanel(k)}</li>`;
   const full = k.w.stops.length >= ROUTE_LIMIT;
@@ -170,7 +173,7 @@ function editTimeline(k, e) {
   const items = e.stops.map((s, i) => {
     const leg = e.legs[i];
     const legHtml = leg ? `<li class="tr-timeline__leg">${legFacts(leg, false)}</li>${insertRow(k, i + 1, false)}` : insertRow(k, n, true);
-    const marks = [s.inserted ? '<span class="tr-mark tr-mark--est">eingefügt</span>' : '', s.failsFilter ? `<span class="tr-mark tr-mark--warn" title="Von dir genannt; gilt trotz Filter">verletzt Filter: ${esc(s.failsFilter)}</span>` : ''].join(' ');
+    const marks = [s.start ? '<span class="tr-mark tr-mark--forced">Start</span>' : '', s.end ? '<span class="tr-mark tr-mark--forced">Ziel</span>' : '', s.inserted ? '<span class="tr-mark tr-mark--est">eingefügt</span>' : '', s.appended ? '<span class="tr-mark tr-mark--est">angehängt</span>' : '', s.failsFilter ? `<span class="tr-mark tr-mark--warn" title="Von dir genannt; gilt trotz Filter">verletzt Filter: ${esc(s.failsFilter)}</span>` : ''].join(' ');
     const cls = [s.si < k.lock ? 'tr-stoptile--frozen' : '', s.si === k.lock ? 'tr-stoptile--now' : '', s.pinned ? 'tr-stoptile--pinned' : ''].join(' ');
     return `<li class="tr-timeline__stop ${s.si < k.lock ? 'is-done' : ''}" data-n="${i + 1}"><div class="tr-stoptile ${cls}">
         <div class="tr-stoptile__head"><div><div class="tr-stoptile__title">${esc(s.term.name)} ${marks}</div><div class="tr-stoptile__sub">${s.place.kind} · ${s.place.body} · ${s.place.system}</div></div>${editStopTools(k, s, n)}</div>
@@ -303,6 +306,7 @@ function editStatus(k) {
   const o = state.ed.optimising;
   if (o) return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>Rest optimieren · feste Stopps bleiben · ${o.long ? 'lange Suche · ' : ''}bis ${o.upTo} Stopps</strong><span class="tr-status__bar"><i style="width:${[20, 55, 85][o.step]}%"></i></span><span class="muted num">${o.elapsed} s / 60 s</span><button class="btn btn-ghost btn-xs" data-act="ed-opt-stop">Suche stoppen</button></div>`;
   const h = k.tab.hist[k.tab.at];
+  if (k.tab.built && !k.tab.at) return `<div class="tr-status" role="status">${ic('plus')}<span><strong>Stopp für Stopp</strong> · ${k.w.stops.length === 1 ? `Start an ${esc(tname(k.w.stops[0].t))} · wähle den zweiten Stopp` : `Start und Ziel stehen · hänge Stopps vor dem Ziel an`} · Datenstand 14:00 Uhr</span><span class="muted">Jeder Stopp kommt aus den Vorschlägen oder von dir; Rückgängig führt bis hierher zurück.</span></div>`;
   const last = state.long.last;
   const done = `Suche abgeschlossen in ${last.elapsed} s · ${state.ed.tabs.length} Routen${last.long ? ' · lange Suche' : ''}${last.stopped ? ' · gestoppt, bestes Zwischenergebnis' : ''}`;
   if (!k.tab.at) return `<div class="tr-status" role="status">${ic('check')}<span>${state.ed.src === 'result' ? done :`${SRC_LABEL[state.ed.src]} geöffnet · Fracht neu geplant`} · Datenstand 14:00 Uhr</span><span class="muted">Bearbeite direkt in der Zeitleiste: ↑ ↓, entfernen, einfügen, festsetzen, markieren.</span></div>`;
@@ -319,12 +323,17 @@ function editPage() {
   pageRoutes.edit = e;
   const tabs = state.ed.tabs.map((tb, i) => {
     const r = evaluate(tb.hist[tb.at].w, tb.hist[tb.at].w.ships);
-    return `<button class="tab ${i === state.ed.tab ? 'active' : ''}" role="tab" aria-selected="${i === state.ed.tab}" data-act="ed-tab" data-val="${i}">${tb.label}${tb.at ? ' <span class="tr-mark tr-mark--forced">bearbeitet</span>' : ''}<small><span class="tr-tab__more">${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · </span>${r.stops.length} Stopps</small></button>`;
+    const small = tb.built && r.stops.length === 1 ? 'Start · noch keine Route' : `<span class="tr-tab__more">${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · </span>${r.stops.length} Stopps`;
+    return `<button class="tab ${i === state.ed.tab ? 'active' : ''}" role="tab" aria-selected="${i === state.ed.tab}" data-act="ed-tab" data-val="${i}">${tb.label}${tb.at && !tb.built ? ' <span class="tr-mark tr-mark--forced">bearbeitet</span>' : ''}<small>${small}</small></button>`;
   }).join('');
+  const isStart = k.tab.built && k.w.stops.length === 1;
   const src = state.ed.src === 'result' ? '' : `<div class="tr-ctxbar"><span class="chip chip--primary">${SRC_LABEL[state.ed.src]}</span><strong>${esc({ saved: 'Abendrunde Crusader – ArcCorp', shared: 'Drei-System-Runde', unit: 'Eis-Pendel Hurston', mission: 'Stanton-Runde · Frachtkonvoi Pyro' }[state.ed.src])}</strong><span class="tr-hint">${state.ed.src === 'mission' ? 'Schiffsliste ist die Routenflotte; Stoppzeiten aus der Einsatzroute' : 'Im Planer bearbeitet; die Quelle bleibt, bis du sie aktualisierst'}</span></div>`;
   const reqBar = state.ed.requestChanged ? `<div class="tr-warnline tr-warnline--info tr-reqbar" role="status">${ic('info')}<span><strong>Anfrage geändert.</strong> Das Ergebnis rechnet noch mit der alten Anfrage.</span><span class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="ed-research">${ic('search')} Neu suchen</button><button class="btn btn-outline btn-xs" data-act="ed-replan-request">${ic('reset')} Nur Fracht neu planen</button></span></div>` : '';
   const tb = k.tab;
-  const work = `<div class="tr-workbar"><span class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="ed-undo" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('arrow-left')} Rückgängig</button><button class="btn btn-ghost btn-xs" data-act="ed-redo" ${tb.at < tb.hist.length - 1 && !k.busy ? '' : 'disabled'}>Wiederholen ${ic('arrow-right')}</button></span><button class="btn btn-ghost btn-xs" data-act="ed-restore" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('reset')} Berechnete Route wiederherstellen</button><span class="tr-hint">${tb.hist.length - 1} Schritt${tb.hist.length === 2 ? '' : 'e'} in diesem Tab</span></div>`;
+  const restore = tb.built ? '' : `<button class="btn btn-ghost btn-xs" data-act="ed-restore" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('reset')} Berechnete Route wiederherstellen</button>`;
+  const replanAll = `<button class="btn btn-ghost btn-xs" data-act="bd-replan-all" ${isStart || k.busy ? 'disabled' : ''} title="Plant die Fracht der gezeigten Route ganz neu, mit Änderungsanzeige">${ic('reset')} Fracht ganz neu planen</button>`;
+  const steps = tb.built ? `${tb.at} Schritt${tb.at === 1 ? '' : 'e'} seit dem Start` : `${tb.hist.length - 1} Schritt${tb.hist.length === 2 ? '' : 'e'} in diesem Tab`;
+  const work = `<div class="tr-workbar"><span class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="ed-undo" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('arrow-left')} Rückgängig</button><button class="btn btn-ghost btn-xs" data-act="ed-redo" ${tb.at < tb.hist.length - 1 && !k.busy ? '' : 'disabled'}>Wiederholen ${ic('arrow-right')}</button></span>${restore}${replanAll}<span class="tr-hint">${steps}</span></div>`;
   const pins = k.w.stops.filter((s) => s.pinned).length;
   const count = k.w.stops.length;
   const over = count > searchLimit();
@@ -333,17 +342,18 @@ function editPage() {
     ? `<span class="tr-hint tr-hint--warn">${ic('info')} Rest optimieren sucht höchstens ${searchLimit()} Stopps (Suchgrenze); diese Route hat ${count}. Entferne Stopps, um wieder zu optimieren. Bearbeiten und Einfügen gehen weiter bis ${ROUTE_LIMIT}.</span>`
     : `<span class="tr-hint">Feste Stopps bleiben an ihrer Stelle; die freien sucht die Suche neu, bis zu ${upTo} Stopps${upTo > LONG_JOB_ABOVE ? ' als lange Suche' : ''} (bis 60 s).</span>`;
   const pinbar = `<div class="tr-pinbar"><span>${ic('map-pin')} <strong>${pins} von ${count}</strong> Stopps fest</span><button class="btn btn-outline btn-xs" data-act="ed-optimise" ${k.busy || pins === count || over ? 'disabled' : ''}>${ic('search')} Rest optimieren</button>${optHint}</div>`;
-  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Bearbeiten einer berechneten Route · Quelle: ${SRC_LABEL[state.ed.src]} · Änderungsanzeige ${state.ed.diffView === 'A' ? 'A: in der Zeitleiste' : 'B: als Tabelle'} · Einfügen und Alternativen ${state.ed.pick === 'dialog' ? 'im Dialog' : 'in der Zeitleiste'}. ${longNote()} Alles rechnet eine kleine Engine im Browser auf erfundenen Preisen.</p>`;
+  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Bearbeiten einer berechneten Route · Quelle: ${SRC_LABEL[state.ed.src]} · Änderungsanzeige ${state.ed.diffView === 'A' ? 'A: in der Zeitleiste' : 'B: als Tabelle'} · Einfügen und Alternativen ${state.ed.pick === 'dialog' ? 'im Dialog' : 'in der Zeitleiste'}. ${longNote()} ${buildNote()} Alles rechnet eine kleine Engine im Browser auf erfundenen Preisen.</p>`;
+  const body = isStart
+    ? `${work}${buildStart(k)}`
+    : `${stopIndex(k, e)}
+      <div class="tr-row tr-row--between"><div><div class="tr-stoptile__title">${esc(e.name)}</div><div class="tr-hint">${e.convoy ? `Konvoi · ${e.ships.length} Schiffe` : esc(k.w.ships[0].name)}</div></div><div class="tr-actions">${editSaveActions(k)}</div></div>
+      ${work}${keptBanner(k, e)}${diffBlock(k, e)}
+      ${tb.built ? forcedMissing(k) : ''}${kpis(e)}${warnList(e)}${shipShares(e)}${pinbar}
+      ${editTimeline(k, e)}`;
   return `${pageHead()}${note}<div class="tr-a">${requestAside()}<section class="tr-a__result" aria-label="Ergebnis">
     ${src}${editStatus(k)}${reqBar}
     <div><div class="tab-nav tr-a__tabs" role="tablist">${tabs}</div>
-    <div class="tr-a__routecard">
-      ${stopIndex(k, e)}
-      <div class="tr-row tr-row--between"><div><div class="tr-stoptile__title">${esc(e.name)}</div><div class="tr-hint">${e.convoy ? `Konvoi · ${e.ships.length} Schiffe` : esc(k.w.ships[0].name)}</div></div><div class="tr-actions">${editSaveActions(k)}</div></div>
-      ${work}${keptBanner(k, e)}${diffBlock(k, e)}
-      ${kpis(e)}${warnList(e)}${shipShares(e)}${pinbar}
-      ${editTimeline(k, e)}
-    </div></div></section></div>`;
+    <div class="tr-a__routecard">${body}</div></div></section></div>`;
 }
 
 /**
@@ -355,6 +365,11 @@ function editPage() {
 function editModal(m, shell) {
   if (m.kind === 'ed-panel') {
     const k = edWork(state.ed.panel.ctx);
+    if (state.ed.panel.kind === 'build') {
+      const pos = appendPos(k.w);
+      const t = pos < k.w.stops.length ? `Stopp vor dem Ziel anhängen · ${esc(tname(k.w.stops[k.w.stops.length - 1].t))}` : `Stopp anhängen nach ${esc(tname(k.w.stops[pos - 1].t))}`;
+      return shell(k.ctx === 'flight' ? `Nächsten Stopp anhängen` : t, buildPanel(k, 'dialog'), '<button class="btn btn-ghost" data-act="ed-panel-close">Schließen</button>', true);
+    }
     const body = state.ed.panel.kind === 'insert' ? insertPanel(k) : markPanel(k);
     const title = state.ed.panel.kind === 'insert' ? 'Stopp einfügen' : state.ed.panel.side === 'buy' ? 'Ausverkauft' : 'Keine Nachfrage';
     return shell(title, body, '<button class="btn btn-ghost" data-act="ed-panel-close">Schließen</button>', true);

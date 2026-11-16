@@ -272,6 +272,7 @@ const ACTIONS = {
   ...SURFACE_ACTIONS,
   ...EDIT_ACTIONS,
   ...LONG_ACTIONS,
+  ...BUILD_ACTIONS,
 };
 
 /**

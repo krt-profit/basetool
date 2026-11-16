@@ -20,7 +20,7 @@ function requestAside() {
     <div class="tr-a__aside-head"><h2>Anfrage</h2><div class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="reset">Zurücksetzen</button><button class="btn btn-ghost btn-xs" data-act="a-collapse" aria-expanded="${!state.aCollapsed}">${state.aCollapsed ? 'Aufklappen' : 'Einklappen'}</button></div></div>
     <div class="tr-a__summary-mobile">${esc(GROUPS.slice(0, 3).map(([k]) => groupSummary(k)).join(' · '))} · ${activeFilters(state.request).length} Filter</div>
     <div class="tr-a__groups">${groups}</div>
-    <div class="tr-a__aside-foot"><button class="btn btn--cta" data-act="compute">${ic('search')} Route berechnen</button><button class="btn btn-ghost btn-xs" data-act="overheads">Meine Stoppzeiten</button></div>
+    <div class="tr-a__aside-foot"><button class="btn btn--cta" data-act="compute">${ic('search')} Route berechnen</button><button class="btn btn-outline tr-bd-entry" data-act="bd-start" title="Ab dem Startterminal: du wählst jeden Stopp aus Vorschlägen">${ic('plus')} Stopp für Stopp bauen</button><button class="btn btn-ghost btn-xs" data-act="overheads">Meine Stoppzeiten</button></div>
   </aside>`;
 }
 
