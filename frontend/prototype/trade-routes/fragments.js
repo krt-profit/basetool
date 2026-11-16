@@ -206,7 +206,8 @@ function statusBar() {
     return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>${label}</strong><span class="tr-status__bar"><i style="width:${[15, 45, 80][s.step] || 10}%"></i></span><span class="muted num">${s.elapsed} s / 60 s</span><button class="btn btn-ghost btn-xs" data-act="stop-search">Suche stoppen</button></div>`;
   }
   const how = s.deadline ? 'Frist erreicht nach 60 s' : s.stopped ? `gestoppt nach ${s.elapsed} s` : `abgeschlossen in ${s.elapsed || 6} s`;
-  return `<div class="tr-status" role="status">${ic('check')}<span>Suche ${how} · ${state.results.length} Route${state.results.length > 1 ? 'n' : ''} · Datenstand 14:00 Uhr</span><span class="muted">Neue Preise kommen stündlich.</span></div>`;
+  const fresh = state.newPrices ? `<div class="tr-warnline tr-warnline--info" role="status">${ic('info')}<span>Neue Preise seit 15:00 Uhr. Die Route bleibt, bis du sie prüfst.</span><button class="btn btn-ghost btn-xs" data-act="recheck" style="margin-left:auto">Route prüfen</button></div>` : '';
+  return `<div class="tr-status" role="status">${ic('check')}<span>Suche ${how} · ${state.results.length} Route${state.results.length > 1 ? 'n' : ''} · Datenstand 14:00 Uhr</span><span class="muted">Neue Preise kommen stündlich.</span></div>${fresh}`;
 }
 
 /**

@@ -114,6 +114,6 @@ function protoBar() {
     <span class="proto-bar__sep"></span>
     <button data-act="scenario" data-val="single" aria-pressed="${state.scenario === 'single'}">1 Schiff</button><button data-act="scenario" data-val="convoy" aria-pressed="${state.scenario === 'convoy'}">Konvoi</button>
     <span class="proto-bar__sep"></span>
-    <button data-act="deadline" aria-pressed="${state.search.deadline}" title="Suche endet an der 60-s-Frist">Frist</button><button data-act="state" aria-pressed="${state.showState}">Zustand</button>
+    <button data-act="deadline" aria-pressed="${state.search.deadline}" title="Suche endet an der 60-s-Frist">Frist</button><button data-act="new-prices" aria-pressed="${state.newPrices}" title="Ein Preislauf hat einen neuen Datenstand gebaut">Preise</button><button data-act="state" aria-pressed="${state.showState}">Zustand</button>
   </div>`;
 }

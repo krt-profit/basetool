@@ -5326,7 +5326,8 @@ function statusBar() {
     return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>${label}</strong><span class="tr-status__bar"><i style="width:${[15, 45, 80][s.step] || 10}%"></i></span><span class="muted num">${s.elapsed} s / 60 s</span><button class="btn btn-ghost btn-xs" data-act="stop-search">Suche stoppen</button></div>`;
   }
   const how = s.deadline ? 'Frist erreicht nach 60 s' : s.stopped ? `gestoppt nach ${s.elapsed} s` : `abgeschlossen in ${s.elapsed || 6} s`;
-  return `<div class="tr-status" role="status">${ic('check')}<span>Suche ${how} · ${state.results.length} Route${state.results.length > 1 ? 'n' : ''} · Datenstand 14:00 Uhr</span><span class="muted">Neue Preise kommen stündlich.</span></div>`;
+  const fresh = state.newPrices ? `<div class="tr-warnline tr-warnline--info" role="status">${ic('info')}<span>Neue Preise seit 15:00 Uhr. Die Route bleibt, bis du sie prüfst.</span><button class="btn btn-ghost btn-xs" data-act="recheck" style="margin-left:auto">Route prüfen</button></div>` : '';
+  return `<div class="tr-status" role="status">${ic('check')}<span>Suche ${how} · ${state.results.length} Route${state.results.length > 1 ? 'n' : ''} · Datenstand 14:00 Uhr</span><span class="muted">Neue Preise kommen stündlich.</span></div>${fresh}`;
 }
 
 /**
@@ -5864,7 +5865,7 @@ function protoBar() {
     <span class="proto-bar__sep"></span>
     <button data-act="scenario" data-val="single" aria-pressed="${state.scenario === 'single'}">1 Schiff</button><button data-act="scenario" data-val="convoy" aria-pressed="${state.scenario === 'convoy'}">Konvoi</button>
     <span class="proto-bar__sep"></span>
-    <button data-act="deadline" aria-pressed="${state.search.deadline}" title="Suche endet an der 60-s-Frist">Frist</button><button data-act="state" aria-pressed="${state.showState}">Zustand</button>
+    <button data-act="deadline" aria-pressed="${state.search.deadline}" title="Suche endet an der 60-s-Frist">Frist</button><button data-act="new-prices" aria-pressed="${state.newPrices}" title="Ein Preislauf hat einen neuen Datenstand gebaut">Preise</button><button data-act="state" aria-pressed="${state.showState}">Zustand</button>
   </div>`;
 }
 
@@ -5891,6 +5892,7 @@ const state = {
   soldOut: {},
   myReports: [],
   showState: false,
+  newPrices: params.get('open') === 'new-prices',
 };
 state.request = freshRequest(state.scenario);
 state.resultShips = state.request.ships.map((s) => ({ ...s }));
@@ -6015,6 +6017,8 @@ const ACTIONS = {
   scenario: (el) => setScenario(el.dataset.val),
   deadline: () => { state.search.deadline = !state.search.deadline; if (state.search.phase === 'done' && !state.search.stopped) state.search.elapsed = state.search.deadline ? 60 : 6; },
   state: () => { state.showState = !state.showState; },
+  'new-prices': () => { state.newPrices = !state.newPrices; },
+  recheck: () => { state.newPrices = false; say('Route geprüft', 'Fracht auf denselben Stopps mit den neuen Preisen geplant; Abweichungen sind markiert.'); },
   compute: () => startSearch(),
   'stop-search': () => stopSearch(),
   sel: (el) => { state.sel = Number(el.dataset.val); state.bStop = 0; },

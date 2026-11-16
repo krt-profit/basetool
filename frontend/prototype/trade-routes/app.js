@@ -21,6 +21,7 @@ const state = {
   soldOut: {},
   myReports: [],
   showState: false,
+  newPrices: params.get('open') === 'new-prices',
 };
 state.request = freshRequest(state.scenario);
 state.resultShips = state.request.ships.map((s) => ({ ...s }));
@@ -145,6 +146,8 @@ const ACTIONS = {
   scenario: (el) => setScenario(el.dataset.val),
   deadline: () => { state.search.deadline = !state.search.deadline; if (state.search.phase === 'done' && !state.search.stopped) state.search.elapsed = state.search.deadline ? 60 : 6; },
   state: () => { state.showState = !state.showState; },
+  'new-prices': () => { state.newPrices = !state.newPrices; },
+  recheck: () => { state.newPrices = false; say('Route geprüft', 'Fracht auf denselben Stopps mit den neuen Preisen geplant; Abweichungen sind markiert.'); },
   compute: () => startSearch(),
   'stop-search': () => stopSearch(),
   sel: (el) => { state.sel = Number(el.dataset.val); state.bStop = 0; },
