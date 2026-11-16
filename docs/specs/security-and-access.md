@@ -5830,7 +5830,10 @@ set is shaped by what the module serves.
   `CspNonceFilter`. Beside it: `X-Frame-Options: DENY`, `Referrer-Policy:
   strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy`
   `same-origin`, HSTS (one year, `includeSubDomains`, `preload`), a `Permissions-Policy` that denies
-  every listed feature, and `X-Content-Type-Options: nosniff`.
+  every listed feature except `clipboard-write`, and `X-Content-Type-Options: nosniff`.
+  `clipboard-write=(self)` lets the app's own pages write to the clipboard through
+  `navigator.clipboard`, which the copy buttons (such as the purchasing report's forum text) need;
+  `clipboard-read=()` stays denied, and no other origin gets either.
 - **Frontend Trusted Types (ADR-0239)** — the directives `require-trusted-types-for 'script';
   trusted-types krt-html krt-fragment` make every DOM script sink take a value of one of the two
   named policies (REQ-FE-022) and forbid any other policy, a `default` one included.
@@ -5851,7 +5854,8 @@ set is shaped by what the module serves.
 - **Backend and ingest (JSON only)** — `Content-Security-Policy: default-src 'none';
   frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, because neither serves a document,
   plus `X-Frame-Options: DENY` and HSTS; the backend additionally sends the frontend's
-  referrer, cross-origin, permissions and `nosniff` headers.
+  referrer, cross-origin and `nosniff` headers and a `Permissions-Policy` that denies every listed
+  feature, `clipboard-write` included.
 - **Edge** — every public vhost adds `Strict-Transport-Security: max-age=63072000;
   includeSubDomains; preload` with `always` (`$hsts_header` in `docker/edge/conf.d/00-maps.conf`),
   so an error page the edge produces itself carries it too.
@@ -5870,10 +5874,17 @@ this requirement first. An inline script is only ever a data bootstrap (REQ-FE-0
 > The frontend sends the Trusted Types directives, report-only by default; the enforced mode is a
 > configuration switch. Production runs `enforce` since 2026-11-10 (#2568).
 
+> [!note] Amended 2026-11-16 — clipboard writes
+> The frontend's `Permissions-Policy` allows `clipboard-write` for its own origin; the deny-all value
+> made Chromium reject every `navigator.clipboard` write, so the purchasing report's copy button only
+> showed an error.
+
 **Acceptance**
 
 - [x] A frontend page carries the nonce-gated CSP with `style-src-attr 'none'` and the Keycloak
   `form-action` origin, and every static header above.
+- [x] A frontend page's `Permissions-Policy` is `clipboard-write=(self)` and `clipboard-read=()`,
+  and the purchasing report's copy button writes the forum text in Chromium.
 - [x] A frontend page carries the Trusted Types directives: report-only by default, in the enforced
   policy with `app.security.trusted-types=enforce`.
 - [x] A Markdown image renders as a link, never as an `<img>`, with its URL sanitised like a link
@@ -5883,7 +5894,8 @@ this requirement first. An inline script is only ever a data bootstrap (REQ-FE-0
 - [x] The public edge sends HSTS on its first response; its absence raises `EdgeHstsHeaderMissing`.
 
 **Enforced by:** `SecurityHeadersTest` (frontend and backend),
-`TrustedTypesModeTest`, the Trusted Types collector of `DialogA11yE2eTest`,
+`PurchasingReportForumCopyE2eTest`, `TrustedTypesModeTest`, the Trusted Types collector of
+`DialogA11yE2eTest`,
 `ClientErrorReportControllerTest`, `:frontend:testClientErrorCspJs`, ingest
 `SecurityConfigTest`, the `blackbox-hsts*` probes behind `EdgeHstsHeaderMissing` · **Code:**
 `frontend/…/kernel/security/SecurityHeaders`, `frontend/…/kernel/security/TrustedTypesMode`,

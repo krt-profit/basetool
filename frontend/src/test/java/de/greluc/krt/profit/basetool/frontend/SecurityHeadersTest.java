@@ -37,6 +37,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.reactive.function.client.WebClient;
 
+/** The security response headers the frontend sends on a rendered page (REQ-SEC-064). */
 @SpringBootTest
 @org.springframework.security.test.context.support.WithMockUser
 class SecurityHeadersTest {
@@ -69,6 +70,25 @@ class SecurityHeadersTest {
         .andExpect(header().string("X-Frame-Options", "DENY"))
         .andExpect(header().string("Referrer-Policy", "strict-origin-when-cross-origin"))
         .andExpect(header().exists("Permissions-Policy"));
+  }
+
+  /**
+   * Verifies the {@code Permissions-Policy} (REQ-SEC-064): every listed feature is denied except
+   * {@code clipboard-write}, which only the app's own origin may use.
+   */
+  @Test
+  void permissionsPolicyAllowsClipboardWriteForTheOwnOriginOnly() throws Exception {
+    mockMvc
+        .perform(get("/"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Permissions-Policy",
+                    "geolocation=(), camera=(), microphone=(), fullscreen=(), payment=(), usb=(),"
+                        + " serial=(), bluetooth=(), accelerometer=(), gyroscope=(),"
+                        + " magnetometer=(), display-capture=(), clipboard-read=(),"
+                        + " clipboard-write=(self), interest-cohort=()"));
   }
 
   /**
