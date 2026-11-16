@@ -9,7 +9,7 @@ let longTimers = [];
 function initLongState() {
   const pick = (k, ok, def) => (ok.includes(params.get(k)) ? params.get(k) : def);
   const limit = Number(pick('limit', ['10', '8'], String(SEARCH_LIMIT_DEFAULT)));
-  state.long = { nField: pick('nfield', ['A', 'B'], 'A'), index: pick('index', ['A', 'B'], 'A'), after: pick('after', ['A', 'B'], 'A'), afterOpen: false, searchLimit: limit, slot: pick('slot', ['free', 'queue', 'full'], 'free'), search: null, last: null };
+  state.long = { nField: pick('nfield', ['A', 'B'], 'A'), index: pick('index', ['A', 'B'], 'A'), after: pick('after', ['A', 'B'], 'B'), afterOpen: false, searchLimit: limit, slot: pick('slot', ['free', 'queue', 'full'], 'free'), search: null, last: null };
   const n = Number(params.get('n'));
   if (n >= 2 && n <= limit) state.request.maxStops = n;
   state.long.last = { elapsed: state.request.maxStops > LONG_JOB_ABOVE ? 44 : 6, long: state.request.maxStops > LONG_JOB_ABOVE, stopped: false };
