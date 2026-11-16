@@ -55,7 +55,7 @@ function ageShort(h) {
 function freshRequest(scenario) {
   return {
     ships: scenario === 'convoy' ? [{ ...SHIP_C2 }, { ...SHIP_CAT }] : [{ ...SHIP_C2 }],
-    maxStops: 4, roundTrip: false, start: '', end: '', runs: 1,
+    maxStops: 3, roundTrip: false, start: '', end: '', runs: 1,
     objective: 'perHour', timeLimit: '', minProfit: '100000',
     systems: [], kinds: [...KINDS], modes: [...MODES],
     refuel: false, armistice: false, monitoring: 'any',

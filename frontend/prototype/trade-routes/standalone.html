@@ -4760,7 +4760,7 @@ body.has-fly .proto-state { bottom: 144px; }
 @media (width <= 768px) {
   .tr-main { padding: var(--space-4) 12px; }
   .tr-grid2, .tr-grid3 { grid-template-columns: 1fr; }
-  .tr-a__tabs .tab small { display: none; }
+  .tr-a__tabs .tab .tr-tab__more { display: none; }
   .tr-timeline__stop, .tr-timeline__leg, .tr-insert { padding-left: 36px; }
   .tr-timeline__stop::before { width: 26px; height: 26px; font-size: var(--fs-xs); }
   .tr-timeline__leg::before { left: 12px; }
@@ -4814,6 +4814,51 @@ body.has-fly .proto-state { bottom: 144px; }
   .tr-pin { min-height: 32px; }
 }
 
+.tr-stepper { display: inline-flex; align-items: center; gap: 8px; }
+.tr-stepper__v { min-width: 2.5rem; text-align: center; font-size: 1.4rem; font-weight: var(--fw-black); color: var(--color-white); }
+.tr-stepper__range { font-size: var(--fs-2xs); color: var(--color-gray-2-text); }
+.tr-nseg { display: flex; width: 100%; max-width: 440px; }
+.tr-nseg .krt-segmented__item { flex: 1 1 0; min-width: 28px; padding: 0; }
+.tr-hint--warn { color: var(--color-warning); display: inline-flex; gap: 6px; align-items: flex-start; }
+.tr-status--refused { border-color: var(--color-danger); }
+.tr-status--refused > .krt-icon { color: var(--color-danger-text); }
+.tr-insert--limit .tr-hint { display: inline-flex; gap: 6px; align-items: center; }
+.tr-after__row { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr); gap: 2px 8px; padding: 6px 0; border-top: 1px solid var(--color-gray-3); }
+.tr-after__n { grid-row: span 2; font-weight: var(--fw-black); color: var(--color-gray-2-text); }
+.tr-after__name { color: var(--color-white); font-weight: var(--fw-bold); }
+.tr-after__rest { padding-top: 8px; border-top: 1px solid var(--color-gray-3); color: var(--color-gray-2-text); font-size: var(--fs-sm); }
+.tr-after__more { margin-top: 6px; }
+
+.tr-sidx { display: none; }
+@media (width <= 768px) {
+  .tr-sidx { display: flex; align-items: center; gap: 4px; position: sticky; top: var(--tr-stick-top, 56px); z-index: 5; margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0; padding: 8px var(--space-4); background: var(--surface-bar); border-bottom: 1px solid var(--color-gray-3); }
+  .tr-fly .tr-sidx { top: 0; margin: 0 -16px; }
+  .tr-sidx__chip { position: relative; cursor: pointer; padding: 0; font-family: inherit; }
+  .tr-sidx__dot { position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; }
+  .tr-sidx__dot--danger { background: var(--color-danger-text); }
+  .tr-sidx__dot--warn { background: var(--color-warning); }
+  .tr-sidx__dot--info { background: var(--color-info-text); }
+  .tr-sidx--A .tr-sidx__chip { flex: 1 1 0; min-width: 0; max-width: 48px; height: 34px; display: flex; align-items: center; justify-content: center; background: var(--control-bg); border: 1px solid var(--control-border); border-radius: var(--radius-sm); color: var(--color-white); font-weight: var(--fw-bold); font-size: var(--fs-sm); }
+  .tr-sidx--A .tr-sidx__chip.is-pinned { box-shadow: inset 3px 0 0 var(--color-primary); }
+  .tr-sidx--A .tr-sidx__chip.is-here { background: color-mix(in srgb, var(--color-primary) 20%, var(--control-bg)); border-bottom: 2px solid var(--color-primary); }
+  .tr-sidx--A .tr-sidx__chip.is-now { border-color: var(--color-primary); }
+  .tr-sidx--A .tr-sidx__chip.is-done { color: var(--color-gray-2-text); background: var(--surface-inset); border-color: var(--color-gray-3); }
+  .tr-sidx--B { gap: 0; }
+  .tr-sidx--B .tr-sidx__rail { flex: 1 1 0; min-width: 2px; height: 2px; background: var(--color-gray-3); }
+  .tr-sidx--B .tr-sidx__chip { flex: 0 0 auto; width: 28px; height: 36px; display: flex; align-items: center; justify-content: center; background: none; border: 0; }
+  .tr-sidx__node { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface-card); border: 2px solid var(--control-border); color: var(--color-white); font-size: var(--fs-2xs); font-weight: var(--fw-black); }
+  .tr-sidx--B .is-pinned .tr-sidx__node { border-color: var(--color-primary); }
+  .tr-sidx--B .is-here .tr-sidx__node { background: var(--color-primary); border-color: var(--color-primary); color: #141414; }
+  .tr-sidx--B .is-now .tr-sidx__node { box-shadow: 0 0 0 2px var(--surface-bar), 0 0 0 4px var(--color-primary); }
+  .tr-sidx--B .is-done .tr-sidx__node { border-color: var(--color-gray-3); background: var(--surface-inset); color: var(--color-gray-2-text); }
+  .tr-sidx--B .tr-sidx__dot { top: 2px; right: 0; }
+}
+@media (width <= 768px) {
+  .tr-fly__head { flex-wrap: wrap; }
+  .tr-fly__head > div:first-child { flex: 1 1 100%; order: 2; }
+  .tr-fly__head > .tr-iconbtns { order: 1; margin-left: auto; }
+  .tr-fly__head h1 { font-size: 1.05rem; line-height: 1.25; }
+}
 </style>
 </head>
 <body>
@@ -5252,6 +5297,60 @@ const FLIGHT_HISTORY_SEED = [
   { id: 'h3', stopIds: ['everus', 'thedus'], name: 'Eis-Pendel Hurston', path: 'Everus Harbor › HDMS-Thedus › Everus Harbor', ships: 'Freelancer MAX „Kiste“', src: 'Einheitsroute', outcome: 'abgelaufen an Stopp 3', earned: 18400, planned: 62100, ended: '09.11., 04:00', lines: [] },
 ];
 
+/** PROTOTYPE data for long routes: more invented stations, their prices, two long stop chains and list entries; nothing is real or stored. */
+
+Object.assign(PLACES, {
+  cruL1: { name: 'CRU-L1 Ambitious Dream Station', kind: 'Raumstation', body: 'Crusader L1', system: 'Stanton', armistice: true, monitored: true, danger: { m: 1.6, n: 5, d: 3 } },
+  arcL1: { name: 'ARC-L1 Wide Forest Station', kind: 'Raumstation', body: 'ArcCorp L1', system: 'Stanton', armistice: true, monitored: true, danger: { m: 1.5, n: 6, d: 2 } },
+  micL1: { name: 'MIC-L1 Shallow Frontier Station', kind: 'Raumstation', body: 'microTech L1', system: 'Stanton', armistice: true, monitored: true, danger: { m: 1.8, n: 4, d: 5 } },
+  hurL2: { name: 'HUR-L2 Faithful Dream Station', kind: 'Raumstation', body: 'Hurston L2', system: 'Stanton', armistice: true, monitored: true, danger: { m: 1.4, n: 7, d: 2 } },
+  orison: { name: 'Orison', kind: 'Stadt', body: 'Crusader', system: 'Stanton', armistice: true, monitored: true, danger: { m: 1.3, n: 8, d: 1 } },
+  grimhex: { name: 'GrimHEX', kind: 'Raumstation', body: 'Yela', system: 'Stanton', armistice: true, monitored: false, danger: { m: 3.2, n: 6, d: 2 } },
+});
+
+Object.assign(TERMINALS, {
+  cruL1: { name: 'Admin – CRU-L1', place: 'cruL1', modes: ['Auto-Load'], refuel: true, bugs: { m: 1.7, n: 4, d: 3 } },
+  arcL1: { name: 'Admin – ARC-L1', place: 'arcL1', modes: ['Auto-Load'], refuel: true, bugs: { m: 2.3, n: 5, d: 2 } },
+  micL1: { name: 'Admin – MIC-L1', place: 'micL1', modes: ['Auto-Load'], refuel: true, bugs: { m: 1.9, n: 3, d: 6 } },
+  hurL2: { name: 'Admin – HUR-L2', place: 'hurL2', modes: ['Auto-Load'], refuel: true, bugs: { m: 1.6, n: 6, d: 1 } },
+  orison: { name: 'TDD – Orison', place: 'orison', modes: ['Frachtaufzug'], refuel: false, bugs: { m: 2.7, n: 5, d: 2 } },
+  grimhex: { name: 'Admin – GrimHEX', place: 'grimhex', modes: ['Ladedock'], refuel: true, bugs: { m: 3.1, n: 4, d: 4 } },
+});
+
+Object.assign(POS, {
+  cruL1: [-7, 22], arcL1: [-2, 24], micL1: [18, -26], hurL2: [14, -4], orison: [-14.5, 15.5], grimhex: [-13, 17.5],
+});
+
+Object.assign(PRICES, {
+  cruL1: { buy: { 'Agricultural Supplies': [90, 900], Hydrogen: [100, 3000] }, sell: { 'Medical Supplies': [2230, 350], 'Processed Food': [228, 500] } },
+  arcL1: { buy: { 'Distilled Spirits': [1080, 450], Iron: [330, 1200] }, sell: { Titanium: [1030, 500], 'Agricultural Supplies': [168, 900], Agricium: [2700, 250] } },
+  micL1: { buy: { 'Processed Food': [136, 1200], Laranite: [2320, 300] }, sell: { 'Distilled Spirits': [1600, 400], Iron: [462, 1100], Agricium: [2760, 300], Hydrogen: [150, 2000] } },
+  hurL2: { buy: { Titanium: [795, 1000], Stims: [325, 600] }, sell: { Laranite: [2980, 400], Gold: [6450, 150], 'Processed Food': [252, 600] } },
+  orison: { buy: { 'Processed Food': [132, 1500] }, sell: { Stims: [495, 300], Iron: [445, 600], Hydrogen: [140, 1500] } },
+  grimhex: { buy: { Stims: [300, 500] }, sell: { 'Distilled Spirits': [1680, 250], Gold: [6300, 80], 'Processed Food': [210, 400] } },
+});
+
+const LONG_CHAINS = [
+  ['seraphim', 'cruL1', 'area18', 'baijini', 'arcL1', 'micL1', 'newbabbage', 'tressler', 'hurL2', 'everus'],
+  ['orison', 'grimhex', 'baijini', 'arcL1', 'micL1', 'newbabbage', 'hurL2', 'lorville', 'tressler', 'everus'],
+];
+
+const SEARCH_LIMIT_DEFAULT = 10;
+const ROUTE_LIMIT = 10;
+const LONG_JOB_ABOVE = 5;
+const SEQ_TEXT_MAX = 80;
+const AFTER_SHOWN = 3;
+
+const LONG_SAVED = { id: 's0', name: 'Große Stanton-Schleife', note: 'Nur mit voller Crew, dauert gut zwei Stunden', path: LONG_CHAINS[0].map((t) => PLACES[TERMINALS[t].place].name), ships: 'C2 Hercules „Lastesel“', perHour: 1712000, opened: 'heute, 20:15' };
+const LONG_UNIT = { id: 'u0', name: 'Rundflug Staffelabend', note: 'Treffpunkt Orison', unit: 'ALPHA', by: 'Kestrel', path: LONG_CHAINS[1].slice(0, 7).map((t) => PLACES[TERMINALS[t].place].name), ships: 'Konvoi · 3× Crusader C2 Hercules', perHour: 4180000, age: '1 Tag' };
+const LONG_SHARE = { code: 'P4XN-7QWD-K2', name: 'Sechs Stationen Stanton', path: LONG_CHAINS[0].slice(0, 6).map((t) => PLACES[TERMINALS[t].place].name), ships: 'Crusader C2 Hercules', at: '15.11., 21:12' };
+const LONG_FLIGHT = { id: 'h0', stopIds: LONG_CHAINS[0], name: 'Große Stanton-Schleife', path: LONG_CHAINS[0].map((t) => PLACES[TERMINALS[t].place].name), ships: 'C2 Hercules „Lastesel“', src: 'Gespeicherte Route', outcome: 'abgeschlossen', earned: 1281400, planned: 1275900, ended: 'heute, 18:02', lines: [] };
+
+SAVED_ROUTES.unshift(LONG_SAVED);
+UNIT_ROUTES.unshift(LONG_UNIT);
+MY_SHARES.unshift(LONG_SHARE);
+FLIGHT_HISTORY_SEED.unshift(LONG_FLIGHT);
+
 /** PROTOTYPE model: formatting, request state and the route computation behind every variant. */
 const NF = new Intl.NumberFormat('de-DE');
 const fmt = (n) => NF.format(Math.round(n));
@@ -5309,7 +5408,7 @@ function ageShort(h) {
 function freshRequest(scenario) {
   return {
     ships: scenario === 'convoy' ? [{ ...SHIP_C2 }, { ...SHIP_CAT }] : [{ ...SHIP_C2 }],
-    maxStops: 4, roundTrip: false, start: '', end: '', runs: 1,
+    maxStops: 3, roundTrip: false, start: '', end: '', runs: 1,
     objective: 'perHour', timeLimit: '', minProfit: '100000',
     systems: [], kinds: [...KINDS], modes: [...MODES],
     refuel: false, armistice: false, monitoring: 'any',
@@ -5669,7 +5768,7 @@ function evaluate(w, shipList) {
   stops.filter((s) => s.failsFilter).forEach((s) => warnings.push({ kind: 'warn', icon: 'warning', text: `${s.term.name} verletzt einen Filter der Anfrage (${s.failsFilter}); von dir eingefügt, darum bleibt es` }));
   (w.marks || []).forEach((m) => warnings.push({ kind: 'warn', icon: 'warning', text: `${m.side === 'buy' ? 'Ausverkauft' : 'Keine Nachfrage'}: ${m.c} bei ${TERMINALS[m.t].name}, noch ${fmt(m.rest)} SCU (nur deine Route)` }));
   const ships2 = perShip.map((p) => ({ ...p, profit: p.revenue - p.cost, need: -p.low, perHour: ((p.revenue - p.cost) * 3600) / Math.max(1, duration) }));
-  const name = stops.map((s) => s.place.name).filter((x, i, a) => i === 0 || x !== a[i - 1]).join(' → ');
+  const name = seqText(stops.map((s) => s.place.name));
   const buys = stops.flatMap((s) => s.jobs).filter((j) => j.side === 'buy');
   const runs = buys.length ? Math.max(1, Math.min(...buys.map((j) => Math.floor(j.stock / Math.max(1, j.qty))))) : 1;
   return {
@@ -6162,7 +6261,7 @@ function fShips() {
  */
 function fShape() {
   const r = state.request;
-  return `<div class="tr-field"><span class="tr-cap">Stopps, höchstens</span><div class="krt-segmented" role="group" aria-label="Stopps">${[2, 3, 4, 5].map((n) => `<button type="button" class="krt-segmented__item" data-act="set" data-key="maxStops" data-val="${n}" aria-pressed="${r.maxStops === n}">${n}</button>`).join('')}</div><span class="tr-hint">2 = A → B. Die Suche darf weniger Stopps nehmen.</span></div>
+  return `${stopsField()}
     ${sw('roundTrip', 'Rundreise', 'endet am ersten Stopp')}
     <div class="tr-grid2"><div class="tr-field"><span class="tr-cap">Startterminal</span>${picker('start', 'terminal', true, 'frei')}</div>
     <div class="tr-field"><span class="tr-cap">Zielterminal</span>${r.roundTrip ? '<span class="tr-hint">Rundreise: zurück zum Start</span>' : picker('end', 'terminal', true, 'frei')}</div></div>
@@ -6717,7 +6816,7 @@ function savedTab() {
   const list = state.savedList;
   if (!list.length) return '<div class="empty-state"><div class="empty-title">Keine gespeicherten Routen</div><div class="empty-text">Speichere eine Route im Routenplaner. Beim Öffnen wird ihre Fracht auf aktuellen Daten neu geplant.</div></div>';
   const rows = list.map((s) => `<tr>
-      <td><a class="row-link" href="#" data-act="open-route" data-src="saved"><span class="cell-title">${esc(s.name)}</span><span class="cell-sub">${esc(s.path)}${s.note ? ` · ${esc(s.note)}` : ''}</span></a></td>
+      <td><a class="row-link" href="#" data-act="open-route" data-src="saved"><span class="cell-title">${esc(s.name)}</span><span class="cell-sub">${esc(seqText(s.path))}${s.note ? ` · ${esc(s.note)}` : ''}</span></a></td>
       <td class="cell-status">${s.broken ? `<span class="tr-mark tr-mark--danger">${esc(s.broken)}</span>` : s.fallback ? '<span class="tr-mark tr-mark--warn">Hangarschiff weg · als Typ</span>' : ''}</td>
       <td data-label="Schiffe">${esc(s.ships)}</td>
       <td class="num" data-label="Pro Stunde">${fmt(s.perHour)}</td>
@@ -6741,7 +6840,7 @@ function unitTab() {
     const by = u.by ? esc(u.by) + (own ? ' (du)' : '') : '<span class="muted">ehemaliges Mitglied</span>';
     const tools = `${rowBtn('save-copy', 'save', 'Als meine Route speichern')}${rowBtn('share-saved', 'external-link', 'Teilen', '', `data-val="${u.id}"`)}${may ? `${rowBtn('rename', 'edit', 'Umbenennen', '', 'data-what="Einheitsroute"')}${rowBtn('confirm-delete-unit', 'trash', 'Löschen', 'btn-quiet-danger', `data-val="${u.id}"`)}` : ''}`;
     return `<tr>
-      <td><a class="row-link" href="#" data-act="open-route" data-src="unit"><span class="cell-title">${esc(u.name)}</span><span class="cell-sub">${esc(u.path)}${u.note ? ` · ${esc(u.note)}` : ''}</span></a></td>
+      <td><a class="row-link" href="#" data-act="open-route" data-src="unit"><span class="cell-title">${esc(u.name)}</span><span class="cell-sub">${esc(seqText(u.path))}${u.note ? ` · ${esc(u.note)}` : ''}</span></a></td>
       <td class="cell-status"><span class="squadron-badge">${u.unit}</span></td>
       <td data-label="Eingetragen von">${by}</td>
       <td data-label="Schiffe">${esc(u.ships)}</td>
@@ -6762,7 +6861,7 @@ function sharedTab() {
   const list = state.shares;
   if (!list.length) return '<div class="empty-state"><div class="empty-title">Nichts geteilt</div><div class="empty-text">„Teilen“ an einer Route erzeugt einen Code und einen Link. Jedes angemeldete Mitglied öffnet damit eine eingefrorene Kopie.</div></div>';
   const rows = list.map((s) => `<tr>
-      <td><a class="row-link" href="#" data-act="open-route" data-src="shared"><span class="cell-title">${esc(s.name)}</span><span class="cell-sub">${esc(s.path)}</span></a></td>
+      <td><a class="row-link" href="#" data-act="open-route" data-src="shared"><span class="cell-title">${esc(s.name)}</span><span class="cell-sub">${esc(seqText(s.path))}</span></a></td>
       <td class="cell-status"><span class="data-value">${s.code}</span></td>
       <td data-label="Schiffe">${esc(s.ships)}</td>
       <td data-label="Geteilt">${esc(s.at)}</td>
@@ -7139,7 +7238,8 @@ function edWork(ctx) {
     return { ctx, w: f.w, entry: f.last, lock: f.pos.idx, flight: f, busy: Boolean(f.readOnly) };
   }
   const tb = state.ed.tabs[state.ed.tab];
-  return { ctx, w: tb.hist[tb.at].w, entry: tb.at > 0 ? tb.hist[tb.at] : null, lock: -1, tab: tb, busy: Boolean(state.ed.optimising) };
+  const searching = Boolean(state.long.search && state.long.search.phase !== 'refused');
+  return { ctx, w: tb.hist[tb.at].w, entry: tb.at > 0 ? tb.hist[tb.at] : null, lock: -1, tab: tb, busy: Boolean(state.ed.optimising) || searching };
 }
 
 /**
@@ -7275,8 +7375,8 @@ function insertRow(k, pos, append) {
   if (pos <= k.lock) return '';
   const p = state.ed.panel;
   if (state.ed.pick === 'inline' && p && p.kind === 'insert' && p.ctx === k.ctx && p.pos === pos) return `<li class="tr-insert tr-insert--open">${insertPanel(k)}</li>`;
-  const full = k.w.stops.length >= 5;
-  return `<li class="tr-insert"><button class="btn btn-ghost btn-xs" data-act="ed-insert-open" data-ctx="${k.ctx}" data-pos="${pos}" ${full || k.busy ? 'disabled' : ''} title="${full ? 'Höchstens 5 Stopps' : ''}">${ic('plus')} ${append ? 'Stopp anhängen' : 'Stopp einfügen'}</button></li>`;
+  const full = k.w.stops.length >= ROUTE_LIMIT;
+  return `<li class="tr-insert"><button class="btn btn-ghost btn-xs" data-act="ed-insert-open" data-ctx="${k.ctx}" data-pos="${pos}" ${full || k.busy ? 'disabled' : ''} title="${full ? `Routengrenze: höchstens ${ROUTE_LIMIT} Stopps` : ''}">${ic('plus')} ${append ? 'Stopp anhängen' : 'Stopp einfügen'}</button></li>${append ? routeLimitHint(k) : ''}`;
 }
 
 /**
@@ -7328,7 +7428,7 @@ function insertPanel(k) {
   const head = p.commodity ? `Abnehmer für ${esc(p.commodity)} einfügen ${at}` : `${p.pos >= k.w.stops.length ? 'Stopp anhängen' : 'Stopp einfügen'} ${at}`;
   return `<div class="tr-panel" role="group" aria-label="${head}">
     <div class="tr-row tr-row--between"><div class="tr-cap">${head}</div>${state.ed.pick === 'inline' ? `<button class="btn btn-ghost btn-xs" data-act="ed-panel-close">${ic('close')} Schließen</button>` : ''}</div>
-    <div class="tr-hint">Die zehn besten Terminals für diese Stelle, jeweils mit der ganzen Route neu geplant (schnelle Spur). Sie folgen den Filtern deiner Anfrage. Ein eingefügter Stopp ist fest. ${k.w.stops.length + 1 > state.request.maxStops ? `Über deine ${state.request.maxStops} Stopps hinaus erlaubt, bis 5.` : ''}</div>
+    <div class="tr-hint">Die zehn besten Terminals für diese Stelle, jeweils mit der ganzen Route neu geplant (schnelle Spur). Sie folgen den Filtern deiner Anfrage. Ein eingefügter Stopp ist fest. ${k.w.stops.length + 1 > state.request.maxStops ? `Über deine ${state.request.maxStops} Stopps hinaus erlaubt, bis ${ROUTE_LIMIT}.` : ''}</div>
     <div class="hud-scroll scroll-x"><table class="tr-jobs tr-cands"><thead><tr><th>Terminal</th>${p.commodity ? '<th class="num">kauft à</th>' : ''}<th class="num">Δ Gewinn</th><th class="num">Δ Dauer</th><th class="num">aUEC/h</th><th>Gefahr</th><th>Bugs</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="8" class="tr-hint">Kein Terminal passt zu den Filtern.</td></tr>`}${greyed}</tbody></table></div>
     <div class="tr-field tr-picker"><label for="ed-search">Oder ein Terminal nennen</label><input id="ed-search" type="search" autocomplete="off" placeholder="Terminal oder Ort suchen …" data-edsearch="${k.ctx}" data-pos="${p.pos}"><div class="tr-picker__list" hidden></div><span class="tr-hint">Ein genanntes Terminal gilt auch gegen einen Filter der Anfrage und wird markiert; ein ausgeschlossenes verlässt die Ausschlussliste.</span></div>
   </div>`;
@@ -7419,10 +7519,14 @@ function editSaveActions(k) {
  * @returns {string} markup
  */
 function editStatus(k) {
+  const searching = editSearchStatus();
+  if (searching) return searching;
   const o = state.ed.optimising;
-  if (o) return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>Rest optimieren · feste Stopps bleiben</strong><span class="tr-status__bar"><i style="width:${[20, 55, 85][o.step]}%"></i></span><span class="muted num">${o.elapsed} s / 60 s</span><button class="btn btn-ghost btn-xs" data-act="ed-opt-stop">Suche stoppen</button></div>`;
+  if (o) return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>Rest optimieren · feste Stopps bleiben · ${o.long ? 'lange Suche · ' : ''}bis ${o.upTo} Stopps</strong><span class="tr-status__bar"><i style="width:${[20, 55, 85][o.step]}%"></i></span><span class="muted num">${o.elapsed} s / 60 s</span><button class="btn btn-ghost btn-xs" data-act="ed-opt-stop">Suche stoppen</button></div>`;
   const h = k.tab.hist[k.tab.at];
-  if (!k.tab.at) return `<div class="tr-status" role="status">${ic('check')}<span>${state.ed.src === 'result' ? 'Suche abgeschlossen in 6 s · 2 Routen' : `${SRC_LABEL[state.ed.src]} geöffnet · Fracht neu geplant`} · Datenstand 14:00 Uhr</span><span class="muted">Bearbeite direkt in der Zeitleiste: ↑ ↓, entfernen, einfügen, festsetzen, markieren.</span></div>`;
+  const last = state.long.last;
+  const done = `Suche abgeschlossen in ${last.elapsed} s · ${state.ed.tabs.length} Routen${last.long ? ' · lange Suche' : ''}${last.stopped ? ' · gestoppt, bestes Zwischenergebnis' : ''}`;
+  if (!k.tab.at) return `<div class="tr-status" role="status">${ic('check')}<span>${state.ed.src === 'result' ? done :`${SRC_LABEL[state.ed.src]} geöffnet · Fracht neu geplant`} · Datenstand 14:00 Uhr</span><span class="muted">Bearbeite direkt in der Zeitleiste: ↑ ↓, entfernen, einfügen, festsetzen, markieren.</span></div>`;
   return `<div class="tr-status" role="status">${ic('edit')}<span><strong>Bearbeitet</strong> · Schritt ${k.tab.at} von ${k.tab.hist.length - 1}: ${esc(h.label)} · ${h.w.kept ? 'Restplan in 0,2 s' : h.diff ? 'Fracht neu geplant in 0,4 s' : 'ohne Neuberechnung'}</span><span class="muted">Arbeitsstand in diesem Browser-Tab; der Server hält nichts, bis du speicherst, teilst oder losfliegst.</span></div>`;
 }
 
@@ -7436,19 +7540,26 @@ function editPage() {
   pageRoutes.edit = e;
   const tabs = state.ed.tabs.map((tb, i) => {
     const r = evaluate(tb.hist[tb.at].w, tb.hist[tb.at].w.ships);
-    return `<button class="tab ${i === state.ed.tab ? 'active' : ''}" role="tab" aria-selected="${i === state.ed.tab}" data-act="ed-tab" data-val="${i}">${tb.label}${tb.at ? ' <span class="tr-mark tr-mark--forced">bearbeitet</span>' : ''}<small>${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · ${r.stops.length} Stopps</small></button>`;
+    return `<button class="tab ${i === state.ed.tab ? 'active' : ''}" role="tab" aria-selected="${i === state.ed.tab}" data-act="ed-tab" data-val="${i}">${tb.label}${tb.at ? ' <span class="tr-mark tr-mark--forced">bearbeitet</span>' : ''}<small><span class="tr-tab__more">${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · </span>${r.stops.length} Stopps</small></button>`;
   }).join('');
   const src = state.ed.src === 'result' ? '' : `<div class="tr-ctxbar"><span class="chip chip--primary">${SRC_LABEL[state.ed.src]}</span><strong>${esc({ saved: 'Abendrunde Crusader – ArcCorp', shared: 'Drei-System-Runde', unit: 'Eis-Pendel Hurston', mission: 'Stanton-Runde · Frachtkonvoi Pyro' }[state.ed.src])}</strong><span class="tr-hint">${state.ed.src === 'mission' ? 'Schiffsliste ist die Routenflotte; Stoppzeiten aus der Einsatzroute' : 'Im Planer bearbeitet; die Quelle bleibt, bis du sie aktualisierst'}</span></div>`;
   const reqBar = state.ed.requestChanged ? `<div class="tr-warnline tr-warnline--info tr-reqbar" role="status">${ic('info')}<span><strong>Anfrage geändert.</strong> Das Ergebnis rechnet noch mit der alten Anfrage.</span><span class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="ed-research">${ic('search')} Neu suchen</button><button class="btn btn-outline btn-xs" data-act="ed-replan-request">${ic('reset')} Nur Fracht neu planen</button></span></div>` : '';
   const tb = k.tab;
   const work = `<div class="tr-workbar"><span class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="ed-undo" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('arrow-left')} Rückgängig</button><button class="btn btn-ghost btn-xs" data-act="ed-redo" ${tb.at < tb.hist.length - 1 && !k.busy ? '' : 'disabled'}>Wiederholen ${ic('arrow-right')}</button></span><button class="btn btn-ghost btn-xs" data-act="ed-restore" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('reset')} Berechnete Route wiederherstellen</button><span class="tr-hint">${tb.hist.length - 1} Schritt${tb.hist.length === 2 ? '' : 'e'} in diesem Tab</span></div>`;
   const pins = k.w.stops.filter((s) => s.pinned).length;
-  const pinbar = `<div class="tr-pinbar"><span>${ic('map-pin')} <strong>${pins} von ${k.w.stops.length}</strong> Stopps fest</span><button class="btn btn-outline btn-xs" data-act="ed-optimise" ${k.busy || pins === k.w.stops.length ? 'disabled' : ''}>${ic('search')} Rest optimieren</button><span class="tr-hint">Feste Stopps bleiben an ihrer Stelle; die freien sucht die Suche neu (bis 60 s).</span></div>`;
-  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Bearbeiten einer berechneten Route · Quelle: ${SRC_LABEL[state.ed.src]} · Änderungsanzeige ${state.ed.diffView === 'A' ? 'A: in der Zeitleiste' : 'B: als Tabelle'} · Einfügen und Alternativen ${state.ed.pick === 'dialog' ? 'im Dialog' : 'in der Zeitleiste'}. Alles rechnet eine kleine Engine im Browser auf erfundenen Preisen.</p>`;
+  const count = k.w.stops.length;
+  const over = count > searchLimit();
+  const upTo = Math.min(searchLimit(), Math.max(state.request.maxStops, count));
+  const optHint = over
+    ? `<span class="tr-hint tr-hint--warn">${ic('info')} Rest optimieren sucht höchstens ${searchLimit()} Stopps (Suchgrenze); diese Route hat ${count}. Entferne Stopps, um wieder zu optimieren. Bearbeiten und Einfügen gehen weiter bis ${ROUTE_LIMIT}.</span>`
+    : `<span class="tr-hint">Feste Stopps bleiben an ihrer Stelle; die freien sucht die Suche neu, bis zu ${upTo} Stopps${upTo > LONG_JOB_ABOVE ? ' als lange Suche' : ''} (bis 60 s).</span>`;
+  const pinbar = `<div class="tr-pinbar"><span>${ic('map-pin')} <strong>${pins} von ${count}</strong> Stopps fest</span><button class="btn btn-outline btn-xs" data-act="ed-optimise" ${k.busy || pins === count || over ? 'disabled' : ''}>${ic('search')} Rest optimieren</button>${optHint}</div>`;
+  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Bearbeiten einer berechneten Route · Quelle: ${SRC_LABEL[state.ed.src]} · Änderungsanzeige ${state.ed.diffView === 'A' ? 'A: in der Zeitleiste' : 'B: als Tabelle'} · Einfügen und Alternativen ${state.ed.pick === 'dialog' ? 'im Dialog' : 'in der Zeitleiste'}. ${longNote()} Alles rechnet eine kleine Engine im Browser auf erfundenen Preisen.</p>`;
   return `${pageHead()}${note}<div class="tr-a">${requestAside()}<section class="tr-a__result" aria-label="Ergebnis">
     ${src}${editStatus(k)}${reqBar}
     <div><div class="tab-nav tr-a__tabs" role="tablist">${tabs}</div>
     <div class="tr-a__routecard">
+      ${stopIndex(k, e)}
       <div class="tr-row tr-row--between"><div><div class="tr-stoptile__title">${esc(e.name)}</div><div class="tr-hint">${e.convoy ? `Konvoi · ${e.ships.length} Schiffe` : esc(k.w.ships[0].name)}</div></div><div class="tr-actions">${editSaveActions(k)}</div></div>
       ${work}${keptBanner(k, e)}${diffBlock(k, e)}
       ${kpis(e)}${warnList(e)}${shipShares(e)}${pinbar}
@@ -7473,6 +7584,144 @@ function editModal(m, shell) {
     return shell('Inzwischen geändert', `<div class="tr-warnline tr-warnline--danger">${ic('warning')}<span>${esc(m.what)}: Jemand hat gespeichert, während du bearbeitet hast (409). Dein Arbeitsstand ist nicht verloren.</span></div><span class="tr-hint">„Neu laden“ holt den gespeicherten Stand in den Planer und verwirft deine Schritte; „Als neue speichern“ behält beide.</span>`, `<button class="btn btn-ghost" data-act="ed-reload">${ic('reset')} Neu laden</button><button class="btn btn--cta" data-act="${m.what === 'Einheitsroute' ? 'to-unit' : 'save'}" data-route="edit">${ic('save')} Als neue speichern</button>`);
   }
   return '';
+}
+
+/** PROTOTYPE views for long routes: the stop-count field, the stop index, the shortened stop sequence and the "Danach" list. */
+
+/**
+ * Shortens a stop sequence by whole names: the full sequence while it fits, else first → second → … (+n) → last.
+ * @param {Array<string>} names the stop names in route order
+ * @param {number} [max] the character budget of the surface
+ * @returns {string} the sequence as text
+ */
+function seqText(names, max = SEQ_TEXT_MAX) {
+  const list = (typeof names === 'string' ? names.split(' › ') : names).filter((x, i, a) => i === 0 || x !== a[i - 1]);
+  const sep = ' → ';
+  const full = list.join(sep);
+  if (full.length <= max || list.length < 3) return full;
+  const last = list[list.length - 1];
+  const two = `${list[0]}${sep}${list[1]}${sep}… (+${list.length - 3})${sep}${last}`;
+  if (list.length > 3 && two.length <= max) return two;
+  return `${list[0]}${sep}… (+${list.length - 2})${sep}${last}`;
+}
+
+/**
+ * Names the long-route choices of the prototype bar for the page's prototype note.
+ * @returns {string} one sentence
+ */
+function longNote() {
+  const L = state.long;
+  return `Lange Routen: Stoppfeld ${L.nField === 'A' ? 'A (Segmente)' : 'B (Stepper)'}, Stoppindex ${L.index === 'A' ? 'A (Chips)' : 'B (Strecke)'} bis 768 px ab 6 Stopps, Suchgrenze ${L.searchLimit}, Routengrenze ${ROUTE_LIMIT}, Platz für lange Suchen ${{ free: 'frei', queue: 'mit Warteschlange', full: 'voll' }[L.slot]}.`;
+}
+
+/**
+ * Returns the highest n the request form offers: the search limit.
+ * @returns {number} the search limit
+ */
+function searchLimit() {
+  return state.long.searchLimit;
+}
+
+/**
+ * Renders the request's stop-count field in the layout the prototype bar chose.
+ * @returns {string} markup
+ */
+function stopsField() {
+  const r = state.request;
+  const max = searchLimit();
+  const longHint = r.maxStops > LONG_JOB_ABOVE ? ` Über ${LONG_JOB_ABOVE} Stopps ist es eine lange Suche: sie läuft auf einem eigenen Platz und braucht länger, bis 60 s.` : '';
+  const hint = `<span class="tr-hint">2 = A → B. Die Suche darf weniger Stopps nehmen. Einfügen geht später bis ${ROUTE_LIMIT}.${longHint}</span>`;
+  if (state.long.nField === 'B') {
+    return `<div class="tr-field"><span class="tr-cap" id="f-n-cap">Stopps, höchstens</span><div class="tr-stepper" role="group" aria-labelledby="f-n-cap">
+      <button type="button" class="btn btn-ghost btn-icon" data-act="n-step" data-d="-1" aria-label="Ein Stopp weniger" ${r.maxStops <= 2 ? 'disabled' : ''}>${ic('minus')}</button>
+      <output class="tr-stepper__v" aria-live="polite">${r.maxStops}</output>
+      <button type="button" class="btn btn-ghost btn-icon" data-act="n-step" data-d="1" aria-label="Ein Stopp mehr" ${r.maxStops >= max ? 'disabled' : ''}>${ic('plus')}</button>
+      <span class="tr-stepper__range">von 2 bis ${max}</span></div>${hint}</div>`;
+  }
+  const items = Array.from({ length: max - 1 }, (_, i) => i + 2);
+  return `<div class="tr-field"><span class="tr-cap">Stopps, höchstens</span><div class="krt-segmented tr-nseg" role="group" aria-label="Stopps">${items.map((n) => `<button type="button" class="krt-segmented__item" data-act="set" data-key="maxStops" data-val="${n}" aria-pressed="${r.maxStops === n}">${n}</button>`).join('')}</div>${hint}</div>`;
+}
+
+/**
+ * Collects what a stop's index chip signals: a mark, a warning or a change from the last step.
+ * @param {object} k the edit context
+ * @param {object} s the computed stop
+ * @returns {{kind: string, text: string}|null} the strongest signal, or null
+ */
+function stopSignal(k, s) {
+  const marks = k.w.marks.filter((m) => m.t === s.t);
+  if (marks.length) return { kind: 'danger', text: `${marks.length} Markierung${marks.length > 1 ? 'en' : ''}` };
+  if (s.gone.length || s.failsFilter) return { kind: 'warn', text: s.failsFilter ? `verletzt Filter: ${s.failsFilter}` : 'nicht wie geplant verkaufbar' };
+  const diff = k.entry && k.entry.diff ? k.entry.diff.filter((l) => l.status !== 'UNCHANGED' && (l.from === s.t || l.to === s.t)) : [];
+  if (diff.length) return { kind: 'info', text: `${diff.length} Frachtzeile${diff.length > 1 ? 'n' : ''} geändert` };
+  return null;
+}
+
+/**
+ * Renders the sticky stop index of a route from six stops; CSS shows it only up to 768 px.
+ * @param {object} k the edit context
+ * @param {object} e the computed working route
+ * @returns {string} markup, empty below six stops
+ */
+function stopIndex(k, e) {
+  if (e.stops.length < 6) return '';
+  const variant = state.long.index;
+  const items = e.stops.map((s, i) => {
+    const sig = stopSignal(k, s);
+    const done = s.si < k.lock;
+    const now = s.si === k.lock;
+    const cls = [s.pinned ? 'is-pinned' : '', done ? 'is-done' : '', now ? 'is-now' : ''].join(' ');
+    const label = [`Stopp ${i + 1}: ${s.term.name}`, done ? 'erledigt' : '', now ? 'aktueller Stopp' : '', s.pinned ? 'fest' : '', sig ? sig.text : ''].filter(Boolean).join(', ');
+    const dot = sig ? `<i class="tr-sidx__dot tr-sidx__dot--${sig.kind}" aria-hidden="true"></i>` : '';
+    return `<button type="button" class="tr-sidx__chip ${cls}" data-sidx="${i + 1}" aria-label="${esc(label)}" title="${esc(label)}">${variant === 'B' ? `<span class="tr-sidx__node">${i + 1}</span>` : i + 1}${dot}</button>`;
+  }).join(variant === 'B' ? '<span class="tr-sidx__rail" aria-hidden="true"></span>' : '');
+  return `<nav class="tr-sidx tr-sidx--${variant}" aria-label="Stoppindex">${items}</nav>`;
+}
+
+/**
+ * Renders the flight view's "Danach" list: the next stops up to a count, then the rest as one line or expandable.
+ * @param {object} e the computed flight route
+ * @param {number} from the index of the first stop after the current one
+ * @returns {string} markup
+ */
+function afterList(e, from) {
+  const rest = e.stops.slice(from);
+  if (!rest.length) return '<div class="card"><h4 class="card-title">Danach</h4><span class="tr-hint">Letzter Stopp.</span></div>';
+  const open = state.long.after === 'B' && state.long.afterOpen;
+  const shown = open ? rest : rest.slice(0, AFTER_SHOWN);
+  const more = rest.length - shown.length;
+  const row = (s) => `<div class="tr-after__row"><span class="tr-after__n">${s.si + 1}</span><span class="tr-after__name">${esc(s.term.name)}</span><span class="tr-hint">${s.jobs.map((j) => `${j.side === 'buy' ? 'Kauf' : 'Verkauf'} ${fmt(j.qty)} ${esc(j.c)}`).join(', ') || 'kein Ladeauftrag'}</span></div>`;
+  let tail = '';
+  if (state.long.after === 'B' && rest.length > AFTER_SHOWN) {
+    tail = `<button type="button" class="btn btn-ghost btn-xs tr-after__more" data-act="after-toggle" aria-expanded="${open}">${open ? `${ic('chevron-up')} Weniger anzeigen` : `${ic('chevron-down')} +${more} weitere anzeigen`}</button>`;
+  } else if (more > 0) {
+    tail = `<div class="tr-after__rest">+${more} weitere bis ${esc(e.stops[e.stops.length - 1].term.name)}</div>`;
+  }
+  return `<div class="card tr-after"><h4 class="card-title">Danach</h4>${shown.map(row).join('')}${tail}</div>`;
+}
+
+/**
+ * Renders the hint at the end of a full route: no more stops through inserting or appending.
+ * @param {object} k the edit context
+ * @returns {string} markup
+ */
+function routeLimitHint(k) {
+  if (k.w.stops.length < ROUTE_LIMIT) return '';
+  return `<li class="tr-insert tr-insert--limit"><span class="tr-hint">${ic('info')} Routengrenze: höchstens ${ROUTE_LIMIT} Stopps${k.ctx === 'flight' ? ', erledigte mitgezählt' : ''}. Entferne einen Stopp, um einen anderen einzufügen.</span></li>`;
+}
+
+/**
+ * Renders the long-search state in the planner's status line: waiting for the long slot, running or refused.
+ * @returns {string} markup, empty without a planner search
+ */
+function editSearchStatus() {
+  const s = state.long.search;
+  if (!s) return '';
+  const n = state.request.maxStops;
+  const kind = n > LONG_JOB_ABOVE ? `lange Suche · bis ${n} Stopps` : `bis ${n} Stopps`;
+  if (s.phase === 'refused') return `<div class="tr-status tr-status--refused" role="alert">${ic('warning')}<span><strong>Lange Suchen sind gerade ausgelastet.</strong> Versuch es in ${s.retry} s noch einmal. Suchen bis ${LONG_JOB_ABOVE} Stopps laufen davon unabhängig.</span><span class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="ed-search-retry">${ic('reset')} Erneut versuchen</button></span></div>`;
+  if (s.phase === 'queued') return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>Wartet auf den Platz für lange Suchen</strong><span class="muted">vor dir: 1 Suche · ${kind}</span><button class="btn btn-ghost btn-xs" data-act="ed-search-stop">Abbrechen</button></div>`;
+  return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>Suche läuft · ${kind}</strong><span class="tr-status__bar"><i style="width:${[10, 35, 60, 85][s.step]}%"></i></span><span class="muted num">${s.elapsed} s / 60 s</span><span class="muted">${s.step ? `Zwischenstand: ${s.step} Route${s.step > 1 ? 'n' : ''}` : 'noch kein Zwischenstand'}</span><button class="btn btn-ghost btn-xs" data-act="ed-search-stop">Suche stoppen</button></div>`;
 }
 
 /** PROTOTYPE flights: a server-held copy of a route with position, loading-job ticks, edits, undo, history and the mission flight. */
@@ -7723,7 +7972,7 @@ function flightView2() {
   const progress = `<div class="tr-fly__progress" aria-hidden="true">${e.stops.map((_, i) => `<i class="${i < f.pos.idx || (i === f.pos.idx && f.pos.phase === 'leg') ? 'is-done' : i === f.pos.idx ? 'is-now' : ''}"></i>`).join('')}</div>`;
   if (state.flyAdjust) {
     const k = edWork('flight');
-    return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Route anpassen"><div class="tr-fly__inner tr-fly__inner--wide">${head}${progress}${conflict}
+    return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Route anpassen"><div class="tr-fly__inner tr-fly__inner--wide">${head}${progress}${stopIndex(k, e)}${conflict}
       <div class="tr-warnline tr-warnline--info">${ic('edit')}<span><strong>Route anpassen.</strong> Was vor dem aktuellen Stopp liegt, ist eingefroren; jede Änderung wirkt auf den Rest. Ladung an Bord und Bargeld gehen fest in jede Neuplanung ein. Das Ergebnis übernimmt der Server in den Flug.</span></div>
       <div class="tr-workbar"><span class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="fl-undo" ${f.undo.length ? '' : 'disabled'}>${ic('arrow-left')} Rückgängig${f.undo.length ? ` (${f.undo.length})` : ''}</button><button class="btn btn-ghost btn-xs" data-act="fl-redo" ${f.redo.length ? '' : 'disabled'}>Wiederholen ${ic('arrow-right')}</button></span><span class="tr-hint">Am Server, von jedem Gerät${f.kind === 'mission' ? ' und jeder Crew der Flotte' : ''}; Abhaken leert den Verlauf.</span></div>
       ${money}${keptBanner(k, e)}${diffBlock(k, e)}${warnList(e)}${editTimeline(k, e)}</div>
@@ -7755,7 +8004,7 @@ function flightView2() {
       <div><strong>${leg.est.length ? '≈ ' : ''}${fmtShort(leg.dur)}</strong> · ${dec(leg.gm)} Gm · an Bord ${fmt(leg.aboard)} SCU</div></div>`;
     foot = ro ? '<span class="tr-hint">Live mitlesen · Schritte setzen die Crews</span>' : `<button class="btn btn-ghost" data-act="fl-back">${ic('arrow-left')} Zurück</button><button class="btn btn--cta" data-act="fl-arrive">${ic('map-pin')} Angekommen</button>`;
   }
-  const later = `<div class="card"><h4 class="card-title">Danach</h4>${e.stops.slice(f.pos.idx + 1).map((s) => `<div class="tr-row tr-row--between" style="padding:6px 0;border-top:1px solid var(--color-gray-3)"><span>${s.si + 1} · ${esc(s.term.name)}</span><span class="tr-hint">${s.jobs.map((j) => `${j.side === 'buy' ? 'Kauf' : 'Verkauf'} ${fmt(j.qty)} ${esc(j.c)}`).join(', ')}</span></div>`).join('') || '<span class="tr-hint">Letzter Stopp.</span>'}</div>`;
+  const later = afterList(e, f.pos.idx + 1);
   return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Flugansicht"><div class="tr-fly__inner">${head}${progress}${live}${conflict}${money}${flightReplanCard(f, e, ro)}${shipSel}${main}${later}</div><div class="tr-fly__foot">${foot}</div></div>`;
 }
 
@@ -7797,7 +8046,7 @@ function flightsTab() {
     const detail = open ? `<tr class="tr-histdetail"><td colspan="6"><div class="tr-stack" style="gap:8px">
       ${h.lines.length ? `<div class="hud-scroll scroll-x"><table class="tr-jobs"><thead><tr><th>Stopp</th><th>Seite</th><th>Ware</th><th class="num">SCU geplant</th><th class="num">SCU Ist</th><th class="num">à geplant</th><th class="num">à Ist</th></tr></thead><tbody>${h.lines.map((l) => `<tr><td>${esc(l[0])}</td><td><span class="tr-side tr-side--${l[1] === 'Kauf' ? 'buy' : 'sell'}">${l[1]}</span></td><td class="tr-cname">${esc(l[2])}</td><td class="num">${fmt(l[3])}</td><td class="num ${l[4] !== l[3] ? 'warn-text' : ''}">${l[4] ? fmt(l[4]) : '—'}</td><td class="num">${fmt(l[5])}</td><td class="num ${l[6] !== null && l[6] !== l[5] ? 'warn-text' : ''}">${l[6] === null ? '—' : fmt(l[6])}</td></tr>`).join('')}</tbody></table></div>` : '<span class="tr-hint">Keine Ladeaufträge abgehakt.</span>'}
       <div class="tr-actions"><button class="btn btn-outline btn-xs" data-act="hist-again" data-val="${h.id}">${ic('arrow-right')} Nochmal fliegen</button><button class="btn btn-ghost btn-xs" data-act="hist-save" data-val="${h.id}">${ic('save')} Als Route speichern</button><button class="btn btn-quiet-danger btn-xs" data-act="hist-delete" data-val="${h.id}">${ic('trash')} Löschen</button><span class="tr-hint">„Nochmal fliegen“ plant die Stopps auf aktuellen Daten neu und öffnet sie im Planer.</span></div></div></td></tr>` : '';
-    return `<tr><td><a class="row-link" href="#" data-act="hist-open" data-val="${h.id}" aria-expanded="${open}"><span class="cell-title">${esc(h.name)}</span><span class="cell-sub">${esc(h.path)} · ${esc(h.src)}</span></a></td>
+    return `<tr><td><a class="row-link" href="#" data-act="hist-open" data-val="${h.id}" aria-expanded="${open}"><span class="cell-title">${esc(h.name)}</span><span class="cell-sub">${esc(seqText(h.path))} · ${esc(h.src)}</span></a></td>
       <td class="cell-status"><span class="tr-mark tr-mark--${h.outcome === 'abgeschlossen' ? 'ok' : 'warn'}">${esc(h.outcome)}</span></td>
       <td data-label="Schiffe">${esc(h.ships)}</td>
       <td class="num" data-label="Verdient"><strong class="${h.earned >= 0 ? 'pos' : 'neg'}">${h.earned < 0 ? '−' : ''}${fmt(Math.abs(h.earned))}</strong><div class="tr-hint">geplant ${fmt(h.planned)}</div></td>
@@ -7985,7 +8234,7 @@ const SURFACE_ACTIONS = {
     SURFACE_ACTIONS['do-switch']('on');
   },
   'do-switch': (v) => { state.switchOn = v === 'on'; state.switchDraft = state.switchOn; say('Gespeichert', `Handelsrouten ${state.switchOn ? 'eingeschaltet' : 'ausgeschaltet'}. Steht im Audit-Log.`); },
-  'confirm-ok': () => { const m = state.modal; state.modal = null; SURFACE_ACTIONS[m.act](m.val); },
+  'confirm-ok': () => { const m = state.modal; state.modal = null; ACTIONS[m.act](m.val); },
   'proto-role': (el) => { state.role = el.dataset.val; },
   'proto-mrole': (el) => { state.missionRole = el.dataset.val; },
   'proto-src': (el) => { state.routeSrc = el.dataset.val; state.edited = false; state.editInPlanner = false; },
@@ -8080,7 +8329,7 @@ function edTab(def, ships) {
  */
 function resetEdit(src) {
   const ships = src === 'mission' ? ['ALPHA', 'BRAVO'].map((k) => ({ ...FLEET_SHIPS[k] })) : state.request.ships.map((s) => ({ ...s }));
-  Object.assign(state.ed, { tabs: EDIT_TABS.map((d) => edTab(d, ships)), tab: 0, src, requestChanged: false, panel: null, optimising: null });
+  Object.assign(state.ed, { tabs: editTabsFor(state.request.maxStops).map((d) => edTab(d, ships)), tab: 0, src, requestChanged: false, panel: null, optimising: null });
 }
 
 /**
@@ -8089,6 +8338,7 @@ function resetEdit(src) {
  */
 function initEditState() {
   const pick = (k, ok, def) => (ok.includes(params.get(k)) ? params.get(k) : def);
+  initLongState();
   if (state.page === 'flights') { state.page = 'routes'; state.routesTab = 'flights'; }
   if (params.get('tab') === 'flights') state.routesTab = 'flights';
   state.ed = { diffView: pick('diff', ['A', 'B'], 'A'), pick: pick('pick', ['dialog', 'inline'], 'dialog'), tick: pick('tick', ['A', 'B'], 'A'), bar: pick('bar', ['A', 'B'], 'A'), conflict: false, conflictNext: false };
@@ -8105,8 +8355,9 @@ function initEditState() {
   state.mflights[mr.id] = mf;
   state.mflightEnded.M2 = { outcome: 'abgeschlossen', ended: '12.11., 23:10', earned: 1018400, planned: 984000, lines: [['Port Tressler', 'Kauf', 'Distilled Spirits', 380, 380, 1105, 1105], ['Levski', 'Verkauf', 'Distilled Spirits', 380, 380, 1690, 1702], ['Levski', 'Kauf', 'Hephaestanite', 696, 640, 2210, 2230], ['Ruin Station', 'Verkauf', 'Hephaestanite', 696, 640, 2960, 2990]] };
   const fly = params.get('flight');
-  if (fly === 'personal') { startFlight(state.ed.tabs[0].hist[0].w, 'Seraphim → Area18 → Baijini Point', 'Berechnete Route'); state.flyOpen = 'personal'; }
+  if (fly === 'personal') { const w = state.ed.tabs[0].hist[0].w; startFlight(w, evaluate(w, w.ships).name, 'Berechnete Route'); state.flyOpen = 'personal'; }
   if (fly === 'M1') state.flyOpen = 'M1';
+  applyLongFlightParams();
 }
 
 /**
@@ -8281,7 +8532,7 @@ const EDIT_ACTIONS = {
     const pos = Number(el.dataset.pos);
     const t = el.dataset.t;
     doStep(el.dataset.ctx, (k) => {
-      if (k.w.stops.length >= 5) { say('Höchstens 5 Stopps', 'Entferne zuerst einen Stopp.'); return null; }
+      if (k.w.stops.length >= ROUTE_LIMIT) { say(`Höchstens ${ROUTE_LIMIT} Stopps`, 'Entferne zuerst einen Stopp.'); return null; }
       const why = failsFilter(t);
       if (state.request.excluded.includes(t)) state.request.excluded = state.request.excluded.filter((x) => x !== t);
       const stops = [...k.w.stops.slice(0, pos), { t, pinned: true, inserted: true, failsFilter: why }, ...k.w.stops.slice(pos)];
@@ -8342,8 +8593,10 @@ const EDIT_ACTIONS = {
   'ed-restore': () => { const tb = state.ed.tabs[state.ed.tab]; doStep('plan', () => ({ label: 'Berechnete Route wiederhergestellt', w: tb.hist[0].w })); },
   'ed-optimise': () => {
     closePanel();
-    state.ed.optimising = { step: 0, elapsed: 0 };
-    optTimers = [[900, 1, 2], [1900, 2, 4]].map(([ms, step, s]) => setTimeout(() => { state.ed.optimising = { step, elapsed: s }; render(); }, ms));
+    const upTo = Math.min(searchLimit(), Math.max(state.request.maxStops, edWork('plan').w.stops.length));
+    const long = upTo > LONG_JOB_ABOVE;
+    state.ed.optimising = { step: 0, elapsed: 0, upTo, long };
+    optTimers = [[900, 1, long ? 11 : 2], [1900, 2, long ? 26 : 4]].map(([ms, step, s]) => setTimeout(() => { Object.assign(state.ed.optimising, { step, elapsed: s }); render(); }, ms));
     optTimers.push(setTimeout(() => { EDIT_ACTIONS['ed-opt-finish'](); render(); }, 3000));
   },
   'ed-opt-finish': () => {
@@ -8363,13 +8616,6 @@ const EDIT_ACTIONS = {
       const stops = k.w.stops.map((s) => ({ ...s, failsFilter: failsFilter(s.t) }));
       return { label: 'Nur Fracht neu geplant (Anfrage geändert)', w: replan({ ...k, w: { ...k.w, ships } }, stops) };
     });
-  },
-  'ed-research': () => confirmFirst('Neu suchen?', 'Die volle Suche verwirft alle Bearbeitungen in allen Tabs. Rückgängig geht danach nicht mehr.', 'Neu suchen', 'do-ed-research', ''),
-  'do-ed-research': () => { goPage('planner'); state.variant = 'A'; startSearch(); },
-  compute: () => {
-    if (state.page !== 'edit') { startSearch(); return; }
-    if (state.ed.tabs.some((tb) => tb.at)) { EDIT_ACTIONS['ed-research'](); return; }
-    EDIT_ACTIONS['do-ed-research']();
   },
   'ed-update': (el) => {
     if (state.ed.conflict) { state.modal = { kind: 'ed-conflict', what: el.dataset.what }; return; }
@@ -8471,7 +8717,7 @@ function editBarControls() {
     if (state.fl) out += `${btn('proto-ed', 'bar', 'A', 'Leiste A', state.ed.bar === 'A')}${btn('proto-ed', 'bar', 'B', 'Leiste B', state.ed.bar === 'B')}`;
     if (f) out += `<button data-act="proto-other" title="Ein anderes Gerät oder eine andere Crew hakt ab">Anderes Gerät</button><button data-act="proto-fconflict" aria-pressed="${state.ed.conflictNext}" title="Die nächste Änderung im Flug trifft auf einen Konflikt">Konflikt</button>`;
   }
-  return out;
+  return out + longBarControls();
 }
 
 document.addEventListener('click', (ev) => {
@@ -8497,6 +8743,236 @@ function fillEdSearch(el) {
 document.addEventListener('input', (ev) => { if (ev.target.dataset.edsearch) fillEdSearch(ev.target); });
 document.addEventListener('focusin', (ev) => { if (ev.target.dataset.edsearch) fillEdSearch(ev.target); });
 document.addEventListener('focusout', (ev) => { if (ev.target.dataset.edsearch) { const list = ev.target.nextElementSibling; setTimeout(() => { list.hidden = true; }, 180); } });
+
+/** PROTOTYPE wiring for long routes: state, tabs by n, the simulated long search, the stop index's jumps and the prototype bar. */
+
+let longTimers = [];
+
+/**
+ * Adds the long-route state to the prototype's state, read from the URL where given.
+ * @returns {void}
+ */
+function initLongState() {
+  const pick = (k, ok, def) => (ok.includes(params.get(k)) ? params.get(k) : def);
+  const limit = Number(pick('limit', ['10', '8'], String(SEARCH_LIMIT_DEFAULT)));
+  state.long = { nField: pick('nfield', ['A', 'B'], 'A'), index: pick('index', ['A', 'B'], 'A'), after: pick('after', ['A', 'B'], 'A'), afterOpen: false, searchLimit: limit, slot: pick('slot', ['free', 'queue', 'full'], 'free'), search: null, last: null };
+  const n = Number(params.get('n'));
+  if (n >= 2 && n <= limit) state.request.maxStops = n;
+  state.long.last = { elapsed: state.request.maxStops > LONG_JOB_ABOVE ? 44 : 6, long: state.request.maxStops > LONG_JOB_ABOVE, stopped: false };
+}
+
+/**
+ * Lists the tabs a search for up to n stops returns, best first by profit per hour.
+ * @param {number} n the request's stop count
+ * @returns {Array<{label: string, stops: Array<string>, forced: Array<string>}>} the tab definitions
+ */
+function editTabsFor(n) {
+  const forced = (stops) => stops.filter((t) => state.request.forced.includes(t));
+  const defs = n <= 3
+    ? EDIT_TABS.map((d) => ({ stops: d.stops.slice(0, n) }))
+    : [LONG_CHAINS[0].slice(0, n), LONG_CHAINS[1].slice(0, n), LONG_CHAINS[1].slice(1, n + 1)].map((stops) => ({ stops }));
+  const ships = state.request.ships;
+  const ranked = defs.map((d) => {
+    const stops = d.stops.map((t) => ({ t, pinned: false }));
+    const e = evaluate({ stops, paths: planCargo(stops, { ships, marks: [] }).paths }, ships);
+    return { ...d, perHour: e.perHour };
+  }).sort((a, b) => b.perHour - a.perHour);
+  return ranked.map((d, i) => ({ label: i ? `Alternative ${i}` : 'Beste Route', stops: d.stops, forced: forced(d.stops) }));
+}
+
+/**
+ * Clears the timers of the simulated planner search.
+ * @returns {void}
+ */
+function clearLongTimers() {
+  longTimers.forEach(clearTimeout);
+  longTimers = [];
+}
+
+/**
+ * Ends the simulated planner search and shows its tabs.
+ * @param {boolean} stopped whether the member stopped it with an intermediate result
+ * @returns {void}
+ */
+function finishEditSearch(stopped) {
+  const s = state.long.search;
+  const n = state.request.maxStops;
+  clearLongTimers();
+  state.long.search = null;
+  state.long.last = { elapsed: s ? s.elapsed : 6, long: n > LONG_JOB_ABOVE, stopped };
+  resetEdit('result');
+}
+
+/**
+ * Starts the simulated search of the planner, a long one above five stops, honouring the long slot's state.
+ * @returns {void}
+ */
+function startEditSearch() {
+  clearLongTimers();
+  closePanel();
+  state.ed.requestChanged = false;
+  const n = state.request.maxStops;
+  const long = n > LONG_JOB_ABOVE;
+  if (long && state.long.slot === 'full') { state.long.search = { phase: 'refused', retry: 30 }; return; }
+  const run = () => {
+    state.long.search = { phase: 'running', step: 0, elapsed: 0 };
+    const steps = long ? [[900, 1, 9], [1900, 2, 22], [2900, 3, 37]] : [[600, 1, 2], [1200, 2, 4]];
+    steps.forEach(([ms, step, elapsed]) => longTimers.push(setTimeout(() => { Object.assign(state.long.search, { step, elapsed }); render(); }, ms)));
+    longTimers.push(setTimeout(() => { state.long.search.elapsed = long ? 44 : 6; finishEditSearch(false); render(); }, long ? 3800 : 1800));
+  };
+  if (long && state.long.slot === 'queue') {
+    state.long.search = { phase: 'queued' };
+    longTimers.push(setTimeout(() => { run(); render(); }, 1800));
+    return;
+  }
+  run();
+}
+
+/**
+ * Ticks every loading job before a stop and moves the personal flight there, as if flown so far.
+ * @param {number} at the stop number the flight stands at
+ * @returns {void}
+ */
+function flyTo(at) {
+  const f = state.fl;
+  if (!f) return;
+  const e = evaluate(f.w, f.ships);
+  const idx = Math.max(0, Math.min(e.stops.length - 1, at - 1));
+  e.stops.slice(0, idx).forEach((s) => s.jobs.forEach((j) => { f.ticks[`${j.key}#0`] = { qty: j.qty, price: j.p, by: 'dir' }; }));
+  f.pos = { idx, phase: 'stop' };
+  f.last = null;
+}
+
+/**
+ * Applies the flight parameters of the URL after the edit state exists: the stop a flight stands at and the adjust view.
+ * @returns {void}
+ */
+function applyLongFlightParams() {
+  const at = Number(params.get('at'));
+  if (state.fl && at > 1) flyTo(at);
+  if (state.fl && params.get('adjust') === '1') state.flyAdjust = true;
+}
+
+const LONG_ACTIONS = {
+  'n-step': (el) => { state.request.maxStops = Math.max(2, Math.min(searchLimit(), state.request.maxStops + Number(el.dataset.d))); },
+  'ed-research': () => {
+    const shown = edWork('plan').w.stops.length;
+    const n = state.request.maxStops;
+    const edited = state.ed.tabs.some((tb) => tb.at);
+    if (!edited && shown <= n) { startEditSearch(); return; }
+    const parts = [];
+    if (shown > n) parts.push(`Die gezeigte Route hat ${shown} Stopps; die neue Suche plant höchstens ${n}, wie in deiner Anfrage.`);
+    parts.push(edited ? 'Die volle Suche verwirft alle Bearbeitungen in allen Tabs. Rückgängig geht danach nicht mehr.' : 'Das gezeigte Ergebnis wird ersetzt.');
+    confirmFirst('Neu suchen?', parts.join(' '), 'Neu suchen', 'do-ed-research', '');
+  },
+  'do-ed-research': () => startEditSearch(),
+  compute: () => {
+    if (state.page !== 'edit') { startSearch(); return; }
+    LONG_ACTIONS['ed-research']();
+  },
+  'ed-search-stop': () => {
+    const s = state.long.search;
+    if (s && s.phase === 'running' && s.step > 0) { finishEditSearch(true); say('Suche gestoppt', 'Bestes bis dahin gefundenes Ergebnis übernommen.'); return; }
+    clearLongTimers();
+    state.long.search = null;
+    say('Suche abgebrochen', 'Noch kein Ergebnis; die gezeigte Route bleibt.');
+  },
+  'ed-search-retry': () => startEditSearch(),
+  'after-toggle': () => { state.long.afterOpen = !state.long.afterOpen; },
+  'proto-n': (el) => { clearLongTimers(); state.long.search = null; state.request.maxStops = Math.min(searchLimit(), Number(el.dataset.val)); finishEditSearch(false); state.long.last.elapsed = state.request.maxStops > LONG_JOB_ABOVE ? 44 : 6; },
+  'proto-long': (el) => {
+    const k = el.dataset.key;
+    state.long[k] = k === 'searchLimit' ? Number(el.dataset.val) : el.dataset.val;
+    if (k === 'searchLimit' && state.request.maxStops > state.long.searchLimit) state.request.maxStops = state.long.searchLimit;
+  },
+  'proto-flyat': (el) => { flyTo(Number(el.dataset.val)); },
+};
+REQUEST_ACTS.push('n-step');
+
+/**
+ * Renders the prototype bar's controls for long routes.
+ * @returns {string} markup
+ */
+function longBarControls() {
+  const btn = (act, key, val, label, on) => `<button data-act="${act}" data-key="${key}" data-val="${val}" aria-pressed="${on}">${label}</button>`;
+  const sep = '<span class="proto-bar__sep"></span>';
+  const L = state.long;
+  let out = '';
+  if (state.page === 'edit') {
+    out += `${sep}${[3, 6, 10].filter((n) => n <= searchLimit()).map((n) => btn('proto-n', '', n, `n=${n}`, state.request.maxStops === n)).join('')}`;
+    out += `${sep}${btn('proto-long', 'nField', 'A', 'Feld A', L.nField === 'A')}${btn('proto-long', 'nField', 'B', 'Feld B', L.nField === 'B')}`;
+    out += `${sep}${btn('proto-long', 'index', 'A', 'Index A', L.index === 'A')}${btn('proto-long', 'index', 'B', 'Index B', L.index === 'B')}`;
+    out += `${sep}${btn('proto-long', 'searchLimit', '10', 'Grenze 10', L.searchLimit === 10)}${btn('proto-long', 'searchLimit', '8', 'Grenze 8', L.searchLimit === 8)}`;
+    out += `${sep}${btn('proto-long', 'slot', 'free', 'Platz frei', L.slot === 'free')}${btn('proto-long', 'slot', 'queue', 'wartet', L.slot === 'queue')}${btn('proto-long', 'slot', 'full', 'voll', L.slot === 'full')}`;
+  }
+  const f = openFlight();
+  if (f && f.kind === 'personal') {
+    out += `${sep}${btn('proto-long', 'after', 'A', 'Danach A', L.after === 'A')}${btn('proto-long', 'after', 'B', 'Danach B', L.after === 'B')}`;
+    out += `${sep}${btn('proto-long', 'index', 'A', 'Index A', L.index === 'A')}${btn('proto-long', 'index', 'B', 'Index B', L.index === 'B')}`;
+    out += `<button data-act="proto-flyat" data-val="${Math.min(f.w.stops.length, f.pos.idx + 3)}" title="Abhaken bis zwei Stopps weiter">+2 Stopps</button>`;
+  }
+  return out;
+}
+
+/**
+ * Scrolls a stop tile below the stuck stop index, in the page or in the flight overlay.
+ * @param {HTMLElement} chip the index chip tapped
+ * @returns {void}
+ */
+function jumpToStop(chip) {
+  const bar = chip.closest('.tr-sidx');
+  const scroller = bar.closest('.tr-fly');
+  const root = scroller || document.getElementById('app');
+  const tile = root.querySelector(`.tr-timeline__stop[data-n="${chip.dataset.sidx}"]`);
+  if (!tile) return;
+  const stuckBottom = (parseFloat(getComputedStyle(bar).top) || 0) + bar.offsetHeight;
+  const dy = tile.getBoundingClientRect().top - (scroller ? scroller.getBoundingClientRect().top : 0) - stuckBottom - 8;
+  (scroller || window).scrollBy({ top: dy, behavior: 'instant' });
+}
+
+/**
+ * Marks the index chip of the stop at the top of the visible timeline.
+ * @returns {void}
+ */
+function spyStopIndex() {
+  document.querySelectorAll('.tr-sidx').forEach((bar) => {
+    if (!bar.offsetParent) return;
+    const root = bar.closest('.tr-fly') || document.getElementById('app');
+    const line = bar.getBoundingClientRect().bottom + 16;
+    let cur = 0;
+    root.querySelectorAll('.tr-timeline__stop').forEach((t, i) => { if (t.getBoundingClientRect().top <= line) cur = i; });
+    bar.querySelectorAll('.tr-sidx__chip').forEach((c, i) => c.classList.toggle('is-here', i === cur));
+  });
+}
+
+/**
+ * Runs after every render: the sticky offset under header and flight bar, the scroll spy and the URL.
+ * @returns {void}
+ */
+function afterRender() {
+  const head = document.querySelector('body > header');
+  const bar = document.querySelector('.tr-flybar');
+  document.documentElement.style.setProperty('--tr-stick-top', `${(head ? head.offsetHeight : 0) + (bar ? bar.offsetHeight : 0)}px`);
+  spyStopIndex();
+  const url = new URL(location.href);
+  if (state.page === 'edit') {
+    url.searchParams.set('n', String(state.request.maxStops));
+    ['nField', 'index', 'after'].forEach((k) => url.searchParams.set(k === 'nField' ? 'nfield' : k, state.long[k]));
+    url.searchParams.set('limit', String(state.long.searchLimit));
+    url.searchParams.set('slot', state.long.slot);
+  }
+  history.replaceState(null, '', url);
+}
+
+document.addEventListener('click', (ev) => {
+  const chip = ev.target.closest('[data-sidx]');
+  if (!chip) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  jumpToStop(chip);
+}, true);
+document.addEventListener('scroll', () => requestAnimationFrame(spyStopIndex), true);
+window.addEventListener('resize', () => afterRender());
 
 /** PROTOTYPE overlays: the flight view, the dialogs, the toast and the prototype bar. */
 
@@ -8721,6 +9197,7 @@ function render() {
   if (state.page === 'routes') url.searchParams.set('tab', state.routesTab); else url.searchParams.delete('tab');
   if (state.page === 'place') url.searchParams.set('place', state.place); else url.searchParams.delete('place');
   history.replaceState(null, '', url);
+  afterRender();
 }
 
 /**
@@ -8894,6 +9371,7 @@ const ACTIONS = {
   'fly-restart': () => { state.flight = { ...state.flight, idx: 0, phase: 'stop', done: {} }; },
   ...SURFACE_ACTIONS,
   ...EDIT_ACTIONS,
+  ...LONG_ACTIONS,
 };
 
 /**

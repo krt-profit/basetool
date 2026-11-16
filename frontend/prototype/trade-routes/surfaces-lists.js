@@ -25,7 +25,7 @@ function savedTab() {
   const list = state.savedList;
   if (!list.length) return '<div class="empty-state"><div class="empty-title">Keine gespeicherten Routen</div><div class="empty-text">Speichere eine Route im Routenplaner. Beim Öffnen wird ihre Fracht auf aktuellen Daten neu geplant.</div></div>';
   const rows = list.map((s) => `<tr>
-      <td><a class="row-link" href="#" data-act="open-route" data-src="saved"><span class="cell-title">${esc(s.name)}</span><span class="cell-sub">${esc(s.path)}${s.note ? ` · ${esc(s.note)}` : ''}</span></a></td>
+      <td><a class="row-link" href="#" data-act="open-route" data-src="saved"><span class="cell-title">${esc(s.name)}</span><span class="cell-sub">${esc(seqText(s.path))}${s.note ? ` · ${esc(s.note)}` : ''}</span></a></td>
       <td class="cell-status">${s.broken ? `<span class="tr-mark tr-mark--danger">${esc(s.broken)}</span>` : s.fallback ? '<span class="tr-mark tr-mark--warn">Hangarschiff weg · als Typ</span>' : ''}</td>
       <td data-label="Schiffe">${esc(s.ships)}</td>
       <td class="num" data-label="Pro Stunde">${fmt(s.perHour)}</td>
@@ -49,7 +49,7 @@ function unitTab() {
     const by = u.by ? esc(u.by) + (own ? ' (du)' : '') : '<span class="muted">ehemaliges Mitglied</span>';
     const tools = `${rowBtn('save-copy', 'save', 'Als meine Route speichern')}${rowBtn('share-saved', 'external-link', 'Teilen', '', `data-val="${u.id}"`)}${may ? `${rowBtn('rename', 'edit', 'Umbenennen', '', 'data-what="Einheitsroute"')}${rowBtn('confirm-delete-unit', 'trash', 'Löschen', 'btn-quiet-danger', `data-val="${u.id}"`)}` : ''}`;
     return `<tr>
-      <td><a class="row-link" href="#" data-act="open-route" data-src="unit"><span class="cell-title">${esc(u.name)}</span><span class="cell-sub">${esc(u.path)}${u.note ? ` · ${esc(u.note)}` : ''}</span></a></td>
+      <td><a class="row-link" href="#" data-act="open-route" data-src="unit"><span class="cell-title">${esc(u.name)}</span><span class="cell-sub">${esc(seqText(u.path))}${u.note ? ` · ${esc(u.note)}` : ''}</span></a></td>
       <td class="cell-status"><span class="squadron-badge">${u.unit}</span></td>
       <td data-label="Eingetragen von">${by}</td>
       <td data-label="Schiffe">${esc(u.ships)}</td>
@@ -70,7 +70,7 @@ function sharedTab() {
   const list = state.shares;
   if (!list.length) return '<div class="empty-state"><div class="empty-title">Nichts geteilt</div><div class="empty-text">„Teilen“ an einer Route erzeugt einen Code und einen Link. Jedes angemeldete Mitglied öffnet damit eine eingefrorene Kopie.</div></div>';
   const rows = list.map((s) => `<tr>
-      <td><a class="row-link" href="#" data-act="open-route" data-src="shared"><span class="cell-title">${esc(s.name)}</span><span class="cell-sub">${esc(s.path)}</span></a></td>
+      <td><a class="row-link" href="#" data-act="open-route" data-src="shared"><span class="cell-title">${esc(s.name)}</span><span class="cell-sub">${esc(seqText(s.path))}</span></a></td>
       <td class="cell-status"><span class="data-value">${s.code}</span></td>
       <td data-label="Schiffe">${esc(s.ships)}</td>
       <td data-label="Geteilt">${esc(s.at)}</td>

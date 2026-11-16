@@ -144,7 +144,7 @@ const SURFACE_ACTIONS = {
     SURFACE_ACTIONS['do-switch']('on');
   },
   'do-switch': (v) => { state.switchOn = v === 'on'; state.switchDraft = state.switchOn; say('Gespeichert', `Handelsrouten ${state.switchOn ? 'eingeschaltet' : 'ausgeschaltet'}. Steht im Audit-Log.`); },
-  'confirm-ok': () => { const m = state.modal; state.modal = null; SURFACE_ACTIONS[m.act](m.val); },
+  'confirm-ok': () => { const m = state.modal; state.modal = null; ACTIONS[m.act](m.val); },
   'proto-role': (el) => { state.role = el.dataset.val; },
   'proto-mrole': (el) => { state.missionRole = el.dataset.val; },
   'proto-src': (el) => { state.routeSrc = el.dataset.val; state.edited = false; state.editInPlanner = false; },

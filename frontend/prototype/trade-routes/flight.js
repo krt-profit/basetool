@@ -246,7 +246,7 @@ function flightView2() {
   const progress = `<div class="tr-fly__progress" aria-hidden="true">${e.stops.map((_, i) => `<i class="${i < f.pos.idx || (i === f.pos.idx && f.pos.phase === 'leg') ? 'is-done' : i === f.pos.idx ? 'is-now' : ''}"></i>`).join('')}</div>`;
   if (state.flyAdjust) {
     const k = edWork('flight');
-    return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Route anpassen"><div class="tr-fly__inner tr-fly__inner--wide">${head}${progress}${conflict}
+    return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Route anpassen"><div class="tr-fly__inner tr-fly__inner--wide">${head}${progress}${stopIndex(k, e)}${conflict}
       <div class="tr-warnline tr-warnline--info">${ic('edit')}<span><strong>Route anpassen.</strong> Was vor dem aktuellen Stopp liegt, ist eingefroren; jede Änderung wirkt auf den Rest. Ladung an Bord und Bargeld gehen fest in jede Neuplanung ein. Das Ergebnis übernimmt der Server in den Flug.</span></div>
       <div class="tr-workbar"><span class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="fl-undo" ${f.undo.length ? '' : 'disabled'}>${ic('arrow-left')} Rückgängig${f.undo.length ? ` (${f.undo.length})` : ''}</button><button class="btn btn-ghost btn-xs" data-act="fl-redo" ${f.redo.length ? '' : 'disabled'}>Wiederholen ${ic('arrow-right')}</button></span><span class="tr-hint">Am Server, von jedem Gerät${f.kind === 'mission' ? ' und jeder Crew der Flotte' : ''}; Abhaken leert den Verlauf.</span></div>
       ${money}${keptBanner(k, e)}${diffBlock(k, e)}${warnList(e)}${editTimeline(k, e)}</div>
@@ -278,7 +278,7 @@ function flightView2() {
       <div><strong>${leg.est.length ? '≈ ' : ''}${fmtShort(leg.dur)}</strong> · ${dec(leg.gm)} Gm · an Bord ${fmt(leg.aboard)} SCU</div></div>`;
     foot = ro ? '<span class="tr-hint">Live mitlesen · Schritte setzen die Crews</span>' : `<button class="btn btn-ghost" data-act="fl-back">${ic('arrow-left')} Zurück</button><button class="btn btn--cta" data-act="fl-arrive">${ic('map-pin')} Angekommen</button>`;
   }
-  const later = `<div class="card"><h4 class="card-title">Danach</h4>${e.stops.slice(f.pos.idx + 1).map((s) => `<div class="tr-row tr-row--between" style="padding:6px 0;border-top:1px solid var(--color-gray-3)"><span>${s.si + 1} · ${esc(s.term.name)}</span><span class="tr-hint">${s.jobs.map((j) => `${j.side === 'buy' ? 'Kauf' : 'Verkauf'} ${fmt(j.qty)} ${esc(j.c)}`).join(', ')}</span></div>`).join('') || '<span class="tr-hint">Letzter Stopp.</span>'}</div>`;
+  const later = afterList(e, f.pos.idx + 1);
   return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Flugansicht"><div class="tr-fly__inner">${head}${progress}${live}${conflict}${money}${flightReplanCard(f, e, ro)}${shipSel}${main}${later}</div><div class="tr-fly__foot">${foot}</div></div>`;
 }
 
@@ -320,7 +320,7 @@ function flightsTab() {
     const detail = open ? `<tr class="tr-histdetail"><td colspan="6"><div class="tr-stack" style="gap:8px">
       ${h.lines.length ? `<div class="hud-scroll scroll-x"><table class="tr-jobs"><thead><tr><th>Stopp</th><th>Seite</th><th>Ware</th><th class="num">SCU geplant</th><th class="num">SCU Ist</th><th class="num">à geplant</th><th class="num">à Ist</th></tr></thead><tbody>${h.lines.map((l) => `<tr><td>${esc(l[0])}</td><td><span class="tr-side tr-side--${l[1] === 'Kauf' ? 'buy' : 'sell'}">${l[1]}</span></td><td class="tr-cname">${esc(l[2])}</td><td class="num">${fmt(l[3])}</td><td class="num ${l[4] !== l[3] ? 'warn-text' : ''}">${l[4] ? fmt(l[4]) : '—'}</td><td class="num">${fmt(l[5])}</td><td class="num ${l[6] !== null && l[6] !== l[5] ? 'warn-text' : ''}">${l[6] === null ? '—' : fmt(l[6])}</td></tr>`).join('')}</tbody></table></div>` : '<span class="tr-hint">Keine Ladeaufträge abgehakt.</span>'}
       <div class="tr-actions"><button class="btn btn-outline btn-xs" data-act="hist-again" data-val="${h.id}">${ic('arrow-right')} Nochmal fliegen</button><button class="btn btn-ghost btn-xs" data-act="hist-save" data-val="${h.id}">${ic('save')} Als Route speichern</button><button class="btn btn-quiet-danger btn-xs" data-act="hist-delete" data-val="${h.id}">${ic('trash')} Löschen</button><span class="tr-hint">„Nochmal fliegen“ plant die Stopps auf aktuellen Daten neu und öffnet sie im Planer.</span></div></div></td></tr>` : '';
-    return `<tr><td><a class="row-link" href="#" data-act="hist-open" data-val="${h.id}" aria-expanded="${open}"><span class="cell-title">${esc(h.name)}</span><span class="cell-sub">${esc(h.path)} · ${esc(h.src)}</span></a></td>
+    return `<tr><td><a class="row-link" href="#" data-act="hist-open" data-val="${h.id}" aria-expanded="${open}"><span class="cell-title">${esc(h.name)}</span><span class="cell-sub">${esc(seqText(h.path))} · ${esc(h.src)}</span></a></td>
       <td class="cell-status"><span class="tr-mark tr-mark--${h.outcome === 'abgeschlossen' ? 'ok' : 'warn'}">${esc(h.outcome)}</span></td>
       <td data-label="Schiffe">${esc(h.ships)}</td>
       <td class="num" data-label="Verdient"><strong class="${h.earned >= 0 ? 'pos' : 'neg'}">${h.earned < 0 ? '−' : ''}${fmt(Math.abs(h.earned))}</strong><div class="tr-hint">geplant ${fmt(h.planned)}</div></td>

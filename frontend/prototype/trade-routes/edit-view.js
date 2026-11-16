@@ -17,7 +17,8 @@ function edWork(ctx) {
     return { ctx, w: f.w, entry: f.last, lock: f.pos.idx, flight: f, busy: Boolean(f.readOnly) };
   }
   const tb = state.ed.tabs[state.ed.tab];
-  return { ctx, w: tb.hist[tb.at].w, entry: tb.at > 0 ? tb.hist[tb.at] : null, lock: -1, tab: tb, busy: Boolean(state.ed.optimising) };
+  const searching = Boolean(state.long.search && state.long.search.phase !== 'refused');
+  return { ctx, w: tb.hist[tb.at].w, entry: tb.at > 0 ? tb.hist[tb.at] : null, lock: -1, tab: tb, busy: Boolean(state.ed.optimising) || searching };
 }
 
 /**
@@ -153,8 +154,8 @@ function insertRow(k, pos, append) {
   if (pos <= k.lock) return '';
   const p = state.ed.panel;
   if (state.ed.pick === 'inline' && p && p.kind === 'insert' && p.ctx === k.ctx && p.pos === pos) return `<li class="tr-insert tr-insert--open">${insertPanel(k)}</li>`;
-  const full = k.w.stops.length >= 5;
-  return `<li class="tr-insert"><button class="btn btn-ghost btn-xs" data-act="ed-insert-open" data-ctx="${k.ctx}" data-pos="${pos}" ${full || k.busy ? 'disabled' : ''} title="${full ? 'Höchstens 5 Stopps' : ''}">${ic('plus')} ${append ? 'Stopp anhängen' : 'Stopp einfügen'}</button></li>`;
+  const full = k.w.stops.length >= ROUTE_LIMIT;
+  return `<li class="tr-insert"><button class="btn btn-ghost btn-xs" data-act="ed-insert-open" data-ctx="${k.ctx}" data-pos="${pos}" ${full || k.busy ? 'disabled' : ''} title="${full ? `Routengrenze: höchstens ${ROUTE_LIMIT} Stopps` : ''}">${ic('plus')} ${append ? 'Stopp anhängen' : 'Stopp einfügen'}</button></li>${append ? routeLimitHint(k) : ''}`;
 }
 
 /**
@@ -206,7 +207,7 @@ function insertPanel(k) {
   const head = p.commodity ? `Abnehmer für ${esc(p.commodity)} einfügen ${at}` : `${p.pos >= k.w.stops.length ? 'Stopp anhängen' : 'Stopp einfügen'} ${at}`;
   return `<div class="tr-panel" role="group" aria-label="${head}">
     <div class="tr-row tr-row--between"><div class="tr-cap">${head}</div>${state.ed.pick === 'inline' ? `<button class="btn btn-ghost btn-xs" data-act="ed-panel-close">${ic('close')} Schließen</button>` : ''}</div>
-    <div class="tr-hint">Die zehn besten Terminals für diese Stelle, jeweils mit der ganzen Route neu geplant (schnelle Spur). Sie folgen den Filtern deiner Anfrage. Ein eingefügter Stopp ist fest. ${k.w.stops.length + 1 > state.request.maxStops ? `Über deine ${state.request.maxStops} Stopps hinaus erlaubt, bis 5.` : ''}</div>
+    <div class="tr-hint">Die zehn besten Terminals für diese Stelle, jeweils mit der ganzen Route neu geplant (schnelle Spur). Sie folgen den Filtern deiner Anfrage. Ein eingefügter Stopp ist fest. ${k.w.stops.length + 1 > state.request.maxStops ? `Über deine ${state.request.maxStops} Stopps hinaus erlaubt, bis ${ROUTE_LIMIT}.` : ''}</div>
     <div class="hud-scroll scroll-x"><table class="tr-jobs tr-cands"><thead><tr><th>Terminal</th>${p.commodity ? '<th class="num">kauft à</th>' : ''}<th class="num">Δ Gewinn</th><th class="num">Δ Dauer</th><th class="num">aUEC/h</th><th>Gefahr</th><th>Bugs</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="8" class="tr-hint">Kein Terminal passt zu den Filtern.</td></tr>`}${greyed}</tbody></table></div>
     <div class="tr-field tr-picker"><label for="ed-search">Oder ein Terminal nennen</label><input id="ed-search" type="search" autocomplete="off" placeholder="Terminal oder Ort suchen …" data-edsearch="${k.ctx}" data-pos="${p.pos}"><div class="tr-picker__list" hidden></div><span class="tr-hint">Ein genanntes Terminal gilt auch gegen einen Filter der Anfrage und wird markiert; ein ausgeschlossenes verlässt die Ausschlussliste.</span></div>
   </div>`;
@@ -297,10 +298,14 @@ function editSaveActions(k) {
  * @returns {string} markup
  */
 function editStatus(k) {
+  const searching = editSearchStatus();
+  if (searching) return searching;
   const o = state.ed.optimising;
-  if (o) return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>Rest optimieren · feste Stopps bleiben</strong><span class="tr-status__bar"><i style="width:${[20, 55, 85][o.step]}%"></i></span><span class="muted num">${o.elapsed} s / 60 s</span><button class="btn btn-ghost btn-xs" data-act="ed-opt-stop">Suche stoppen</button></div>`;
+  if (o) return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>Rest optimieren · feste Stopps bleiben · ${o.long ? 'lange Suche · ' : ''}bis ${o.upTo} Stopps</strong><span class="tr-status__bar"><i style="width:${[20, 55, 85][o.step]}%"></i></span><span class="muted num">${o.elapsed} s / 60 s</span><button class="btn btn-ghost btn-xs" data-act="ed-opt-stop">Suche stoppen</button></div>`;
   const h = k.tab.hist[k.tab.at];
-  if (!k.tab.at) return `<div class="tr-status" role="status">${ic('check')}<span>${state.ed.src === 'result' ? 'Suche abgeschlossen in 6 s · 2 Routen' : `${SRC_LABEL[state.ed.src]} geöffnet · Fracht neu geplant`} · Datenstand 14:00 Uhr</span><span class="muted">Bearbeite direkt in der Zeitleiste: ↑ ↓, entfernen, einfügen, festsetzen, markieren.</span></div>`;
+  const last = state.long.last;
+  const done = `Suche abgeschlossen in ${last.elapsed} s · ${state.ed.tabs.length} Routen${last.long ? ' · lange Suche' : ''}${last.stopped ? ' · gestoppt, bestes Zwischenergebnis' : ''}`;
+  if (!k.tab.at) return `<div class="tr-status" role="status">${ic('check')}<span>${state.ed.src === 'result' ? done :`${SRC_LABEL[state.ed.src]} geöffnet · Fracht neu geplant`} · Datenstand 14:00 Uhr</span><span class="muted">Bearbeite direkt in der Zeitleiste: ↑ ↓, entfernen, einfügen, festsetzen, markieren.</span></div>`;
   return `<div class="tr-status" role="status">${ic('edit')}<span><strong>Bearbeitet</strong> · Schritt ${k.tab.at} von ${k.tab.hist.length - 1}: ${esc(h.label)} · ${h.w.kept ? 'Restplan in 0,2 s' : h.diff ? 'Fracht neu geplant in 0,4 s' : 'ohne Neuberechnung'}</span><span class="muted">Arbeitsstand in diesem Browser-Tab; der Server hält nichts, bis du speicherst, teilst oder losfliegst.</span></div>`;
 }
 
@@ -314,19 +319,26 @@ function editPage() {
   pageRoutes.edit = e;
   const tabs = state.ed.tabs.map((tb, i) => {
     const r = evaluate(tb.hist[tb.at].w, tb.hist[tb.at].w.ships);
-    return `<button class="tab ${i === state.ed.tab ? 'active' : ''}" role="tab" aria-selected="${i === state.ed.tab}" data-act="ed-tab" data-val="${i}">${tb.label}${tb.at ? ' <span class="tr-mark tr-mark--forced">bearbeitet</span>' : ''}<small>${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · ${r.stops.length} Stopps</small></button>`;
+    return `<button class="tab ${i === state.ed.tab ? 'active' : ''}" role="tab" aria-selected="${i === state.ed.tab}" data-act="ed-tab" data-val="${i}">${tb.label}${tb.at ? ' <span class="tr-mark tr-mark--forced">bearbeitet</span>' : ''}<small><span class="tr-tab__more">${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · </span>${r.stops.length} Stopps</small></button>`;
   }).join('');
   const src = state.ed.src === 'result' ? '' : `<div class="tr-ctxbar"><span class="chip chip--primary">${SRC_LABEL[state.ed.src]}</span><strong>${esc({ saved: 'Abendrunde Crusader – ArcCorp', shared: 'Drei-System-Runde', unit: 'Eis-Pendel Hurston', mission: 'Stanton-Runde · Frachtkonvoi Pyro' }[state.ed.src])}</strong><span class="tr-hint">${state.ed.src === 'mission' ? 'Schiffsliste ist die Routenflotte; Stoppzeiten aus der Einsatzroute' : 'Im Planer bearbeitet; die Quelle bleibt, bis du sie aktualisierst'}</span></div>`;
   const reqBar = state.ed.requestChanged ? `<div class="tr-warnline tr-warnline--info tr-reqbar" role="status">${ic('info')}<span><strong>Anfrage geändert.</strong> Das Ergebnis rechnet noch mit der alten Anfrage.</span><span class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="ed-research">${ic('search')} Neu suchen</button><button class="btn btn-outline btn-xs" data-act="ed-replan-request">${ic('reset')} Nur Fracht neu planen</button></span></div>` : '';
   const tb = k.tab;
   const work = `<div class="tr-workbar"><span class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="ed-undo" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('arrow-left')} Rückgängig</button><button class="btn btn-ghost btn-xs" data-act="ed-redo" ${tb.at < tb.hist.length - 1 && !k.busy ? '' : 'disabled'}>Wiederholen ${ic('arrow-right')}</button></span><button class="btn btn-ghost btn-xs" data-act="ed-restore" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('reset')} Berechnete Route wiederherstellen</button><span class="tr-hint">${tb.hist.length - 1} Schritt${tb.hist.length === 2 ? '' : 'e'} in diesem Tab</span></div>`;
   const pins = k.w.stops.filter((s) => s.pinned).length;
-  const pinbar = `<div class="tr-pinbar"><span>${ic('map-pin')} <strong>${pins} von ${k.w.stops.length}</strong> Stopps fest</span><button class="btn btn-outline btn-xs" data-act="ed-optimise" ${k.busy || pins === k.w.stops.length ? 'disabled' : ''}>${ic('search')} Rest optimieren</button><span class="tr-hint">Feste Stopps bleiben an ihrer Stelle; die freien sucht die Suche neu (bis 60 s).</span></div>`;
-  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Bearbeiten einer berechneten Route · Quelle: ${SRC_LABEL[state.ed.src]} · Änderungsanzeige ${state.ed.diffView === 'A' ? 'A: in der Zeitleiste' : 'B: als Tabelle'} · Einfügen und Alternativen ${state.ed.pick === 'dialog' ? 'im Dialog' : 'in der Zeitleiste'}. Alles rechnet eine kleine Engine im Browser auf erfundenen Preisen.</p>`;
+  const count = k.w.stops.length;
+  const over = count > searchLimit();
+  const upTo = Math.min(searchLimit(), Math.max(state.request.maxStops, count));
+  const optHint = over
+    ? `<span class="tr-hint tr-hint--warn">${ic('info')} Rest optimieren sucht höchstens ${searchLimit()} Stopps (Suchgrenze); diese Route hat ${count}. Entferne Stopps, um wieder zu optimieren. Bearbeiten und Einfügen gehen weiter bis ${ROUTE_LIMIT}.</span>`
+    : `<span class="tr-hint">Feste Stopps bleiben an ihrer Stelle; die freien sucht die Suche neu, bis zu ${upTo} Stopps${upTo > LONG_JOB_ABOVE ? ' als lange Suche' : ''} (bis 60 s).</span>`;
+  const pinbar = `<div class="tr-pinbar"><span>${ic('map-pin')} <strong>${pins} von ${count}</strong> Stopps fest</span><button class="btn btn-outline btn-xs" data-act="ed-optimise" ${k.busy || pins === count || over ? 'disabled' : ''}>${ic('search')} Rest optimieren</button>${optHint}</div>`;
+  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Bearbeiten einer berechneten Route · Quelle: ${SRC_LABEL[state.ed.src]} · Änderungsanzeige ${state.ed.diffView === 'A' ? 'A: in der Zeitleiste' : 'B: als Tabelle'} · Einfügen und Alternativen ${state.ed.pick === 'dialog' ? 'im Dialog' : 'in der Zeitleiste'}. ${longNote()} Alles rechnet eine kleine Engine im Browser auf erfundenen Preisen.</p>`;
   return `${pageHead()}${note}<div class="tr-a">${requestAside()}<section class="tr-a__result" aria-label="Ergebnis">
     ${src}${editStatus(k)}${reqBar}
     <div><div class="tab-nav tr-a__tabs" role="tablist">${tabs}</div>
     <div class="tr-a__routecard">
+      ${stopIndex(k, e)}
       <div class="tr-row tr-row--between"><div><div class="tr-stoptile__title">${esc(e.name)}</div><div class="tr-hint">${e.convoy ? `Konvoi · ${e.ships.length} Schiffe` : esc(k.w.ships[0].name)}</div></div><div class="tr-actions">${editSaveActions(k)}</div></div>
       ${work}${keptBanner(k, e)}${diffBlock(k, e)}
       ${kpis(e)}${warnList(e)}${shipShares(e)}${pinbar}

@@ -88,7 +88,7 @@ function fShips() {
  */
 function fShape() {
   const r = state.request;
-  return `<div class="tr-field"><span class="tr-cap">Stopps, höchstens</span><div class="krt-segmented" role="group" aria-label="Stopps">${[2, 3, 4, 5].map((n) => `<button type="button" class="krt-segmented__item" data-act="set" data-key="maxStops" data-val="${n}" aria-pressed="${r.maxStops === n}">${n}</button>`).join('')}</div><span class="tr-hint">2 = A → B. Die Suche darf weniger Stopps nehmen.</span></div>
+  return `${stopsField()}
     ${sw('roundTrip', 'Rundreise', 'endet am ersten Stopp')}
     <div class="tr-grid2"><div class="tr-field"><span class="tr-cap">Startterminal</span>${picker('start', 'terminal', true, 'frei')}</div>
     <div class="tr-field"><span class="tr-cap">Zielterminal</span>${r.roundTrip ? '<span class="tr-hint">Rundreise: zurück zum Start</span>' : picker('end', 'terminal', true, 'frei')}</div></div>

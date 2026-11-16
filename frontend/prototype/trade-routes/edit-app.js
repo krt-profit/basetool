@@ -22,7 +22,7 @@ function edTab(def, ships) {
  */
 function resetEdit(src) {
   const ships = src === 'mission' ? ['ALPHA', 'BRAVO'].map((k) => ({ ...FLEET_SHIPS[k] })) : state.request.ships.map((s) => ({ ...s }));
-  Object.assign(state.ed, { tabs: EDIT_TABS.map((d) => edTab(d, ships)), tab: 0, src, requestChanged: false, panel: null, optimising: null });
+  Object.assign(state.ed, { tabs: editTabsFor(state.request.maxStops).map((d) => edTab(d, ships)), tab: 0, src, requestChanged: false, panel: null, optimising: null });
 }
 
 /**
@@ -31,6 +31,7 @@ function resetEdit(src) {
  */
 function initEditState() {
   const pick = (k, ok, def) => (ok.includes(params.get(k)) ? params.get(k) : def);
+  initLongState();
   if (state.page === 'flights') { state.page = 'routes'; state.routesTab = 'flights'; }
   if (params.get('tab') === 'flights') state.routesTab = 'flights';
   state.ed = { diffView: pick('diff', ['A', 'B'], 'A'), pick: pick('pick', ['dialog', 'inline'], 'dialog'), tick: pick('tick', ['A', 'B'], 'A'), bar: pick('bar', ['A', 'B'], 'A'), conflict: false, conflictNext: false };
@@ -47,8 +48,9 @@ function initEditState() {
   state.mflights[mr.id] = mf;
   state.mflightEnded.M2 = { outcome: 'abgeschlossen', ended: '12.11., 23:10', earned: 1018400, planned: 984000, lines: [['Port Tressler', 'Kauf', 'Distilled Spirits', 380, 380, 1105, 1105], ['Levski', 'Verkauf', 'Distilled Spirits', 380, 380, 1690, 1702], ['Levski', 'Kauf', 'Hephaestanite', 696, 640, 2210, 2230], ['Ruin Station', 'Verkauf', 'Hephaestanite', 696, 640, 2960, 2990]] };
   const fly = params.get('flight');
-  if (fly === 'personal') { startFlight(state.ed.tabs[0].hist[0].w, 'Seraphim → Area18 → Baijini Point', 'Berechnete Route'); state.flyOpen = 'personal'; }
+  if (fly === 'personal') { const w = state.ed.tabs[0].hist[0].w; startFlight(w, evaluate(w, w.ships).name, 'Berechnete Route'); state.flyOpen = 'personal'; }
   if (fly === 'M1') state.flyOpen = 'M1';
+  applyLongFlightParams();
 }
 
 /**
@@ -223,7 +225,7 @@ const EDIT_ACTIONS = {
     const pos = Number(el.dataset.pos);
     const t = el.dataset.t;
     doStep(el.dataset.ctx, (k) => {
-      if (k.w.stops.length >= 5) { say('Höchstens 5 Stopps', 'Entferne zuerst einen Stopp.'); return null; }
+      if (k.w.stops.length >= ROUTE_LIMIT) { say(`Höchstens ${ROUTE_LIMIT} Stopps`, 'Entferne zuerst einen Stopp.'); return null; }
       const why = failsFilter(t);
       if (state.request.excluded.includes(t)) state.request.excluded = state.request.excluded.filter((x) => x !== t);
       const stops = [...k.w.stops.slice(0, pos), { t, pinned: true, inserted: true, failsFilter: why }, ...k.w.stops.slice(pos)];
@@ -284,8 +286,10 @@ const EDIT_ACTIONS = {
   'ed-restore': () => { const tb = state.ed.tabs[state.ed.tab]; doStep('plan', () => ({ label: 'Berechnete Route wiederhergestellt', w: tb.hist[0].w })); },
   'ed-optimise': () => {
     closePanel();
-    state.ed.optimising = { step: 0, elapsed: 0 };
-    optTimers = [[900, 1, 2], [1900, 2, 4]].map(([ms, step, s]) => setTimeout(() => { state.ed.optimising = { step, elapsed: s }; render(); }, ms));
+    const upTo = Math.min(searchLimit(), Math.max(state.request.maxStops, edWork('plan').w.stops.length));
+    const long = upTo > LONG_JOB_ABOVE;
+    state.ed.optimising = { step: 0, elapsed: 0, upTo, long };
+    optTimers = [[900, 1, long ? 11 : 2], [1900, 2, long ? 26 : 4]].map(([ms, step, s]) => setTimeout(() => { Object.assign(state.ed.optimising, { step, elapsed: s }); render(); }, ms));
     optTimers.push(setTimeout(() => { EDIT_ACTIONS['ed-opt-finish'](); render(); }, 3000));
   },
   'ed-opt-finish': () => {
@@ -305,13 +309,6 @@ const EDIT_ACTIONS = {
       const stops = k.w.stops.map((s) => ({ ...s, failsFilter: failsFilter(s.t) }));
       return { label: 'Nur Fracht neu geplant (Anfrage geändert)', w: replan({ ...k, w: { ...k.w, ships } }, stops) };
     });
-  },
-  'ed-research': () => confirmFirst('Neu suchen?', 'Die volle Suche verwirft alle Bearbeitungen in allen Tabs. Rückgängig geht danach nicht mehr.', 'Neu suchen', 'do-ed-research', ''),
-  'do-ed-research': () => { goPage('planner'); state.variant = 'A'; startSearch(); },
-  compute: () => {
-    if (state.page !== 'edit') { startSearch(); return; }
-    if (state.ed.tabs.some((tb) => tb.at)) { EDIT_ACTIONS['ed-research'](); return; }
-    EDIT_ACTIONS['do-ed-research']();
   },
   'ed-update': (el) => {
     if (state.ed.conflict) { state.modal = { kind: 'ed-conflict', what: el.dataset.what }; return; }
@@ -413,7 +410,7 @@ function editBarControls() {
     if (state.fl) out += `${btn('proto-ed', 'bar', 'A', 'Leiste A', state.ed.bar === 'A')}${btn('proto-ed', 'bar', 'B', 'Leiste B', state.ed.bar === 'B')}`;
     if (f) out += `<button data-act="proto-other" title="Ein anderes Gerät oder eine andere Crew hakt ab">Anderes Gerät</button><button data-act="proto-fconflict" aria-pressed="${state.ed.conflictNext}" title="Die nächste Änderung im Flug trifft auf einen Konflikt">Konflikt</button>`;
   }
-  return out;
+  return out + longBarControls();
 }
 
 document.addEventListener('click', (ev) => {

@@ -197,7 +197,7 @@ function evaluate(w, shipList) {
   stops.filter((s) => s.failsFilter).forEach((s) => warnings.push({ kind: 'warn', icon: 'warning', text: `${s.term.name} verletzt einen Filter der Anfrage (${s.failsFilter}); von dir eingefügt, darum bleibt es` }));
   (w.marks || []).forEach((m) => warnings.push({ kind: 'warn', icon: 'warning', text: `${m.side === 'buy' ? 'Ausverkauft' : 'Keine Nachfrage'}: ${m.c} bei ${TERMINALS[m.t].name}, noch ${fmt(m.rest)} SCU (nur deine Route)` }));
   const ships2 = perShip.map((p) => ({ ...p, profit: p.revenue - p.cost, need: -p.low, perHour: ((p.revenue - p.cost) * 3600) / Math.max(1, duration) }));
-  const name = stops.map((s) => s.place.name).filter((x, i, a) => i === 0 || x !== a[i - 1]).join(' → ');
+  const name = seqText(stops.map((s) => s.place.name));
   const buys = stops.flatMap((s) => s.jobs).filter((j) => j.side === 'buy');
   const runs = buys.length ? Math.max(1, Math.min(...buys.map((j) => Math.floor(j.stock / Math.max(1, j.qty))))) : 1;
   return {

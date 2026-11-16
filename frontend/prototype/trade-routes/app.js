@@ -97,6 +97,7 @@ function render() {
   if (state.page === 'routes') url.searchParams.set('tab', state.routesTab); else url.searchParams.delete('tab');
   if (state.page === 'place') url.searchParams.set('place', state.place); else url.searchParams.delete('place');
   history.replaceState(null, '', url);
+  afterRender();
 }
 
 /**
@@ -270,6 +271,7 @@ const ACTIONS = {
   'fly-restart': () => { state.flight = { ...state.flight, idx: 0, phase: 'stop', done: {} }; },
   ...SURFACE_ACTIONS,
   ...EDIT_ACTIONS,
+  ...LONG_ACTIONS,
 };
 
 /**
