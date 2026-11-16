@@ -9,7 +9,9 @@ DS = HERE.parents[2] / ".claude" / "skills" / "das-kartell-design"
 SCRIPTS = [
     "data.js",
     "surfaces-data.js",
+    "edit-data.js",
     "model.js",
+    "edit-engine.js",
     "fragments.js",
     "forms.js",
     "variants.js",
@@ -18,7 +20,10 @@ SCRIPTS = [
     "surfaces-mission.js",
     "surfaces-ratings.js",
     "surfaces-admin.js",
+    "edit-view.js",
+    "flight.js",
     "surfaces-app.js",
+    "edit-app.js",
     "overlays.js",
     "app.js",
 ]

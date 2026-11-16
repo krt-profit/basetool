@@ -1,6 +1,8 @@
 /** PROTOTYPE wiring of the surfaces beside the planner: pages, actions, dialogs and the prototype bar. */
 
 const PAGES = {
+  edit: 'Planer · Bearbeiten',
+  flights: 'Meine Flüge',
   planner: 'Routenplaner',
   routes: 'Routen (Listen)',
   route: 'Geöffnete Route',
@@ -18,11 +20,15 @@ const PAGES = {
  */
 function goPage(page) {
   if (page !== 'planner') state.missionSearch = null;
-  state.page = page;
+  state.page = page === 'flights' ? 'routes' : page;
+  if (page === 'flights') state.routesTab = 'flights';
   state.edited = false;
   state.editInPlanner = false;
   state.modal = null;
   state.flight = null;
+  state.flyOpen = null;
+  state.flyAdjust = false;
+  if (state.ed) state.ed.panel = null;
   window.scrollTo(0, 0);
 }
 
@@ -198,7 +204,7 @@ function surfaceBarControls() {
   if (state.page === 'routes' && state.routesTab === 'unit') extra = `${sep}${btn('proto-role', 'member', 'Mitglied', state.role !== 'officer')}${btn('proto-role', 'officer', 'Offizier', state.role === 'officer')}`;
   if (state.page === 'mission') extra = `${sep}${btn('proto-mrole', 'manager', 'Leiter', state.missionRole === 'manager')}${btn('proto-mrole', 'crew', 'Crew', state.missionRole === 'crew')}${btn('proto-mrole', 'reader', 'Mitglied', state.missionRole === 'reader')}${state.missionRole === 'crew' ? `${sep}${btn('proto-alt', '', state.missionAlt === 'top' ? 'A · Teil oben' : 'B · Umschalter', true)}` : ''}`;
   if (state.page === 'place' || state.page === 'ratings') extra = `${sep}${btn('proto-role', 'member', 'Mitglied', state.role !== 'admin')}${btn('proto-role', 'admin', 'Admin', state.role === 'admin')}`;
-  return `${select}${extra}`;
+  return `${select}${extra}${editBarControls()}`;
 }
 
 /**
@@ -206,5 +212,5 @@ function surfaceBarControls() {
  * @returns {string} markup
  */
 function surfacePage() {
-  return { routes: routesPage, route: routePage, mission: missionPage, ratings: ratingsPage, place: placePage, admin: adminPage, off: offPage }[state.page]();
+  return { edit: editPage, routes: routesPage, route: routePage, mission: missionPage, ratings: ratingsPage, place: placePage, admin: adminPage, off: offPage }[state.page]();
 }

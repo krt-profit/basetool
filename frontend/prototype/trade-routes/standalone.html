@@ -4680,6 +4680,72 @@ body.has-fly .proto-state { bottom: 144px; }
 .data-table .tr-mark { white-space: normal; }
 .proto-bar__page { height: 30px; border-radius: 999px; border: 0; background: #141414; color: #fff; font: 700 .75rem Lato, sans-serif; padding: 0 10px; }
 
+.tr-workbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 10px; background: var(--surface-inset); border: 1px solid var(--color-gray-3); border-radius: var(--radius-tile); }
+.tr-pinbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: var(--fs-sm); }
+.tr-pinbar .krt-icon { color: var(--color-primary); }
+.tr-pin { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 8px; border-radius: var(--radius-control); background: var(--control-bg); border: 1px solid var(--control-border); color: var(--control-fg); font: inherit; font-size: var(--fs-2xs); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
+.tr-pin:hover { background: var(--control-bg-hover); color: var(--color-white); }
+.tr-pin[aria-pressed="true"] { background: var(--control-selected-bg); border-color: var(--control-selected-border); color: var(--control-selected-fg); box-shadow: inset 0 -2px 0 var(--color-primary); }
+.tr-pin[aria-pressed="true"] .krt-icon { color: var(--color-primary); }
+.tr-pin:disabled { opacity: .5; cursor: default; }
+.tr-stoptile--pinned { border-left: 3px solid var(--color-primary); }
+.tr-stoptile--frozen { opacity: .62; background: var(--surface-inset); }
+.tr-stoptile--now { border-color: var(--color-primary); }
+.tr-timeline__stop.is-done::before { border-color: var(--color-success); background: color-mix(in srgb, var(--color-success) 25%, var(--surface-bar)); }
+.tr-kept { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 12px; padding: 10px 12px; border-radius: var(--radius-tile); border: 1px dashed var(--color-accent-light); background: color-mix(in srgb, var(--color-primary) 8%, transparent); font-size: var(--fs-sm); }
+.tr-kept > div { display: flex; gap: 8px; align-items: flex-start; flex: 1 1 360px; }
+.tr-kept .krt-icon { margin-top: 3px; color: var(--color-accent-light); }
+.tr-diff { display: flex; flex-direction: column; gap: var(--space-3); padding: 12px; border: 1px solid var(--color-gray-3); border-radius: var(--radius-tile); background: var(--surface-inset); }
+.tr-difftable { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.tr-difftable tr.is-same td { color: var(--color-gray-2-text); }
+.tr-difffig { font-size: var(--fs-xs); white-space: nowrap; }
+.tr-difffig .tr-cap-k { color: var(--color-gray-2-text); text-transform: uppercase; font-size: var(--fs-2xs); letter-spacing: .06em; font-weight: var(--fw-bold); }
+.tr-panel { display: flex; flex-direction: column; gap: var(--space-3); }
+.tr-insert--open, .tr-inline-row > td { padding-top: 8px; padding-bottom: 8px; }
+.tr-insert--open .tr-panel, .tr-inline-row .tr-panel { background: var(--surface-panel); border: 1px solid var(--color-primary); border-radius: var(--radius-tile); padding: 12px; }
+.tr-insert--open { display: block; }
+.tr-cands tr.is-off td { color: var(--color-gray-2-text); }
+.tr-cands .tr-rate small { display: none; }
+.tr-report { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; }
+.tr-reqbar { align-items: center; flex-wrap: wrap; }
+.tr-reqbar .tr-actions { margin-left: auto; }
+.tr-jobs tr.is-ticked td { color: var(--color-gray-2-text); }
+.tr-picker__opt:disabled { opacity: .55; cursor: default; }
+
+.tr-fly__inner--wide { max-width: 1040px; }
+.tr-flymoney { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: var(--fs-sm); color: var(--color-gray-1); }
+.tr-flymoney strong { font-variant-numeric: tabular-nums; color: var(--color-white); }
+.tr-flymoney strong.pos { color: var(--color-success-text); }
+.tr-flymoney strong.neg { color: var(--color-danger-text); }
+.tr-fly__job { flex-direction: column; align-items: stretch; gap: 8px; }
+.tr-fly__jobrow { display: flex; align-items: center; gap: 10px; }
+.tr-fly__jobmain { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: var(--color-white); }
+.tr-fly__job--b { flex-direction: column; align-items: stretch; }
+.tr-fly__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 9rem)) auto; gap: 8px; align-items: end; }
+.tr-fly__fields input { height: 2.6rem; font-size: 1rem; }
+.tr-fly__fields .btn { min-height: 2.6rem; }
+.tr-flyside { font-weight: var(--fw-black); font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; }
+.tr-flyside--buy { color: var(--color-danger-text); }
+.tr-flyside--sell { color: var(--color-success-text); }
+.tr-flyqty { color: var(--color-white); }
+.tr-flydone { font-size: var(--fs-sm); color: var(--color-success-text); }
+.tr-fly__job.is-done .tr-flyqty { color: var(--color-gray-2-text); text-decoration: line-through; }
+.tr-flydiff { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--radius-tile); border: 1px solid var(--color-accent-light); background: color-mix(in srgb, var(--color-primary) 8%, var(--surface-panel)); font-size: var(--fs-sm); }
+.tr-flydiff .krt-icon { color: var(--color-accent-light); }
+.tr-flydiff__line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tr-flybar { position: sticky; top: var(--krt-header-height, 72px); z-index: var(--z-dropdown); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px var(--page-gutter, 24px); background: var(--surface-bar); border-bottom: 2px solid var(--color-primary); font-size: var(--fs-sm); }
+.tr-flybar__k { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: var(--fw-black); text-transform: uppercase; letter-spacing: .12em; color: var(--color-accent-light); }
+.tr-flybar strong { color: var(--color-white); }
+.tr-flybar__sp { flex: 1; }
+.tr-flymini { position: fixed; right: 20px; bottom: 76px; z-index: var(--z-toast); width: 260px; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--surface-panel); border: 1px solid var(--color-primary); border-radius: var(--radius-box); box-shadow: var(--glow-primary-lg); }
+.tr-flymini__k { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: var(--fw-black); text-transform: uppercase; letter-spacing: .12em; color: var(--color-accent-light); }
+.tr-flymini__name { font-weight: var(--fw-bold); color: var(--color-white); }
+.tr-flymini .btn { align-self: flex-start; }
+.tr-mflight { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
+.tr-mflight--live { border-color: var(--color-primary); }
+.tr-mflight .tr-cap .krt-icon { color: var(--color-primary); }
+.tr-histdetail > td { background: var(--surface-inset); }
+
 @media (width <= 1180px) {
   .tr-a { grid-template-columns: 340px minmax(0, 1fr); }
   .tr-c__cards { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
@@ -4741,6 +4807,11 @@ body.has-fly .proto-state { bottom: 144px; }
   .proto-bar__label { min-width: 64px; white-space: normal; line-height: 1.1; }
   .tr-toast { left: 12px; right: 12px; max-width: none; }
   .palette-trigger-text, .nav-kbd { display: none; }
+  .tr-fly__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tr-fly__fields .btn { grid-column: 1 / -1; justify-content: center; }
+  .tr-flymini { left: 12px; right: 12px; width: auto; bottom: 64px; }
+  .tr-flybar { padding: 8px 12px; }
+  .tr-pin { min-height: 32px; }
 }
 
 </style>
@@ -4846,6 +4917,7 @@ body.has-fly .proto-state { bottom: 144px; }
     </div>
   </nav>
 </header>
+<div id="flybar-root"></div>
 <main id="app" class="tr-main"></main>
 <div id="overlay-root"></div>
 <div id="toast-root"></div>
@@ -5140,6 +5212,46 @@ const DATA_JOBS = [
   { name: 'Bewertungen bereinigen', every: 'täglich', last: 'heute, 04:00', result: '37 Meldungen beendet (31 Alter, 6 Patch)', ok: true },
 ];
 
+/** PROTOTYPE data for the edit flows: invented positions, prices and the flight history; nothing is real or stored. */
+
+const POS = {
+  seraphim: [-14, 16], area18: [0, 28], baijini: [0.6, 28.7], tressler: [22.4, -31.8], newbabbage: [22, -32],
+  everus: [12.2, 0.3], lorville: [12, 0], thedus: [12.8, 1.2], pyrogw: [-30, -20],
+};
+
+const PRICES = {
+  seraphim: { buy: { 'Medical Supplies': [1820, 1400], Stims: [335, 1200], 'Processed Food': [140, 2200] }, sell: { Titanium: [1010, 600], Agricium: [2650, 300] } },
+  area18: { buy: { Titanium: [805, 2600] }, sell: { 'Medical Supplies': [2285, 400], Stims: [470, 250], 'Processed Food': [235, 600], 'Agricultural Supplies': [160, null] } },
+  area18b: { buy: { Hydrogen: [105, 5000] }, sell: { Agricium: [2780, 200], 'Medical Supplies': [2190, 600] } },
+  baijini: { buy: { 'Processed Food': [140, 2000], Agricium: [2340, 350] }, sell: { Stims: [640, null], Titanium: [985, 2400], 'Medical Supplies': [1950, 300] } },
+  tressler: { buy: { 'Distilled Spirits': [1105, 900], 'Agricultural Supplies': [95, 3000] }, sell: { 'Medical Supplies': [2240, 800], Titanium: [1040, 1500], Stims: [510, 600] } },
+  everus: { buy: { Iron: [342, 1500], Laranite: [2380, 400] }, sell: { Stims: [480, 900], 'Processed Food': [205, 1200], 'Distilled Spirits': [1560, 500] } },
+  thedus: { buy: { Laranite: [2290, 600] }, sell: { 'Medical Supplies': [2520, 500], Iron: [451, 1400], Titanium: [1120, 800] } },
+  lorville: { buy: { Iron: [330, 2500] }, sell: { 'Medical Supplies': [2330, 700], Agricium: [2810, 400], 'Distilled Spirits': [1620, 700] } },
+  lorvilleb: { buy: { Gold: [5900, 120] }, sell: { Titanium: [990, 900], Stims: [505, 400] } },
+  newbabbage: { buy: { Agricium: [2295, 500], Gold: [5800, 200] }, sell: { Laranite: [3010, 800], Iron: [470, 1600], 'Processed Food': [240, 1000] } },
+  pyrogw: { buy: { Hydrogen: [98, 6000] }, sell: { 'Medical Supplies': [2410, 350], 'Processed Food': [260, 900] } },
+};
+
+const EDIT_TABS = [
+  { label: 'Beste Route', stops: ['seraphim', 'area18', 'baijini'], forced: ['baijini'] },
+  { label: 'Alternative 1', stops: ['tressler', 'everus', 'lorville'], forced: [] },
+];
+
+const FLIGHT_UNDO_MAX = 20;
+
+const FLIGHT_HISTORY_SEED = [
+  { id: 'h1', stopIds: ['seraphim', 'area18', 'baijini'], name: 'Abendrunde Crusader – ArcCorp', path: 'Seraphim Station › Area18 › Baijini Point', ships: 'C2 Hercules „Lastesel“', src: 'Gespeicherte Route', outcome: 'abgeschlossen', earned: 351200, planned: 348040, ended: 'gestern, 22:41', lines: [
+    ['Seraphim Station', 'Kauf', 'Medical Supplies', 400, 400, 1820, 1820], ['Seraphim Station', 'Kauf', 'Stims', 296, 296, 335, 335],
+    ['Area18', 'Verkauf', 'Medical Supplies', 400, 400, 2285, 2290], ['Area18', 'Kauf', 'Titanium', 400, 400, 805, 805],
+    ['Baijini Point', 'Verkauf', 'Stims', 296, 296, 640, 652], ['Baijini Point', 'Verkauf', 'Titanium', 400, 400, 985, 985],
+  ] },
+  { id: 'h2', stopIds: ['tressler', 'everus', 'lorville'], name: 'Tressler › Everus › Lorville', path: 'Port Tressler › Everus Harbor › Lorville', ships: 'C2 Hercules „Lastesel“', src: 'Berechnete Route', outcome: 'abgebrochen an Stopp 2', earned: 0, planned: 296500, ended: '14.11., 23:58', lines: [
+    ['Port Tressler', 'Kauf', 'Distilled Spirits', 380, 380, 1105, 1105], ['Everus Harbor', 'Verkauf', 'Distilled Spirits', 380, 0, 1560, null],
+  ] },
+  { id: 'h3', stopIds: ['everus', 'thedus'], name: 'Eis-Pendel Hurston', path: 'Everus Harbor › HDMS-Thedus › Everus Harbor', ships: 'Freelancer MAX „Kiste“', src: 'Einheitsroute', outcome: 'abgelaufen an Stopp 3', earned: 18400, planned: 62100, ended: '09.11., 04:00', lines: [] },
+];
+
 /** PROTOTYPE model: formatting, request state and the route computation behind every variant. */
 const NF = new Intl.NumberFormat('de-DE');
 const fmt = (n) => NF.format(Math.round(n));
@@ -5356,6 +5468,311 @@ function rank(routes, r) {
     return list.filter((x) => x.profit >= min).sort((a, b) => a.duration - b.duration);
   }
   return list.sort((a, b) => b.perHour - a.perHour);
+}
+
+/** PROTOTYPE engine for the edit flows: a greedy cargo planner, the kept plan, the diff, candidates and alternatives. */
+
+const MODE_LOAD = { 'Auto-Load': [120, 0.07], Ladedock: [120, 0.4], Frachtaufzug: [180, 0.5] };
+
+/**
+ * Builds the key of a buy-sell path.
+ * @param {{c: string, from: string, to: string}} p the path
+ * @returns {string} commodity, buy terminal and sell terminal
+ */
+const pathKey = (p) => `${p.c}|${p.from}|${p.to}`;
+
+/**
+ * Sums the usable hold of a ship list.
+ * @param {Array<object>} ships the ship list
+ * @returns {number} SCU
+ */
+const holdOf = (ships) => expandShips(ships).reduce((a, s) => a + Math.max(0, s.scu - s.reserve), 0);
+
+/**
+ * Sums the starting capital of a ship list.
+ * @param {Array<object>} ships the ship list
+ * @returns {number} aUEC
+ */
+const capitalOf = (ships) => expandShips(ships).reduce((a, s) => a + s.capital, 0);
+
+/**
+ * Returns the straight-line distance between two terminals in one system.
+ * @param {string} a terminal id
+ * @param {string} b terminal id
+ * @returns {number|null} Gm, or null across systems
+ */
+function gmBetween(a, b) {
+  const pa = POS[TERMINALS[a].place];
+  const pb = POS[TERMINALS[b].place];
+  if (!pa || !pb) return null;
+  return Math.max(0.3, Math.hypot(pa[0] - pb[0], pa[1] - pb[1]));
+}
+
+/**
+ * Names the request filter a terminal fails, if any.
+ * @param {string} t terminal id
+ * @returns {string} the failed filter, or an empty string
+ */
+function failsFilter(t) {
+  const place = PLACES[TERMINALS[t].place];
+  const r = state.request;
+  if (r.excluded.includes(t)) return 'ausgeschlossen';
+  if (r.armistice && !place.armistice) return 'nur Waffenstillstand';
+  if (!r.kinds.includes(place.kind)) return `ohne ${place.kind}`;
+  if (r.systems.length && !r.systems.includes(place.system)) return 'anderes System';
+  return '';
+}
+
+/**
+ * Reads the stock or demand cap of one side of a commodity at a terminal, a mark taking precedence.
+ * @param {string} side buy or sell
+ * @param {string} t terminal id
+ * @param {string} c commodity
+ * @param {Array<object>} marks the route-local marks
+ * @returns {number} SCU, Infinity for unknown demand
+ */
+function capOf(side, t, c, marks) {
+  const m = marks.find((x) => x.t === t && x.c === c && x.side === side);
+  if (m) return m.rest;
+  const e = PRICES[t]?.[side]?.[c];
+  if (!e) return 0;
+  return e[1] === null ? Infinity : e[1];
+}
+
+/**
+ * Plans the cargo on a fixed stop order: fixed paths first, then kept paths as upper bounds, then greedy by margin.
+ * @param {Array<object>} stops the stop sequence ({t, pinned, inserted, ...})
+ * @param {{ships: Array<object>, marks?: Array<object>, fixed?: Array<object>, keep?: Array<object>, fromIdx?: number, onlyFrom?: string, extra?: Array<object>, skip?: Array<string>}} opts planning options; skip lists "terminal|commodity" purchases already ticked
+ * @returns {{paths: Array<object>, lost: Array<object>}} the planned paths and the kept paths no longer sellable as planned
+ */
+function planCargo(stops, opts) {
+  const ts = stops.map((s) => s.t);
+  const n = ts.length;
+  const marks = opts.marks || [];
+  const free = Array(Math.max(0, n - 1)).fill(holdOf(opts.ships));
+  const cash = Array(n).fill(capitalOf(opts.ships));
+  const used = {};
+  const paths = [];
+  const lost = [];
+  const room = (i, j, c, pb) => {
+    let q = Math.min(capOf('buy', ts[i], c, marks) - (used[`b|${ts[i]}|${c}`] || 0), capOf('sell', ts[j], c, marks) - (used[`s|${ts[j]}|${c}`] || 0));
+    for (let k = i; k < j; k += 1) q = Math.min(q, free[k], Math.floor(cash[k] / pb));
+    return Math.max(0, Math.floor(q));
+  };
+  const place = (p, i, j) => {
+    for (let k = i; k < j; k += 1) { free[k] -= p.qty; cash[k] -= p.qty * p.pb; }
+    for (let k = j; k < n; k += 1) cash[k] += p.qty * (p.ps - p.pb);
+    used[`b|${p.from}|${p.c}`] = (used[`b|${p.from}|${p.c}`] || 0) + p.qty;
+    used[`s|${p.to}|${p.c}`] = (used[`s|${p.to}|${p.c}`] || 0) + p.qty;
+    const same = paths.find((x) => pathKey(x) === pathKey(p) && x.pb === p.pb && x.ps === p.ps && !x.fixed && !p.fixed);
+    if (same) same.qty += p.qty; else paths.push(p);
+  };
+  (opts.fixed || []).forEach((p) => { const i = ts.indexOf(p.from); const j = ts.indexOf(p.to); if (i >= 0 && j > i) place({ ...p }, i, j); });
+  if (opts.keep) {
+    [...opts.keep].sort((a, b) => (b.ps - b.pb) - (a.ps - a.pb)).forEach((p) => {
+      if ((opts.fixed || []).some((f) => pathKey(f) === pathKey(p))) return;
+      const i = ts.indexOf(p.from);
+      const j = ts.indexOf(p.to);
+      if (i < 0 || j < 0 || j < i) { lost.push({ ...p, why: i < 0 ? 'DROPPED' : 'NOT_SELLABLE' }); return; }
+      const q = Math.min(p.qty, room(i, j, p.c, p.pb));
+      if (q > 0) place({ ...p, qty: q, reduced: q < p.qty ? p.qty : 0 }, i, j);
+      else lost.push({ ...p, why: 'NOT_SELLABLE' });
+    });
+    (opts.extra || []).forEach((p) => { const i = ts.indexOf(p.from); const j = ts.indexOf(p.to); const q = Math.min(p.qty, room(i, j, p.c, p.pb)); if (q > 0) place({ ...p, qty: q }, i, j); });
+    return { paths, lost };
+  }
+  const cands = [];
+  for (let i = opts.fromIdx || 0; i < n; i += 1) {
+    if (opts.onlyFrom && ts[i] !== opts.onlyFrom) continue;
+    Object.entries(PRICES[ts[i]]?.buy || {}).forEach(([c, [pb]]) => {
+      if (state.request.exclCommodities.includes(c) || (opts.skip || []).includes(`${ts[i]}|${c}`)) return;
+      for (let j = i + 1; j < n; j += 1) {
+        const e = PRICES[ts[j]]?.sell?.[c];
+        if (e && e[0] > pb) cands.push({ c, from: ts[i], to: ts[j], pb, ps: e[0], i, j });
+      }
+    });
+  }
+  cands.sort((a, b) => (b.ps - b.pb) - (a.ps - a.pb)).forEach((x) => {
+    const q = room(x.i, x.j, x.c, x.pb);
+    if (q > 0) place({ c: x.c, from: x.from, to: x.to, pb: x.pb, ps: x.ps, qty: q }, x.i, x.j);
+  });
+  return { paths, lost };
+}
+
+/**
+ * Computes a working route's figures in the shape the shared fragments render.
+ * @param {{stops: Array<object>, paths: Array<object>, lost?: Array<object>, marks?: Array<object>}} w the working route
+ * @param {Array<object>} shipList the ship list
+ * @returns {object} the computed route
+ */
+function evaluate(w, shipList) {
+  const ships = expandShips(shipList);
+  const convoy = ships.length > 1;
+  const hold = holdOf(shipList);
+  const ts = w.stops.map((s) => s.t);
+  const perShip = ships.map((s) => ({ label: s.label, short: s.short, capital: s.capital, revenue: 0, cost: 0, cash: 0, low: 0 }));
+  let revenue = 0;
+  let cost = 0;
+  let cash = 0;
+  let low = 0;
+  const lost = w.lost || [];
+  const stops = w.stops.map((ws, si) => {
+    const term = TERMINALS[ws.t];
+    const pl = PLACES[term.place];
+    const jobs = [];
+    w.paths.forEach((p) => {
+      ['buy', 'sell'].forEach((side) => {
+        if ((side === 'buy' ? p.from : p.to) !== ws.t) return;
+        const price = side === 'buy' ? p.pb : p.ps;
+        const shares = split(p.qty, ships);
+        const sum = p.qty * price;
+        const e = PRICES[ws.t]?.[side]?.[p.c];
+        if (side === 'buy') cost += sum; else revenue += sum;
+        shares.forEach((q, i) => { if (side === 'buy') perShip[i].cost += q * price; else perShip[i].revenue += q * price; });
+        jobs.push({ side, c: p.c, qty: p.qty, p: price, sum, shares, path: p, key: `${pathKey(p)}|${side}`, age: 3, demand: side === 'sell' && e && e[1] === null ? null : 1, stock: e ? e[1] : 0, avail: { pct: 85, n: 3 } });
+      });
+    });
+    jobs.filter((j) => j.side === 'sell').forEach((j) => { cash += j.sum; });
+    jobs.filter((j) => j.side === 'buy').forEach((j) => { cash -= j.sum; });
+    low = Math.min(low, cash);
+    perShip.forEach((p, i) => { jobs.forEach((j) => { p.cash += (j.side === 'sell' ? 1 : -1) * j.shares[i] * j.p; }); p.low = Math.min(p.low, p.cash); });
+    const mode = MODES.find((m) => term.modes.includes(m) && state.request.modes.includes(m)) || term.modes[0];
+    const moved = jobs.reduce((a, j) => a + j.qty, 0);
+    const [base, per] = MODE_LOAD[mode];
+    const load = moved ? Math.round(base + per * moved) : 0;
+    const over = OVERHEADS[pl.kind] * 60;
+    const loaders = convoy ? ships.filter((_, i) => jobs.some((j) => j.shares[i] > 0)).length : 1;
+    const surcharge = convoy ? SURCHARGE[pl.kind] * Math.max(0, loaders - 1) : 0;
+    const fee = mode === 'Auto-Load' ? Math.round(moved * 1.6) : 0;
+    const why = (p) => {
+      const m = (w.marks || []).find((x) => x.c === p.c && ((x.side === 'buy' && x.t === p.from) || (x.side === 'sell' && x.t === p.to)));
+      if (m) return m.side === 'buy' ? 'ausverkauft' : 'keine Nachfrage';
+      return { DROPPED: 'weggefallen', UNSOLD: 'kein Abnehmer auf dem Rest der Route' }[p.why] || 'nicht wie geplant verkaufbar';
+    };
+    const gone = lost.filter((p) => p.from === ws.t || p.to === ws.t).map((p) => ({ side: p.from === ws.t ? 'buy' : 'sell', c: p.c, qty: p.qty, p: p.from === ws.t ? p.pb : p.ps, gone: why(p) }));
+    return { ...ws, si, t: ws.t, term, place: pl, jobs, gone, mode, over, load, fee, surcharge, loaders, dur: over + load + surcharge, forced: ws.forced };
+  });
+  const legs = stops.slice(1).map((s, i) => {
+    const gm = gmBetween(ts[i], ts[i + 1]);
+    const est = gm === null ? ['Systemwechsel: Entfernung aus UEX'] : [];
+    const g = gm === null ? 60 : gm;
+    const qt = Math.round((110 + 19 * g) * (convoy ? 1.12 : 1));
+    const crossings = gm === null ? 1 : 0;
+    const aboard = w.paths.filter((p) => ts.indexOf(p.from) <= i && ts.indexOf(p.to) > i).reduce((a, p) => a + p.qty, 0);
+    return { gm: g, est, qtDur: qt, crossings, dur: qt + crossings * CROSSING, aboard, hold };
+  });
+  const duration = stops.reduce((a, s) => a + s.dur, 0) + legs.reduce((a, l) => a + l.dur, 0);
+  const profit = revenue - cost;
+  const warnings = [];
+  const unknown = stops.flatMap((s) => s.jobs).filter((j) => j.side === 'sell' && j.demand === null);
+  if (unknown.length) warnings.push({ kind: 'info', icon: 'info', text: `Nachfrage unbekannt bei ${unknown.length} Verkauf${unknown.length > 1 ? 'en' : ''}: nur der Laderaum begrenzt die Menge` });
+  stops.filter((s) => s.failsFilter).forEach((s) => warnings.push({ kind: 'warn', icon: 'warning', text: `${s.term.name} verletzt einen Filter der Anfrage (${s.failsFilter}); von dir eingefügt, darum bleibt es` }));
+  (w.marks || []).forEach((m) => warnings.push({ kind: 'warn', icon: 'warning', text: `${m.side === 'buy' ? 'Ausverkauft' : 'Keine Nachfrage'}: ${m.c} bei ${TERMINALS[m.t].name}, noch ${fmt(m.rest)} SCU (nur deine Route)` }));
+  const ships2 = perShip.map((p) => ({ ...p, profit: p.revenue - p.cost, need: -p.low, perHour: ((p.revenue - p.cost) * 3600) / Math.max(1, duration) }));
+  const name = stops.map((s) => s.place.name).filter((x, i, a) => i === 0 || x !== a[i - 1]).join(' → ');
+  const buys = stops.flatMap((s) => s.jobs).filter((j) => j.side === 'buy');
+  const runs = buys.length ? Math.max(1, Math.min(...buys.map((j) => Math.floor(j.stock / Math.max(1, j.qty))))) : 1;
+  return {
+    id: w.id || 'edit', round: false, stops, legs, revenue, cost, profit, duration,
+    perHour: (profit * 3600) / Math.max(1, duration), capital: -low, runs, oldest: 9, stale: false,
+    estimated: legs.some((l) => l.est.length), warnings, ships: ships2, convoy, name, paths: w.paths,
+  };
+}
+
+/**
+ * Compares two cargo plans per buy-sell path.
+ * @param {object} before the working route before the step
+ * @param {object} after the working route after the step
+ * @param {Array<object>} shipList the ship list, for the per-ship split
+ * @returns {Array<object>} one line per path with status, quantities before and after, and per-ship shares
+ */
+function diffPlans(before, after, shipList) {
+  const ships = expandShips(shipList);
+  const order = after.stops.map((s) => s.t);
+  const now = new Map(after.paths.map((p) => [pathKey(p), p]));
+  const was = new Set(before.paths.map(pathKey));
+  const lines = before.paths.map((p) => {
+    const q = now.get(pathKey(p));
+    const fi = order.indexOf(p.from);
+    const ti = order.indexOf(p.to);
+    let status = 'DROPPED';
+    if (q) status = q.qty === p.qty ? 'UNCHANGED' : 'CHANGED';
+    else if (fi >= 0 && (ti < 0 || ti < fi)) status = 'NOT_SELLABLE';
+    return { c: p.c, from: p.from, to: p.to, before: p.qty, after: q ? q.qty : 0, status };
+  });
+  after.paths.filter((q) => !was.has(pathKey(q))).forEach((q) => lines.push({ c: q.c, from: q.from, to: q.to, before: 0, after: q.qty, status: 'NEW' }));
+  return lines.map((l) => ({ ...l, sharesBefore: split(l.before, ships), sharesAfter: split(l.after, ships) }));
+}
+
+/**
+ * Lists the ten best terminals for a position, each with the whole route's cargo re-planned.
+ * @param {object} w the working route
+ * @param {number} pos the index the new stop takes
+ * @param {Array<object>} ships the ship list
+ * @param {string} [commodity] only terminals that buy this commodity
+ * @param {function(Array<object>): object} [optsFor] planning options for a stop sequence, a flight's fixed prefix included
+ * @returns {{list: Array<object>, onRoute: Array<string>}} the candidates and the terminals already on the route
+ */
+function candidatesFor(w, pos, ships, commodity, optsFor) {
+  const base = evaluate(w, ships);
+  const onRoute = w.stops.map((s) => s.t);
+  const list = Object.keys(TERMINALS).filter((t) => POS[TERMINALS[t].place] && PRICES[t] && !onRoute.includes(t) && !failsFilter(t))
+    .filter((t) => !commodity || PRICES[t].sell[commodity])
+    .map((t) => {
+      const stops = [...w.stops.slice(0, pos), { t, pinned: true, inserted: true }, ...w.stops.slice(pos)];
+      const plan = planCargo(stops, optsFor ? optsFor(stops) : { ships, marks: w.marks });
+      const e = evaluate({ stops, paths: plan.paths }, ships);
+      return { t, dProfit: e.profit - base.profit, dDur: e.duration - base.duration, perHour: e.perHour, sells: commodity ? PRICES[t].sell[commodity][0] : 0 };
+    });
+  list.sort((a, b) => (commodity ? b.sells - a.sells : b.perHour - a.perHour));
+  return { list: list.slice(0, 10), onRoute };
+}
+
+/**
+ * Lists commodities that fill the hold and cash a mark freed at a stop and sell at later planned stops.
+ * @param {object} w the working route, its paths fixed
+ * @param {number} si the stop index
+ * @param {Array<object>} ships the ship list
+ * @returns {Array<object>} paths with their profit, best first
+ */
+function alternativesAt(w, si, ships) {
+  const t = w.stops[si].t;
+  const alts = [];
+  Object.entries(PRICES[t]?.buy || {}).forEach(([c, [pb]]) => {
+    if (w.marks.some((m) => m.t === t && m.c === c && m.side === 'buy')) return;
+    w.stops.slice(si + 1).forEach((s) => {
+      const e = PRICES[s.t]?.sell?.[c];
+      if (!e || e[0] <= pb) return;
+      const k = `${c}|${t}|${s.t}`;
+      const sum = (ps) => ps.filter((p) => pathKey(p) === k).reduce((a, p) => a + p.qty, 0);
+      const trial = planCargo(w.stops, { ships, marks: w.marks, fixed: w.paths, keep: [], extra: [{ c, from: t, to: s.t, pb, ps: e[0], qty: 99999 }] });
+      const qty = sum(trial.paths) - sum(w.paths);
+      if (qty > 0) alts.push({ c, from: t, to: s.t, pb, ps: e[0], qty, gain: qty * (e[0] - pb) });
+    });
+  });
+  return alts.sort((a, b) => b.gain - a.gain).slice(0, 6);
+}
+
+/**
+ * Searches the unpinned positions again, the pinned stops keeping theirs.
+ * @param {object} w the working route
+ * @param {Array<object>} ships the ship list
+ * @returns {Array<object>} the new stop sequence
+ */
+function optimiseRest(w, ships) {
+  const stops = w.stops.map((s) => ({ ...s }));
+  const pool = Object.keys(TERMINALS).filter((t) => POS[TERMINALS[t].place] && PRICES[t] && !failsFilter(t));
+  stops.forEach((s, i) => {
+    if (s.pinned) return;
+    let best = { t: s.t, v: -Infinity };
+    pool.filter((t) => t === s.t || !stops.some((x) => x.t === t)).forEach((t) => {
+      const trial = stops.map((x, k) => (k === i ? { t, pinned: false } : x));
+      const e = evaluate({ stops: trial, paths: planCargo(trial, { ships, marks: w.marks }).paths }, ships);
+      if (e.perHour > best.v) best = { t, v: e.perHour };
+    });
+    stops[i] = { t: best.t, pinned: false, forced: false };
+  });
+  return stops;
 }
 
 /** PROTOTYPE fragments shared by the variants: ratings, stop facts, cargo lines, key figures and markers. */
@@ -6360,8 +6777,8 @@ function sharedTab() {
  * @returns {string} markup
  */
 function routesPage() {
-  const tabs = [['saved', 'Gespeichert', `${state.savedList.length}/${SAVED_LIMIT}`], ['unit', 'Einheitsrouten', String(state.unitList.length)], ['shared', 'Von mir geteilt', String(state.shares.length)]];
-  const body = { saved: savedTab, unit: unitTab, shared: sharedTab }[state.routesTab]();
+  const tabs = [['saved', 'Gespeichert', `${state.savedList.length}/${SAVED_LIMIT}`], ['unit', 'Einheitsrouten', String(state.unitList.length)], ['shared', 'Von mir geteilt', String(state.shares.length)], ['flights', 'Meine Flüge', String(state.history.length)]];
+  const body = { saved: savedTab, unit: unitTab, shared: sharedTab, flights: flightsTab }[state.routesTab]();
   return `<div class="page-head"><div class="page-head__main"><span class="page-eyebrow">Handel</span><div class="page-title"><h1>Routen</h1></div></div>
       <div class="page-actions"><button class="btn btn-ghost" data-act="open-code">Code öffnen</button><button class="btn btn--cta" data-act="go" data-page="planner">${ic('plus')} Neue Route</button></div></div>
     <p class="proto-note"><strong>PROTOTYP</strong> · Gespeicherte Routen, Einheitsrouten und deine geteilten Routen als Tabs einer Seite. Erfundene Daten; jede Zeile öffnet dasselbe Beispiel.</p>
@@ -6440,7 +6857,7 @@ function missionTile(mr, i, count) {
   const open = state.missionOpen.includes(mr.id);
   const mineIdx = state.missionRole === 'crew' ? mr.fleet.indexOf(MY_UNIT) : -1;
   const fleet = mr.fleet.length ? mr.fleet.map((k) => `<span class="tr-fleetchip ${k === MY_UNIT && state.missionRole === 'crew' ? 'is-mine' : ''}"><span class="squadron-badge">${k}</span>${esc(k === 'ALPHA' ? 'C2 Hercules „Lastesel“' : 'Drake Caterpillar (Typ)')}</span>`).join('') : '<span class="tr-hint">Schiffsliste der Quelle</span>';
-  const marks = mr.marks.map((m) => `<span class="tr-mark tr-mark--${m.kind}">${esc(m.text)}</span>`).join(' ');
+  const marks = (state.mflights[mr.id] ? '<span class="tr-mark tr-mark--forced">Einsatzflug läuft</span> ' : '') + mr.marks.map((m) => `<span class="tr-mark tr-mark--${m.kind}">${esc(m.text)}</span>`).join(' ');
   const order = manager ? `<span class="tr-iconbtns">${rowBtn('m-up', 'chevron-up', 'Nach oben', '', `data-val="${i}" ${i === 0 ? 'disabled' : ''}`)}${rowBtn('m-down', 'chevron-down', 'Nach unten', '', `data-val="${i}" ${i === count - 1 ? 'disabled' : ''}`)}</span>` : '';
   const head = `<div class="tr-mroute__head">
       <span class="tr-mroute__n">${i + 1}</span>
@@ -6453,8 +6870,12 @@ function missionTile(mr, i, count) {
   const adopt = manager
     ? `<button class="btn btn-outline btn-xs" data-act="m-adopt" data-val="${mr.id}">${ic('check')} Route aktualisieren</button><span class="tr-hint">übernimmt die Neuberechnung und benachrichtigt die Crews der Flotte</span>`
     : '<span class="tr-hint">Ein Einsatzleiter entscheidet, ob der Plan aktualisiert wird. Bis dahin gilt der gespeicherte Plan.</span>';
+  const running = Boolean(state.mflights[mr.id]);
+  const flyBtn = mineIdx >= 0 || manager
+    ? `<button class="btn btn--cta" data-act="fly-part" data-route="${plan.id}" data-ship="${mineIdx}">${ic('arrow-right')} ${running ? 'Mitfliegen' : 'Losfliegen'}${mineIdx >= 0 ? ' (mein Teil)' : ''}</button>`
+    : `<button class="btn btn-outline" data-act="fly" data-route="${plan.id}">${ic('arrow-right')} Als eigene Kopie fliegen</button>`;
   const copyOut = `<div class="tr-actions">
-      ${mineIdx >= 0 ? `<button class="btn btn--cta" data-act="fly-part" data-route="${plan.id}" data-ship="${mineIdx}">${ic('arrow-right')} Losfliegen (mein Teil)</button>` : `<button class="btn btn-outline" data-act="fly" data-route="${plan.id}">${ic('arrow-right')} Losfliegen</button>`}
+      ${flyBtn}
       <button class="btn btn-ghost" data-act="save-copy">${ic('save')} Als meine Route speichern</button>
       <button class="btn btn-ghost" data-act="to-unit">${ic('users')} Für Einheit</button>
       <button class="btn btn-ghost" data-act="share" data-route="${plan.id}">Teilen</button>
@@ -6462,6 +6883,7 @@ function missionTile(mr, i, count) {
   const managerTools = manager ? `<div class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="m-edit" data-val="${mr.id}">${ic('edit')} Im Planer bearbeiten</button><button class="btn btn-ghost btn-xs" data-act="m-optimise" data-val="${mr.id}">${ic('search')} Für die Flotte optimieren</button><button class="btn btn-quiet-danger btn-xs" data-act="confirm-m-remove" data-val="${mr.id}">${ic('trash')} Aus dem Einsatz entfernen</button></div>` : '';
   return `<article class="tr-mroute is-open">${head}<div class="tr-mroute__body">
       ${deviates ? `${compareStrip(plan, now, 'Gespeicherter Plan (Briefing) gegenüber einer Neuberechnung auf aktuellen Daten')}${devBox(now)}<div class="tr-row">${adopt}</div>` : `<div class="tr-warnline tr-warnline--ok">${ic('check')}<span>Keine Abweichungen: der gespeicherte Plan gilt.</span></div>`}
+      ${missionFlightPanel(mr, plan)}
       ${fleetPanel(mr)}
       ${routeOverheads()}
       ${copyOut}
@@ -6490,7 +6912,7 @@ function myPart() {
     }).join('');
     const transfer = ci < chain.length - 1 ? (() => { total += TRANSFER.dur; return `<div class="tr-transfer">${ic('arrow-right')}<span><strong>Leerflug</strong> ${esc(TRANSFER.from)} → ${esc(TRANSFER.to)} · ≈ ${fmtShort(TRANSFER.dur)} · ${dec(TRANSFER.gm)} Gm · mit dem Antrieb deiner C2</span></div>`; })() : '';
     const pos = state.missionRoutes.indexOf(mr) + 1;
-    return `<div class="tr-chain__route"><div class="tr-row tr-row--between"><div><span class="tr-cap">Route ${pos}</span> <strong>${esc(mr.name)}</strong> <span class="tr-hint">${fmtDur(plan.duration)}${plan.convoy ? ` · im Konvoi mit ${plan.ships.length - 1} Schiff` : ''}</span></div><button class="btn btn-ghost btn-xs" data-act="fly-part" data-route="${plan.id}" data-ship="${idx}">${ic('arrow-right')} Losfliegen</button></div><ol class="tr-chain__stops">${stops}</ol></div>${transfer}`;
+    return `<div class="tr-chain__route"><div class="tr-row tr-row--between"><div><span class="tr-cap">Route ${pos}</span> <strong>${esc(mr.name)}</strong> <span class="tr-hint">${fmtDur(plan.duration)}${plan.convoy ? ` · im Konvoi mit ${plan.ships.length - 1} Schiff` : ''}</span></div><button class="btn btn-ghost btn-xs" data-act="fly-part" data-route="${plan.id}" data-ship="${idx}">${ic('arrow-right')} ${state.mflights[mr.id] ? 'Mitfliegen' : 'Losfliegen'}</button></div><ol class="tr-chain__stops">${stops}</ol></div>${transfer}`;
   }).join('');
   return `<section class="card card--accent tr-chain"><div class="tr-row tr-row--between"><h4 class="card-title">Dein Teil · <span class="squadron-badge">${MY_UNIT}</span> C2 Hercules „Lastesel“</h4><span class="tr-hint">Kette ${fmtDur(total)} · ${chain.length} Routen in Einsatz-Reihenfolge</span></div>${parts}
     <div class="tr-hint">Nur Information: die Kette wird nicht optimiert, die nächste Route muss nicht dort beginnen, wo die letzte endet.</div></section>`;
@@ -6698,9 +7120,730 @@ function offPage() {
     </div>`;
 }
 
+/** PROTOTYPE edit flows in the planner of variant A: working state, diff, kept plan, insert, marks, pins and write-back. */
+
+const DIFF_TEXT = { UNCHANGED: 'unverändert', CHANGED: 'geändert', DROPPED: 'weggefallen', NOT_SELLABLE: 'nicht wie geplant verkaufbar', NEW: 'neu' };
+const DIFF_CLS = { UNCHANGED: 'muted', CHANGED: 'warn', DROPPED: 'danger', NOT_SELLABLE: 'danger', NEW: 'ok' };
+const SRC_LABEL = { result: 'Berechnete Route', saved: 'Gespeicherte Route', shared: 'Geteilte Route', unit: 'Einheitsroute', mission: 'Einsatzroute' };
+const tname = (t) => TERMINALS[t].name;
+const pname = (t) => PLACES[TERMINALS[t].place].name;
+
+/**
+ * Resolves what an edit renders and acts on: the planner tab's working state or the open flight.
+ * @param {string} ctx plan or flight
+ * @returns {object} the working route, its last step, the structural lock index and the context
+ */
+function edWork(ctx) {
+  if (ctx === 'flight') {
+    const f = openFlight();
+    return { ctx, w: f.w, entry: f.last, lock: f.pos.idx, flight: f, busy: Boolean(f.readOnly) };
+  }
+  const tb = state.ed.tabs[state.ed.tab];
+  return { ctx, w: tb.hist[tb.at].w, entry: tb.at > 0 ? tb.hist[tb.at] : null, lock: -1, tab: tb, busy: Boolean(state.ed.optimising) };
+}
+
+/**
+ * Renders one buy-sell path as text.
+ * @param {{c: string, from: string, to: string}} l the path
+ * @returns {string} commodity, buy and sell place
+ */
+function pathText(l) {
+  return `${esc(l.c)} · ${esc(pname(l.from))} → ${esc(pname(l.to))}`;
+}
+
+/**
+ * Renders the diff of the last step beside the figures, as a change list (A) or a table (B).
+ * @param {object} k the edit context
+ * @param {object} e the computed working route
+ * @returns {string} markup
+ */
+function diffBlock(k, e) {
+  const entry = k.entry;
+  if (!entry || !entry.diff) return '';
+  const old = evaluate(entry.before, entry.before.ships);
+  const changed = entry.diff.filter((l) => l.status !== 'UNCHANGED');
+  const same = entry.diff.length - changed.length;
+  const ships = e.convoy ? `<div class="tr-hint">Pro Schiff: ${e.ships.map((s, i) => `${esc(s.short)} ${fmt(old.ships[i]?.profit || 0)} → <strong class="${s.profit >= (old.ships[i]?.profit || 0) ? 'pos' : 'neg'}">${fmt(s.profit)}</strong>`).join(' · ')} aUEC</div>` : '';
+  if (state.ed.diffView === 'B') {
+    const sh = e.convoy ? e.ships.map((s) => `<th class="num">${esc(s.short)}</th>`).join('') : '';
+    const rows = entry.diff.map((l) => `<tr class="${l.status === 'UNCHANGED' ? 'is-same' : ''}"><td><span class="tr-mark tr-mark--${DIFF_CLS[l.status]}">${DIFF_TEXT[l.status]}</span></td><td>${pathText(l)}</td><td class="num">${l.before ? fmt(l.before) : '—'}</td><td class="num"><strong>${l.after ? fmt(l.after) : '—'}</strong></td>${e.convoy ? l.sharesAfter.map((q, i) => `<td class="num">${fmt(l.sharesBefore[i])} → ${fmt(q)}</td>`).join('') : ''}</tr>`).join('');
+    const fig = (k2, o, n, show, up) => `<span class="tr-difffig"><span class="tr-cap-k">${k2}</span> ${show(o)} → <strong class="${(up ? n > o : n < o) ? 'pos' : n === o ? '' : 'neg'}">${show(n)}</strong></span>`;
+    return `<section class="card card--inset tr-difftable" aria-label="Änderungen">
+      <div class="tr-row tr-row--between"><div class="tr-cap">Änderungen · ${esc(entry.label)}</div><div class="tr-row">${fig('Gewinn', old.profit, e.profit, fmt, true)}${fig('Dauer', old.duration, e.duration, fmtDur, false)}${fig('aUEC/h', old.perHour, e.perHour, fmt, true)}</div></div>
+      <div class="hud-scroll scroll-x"><table class="tr-jobs"><thead><tr><th>Status</th><th>Ware · Kauf → Verkauf</th><th class="num">SCU vorher</th><th class="num">SCU jetzt</th>${sh}</tr></thead><tbody>${rows}</tbody></table></div>
+      ${ships}</section>`;
+  }
+  const group = (st, title, cls, icon) => {
+    const ls = entry.diff.filter((l) => l.status === st);
+    return ls.length ? `<div class="tr-devgroup"><div class="tr-cap">${title} (${ls.length})</div>${ls.map((l) => `<div class="tr-warnline ${cls}">${ic(icon)}<span>${pathText(l)}: ${l.before ? `${fmt(l.before)} SCU` : ''}${l.before && l.after ? ' → ' : ''}${l.after ? `<strong>${fmt(l.after)} SCU</strong>` : ''}</span></div>`).join('')}</div>` : '';
+  };
+  return `<section class="tr-diff" aria-label="Änderungen">
+    ${compareStrip(old, e, `Vorher und jetzt · ${entry.label}`)}
+    <div class="tr-devbox">${group('NOT_SELLABLE', 'Nicht wie geplant verkaufbar', 'tr-warnline--danger', 'warning')}${group('DROPPED', 'Weggefallen', 'tr-warnline--danger', 'minus')}${group('CHANGED', 'Geändert', '', 'edit')}${group('NEW', 'Neu im Plan', 'tr-warnline--ok', 'plus')}
+    ${same ? `<div class="tr-hint">${same} Frachtzeile${same > 1 ? 'n' : ''} unverändert. Die Zeilen tragen die Änderung auch in der Zeitleiste.</div>` : ''}${changed.length ? '' : `<div class="tr-warnline tr-warnline--ok">${ic('check')}<span>Frachtplan unverändert.</span></div>`}</div>${ships}</section>`;
+}
+
+/**
+ * Renders the kept-plan banner after a reorder.
+ * @param {object} k the edit context
+ * @param {object} e the computed working route
+ * @returns {string} markup
+ */
+function keptBanner(k, e) {
+  if (!k.w.kept) return '';
+  const lost = (k.w.lost || []).length;
+  const cut = k.w.paths.filter((p) => p.reduced).length;
+  return `<div class="tr-kept" role="status"><div>${ic('swap')}<span><strong>Restplan</strong> nach dem Umstellen: der letzte volle Frachtplan in der neuen Reihenfolge, gekürzt auf das, was noch geht. ${lost ? `<strong class="neg">${lost} nicht wie geplant verkaufbar</strong>` : 'Alles bleibt verkaufbar'}${cut ? ` · ${cut} gekürzt` : ''}. Die Kennzahlen sind die des Restplans; du kannst ihn so speichern, teilen oder fliegen.</span></div>
+    <button class="btn btn-outline btn-xs" data-act="ed-recompute" data-ctx="${k.ctx}" ${k.busy ? 'disabled' : ''}>${ic('reset')} Waren neu berechnen</button></div>`;
+}
+
+/**
+ * Renders the cargo lines of one stop with diff markers, marks and their actions.
+ * @param {object} k the edit context
+ * @param {object} s the computed stop
+ * @param {object} e the computed working route
+ * @param {Map<string, object>} dm the diff lines by path key, empty for diff B
+ * @returns {string} markup
+ */
+function editJobs(k, s, e, dm) {
+  const f = k.flight;
+  const done = s.si < k.lock;
+  const rows = [...s.jobs].sort((a, b) => (a.side === b.side ? 0 : a.side === 'sell' ? -1 : 1)).map((j) => {
+    const l = dm.get(pathKey(j.path));
+    const mark = k.w.marks.find((m) => m.t === s.t && m.c === j.c && m.side === j.side);
+    const ticked = f ? flightTickOf(f, j) : null;
+    const marks = [
+      l && l.status === 'NEW' ? '<span class="tr-mark tr-mark--ok">neu</span>' : '',
+      l && l.status === 'CHANGED' ? `<span class="tr-mark tr-mark--warn">geändert</span><div class="tr-was">vorher ${fmt(l.before)} SCU</div>` : '',
+      j.path.reduced ? `<span class="tr-mark tr-mark--warn">gekürzt</span><div class="tr-was">vorher ${fmt(j.path.reduced)} SCU</div>` : '',
+      mark ? `<span class="tr-mark tr-mark--danger">${j.side === 'buy' ? 'ausverkauft' : 'keine Nachfrage'} · noch ${fmt(mark.rest)} SCU</span>` : '',
+      j.side === 'sell' && j.demand === null ? '<span class="tr-mark tr-mark--info tr-mark--est">Nachfrage unbekannt</span>' : '',
+      ticked ? `<span class="tr-mark tr-mark--ok">${ic('check')} Ist ${fmt(ticked.qty)} à ${fmt(ticked.price)}</span>` : '',
+      j.path.fixed && !ticked && f ? '<span class="tr-mark tr-mark--muted">an Bord, fest</span>' : '',
+    ].join(' ');
+    const split = e.convoy ? `<div class="tr-hint">${j.shares.map((q, i) => `${esc(e.ships[i].short)} ${fmt(q)}`).join(' · ')}</div>` : '';
+    let act = '';
+    if (!done && !ticked && !k.busy) {
+      const markBtn = `<button class="btn btn-ghost btn-xs" data-act="ed-mark" data-ctx="${k.ctx}" data-si="${s.si}" data-c="${esc(j.c)}" data-side="${j.side}">${mark ? 'Alternativen' : j.side === 'buy' ? 'Ausverkauft' : 'Keine Nachfrage'}</button>`;
+      act = markBtn + (mark ? `<button class="btn btn-ghost btn-xs" data-act="ed-unmark" data-ctx="${k.ctx}" data-si="${s.si}" data-c="${esc(j.c)}" data-side="${j.side}">Aufheben</button>` : '');
+    }
+    const panel = state.ed.pick === 'inline' && state.ed.panel && state.ed.panel.kind === 'mark' && state.ed.panel.ctx === k.ctx && state.ed.panel.si === s.si && state.ed.panel.c === j.c && state.ed.panel.side === j.side
+      ? `<tr class="tr-inline-row"><td colspan="8">${markPanel(k)}</td></tr>` : '';
+    return `<tr class="${ticked ? 'is-ticked' : ''}">
+      <td class="c-side"><span class="tr-side tr-side--${j.side}">${j.side === 'buy' ? 'Kauf' : 'Verkauf'}</span></td>
+      <td class="c-ware"><span class="tr-cname">${esc(j.c)}</span> ${marks}${split}</td>
+      <td class="num c-qty">${fmt(j.qty)}<span class="c-unit"> SCU</span></td>
+      <td class="num c-price"><span class="c-unit">à </span>${fmt(j.p)}</td>
+      <td class="num c-sum ${j.side === 'buy' ? 'neg' : 'pos'}">${j.side === 'buy' ? '−' : '+'}${fmt(j.sum)}</td>
+      <td class="nowrap c-age"><span class="tr-hint">vor 3 h</span></td>
+      <td class="c-avail">${availChip(j)}</td>
+      <td class="num c-act"><span class="tr-iconbtns">${act}</span></td></tr>${panel}`;
+  }).join('');
+  const goneDiff = state.ed.diffView === 'A' ? [...dm.values()].filter((l) => (l.status === 'DROPPED' || l.status === 'NOT_SELLABLE') && (l.from === s.t || l.to === s.t) && !s.gone.some((g) => g.c === l.c)).map((l) => ({ side: l.from === s.t ? 'buy' : 'sell', c: l.c, qty: l.before, gone: DIFF_TEXT[l.status] })) : [];
+  const gone = [...s.gone, ...goneDiff].map((g) => `<tr class="is-gone"><td class="c-side"><span class="tr-side tr-side--${g.side}">${g.side === 'buy' ? 'Kauf' : 'Verkauf'}</span></td><td class="c-ware"><span class="tr-cname">${esc(g.c)}</span> <span class="tr-mark tr-mark--danger">${esc(g.gone)}</span></td><td class="num c-qty">${fmt(g.qty)}<span class="c-unit"> SCU</span></td><td class="num c-price"></td><td class="num c-sum">—</td><td class="c-age"></td><td class="c-avail"></td><td class="c-act"></td></tr>`).join('');
+  const body = rows + gone || '<tr><td colspan="8" class="tr-hint">Kein Ladeauftrag an diesem Stopp.</td></tr>';
+  return `<div class="hud-scroll scroll-x"><table class="tr-jobs tr-jobs--stop"><thead><tr><th>Seite</th><th>Ware</th><th class="num">SCU</th><th class="num">aUEC/SCU</th><th class="num">Summe</th><th>Preis</th><th>Verfügbarkeit</th><th></th></tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+/**
+ * Renders the controls of one stop tile: pin, move, remove and rate.
+ * @param {object} k the edit context
+ * @param {object} s the computed stop
+ * @param {number} n the number of stops
+ * @returns {string} markup
+ */
+function editStopTools(k, s, n) {
+  if (s.si < k.lock) return '<span class="tr-mark tr-mark--muted">erledigt · eingefroren</span>';
+  const rate = `<button class="btn btn-ghost btn-xs" data-act="rate" data-route="${k.ctx === 'flight' ? 'flight' : 'edit'}" data-stop="${s.si}">Bewerten</button>`;
+  if (s.si === k.lock) return `<span class="tr-iconbtns"><span class="tr-mark tr-mark--forced">aktueller Stopp</span>${rate}</span>`;
+  const dis = k.busy ? 'disabled' : '';
+  const pin = `<button class="tr-pin" data-act="ed-pin" data-ctx="${k.ctx}" data-si="${s.si}" aria-pressed="${Boolean(s.pinned)}" title="${s.pinned ? 'Fest: „Rest optimieren“ lässt diesen Stopp an seiner Stelle' : 'Frei: „Rest optimieren“ darf diesen Stopp ersetzen'}" ${dis}>${ic('map-pin')} ${s.pinned ? 'Fest' : 'Frei'}</button>`;
+  const up = `<button class="btn btn-ghost btn-xs btn-icon" data-act="ed-move" data-ctx="${k.ctx}" data-si="${s.si}" data-d="-1" aria-label="Stopp nach oben" title="Stopp nach oben" ${s.si === 0 || s.si - 1 <= k.lock || k.busy ? 'disabled' : ''}>${ic('chevron-up')}</button>`;
+  const down = `<button class="btn btn-ghost btn-xs btn-icon" data-act="ed-move" data-ctx="${k.ctx}" data-si="${s.si}" data-d="1" aria-label="Stopp nach unten" title="Stopp nach unten" ${s.si === n - 1 || k.busy ? 'disabled' : ''}>${ic('chevron-down')}</button>`;
+  const rm = `<button class="btn btn-quiet-danger btn-xs btn-icon" data-act="ed-remove" data-ctx="${k.ctx}" data-si="${s.si}" aria-label="Stopp entfernen" title="${n <= 2 ? 'Eine Route behält mindestens zwei Terminals' : 'Stopp entfernen'}" ${n <= 2 || k.busy ? 'disabled' : ''}>${ic('trash')}</button>`;
+  return `<span class="tr-iconbtns">${pin}${rate}${up}${down}${rm}</span>`;
+}
+
+/**
+ * Renders the insert entry point or its inline panel at a position.
+ * @param {object} k the edit context
+ * @param {number} pos the index a new stop takes
+ * @param {boolean} append whether it is the position after the last stop
+ * @returns {string} markup
+ */
+function insertRow(k, pos, append) {
+  if (pos <= k.lock) return '';
+  const p = state.ed.panel;
+  if (state.ed.pick === 'inline' && p && p.kind === 'insert' && p.ctx === k.ctx && p.pos === pos) return `<li class="tr-insert tr-insert--open">${insertPanel(k)}</li>`;
+  const full = k.w.stops.length >= 5;
+  return `<li class="tr-insert"><button class="btn btn-ghost btn-xs" data-act="ed-insert-open" data-ctx="${k.ctx}" data-pos="${pos}" ${full || k.busy ? 'disabled' : ''} title="${full ? 'Höchstens 5 Stopps' : ''}">${ic('plus')} ${append ? 'Stopp anhängen' : 'Stopp einfügen'}</button></li>`;
+}
+
+/**
+ * Renders the editable stop timeline of a working route.
+ * @param {object} k the edit context
+ * @param {object} e the computed working route
+ * @returns {string} markup
+ */
+function editTimeline(k, e) {
+  const dm = state.ed.diffView === 'A' && k.entry && k.entry.diff ? new Map(k.entry.diff.map((l) => [`${l.c}|${l.from}|${l.to}`, l])) : new Map();
+  const n = e.stops.length;
+  const items = e.stops.map((s, i) => {
+    const leg = e.legs[i];
+    const legHtml = leg ? `<li class="tr-timeline__leg">${legFacts(leg, false)}</li>${insertRow(k, i + 1, false)}` : insertRow(k, n, true);
+    const marks = [s.inserted ? '<span class="tr-mark tr-mark--est">eingefügt</span>' : '', s.failsFilter ? `<span class="tr-mark tr-mark--warn" title="Von dir genannt; gilt trotz Filter">verletzt Filter: ${esc(s.failsFilter)}</span>` : ''].join(' ');
+    const cls = [s.si < k.lock ? 'tr-stoptile--frozen' : '', s.si === k.lock ? 'tr-stoptile--now' : '', s.pinned ? 'tr-stoptile--pinned' : ''].join(' ');
+    return `<li class="tr-timeline__stop ${s.si < k.lock ? 'is-done' : ''}" data-n="${i + 1}"><div class="tr-stoptile ${cls}">
+        <div class="tr-stoptile__head"><div><div class="tr-stoptile__title">${esc(s.term.name)} ${marks}</div><div class="tr-stoptile__sub">${s.place.kind} · ${s.place.body} · ${s.place.system}</div></div>${editStopTools(k, s, n)}</div>
+        ${s.si < k.lock ? '' : stopFacts(s)}
+        ${editJobs(k, s, e, dm)}
+        ${shipLists(s, e, k.flight ? k.flight.ship : -1)}
+        ${stopTime(s)}
+      </div></li>${legHtml}`;
+  }).join('');
+  return `<ol class="tr-timeline">${items}</ol>`;
+}
+
+/**
+ * Renders the insert panel: the ten candidates for the position and the terminal search.
+ * @param {object} k the edit context
+ * @returns {string} markup
+ */
+function insertPanel(k) {
+  const p = state.ed.panel;
+  const ships = k.w.ships;
+  const { list, onRoute } = candidatesFor(k.w, p.pos, ships, p.commodity, (stops) => planOpts(k, stops, k.w.marks));
+  const at = p.pos >= k.w.stops.length ? `nach ${esc(tname(k.w.stops[k.w.stops.length - 1].t))}` : `zwischen ${p.pos ? esc(tname(k.w.stops[p.pos - 1].t)) : 'Start'} und ${esc(tname(k.w.stops[p.pos].t))}`;
+  const rows = list.map((c) => {
+    const t = TERMINALS[c.t];
+    const pl = PLACES[t.place];
+    return `<tr><td><span class="tr-cname">${esc(t.name)}</span><div class="tr-hint">${pl.kind} · ${pl.body} · ${pl.system}</div></td>
+      ${p.commodity ? `<td class="num">${fmt(c.sells)}</td>` : ''}
+      <td class="num ${c.dProfit >= 0 ? 'pos' : 'neg'}">${c.dProfit >= 0 ? '+' : '−'}${fmt(Math.abs(c.dProfit))}</td>
+      <td class="num">+${fmtDur(Math.max(0, c.dDur))}</td><td class="num">${fmt(c.perHour)}</td>
+      <td>${rateChip('', pl.danger, MIN_RATERS.danger)}</td><td>${rateChip('', t.bugs, MIN_RATERS.bugs)}</td>
+      <td class="num"><button class="btn btn-outline btn-xs" data-act="ed-insert" data-ctx="${k.ctx}" data-pos="${p.pos}" data-t="${c.t}">Einfügen</button></td></tr>`;
+  }).join('');
+  const greyed = onRoute.map((t) => `<tr class="is-off"><td><span class="tr-cname">${esc(tname(t))}</span></td><td colspan="${p.commodity ? 7 : 6}" class="tr-hint">schon auf der Route</td></tr>`).join('');
+  const head = p.commodity ? `Abnehmer für ${esc(p.commodity)} einfügen ${at}` : `${p.pos >= k.w.stops.length ? 'Stopp anhängen' : 'Stopp einfügen'} ${at}`;
+  return `<div class="tr-panel" role="group" aria-label="${head}">
+    <div class="tr-row tr-row--between"><div class="tr-cap">${head}</div>${state.ed.pick === 'inline' ? `<button class="btn btn-ghost btn-xs" data-act="ed-panel-close">${ic('close')} Schließen</button>` : ''}</div>
+    <div class="tr-hint">Die zehn besten Terminals für diese Stelle, jeweils mit der ganzen Route neu geplant (schnelle Spur). Sie folgen den Filtern deiner Anfrage. Ein eingefügter Stopp ist fest. ${k.w.stops.length + 1 > state.request.maxStops ? `Über deine ${state.request.maxStops} Stopps hinaus erlaubt, bis 5.` : ''}</div>
+    <div class="hud-scroll scroll-x"><table class="tr-jobs tr-cands"><thead><tr><th>Terminal</th>${p.commodity ? '<th class="num">kauft à</th>' : ''}<th class="num">Δ Gewinn</th><th class="num">Δ Dauer</th><th class="num">aUEC/h</th><th>Gefahr</th><th>Bugs</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="8" class="tr-hint">Kein Terminal passt zu den Filtern.</td></tr>`}${greyed}</tbody></table></div>
+    <div class="tr-field tr-picker"><label for="ed-search">Oder ein Terminal nennen</label><input id="ed-search" type="search" autocomplete="off" placeholder="Terminal oder Ort suchen …" data-edsearch="${k.ctx}" data-pos="${p.pos}"><div class="tr-picker__list" hidden></div><span class="tr-hint">Ein genanntes Terminal gilt auch gegen einen Filter der Anfrage und wird markiert; ein ausgeschlossenes verlässt die Ausschlussliste.</span></div>
+  </div>`;
+}
+
+/**
+ * Lists terminals matching a query for the insert panel's search.
+ * @param {string} q the query
+ * @param {string} ctx plan or flight
+ * @param {number} pos the insert position
+ * @returns {string} option markup
+ */
+function edSearchOptions(q, ctx, pos) {
+  const k = edWork(ctx);
+  const on = k.w.stops.map((s) => s.t);
+  const needle = q.trim().toLowerCase();
+  return Object.entries(TERMINALS).filter(([, t]) => !needle || `${t.name} ${PLACES[t.place].name}`.toLowerCase().includes(needle)).slice(0, 12).map(([id, t]) => {
+    const why = failsFilter(id);
+    if (on.includes(id)) return `<button type="button" class="tr-picker__opt" disabled><span>${esc(t.name)}</span><small>schon auf der Route</small></button>`;
+    return `<button type="button" class="tr-picker__opt" data-act="ed-insert" data-ctx="${ctx}" data-pos="${pos}" data-t="${id}"><span>${esc(t.name)}</span><small>${PLACES[t.place].kind} · ${PLACES[t.place].system}${why ? ` · <span class="warn-text">verletzt Filter: ${esc(why)}</span>` : ''}</small></button>`;
+  }).join('') || '<div class="tr-hint" style="padding:8px">Nichts gefunden.</div>';
+}
+
+/**
+ * Renders the mark panel: the remaining quantity, then the report offer and the alternatives.
+ * @param {object} k the edit context
+ * @returns {string} markup
+ */
+function markPanel(k) {
+  const p = state.ed.panel;
+  const s = k.w.stops[p.si];
+  const term = tname(s.t);
+  const buy = p.side === 'buy';
+  const close = `<button class="btn btn-ghost btn-xs" data-act="ed-panel-close">${ic('close')} Schließen</button>`;
+  if (p.phase === 'ask') {
+    return `<div class="tr-panel"><div class="tr-row tr-row--between"><div class="tr-cap">${buy ? 'Ausverkauft' : 'Keine Nachfrage'} · ${esc(p.c)} bei ${esc(term)}</div>${state.ed.pick === 'inline' ? close : ''}</div>
+      <div class="tr-row"><div class="tr-field" style="width:12rem"><label for="ed-rest">${buy ? 'Noch verfügbar' : 'Nur so viel abgenommen'} (SCU)</label><input id="ed-rest" type="number" min="0" value="0"></div>
+      <button class="btn btn--cta" data-act="ed-mark-apply" data-ctx="${k.ctx}" style="align-self:flex-end">Markieren</button></div>
+      <span class="tr-hint">Nur für ${k.ctx === 'flight' ? 'diesen Flug' : 'deine Route'}; nichts wird geteilt. Die fehlende Menge und was an ihr hängt, verlassen den Plan sofort; die Kennzahlen folgen.</span></div>`;
+  }
+  const e = evaluate(k.w, k.w.ships);
+  const report = `<div class="card card--inset tr-report"><div><div class="tr-cap">Verfügbarkeit melden?</div><span class="tr-hint">Vorbelegt mit „${p.rest ? 'weniger' : 'nichts da'}“ für ${esc(p.c)} · ${buy ? 'Kauf' : 'Verkauf'}. Anonym; gesendet wird nur auf deinen Klick.</span></div><button class="btn btn-ghost btn-xs" data-act="ed-report">Melden: ${p.rest ? 'weniger' : 'nichts da'}</button></div>`;
+  let body = '';
+  if (buy) {
+    const alts = alternativesAt(k.w, p.si, k.w.ships);
+    const sel = p.sel || [];
+    const rows = alts.map((a, i) => `<tr><td><input type="checkbox" data-act="ed-alt-sel" data-i="${i}" ${sel.includes(i) ? 'checked' : ''} aria-label="${esc(a.c)} übernehmen"></td><td><span class="tr-cname">${esc(a.c)}</span></td><td class="num">${fmt(a.qty)}</td><td class="num">${fmt(a.pb)}</td><td>${esc(pname(a.to))} <span class="tr-hint">à ${fmt(a.ps)}</span></td><td class="num pos">+${fmt(a.gain)}</td></tr>`).join('');
+    body = `<div class="tr-cap">Alternative Waren an diesem Stopp</div><span class="tr-hint">Kaufbar hier, passen in den frei gewordenen Laderaum (${fmt(e.legs[p.si]?.hold - e.legs[p.si]?.aboard || 0)} SCU) und das Bargeld und werden an einem späteren Stopp der Route verkauft. Der Rest des Plans bleibt. Mehrere gehen, solange Laderaum und Bargeld reichen.</span>
+      <div class="hud-scroll scroll-x"><table class="tr-jobs"><thead><tr><th></th><th>Ware</th><th class="num">SCU</th><th class="num">Kauf à</th><th>Verkauf an</th><th class="num">Δ Gewinn</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="tr-hint">Keine Ware passt zu einem späteren Stopp.</td></tr>'}</tbody></table></div>
+      <div class="tr-actions"><button class="btn btn--cta" data-act="ed-alt-take" data-ctx="${k.ctx}" ${sel.length ? '' : 'disabled'}>${ic('check')} Übernehmen${sel.length ? ` (${sel.length})` : ''}</button><button class="btn btn-ghost" data-act="ed-replan-here" data-ctx="${k.ctx}">${ic('reset')} Fracht ab hier neu planen</button><span class="tr-hint">„Fracht ab hier neu planen“ darf auch andere Stopps ändern.</span></div>`;
+  } else {
+    const later = k.w.stops.slice(p.si + 1).filter((x) => PRICES[x.t]?.sell?.[p.c]).map((x) => `<tr><td>${esc(tname(x.t))}</td><td class="num">${fmt(PRICES[x.t].sell[p.c][0])}</td><td class="num"><button class="btn btn-outline btn-xs" data-act="ed-sell-later" data-ctx="${k.ctx}" data-t="${x.t}">Dort verkaufen</button></td></tr>`).join('');
+    const ins = candidatesFor(k.w, p.si + 1, k.w.ships, p.c, (stops) => planOpts(k, stops, k.w.marks)).list.slice(0, 3).map((c) => `<tr><td>${esc(tname(c.t))} <span class="tr-hint">einfügen nach Stopp ${p.si + 1}</span></td><td class="num">${fmt(c.sells)}</td><td class="num"><button class="btn btn-ghost btn-xs" data-act="ed-insert" data-ctx="${k.ctx}" data-pos="${p.si + 1}" data-t="${c.t}">Einfügen</button></td></tr>`).join('');
+    body = `<div class="tr-cap">Wohin mit der Ware?</div><span class="tr-hint">Was hier nicht abgenommen wird, bleibt an Bord. Spätere Stopps der Route, die ${esc(p.c)} kaufen, und die besten Terminals, die sich direkt danach einfügen lassen.</span>
+      <div class="hud-scroll scroll-x"><table class="tr-jobs"><thead><tr><th>Terminal</th><th class="num">kauft à</th><th></th></tr></thead><tbody>${later}${ins || ''}${later || ins ? '' : '<tr><td colspan="3" class="tr-hint">Niemand auf oder nahe der Route kauft diese Ware.</td></tr>'}</tbody></table></div>`;
+  }
+  return `<div class="tr-panel"><div class="tr-row tr-row--between"><div class="tr-cap">${buy ? 'Ausverkauft' : 'Keine Nachfrage'} markiert · ${esc(p.c)} bei ${esc(term)} · noch ${fmt(p.rest)} SCU</div>${state.ed.pick === 'inline' ? close : ''}</div>${report}${body}</div>`;
+}
+
+/**
+ * Renders the save, share and fly actions that follow the working state's source and the member's right.
+ * @param {object} k the edit context
+ * @returns {string} markup
+ */
+function editSaveActions(k) {
+  const edited = k.tab.at > 0;
+  const fly = (cls) => `<button class="btn ${cls}" data-act="ed-fly">${ic('arrow-right')} Losfliegen</button>`;
+  const share = '<button class="btn btn-ghost" data-act="share" data-route="edit">Teilen</button>';
+  const mine = (cls) => `<button class="btn ${cls}" data-act="ed-save-mine">${ic('save')} Als meine Route speichern</button>`;
+  const src = state.ed.src;
+  if (src === 'result') return `<button class="btn btn--cta" data-act="save" data-route="edit">${ic('save')} Speichern</button>${fly('btn-outline')}${share}<button class="btn btn-ghost" data-act="to-unit">${ic('users')} Für Einheit</button>`;
+  if (!edited) return `${fly('btn--cta')}${share}`;
+  if (src === 'saved') return `<button class="btn btn--cta" data-act="ed-update" data-what="Gespeicherte Route">${ic('save')} Gespeicherte Route aktualisieren</button><button class="btn btn-ghost" data-act="save" data-route="edit">Als neue speichern</button>${fly('btn-outline')}`;
+  if (src === 'shared') return `${mine('btn--cta')}${fly('btn-outline')}<span class="tr-hint">Eine geteilte Route bleibt eingefroren; eine geänderte teilst du neu.</span>`;
+  if (src === 'unit') {
+    return state.role === 'officer'
+      ? `<button class="btn btn--cta" data-act="ed-update" data-what="Einheitsroute">${ic('save')} Einheitsroute aktualisieren</button><button class="btn btn-ghost" data-act="to-unit">Als neue Einheitsroute speichern</button>${mine('btn-ghost')}`
+      : `<button class="btn btn--cta" data-act="to-unit">${ic('users')} Als neue Einheitsroute speichern</button>${mine('btn-ghost')}<span class="tr-hint">Zurückschreiben dürfen der Eintragende, Offiziere und Einsatzleiter von ALPHA.</span>`;
+  }
+  return state.missionRole === 'manager'
+    ? `<button class="btn btn--cta" data-act="ed-update" data-what="Einsatzroute">${ic('save')} Einsatzroute aktualisieren</button><span class="tr-hint">Speichert den Plan und schickt „Routenplan geändert“ an die Crews der Flotte.</span>`
+    : `${mine('btn--cta')}<span class="tr-hint">Du bearbeitest eine Kopie; zurückschreiben darf nur ein Einsatzleiter.</span>`;
+}
+
+/**
+ * Renders the status line of the planner's working state.
+ * @param {object} k the edit context
+ * @returns {string} markup
+ */
+function editStatus(k) {
+  const o = state.ed.optimising;
+  if (o) return `<div class="tr-status tr-status--running" role="status"><span class="krt-spinner" aria-hidden="true"></span><strong>Rest optimieren · feste Stopps bleiben</strong><span class="tr-status__bar"><i style="width:${[20, 55, 85][o.step]}%"></i></span><span class="muted num">${o.elapsed} s / 60 s</span><button class="btn btn-ghost btn-xs" data-act="ed-opt-stop">Suche stoppen</button></div>`;
+  const h = k.tab.hist[k.tab.at];
+  if (!k.tab.at) return `<div class="tr-status" role="status">${ic('check')}<span>${state.ed.src === 'result' ? 'Suche abgeschlossen in 6 s · 2 Routen' : `${SRC_LABEL[state.ed.src]} geöffnet · Fracht neu geplant`} · Datenstand 14:00 Uhr</span><span class="muted">Bearbeite direkt in der Zeitleiste: ↑ ↓, entfernen, einfügen, festsetzen, markieren.</span></div>`;
+  return `<div class="tr-status" role="status">${ic('edit')}<span><strong>Bearbeitet</strong> · Schritt ${k.tab.at} von ${k.tab.hist.length - 1}: ${esc(h.label)} · ${h.w.kept ? 'Restplan in 0,2 s' : h.diff ? 'Fracht neu geplant in 0,4 s' : 'ohne Neuberechnung'}</span><span class="muted">Arbeitsstand in diesem Browser-Tab; der Server hält nichts, bis du speicherst, teilst oder losfliegst.</span></div>`;
+}
+
+/**
+ * Renders the planner page with the working state of the shown tab.
+ * @returns {string} markup
+ */
+function editPage() {
+  const k = edWork('plan');
+  const e = evaluate(k.w, k.w.ships);
+  pageRoutes.edit = e;
+  const tabs = state.ed.tabs.map((tb, i) => {
+    const r = evaluate(tb.hist[tb.at].w, tb.hist[tb.at].w.ships);
+    return `<button class="tab ${i === state.ed.tab ? 'active' : ''}" role="tab" aria-selected="${i === state.ed.tab}" data-act="ed-tab" data-val="${i}">${tb.label}${tb.at ? ' <span class="tr-mark tr-mark--forced">bearbeitet</span>' : ''}<small>${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · ${r.stops.length} Stopps</small></button>`;
+  }).join('');
+  const src = state.ed.src === 'result' ? '' : `<div class="tr-ctxbar"><span class="chip chip--primary">${SRC_LABEL[state.ed.src]}</span><strong>${esc({ saved: 'Abendrunde Crusader – ArcCorp', shared: 'Drei-System-Runde', unit: 'Eis-Pendel Hurston', mission: 'Stanton-Runde · Frachtkonvoi Pyro' }[state.ed.src])}</strong><span class="tr-hint">${state.ed.src === 'mission' ? 'Schiffsliste ist die Routenflotte; Stoppzeiten aus der Einsatzroute' : 'Im Planer bearbeitet; die Quelle bleibt, bis du sie aktualisierst'}</span></div>`;
+  const reqBar = state.ed.requestChanged ? `<div class="tr-warnline tr-warnline--info tr-reqbar" role="status">${ic('info')}<span><strong>Anfrage geändert.</strong> Das Ergebnis rechnet noch mit der alten Anfrage.</span><span class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="ed-research">${ic('search')} Neu suchen</button><button class="btn btn-outline btn-xs" data-act="ed-replan-request">${ic('reset')} Nur Fracht neu planen</button></span></div>` : '';
+  const tb = k.tab;
+  const work = `<div class="tr-workbar"><span class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="ed-undo" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('arrow-left')} Rückgängig</button><button class="btn btn-ghost btn-xs" data-act="ed-redo" ${tb.at < tb.hist.length - 1 && !k.busy ? '' : 'disabled'}>Wiederholen ${ic('arrow-right')}</button></span><button class="btn btn-ghost btn-xs" data-act="ed-restore" ${tb.at && !k.busy ? '' : 'disabled'}>${ic('reset')} Berechnete Route wiederherstellen</button><span class="tr-hint">${tb.hist.length - 1} Schritt${tb.hist.length === 2 ? '' : 'e'} in diesem Tab</span></div>`;
+  const pins = k.w.stops.filter((s) => s.pinned).length;
+  const pinbar = `<div class="tr-pinbar"><span>${ic('map-pin')} <strong>${pins} von ${k.w.stops.length}</strong> Stopps fest</span><button class="btn btn-outline btn-xs" data-act="ed-optimise" ${k.busy || pins === k.w.stops.length ? 'disabled' : ''}>${ic('search')} Rest optimieren</button><span class="tr-hint">Feste Stopps bleiben an ihrer Stelle; die freien sucht die Suche neu (bis 60 s).</span></div>`;
+  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Bearbeiten einer berechneten Route · Quelle: ${SRC_LABEL[state.ed.src]} · Änderungsanzeige ${state.ed.diffView === 'A' ? 'A: in der Zeitleiste' : 'B: als Tabelle'} · Einfügen und Alternativen ${state.ed.pick === 'dialog' ? 'im Dialog' : 'in der Zeitleiste'}. Alles rechnet eine kleine Engine im Browser auf erfundenen Preisen.</p>`;
+  return `${pageHead()}${note}<div class="tr-a">${requestAside()}<section class="tr-a__result" aria-label="Ergebnis">
+    ${src}${editStatus(k)}${reqBar}
+    <div><div class="tab-nav tr-a__tabs" role="tablist">${tabs}</div>
+    <div class="tr-a__routecard">
+      <div class="tr-row tr-row--between"><div><div class="tr-stoptile__title">${esc(e.name)}</div><div class="tr-hint">${e.convoy ? `Konvoi · ${e.ships.length} Schiffe` : esc(k.w.ships[0].name)}</div></div><div class="tr-actions">${editSaveActions(k)}</div></div>
+      ${work}${keptBanner(k, e)}${diffBlock(k, e)}
+      ${kpis(e)}${warnList(e)}${shipShares(e)}${pinbar}
+      ${editTimeline(k, e)}
+    </div></div></section></div>`;
+}
+
+/**
+ * Renders the dialogs of the edit flows; empty for a dialog of another surface.
+ * @param {object} m the open dialog
+ * @param {function(string, string, string, boolean): string} shell the dialog frame
+ * @returns {string} markup
+ */
+function editModal(m, shell) {
+  if (m.kind === 'ed-panel') {
+    const k = edWork(state.ed.panel.ctx);
+    const body = state.ed.panel.kind === 'insert' ? insertPanel(k) : markPanel(k);
+    const title = state.ed.panel.kind === 'insert' ? 'Stopp einfügen' : state.ed.panel.side === 'buy' ? 'Ausverkauft' : 'Keine Nachfrage';
+    return shell(title, body, '<button class="btn btn-ghost" data-act="ed-panel-close">Schließen</button>', true);
+  }
+  if (m.kind === 'ed-conflict') {
+    return shell('Inzwischen geändert', `<div class="tr-warnline tr-warnline--danger">${ic('warning')}<span>${esc(m.what)}: Jemand hat gespeichert, während du bearbeitet hast (409). Dein Arbeitsstand ist nicht verloren.</span></div><span class="tr-hint">„Neu laden“ holt den gespeicherten Stand in den Planer und verwirft deine Schritte; „Als neue speichern“ behält beide.</span>`, `<button class="btn btn-ghost" data-act="ed-reload">${ic('reset')} Neu laden</button><button class="btn btn--cta" data-act="${m.what === 'Einheitsroute' ? 'to-unit' : 'save'}" data-route="edit">${ic('save')} Als neue speichern</button>`);
+  }
+  return '';
+}
+
+/** PROTOTYPE flights: a server-held copy of a route with position, loading-job ticks, edits, undo, history and the mission flight. */
+
+/**
+ * Returns the flight the overlay shows: the member's personal flight or a mission route's flight.
+ * @returns {object|null} the flight
+ */
+function openFlight() {
+  if (!state.flyOpen) return null;
+  return state.flyOpen === 'personal' ? state.fl : state.mflights[state.flyOpen];
+}
+
+/**
+ * Starts a flight from a working route, as the server would from a job result.
+ * @param {string} kind personal or mission
+ * @param {object} w the working route
+ * @param {{name: string, src: string, mission?: string, ship?: number}} meta name, source kind and mission route
+ * @returns {object} the flight
+ */
+function newFlight(kind, w, meta) {
+  const e = evaluate(w, w.ships);
+  return { kind, ...meta, ships: w.ships, w: { ...w, marks: [], lost: [], kept: false }, pos: { idx: 0, phase: 'stop' }, ticks: {}, tickBefore: {}, undo: [], redo: [], last: null, conflict: null, planned: e.profit, ship: meta.ship ?? -1, started: 'heute, 19:40' };
+}
+
+/**
+ * Converts a computed route of the other surfaces into a working route.
+ * @param {object} r the computed route
+ * @param {Array<object>} ships the ship list
+ * @returns {object} the working route
+ */
+function fromComputed(r, ships) {
+  const paths = [];
+  r.stops.forEach((s, i) => s.jobs.filter((j) => j.side === 'buy').forEach((j) => {
+    const sell = r.stops.slice(i + 1).find((x) => x.jobs.some((y) => y.side === 'sell' && y.c === j.c));
+    if (!sell) return;
+    const sj = sell.jobs.find((y) => y.side === 'sell' && y.c === j.c);
+    paths.push({ c: j.c, from: s.t, to: sell.t, qty: j.qty, pb: j.p, ps: sj.p });
+  }));
+  return { stops: r.stops.map((s) => ({ t: s.t, forced: s.forced })), paths, lost: [], marks: [], ships, lastFull: paths };
+}
+
+/**
+ * Reads a loading job's tick, combined over the ships that carry it.
+ * @param {object} f the flight
+ * @param {object} j the job
+ * @returns {{qty: number, price: number}|null} the actual values, or null while a ship's part is open
+ */
+function flightTickOf(f, j) {
+  const n = expandShips(f.ships).length;
+  const keys = Array.from({ length: n }, (_, i) => i).filter((i) => (n > 1 ? j.shares[i] : j.qty) > 0).map((i) => `${j.key}#${i}`);
+  if (!keys.length || !keys.every((k) => f.ticks[k])) return null;
+  return { qty: keys.reduce((a, k) => a + f.ticks[k].qty, 0), price: f.ticks[keys[0]].price };
+}
+
+/**
+ * Lists the purchases already ticked, which a re-plan must not buy again.
+ * @param {object} f the flight
+ * @returns {Array<string>} "terminal|commodity" keys
+ */
+function tickedBuys(f) {
+  return Object.keys(f.ticks).filter((k) => k.includes('|buy#')).map((k) => { const [c, from] = k.split('|'); return `${from}|${c}`; });
+}
+
+/**
+ * Collects the flight's fixed prefix: cargo bought before the current stop or ticked, re-routed when its sale left the route.
+ * @param {object} f the flight
+ * @param {Array<object>} stops the stop sequence the re-plan uses
+ * @returns {{fixed: Array<object>, lost: Array<object>}} the fixed paths and cargo aboard without a buyer
+ */
+function flightPrefix(f, stops) {
+  const old = f.w.stops.map((s) => s.t);
+  const ts = stops.map((s) => s.t);
+  const bought = tickedBuys(f);
+  const fixed = [];
+  const lost = [];
+  f.w.paths.filter((p) => p.fixed || old.indexOf(p.from) < f.pos.idx || bought.includes(`${p.from}|${p.c}`)).forEach((p) => {
+    const from = ts.indexOf(p.from);
+    if (ts.indexOf(p.to) > Math.max(from, f.pos.idx - 1)) { fixed.push({ ...p, fixed: true }); return; }
+    const best = ts.slice(Math.max(from, f.pos.idx) + 1).filter((t) => PRICES[t]?.sell?.[p.c]).sort((a, b) => PRICES[b].sell[p.c][0] - PRICES[a].sell[p.c][0])[0];
+    if (best) fixed.push({ ...p, to: best, ps: PRICES[best].sell[p.c][0], fixed: true });
+    else lost.push({ ...p, why: 'UNSOLD' });
+  });
+  return { fixed, lost };
+}
+
+/**
+ * Applies a tick with its actual values; a deviation re-plans the rest at once.
+ * @param {object} f the flight
+ * @param {string} tk the job key with the ship index
+ * @param {number} qty the actual quantity
+ * @param {number} price the actual price per SCU
+ * @returns {void}
+ */
+function tickFlight(f, tk, qty, price) {
+  const [jk, si] = tk.split('#');
+  const e = evaluate(f.w, f.ships);
+  const stop = e.stops.find((s) => s.jobs.some((x) => x.key === jk));
+  const j = stop.jobs.find((x) => x.key === jk);
+  const ship = Number(si);
+  const planned = e.convoy ? j.shares[ship] : j.qty;
+  f.ticks[tk] = { qty, price, by: f.kind === 'mission' ? ME : 'dir' };
+  f.undo = [];
+  f.redo = [];
+  f.conflict = null;
+  if (qty === planned && price === j.p) { f.last = null; return; }
+  const before = f.w;
+  const paths = before.paths.map((p) => ({ ...p }));
+  const p = paths.find((x) => pathKey(x) === pathKey(j.path));
+  const delta = planned - qty;
+  p.qty = Math.max(0, p.qty - delta);
+  p.fixed = true;
+  if (j.side === 'buy') p.pb = price; else p.ps = price;
+  const work = { ...f, w: { ...before, paths } };
+  const { fixed, lost } = flightPrefix(work, before.stops);
+  if (j.side === 'sell' && delta > 0) {
+    const best = before.stops.slice(stop.si + 1).map((s) => s.t).filter((t) => PRICES[t]?.sell?.[j.c]).sort((a, b) => PRICES[b].sell[j.c][0] - PRICES[a].sell[j.c][0])[0];
+    if (best) fixed.push({ c: j.c, from: p.from, to: best, qty: delta, pb: p.pb, ps: PRICES[best].sell[j.c][0], fixed: true });
+    else lost.push({ c: j.c, from: p.from, to: stop.t, qty: delta, pb: p.pb, ps: p.ps, why: 'UNSOLD' });
+  }
+  const plan = planCargo(before.stops, { ships: f.ships, marks: before.marks, fixed, fromIdx: f.pos.idx, skip: tickedBuys(f) });
+  f.w = { ...before, paths: plan.paths, lost };
+  const what = qty !== planned ? `${fmt(qty)} statt ${fmt(planned)} SCU` : `à ${fmt(price)} statt ${fmt(j.p)}`;
+  f.last = { label: `Ist-Wert ${j.c} (${j.side === 'buy' ? 'Kauf' : 'Verkauf'}): ${what}`, before, diff: diffPlans(before, f.w, f.ships), tick: tk, belowPlan: j.side === 'buy' && qty < planned ? { si: stop.si, c: j.c } : null };
+  f.tickBefore[tk] = before;
+}
+
+/**
+ * Takes a tick back, with the re-plan it caused.
+ * @param {object} f the flight
+ * @param {string} tk the job key with the ship index
+ * @returns {void}
+ */
+function untickFlight(f, tk) {
+  if (f.tickBefore[tk]) { f.w = f.tickBefore[tk]; delete f.tickBefore[tk]; }
+  delete f.ticks[tk];
+  if (f.last && f.last.tick === tk) f.last = null;
+}
+
+/**
+ * Sums the margin the ticked sales realised so far; cargo still aboard counts nothing yet.
+ * @param {object} f the flight
+ * @returns {number} aUEC, per sold SCU its actual price minus its purchase price
+ */
+function earnedOf(f) {
+  return Object.entries(f.ticks).filter(([k]) => k.includes('|sell#')).reduce((a, [k, v]) => {
+    const pk = k.split('|sell#')[0];
+    const p = [...f.w.paths, ...(f.w.lost || [])].find((x) => pathKey(x) === pk);
+    return a + v.qty * (v.price - (p ? p.pb : v.price));
+  }, 0);
+}
+
+/**
+ * Sums the purchase value of the cargo aboard: ticked purchases not yet ticked as sold.
+ * @param {object} f the flight
+ * @returns {number} aUEC
+ */
+function aboardValueOf(f) {
+  const bought = Object.entries(f.ticks).filter(([k]) => k.includes('|buy#')).reduce((a, [, v]) => a + v.qty * v.price, 0);
+  const sold = Object.entries(f.ticks).filter(([k]) => k.includes('|sell#')).reduce((a, [k, v]) => {
+    const p = [...f.w.paths, ...(f.w.lost || [])].find((x) => pathKey(x) === k.split('|sell#')[0]);
+    return a + v.qty * (p ? p.pb : 0);
+  }, 0);
+  return Math.max(0, bought - sold);
+}
+
+/**
+ * Ends a flight and leaves its history entry.
+ * @param {object} f the flight
+ * @param {string} outcome finished, abandoned or expired, with the stop
+ * @returns {object} the history entry
+ */
+function endFlight(f, outcome) {
+  const e = evaluate(f.w, f.ships);
+  const lines = e.stops.flatMap((s) => s.jobs.map((j) => {
+    const t = flightTickOf(f, j);
+    return [s.place.name, j.side === 'buy' ? 'Kauf' : 'Verkauf', j.c, j.qty, t ? t.qty : 0, j.p, t ? t.price : null];
+  }));
+  const entry = { id: `h${Date.now()}`, name: f.name, path: e.stops.map((s) => s.place.name).join(' › '), ships: e.convoy ? `Konvoi · ${e.ships.length} Schiffe` : f.ships[0].name, src: f.src, outcome, earned: earnedOf(f), planned: f.planned, ended: 'gerade eben', lines, w: f.w };
+  if (f.kind === 'mission') { state.mflightEnded[f.mission] = entry; state.mflights[f.mission] = null; } else { state.history = [entry, ...state.history].slice(0, 100); state.fl = null; }
+  return entry;
+}
+
+/**
+ * Renders one loading job of one ship in the flight view, in the tick layout the prototype bar chose.
+ * @param {object} f the flight
+ * @param {object} e the computed flight route
+ * @param {object} s the computed stop
+ * @param {object} j the job
+ * @param {number} i the ship index
+ * @param {boolean} ro whether the viewer only watches
+ * @returns {string} markup
+ */
+function flightJob(f, e, s, j, i, ro) {
+  const tk = `${j.key}#${i}`;
+  const planned = e.convoy ? j.shares[i] : j.qty;
+  const t = f.ticks[tk];
+  const buy = j.side === 'buy';
+  const who = e.convoy ? `<span class="tr-hint">${esc(e.ships[i].label)}</span> ` : '';
+  const verb = `<span class="tr-flyside tr-flyside--${j.side}">${buy ? 'Kaufen' : 'Verkaufen'}</span>`;
+  const mark = f.w.marks.find((m) => m.t === s.t && m.c === j.c && m.side === j.side);
+  const markBtn = ro || t ? '' : `<button class="btn ${mark ? 'btn-outline' : 'btn-ghost'} btn-xs" data-act="ed-mark" data-ctx="flight" data-si="${s.si}" data-c="${esc(j.c)}" data-side="${j.side}">${mark ? 'Alternativen' : buy ? 'Ausverkauft' : 'Keine Nachfrage'}</button>`;
+  const done = t ? `<div class="tr-flydone">${ic('check')} Ist ${fmt(t.qty)} SCU à ${fmt(t.price)}${t.qty !== planned ? ` <span class="warn-text">statt ${fmt(planned)}</span>` : ''}${t.price !== j.p ? ` <span class="warn-text">statt à ${fmt(j.p)}</span>` : ''} · abgehakt von ${esc(t.by)}</div>` : '';
+  if (state.ed.tick === 'B' && !ro) {
+    if (t) return `<div class="tr-fly__job is-done tr-fly__job--b"><div class="tr-fly__jobmain">${who}${verb}<strong>${esc(j.c)}</strong>${done}</div><button class="btn btn-ghost btn-xs" data-act="fl-untick" data-key="${tk}">Zurücknehmen</button></div>`;
+    return `<div class="tr-fly__job tr-fly__job--b ${mark ? 'is-soldout' : ''}"><div class="tr-fly__jobmain">${who}${verb}<strong>${esc(j.c)}</strong> <span class="tr-hint">geplant ${fmt(planned)} SCU à ${fmt(j.p)}${!buy && j.demand === null ? ' · Nachfrage unbekannt' : ''}</span></div>
+      <div class="tr-fly__fields"><div class="tr-field"><label for="fq-${tk}">Menge (SCU)</label><input id="fq-${tk}" type="number" min="0" value="${planned}" inputmode="numeric"></div><div class="tr-field"><label for="fp-${tk}">Preis (aUEC/SCU)</label><input id="fp-${tk}" type="number" min="0" value="${j.p}" inputmode="numeric"></div>
+      <button class="btn btn--cta" data-act="fl-tick-fields" data-key="${tk}">${ic('check')} ${buy ? 'Gekauft' : 'Verkauft'}</button></div>${markBtn ? `<div>${markBtn}</div>` : ''}</div>`;
+  }
+  const open = state.flyEditKey === tk && !t && !ro;
+  const fields = open ? `<div class="tr-fly__fields"><div class="tr-field"><label for="fq-${tk}">Ist-Menge (SCU)</label><input id="fq-${tk}" type="number" min="0" value="${planned}" inputmode="numeric"></div><div class="tr-field"><label for="fp-${tk}">Ist-Preis (aUEC/SCU)</label><input id="fp-${tk}" type="number" min="0" value="${j.p}" inputmode="numeric"></div><button class="btn btn--cta" data-act="fl-tick-fields" data-key="${tk}">${ic('check')} Abhaken</button></div>` : '';
+  return `<div class="tr-fly__job ${t ? 'is-done' : ''} ${mark ? 'is-soldout' : ''}"><div class="tr-fly__jobrow"><label><input type="checkbox" data-act="${t ? 'fl-untick' : 'fl-tick'}" data-key="${tk}" ${t ? 'checked' : ''} ${ro ? 'disabled' : ''}><span>${who}${verb}<br><strong class="tr-flyqty">${fmt(planned)} SCU ${esc(j.c)}</strong> <span class="tr-hint">à ${fmt(j.p)} aUEC${!buy && j.demand === null ? ' · Nachfrage unbekannt' : ''}</span></span></label>
+    <span class="tr-iconbtns">${t || ro ? '' : `<button class="btn btn-ghost btn-xs" data-act="fl-edit-key" data-key="${tk}" aria-expanded="${open}">Menge/Preis</button>`}${markBtn}</span></div>${done}${fields}</div>`;
+}
+
+/**
+ * Renders the compact diff of the flight's last re-plan.
+ * @param {object} f the flight
+ * @param {object} e the computed flight route
+ * @param {boolean} ro whether the viewer only watches
+ * @returns {string} markup
+ */
+function flightReplanCard(f, e, ro) {
+  if (!f.last || !f.last.diff) return '';
+  const old = evaluate(f.last.before, f.ships);
+  const lines = f.last.diff.filter((l) => l.status !== 'UNCHANGED').map((l) => `<div class="tr-flydiff__line"><span class="tr-mark tr-mark--${DIFF_CLS[l.status]}">${DIFF_TEXT[l.status]}</span> ${pathText(l)} ${l.before ? fmt(l.before) : ''}${l.before && l.after ? ' → ' : ''}${l.after ? `<strong>${fmt(l.after)}</strong>` : ''} SCU</div>`).join('');
+  const undo = f.last.tick ? '<span class="tr-hint">Zurücknehmen des Hakens nimmt die Neuplanung mit zurück.</span>' : ro ? '' : `<button class="btn btn-ghost btn-xs" data-act="fl-undo" ${f.undo.length ? '' : 'disabled'}>${ic('arrow-left')} Rückgängig</button>`;
+  const sold = f.last.belowPlan && !ro ? `<button class="btn btn-outline btn-xs" data-act="ed-mark" data-ctx="flight" data-si="${f.last.belowPlan.si}" data-c="${esc(f.last.belowPlan.c)}" data-side="buy">Ausverkauft markieren</button>` : '';
+  return `<div class="tr-flydiff" role="status"><div class="tr-row tr-row--between"><strong>${ic('reset')} Rest neu geplant</strong><span class="tr-hint">Gewinn ${fmt(old.profit)} → <strong class="${e.profit >= old.profit ? 'pos' : 'neg'}">${fmt(e.profit)}</strong></span></div><div class="tr-hint">${esc(f.last.label)}</div>${lines || '<div class="tr-hint">Frachtplan unverändert.</div>'}<div class="tr-row">${sold}${undo}</div></div>`;
+}
+
+/**
+ * Renders the flight view: progress, money, the current step and the remaining stops, or the adjust view.
+ * @returns {string} markup
+ */
+function flightView2() {
+  const f = openFlight();
+  if (state.flyDone) return flightDoneView();
+  if (!f) return '';
+  const e = evaluate(f.w, f.ships);
+  pageRoutes.flight = e;
+  const ro = f.kind === 'mission' && state.missionRole === 'reader';
+  const earned = earnedOf(f);
+  const head = `<div class="tr-fly__head"><div><div class="tr-fly__eyebrow">${f.kind === 'mission' ? `Einsatzflug · ${esc(MISSION.name)}` : `Flug · ${esc(f.src)} · seit ${esc(f.started)}`}</div><h1>${esc(f.name)}</h1></div><div class="tr-iconbtns">${ro || state.flyAdjust ? '' : `<button class="btn btn-ghost" data-act="fl-adjust">${ic('edit')} Route anpassen</button>`}<button class="btn btn-ghost" data-act="fl-close">${ic('close')} Schließen</button></div></div>`;
+  const live = f.kind === 'mission' ? `<div class="tr-warnline tr-warnline--info">${ic('users')}<span>${ro ? '<strong>Live · nur ansehen.</strong> Ticks, Markierungen und Änderungen der Flotte erscheinen hier sofort.' : 'Ein Flug für die ganze Routenflotte: jede Crew und jeder Einsatzleiter hakt ab, markiert und ändert; alle Leser sehen live zu.'}</span></div>` : '';
+  const conflict = f.conflict ? `<div class="tr-warnline tr-warnline--danger" role="alert">${ic('warning')}<span><strong>Flug hat sich inzwischen geändert.</strong> ${esc(f.conflict.why)} Deine Änderung „${esc(f.conflict.label)}“ wurde nicht übernommen.</span><span class="tr-actions"><button class="btn btn-outline btn-xs" data-act="fl-retry">Erneut ausführen</button><button class="btn btn-ghost btn-xs" data-act="fl-dismiss">Verwerfen</button></span></div>` : '';
+  const money = `<div class="tr-flymoney"><span>Verdient <strong class="${earned >= 0 ? 'pos' : 'neg'}">${earned < 0 ? '−' : ''}${fmt(Math.abs(earned))}</strong></span><span>+ noch geplant <strong>${fmt(e.profit - earned)}</strong></span><span>= <strong>${fmt(e.profit)}</strong> aUEC</span><span class="tr-hint">Ladung an Bord: ${fmt(aboardValueOf(f))} aUEC Einkaufswert</span></div>`;
+  const progress = `<div class="tr-fly__progress" aria-hidden="true">${e.stops.map((_, i) => `<i class="${i < f.pos.idx || (i === f.pos.idx && f.pos.phase === 'leg') ? 'is-done' : i === f.pos.idx ? 'is-now' : ''}"></i>`).join('')}</div>`;
+  if (state.flyAdjust) {
+    const k = edWork('flight');
+    return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Route anpassen"><div class="tr-fly__inner tr-fly__inner--wide">${head}${progress}${conflict}
+      <div class="tr-warnline tr-warnline--info">${ic('edit')}<span><strong>Route anpassen.</strong> Was vor dem aktuellen Stopp liegt, ist eingefroren; jede Änderung wirkt auf den Rest. Ladung an Bord und Bargeld gehen fest in jede Neuplanung ein. Das Ergebnis übernimmt der Server in den Flug.</span></div>
+      <div class="tr-workbar"><span class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="fl-undo" ${f.undo.length ? '' : 'disabled'}>${ic('arrow-left')} Rückgängig${f.undo.length ? ` (${f.undo.length})` : ''}</button><button class="btn btn-ghost btn-xs" data-act="fl-redo" ${f.redo.length ? '' : 'disabled'}>Wiederholen ${ic('arrow-right')}</button></span><span class="tr-hint">Am Server, von jedem Gerät${f.kind === 'mission' ? ' und jeder Crew der Flotte' : ''}; Abhaken leert den Verlauf.</span></div>
+      ${money}${keptBanner(k, e)}${diffBlock(k, e)}${warnList(e)}${editTimeline(k, e)}</div>
+      <div class="tr-fly__foot"><button class="btn btn--cta" data-act="fl-adjust-done">${ic('check')} Zurück zum Flug</button></div></div>`;
+  }
+  const n = expandShips(f.ships).length;
+  const shipSel = e.convoy ? `<div class="tr-field"><span class="tr-cap">Ansicht für</span><div class="tr-fly__shipsel">${[-1, ...e.ships.map((_, i) => i)].map((i) => `<button class="tr-toggle" data-act="fl-ship" data-val="${i}" aria-pressed="${f.ship === i}">${i < 0 ? 'Ganzer Konvoi' : esc(e.ships[i].label)}</button>`).join('')}</div></div>` : '';
+  const stop = e.stops[f.pos.idx];
+  let main = '';
+  let foot = '';
+  if (f.pos.phase === 'stop') {
+    const ships = e.convoy ? (f.ship >= 0 ? [f.ship] : e.ships.map((_, i) => i)) : [0];
+    const jobs = [...stop.jobs].sort((a, b) => (a.side === b.side ? 0 : a.side === 'sell' ? -1 : 1));
+    const rows = jobs.flatMap((j) => ships.filter((i) => (n > 1 ? j.shares[i] : j.qty) > 0).map((i) => flightJob(f, e, stop, j, i, ro))).join('');
+    const open = jobs.flatMap((j) => ships.filter((i) => (n > 1 ? j.shares[i] : j.qty) > 0).map((i) => `${j.key}#${i}`)).filter((k) => !f.ticks[k]).length;
+    const markPanelHere = state.ed.panel && state.ed.panel.ctx === 'flight' && state.ed.pick === 'inline' ? markPanel(edWork('flight')) : '';
+    const gone = stop.gone.map((g) => `<div class="tr-warnline tr-warnline--danger">${ic('warning')}<span>${esc(g.c)}: ${fmt(g.qty)} SCU ${esc(g.gone)}</span></div>`).join('');
+    main = `<div class="tr-fly__next"><div class="tr-fly__eyebrow">Stopp ${f.pos.idx + 1} von ${e.stops.length} · ${stop.place.kind} · ${stop.place.system}</div>
+      <div class="tr-fly__big">${esc(stop.term.name)}</div>${stopFacts(stop)}
+      <div class="tr-stack" style="gap:8px">${rows || '<span class="tr-hint">Kein Ladeauftrag für diese Ansicht.</span>'}</div>${gone}${markPanelHere}
+      ${stopTime(stop)}
+      <div class="tr-row"><button class="btn btn-ghost btn-xs" data-act="rate" data-route="flight" data-stop="${stop.si}">Stopp bewerten</button>${ro ? '' : '<button class="btn btn-quiet-danger btn-xs" data-act="fl-abandon">Flug abbrechen</button>'}</div></div>`;
+    const last = f.pos.idx === e.stops.length - 1;
+    foot = ro ? '<span class="tr-hint">Live mitlesen · Schritte setzen die Crews</span>' : `<button class="btn btn--cta" data-act="${last ? 'fl-finish' : 'fl-next'}">${ic('check')} ${last ? 'Route abschließen' : 'Stopp erledigt'}${open ? ` (${open} offen)` : ''}</button>`;
+  } else {
+    const leg = e.legs[f.pos.idx];
+    const next = e.stops[f.pos.idx + 1];
+    main = `<div class="tr-fly__next"><div class="tr-fly__eyebrow">Etappe ${f.pos.idx + 1} von ${e.legs.length}</div><div class="tr-fly__big">Fliege zu ${esc(next.term.name)}</div>
+      <div><strong>${leg.est.length ? '≈ ' : ''}${fmtShort(leg.dur)}</strong> · ${dec(leg.gm)} Gm · an Bord ${fmt(leg.aboard)} SCU</div></div>`;
+    foot = ro ? '<span class="tr-hint">Live mitlesen · Schritte setzen die Crews</span>' : `<button class="btn btn-ghost" data-act="fl-back">${ic('arrow-left')} Zurück</button><button class="btn btn--cta" data-act="fl-arrive">${ic('map-pin')} Angekommen</button>`;
+  }
+  const later = `<div class="card"><h4 class="card-title">Danach</h4>${e.stops.slice(f.pos.idx + 1).map((s) => `<div class="tr-row tr-row--between" style="padding:6px 0;border-top:1px solid var(--color-gray-3)"><span>${s.si + 1} · ${esc(s.term.name)}</span><span class="tr-hint">${s.jobs.map((j) => `${j.side === 'buy' ? 'Kauf' : 'Verkauf'} ${fmt(j.qty)} ${esc(j.c)}`).join(', ')}</span></div>`).join('') || '<span class="tr-hint">Letzter Stopp.</span>'}</div>`;
+  return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Flugansicht"><div class="tr-fly__inner">${head}${progress}${live}${conflict}${money}${flightReplanCard(f, e, ro)}${shipSel}${main}${later}</div><div class="tr-fly__foot">${foot}</div></div>`;
+}
+
+/**
+ * Renders the end of a flight with its outcome and the follow-up actions.
+ * @returns {string} markup
+ */
+function flightDoneView() {
+  const h = state.flyDone;
+  return `<div class="tr-fly" role="dialog" aria-modal="true" aria-label="Flug beendet"><div class="tr-fly__inner">
+    <div class="tr-fly__next"><div class="tr-fly__eyebrow">${esc(h.outcome)}</div><div class="tr-fly__big">${esc(h.name)}</div>
+    <div class="tr-flymoney"><span>Verdient <strong class="${h.earned >= 0 ? 'pos' : 'neg'}">${h.earned < 0 ? '−' : ''}${fmt(Math.abs(h.earned))}</strong></span><span>geplant beim Start <strong>${fmt(h.planned)}</strong> aUEC</span></div>
+    <span class="tr-hint">${h.mission ? 'Der Eintrag bleibt bei der Einsatzroute.' : 'Steht jetzt unter „Meine Flüge“, 90 Tage lang.'} Stimmte etwas nicht? Bewerte die Stopps, damit die nächste Crew es weiß.</span></div></div>
+    <div class="tr-fly__foot">${h.mission ? '' : `<button class="btn btn-ghost" data-act="hist-again" data-val="${h.id}">Nochmal fliegen</button><button class="btn btn-ghost" data-act="hist-save" data-val="${h.id}">Als Route speichern</button>`}<button class="btn btn--cta" data-act="fl-done-close">Schließen</button></div></div>`;
+}
+
+/**
+ * Renders the running-flight bar every page carries while a personal flight runs.
+ * @returns {string} markup
+ */
+function flightBar() {
+  const f = state.fl;
+  if (!f || state.flyOpen || state.flyDone) return '';
+  const e = evaluate(f.w, f.ships);
+  const where = f.pos.phase === 'stop' ? `Stopp ${f.pos.idx + 1} von ${e.stops.length} · ${esc(e.stops[f.pos.idx].term.name)}` : `unterwegs nach ${esc(e.stops[f.pos.idx + 1].term.name)}`;
+  if (state.ed.bar === 'B') return `<div class="tr-flymini" role="status"><div class="tr-flymini__k">${ic('arrow-right')} Flug läuft</div><div class="tr-flymini__name">${esc(f.name)}</div><div class="tr-hint">${where}</div><div class="tr-fly__progress" aria-hidden="true">${e.stops.map((_, i) => `<i class="${i < f.pos.idx ? 'is-done' : i === f.pos.idx ? 'is-now' : ''}"></i>`).join('')}</div><button class="btn btn--cta btn-xs" data-act="fl-open">Fortsetzen</button></div>`;
+  return `<div class="tr-flybar" role="status"><span class="tr-flybar__k">${ic('arrow-right')} Flug läuft</span><strong>${esc(f.name)}</strong><span class="tr-hint">${where}</span><span class="tr-flybar__sp"></span><button class="btn btn--cta btn-xs" data-act="fl-open">Fortsetzen</button></div>`;
+}
+
+/**
+ * Renders the member's flight history as the routes page's fourth tab.
+ * @returns {string} markup
+ */
+function flightsTab() {
+  const list = state.history;
+  if (!list.length) return '<div class="empty-state"><div class="empty-title">Noch keine Flüge</div><div class="empty-text">Ein beendeter Flug bleibt hier 90 Tage, ohne Zeiten.</div></div>';
+  const rows = list.map((h) => {
+    const open = state.histOpen === h.id;
+    const detail = open ? `<tr class="tr-histdetail"><td colspan="6"><div class="tr-stack" style="gap:8px">
+      ${h.lines.length ? `<div class="hud-scroll scroll-x"><table class="tr-jobs"><thead><tr><th>Stopp</th><th>Seite</th><th>Ware</th><th class="num">SCU geplant</th><th class="num">SCU Ist</th><th class="num">à geplant</th><th class="num">à Ist</th></tr></thead><tbody>${h.lines.map((l) => `<tr><td>${esc(l[0])}</td><td><span class="tr-side tr-side--${l[1] === 'Kauf' ? 'buy' : 'sell'}">${l[1]}</span></td><td class="tr-cname">${esc(l[2])}</td><td class="num">${fmt(l[3])}</td><td class="num ${l[4] !== l[3] ? 'warn-text' : ''}">${l[4] ? fmt(l[4]) : '—'}</td><td class="num">${fmt(l[5])}</td><td class="num ${l[6] !== null && l[6] !== l[5] ? 'warn-text' : ''}">${l[6] === null ? '—' : fmt(l[6])}</td></tr>`).join('')}</tbody></table></div>` : '<span class="tr-hint">Keine Ladeaufträge abgehakt.</span>'}
+      <div class="tr-actions"><button class="btn btn-outline btn-xs" data-act="hist-again" data-val="${h.id}">${ic('arrow-right')} Nochmal fliegen</button><button class="btn btn-ghost btn-xs" data-act="hist-save" data-val="${h.id}">${ic('save')} Als Route speichern</button><button class="btn btn-quiet-danger btn-xs" data-act="hist-delete" data-val="${h.id}">${ic('trash')} Löschen</button><span class="tr-hint">„Nochmal fliegen“ plant die Stopps auf aktuellen Daten neu und öffnet sie im Planer.</span></div></div></td></tr>` : '';
+    return `<tr><td><a class="row-link" href="#" data-act="hist-open" data-val="${h.id}" aria-expanded="${open}"><span class="cell-title">${esc(h.name)}</span><span class="cell-sub">${esc(h.path)} · ${esc(h.src)}</span></a></td>
+      <td class="cell-status"><span class="tr-mark tr-mark--${h.outcome === 'abgeschlossen' ? 'ok' : 'warn'}">${esc(h.outcome)}</span></td>
+      <td data-label="Schiffe">${esc(h.ships)}</td>
+      <td class="num" data-label="Verdient"><strong class="${h.earned >= 0 ? 'pos' : 'neg'}">${h.earned < 0 ? '−' : ''}${fmt(Math.abs(h.earned))}</strong><div class="tr-hint">geplant ${fmt(h.planned)}</div></td>
+      <td data-label="Beendet">${esc(h.ended)}</td>
+      <td class="cell-actions"><svg class="krt-icon row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-${open ? 'up' : 'down'}"></use></svg></td></tr>${detail}`;
+  }).join('');
+  return `<div class="tr-row tr-row--between"><span class="tr-hint">Deine beendeten Flüge: Stopps, Schiffe, der letzte Plan mit Ist-Mengen und Ist-Preisen, verdient neben geplant. Ohne Zeiten. 90 Tage, höchstens 100; nur du siehst sie.</span><span class="tr-hint">${list.length} von 100</span></div>
+    <div class="card card--flush"><table class="data-table data-table--stack"><thead><tr><th>Flug</th><th class="cell-status">Ausgang</th><th>Schiffe</th><th class="num">aUEC</th><th>Beendet</th><th class="cell-actions"><span class="visually-hidden">Details</span></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+/**
+ * Renders the mission flight of a mission route on the mission's routes tab.
+ * @param {object} mr the mission route
+ * @param {object} plan the stored plan
+ * @returns {string} markup
+ */
+function missionFlightPanel(mr, plan) {
+  const f = state.mflights[mr.id];
+  const ended = state.mflightEnded[mr.id];
+  const role = state.missionRole;
+  const crew = role === 'crew' && mr.fleet.includes(MY_UNIT);
+  const may = role === 'manager' || crew;
+  if (!f) {
+    const last = ended ? `<div class="tr-hint">Letzter Einsatzflug: <strong>${esc(ended.outcome)}</strong> ${esc(ended.ended)} · verdient <strong class="${ended.earned >= 0 ? 'pos' : 'neg'}">${fmt(ended.earned)}</strong> von geplant ${fmt(ended.planned)} aUEC <button class="btn btn-ghost btn-xs" data-act="mf-ended" data-val="${mr.id}">${state.mEndedOpen === mr.id ? 'Details ausblenden' : 'Details'}</button></div>${state.mEndedOpen === mr.id ? `<div class="hud-scroll scroll-x"><table class="tr-jobs"><thead><tr><th>Stopp</th><th>Seite</th><th>Ware</th><th class="num">SCU geplant</th><th class="num">SCU Ist</th><th class="num">à Ist</th></tr></thead><tbody>${ended.lines.map((l) => `<tr><td>${esc(l[0])}</td><td>${l[1]}</td><td class="tr-cname">${esc(l[2])}</td><td class="num">${fmt(l[3])}</td><td class="num">${l[4] ? fmt(l[4]) : '—'}</td><td class="num">${l[6] === null ? '—' : fmt(l[6])}</td></tr>`).join('')}</tbody></table></div>` : ''}` : '<span class="tr-hint">Noch kein Einsatzflug. Das erste „Losfliegen (mein Teil)“ einer Crew startet ihn für die ganze Routenflotte.</span>';
+    return `<div class="card card--inset tr-mflight"><div class="tr-cap">Einsatzflug</div>${last}</div>`;
+  }
+  const e = evaluate(f.w, f.ships);
+  const jobs = e.stops.flatMap((s) => s.jobs);
+  const perShip = e.ships.map((s, i) => {
+    const mine = jobs.filter((j) => (e.convoy ? j.shares[i] : j.qty) > 0);
+    const done = mine.filter((j) => f.ticks[`${j.key}#${i}`]).length;
+    return `<span class="tr-fleetchip ${s.short === MY_UNIT && crew ? 'is-mine' : ''}"><span class="squadron-badge">${esc(s.short)}</span>${done} von ${mine.length} Ladeaufträgen</span>`;
+  }).join('');
+  const where = f.pos.phase === 'stop' ? `an Stopp ${f.pos.idx + 1} von ${e.stops.length} · ${esc(e.stops[f.pos.idx].term.name)}` : `unterwegs nach ${esc(e.stops[f.pos.idx + 1].term.name)}`;
+  const btn = may ? `<button class="btn btn--cta btn-xs" data-act="mf-open" data-val="${mr.id}">${ic('arrow-right')} Mitfliegen${crew ? ' (mein Teil)' : ''}</button>` : `<button class="btn btn-outline btn-xs" data-act="mf-open" data-val="${mr.id}">${ic('eye')} Live ansehen</button>`;
+  return `<div class="card card--inset tr-mflight tr-mflight--live"><div class="tr-row tr-row--between"><div class="tr-cap">${ic('arrow-right')} Einsatzflug läuft · Konvoi ${where}</div>${btn}</div>
+    <div class="tr-fly__progress" aria-hidden="true">${e.stops.map((_, i) => `<i class="${i < f.pos.idx || (i === f.pos.idx && f.pos.phase === 'leg') ? 'is-done' : i === f.pos.idx ? 'is-now' : ''}"></i>`).join('')}</div>
+    <div class="tr-row">${perShip}</div>
+    <div class="tr-hint">Zuletzt: ${esc(f.lastActivity || 'Rost hat Medical Supplies (Kauf, BRAVO) abgehakt')} · verdient ${fmt(earnedOf(f))} aUEC. ${role === 'manager' ? '„Route aktualisieren“ ändert den gespeicherten Plan, nicht den laufenden Flug.' : ''}</div></div>`;
+}
+
 /** PROTOTYPE wiring of the surfaces beside the planner: pages, actions, dialogs and the prototype bar. */
 
 const PAGES = {
+  edit: 'Planer · Bearbeiten',
+  flights: 'Meine Flüge',
   planner: 'Routenplaner',
   routes: 'Routen (Listen)',
   route: 'Geöffnete Route',
@@ -6718,11 +7861,15 @@ const PAGES = {
  */
 function goPage(page) {
   if (page !== 'planner') state.missionSearch = null;
-  state.page = page;
+  state.page = page === 'flights' ? 'routes' : page;
+  if (page === 'flights') state.routesTab = 'flights';
   state.edited = false;
   state.editInPlanner = false;
   state.modal = null;
   state.flight = null;
+  state.flyOpen = null;
+  state.flyAdjust = false;
+  if (state.ed) state.ed.panel = null;
   window.scrollTo(0, 0);
 }
 
@@ -6898,7 +8045,7 @@ function surfaceBarControls() {
   if (state.page === 'routes' && state.routesTab === 'unit') extra = `${sep}${btn('proto-role', 'member', 'Mitglied', state.role !== 'officer')}${btn('proto-role', 'officer', 'Offizier', state.role === 'officer')}`;
   if (state.page === 'mission') extra = `${sep}${btn('proto-mrole', 'manager', 'Leiter', state.missionRole === 'manager')}${btn('proto-mrole', 'crew', 'Crew', state.missionRole === 'crew')}${btn('proto-mrole', 'reader', 'Mitglied', state.missionRole === 'reader')}${state.missionRole === 'crew' ? `${sep}${btn('proto-alt', '', state.missionAlt === 'top' ? 'A · Teil oben' : 'B · Umschalter', true)}` : ''}`;
   if (state.page === 'place' || state.page === 'ratings') extra = `${sep}${btn('proto-role', 'member', 'Mitglied', state.role !== 'admin')}${btn('proto-role', 'admin', 'Admin', state.role === 'admin')}`;
-  return `${select}${extra}`;
+  return `${select}${extra}${editBarControls()}`;
 }
 
 /**
@@ -6906,8 +8053,450 @@ function surfaceBarControls() {
  * @returns {string} markup
  */
 function surfacePage() {
-  return { routes: routesPage, route: routePage, mission: missionPage, ratings: ratingsPage, place: placePage, admin: adminPage, off: offPage }[state.page]();
+  return { edit: editPage, routes: routesPage, route: routePage, mission: missionPage, ratings: ratingsPage, place: placePage, admin: adminPage, off: offPage }[state.page]();
 }
+
+/** PROTOTYPE wiring of the edit flows and flights: state, edit steps, actions and the prototype bar's controls. */
+
+const REQUEST_ACTS = ['set', 'toggle', 'pick', 'pick-place', 'list-remove', 'chip-remove', 'reset', 'ship-remove', 'ship-add'];
+let optTimers = [];
+
+/**
+ * Builds a tab's working state from its computed stops.
+ * @param {{label: string, stops: Array<string>, forced: Array<string>}} def the tab
+ * @param {Array<object>} ships the ship list
+ * @returns {object} the tab with its history
+ */
+function edTab(def, ships) {
+  const stops = def.stops.map((t) => ({ t, pinned: false, forced: def.forced.includes(t) }));
+  const p = planCargo(stops, { ships, marks: [] });
+  return { label: def.label, hist: [{ label: 'Berechnet', w: { stops, paths: p.paths, lost: [], marks: [], ships, lastFull: p.paths, kept: false } }], at: 0 };
+}
+
+/**
+ * Opens a fresh working state for a source, as the planner does when a route opens in it.
+ * @param {string} src result, saved, shared, unit or mission
+ * @returns {void}
+ */
+function resetEdit(src) {
+  const ships = src === 'mission' ? ['ALPHA', 'BRAVO'].map((k) => ({ ...FLEET_SHIPS[k] })) : state.request.ships.map((s) => ({ ...s }));
+  Object.assign(state.ed, { tabs: EDIT_TABS.map((d) => edTab(d, ships)), tab: 0, src, requestChanged: false, panel: null, optimising: null });
+}
+
+/**
+ * Adds the edit and flight state to the prototype's state, read from the URL where given.
+ * @returns {void}
+ */
+function initEditState() {
+  const pick = (k, ok, def) => (ok.includes(params.get(k)) ? params.get(k) : def);
+  if (state.page === 'flights') { state.page = 'routes'; state.routesTab = 'flights'; }
+  if (params.get('tab') === 'flights') state.routesTab = 'flights';
+  state.ed = { diffView: pick('diff', ['A', 'B'], 'A'), pick: pick('pick', ['dialog', 'inline'], 'dialog'), tick: pick('tick', ['A', 'B'], 'A'), bar: pick('bar', ['A', 'B'], 'A'), conflict: false, conflictNext: false };
+  state.request.armistice = true;
+  resetEdit(pick('src', ['result', 'saved', 'shared', 'unit', 'mission'], 'result'));
+  Object.assign(state, { fl: null, flyOpen: null, flyAdjust: false, flyDone: null, flyEditKey: null, history: FLIGHT_HISTORY_SEED.map((h) => ({ ...h })), histOpen: null, mflights: {}, mflightEnded: {}, mEndedOpen: null });
+  const mr = state.missionRoutes[0];
+  const ships = mr.fleet.map((k) => ({ ...FLEET_SHIPS[k] }));
+  const mf = newFlight('mission', fromComputed(computeRoute(ROUTES.find((x) => x.id === mr.base), ships), ships), { name: mr.name, src: 'Einsatzroute', mission: mr.id });
+  const e = evaluate(mf.w, ships);
+  e.stops[0].jobs.forEach((j) => ships.forEach((_, i) => { if (j.shares[i] > 0) mf.ticks[`${j.key}#${i}`] = { qty: j.shares[i], price: j.p, by: i ? 'Rost' : 'Vagabund' }; }));
+  mf.pos = { idx: 1, phase: 'stop' };
+  mf.lastActivity = 'Rost hat an Seraphim Station alles für BRAVO abgehakt; der Konvoi steht an Area18';
+  state.mflights[mr.id] = mf;
+  state.mflightEnded.M2 = { outcome: 'abgeschlossen', ended: '12.11., 23:10', earned: 1018400, planned: 984000, lines: [['Port Tressler', 'Kauf', 'Distilled Spirits', 380, 380, 1105, 1105], ['Levski', 'Verkauf', 'Distilled Spirits', 380, 380, 1690, 1702], ['Levski', 'Kauf', 'Hephaestanite', 696, 640, 2210, 2230], ['Ruin Station', 'Verkauf', 'Hephaestanite', 696, 640, 2960, 2990]] };
+  const fly = params.get('flight');
+  if (fly === 'personal') { startFlight(state.ed.tabs[0].hist[0].w, 'Seraphim → Area18 → Baijini Point', 'Berechnete Route'); state.flyOpen = 'personal'; }
+  if (fly === 'M1') state.flyOpen = 'M1';
+}
+
+/**
+ * Resolves the planning options of an edit context; a flight adds its fixed prefix.
+ * @param {object} k the edit context
+ * @param {Array<object>} stops the stop sequence the re-plan uses
+ * @param {Array<object>} marks the marks the re-plan honours
+ * @returns {object} options for planCargo
+ */
+function planOpts(k, stops, marks) {
+  if (k.ctx !== 'flight') return { ships: k.w.ships, marks };
+  const { fixed, lost } = flightPrefix(k.flight, stops);
+  return { ships: k.flight.ships, marks, fixed, fromIdx: k.flight.pos.idx, skip: tickedBuys(k.flight), lostPrefix: lost };
+}
+
+/**
+ * Re-plans the cargo on a stop sequence, fully or in keep mode.
+ * @param {object} k the edit context
+ * @param {Array<object>} stops the stop sequence
+ * @param {{keep?: Array<object>, extra?: Array<object>, marks?: Array<object>}} [more] keep mode, extra paths and replaced marks
+ * @returns {object} the new working route
+ */
+function replan(k, stops, more = {}) {
+  const marks = more.marks || k.w.marks;
+  const o = { ...planOpts(k, stops, marks), keep: more.keep, extra: more.extra };
+  const p = planCargo(stops, o);
+  return { ...k.w, stops, marks, paths: p.paths, lost: [...(o.lostPrefix || []), ...p.lost], kept: Boolean(more.keep) && !more.extra && !more.marks, lastFull: more.keep ? k.w.lastFull : p.paths };
+}
+
+/**
+ * Ticks the next open loading job at the flight's stop, as another device or crew would.
+ * @param {object} f the flight
+ * @returns {void}
+ */
+function otherDeviceTick(f) {
+  const e = evaluate(f.w, f.ships);
+  const s = e.stops[f.pos.idx];
+  const n = expandShips(f.ships).length;
+  const hit = s.jobs.flatMap((j) => Array.from({ length: n }, (_, i) => ({ j, i }))).find(({ j, i }) => (n > 1 ? j.shares[i] : j.qty) > 0 && !f.ticks[`${j.key}#${i}`]);
+  if (!hit) return;
+  const who = f.kind === 'mission' ? 'Rost' : 'Dein Handy';
+  f.ticks[`${hit.j.key}#${hit.i}`] = { qty: n > 1 ? hit.j.shares[hit.i] : hit.j.qty, price: hit.j.p, by: who };
+  f.undo = [];
+  f.redo = [];
+  f.lastActivity = `${who} hat ${hit.j.c} (${hit.j.side === 'buy' ? 'Kauf' : 'Verkauf'}) abgehakt`;
+  say('Live aktualisiert', `${f.lastActivity}. Die Ansicht folgt ohne Neuladen.`);
+}
+
+/**
+ * Runs one edit step in the planner tab or the flight; in a flight a conflicting change ends it unapplied.
+ * @param {string} ctx plan or flight
+ * @param {function(object): ({label: string, w: object, diff?: boolean}|null)} make computes the step from the edit context
+ * @returns {void}
+ */
+function doStep(ctx, make) {
+  const k = edWork(ctx);
+  const res = make(k);
+  if (!res) return;
+  if (ctx === 'flight') {
+    const f = k.flight;
+    if (state.ed.conflictNext) {
+      state.ed.conflictNext = false;
+      otherDeviceTick(f);
+      f.conflict = { label: res.label, why: `${f.lastActivity}, während deine Änderung lief.`, retry: () => doStep(ctx, make) };
+      return;
+    }
+    f.undo.push({ label: res.label, w: f.w });
+    if (f.undo.length > FLIGHT_UNDO_MAX) f.undo.shift();
+    f.redo = [];
+    f.last = res.diff === false ? null : { label: res.label, before: f.w, diff: diffPlans(f.w, res.w, f.ships) };
+    f.w = res.w;
+    f.conflict = null;
+    return;
+  }
+  const tb = k.tab;
+  tb.hist = tb.hist.slice(0, tb.at + 1);
+  tb.hist.push({ label: res.label, w: res.w, before: k.w, diff: res.diff === false ? null : diffPlans(k.w, res.w, res.w.ships) });
+  tb.at += 1;
+}
+
+/**
+ * Starts a personal flight, which replaces nothing; a running flight is asked about first by the caller.
+ * @param {object} w the working route
+ * @param {string} name the flight's name
+ * @param {string} src the source kind
+ * @returns {void}
+ */
+function startFlight(w, name, src) {
+  state.fl = newFlight('personal', w, { name, src });
+  state.flyOpen = 'personal';
+  state.flyAdjust = false;
+}
+
+/**
+ * Opens the mark or insert panel, as a dialog or inline as the prototype bar chose.
+ * @param {object} panel the panel state
+ * @returns {void}
+ */
+function openPanel(panel) {
+  state.ed.panel = panel;
+  state.modal = state.ed.pick === 'dialog' || (panel.ctx === 'flight' && !state.flyAdjust && panel.kind === 'insert') ? { kind: 'ed-panel' } : null;
+}
+
+/**
+ * Closes the open panel and its dialog.
+ * @returns {void}
+ */
+function closePanel() {
+  state.ed.panel = null;
+  if (state.modal && state.modal.kind === 'ed-panel') state.modal = null;
+}
+
+/**
+ * Reads the planned quantity and price of a loading job for one ship.
+ * @param {object} f the flight
+ * @param {string} tk the job key with the ship index
+ * @returns {{qty: number, price: number}} the plan
+ */
+function plannedOf(f, tk) {
+  const [jk, si] = tk.split('#');
+  const e = evaluate(f.w, f.ships);
+  const j = e.stops.flatMap((s) => s.jobs).find((x) => x.key === jk);
+  return { qty: e.convoy ? j.shares[Number(si)] : j.qty, price: j.p };
+}
+
+/**
+ * Re-plans a history entry's stops on current data and opens them in the planner.
+ * @param {object} h the history entry
+ * @returns {void}
+ */
+function flyAgain(h) {
+  const ships = state.request.ships.map((s) => ({ ...s }));
+  const stops = h.stopIds || (h.w ? h.w.stops.map((s) => s.t) : ['seraphim', 'area18', 'baijini']);
+  state.flyDone = null;
+  goPage('edit');
+  resetEdit('result');
+  state.ed.tabs[0] = edTab({ label: 'Aus „Meine Flüge“', stops, forced: [] }, ships);
+  say('Stopps neu geplant', `„${h.name}“ auf aktuellen Daten. Prüfe die Route und flieg los.`);
+}
+
+const EDIT_ACTIONS = {
+  'ed-tab': (el) => { state.ed.tab = Number(el.dataset.val); closePanel(); },
+  'ed-remove': (el) => {
+    const si = Number(el.dataset.si);
+    doStep(el.dataset.ctx, (k) => {
+      const s = k.w.stops[si];
+      const stops = k.w.stops.filter((_, i) => i !== si);
+      if (stops.length < 2) return null;
+      if (k.ctx === 'plan' && s.forced) state.request.forced = state.request.forced.filter((t) => t !== s.t);
+      return { label: `${tname(s.t)} entfernt${s.forced && k.ctx === 'plan' ? ' (verlässt die erzwungenen Terminals)' : ''}`, w: replan(k, stops) };
+    });
+  },
+  'ed-move': (el) => {
+    const si = Number(el.dataset.si);
+    const d = Number(el.dataset.d);
+    doStep(el.dataset.ctx, (k) => {
+      const stops = k.w.stops.map((s) => ({ ...s }));
+      [stops[si], stops[si + d]] = [stops[si + d], stops[si]];
+      return { label: `${tname(stops[si + d].t)} nach ${d < 0 ? 'oben' : 'unten'}`, w: replan(k, stops, { keep: k.w.lastFull }) };
+    });
+  },
+  'ed-recompute': (el) => doStep(el.dataset.ctx, (k) => ({ label: 'Waren neu berechnet', w: replan(k, k.w.stops) })),
+  'ed-pin': (el) => {
+    const si = Number(el.dataset.si);
+    doStep(el.dataset.ctx, (k) => {
+      const stops = k.w.stops.map((s, i) => (i === si ? { ...s, pinned: !s.pinned } : s));
+      return { label: `${tname(stops[si].t)} ${stops[si].pinned ? 'festgesetzt' : 'freigegeben'}`, w: { ...k.w, stops }, diff: false };
+    });
+  },
+  'ed-insert-open': (el) => openPanel({ kind: 'insert', ctx: el.dataset.ctx, pos: Number(el.dataset.pos) }),
+  'ed-insert': (el) => {
+    const pos = Number(el.dataset.pos);
+    const t = el.dataset.t;
+    doStep(el.dataset.ctx, (k) => {
+      if (k.w.stops.length >= 5) { say('Höchstens 5 Stopps', 'Entferne zuerst einen Stopp.'); return null; }
+      const why = failsFilter(t);
+      if (state.request.excluded.includes(t)) state.request.excluded = state.request.excluded.filter((x) => x !== t);
+      const stops = [...k.w.stops.slice(0, pos), { t, pinned: true, inserted: true, failsFilter: why }, ...k.w.stops.slice(pos)];
+      return { label: `${tname(t)} eingefügt an Position ${pos + 1}`, w: replan(k, stops) };
+    });
+    closePanel();
+  },
+  'ed-panel-close': () => closePanel(),
+  'ed-mark': (el) => {
+    const k = edWork(el.dataset.ctx);
+    const si = Number(el.dataset.si);
+    const m = k.w.marks.find((x) => x.t === k.w.stops[si].t && x.c === el.dataset.c && x.side === el.dataset.side);
+    openPanel({ kind: 'mark', ctx: el.dataset.ctx, si, c: el.dataset.c, side: el.dataset.side, phase: m ? 'done' : 'ask', rest: m ? m.rest : 0, sel: [] });
+  },
+  'ed-mark-apply': (el) => {
+    const p = state.ed.panel;
+    const rest = Math.max(0, Number(document.getElementById('ed-rest')?.value) || 0);
+    doStep(el.dataset.ctx, (k) => {
+      const t = k.w.stops[p.si].t;
+      const marks = [...k.w.marks.filter((x) => !(x.t === t && x.c === p.c && x.side === p.side)), { t, c: p.c, side: p.side, rest }];
+      return { label: `${p.side === 'buy' ? 'Ausverkauft' : 'Keine Nachfrage'}: ${p.c} bei ${tname(t)}, noch ${fmt(rest)} SCU`, w: replan(k, k.w.stops, { keep: k.w.paths, marks }) };
+    });
+    Object.assign(p, { phase: 'done', rest });
+  },
+  'ed-unmark': (el) => {
+    const si = Number(el.dataset.si);
+    doStep(el.dataset.ctx, (k) => {
+      const t = k.w.stops[si].t;
+      const marks = k.w.marks.filter((x) => !(x.t === t && x.c === el.dataset.c && x.side === el.dataset.side));
+      return { label: `Markierung aufgehoben: ${el.dataset.c}`, w: replan(k, k.w.stops, { keep: k.w.lastFull, marks }) };
+    });
+    closePanel();
+  },
+  'ed-alt-sel': (el) => { const i = Number(el.dataset.i); const s = state.ed.panel.sel; state.ed.panel.sel = s.includes(i) ? s.filter((x) => x !== i) : [...s, i]; },
+  'ed-alt-take': (el) => {
+    const p = state.ed.panel;
+    doStep(el.dataset.ctx, (k) => {
+      const alts = alternativesAt(k.w, p.si, k.w.ships).filter((_, i) => p.sel.includes(i));
+      return { label: `${alts.length} alternative Ware${alts.length > 1 ? 'n' : ''} bei ${tname(k.w.stops[p.si].t)} übernommen`, w: replan(k, k.w.stops, { keep: k.w.paths, extra: alts }) };
+    });
+    closePanel();
+  },
+  'ed-replan-here': (el) => { doStep(el.dataset.ctx, (k) => ({ label: 'Fracht ab hier neu geplant', w: replan(k, k.w.stops) })); closePanel(); },
+  'ed-sell-later': (el) => {
+    const p = state.ed.panel;
+    const to = el.dataset.t;
+    doStep(el.dataset.ctx, (k) => {
+      const t = k.w.stops[p.si].t;
+      const src = k.w.lastFull.find((x) => x.c === p.c && x.to === t) || k.w.paths.find((x) => x.c === p.c && x.to === t);
+      if (!src) return null;
+      return { label: `${p.c} an ${tname(to)} verkaufen`, w: replan(k, k.w.stops, { keep: k.w.paths, extra: [{ c: p.c, from: src.from, to, pb: src.pb, ps: PRICES[to].sell[p.c][0], qty: 99999 }] }) };
+    });
+    closePanel();
+  },
+  'ed-report': () => { closePanel(); say('Gemeldet', 'Verfügbarkeit anonym gemeldet; der Durchschnitt folgt mit dem nächsten Stundenlauf.'); },
+  'ed-undo': () => { const tb = state.ed.tabs[state.ed.tab]; tb.at = Math.max(0, tb.at - 1); closePanel(); },
+  'ed-redo': () => { const tb = state.ed.tabs[state.ed.tab]; tb.at = Math.min(tb.hist.length - 1, tb.at + 1); closePanel(); },
+  'ed-restore': () => { const tb = state.ed.tabs[state.ed.tab]; doStep('plan', () => ({ label: 'Berechnete Route wiederhergestellt', w: tb.hist[0].w })); },
+  'ed-optimise': () => {
+    closePanel();
+    state.ed.optimising = { step: 0, elapsed: 0 };
+    optTimers = [[900, 1, 2], [1900, 2, 4]].map(([ms, step, s]) => setTimeout(() => { state.ed.optimising = { step, elapsed: s }; render(); }, ms));
+    optTimers.push(setTimeout(() => { EDIT_ACTIONS['ed-opt-finish'](); render(); }, 3000));
+  },
+  'ed-opt-finish': () => {
+    optTimers.forEach(clearTimeout);
+    state.ed.optimising = null;
+    doStep('plan', (k) => {
+      const stops = optimiseRest(k.w, k.w.ships);
+      const same = stops.every((s, i) => s.t === k.w.stops[i].t);
+      return { label: same ? 'Rest optimiert: die freien Stopps sind schon die besten' : 'Rest optimiert, feste Stopps blieben', w: replan(k, stops) };
+    });
+  },
+  'ed-opt-stop': () => { const got = state.ed.optimising.step > 0; optTimers.forEach(clearTimeout); state.ed.optimising = null; if (got) EDIT_ACTIONS['ed-opt-finish'](); say('Suche gestoppt', got ? 'Bestes bis dahin gefundenes Ergebnis übernommen.' : 'Noch kein Ergebnis; die Route bleibt.'); },
+  'ed-replan-request': () => {
+    state.ed.requestChanged = false;
+    doStep('plan', (k) => {
+      const ships = state.request.ships.map((s) => ({ ...s }));
+      const stops = k.w.stops.map((s) => ({ ...s, failsFilter: failsFilter(s.t) }));
+      return { label: 'Nur Fracht neu geplant (Anfrage geändert)', w: replan({ ...k, w: { ...k.w, ships } }, stops) };
+    });
+  },
+  'ed-research': () => confirmFirst('Neu suchen?', 'Die volle Suche verwirft alle Bearbeitungen in allen Tabs. Rückgängig geht danach nicht mehr.', 'Neu suchen', 'do-ed-research', ''),
+  'do-ed-research': () => { goPage('planner'); state.variant = 'A'; startSearch(); },
+  compute: () => {
+    if (state.page !== 'edit') { startSearch(); return; }
+    if (state.ed.tabs.some((tb) => tb.at)) { EDIT_ACTIONS['ed-research'](); return; }
+    EDIT_ACTIONS['do-ed-research']();
+  },
+  'ed-update': (el) => {
+    if (state.ed.conflict) { state.modal = { kind: 'ed-conflict', what: el.dataset.what }; return; }
+    const tb = state.ed.tabs[state.ed.tab];
+    say(`${el.dataset.what} aktualisiert`, el.dataset.what === 'Einsatzroute' ? 'Plan gespeichert; „Routenplan geändert“ geht an die Crews der Flotte.' : 'Ganzer Inhalt ersetzt: Anfrage, Stopps, Momentaufnahme. Auf dem Server gibt es dafür kein Rückgängig.');
+    tb.hist = [{ label: 'Gespeichert', w: tb.hist[tb.at].w }];
+    tb.at = 0;
+  },
+  'ed-reload': () => { state.modal = null; resetEdit(state.ed.src); say('Neu geladen', 'Der gespeicherte Stand steht im Planer; deine Schritte sind verworfen.'); },
+  'ed-save-mine': () => say('Als deine Route gespeichert', `${state.savedList.length + 1} von ${SAVED_LIMIT} Plätzen.`),
+  edit: () => { state.modal = null; goPage('edit'); },
+  'edit-in-planner': () => { const src = state.routeSrc; goPage('edit'); resetEdit(src); },
+  'm-edit': () => { goPage('edit'); resetEdit('mission'); },
+  fly: (el) => {
+    const id = el.dataset.route;
+    const go = () => {
+      if (id === 'edit') { const k = edWork('plan'); startFlight(k.w, evaluate(k.w, k.w.ships).name, SRC_LABEL[state.ed.src]); return; }
+      const r = routeById(id);
+      const ships = state.page === 'planner' ? state.resultShips.map((s) => ({ ...s })) : [{ ...SHIP_C2 }];
+      startFlight(fromComputed(r, ships), r.name, state.page === 'route' ? OPEN_SOURCES[state.routeSrc].label : 'Berechnete Route');
+    };
+    if (state.fl) { state.pendingFly = go; confirmFirst('Laufenden Flug abbrechen?', `„${state.fl.name}“ läuft noch. Losfliegen bricht ihn ab; er landet als „abgebrochen“ in „Meine Flüge“.`, 'Abbrechen und losfliegen', 'do-fly-replace', ''); return; }
+    go();
+  },
+  'ed-fly': () => EDIT_ACTIONS.fly({ dataset: { route: 'edit' } }),
+  'do-fly-replace': () => { endFlight(state.fl, `abgebrochen an Stopp ${state.fl.pos.idx + 1}`); state.pendingFly(); },
+  'fly-part': (el) => {
+    const mr = state.missionRoutes.find((x) => x.base === el.dataset.route) || state.missionRoutes[0];
+    if (!state.mflights[mr.id]) {
+      const ships = mr.fleet.map((k) => ({ ...FLEET_SHIPS[k] }));
+      state.mflights[mr.id] = newFlight('mission', fromComputed(computeRoute(ROUTES.find((x) => x.id === mr.base), ships), ships), { name: mr.name, src: 'Einsatzroute', mission: mr.id });
+      say('Einsatzflug gestartet', 'Für die ganze Routenflotte; alle Leser des Einsatzes sehen live zu.');
+    }
+    state.mflights[mr.id].ship = Number(el.dataset.ship);
+    state.flyOpen = mr.id;
+  },
+  'mf-open': (el) => { const f = state.mflights[el.dataset.val]; f.ship = state.missionRole === 'crew' ? Math.max(0, state.missionRoutes.find((x) => x.id === el.dataset.val).fleet.indexOf(MY_UNIT)) : -1; state.flyOpen = el.dataset.val; },
+  'mf-ended': (el) => { state.mEndedOpen = state.mEndedOpen === el.dataset.val ? null : el.dataset.val; },
+  'fl-open': () => { state.flyOpen = 'personal'; },
+  'fl-close': () => { state.flyOpen = null; state.flyAdjust = false; closePanel(); },
+  'fl-ship': (el) => { openFlight().ship = Number(el.dataset.val); },
+  'fl-tick': (el) => { const f = openFlight(); const p = plannedOf(f, el.dataset.key); tickFlight(f, el.dataset.key, p.qty, p.price); state.flyEditKey = null; },
+  'fl-tick-fields': (el) => {
+    const f = openFlight();
+    const tk = el.dataset.key;
+    const p = plannedOf(f, tk);
+    const q = Number(document.getElementById(`fq-${tk}`)?.value);
+    const pr = Number(document.getElementById(`fp-${tk}`)?.value);
+    tickFlight(f, tk, Number.isFinite(q) ? Math.max(0, q) : p.qty, Number.isFinite(pr) && pr > 0 ? pr : p.price);
+    state.flyEditKey = null;
+  },
+  'fl-untick': (el) => untickFlight(openFlight(), el.dataset.key),
+  'fl-edit-key': (el) => { state.flyEditKey = state.flyEditKey === el.dataset.key ? null : el.dataset.key; },
+  'fl-next': () => { openFlight().pos.phase = 'leg'; document.querySelector('.tr-fly')?.scrollTo(0, 0); },
+  'fl-arrive': () => { const f = openFlight(); f.pos = { idx: f.pos.idx + 1, phase: 'stop' }; f.last = null; document.querySelector('.tr-fly')?.scrollTo(0, 0); },
+  'fl-back': () => { openFlight().pos.phase = 'stop'; },
+  'fl-finish': () => { const f = openFlight(); state.flyDone = { ...endFlight(f, 'abgeschlossen'), mission: f.kind === 'mission' }; state.flyOpen = null; },
+  'fl-abandon': () => confirmFirst('Flug abbrechen?', 'Der Flug endet als „abgebrochen“ an diesem Stopp. Abgehaktes bleibt im Verlauf; die Quelle der Route bleibt unberührt.', 'Flug abbrechen', 'do-fl-abandon', ''),
+  'do-fl-abandon': () => { const f = openFlight(); state.flyDone = { ...endFlight(f, `abgebrochen an Stopp ${f.pos.idx + 1}`), mission: f.kind === 'mission' }; state.flyOpen = null; },
+  'fl-done-close': () => { state.flyDone = null; },
+  'fl-adjust': () => { state.flyAdjust = true; closePanel(); document.querySelector('.tr-fly')?.scrollTo(0, 0); },
+  'fl-adjust-done': () => { state.flyAdjust = false; closePanel(); },
+  'fl-undo': () => { const f = openFlight(); const u = f.undo.pop(); if (!u) return; f.redo.push({ label: u.label, w: f.w }); f.w = u.w; f.last = null; say('Rückgängig', `„${u.label}“ zurückgenommen, für alle Geräte.`); },
+  'fl-redo': () => { const f = openFlight(); const r = f.redo.pop(); if (!r) return; f.undo.push({ label: r.label, w: f.w }); f.w = r.w; f.last = null; },
+  'fl-retry': () => { const f = openFlight(); const c = f.conflict; f.conflict = null; c.retry(); },
+  'fl-dismiss': () => { openFlight().conflict = null; },
+  'hist-open': (el) => { state.histOpen = state.histOpen === el.dataset.val ? null : el.dataset.val; },
+  'hist-again': (el) => { const h = state.history.find((x) => x.id === el.dataset.val) || state.flyDone; flyAgain(h); },
+  'hist-save': () => { state.flyDone = null; say('Als Route gespeichert', `Der letzte Plan des Flugs; ${state.savedList.length + 1} von ${SAVED_LIMIT} Plätzen.`); },
+  'hist-delete': (el) => confirmFirst('Flug aus dem Verlauf löschen?', 'Der Eintrag verschwindet endgültig; er zählt nirgends mehr.', 'Löschen', 'do-hist-delete', el.dataset.val),
+  'do-hist-delete': (v) => { state.history = state.history.filter((x) => x.id !== v); say('Flug gelöscht', ''); },
+  'proto-edsrc': (el) => { if (el.dataset.val === 'mission') state.missionRole = 'manager'; resetEdit(el.dataset.val); },
+  'proto-ed': (el) => { state.ed[el.dataset.key] = el.dataset.val; closePanel(); },
+  'proto-conflict': () => { state.ed.conflict = !state.ed.conflict; },
+  'proto-fconflict': () => { state.ed.conflictNext = !state.ed.conflictNext; },
+  'proto-other': () => { const f = openFlight() || state.fl; if (f) otherDeviceTick(f); },
+  'proto-startfly': () => { const k = edWork('plan'); EDIT_ACTIONS.fly({ dataset: { route: 'edit' } }); if (!state.fl) startFlight(k.w, evaluate(k.w, k.w.ships).name, 'Berechnete Route'); },
+};
+
+/**
+ * Renders the prototype bar's controls for the edit page and for flights.
+ * @returns {string} markup
+ */
+function editBarControls() {
+  const btn = (act, key, val, label, on) => `<button data-act="${act}" data-key="${key}" data-val="${val}" aria-pressed="${on}">${label}</button>`;
+  const sep = '<span class="proto-bar__sep"></span>';
+  let out = '';
+  if (state.page === 'edit') {
+    out += `${sep}<select class="proto-bar__page" data-proto-edsrc aria-label="Quelle">${Object.entries(SRC_LABEL).map(([k, l]) => `<option value="${k}" ${state.ed.src === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+    if (state.ed.src === 'unit') out += btn('proto-role', '', state.role === 'officer' ? 'member' : 'officer', state.role === 'officer' ? 'Offizier' : 'Mitglied', true);
+    if (state.ed.src === 'mission') out += btn('proto-mrole', '', state.missionRole === 'manager' ? 'crew' : 'manager', state.missionRole === 'manager' ? 'Leiter' : 'Crew', true);
+    if (state.ed.src !== 'result') out += `<button data-act="proto-conflict" aria-pressed="${state.ed.conflict}" title="Aktualisieren antwortet 409">409</button>`;
+    out += `${sep}${btn('proto-ed', 'diffView', 'A', 'Diff A', state.ed.diffView === 'A')}${btn('proto-ed', 'diffView', 'B', 'Diff B', state.ed.diffView === 'B')}${sep}${btn('proto-ed', 'pick', 'dialog', 'Dialog', state.ed.pick === 'dialog')}${btn('proto-ed', 'pick', 'inline', 'Inline', state.ed.pick === 'inline')}`;
+    if (!state.fl) out += `${sep}<button data-act="proto-startfly">Flug starten</button>`;
+  }
+  const f = openFlight() || state.fl;
+  if (f || state.page === 'mission') {
+    out += `${sep}${btn('proto-ed', 'tick', 'A', 'Haken A', state.ed.tick === 'A')}${btn('proto-ed', 'tick', 'B', 'Haken B', state.ed.tick === 'B')}`;
+    if (state.fl) out += `${btn('proto-ed', 'bar', 'A', 'Leiste A', state.ed.bar === 'A')}${btn('proto-ed', 'bar', 'B', 'Leiste B', state.ed.bar === 'B')}`;
+    if (f) out += `<button data-act="proto-other" title="Ein anderes Gerät oder eine andere Crew hakt ab">Anderes Gerät</button><button data-act="proto-fconflict" aria-pressed="${state.ed.conflictNext}" title="Die nächste Änderung im Flug trifft auf einen Konflikt">Konflikt</button>`;
+  }
+  return out;
+}
+
+document.addEventListener('click', (ev) => {
+  const el = ev.target.closest('[data-act]');
+  if (el && state.page === 'edit' && !state.flyOpen && REQUEST_ACTS.includes(el.dataset.act) && el.closest('.tr-a__aside')) state.ed.requestChanged = true;
+}, true);
+document.addEventListener('change', (ev) => {
+  const el = ev.target;
+  if (state.page === 'edit' && (el.dataset.bind || el.dataset.ship) && el.closest('.tr-a__aside')) state.ed.requestChanged = true;
+  if (el.dataset.protoEdsrc !== undefined) { EDIT_ACTIONS['proto-edsrc']({ dataset: { val: el.value } }); render(); }
+}, true);
+
+/**
+ * Fills the insert panel's terminal search list for its current query.
+ * @param {HTMLInputElement} el the search input
+ * @returns {void}
+ */
+function fillEdSearch(el) {
+  const list = el.nextElementSibling;
+  list.innerHTML = edSearchOptions(el.value, el.dataset.edsearch, Number(el.dataset.pos));
+  list.hidden = false;
+}
+document.addEventListener('input', (ev) => { if (ev.target.dataset.edsearch) fillEdSearch(ev.target); });
+document.addEventListener('focusin', (ev) => { if (ev.target.dataset.edsearch) fillEdSearch(ev.target); });
+document.addEventListener('focusout', (ev) => { if (ev.target.dataset.edsearch) { const list = ev.target.nextElementSibling; setTimeout(() => { list.hidden = true; }, 180); } });
 
 /** PROTOTYPE overlays: the flight view, the dialogs, the toast and the prototype bar. */
 
@@ -6969,7 +8558,7 @@ function modal() {
   if (!m) return '';
   const shell = (title, body, foot, wide) => `<div class="tr-modal-overlay" data-act="modal-scrim"><div class="krt-modal ${wide ? 'krt-modal--wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="krt-modal-head"><h2>${title}</h2><button class="btn btn-ghost btn-xs btn-icon" data-act="modal-close" aria-label="Schließen">${ic('close')}</button></div><div class="krt-modal-body">${body}</div><div class="krt-modal-foot">${foot}</div></div></div>`;
   const cancel = '<button class="btn btn-ghost" data-act="modal-close">Abbrechen</button>';
-  const own = surfaceModal(m, shell);
+  const own = editModal(m, shell) || surfaceModal(m, shell);
   if (own) return own;
   const r = m.route ? routeById(m.route) : null;
   if (m.kind === 'save') {
@@ -7084,6 +8673,7 @@ const state = {
 };
 state.request = freshRequest(state.scenario);
 state.resultShips = state.request.ships.map((s) => ({ ...s }));
+initEditState();
 
 /**
  * Opens the state a URL parameter names, so a view can be linked directly.
@@ -7115,12 +8705,14 @@ function render() {
   Object.keys(pageRoutes).forEach((k) => { delete pageRoutes[k]; });
   const view = state.page === 'planner' ? { A: variantA, B: variantB, C: variantC }[state.variant] : surfacePage;
   document.getElementById('app').innerHTML = view();
-  document.getElementById('overlay-root').innerHTML = (state.flight ? flightView() : '') + modal();
+  document.getElementById('flybar-root').innerHTML = flightBar();
+  document.getElementById('overlay-root').innerHTML = flightView2() + modal();
   document.getElementById('toast-root').innerHTML = toast();
   document.getElementById('proto-root').innerHTML = protoBar();
   keep.forEach(([sel, top]) => { const el = document.querySelector(sel); if (el) el.scrollTop = top; });
-  document.body.style.overflow = state.flight || state.modal || state.drawer ? 'hidden' : '';
-  document.body.classList.toggle('has-fly', Boolean(state.flight));
+  const flying = Boolean(state.flyOpen || state.flyDone);
+  document.body.style.overflow = flying || state.modal || state.drawer ? 'hidden' : '';
+  document.body.classList.toggle('has-fly', flying);
   const url = new URL(location.href);
   url.searchParams.set('page', state.page);
   url.searchParams.set('variant', state.variant);
@@ -7301,6 +8893,7 @@ const ACTIONS = {
   'fly-back': () => { state.flight.phase = 'stop'; },
   'fly-restart': () => { state.flight = { ...state.flight, idx: 0, phase: 'stop', done: {} }; },
   ...SURFACE_ACTIONS,
+  ...EDIT_ACTIONS,
 };
 
 /**
@@ -7372,8 +8965,8 @@ document.addEventListener('toggle', (ev) => {
 }, true);
 document.addEventListener('keydown', (ev) => {
   if (ev.target.closest('input, textarea, select, [contenteditable]')) return;
-  if (ev.key === 'Escape') { state.modal = null; state.drawer = ''; render(); return; }
-  if (state.flight || state.modal || state.page !== 'planner') return;
+  if (ev.key === 'Escape') { state.modal = null; state.drawer = ''; if (state.ed) state.ed.panel = null; render(); return; }
+  if (state.flyOpen || state.modal || state.page !== 'planner') return;
   if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
     ACTIONS.variant({ dataset: { val: ev.key === 'ArrowLeft' ? '-1' : '1' } });
     render();

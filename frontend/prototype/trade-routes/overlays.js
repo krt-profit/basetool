@@ -58,7 +58,7 @@ function modal() {
   if (!m) return '';
   const shell = (title, body, foot, wide) => `<div class="tr-modal-overlay" data-act="modal-scrim"><div class="krt-modal ${wide ? 'krt-modal--wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="krt-modal-head"><h2>${title}</h2><button class="btn btn-ghost btn-xs btn-icon" data-act="modal-close" aria-label="Schließen">${ic('close')}</button></div><div class="krt-modal-body">${body}</div><div class="krt-modal-foot">${foot}</div></div></div>`;
   const cancel = '<button class="btn btn-ghost" data-act="modal-close">Abbrechen</button>';
-  const own = surfaceModal(m, shell);
+  const own = editModal(m, shell) || surfaceModal(m, shell);
   if (own) return own;
   const r = m.route ? routeById(m.route) : null;
   if (m.kind === 'save') {

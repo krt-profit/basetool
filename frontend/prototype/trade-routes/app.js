@@ -49,6 +49,7 @@ const state = {
 };
 state.request = freshRequest(state.scenario);
 state.resultShips = state.request.ships.map((s) => ({ ...s }));
+initEditState();
 
 /**
  * Opens the state a URL parameter names, so a view can be linked directly.
@@ -80,12 +81,14 @@ function render() {
   Object.keys(pageRoutes).forEach((k) => { delete pageRoutes[k]; });
   const view = state.page === 'planner' ? { A: variantA, B: variantB, C: variantC }[state.variant] : surfacePage;
   document.getElementById('app').innerHTML = view();
-  document.getElementById('overlay-root').innerHTML = (state.flight ? flightView() : '') + modal();
+  document.getElementById('flybar-root').innerHTML = flightBar();
+  document.getElementById('overlay-root').innerHTML = flightView2() + modal();
   document.getElementById('toast-root').innerHTML = toast();
   document.getElementById('proto-root').innerHTML = protoBar();
   keep.forEach(([sel, top]) => { const el = document.querySelector(sel); if (el) el.scrollTop = top; });
-  document.body.style.overflow = state.flight || state.modal || state.drawer ? 'hidden' : '';
-  document.body.classList.toggle('has-fly', Boolean(state.flight));
+  const flying = Boolean(state.flyOpen || state.flyDone);
+  document.body.style.overflow = flying || state.modal || state.drawer ? 'hidden' : '';
+  document.body.classList.toggle('has-fly', flying);
   const url = new URL(location.href);
   url.searchParams.set('page', state.page);
   url.searchParams.set('variant', state.variant);
@@ -266,6 +269,7 @@ const ACTIONS = {
   'fly-back': () => { state.flight.phase = 'stop'; },
   'fly-restart': () => { state.flight = { ...state.flight, idx: 0, phase: 'stop', done: {} }; },
   ...SURFACE_ACTIONS,
+  ...EDIT_ACTIONS,
 };
 
 /**
@@ -337,8 +341,8 @@ document.addEventListener('toggle', (ev) => {
 }, true);
 document.addEventListener('keydown', (ev) => {
   if (ev.target.closest('input, textarea, select, [contenteditable]')) return;
-  if (ev.key === 'Escape') { state.modal = null; state.drawer = ''; render(); return; }
-  if (state.flight || state.modal || state.page !== 'planner') return;
+  if (ev.key === 'Escape') { state.modal = null; state.drawer = ''; if (state.ed) state.ed.panel = null; render(); return; }
+  if (state.flyOpen || state.modal || state.page !== 'planner') return;
   if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
     ACTIONS.variant({ dataset: { val: ev.key === 'ArrowLeft' ? '-1' : '1' } });
     render();

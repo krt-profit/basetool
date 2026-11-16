@@ -85,8 +85,8 @@ function sharedTab() {
  * @returns {string} markup
  */
 function routesPage() {
-  const tabs = [['saved', 'Gespeichert', `${state.savedList.length}/${SAVED_LIMIT}`], ['unit', 'Einheitsrouten', String(state.unitList.length)], ['shared', 'Von mir geteilt', String(state.shares.length)]];
-  const body = { saved: savedTab, unit: unitTab, shared: sharedTab }[state.routesTab]();
+  const tabs = [['saved', 'Gespeichert', `${state.savedList.length}/${SAVED_LIMIT}`], ['unit', 'Einheitsrouten', String(state.unitList.length)], ['shared', 'Von mir geteilt', String(state.shares.length)], ['flights', 'Meine Flüge', String(state.history.length)]];
+  const body = { saved: savedTab, unit: unitTab, shared: sharedTab, flights: flightsTab }[state.routesTab]();
   return `<div class="page-head"><div class="page-head__main"><span class="page-eyebrow">Handel</span><div class="page-title"><h1>Routen</h1></div></div>
       <div class="page-actions"><button class="btn btn-ghost" data-act="open-code">Code öffnen</button><button class="btn btn--cta" data-act="go" data-page="planner">${ic('plus')} Neue Route</button></div></div>
     <p class="proto-note"><strong>PROTOTYP</strong> · Gespeicherte Routen, Einheitsrouten und deine geteilten Routen als Tabs einer Seite. Erfundene Daten; jede Zeile öffnet dasselbe Beispiel.</p>

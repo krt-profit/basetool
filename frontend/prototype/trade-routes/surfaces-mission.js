@@ -69,7 +69,7 @@ function missionTile(mr, i, count) {
   const open = state.missionOpen.includes(mr.id);
   const mineIdx = state.missionRole === 'crew' ? mr.fleet.indexOf(MY_UNIT) : -1;
   const fleet = mr.fleet.length ? mr.fleet.map((k) => `<span class="tr-fleetchip ${k === MY_UNIT && state.missionRole === 'crew' ? 'is-mine' : ''}"><span class="squadron-badge">${k}</span>${esc(k === 'ALPHA' ? 'C2 Hercules „Lastesel“' : 'Drake Caterpillar (Typ)')}</span>`).join('') : '<span class="tr-hint">Schiffsliste der Quelle</span>';
-  const marks = mr.marks.map((m) => `<span class="tr-mark tr-mark--${m.kind}">${esc(m.text)}</span>`).join(' ');
+  const marks = (state.mflights[mr.id] ? '<span class="tr-mark tr-mark--forced">Einsatzflug läuft</span> ' : '') + mr.marks.map((m) => `<span class="tr-mark tr-mark--${m.kind}">${esc(m.text)}</span>`).join(' ');
   const order = manager ? `<span class="tr-iconbtns">${rowBtn('m-up', 'chevron-up', 'Nach oben', '', `data-val="${i}" ${i === 0 ? 'disabled' : ''}`)}${rowBtn('m-down', 'chevron-down', 'Nach unten', '', `data-val="${i}" ${i === count - 1 ? 'disabled' : ''}`)}</span>` : '';
   const head = `<div class="tr-mroute__head">
       <span class="tr-mroute__n">${i + 1}</span>
@@ -82,8 +82,12 @@ function missionTile(mr, i, count) {
   const adopt = manager
     ? `<button class="btn btn-outline btn-xs" data-act="m-adopt" data-val="${mr.id}">${ic('check')} Route aktualisieren</button><span class="tr-hint">übernimmt die Neuberechnung und benachrichtigt die Crews der Flotte</span>`
     : '<span class="tr-hint">Ein Einsatzleiter entscheidet, ob der Plan aktualisiert wird. Bis dahin gilt der gespeicherte Plan.</span>';
+  const running = Boolean(state.mflights[mr.id]);
+  const flyBtn = mineIdx >= 0 || manager
+    ? `<button class="btn btn--cta" data-act="fly-part" data-route="${plan.id}" data-ship="${mineIdx}">${ic('arrow-right')} ${running ? 'Mitfliegen' : 'Losfliegen'}${mineIdx >= 0 ? ' (mein Teil)' : ''}</button>`
+    : `<button class="btn btn-outline" data-act="fly" data-route="${plan.id}">${ic('arrow-right')} Als eigene Kopie fliegen</button>`;
   const copyOut = `<div class="tr-actions">
-      ${mineIdx >= 0 ? `<button class="btn btn--cta" data-act="fly-part" data-route="${plan.id}" data-ship="${mineIdx}">${ic('arrow-right')} Losfliegen (mein Teil)</button>` : `<button class="btn btn-outline" data-act="fly" data-route="${plan.id}">${ic('arrow-right')} Losfliegen</button>`}
+      ${flyBtn}
       <button class="btn btn-ghost" data-act="save-copy">${ic('save')} Als meine Route speichern</button>
       <button class="btn btn-ghost" data-act="to-unit">${ic('users')} Für Einheit</button>
       <button class="btn btn-ghost" data-act="share" data-route="${plan.id}">Teilen</button>
@@ -91,6 +95,7 @@ function missionTile(mr, i, count) {
   const managerTools = manager ? `<div class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="m-edit" data-val="${mr.id}">${ic('edit')} Im Planer bearbeiten</button><button class="btn btn-ghost btn-xs" data-act="m-optimise" data-val="${mr.id}">${ic('search')} Für die Flotte optimieren</button><button class="btn btn-quiet-danger btn-xs" data-act="confirm-m-remove" data-val="${mr.id}">${ic('trash')} Aus dem Einsatz entfernen</button></div>` : '';
   return `<article class="tr-mroute is-open">${head}<div class="tr-mroute__body">
       ${deviates ? `${compareStrip(plan, now, 'Gespeicherter Plan (Briefing) gegenüber einer Neuberechnung auf aktuellen Daten')}${devBox(now)}<div class="tr-row">${adopt}</div>` : `<div class="tr-warnline tr-warnline--ok">${ic('check')}<span>Keine Abweichungen: der gespeicherte Plan gilt.</span></div>`}
+      ${missionFlightPanel(mr, plan)}
       ${fleetPanel(mr)}
       ${routeOverheads()}
       ${copyOut}
@@ -119,7 +124,7 @@ function myPart() {
     }).join('');
     const transfer = ci < chain.length - 1 ? (() => { total += TRANSFER.dur; return `<div class="tr-transfer">${ic('arrow-right')}<span><strong>Leerflug</strong> ${esc(TRANSFER.from)} → ${esc(TRANSFER.to)} · ≈ ${fmtShort(TRANSFER.dur)} · ${dec(TRANSFER.gm)} Gm · mit dem Antrieb deiner C2</span></div>`; })() : '';
     const pos = state.missionRoutes.indexOf(mr) + 1;
-    return `<div class="tr-chain__route"><div class="tr-row tr-row--between"><div><span class="tr-cap">Route ${pos}</span> <strong>${esc(mr.name)}</strong> <span class="tr-hint">${fmtDur(plan.duration)}${plan.convoy ? ` · im Konvoi mit ${plan.ships.length - 1} Schiff` : ''}</span></div><button class="btn btn-ghost btn-xs" data-act="fly-part" data-route="${plan.id}" data-ship="${idx}">${ic('arrow-right')} Losfliegen</button></div><ol class="tr-chain__stops">${stops}</ol></div>${transfer}`;
+    return `<div class="tr-chain__route"><div class="tr-row tr-row--between"><div><span class="tr-cap">Route ${pos}</span> <strong>${esc(mr.name)}</strong> <span class="tr-hint">${fmtDur(plan.duration)}${plan.convoy ? ` · im Konvoi mit ${plan.ships.length - 1} Schiff` : ''}</span></div><button class="btn btn-ghost btn-xs" data-act="fly-part" data-route="${plan.id}" data-ship="${idx}">${ic('arrow-right')} ${state.mflights[mr.id] ? 'Mitfliegen' : 'Losfliegen'}</button></div><ol class="tr-chain__stops">${stops}</ol></div>${transfer}`;
   }).join('');
   return `<section class="card card--accent tr-chain"><div class="tr-row tr-row--between"><h4 class="card-title">Dein Teil · <span class="squadron-badge">${MY_UNIT}</span> C2 Hercules „Lastesel“</h4><span class="tr-hint">Kette ${fmtDur(total)} · ${chain.length} Routen in Einsatz-Reihenfolge</span></div>${parts}
     <div class="tr-hint">Nur Information: die Kette wird nicht optimiert, die nächste Route muss nicht dort beginnen, wo die letzte endet.</div></section>`;
