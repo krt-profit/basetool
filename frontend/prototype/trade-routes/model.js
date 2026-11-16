@@ -145,7 +145,8 @@ function computeRoute(base, shipList) {
   const stops = base.stops.map((st, si) => {
     const term = TERMINALS[st.t];
     const place = PLACES[term.place];
-    const jobs = st.jobs.map((j) => {
+    const gone = st.jobs.filter((j) => j.gone);
+    const jobs = st.jobs.filter((j) => !j.gone).map((j) => {
       const qty = Math.floor(j.qty * factor);
       const shares = split(qty, ships);
       const sum = qty * j.p;
@@ -166,7 +167,7 @@ function computeRoute(base, shipList) {
     const loaders = convoy ? ships.filter((_, i) => jobs.some((j) => j.shares[i] > 0)).length : 1;
     const surcharge = convoy ? SURCHARGE[place.kind] * Math.max(0, loaders - 1) : 0;
     const dur = st.over + st.load + surcharge;
-    return { ...st, si, term, place, jobs, dur, surcharge, loaders };
+    return { ...st, si, term, place, jobs, gone, dur, surcharge, loaders };
   });
   const legs = base.legs.map((l) => {
     const est = [l.est, ...shipEst].filter(Boolean);

@@ -22,6 +22,29 @@ const state = {
   myReports: [],
   showState: false,
   newPrices: params.get('open') === 'new-prices',
+  page: PAGES[params.get('page')] ? params.get('page') : 'planner',
+  routesTab: ['saved', 'unit', 'shared'].includes(params.get('tab')) ? params.get('tab') : 'saved',
+  routeSrc: ['saved', 'unit', 'shared', 'dead'].includes(params.get('src')) ? params.get('src') : 'saved',
+  openMode: params.get('alt') === 'B' ? 'page' : 'planner',
+  missionAlt: params.get('alt') === 'B' ? 'switch' : 'top',
+  missionRole: ['manager', 'crew', 'reader'].includes(params.get('role')) ? params.get('role') : 'manager',
+  role: ['member', 'officer', 'admin'].includes(params.get('role')) ? params.get('role') : 'member',
+  edited: false,
+  hangarGone: false,
+  missionSearch: null,
+  missionOpen: ['M1'],
+  missionView: 'all',
+  ratingsTab: 'places',
+  ratingFilter: { systems: [], kinds: [], sort: 'danger' },
+  place: PLACES[params.get('place')] ? params.get('place') : 'area18',
+  savedList: SAVED_ROUTES.map((s) => ({ ...s })),
+  unitList: UNIT_ROUTES.map((u) => ({ ...u })),
+  shares: MY_SHARES.map((s) => ({ ...s })),
+  revoked: [],
+  missionRoutes: MISSION_ROUTES.map((m) => ({ ...m, fleet: [...m.fleet], marks: [...m.marks] })),
+  myReportList: MY_REPORTS_SEED.map((r) => ({ ...r })),
+  switchOn: false,
+  switchDraft: false,
 };
 state.request = freshRequest(state.scenario);
 state.resultShips = state.request.ships.map((s) => ({ ...s }));
@@ -53,7 +76,8 @@ let toastTimer = 0;
  */
 function render() {
   const keep = ['.tr-a__groups', '.tr-drawer__body', '.tr-fly'].map((sel) => [sel, document.querySelector(sel)?.scrollTop || 0]);
-  const view = { A: variantA, B: variantB, C: variantC }[state.variant];
+  Object.keys(pageRoutes).forEach((k) => { delete pageRoutes[k]; });
+  const view = state.page === 'planner' ? { A: variantA, B: variantB, C: variantC }[state.variant] : surfacePage;
   document.getElementById('app').innerHTML = view();
   document.getElementById('overlay-root').innerHTML = (state.flight ? flightView() : '') + modal();
   document.getElementById('toast-root').innerHTML = toast();
@@ -62,8 +86,12 @@ function render() {
   document.body.style.overflow = state.flight || state.modal || state.drawer ? 'hidden' : '';
   document.body.classList.toggle('has-fly', Boolean(state.flight));
   const url = new URL(location.href);
+  url.searchParams.set('page', state.page);
   url.searchParams.set('variant', state.variant);
   url.searchParams.set('scenario', state.scenario);
+  if (state.page === 'route') url.searchParams.set('src', state.routeSrc); else url.searchParams.delete('src');
+  if (state.page === 'routes') url.searchParams.set('tab', state.routesTab); else url.searchParams.delete('tab');
+  if (state.page === 'place') url.searchParams.set('place', state.place); else url.searchParams.delete('place');
   history.replaceState(null, '', url);
 }
 
@@ -193,7 +221,7 @@ const ACTIONS = {
   rate: (el) => { state.modal = { kind: 'rate', route: el.dataset.route, stop: Number(el.dataset.stop), vals: {} }; },
   'rate-val': (el) => { state.modal.vals[el.dataset.key] = Number(el.dataset.val); },
   'rate-send': () => {
-    const r = results().find((x) => x.id === state.modal.route);
+    const r = routeById(state.modal.route);
     const s = r.stops[state.modal.stop];
     const n = Object.keys(state.modal.vals).length;
     if (!n) { say('Nichts ausgewählt', 'Wähle mindestens einen Wert.'); return; }
@@ -217,14 +245,18 @@ const ACTIONS = {
   'modal-ok': (el) => { state.modal = null; say(el.dataset.val, ''); },
   'modal-close': () => { state.modal = null; },
   'modal-scrim': (el, ev) => { if (ev.target === el) state.modal = null; },
-  edit: (el) => { state.modal = null; say(`Einstieg: ${el.dataset.what}`, 'Das Verhalten entscheidet das Ticket „Editing a calculated route“.'); },
-  followup: (el) => { state.modal = null; say(`Einstieg: ${el.dataset.what}`, 'Die Seite selbst kommt im Folge-Prototyp der übrigen Flächen.'); },
+  edit: (el) => {
+    state.modal = null;
+    if (state.page === 'route') state.edited = true;
+    say(`Einstieg: ${el.dataset.what}`, 'Das Verhalten entscheidet das Ticket „Editing a calculated route“.');
+  },
+  followup: (el) => { state.modal = null; say(`Nicht im Prototyp: ${el.dataset.what}`, 'Diese Fläche gibt es schon oder sie gehört nicht zu den Routen.'); },
   fly: (el) => { state.flight = { route: el.dataset.route, idx: 0, phase: 'stop', done: {}, ship: -1 }; },
   'fly-close': () => { state.flight = null; },
   'fly-ship': (el) => { state.flight.ship = Number(el.dataset.val); },
   'fly-job': (el) => { const k = el.dataset.key; state.flight.done[k] = !state.flight.done[k]; },
   'fly-next': () => {
-    const r = results().find((x) => x.id === state.flight.route);
+    const r = routeById(state.flight.route);
     const f = state.flight;
     if (f.phase === 'stop') f.phase = f.idx === r.stops.length - 1 ? 'done' : 'leg';
     else if (f.phase === 'leg') { f.idx += 1; f.phase = 'stop'; }
@@ -232,6 +264,7 @@ const ACTIONS = {
   },
   'fly-back': () => { state.flight.phase = 'stop'; },
   'fly-restart': () => { state.flight = { ...state.flight, idx: 0, phase: 'stop', done: {} }; },
+  ...SURFACE_ACTIONS,
 };
 
 /**
@@ -240,7 +273,7 @@ const ACTIONS = {
  * @returns {object} the dialog state
  */
 function soldOutModal(el) {
-  const r = results().find((x) => x.id === el.dataset.route);
+  const r = routeById(el.dataset.route);
   const s = r.stops[Number(el.dataset.stop)];
   const j = s.jobs.find((x) => x.key === el.dataset.key);
   return { kind: 'soldout', c: j.c, term: s.term.name, t: s.t };
@@ -252,12 +285,15 @@ document.addEventListener('click', (ev) => {
   const fn = ACTIONS[el.dataset.act];
   if (!fn) return;
   if (el.dataset.act === 'fly-job') return;
+  if (el.dataset.act === 'modal-scrim' && ev.target !== el) return;
+  if (el.tagName === 'A') ev.preventDefault();
   fn(el, ev);
   render();
 });
 
 document.addEventListener('change', (ev) => {
   const el = ev.target;
+  if (el.dataset.protoPage !== undefined) { goPage(el.value); render(); return; }
   if (el.dataset.act === 'fly-job') { ACTIONS['fly-job'](el); render(); return; }
   if (el.dataset.bind) {
     const k = el.dataset.bind;
@@ -301,7 +337,7 @@ document.addEventListener('toggle', (ev) => {
 document.addEventListener('keydown', (ev) => {
   if (ev.target.closest('input, textarea, select, [contenteditable]')) return;
   if (ev.key === 'Escape') { state.modal = null; state.drawer = ''; render(); return; }
-  if (state.flight || state.modal) return;
+  if (state.flight || state.modal || state.page !== 'planner') return;
   if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
     ACTIONS.variant({ dataset: { val: ev.key === 'ArrowLeft' ? '-1' : '1' } });
     render();

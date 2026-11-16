@@ -6,8 +6,22 @@
  */
 function pageHead() {
   return `<div class="page-head"><div class="page-head__main"><span class="page-eyebrow">Handel</span><div class="page-title"><h1>Routenplaner</h1></div></div>
-    <div class="page-actions"><button class="btn btn-ghost" data-act="followup" data-what="Gespeicherte Routen">${ic('list')} Gespeicherte Routen <span class="count-badge count-badge--sm">12</span></button><button class="btn btn-ghost" data-act="open-code">Code öffnen</button></div></div>
-    <p class="proto-note"><strong>PROTOTYP</strong> · Variante ${state.variant} · erfundene Daten, nichts wird gespeichert. Bearbeiten, Einheit und gespeicherte Routen sind nur Einstiege.</p>`;
+    <div class="page-actions"><button class="btn btn-ghost" data-act="go" data-page="routes" data-tab="saved">${ic('list')} Gespeicherte Routen <span class="count-badge count-badge--sm">${state.savedList.length}</span></button><button class="btn btn-ghost" data-act="open-code">Code öffnen</button></div></div>
+    ${state.page === 'planner' ? `<p class="proto-note"><strong>PROTOTYP</strong> · Variante ${state.variant} · erfundene Daten, nichts wird gespeichert. Bearbeiten ist nur ein Einstieg; die übrigen Flächen wählst du unten links.</p>` : ''}`;
+}
+
+/**
+ * Renders the request column of variant A.
+ * @returns {string} markup
+ */
+function requestAside() {
+  const groups = GROUPS.map(([k, label, f]) => `<details class="tr-a__group" data-group="${k}" ${state.aOpen.includes(k) ? 'open' : ''}><summary>${label}<span class="tr-sum">${esc(groupSummary(k))}</span>${ic('chevron-down')}</summary><div class="tr-a__group-body">${f()}</div></details>`).join('');
+  return `<aside class="tr-a__aside ${state.aCollapsed ? 'is-collapsed' : ''}" aria-label="Anfrage">
+    <div class="tr-a__aside-head"><h2>Anfrage</h2><div class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="reset">Zurücksetzen</button><button class="btn btn-ghost btn-xs" data-act="a-collapse" aria-expanded="${!state.aCollapsed}">${state.aCollapsed ? 'Aufklappen' : 'Einklappen'}</button></div></div>
+    <div class="tr-a__summary-mobile">${esc(GROUPS.slice(0, 3).map(([k]) => groupSummary(k)).join(' · '))} · ${activeFilters(state.request).length} Filter</div>
+    <div class="tr-a__groups">${groups}</div>
+    <div class="tr-a__aside-foot"><button class="btn btn--cta" data-act="compute">${ic('search')} Route berechnen</button><button class="btn btn-ghost btn-xs" data-act="overheads">Meine Stoppzeiten</button></div>
+  </aside>`;
 }
 
 /**
@@ -17,35 +31,20 @@ function pageHead() {
 function variantA() {
   const list = results();
   const sel = list[Math.min(state.sel, list.length - 1)];
-  const groups = GROUPS.map(([k, label, f]) => `<details class="tr-a__group" data-group="${k}" ${state.aOpen.includes(k) ? 'open' : ''}><summary>${label}<span class="tr-sum">${esc(groupSummary(k))}</span>${ic('chevron-down')}</summary><div class="tr-a__group-body">${f()}</div></details>`).join('');
-  const aside = `<aside class="tr-a__aside ${state.aCollapsed ? 'is-collapsed' : ''}" aria-label="Anfrage">
-    <div class="tr-a__aside-head"><h2>Anfrage</h2><div class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="reset">Zurücksetzen</button><button class="btn btn-ghost btn-xs" data-act="a-collapse" aria-expanded="${!state.aCollapsed}">${state.aCollapsed ? 'Aufklappen' : 'Einklappen'}</button></div></div>
-    <div class="tr-a__summary-mobile">${esc(GROUPS.slice(0, 3).map(([k]) => groupSummary(k)).join(' · '))} · ${activeFilters(state.request).length} Filter</div>
-    <div class="tr-a__groups">${groups}</div>
-    <div class="tr-a__aside-foot"><button class="btn btn--cta" data-act="compute">${ic('search')} Route berechnen</button><button class="btn btn-ghost btn-xs" data-act="overheads">Meine Stoppzeiten</button></div>
-  </aside>`;
-  if (!sel) return `${pageHead()}<div class="tr-a">${aside}<section class="tr-a__result">${statusBar()}<div class="empty-state">Die Suche läuft. Das erste Zwischenergebnis kommt nach dem 2-Stopp-Durchgang.</div></section></div>`;
+  const aside = requestAside();
+  const forMission = state.missionSearch ? `<div class="tr-warnline tr-warnline--info" role="status">${ic('info')}<span>Suche für die Einsatzroute „${esc(state.missionSearch.name)}“ im Einsatz „${esc(MISSION.name)}“: Schiffsliste ist die Routenflotte, Filter und Ziel kommen aus der Route. Der gespeicherte Plan bleibt, bis du ein Ergebnis übernimmst.</span></div>` : '';
+  if (!sel) return `${pageHead()}<div class="tr-a">${aside}<section class="tr-a__result">${forMission}${statusBar()}<div class="empty-state">Die Suche läuft. Das erste Zwischenergebnis kommt nach dem 2-Stopp-Durchgang.</div></section></div>`;
   const tabs = list.map((r, i) => `<button class="tab ${r === sel ? 'active' : ''}" role="tab" aria-selected="${r === sel}" data-act="sel" data-val="${i}">${i === 0 ? 'Beste Route' : `Alternative ${i}`}<small>${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · ${r.stops.length} Stopps</small></button>`).join('');
-  const timeline = sel.stops.map((s, i) => {
-    const leg = sel.legs[i];
-    const legHtml = leg ? `<li class="tr-timeline__leg ${leg.detour ? 'tr-timeline__leg--detour' : ''}">${legFacts(leg, false)}</li><li class="tr-insert"><button class="btn btn-ghost btn-xs" data-act="edit" data-what="Stopp einfügen">${ic('plus')} Stopp einfügen</button></li>` : '';
-    return `<li class="tr-timeline__stop" data-n="${i + 1}"><div class="tr-stoptile">
-        <div class="tr-stoptile__head"><div><div class="tr-stoptile__title">${esc(s.term.name)}</div><div class="tr-stoptile__sub">${s.place.kind} · ${s.place.body} · ${s.place.system}${sel.round && i === sel.stops.length - 1 ? ' · zurück zum Start' : ''}</div></div>${stopEdit(s, sel)}</div>
-        ${stopFacts(s)}
-        ${jobsTable(s, sel)}
-        ${shipLists(s, sel)}
-        ${stopTime(s)}
-      </div></li>${legHtml}`;
-  }).join('');
+  const timeline = stopTimeline(sel);
   return `${pageHead()}<div class="tr-a">${aside}<section class="tr-a__result" aria-label="Ergebnis">
-      ${statusBar()}
+      ${forMission}${statusBar()}
       <div><div class="tab-nav tr-a__tabs" role="tablist">${tabs}</div>
       <div class="tr-a__routecard">
         <div class="tr-row tr-row--between"><div><div class="tr-stoptile__title">${esc(sel.name)}</div><div class="tr-hint">${sel.convoy ? `Konvoi · ${sel.ships.length} Schiffe` : esc(state.resultShips[0].name)}</div></div>${routeActions(sel)}</div>
         ${kpis(sel)}
         ${warnList(sel)}
         ${shipShares(sel)}
-        <ol class="tr-timeline">${timeline}</ol>
+        ${timeline}
       </div></div>
     </section></div>`;
 }

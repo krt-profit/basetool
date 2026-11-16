@@ -43,7 +43,33 @@ function stopFacts(s) {
     ${rateChip('Gefahr', s.place.danger, MIN_RATERS.danger)}
     ${rateChip('Bugs', s.term.bugs, MIN_RATERS.bugs)}
     ${mine ? `<span class="tr-mark tr-mark--ok">${mine} eigene Meldung${mine > 1 ? 'en' : ''}</span>` : ''}
+    <button class="btn btn-ghost btn-xs" data-act="go-place" data-val="${s.term.place}" title="Stoppbewertungen dieses Orts">Alle Bewertungen</button>
   </div>`;
+}
+
+/**
+ * Formats the change from an old to a new value in percent.
+ * @param {number} now the new value
+ * @param {number} was the old value
+ * @returns {string} the signed change
+ */
+function pctChange(now, was) {
+  const p = ((now - was) / was) * 100;
+  return `${p > 0 ? '+' : p < 0 ? '−' : '±'}${dec(Math.abs(p))} %`;
+}
+
+/**
+ * Renders the deviation note of a cargo line against the route snapshot.
+ * @param {object} j the cargo line
+ * @param {string} cell price or qty
+ * @returns {string} markup
+ */
+function devNote(j, cell) {
+  if (!j.dev) return '';
+  if (cell === 'qty') return j.dev.wasQty ? `<div class="tr-was">vorher ${fmt(j.dev.wasQty)}</div>` : '';
+  if (!j.dev.was) return '';
+  const big = Math.abs((j.p - j.dev.was) / j.dev.was) >= 0.1;
+  return `<div class="tr-was ${big ? 'tr-was--big' : ''}">vorher ${fmt(j.dev.was)} · ${pctChange(j.p, j.dev.was)}</div>`;
 }
 
 /**
@@ -69,25 +95,33 @@ function jobsTable(s, r) {
     const sold = state.soldOut[j.key];
     const marks = [
       j.side === 'sell' && j.demand === null ? '<span class="tr-mark tr-mark--info tr-mark--est">Nachfrage unbekannt</span>' : '',
-      j.age > 168 ? '<span class="tr-mark tr-mark--warn">veraltet</span>' : '',
+      j.age > 360 ? '<span class="tr-mark tr-mark--danger">abgelaufen</span>' : j.age > 168 ? '<span class="tr-mark tr-mark--warn">veraltet</span>' : '',
       j.warn ? `<span class="tr-mark tr-mark--warn" title="Warnware">⚠ ${esc(j.warn)}</span>` : '',
       sold ? '<span class="tr-mark tr-mark--danger">ausverkauft (nur deine Route)</span>' : '',
+      j.neu ? '<span class="tr-mark tr-mark--est">neu im Plan</span>' : '',
+      j.dev && j.dev.reason ? `<span class="tr-mark tr-mark--danger">${esc(j.dev.reason)}</span>` : '',
     ].join(' ');
     const split = r.convoy ? `<div class="tr-hint">${j.shares.map((q, i) => `${esc(r.ships[i].short)} ${fmt(q)}`).join(' · ')}</div>` : '';
-    const action = j.side === 'buy'
+    const action = j.side === 'buy' && !r.frozen
       ? `<button class="btn btn-ghost btn-xs" data-act="soldout" data-key="${j.key}" data-route="${r.id}" data-stop="${s.si}">${sold ? 'Markierung aufheben' : 'Ausverkauft'}</button>`
       : '';
     return `<tr class="${sold ? 'is-soldout' : ''}">
       <td class="c-side"><span class="tr-side tr-side--${j.side}">${j.side === 'buy' ? 'Kauf' : 'Verkauf'}</span></td>
       <td class="c-ware"><span class="tr-cname">${esc(j.c)}</span> ${marks}${split}</td>
-      <td class="num c-qty">${fmt(j.qty)}<span class="c-unit"> SCU</span></td>
-      <td class="num c-price"><span class="c-unit">à </span>${fmt(j.p)}</td>
+      <td class="num c-qty">${fmt(j.qty)}<span class="c-unit"> SCU</span>${devNote(j, 'qty')}</td>
+      <td class="num c-price"><span class="c-unit">à </span>${fmt(j.p)}${devNote(j, 'price')}</td>
       <td class="num c-sum ${j.side === 'buy' ? 'neg' : 'pos'}">${j.side === 'buy' ? '−' : '+'}${fmt(j.sum)}</td>
       <td class="nowrap c-age"><span class="tr-hint">${ageText(j.age)}</span></td>
       <td class="c-avail">${availChip(j)}</td>
       <td class="num c-act">${action}</td>
     </tr>`;
-  }).join('');
+  }).join('') + (s.gone || []).map((g) => `<tr class="is-gone">
+      <td class="c-side"><span class="tr-side tr-side--${g.side}">${g.side === 'buy' ? 'Kauf' : 'Verkauf'}</span></td>
+      <td class="c-ware"><span class="tr-cname">${esc(g.c)}</span> <span class="tr-mark tr-mark--danger">${esc(g.gone)}</span></td>
+      <td class="num c-qty">${fmt(g.qty)}<span class="c-unit"> SCU</span></td>
+      <td class="num c-price"><span class="c-unit">à </span>${fmt(g.p)}</td>
+      <td class="num c-sum">—</td><td class="c-age"></td><td class="c-avail"></td><td class="c-act"></td>
+    </tr>`).join('');
   return `<div class="hud-scroll scroll-x"><table class="tr-jobs tr-jobs--stop"><thead><tr><th>Seite</th><th>Ware</th><th class="num">SCU</th><th class="num">aUEC/SCU</th><th class="num">Summe</th><th>Preis</th><th>Verfügbarkeit</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
@@ -154,14 +188,39 @@ function shipShares(r) {
  * Renders the per-ship shopping list of one stop.
  * @param {object} s the computed stop
  * @param {object} r the computed route
+ * @param {number} mine the index of the viewer's own ship, or -1
  * @returns {string} markup
  */
-function shipLists(s, r) {
+function shipLists(s, r, mine = -1) {
   if (!r.convoy) return '';
   return `<div class="tr-ships-mini">${r.ships.map((sh, i) => {
     const lines = s.jobs.filter((j) => j.shares[i] > 0).map((j) => `<div>${j.side === 'buy' ? '<span class="neg">Kauf</span>' : '<span class="pos">Verkauf</span>'} ${fmt(j.shares[i])} ${esc(j.c)}</div>`).join('');
-    return `<div><b>${esc(sh.label)}</b>${lines || '<div class="muted">fliegt mit, lädt nichts</div>'}</div>`;
+    return `<div class="${i === mine ? 'is-mine' : ''}"><b>${esc(sh.label)}</b>${i === mine ? ' <span class="tr-mark tr-mark--forced">dein Schiff</span>' : ''}${lines || '<div class="muted">fliegt mit, lädt nichts</div>'}</div>`;
   }).join('')}</div>`;
+}
+
+/**
+ * Renders the vertical stop timeline of a route.
+ * @param {object} r the computed route
+ * @param {{edit: boolean, insert: boolean, mine: number}} opts whether edit entry points show, and the viewer's ship
+ * @returns {string} markup
+ */
+function stopTimeline(r, opts = { edit: true, insert: true, mine: -1 }) {
+  const items = r.stops.map((s, i) => {
+    const leg = r.legs[i];
+    const insert = leg && opts.insert ? `<li class="tr-insert"><button class="btn btn-ghost btn-xs" data-act="edit" data-what="Stopp einfügen">${ic('plus')} Stopp einfügen</button></li>` : '';
+    const legHtml = leg ? `<li class="tr-timeline__leg ${leg.detour ? 'tr-timeline__leg--detour' : ''}">${legFacts(leg, false)}</li>${insert}` : '';
+    const hard = (s.gone && s.gone.length) || s.jobs.some((j) => (j.dev && j.dev.reason) || j.age > 168);
+    const tools = opts.edit ? stopEdit(s, r) : `<div class="tr-iconbtns"><button class="btn btn-ghost btn-xs" data-act="rate" data-route="${r.id}" data-stop="${s.si}">Bewerten</button></div>`;
+    return `<li class="tr-timeline__stop" data-n="${i + 1}"><div class="tr-stoptile ${hard && r.compared ? 'tr-stoptile--dev' : ''}">
+        <div class="tr-stoptile__head"><div><div class="tr-stoptile__title">${esc(s.term.name)}</div><div class="tr-stoptile__sub">${s.place.kind} · ${s.place.body} · ${s.place.system}${r.round && i === r.stops.length - 1 ? ' · zurück zum Start' : ''}</div></div>${tools}</div>
+        ${stopFacts(s)}
+        ${jobsTable(s, r)}
+        ${shipLists(s, r, opts.mine)}
+        ${stopTime(s)}
+      </div></li>${legHtml}`;
+  }).join('');
+  return `<ol class="tr-timeline">${items}</ol>`;
 }
 
 /**
@@ -171,11 +230,17 @@ function shipLists(s, r) {
  */
 function routeActions(r) {
   const saved = state.saved.includes(r.id);
+  if (state.missionSearch) {
+    return `<div class="tr-actions">
+      <button class="btn btn--cta" data-act="mission-adopt">${ic('check')} In den Einsatz übernehmen</button>
+      <button class="btn btn-ghost" data-act="go" data-page="mission">${ic('arrow-left')} Zurück zum Einsatz</button>
+    </div>`;
+  }
   return `<div class="tr-actions">
     <button class="btn btn--cta" data-act="save" data-route="${r.id}" ${saved ? 'aria-pressed="true"' : ''}>${ic(saved ? 'check' : 'save')} ${saved ? 'Gespeichert' : 'Speichern'}</button>
     <button class="btn btn-outline" data-act="fly" data-route="${r.id}">${ic('arrow-right')} Losfliegen</button>
     <button class="btn btn-ghost" data-act="share" data-route="${r.id}">Teilen</button>
-    <button class="btn btn-ghost" data-act="followup" data-what="Als Einheitsroute übernehmen">${ic('users')} Für Einheit</button>
+    <button class="btn btn-ghost" data-act="to-unit">${ic('users')} Für Einheit</button>
   </div>`;
 }
 
@@ -217,4 +282,15 @@ function statusBar() {
 function results() {
   const ids = state.search.phase === 'running' ? [[], ['r3'], ['r1', 'r3']][state.search.step] || [] : state.results;
   return rank(ids.map((id) => computeRoute(ROUTES.find((x) => x.id === id), state.resultShips)), state.request);
+}
+
+const pageRoutes = {};
+
+/**
+ * Finds a computed route shown on the current page, falling back to the planner's results.
+ * @param {string} id the route id
+ * @returns {object|undefined} the computed route
+ */
+function routeById(id) {
+  return pageRoutes[id] || results().find((x) => x.id === id);
 }

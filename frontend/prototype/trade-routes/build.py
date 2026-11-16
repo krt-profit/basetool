@@ -6,7 +6,22 @@ import re
 
 HERE = pathlib.Path(__file__).resolve().parent
 DS = HERE.parents[2] / ".claude" / "skills" / "das-kartell-design"
-SCRIPTS = ["data.js", "model.js", "fragments.js", "forms.js", "variants.js", "overlays.js", "app.js"]
+SCRIPTS = [
+    "data.js",
+    "surfaces-data.js",
+    "model.js",
+    "fragments.js",
+    "forms.js",
+    "variants.js",
+    "surfaces-route.js",
+    "surfaces-lists.js",
+    "surfaces-mission.js",
+    "surfaces-ratings.js",
+    "surfaces-admin.js",
+    "surfaces-app.js",
+    "overlays.js",
+    "app.js",
+]
 WEIGHTS = {300: "Lato-Light", 400: "Lato-Regular", 700: "Lato-Bold", 900: "Lato-Black"}
 
 

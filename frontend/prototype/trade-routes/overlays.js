@@ -6,7 +6,7 @@
  */
 function flightView() {
   const f = state.flight;
-  const r = results().find((x) => x.id === f.route);
+  const r = routeById(f.route);
   if (!r) return '';
   const stop = r.stops[f.idx];
   const qty = (j) => (r.convoy && f.ship >= 0 ? j.shares[f.ship] : j.qty);
@@ -58,7 +58,9 @@ function modal() {
   if (!m) return '';
   const shell = (title, body, foot, wide) => `<div class="tr-modal-overlay" data-act="modal-scrim"><div class="krt-modal ${wide ? 'krt-modal--wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="krt-modal-head"><h2>${title}</h2><button class="btn btn-ghost btn-xs btn-icon" data-act="modal-close" aria-label="Schließen">${ic('close')}</button></div><div class="krt-modal-body">${body}</div><div class="krt-modal-foot">${foot}</div></div></div>`;
   const cancel = '<button class="btn btn-ghost" data-act="modal-close">Abbrechen</button>';
-  const r = m.route ? results().find((x) => x.id === m.route) : null;
+  const own = surfaceModal(m, shell);
+  if (own) return own;
+  const r = m.route ? routeById(m.route) : null;
   if (m.kind === 'save') {
     return shell('Route speichern', `<div class="tr-field"><label for="m-name">Name</label><input id="m-name" type="text" value="${esc(r.name)}" maxlength="80"></div><div class="tr-field"><label for="m-note">Notiz <span class="tr-hint">nur für dich, wird nicht geteilt</span></label><textarea id="m-note" rows="3"></textarea></div><span class="tr-hint">Gespeichert werden Anfrage und Ergebnis. Beim Öffnen wird die Fracht auf den gespeicherten Stopps neu geplant und Abweichungen markiert. 12 von 50 Plätzen belegt.</span>`, `${cancel}<button class="btn btn--cta" data-act="save-confirm" data-route="${r.id}">${ic('save')} Speichern</button>`);
   }
@@ -83,7 +85,7 @@ function modal() {
     return shell('Meine Stoppzeiten', `<span class="tr-hint">Gelten für alle deine Berechnungen, auch über Clients. Am Server gespeichert.</span><table class="tr-jobs"><thead><tr><th>Ortsart</th><th class="num">Grundzeit (min)</th><th class="num">Konvoi-Aufschlag je Schiff (min)</th></tr></thead><tbody>${KINDS.map((k) => `<tr><td>${k}</td><td class="num"><input type="number" min="0" value="${OVERHEADS[k]}" style="width:5rem"></td><td class="num"><input type="number" min="0" value="${SURCHARGE[k] / 60}" style="width:5rem"></td></tr>`).join('')}</tbody></table>`, `<button class="btn btn-ghost" data-act="modal-close">Standard</button><button class="btn btn--cta" data-act="modal-ok" data-val="Stoppzeiten gespeichert">${ic('save')} Speichern</button>`, true);
   }
   if (m.kind === 'code') {
-    return shell('Geteilte Route öffnen', '<div class="tr-field"><label for="m-code">Code</label><input id="m-code" type="text" placeholder="z. B. K7Q2-M9XA-P3" maxlength="12"></div>', `${cancel}<button class="btn btn--cta" data-act="followup" data-what="Geteilte Route öffnen">Öffnen</button>`);
+    return shell('Geteilte Route öffnen', '<div class="tr-field"><label for="m-code">Code</label><input id="m-code" type="text" placeholder="z. B. K7Q2-M9XA-P3" maxlength="12"></div>', `${cancel}<button class="btn btn--cta" data-act="open-code-go" data-input="m-code">Öffnen</button>`);
   }
   return '';
 }
@@ -109,11 +111,13 @@ function protoBar() {
     flight: state.flight, saved: state.saved, soldOut: Object.keys(state.soldOut), myReports: state.myReports, modal: state.modal && state.modal.kind,
     activeFilters: activeFilters(state.request).map((f) => f.label),
   }, null, 2))}</div>` : '';
-  return `${dump}<div class="proto-bar" role="toolbar" aria-label="Prototyp">
+  const planner = state.page === 'planner' ? `<span class="proto-bar__sep"></span>
     <button data-act="variant" data-val="-1" aria-label="Vorige Variante">◀</button><span class="proto-bar__label">${state.variant} · ${VARIANTS[state.variant]}</span><button data-act="variant" data-val="1" aria-label="Nächste Variante">▶</button>
     <span class="proto-bar__sep"></span>
     <button data-act="scenario" data-val="single" aria-pressed="${state.scenario === 'single'}">1 Schiff</button><button data-act="scenario" data-val="convoy" aria-pressed="${state.scenario === 'convoy'}">Konvoi</button>
     <span class="proto-bar__sep"></span>
-    <button data-act="deadline" aria-pressed="${state.search.deadline}" title="Suche endet an der 60-s-Frist">Frist</button><button data-act="new-prices" aria-pressed="${state.newPrices}" title="Ein Preislauf hat einen neuen Datenstand gebaut">Preise</button><button data-act="state" aria-pressed="${state.showState}">Zustand</button>
+    <button data-act="deadline" aria-pressed="${state.search.deadline}" title="Suche endet an der 60-s-Frist">Frist</button><button data-act="new-prices" aria-pressed="${state.newPrices}" title="Ein Preislauf hat einen neuen Datenstand gebaut">Preise</button>` : '';
+  return `${dump}<div class="proto-bar" role="toolbar" aria-label="Prototyp">
+    ${surfaceBarControls()}${planner}<span class="proto-bar__sep"></span><button data-act="state" aria-pressed="${state.showState}">Zustand</button>
   </div>`;
 }
