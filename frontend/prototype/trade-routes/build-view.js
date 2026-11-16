@@ -170,10 +170,12 @@ function buildPanel(k, where) {
   const key = res.oneKey ? 'here' : state.bd.key;
   const list = key === 'onward' ? res.byOnward : res.byHere;
   const prevT = k.w.stops[res.pos - 1].t;
-  const endT = res.oneKey ? k.w.stops[k.w.stops.length - 1].t : '';
+  const endT = res.pos < k.w.stops.length ? k.w.stops[k.w.stops.length - 1].t : '';
   const o = { key, holding: mode === 'hold' && holdShown, prev: start ? '' : prevT, start };
   const keys = res.oneKey
-    ? `<div class="tr-hint">${ic('info')} Ziel steht fest: der Wert jedes Kandidaten enthält schon die Etappe nach ${esc(pname(endT))}. Darum gibt es nur eine Sortierung.</div>`
+    ? `<div class="tr-hint">${ic('info')} ${endT
+      ? `Ziel steht fest: der Wert jedes Kandidaten enthält schon die Etappe nach ${esc(pname(endT))}. Darum gibt es nur eine Sortierung.`
+      : `Letzter Stopp vor der Routengrenze (${ROUTE_LIMIT}${k.ctx === 'flight' ? ', erledigte mitgezählt' : ''}): danach folgt kein Weiterflug mehr. Darum gibt es nur „Bis hier“.`}</div>`
     : `<div class="tr-field"><span class="tr-cap">Sortieren</span><div class="krt-segmented krt-segmented--sm" role="group" aria-label="Sortieren">${['onward', 'here'].map((x) => `<button type="button" class="krt-segmented__item" data-act="bd-key" data-val="${x}" aria-pressed="${key === x}">${KEY_LABEL[x]}</button>`).join('')}</div><span class="tr-hint">${key === 'onward' ? 'Wert bis hier plus der beste einzelne Sprung danach (Schätzung). Ein Stopp zählt auch mit dem, was er für die nächste Etappe bietet.' : 'Genauer Wert der Route mit diesem Terminal als letztem Stopp, Fracht geplant.'}</span></div>`;
   const hold = holdShown
     ? `<div class="tr-field"><span class="tr-cap">Bisherige Fracht</span><div class="krt-segmented krt-segmented--sm" role="group" aria-label="Bisherige Fracht">${[['hold', 'Halten'], ['replan', 'Neu planen']].map(([x, l]) => `<button type="button" class="krt-segmented__item" data-act="bd-hold" data-val="${x}" aria-pressed="${state.bd.hold === x}">${l}</button>`).join('')}</div><span class="tr-hint">${state.bd.hold === 'hold' ? `Die Ladeaufträge bis zum vorletzten Stopp bleiben; geplant werden nur ${esc(pname(prevT))} und der neue Stopp.` : 'Der ganze Frachtplan wird neu geplant; auch frühere Stopps können sich ändern.'}</span></div>`
@@ -186,7 +188,7 @@ function buildPanel(k, where) {
     ? `<div class="tr-bd__block tr-bd__block--forced"><div class="tr-cap">${ic('map-pin')} Erzwungen · fehlt noch</div><ol class="tr-cands2">${res.forced.map((c) => candLine(k, c, 0, o)).join('')}</ol></div>`
     : '';
   const rows = list.map((c, i) => candLine(k, c, i + 1, o)).join('');
-  const title = start ? `Zweiten Stopp wählen · ab ${esc(tname(prevT))}` : res.oneKey ? `Stopp anhängen vor dem Ziel ${esc(tname(endT))}` : `Stopp anhängen nach ${esc(tname(prevT))}`;
+  const title = start ? `Zweiten Stopp wählen · ab ${esc(tname(prevT))}` : endT ? `Stopp anhängen vor dem Ziel ${esc(tname(endT))}` : `Stopp anhängen nach ${esc(tname(prevT))}`;
   const close = where === 'inline' ? `<button class="btn btn-ghost btn-xs" data-act="bd-inline" data-val="0">${ic('chevron-up')} Einklappen</button>` : '';
   return `<div class="tr-panel tr-bd tr-bd--${where}" role="group" aria-label="${title}">
     ${where === 'dialog' ? '' : `<div class="tr-row tr-row--between"><div class="tr-cap tr-bd__title">${title}</div>${close}</div>`}

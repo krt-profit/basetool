@@ -153,9 +153,10 @@ function earlierChanges(diff, ts, pos) {
  * @param {number} pos the index it takes
  * @param {string} mode hold or replan
  * @param {object} base the computed current route
+ * @param {boolean} fills whether this append fills the route limit, so no onward hop follows
  * @returns {object} the candidate
  */
-function scoreCandidate(k, t, pos, mode, base) {
+function scoreCandidate(k, t, pos, mode, base, fills) {
   const ships = k.w.ships;
   const why = failsFilter(t);
   const stops = [...k.w.stops.slice(0, pos), { t, pinned: true, appended: true, failsFilter: why, forced: state.request.forced.includes(t) }, ...k.w.stops.slice(pos)];
@@ -164,7 +165,7 @@ function scoreCandidate(k, t, pos, mode, base) {
   const e = evaluate(w2, ships);
   const ts = stops.map((s) => s.t);
   const atEnd = pos === stops.length - 1;
-  const hop = atEnd ? onwardHop(t, ts, ships, e) : null;
+  const hop = atEnd && !fills ? onwardHop(t, ts, ships, e) : null;
   const limit = timeLimitSec();
   const here = objectiveValue(e.profit, e.duration);
   const onward = hop ? hop.score : here;
@@ -195,7 +196,7 @@ function scoreCandidate(k, t, pos, mode, base) {
  * Lists the append candidates of a working route under both keys, with the forced terminals still missing in a block of their own.
  * @param {object} k the edit context
  * @param {string} mode hold or replan
- * @returns {{pos: number, base: object, byOnward: Array<object>, byHere: Array<object>, forced: Array<object>, oneKey: boolean}} the candidate lists
+ * @returns {{pos: number, base: object, byOnward: Array<object>, byHere: Array<object>, forced: Array<object>, oneKey: boolean, fills: boolean}} the candidate lists; one key with a fixed end or when the append fills the route limit
  */
 function buildCandidates(k, mode) {
   const r = state.request;
@@ -206,11 +207,12 @@ function buildCandidates(k, mode) {
   const base = evaluate(k.w, k.w.ships);
   const onRoute = k.w.stops.map((s) => s.t);
   const pool = Object.keys(TERMINALS).filter((t) => POS[TERMINALS[t].place] && PRICES[t] && !onRoute.includes(t));
-  const all = pool.filter((t) => !failsFilter(t)).map((t) => scoreCandidate(k, t, pos, mode, base));
+  const fills = k.w.stops.length + 1 >= ROUTE_LIMIT;
+  const all = pool.filter((t) => !failsFilter(t)).map((t) => scoreCandidate(k, t, pos, mode, base, fills));
   const rank = (key) => [...all].sort((a, b) => (a.over === b.over ? b[key] - a[key] : a.over ? 1 : -1)).slice(0, BUILD_LIST_SIZE);
   const missing = r.forced.filter((t) => !onRoute.includes(t) && !r.excluded.includes(t));
-  const forced = missing.map((t) => all.find((c) => c.t === t) || scoreCandidate(k, t, pos, mode, base));
-  const res = { pos, base, byOnward: rank('onward'), byHere: rank('here'), forced, oneKey: pos < k.w.stops.length };
+  const forced = missing.map((t) => all.find((c) => c.t === t) || scoreCandidate(k, t, pos, mode, base, fills));
+  const res = { pos, base, byOnward: rank('onward'), byHere: rank('here'), forced, oneKey: pos < k.w.stops.length || fills, fills };
   memo = memo || {};
   memo[sig] = res;
   buildMemo.set(k.w, memo);

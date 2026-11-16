@@ -6134,9 +6134,10 @@ function earlierChanges(diff, ts, pos) {
  * @param {number} pos the index it takes
  * @param {string} mode hold or replan
  * @param {object} base the computed current route
+ * @param {boolean} fills whether this append fills the route limit, so no onward hop follows
  * @returns {object} the candidate
  */
-function scoreCandidate(k, t, pos, mode, base) {
+function scoreCandidate(k, t, pos, mode, base, fills) {
   const ships = k.w.ships;
   const why = failsFilter(t);
   const stops = [...k.w.stops.slice(0, pos), { t, pinned: true, appended: true, failsFilter: why, forced: state.request.forced.includes(t) }, ...k.w.stops.slice(pos)];
@@ -6145,7 +6146,7 @@ function scoreCandidate(k, t, pos, mode, base) {
   const e = evaluate(w2, ships);
   const ts = stops.map((s) => s.t);
   const atEnd = pos === stops.length - 1;
-  const hop = atEnd ? onwardHop(t, ts, ships, e) : null;
+  const hop = atEnd && !fills ? onwardHop(t, ts, ships, e) : null;
   const limit = timeLimitSec();
   const here = objectiveValue(e.profit, e.duration);
   const onward = hop ? hop.score : here;
@@ -6176,7 +6177,7 @@ function scoreCandidate(k, t, pos, mode, base) {
  * Lists the append candidates of a working route under both keys, with the forced terminals still missing in a block of their own.
  * @param {object} k the edit context
  * @param {string} mode hold or replan
- * @returns {{pos: number, base: object, byOnward: Array<object>, byHere: Array<object>, forced: Array<object>, oneKey: boolean}} the candidate lists
+ * @returns {{pos: number, base: object, byOnward: Array<object>, byHere: Array<object>, forced: Array<object>, oneKey: boolean, fills: boolean}} the candidate lists; one key with a fixed end or when the append fills the route limit
  */
 function buildCandidates(k, mode) {
   const r = state.request;
@@ -6187,11 +6188,12 @@ function buildCandidates(k, mode) {
   const base = evaluate(k.w, k.w.ships);
   const onRoute = k.w.stops.map((s) => s.t);
   const pool = Object.keys(TERMINALS).filter((t) => POS[TERMINALS[t].place] && PRICES[t] && !onRoute.includes(t));
-  const all = pool.filter((t) => !failsFilter(t)).map((t) => scoreCandidate(k, t, pos, mode, base));
+  const fills = k.w.stops.length + 1 >= ROUTE_LIMIT;
+  const all = pool.filter((t) => !failsFilter(t)).map((t) => scoreCandidate(k, t, pos, mode, base, fills));
   const rank = (key) => [...all].sort((a, b) => (a.over === b.over ? b[key] - a[key] : a.over ? 1 : -1)).slice(0, BUILD_LIST_SIZE);
   const missing = r.forced.filter((t) => !onRoute.includes(t) && !r.excluded.includes(t));
-  const forced = missing.map((t) => all.find((c) => c.t === t) || scoreCandidate(k, t, pos, mode, base));
-  const res = { pos, base, byOnward: rank('onward'), byHere: rank('here'), forced, oneKey: pos < k.w.stops.length };
+  const forced = missing.map((t) => all.find((c) => c.t === t) || scoreCandidate(k, t, pos, mode, base, fills));
+  const res = { pos, base, byOnward: rank('onward'), byHere: rank('here'), forced, oneKey: pos < k.w.stops.length || fills, fills };
   memo = memo || {};
   memo[sig] = res;
   buildMemo.set(k.w, memo);
@@ -8235,10 +8237,12 @@ function buildPanel(k, where) {
   const key = res.oneKey ? 'here' : state.bd.key;
   const list = key === 'onward' ? res.byOnward : res.byHere;
   const prevT = k.w.stops[res.pos - 1].t;
-  const endT = res.oneKey ? k.w.stops[k.w.stops.length - 1].t : '';
+  const endT = res.pos < k.w.stops.length ? k.w.stops[k.w.stops.length - 1].t : '';
   const o = { key, holding: mode === 'hold' && holdShown, prev: start ? '' : prevT, start };
   const keys = res.oneKey
-    ? `<div class="tr-hint">${ic('info')} Ziel steht fest: der Wert jedes Kandidaten enthält schon die Etappe nach ${esc(pname(endT))}. Darum gibt es nur eine Sortierung.</div>`
+    ? `<div class="tr-hint">${ic('info')} ${endT
+      ? `Ziel steht fest: der Wert jedes Kandidaten enthält schon die Etappe nach ${esc(pname(endT))}. Darum gibt es nur eine Sortierung.`
+      : `Letzter Stopp vor der Routengrenze (${ROUTE_LIMIT}${k.ctx === 'flight' ? ', erledigte mitgezählt' : ''}): danach folgt kein Weiterflug mehr. Darum gibt es nur „Bis hier“.`}</div>`
     : `<div class="tr-field"><span class="tr-cap">Sortieren</span><div class="krt-segmented krt-segmented--sm" role="group" aria-label="Sortieren">${['onward', 'here'].map((x) => `<button type="button" class="krt-segmented__item" data-act="bd-key" data-val="${x}" aria-pressed="${key === x}">${KEY_LABEL[x]}</button>`).join('')}</div><span class="tr-hint">${key === 'onward' ? 'Wert bis hier plus der beste einzelne Sprung danach (Schätzung). Ein Stopp zählt auch mit dem, was er für die nächste Etappe bietet.' : 'Genauer Wert der Route mit diesem Terminal als letztem Stopp, Fracht geplant.'}</span></div>`;
   const hold = holdShown
     ? `<div class="tr-field"><span class="tr-cap">Bisherige Fracht</span><div class="krt-segmented krt-segmented--sm" role="group" aria-label="Bisherige Fracht">${[['hold', 'Halten'], ['replan', 'Neu planen']].map(([x, l]) => `<button type="button" class="krt-segmented__item" data-act="bd-hold" data-val="${x}" aria-pressed="${state.bd.hold === x}">${l}</button>`).join('')}</div><span class="tr-hint">${state.bd.hold === 'hold' ? `Die Ladeaufträge bis zum vorletzten Stopp bleiben; geplant werden nur ${esc(pname(prevT))} und der neue Stopp.` : 'Der ganze Frachtplan wird neu geplant; auch frühere Stopps können sich ändern.'}</span></div>`
@@ -8251,7 +8255,7 @@ function buildPanel(k, where) {
     ? `<div class="tr-bd__block tr-bd__block--forced"><div class="tr-cap">${ic('map-pin')} Erzwungen · fehlt noch</div><ol class="tr-cands2">${res.forced.map((c) => candLine(k, c, 0, o)).join('')}</ol></div>`
     : '';
   const rows = list.map((c, i) => candLine(k, c, i + 1, o)).join('');
-  const title = start ? `Zweiten Stopp wählen · ab ${esc(tname(prevT))}` : res.oneKey ? `Stopp anhängen vor dem Ziel ${esc(tname(endT))}` : `Stopp anhängen nach ${esc(tname(prevT))}`;
+  const title = start ? `Zweiten Stopp wählen · ab ${esc(tname(prevT))}` : endT ? `Stopp anhängen vor dem Ziel ${esc(tname(endT))}` : `Stopp anhängen nach ${esc(tname(prevT))}`;
   const close = where === 'inline' ? `<button class="btn btn-ghost btn-xs" data-act="bd-inline" data-val="0">${ic('chevron-up')} Einklappen</button>` : '';
   return `<div class="tr-panel tr-bd tr-bd--${where}" role="group" aria-label="${title}">
     ${where === 'dialog' ? '' : `<div class="tr-row tr-row--between"><div class="tr-cap tr-bd__title">${title}</div>${close}</div>`}
