@@ -92,7 +92,7 @@ public final class SecurityHeaders {
               "geolocation=(), camera=(), microphone=(), fullscreen=(),"
                   + " payment=(), usb=(), serial=(), bluetooth=(), accelerometer=(),"
                   + " gyroscope=(), magnetometer=(), display-capture=(),"
-                  + " clipboard-read=(), clipboard-write=(), interest-cohort=()"));
+                  + " clipboard-read=(), clipboard-write=(self), interest-cohort=()"));
       headers.contentTypeOptions(Customizer.withDefaults());
     };
   }
