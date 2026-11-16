@@ -232,7 +232,7 @@ function routeActions(r) {
   const saved = state.saved.includes(r.id);
   if (state.missionSearch) {
     return `<div class="tr-actions">
-      <button class="btn btn--cta" data-act="mission-adopt">${ic('check')} In den Einsatz übernehmen</button>
+      <button class="btn btn--cta" data-act="mission-adopt">${ic('check')} ${state.missionSearch.mode === 'edit' ? 'Einsatzroute aktualisieren' : 'In den Einsatz übernehmen'}</button>
       <button class="btn btn-ghost" data-act="go" data-page="mission">${ic('arrow-left')} Zurück zum Einsatz</button>
     </div>`;
   }

@@ -90,30 +90,32 @@ function mayEditUnitRoute() {
 }
 
 /**
- * Renders the actions of an opened route for its source and edit state.
+ * Renders the actions of an opened route for its source, where it is shown and its edit state.
  * @param {string} src saved, unit or shared
  * @param {object} now the recomputed route
+ * @param {boolean} inPlanner whether the route is the planner's working state
  * @returns {string} markup
  */
-function openedActions(src, now) {
+function openedActions(src, now, inPlanner) {
   const fly = (cls) => `<button class="btn ${cls}" data-act="fly" data-route="${now.id}">${ic('arrow-right')} Losfliegen</button>`;
   const mine = (cls) => `<button class="btn ${cls}" data-act="save-copy">${ic('save')} Als meine Route speichern</button>`;
   const myShip = '<button class="btn btn-ghost" data-act="my-ship">Mit meinem Schiff berechnen</button>';
   const toUnit = `<button class="btn btn-ghost" data-act="to-unit">${ic('users')} Für Einheit</button>`;
   const share = `<button class="btn btn-ghost" data-act="share" data-route="${now.id}">Teilen</button>`;
+  const edit = `<button class="btn btn-ghost" data-act="edit-in-planner">${ic('edit')} Im Planer bearbeiten</button>`;
   let main = '';
   let more = '';
   if (src === 'saved') {
     main = state.edited
       ? `<button class="btn btn--cta" data-act="saved-update">${ic('save')} Gespeicherte Route aktualisieren</button><button class="btn btn-ghost" data-act="save-new">Als neue speichern</button>${fly('btn-outline')}`
-      : `${fly('btn--cta')}${share}${toUnit}`;
+      : `${fly('btn--cta')}${share}${toUnit}${inPlanner ? '' : edit}`;
     more = `<button class="btn btn-ghost btn-xs" data-act="research">${ic('search')} Mit diesen Einstellungen neu suchen</button><button class="btn btn-ghost btn-xs" data-act="pin-optimise">Mit festen Stopps optimieren</button>`;
   } else if (src === 'unit') {
-    if (state.edited && mayEditUnitRoute()) main = `<button class="btn btn--cta" data-act="unit-update">${ic('save')} Einheitsroute aktualisieren</button>${mine('btn-ghost')}`;
-    else if (state.edited) main = `${mine('btn--cta')}<span class="tr-hint">Zurückschreiben dürfen nur Vagabund (eingetragen), Offiziere und Einsatzleiter von ALPHA.</span>`;
-    else main = `${fly('btn--cta')}${mine('btn-ghost')}${myShip}${share}`;
+    if (inPlanner && state.edited && mayEditUnitRoute()) main = `<button class="btn btn--cta" data-act="unit-update">${ic('save')} Einheitsroute aktualisieren</button><button class="btn btn-ghost" data-act="to-unit">Als neue Einheitsroute speichern</button>${mine('btn-ghost')}`;
+    else if (inPlanner && state.edited) main = `<button class="btn btn--cta" data-act="to-unit">${ic('users')} Als neue Einheitsroute speichern</button>${mine('btn-ghost')}<span class="tr-hint">Zurückschreiben dürfen nur Vagabund (eingetragen), Offiziere und Einsatzleiter von ALPHA.</span>`;
+    else main = `${fly('btn--cta')}${mine('btn-ghost')}${inPlanner ? '' : `${myShip}${edit}`}${share}`;
   } else {
-    main = `${mine('btn--cta')}${fly('btn-outline')}<button class="btn btn-ghost" data-act="edit-in-planner">${ic('edit')} Im Planer bearbeiten</button>${myShip}${toUnit}`;
+    main = `${mine('btn--cta')}${fly('btn-outline')}${inPlanner ? '<span class="tr-hint">Eine geteilte Route bleibt eingefroren; eine geänderte Fassung teilst du neu.</span>' : `${edit}${myShip}`}${toUnit}`;
   }
   return `<div class="tr-actions">${main}</div>${more ? `<div class="tr-actions">${more}</div>` : ''}`;
 }
@@ -121,27 +123,28 @@ function openedActions(src, now) {
 /**
  * Renders the result side of an opened route: status, comparison, deviations, figures and timeline.
  * @param {string} src saved, unit or shared
+ * @param {boolean} inPlanner whether the route is the planner's working state
  * @returns {string} markup
  */
-function openedResult(src) {
+function openedResult(src, inPlanner) {
   const { o, old, now } = openedRoute(src);
   const after = {
     saved: 'Die Momentaufnahme steht jetzt auf diesem Stand; das nächste Öffnen vergleicht hiermit.',
     unit: 'Nichts wird zurückgeschrieben. Die Momentaufnahme der Einheit ändert nur „Einheitsroute aktualisieren“.',
     shared: 'Eingefrorene Kopie: verglichen wird mit dem Stand beim Teilen, nichts wird zurückgeschrieben.',
   }[src];
-  const edited = state.edited ? `<div class="tr-warnline tr-warnline--info">${ic('edit')}<span>Bearbeitet: Stopps geändert. Die ${src === 'unit' ? 'Einheitsroute' : 'gespeicherte Route'} bleibt, bis du sie aktualisierst.</span></div>` : '';
+  const edited = state.edited && inPlanner ? `<div class="tr-warnline tr-warnline--info">${ic('edit')}<span>Bearbeitet: Stopps geändert. Die ${{ saved: 'gespeicherte Route', unit: 'Einheitsroute', shared: 'geteilte Route' }[src]} bleibt, bis du ${src === 'shared' ? 'eine eigene speicherst' : 'sie aktualisierst'}.</span></div>` : '';
   return `<div class="tr-status" role="status">${ic('check')}<span>Fracht auf den ${src === 'shared' ? 'geteilten' : 'gespeicherten'} Stopps neu geplant · schnelle Spur · 0,8 s · Datenstand 14:00 Uhr</span><span class="muted">${after}</span></div>
     ${edited}
     ${compareStrip(old, now, `Vergleich mit der Momentaufnahme vom ${o.since}`)}
     ${devBox(now)}
     <div class="tr-a__routecard tr-routecard--open">
       <div class="tr-row tr-row--between"><div><div class="tr-stoptile__title">${esc(o.name)}</div><div class="tr-hint">${esc(now.name)}</div><div class="tr-hint">${esc(state.hangarGone && src === 'saved' ? 'Crusader C2 Hercules (Typ, statt Hangarschiff)' : (src === 'saved' ? SHIP_C2.name : 'Crusader C2 Hercules (Typ)'))}</div></div></div>
-      ${openedActions(src, now)}
+      ${openedActions(src, now, inPlanner)}
       ${kpis(now)}
       ${warnList(now)}
       ${shipShares(now)}
-      ${stopTimeline(now, { edit: src !== 'shared', insert: src !== 'shared', mine: -1 })}
+      ${stopTimeline(now, { edit: inPlanner, insert: inPlanner, mine: -1 })}
     </div>`;
 }
 
@@ -188,15 +191,17 @@ function routePage() {
   const src = state.routeSrc;
   if (src === 'dead') return deadCodePage();
   const o = OPEN_SOURCES[src];
-  const inPlanner = src === 'saved' && state.openMode === 'planner';
-  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Geöffnete ${o.label} · ${inPlanner ? 'Alternative A: eigene Route öffnet im Planer' : 'Alternative B: jede Route öffnet auf einer eigenen Routenseite'} · Bearbeiten (↑, ↓, Entfernen) setzt den Zustand „bearbeitet“.</p>`;
+  const inPlanner = (src === 'saved' && state.openMode === 'planner') || state.editInPlanner;
+  const how = src === 'saved' ? (state.openMode === 'planner' ? 'Alternative A: eigene Route öffnet im Planer' : 'Alternative B: jede Route öffnet auf einer eigenen Routenseite') : (inPlanner ? 'im Planer bearbeitet' : 'Routenseite; bearbeitet wird im Planer');
+  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Geöffnete ${o.label} · ${how}${inPlanner ? ' · ↑, ↓, Entfernen setzen den Zustand „bearbeitet“' : ''}.</p>`;
   if (inPlanner) {
-    const ctx = `<div class="tr-ctxbar"><span class="chip chip--primary">${o.label}</span><strong>${esc(o.name)}</strong><span class="tr-hint">${esc(o.note)}</span><button class="btn btn-ghost btn-xs" data-act="go" data-page="routes" data-tab="saved" style="margin-left:auto">${ic('list')} Alle gespeicherten</button></div>`;
-    return `${pageHead()}${note}<div class="tr-a">${requestAside()}<section class="tr-a__result" aria-label="Ergebnis">${ctx}${openedResult(src)}</section></div>`;
+    const back = src === 'saved' ? `<button class="btn btn-ghost btn-xs" data-act="go" data-page="routes" data-tab="saved" style="margin-left:auto">${ic('list')} Alle gespeicherten</button>` : `<button class="btn btn-ghost btn-xs" data-act="leave-planner" style="margin-left:auto">${ic('arrow-left')} Zur Routenseite</button>`;
+    const ctx = `<div class="tr-ctxbar"><span class="chip chip--primary">${o.label}</span><strong>${esc(o.name)}</strong><span class="tr-hint">${esc(src === 'shared' ? `Code ${o.code}` : o.note)}</span>${back}</div>`;
+    return `${pageHead()}${note}<div class="tr-a">${requestAside()}<section class="tr-a__result" aria-label="Ergebnis">${ctx}${openedResult(src, true)}</section></div>`;
   }
   const back = src === 'shared' ? `<a class="page-eyebrow" href="#" data-act="go" data-page="planner">${ic('arrow-left')}<span>Routenplaner</span></a>` : `<a class="page-eyebrow" href="#" data-act="go" data-page="routes" data-tab="${src}">${ic('arrow-left')}<span>Routen</span></a>`;
   const badge = src === 'unit' ? `<span class="squadron-badge">${o.unit}</span>` : '';
   const head = `<div class="page-head"><div class="page-head__main">${back}<div class="page-title"><h1>${esc(o.name)}</h1>${badge}<span class="chip chip--primary">${o.label}</span></div></div>
     <div class="page-actions"><button class="btn btn-ghost" data-act="open-code">Code öffnen</button></div></div>`;
-  return `${head}${note}<div class="tr-a">${contextAside(src)}<section class="tr-a__result" aria-label="Route">${openedResult(src)}</section></div>`;
+  return `${head}${note}<div class="tr-a">${contextAside(src)}<section class="tr-a__result" aria-label="Route">${openedResult(src, false)}</section></div>`;
 }

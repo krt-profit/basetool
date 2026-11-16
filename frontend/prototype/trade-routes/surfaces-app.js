@@ -20,6 +20,7 @@ function goPage(page) {
   if (page !== 'planner') state.missionSearch = null;
   state.page = page;
   state.edited = false;
+  state.editInPlanner = false;
   state.modal = null;
   state.flight = null;
   window.scrollTo(0, 0);
@@ -64,14 +65,20 @@ const SURFACE_ACTIONS = {
   'save-copy': () => { say('Als deine Route gespeichert', `${state.savedList.length + 1} von ${SAVED_LIMIT} Plätzen. Hangarschiffe anderer sind Typen.`); },
   'to-unit': () => { state.modal = { kind: 'to-unit' }; },
   'to-unit-confirm': () => { state.modal = null; say('In die Einheit gespeichert', 'Unabhängige Kopie in ALPHA (24 von 100). Hangarschiffe sind Typen.'); },
-  'my-ship': () => { state.modal = { kind: 'my-ship' }; },
-  'my-ship-confirm': () => { state.modal = null; say('Mit deinem Schiff geplant', 'Fracht auf denselben Stopps neu geplant; nichts wird zurückgeschrieben.'); },
+  'my-ship': () => {
+    state.editInPlanner = true;
+    state.aCollapsed = false;
+    state.aOpen = [...new Set([...state.aOpen, 'ships'])];
+    window.scrollTo(0, 0);
+    say('Mit deinem Schiff', 'Ändere links die Schiffsliste und wähle „Nur Fracht neu planen“; die Stopps bleiben.');
+  },
+  'leave-planner': () => { state.editInPlanner = false; state.edited = false; },
   'saved-update': () => { state.edited = false; say('Gespeicherte Route aktualisiert', 'Inhalt ersetzt (Anfrage, Stopps, Momentaufnahme); Name und Notiz unberührt.'); },
   'save-new': () => { state.modal = { kind: 'save', route: 'o1' }; },
   'unit-update': () => { state.edited = false; say('Einheitsroute aktualisiert', 'Neue Momentaufnahme für alle in ALPHA.'); },
   research: () => { goPage('planner'); startSearch(); say('Neue Suche', 'Mit den gespeicherten Einstellungen auf aktuellen Daten.'); },
   'pin-optimise': () => { goPage('planner'); startSearch(); say('Suche mit festen Stopps', 'Die gespeicherten Stopps sind erzwungen; die Suche darf weitere ergänzen.'); },
-  'edit-in-planner': () => { goPage('planner'); state.search = { ...state.search, phase: 'done' }; state.results = ['r2']; say('Im Planer', 'Als dein Arbeitsstand übernommen; speichern legt eine eigene Route an.'); },
+  'edit-in-planner': () => { state.editInPlanner = true; state.edited = false; window.scrollTo(0, 0); },
   'open-code-go': (el) => {
     const code = typedCode(el.dataset.input || 'm-code');
     goPage('route');
@@ -87,11 +94,24 @@ const SURFACE_ACTIONS = {
     const mr = state.missionRoutes.find((x) => x.id === el.dataset.val);
     goPage('planner');
     state.variant = 'A';
-    state.missionSearch = { id: mr.id, name: mr.name };
+    state.missionSearch = { id: mr.id, name: mr.name, mode: 'search' };
     setScenario('convoy');
     startSearch();
   },
-  'mission-adopt': () => { goPage('mission'); say('In den Einsatz übernommen', 'Der Plan ist ersetzt; Hinweis „Routenplan geändert“ an die Crews der Flotte.'); },
+  'm-edit': (el) => {
+    const mr = state.missionRoutes.find((x) => x.id === el.dataset.val);
+    goPage('planner');
+    state.variant = 'A';
+    state.missionSearch = { id: mr.id, name: mr.name, mode: 'edit' };
+    setScenario('convoy');
+    state.results = ['r1'];
+    state.search = { ...state.search, phase: 'done', stopped: false };
+  },
+  'mission-adopt': () => {
+    const title = state.missionSearch.mode === 'edit' ? 'Einsatzroute aktualisiert' : 'In den Einsatz übernommen';
+    goPage('mission');
+    say(title, 'Der Plan ist ersetzt; Hinweis „Routenplan geändert“ an die Crews der Flotte.');
+  },
   'confirm-m-remove': (el) => { const mr = state.missionRoutes.find((x) => x.id === el.dataset.val); confirmFirst('Route aus dem Einsatz entfernen?', `„${mr.name}“ und ihr Plan verschwinden aus diesem Einsatz. Die Quelle bleibt.`, 'Entfernen', 'do-m-remove', mr.id); },
   'do-m-remove': (v) => { state.missionRoutes = state.missionRoutes.filter((x) => x.id !== v); say('Route entfernt', ''); },
   'add-route': () => { state.modal = { kind: 'add-route', from: 'saved' }; },
@@ -121,7 +141,7 @@ const SURFACE_ACTIONS = {
   'confirm-ok': () => { const m = state.modal; state.modal = null; SURFACE_ACTIONS[m.act](m.val); },
   'proto-role': (el) => { state.role = el.dataset.val; },
   'proto-mrole': (el) => { state.missionRole = el.dataset.val; },
-  'proto-src': (el) => { state.routeSrc = el.dataset.val; state.edited = false; },
+  'proto-src': (el) => { state.routeSrc = el.dataset.val; state.edited = false; state.editInPlanner = false; },
   'proto-alt': () => {
     if (state.page === 'route') state.openMode = state.openMode === 'planner' ? 'page' : 'planner';
     if (state.page === 'mission') state.missionAlt = state.missionAlt === 'top' ? 'switch' : 'top';
@@ -146,10 +166,6 @@ function surfaceModal(m, shell) {
   }
   if (m.kind === 'to-unit') {
     return shell('In eine Einheit speichern', `<div class="tr-field"><label for="m-unit">Einheit</label><select id="m-unit">${MY_UNITS.map((u) => `<option>${u.label} · ${u.used} von ${UNIT_LIMIT}</option>`).join('')}</select><span class="tr-hint">Einheiten, in denen du Mitglied bist oder die du als Offizier erreichst. Später nicht änderbar.</span></div><div class="tr-field"><label for="m-uname">Name</label><input id="m-uname" type="text" maxlength="80" value="Seraphim › Area18 › Baijini Point"></div><div class="tr-field"><label for="m-unote">Notiz <span class="tr-hint">sehen alle in der Einheit</span></label><textarea id="m-unote" rows="2" maxlength="500"></textarea></div><span class="tr-hint">Die Einheit bekommt eine unabhängige Kopie; Hangarschiffe werden zu Typen. Du bleibst als „eingetragen von“ sichtbar und kannst sie ändern, solange du Mitglied bist.</span>`, `${cancel}<button class="btn btn--cta" data-act="to-unit-confirm">${ic('users')} In Einheit speichern</button>`);
-  }
-  if (m.kind === 'my-ship') {
-    const opts = [['C2 Hercules „Lastesel“', 'Hangarschiff · 696 SCU'], ['Freelancer MAX „Kiste“', 'Hangarschiff · 120 SCU'], ['Katalogtyp wählen …', 'beliebiger Frachttyp']];
-    return shell('Mit meinem Schiff berechnen', `<span class="tr-hint">Plant die Fracht auf denselben Stopps für dein Schiff neu. Die Route selbst bleibt unverändert.</span><div class="tr-stack" style="gap:6px">${opts.map(([n, s], i) => `<label class="tr-radio"><input type="radio" name="m-ship" ${i === 0 ? 'checked' : ''}> <span><strong>${n}</strong> <span class="tr-hint">${s}</span></span></label>`).join('')}</div>`, `${cancel}<button class="btn btn--cta" data-act="my-ship-confirm">${ic('search')} Neu planen</button>`);
   }
   if (m.kind === 'add-route') {
     const src = [['saved', 'Aus meinen gespeicherten Routen'], ['unit', 'Aus den Einheitsrouten'], ['code', 'Geteilte Route per Code'], ['search', 'Neue Suche für die Flotte']];
@@ -177,7 +193,7 @@ function surfaceBarControls() {
   const select = `<select class="proto-bar__page" data-proto-page aria-label="Fläche">${Object.entries(PAGES).map(([k, l]) => `<option value="${k}" ${state.page === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
   let extra = '';
   if (state.page === 'route') {
-    extra = `${sep}${['saved', 'unit', 'shared', 'dead'].map((k) => btn('proto-src', k, { saved: 'Gespeichert', unit: 'Einheit', shared: 'Geteilt', dead: 'Widerrufen' }[k], state.routeSrc === k)).join('')}${sep}${state.routeSrc === 'saved' ? `${btn('proto-alt', '', state.openMode === 'planner' ? 'A · im Planer' : 'B · Routenseite', true)}${btn('proto-hangar', '', 'Schiff weg', state.hangarGone)}` : ''}${state.routeSrc !== 'dead' ? btn('proto-edited', '', 'Bearbeitet', state.edited) : ''}${state.routeSrc === 'unit' ? btn('proto-role', state.role === 'officer' ? 'member' : 'officer', state.role === 'officer' ? 'Offizier' : 'Mitglied', true) : ''}`;
+    extra = `${sep}${['saved', 'unit', 'shared', 'dead'].map((k) => btn('proto-src', k, { saved: 'Gespeichert', unit: 'Einheit', shared: 'Geteilt', dead: 'Widerrufen' }[k], state.routeSrc === k)).join('')}${sep}${state.routeSrc === 'saved' ? `${btn('proto-alt', '', state.openMode === 'planner' ? 'A · im Planer' : 'B · Routenseite', true)}${btn('proto-hangar', '', 'Schiff weg', state.hangarGone)}` : ''}${(state.routeSrc === 'saved' && state.openMode === 'planner') || state.editInPlanner ? btn('proto-edited', '', 'Bearbeitet', state.edited) : ''}${state.routeSrc === 'unit' ? btn('proto-role', state.role === 'officer' ? 'member' : 'officer', state.role === 'officer' ? 'Offizier' : 'Mitglied', true) : ''}`;
   }
   if (state.page === 'routes' && state.routesTab === 'unit') extra = `${sep}${btn('proto-role', 'member', 'Mitglied', state.role !== 'officer')}${btn('proto-role', 'officer', 'Offizier', state.role === 'officer')}`;
   if (state.page === 'mission') extra = `${sep}${btn('proto-mrole', 'manager', 'Leiter', state.missionRole === 'manager')}${btn('proto-mrole', 'crew', 'Crew', state.missionRole === 'crew')}${btn('proto-mrole', 'reader', 'Mitglied', state.missionRole === 'reader')}${state.missionRole === 'crew' ? `${sep}${btn('proto-alt', '', state.missionAlt === 'top' ? 'A · Teil oben' : 'B · Umschalter', true)}` : ''}`;

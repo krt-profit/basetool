@@ -4627,7 +4627,6 @@ body.has-fly .proto-state { bottom: 144px; }
 .tr-tabbody { margin-top: var(--space-4); }
 .tr-dead { text-align: center; padding: var(--space-6) var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
 .tr-dead__title { font-size: 1.4rem; font-weight: var(--fw-black); text-transform: uppercase; letter-spacing: .08em; color: var(--color-primary); }
-.tr-radio { display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--surface-card); border: 1px solid var(--color-gray-3); border-radius: var(--radius-tile); cursor: pointer; }
 .tr-mroute { background: var(--surface-panel); border: 1px solid var(--color-gray-3); border-radius: var(--radius-box); }
 .tr-mroute.is-open { border-color: var(--color-gray-2); }
 .tr-mroute__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: var(--space-3); align-items: center; padding: 12px 14px; }
@@ -5593,7 +5592,7 @@ function routeActions(r) {
   const saved = state.saved.includes(r.id);
   if (state.missionSearch) {
     return `<div class="tr-actions">
-      <button class="btn btn--cta" data-act="mission-adopt">${ic('check')} In den Einsatz übernehmen</button>
+      <button class="btn btn--cta" data-act="mission-adopt">${ic('check')} ${state.missionSearch.mode === 'edit' ? 'Einsatzroute aktualisieren' : 'In den Einsatz übernehmen'}</button>
       <button class="btn btn-ghost" data-act="go" data-page="mission">${ic('arrow-left')} Zurück zum Einsatz</button>
     </div>`;
   }
@@ -5892,7 +5891,8 @@ function variantA() {
   const list = results();
   const sel = list[Math.min(state.sel, list.length - 1)];
   const aside = requestAside();
-  const forMission = state.missionSearch ? `<div class="tr-warnline tr-warnline--info" role="status">${ic('info')}<span>Suche für die Einsatzroute „${esc(state.missionSearch.name)}“ im Einsatz „${esc(MISSION.name)}“: Schiffsliste ist die Routenflotte, Filter und Ziel kommen aus der Route. Der gespeicherte Plan bleibt, bis du ein Ergebnis übernimmst.</span></div>` : '';
+  const ms = state.missionSearch;
+  const forMission = ms ? `<div class="tr-warnline tr-warnline--info" role="status">${ic('info')}<span>${ms.mode === 'edit' ? 'Bearbeiten' : 'Suche'} für die Einsatzroute „${esc(ms.name)}“ im Einsatz „${esc(MISSION.name)}“: Schiffsliste ist die Routenflotte, ${ms.mode === 'edit' ? 'Stoppzeiten und Konvoi-Aufschläge' : 'Filter und Ziel'} kommen aus der Route. Der gespeicherte Plan bleibt, bis du ${ms.mode === 'edit' ? 'die Einsatzroute aktualisierst' : 'ein Ergebnis übernimmst'}.</span></div>` : '';
   if (!sel) return `${pageHead()}<div class="tr-a">${aside}<section class="tr-a__result">${forMission}${statusBar()}<div class="empty-state">Die Suche läuft. Das erste Zwischenergebnis kommt nach dem 2-Stopp-Durchgang.</div></section></div>`;
   const tabs = list.map((r, i) => `<button class="tab ${r === sel ? 'active' : ''}" role="tab" aria-selected="${r === sel}" data-act="sel" data-val="${i}">${i === 0 ? 'Beste Route' : `Alternative ${i}`}<small>${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · ${r.stops.length} Stopps</small></button>`).join('');
   const timeline = stopTimeline(sel);
@@ -6157,30 +6157,32 @@ function mayEditUnitRoute() {
 }
 
 /**
- * Renders the actions of an opened route for its source and edit state.
+ * Renders the actions of an opened route for its source, where it is shown and its edit state.
  * @param {string} src saved, unit or shared
  * @param {object} now the recomputed route
+ * @param {boolean} inPlanner whether the route is the planner's working state
  * @returns {string} markup
  */
-function openedActions(src, now) {
+function openedActions(src, now, inPlanner) {
   const fly = (cls) => `<button class="btn ${cls}" data-act="fly" data-route="${now.id}">${ic('arrow-right')} Losfliegen</button>`;
   const mine = (cls) => `<button class="btn ${cls}" data-act="save-copy">${ic('save')} Als meine Route speichern</button>`;
   const myShip = '<button class="btn btn-ghost" data-act="my-ship">Mit meinem Schiff berechnen</button>';
   const toUnit = `<button class="btn btn-ghost" data-act="to-unit">${ic('users')} Für Einheit</button>`;
   const share = `<button class="btn btn-ghost" data-act="share" data-route="${now.id}">Teilen</button>`;
+  const edit = `<button class="btn btn-ghost" data-act="edit-in-planner">${ic('edit')} Im Planer bearbeiten</button>`;
   let main = '';
   let more = '';
   if (src === 'saved') {
     main = state.edited
       ? `<button class="btn btn--cta" data-act="saved-update">${ic('save')} Gespeicherte Route aktualisieren</button><button class="btn btn-ghost" data-act="save-new">Als neue speichern</button>${fly('btn-outline')}`
-      : `${fly('btn--cta')}${share}${toUnit}`;
+      : `${fly('btn--cta')}${share}${toUnit}${inPlanner ? '' : edit}`;
     more = `<button class="btn btn-ghost btn-xs" data-act="research">${ic('search')} Mit diesen Einstellungen neu suchen</button><button class="btn btn-ghost btn-xs" data-act="pin-optimise">Mit festen Stopps optimieren</button>`;
   } else if (src === 'unit') {
-    if (state.edited && mayEditUnitRoute()) main = `<button class="btn btn--cta" data-act="unit-update">${ic('save')} Einheitsroute aktualisieren</button>${mine('btn-ghost')}`;
-    else if (state.edited) main = `${mine('btn--cta')}<span class="tr-hint">Zurückschreiben dürfen nur Vagabund (eingetragen), Offiziere und Einsatzleiter von ALPHA.</span>`;
-    else main = `${fly('btn--cta')}${mine('btn-ghost')}${myShip}${share}`;
+    if (inPlanner && state.edited && mayEditUnitRoute()) main = `<button class="btn btn--cta" data-act="unit-update">${ic('save')} Einheitsroute aktualisieren</button><button class="btn btn-ghost" data-act="to-unit">Als neue Einheitsroute speichern</button>${mine('btn-ghost')}`;
+    else if (inPlanner && state.edited) main = `<button class="btn btn--cta" data-act="to-unit">${ic('users')} Als neue Einheitsroute speichern</button>${mine('btn-ghost')}<span class="tr-hint">Zurückschreiben dürfen nur Vagabund (eingetragen), Offiziere und Einsatzleiter von ALPHA.</span>`;
+    else main = `${fly('btn--cta')}${mine('btn-ghost')}${inPlanner ? '' : `${myShip}${edit}`}${share}`;
   } else {
-    main = `${mine('btn--cta')}${fly('btn-outline')}<button class="btn btn-ghost" data-act="edit-in-planner">${ic('edit')} Im Planer bearbeiten</button>${myShip}${toUnit}`;
+    main = `${mine('btn--cta')}${fly('btn-outline')}${inPlanner ? '<span class="tr-hint">Eine geteilte Route bleibt eingefroren; eine geänderte Fassung teilst du neu.</span>' : `${edit}${myShip}`}${toUnit}`;
   }
   return `<div class="tr-actions">${main}</div>${more ? `<div class="tr-actions">${more}</div>` : ''}`;
 }
@@ -6188,27 +6190,28 @@ function openedActions(src, now) {
 /**
  * Renders the result side of an opened route: status, comparison, deviations, figures and timeline.
  * @param {string} src saved, unit or shared
+ * @param {boolean} inPlanner whether the route is the planner's working state
  * @returns {string} markup
  */
-function openedResult(src) {
+function openedResult(src, inPlanner) {
   const { o, old, now } = openedRoute(src);
   const after = {
     saved: 'Die Momentaufnahme steht jetzt auf diesem Stand; das nächste Öffnen vergleicht hiermit.',
     unit: 'Nichts wird zurückgeschrieben. Die Momentaufnahme der Einheit ändert nur „Einheitsroute aktualisieren“.',
     shared: 'Eingefrorene Kopie: verglichen wird mit dem Stand beim Teilen, nichts wird zurückgeschrieben.',
   }[src];
-  const edited = state.edited ? `<div class="tr-warnline tr-warnline--info">${ic('edit')}<span>Bearbeitet: Stopps geändert. Die ${src === 'unit' ? 'Einheitsroute' : 'gespeicherte Route'} bleibt, bis du sie aktualisierst.</span></div>` : '';
+  const edited = state.edited && inPlanner ? `<div class="tr-warnline tr-warnline--info">${ic('edit')}<span>Bearbeitet: Stopps geändert. Die ${{ saved: 'gespeicherte Route', unit: 'Einheitsroute', shared: 'geteilte Route' }[src]} bleibt, bis du ${src === 'shared' ? 'eine eigene speicherst' : 'sie aktualisierst'}.</span></div>` : '';
   return `<div class="tr-status" role="status">${ic('check')}<span>Fracht auf den ${src === 'shared' ? 'geteilten' : 'gespeicherten'} Stopps neu geplant · schnelle Spur · 0,8 s · Datenstand 14:00 Uhr</span><span class="muted">${after}</span></div>
     ${edited}
     ${compareStrip(old, now, `Vergleich mit der Momentaufnahme vom ${o.since}`)}
     ${devBox(now)}
     <div class="tr-a__routecard tr-routecard--open">
       <div class="tr-row tr-row--between"><div><div class="tr-stoptile__title">${esc(o.name)}</div><div class="tr-hint">${esc(now.name)}</div><div class="tr-hint">${esc(state.hangarGone && src === 'saved' ? 'Crusader C2 Hercules (Typ, statt Hangarschiff)' : (src === 'saved' ? SHIP_C2.name : 'Crusader C2 Hercules (Typ)'))}</div></div></div>
-      ${openedActions(src, now)}
+      ${openedActions(src, now, inPlanner)}
       ${kpis(now)}
       ${warnList(now)}
       ${shipShares(now)}
-      ${stopTimeline(now, { edit: src !== 'shared', insert: src !== 'shared', mine: -1 })}
+      ${stopTimeline(now, { edit: inPlanner, insert: inPlanner, mine: -1 })}
     </div>`;
 }
 
@@ -6255,17 +6258,19 @@ function routePage() {
   const src = state.routeSrc;
   if (src === 'dead') return deadCodePage();
   const o = OPEN_SOURCES[src];
-  const inPlanner = src === 'saved' && state.openMode === 'planner';
-  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Geöffnete ${o.label} · ${inPlanner ? 'Alternative A: eigene Route öffnet im Planer' : 'Alternative B: jede Route öffnet auf einer eigenen Routenseite'} · Bearbeiten (↑, ↓, Entfernen) setzt den Zustand „bearbeitet“.</p>`;
+  const inPlanner = (src === 'saved' && state.openMode === 'planner') || state.editInPlanner;
+  const how = src === 'saved' ? (state.openMode === 'planner' ? 'Alternative A: eigene Route öffnet im Planer' : 'Alternative B: jede Route öffnet auf einer eigenen Routenseite') : (inPlanner ? 'im Planer bearbeitet' : 'Routenseite; bearbeitet wird im Planer');
+  const note = `<p class="proto-note"><strong>PROTOTYP</strong> · Geöffnete ${o.label} · ${how}${inPlanner ? ' · ↑, ↓, Entfernen setzen den Zustand „bearbeitet“' : ''}.</p>`;
   if (inPlanner) {
-    const ctx = `<div class="tr-ctxbar"><span class="chip chip--primary">${o.label}</span><strong>${esc(o.name)}</strong><span class="tr-hint">${esc(o.note)}</span><button class="btn btn-ghost btn-xs" data-act="go" data-page="routes" data-tab="saved" style="margin-left:auto">${ic('list')} Alle gespeicherten</button></div>`;
-    return `${pageHead()}${note}<div class="tr-a">${requestAside()}<section class="tr-a__result" aria-label="Ergebnis">${ctx}${openedResult(src)}</section></div>`;
+    const back = src === 'saved' ? `<button class="btn btn-ghost btn-xs" data-act="go" data-page="routes" data-tab="saved" style="margin-left:auto">${ic('list')} Alle gespeicherten</button>` : `<button class="btn btn-ghost btn-xs" data-act="leave-planner" style="margin-left:auto">${ic('arrow-left')} Zur Routenseite</button>`;
+    const ctx = `<div class="tr-ctxbar"><span class="chip chip--primary">${o.label}</span><strong>${esc(o.name)}</strong><span class="tr-hint">${esc(src === 'shared' ? `Code ${o.code}` : o.note)}</span>${back}</div>`;
+    return `${pageHead()}${note}<div class="tr-a">${requestAside()}<section class="tr-a__result" aria-label="Ergebnis">${ctx}${openedResult(src, true)}</section></div>`;
   }
   const back = src === 'shared' ? `<a class="page-eyebrow" href="#" data-act="go" data-page="planner">${ic('arrow-left')}<span>Routenplaner</span></a>` : `<a class="page-eyebrow" href="#" data-act="go" data-page="routes" data-tab="${src}">${ic('arrow-left')}<span>Routen</span></a>`;
   const badge = src === 'unit' ? `<span class="squadron-badge">${o.unit}</span>` : '';
   const head = `<div class="page-head"><div class="page-head__main">${back}<div class="page-title"><h1>${esc(o.name)}</h1>${badge}<span class="chip chip--primary">${o.label}</span></div></div>
     <div class="page-actions"><button class="btn btn-ghost" data-act="open-code">Code öffnen</button></div></div>`;
-  return `${head}${note}<div class="tr-a">${contextAside(src)}<section class="tr-a__result" aria-label="Route">${openedResult(src)}</section></div>`;
+  return `${head}${note}<div class="tr-a">${contextAside(src)}<section class="tr-a__result" aria-label="Route">${openedResult(src, false)}</section></div>`;
 }
 
 /** PROTOTYPE route lists: saved routes, unit routes and the member's shared routes as tabs of one page. */
@@ -6454,7 +6459,7 @@ function missionTile(mr, i, count) {
       <button class="btn btn-ghost" data-act="to-unit">${ic('users')} Für Einheit</button>
       <button class="btn btn-ghost" data-act="share" data-route="${plan.id}">Teilen</button>
     </div>`;
-  const managerTools = manager ? `<div class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="m-optimise" data-val="${mr.id}">${ic('search')} Für die Flotte optimieren</button><button class="btn btn-quiet-danger btn-xs" data-act="confirm-m-remove" data-val="${mr.id}">${ic('trash')} Aus dem Einsatz entfernen</button></div>` : '';
+  const managerTools = manager ? `<div class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="m-edit" data-val="${mr.id}">${ic('edit')} Im Planer bearbeiten</button><button class="btn btn-ghost btn-xs" data-act="m-optimise" data-val="${mr.id}">${ic('search')} Für die Flotte optimieren</button><button class="btn btn-quiet-danger btn-xs" data-act="confirm-m-remove" data-val="${mr.id}">${ic('trash')} Aus dem Einsatz entfernen</button></div>` : '';
   return `<article class="tr-mroute is-open">${head}<div class="tr-mroute__body">
       ${deviates ? `${compareStrip(plan, now, 'Gespeicherter Plan (Briefing) gegenüber einer Neuberechnung auf aktuellen Daten')}${devBox(now)}<div class="tr-row">${adopt}</div>` : `<div class="tr-warnline tr-warnline--ok">${ic('check')}<span>Keine Abweichungen: der gespeicherte Plan gilt.</span></div>`}
       ${fleetPanel(mr)}
@@ -6462,7 +6467,7 @@ function missionTile(mr, i, count) {
       ${copyOut}
       ${kpis(plan)}
       ${shipShares(plan)}
-      ${stopTimeline(plan, { edit: manager, insert: manager, mine: mineIdx })}
+      ${stopTimeline(plan, { edit: false, insert: false, mine: mineIdx })}
       ${managerTools}
     </div></article>`;
 }
@@ -6715,6 +6720,7 @@ function goPage(page) {
   if (page !== 'planner') state.missionSearch = null;
   state.page = page;
   state.edited = false;
+  state.editInPlanner = false;
   state.modal = null;
   state.flight = null;
   window.scrollTo(0, 0);
@@ -6759,14 +6765,20 @@ const SURFACE_ACTIONS = {
   'save-copy': () => { say('Als deine Route gespeichert', `${state.savedList.length + 1} von ${SAVED_LIMIT} Plätzen. Hangarschiffe anderer sind Typen.`); },
   'to-unit': () => { state.modal = { kind: 'to-unit' }; },
   'to-unit-confirm': () => { state.modal = null; say('In die Einheit gespeichert', 'Unabhängige Kopie in ALPHA (24 von 100). Hangarschiffe sind Typen.'); },
-  'my-ship': () => { state.modal = { kind: 'my-ship' }; },
-  'my-ship-confirm': () => { state.modal = null; say('Mit deinem Schiff geplant', 'Fracht auf denselben Stopps neu geplant; nichts wird zurückgeschrieben.'); },
+  'my-ship': () => {
+    state.editInPlanner = true;
+    state.aCollapsed = false;
+    state.aOpen = [...new Set([...state.aOpen, 'ships'])];
+    window.scrollTo(0, 0);
+    say('Mit deinem Schiff', 'Ändere links die Schiffsliste und wähle „Nur Fracht neu planen“; die Stopps bleiben.');
+  },
+  'leave-planner': () => { state.editInPlanner = false; state.edited = false; },
   'saved-update': () => { state.edited = false; say('Gespeicherte Route aktualisiert', 'Inhalt ersetzt (Anfrage, Stopps, Momentaufnahme); Name und Notiz unberührt.'); },
   'save-new': () => { state.modal = { kind: 'save', route: 'o1' }; },
   'unit-update': () => { state.edited = false; say('Einheitsroute aktualisiert', 'Neue Momentaufnahme für alle in ALPHA.'); },
   research: () => { goPage('planner'); startSearch(); say('Neue Suche', 'Mit den gespeicherten Einstellungen auf aktuellen Daten.'); },
   'pin-optimise': () => { goPage('planner'); startSearch(); say('Suche mit festen Stopps', 'Die gespeicherten Stopps sind erzwungen; die Suche darf weitere ergänzen.'); },
-  'edit-in-planner': () => { goPage('planner'); state.search = { ...state.search, phase: 'done' }; state.results = ['r2']; say('Im Planer', 'Als dein Arbeitsstand übernommen; speichern legt eine eigene Route an.'); },
+  'edit-in-planner': () => { state.editInPlanner = true; state.edited = false; window.scrollTo(0, 0); },
   'open-code-go': (el) => {
     const code = typedCode(el.dataset.input || 'm-code');
     goPage('route');
@@ -6782,11 +6794,24 @@ const SURFACE_ACTIONS = {
     const mr = state.missionRoutes.find((x) => x.id === el.dataset.val);
     goPage('planner');
     state.variant = 'A';
-    state.missionSearch = { id: mr.id, name: mr.name };
+    state.missionSearch = { id: mr.id, name: mr.name, mode: 'search' };
     setScenario('convoy');
     startSearch();
   },
-  'mission-adopt': () => { goPage('mission'); say('In den Einsatz übernommen', 'Der Plan ist ersetzt; Hinweis „Routenplan geändert“ an die Crews der Flotte.'); },
+  'm-edit': (el) => {
+    const mr = state.missionRoutes.find((x) => x.id === el.dataset.val);
+    goPage('planner');
+    state.variant = 'A';
+    state.missionSearch = { id: mr.id, name: mr.name, mode: 'edit' };
+    setScenario('convoy');
+    state.results = ['r1'];
+    state.search = { ...state.search, phase: 'done', stopped: false };
+  },
+  'mission-adopt': () => {
+    const title = state.missionSearch.mode === 'edit' ? 'Einsatzroute aktualisiert' : 'In den Einsatz übernommen';
+    goPage('mission');
+    say(title, 'Der Plan ist ersetzt; Hinweis „Routenplan geändert“ an die Crews der Flotte.');
+  },
   'confirm-m-remove': (el) => { const mr = state.missionRoutes.find((x) => x.id === el.dataset.val); confirmFirst('Route aus dem Einsatz entfernen?', `„${mr.name}“ und ihr Plan verschwinden aus diesem Einsatz. Die Quelle bleibt.`, 'Entfernen', 'do-m-remove', mr.id); },
   'do-m-remove': (v) => { state.missionRoutes = state.missionRoutes.filter((x) => x.id !== v); say('Route entfernt', ''); },
   'add-route': () => { state.modal = { kind: 'add-route', from: 'saved' }; },
@@ -6816,7 +6841,7 @@ const SURFACE_ACTIONS = {
   'confirm-ok': () => { const m = state.modal; state.modal = null; SURFACE_ACTIONS[m.act](m.val); },
   'proto-role': (el) => { state.role = el.dataset.val; },
   'proto-mrole': (el) => { state.missionRole = el.dataset.val; },
-  'proto-src': (el) => { state.routeSrc = el.dataset.val; state.edited = false; },
+  'proto-src': (el) => { state.routeSrc = el.dataset.val; state.edited = false; state.editInPlanner = false; },
   'proto-alt': () => {
     if (state.page === 'route') state.openMode = state.openMode === 'planner' ? 'page' : 'planner';
     if (state.page === 'mission') state.missionAlt = state.missionAlt === 'top' ? 'switch' : 'top';
@@ -6841,10 +6866,6 @@ function surfaceModal(m, shell) {
   }
   if (m.kind === 'to-unit') {
     return shell('In eine Einheit speichern', `<div class="tr-field"><label for="m-unit">Einheit</label><select id="m-unit">${MY_UNITS.map((u) => `<option>${u.label} · ${u.used} von ${UNIT_LIMIT}</option>`).join('')}</select><span class="tr-hint">Einheiten, in denen du Mitglied bist oder die du als Offizier erreichst. Später nicht änderbar.</span></div><div class="tr-field"><label for="m-uname">Name</label><input id="m-uname" type="text" maxlength="80" value="Seraphim › Area18 › Baijini Point"></div><div class="tr-field"><label for="m-unote">Notiz <span class="tr-hint">sehen alle in der Einheit</span></label><textarea id="m-unote" rows="2" maxlength="500"></textarea></div><span class="tr-hint">Die Einheit bekommt eine unabhängige Kopie; Hangarschiffe werden zu Typen. Du bleibst als „eingetragen von“ sichtbar und kannst sie ändern, solange du Mitglied bist.</span>`, `${cancel}<button class="btn btn--cta" data-act="to-unit-confirm">${ic('users')} In Einheit speichern</button>`);
-  }
-  if (m.kind === 'my-ship') {
-    const opts = [['C2 Hercules „Lastesel“', 'Hangarschiff · 696 SCU'], ['Freelancer MAX „Kiste“', 'Hangarschiff · 120 SCU'], ['Katalogtyp wählen …', 'beliebiger Frachttyp']];
-    return shell('Mit meinem Schiff berechnen', `<span class="tr-hint">Plant die Fracht auf denselben Stopps für dein Schiff neu. Die Route selbst bleibt unverändert.</span><div class="tr-stack" style="gap:6px">${opts.map(([n, s], i) => `<label class="tr-radio"><input type="radio" name="m-ship" ${i === 0 ? 'checked' : ''}> <span><strong>${n}</strong> <span class="tr-hint">${s}</span></span></label>`).join('')}</div>`, `${cancel}<button class="btn btn--cta" data-act="my-ship-confirm">${ic('search')} Neu planen</button>`);
   }
   if (m.kind === 'add-route') {
     const src = [['saved', 'Aus meinen gespeicherten Routen'], ['unit', 'Aus den Einheitsrouten'], ['code', 'Geteilte Route per Code'], ['search', 'Neue Suche für die Flotte']];
@@ -6872,7 +6893,7 @@ function surfaceBarControls() {
   const select = `<select class="proto-bar__page" data-proto-page aria-label="Fläche">${Object.entries(PAGES).map(([k, l]) => `<option value="${k}" ${state.page === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
   let extra = '';
   if (state.page === 'route') {
-    extra = `${sep}${['saved', 'unit', 'shared', 'dead'].map((k) => btn('proto-src', k, { saved: 'Gespeichert', unit: 'Einheit', shared: 'Geteilt', dead: 'Widerrufen' }[k], state.routeSrc === k)).join('')}${sep}${state.routeSrc === 'saved' ? `${btn('proto-alt', '', state.openMode === 'planner' ? 'A · im Planer' : 'B · Routenseite', true)}${btn('proto-hangar', '', 'Schiff weg', state.hangarGone)}` : ''}${state.routeSrc !== 'dead' ? btn('proto-edited', '', 'Bearbeitet', state.edited) : ''}${state.routeSrc === 'unit' ? btn('proto-role', state.role === 'officer' ? 'member' : 'officer', state.role === 'officer' ? 'Offizier' : 'Mitglied', true) : ''}`;
+    extra = `${sep}${['saved', 'unit', 'shared', 'dead'].map((k) => btn('proto-src', k, { saved: 'Gespeichert', unit: 'Einheit', shared: 'Geteilt', dead: 'Widerrufen' }[k], state.routeSrc === k)).join('')}${sep}${state.routeSrc === 'saved' ? `${btn('proto-alt', '', state.openMode === 'planner' ? 'A · im Planer' : 'B · Routenseite', true)}${btn('proto-hangar', '', 'Schiff weg', state.hangarGone)}` : ''}${(state.routeSrc === 'saved' && state.openMode === 'planner') || state.editInPlanner ? btn('proto-edited', '', 'Bearbeitet', state.edited) : ''}${state.routeSrc === 'unit' ? btn('proto-role', state.role === 'officer' ? 'member' : 'officer', state.role === 'officer' ? 'Offizier' : 'Mitglied', true) : ''}`;
   }
   if (state.page === 'routes' && state.routesTab === 'unit') extra = `${sep}${btn('proto-role', 'member', 'Mitglied', state.role !== 'officer')}${btn('proto-role', 'officer', 'Offizier', state.role === 'officer')}`;
   if (state.page === 'mission') extra = `${sep}${btn('proto-mrole', 'manager', 'Leiter', state.missionRole === 'manager')}${btn('proto-mrole', 'crew', 'Crew', state.missionRole === 'crew')}${btn('proto-mrole', 'reader', 'Mitglied', state.missionRole === 'reader')}${state.missionRole === 'crew' ? `${sep}${btn('proto-alt', '', state.missionAlt === 'top' ? 'A · Teil oben' : 'B · Umschalter', true)}` : ''}`;
@@ -7044,6 +7065,7 @@ const state = {
   missionRole: ['manager', 'crew', 'reader'].includes(params.get('role')) ? params.get('role') : 'manager',
   role: ['member', 'officer', 'admin'].includes(params.get('role')) ? params.get('role') : 'member',
   edited: false,
+  editInPlanner: false,
   hangarGone: false,
   missionSearch: null,
   missionOpen: ['M1'],

@@ -30,6 +30,7 @@ const state = {
   missionRole: ['manager', 'crew', 'reader'].includes(params.get('role')) ? params.get('role') : 'manager',
   role: ['member', 'officer', 'admin'].includes(params.get('role')) ? params.get('role') : 'member',
   edited: false,
+  editInPlanner: false,
   hangarGone: false,
   missionSearch: null,
   missionOpen: ['M1'],

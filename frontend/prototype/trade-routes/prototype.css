@@ -277,7 +277,6 @@ body.has-fly .proto-state { bottom: 144px; }
 .tr-tabbody { margin-top: var(--space-4); }
 .tr-dead { text-align: center; padding: var(--space-6) var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
 .tr-dead__title { font-size: 1.4rem; font-weight: var(--fw-black); text-transform: uppercase; letter-spacing: .08em; color: var(--color-primary); }
-.tr-radio { display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--surface-card); border: 1px solid var(--color-gray-3); border-radius: var(--radius-tile); cursor: pointer; }
 .tr-mroute { background: var(--surface-panel); border: 1px solid var(--color-gray-3); border-radius: var(--radius-box); }
 .tr-mroute.is-open { border-color: var(--color-gray-2); }
 .tr-mroute__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: var(--space-3); align-items: center; padding: 12px 14px; }

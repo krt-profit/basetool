@@ -32,7 +32,8 @@ function variantA() {
   const list = results();
   const sel = list[Math.min(state.sel, list.length - 1)];
   const aside = requestAside();
-  const forMission = state.missionSearch ? `<div class="tr-warnline tr-warnline--info" role="status">${ic('info')}<span>Suche für die Einsatzroute „${esc(state.missionSearch.name)}“ im Einsatz „${esc(MISSION.name)}“: Schiffsliste ist die Routenflotte, Filter und Ziel kommen aus der Route. Der gespeicherte Plan bleibt, bis du ein Ergebnis übernimmst.</span></div>` : '';
+  const ms = state.missionSearch;
+  const forMission = ms ? `<div class="tr-warnline tr-warnline--info" role="status">${ic('info')}<span>${ms.mode === 'edit' ? 'Bearbeiten' : 'Suche'} für die Einsatzroute „${esc(ms.name)}“ im Einsatz „${esc(MISSION.name)}“: Schiffsliste ist die Routenflotte, ${ms.mode === 'edit' ? 'Stoppzeiten und Konvoi-Aufschläge' : 'Filter und Ziel'} kommen aus der Route. Der gespeicherte Plan bleibt, bis du ${ms.mode === 'edit' ? 'die Einsatzroute aktualisierst' : 'ein Ergebnis übernimmst'}.</span></div>` : '';
   if (!sel) return `${pageHead()}<div class="tr-a">${aside}<section class="tr-a__result">${forMission}${statusBar()}<div class="empty-state">Die Suche läuft. Das erste Zwischenergebnis kommt nach dem 2-Stopp-Durchgang.</div></section></div>`;
   const tabs = list.map((r, i) => `<button class="tab ${r === sel ? 'active' : ''}" role="tab" aria-selected="${r === sel}" data-act="sel" data-val="${i}">${i === 0 ? 'Beste Route' : `Alternative ${i}`}<small>${fmt(r.perHour)} aUEC/h · ${fmtDur(r.duration)} · ${r.stops.length} Stopps</small></button>`).join('');
   const timeline = stopTimeline(sel);

@@ -88,7 +88,7 @@ function missionTile(mr, i, count) {
       <button class="btn btn-ghost" data-act="to-unit">${ic('users')} Für Einheit</button>
       <button class="btn btn-ghost" data-act="share" data-route="${plan.id}">Teilen</button>
     </div>`;
-  const managerTools = manager ? `<div class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="m-optimise" data-val="${mr.id}">${ic('search')} Für die Flotte optimieren</button><button class="btn btn-quiet-danger btn-xs" data-act="confirm-m-remove" data-val="${mr.id}">${ic('trash')} Aus dem Einsatz entfernen</button></div>` : '';
+  const managerTools = manager ? `<div class="tr-actions"><button class="btn btn-ghost btn-xs" data-act="m-edit" data-val="${mr.id}">${ic('edit')} Im Planer bearbeiten</button><button class="btn btn-ghost btn-xs" data-act="m-optimise" data-val="${mr.id}">${ic('search')} Für die Flotte optimieren</button><button class="btn btn-quiet-danger btn-xs" data-act="confirm-m-remove" data-val="${mr.id}">${ic('trash')} Aus dem Einsatz entfernen</button></div>` : '';
   return `<article class="tr-mroute is-open">${head}<div class="tr-mroute__body">
       ${deviates ? `${compareStrip(plan, now, 'Gespeicherter Plan (Briefing) gegenüber einer Neuberechnung auf aktuellen Daten')}${devBox(now)}<div class="tr-row">${adopt}</div>` : `<div class="tr-warnline tr-warnline--ok">${ic('check')}<span>Keine Abweichungen: der gespeicherte Plan gilt.</span></div>`}
       ${fleetPanel(mr)}
@@ -96,7 +96,7 @@ function missionTile(mr, i, count) {
       ${copyOut}
       ${kpis(plan)}
       ${shipShares(plan)}
-      ${stopTimeline(plan, { edit: manager, insert: manager, mine: mineIdx })}
+      ${stopTimeline(plan, { edit: false, insert: false, mine: mineIdx })}
       ${managerTools}
     </div></article>`;
 }
