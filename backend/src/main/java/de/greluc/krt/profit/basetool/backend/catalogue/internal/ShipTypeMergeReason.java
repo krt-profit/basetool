@@ -54,7 +54,14 @@ enum ShipTypeMergeReason {
    * The merged row's record is superseded by the {@code _GS} record of the same in-game name the
    * surviving row holds (REQ-P4K-053).
    */
-  SUPERSEDED_BY_GS_RECORD(true);
+  SUPERSEDED_BY_GS_RECORD(true),
+
+  /**
+   * The merged row's GUID left a complete catalogue, its class name extends the surviving row's
+   * base by a suffix, and its name begins with the base's in-game name: a vanished edition of that
+   * ship (REQ-P4K-053).
+   */
+  EDITION_OF_BASE(true);
 
   /** Whether the merged row may hold a P4K GUID, which then leaves the catalogue with it. */
   @Getter private final boolean mergingP4kRow;

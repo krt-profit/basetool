@@ -71,3 +71,14 @@ old record leaves the files. @greluc decided that the `_GS` record supersedes th
 the row of the old record merges into the row of the `_GS` record, and the old record is covered
 from then on (REQ-P4K-053, REQ-P4K-050). This is the one exception to "two rows a listed GUID each
 holds stay apart"; it applies only to the exact `<class>` / `<class>_GS` pair of one in-game name.
+
+## Amendment — a vanished edition belongs to its ship (2026-11-17)
+
+Three rows held records LIVE 4.10.200 no longer lists, with no player base of their name: the old
+Taurus Wikelo War Special (its successor is a variant of the same name), the Hammerhead 2949 Best
+In Show Edition (now a livery of the Hammerhead) and the Phoenix Emerald (now only a shop display).
+@greluc decided to merge all three: a departed row also follows the single player record of its
+name, a variant included, and a vanished edition — class name extending a base's by a suffix, name
+beginning with the base's in-game name — merges into its ship. The UEX vehicle id a merge leaves
+behind stays known, so UEX keeping such an edition as a listing of its own creates no new ship type
+(REQ-DATA-043).

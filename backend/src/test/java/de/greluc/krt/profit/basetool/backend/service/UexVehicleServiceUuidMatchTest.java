@@ -501,6 +501,29 @@ class UexVehicleServiceUuidMatchTest {
   }
 
   @Test
+  void aListingAMergeLeftBehindCreatesNoRow() {
+    List<ShipType> rows = inMemory();
+    when(uexClient.getVehicles())
+        .thenReturn(
+            fetched(
+                List.of(
+                    vehicleDto(
+                        48,
+                        "",
+                        "Constellation Mk IV Phoenix Emerald",
+                        "RSI Constellation Mk IV Phoenix Emerald",
+                        "1"))));
+    when(shipTypeRepository.isMergedUexVehicleId(48)).thenReturn(true);
+    when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    assertTrue(rows.isEmpty());
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository).markUexDeletedExcept(any(), any());
+  }
+
+  @Test
   void aSecondListingOfARowTheOtherListingsUuidConfirmsStaysOff() {
     UUID confirmed = UUID.fromString("93e1a434-f4fa-43ee-a40c-71bcae5073bc");
     ShipType retaliator = new ShipType();
@@ -722,24 +745,28 @@ class UexVehicleServiceUuidMatchTest {
   }
 
   /**
-   * Backs the repository's id and name lookups and its saves with a list of rows.
+   * Backs the repository's id and name lookups and its saves with a list of rows; a lookup a test
+   * never reaches is no failure.
    *
    * @param stored the rows stored before the sync
    * @return the live list of rows, new ones included
    */
   private List<ShipType> inMemory(ShipType... stored) {
     List<ShipType> rows = new ArrayList<>(List.of(stored));
-    when(shipTypeRepository.findByUexVehicleId(any()))
+    lenient()
+        .when(shipTypeRepository.findByUexVehicleId(any()))
         .thenAnswer(inv ->
             rows.stream()
                 .filter(row -> inv.getArgument(0).equals(row.getUexVehicleId()))
                 .findFirst());
-    when(shipTypeRepository.findByNameIgnoreCase(any()))
+    lenient()
+        .when(shipTypeRepository.findByNameIgnoreCase(any()))
         .thenAnswer(inv ->
             rows.stream()
                 .filter(row -> inv.<String>getArgument(0).equalsIgnoreCase(row.getName()))
                 .findFirst());
-    when(shipTypeRepository.save(any()))
+    lenient()
+        .when(shipTypeRepository.save(any()))
         .thenAnswer(inv -> {
           ShipType row = inv.getArgument(0);
           if (row.getId() == null) {

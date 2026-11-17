@@ -1388,7 +1388,14 @@ Rules 3 and 4 also find a row whose GUID left the catalogue and that moves to a 
 row holds.
 
 A row whose GUID left a complete catalogue is a twin of the row holding the record that succeeds it:
-the single player base carrying one of its names (REQ-P4K-051).
+the single player base carrying one of its names (REQ-P4K-051); else the single player record, a
+variant included, carrying one of its names (4.10.200: the old Taurus Wikelo War Special and
+`RSI_Constellation_Taurus_GS_Military`); else, for a vanished edition of a ship, the row holding that
+ship. A row is a vanished edition when its class name extends the class name of a player base, or
+of that base's `_GS` record, by a suffix and one of its names begins with that base's in-game name
+(`AEGS_Hammerhead_Showdown`, "Aegis Hammerhead 2949 Best In Show Edition", now a livery of the
+Hammerhead; `RSI_Constellation_Phoenix_Emerald`, now only a shop display of the Phoenix). The row
+holding the base, or the single row moving to it in this run (REQ-P4K-051), takes the edition.
 
 A game build can carry a reworked ship as a new record whose class name is the old one plus `_GS`
 while the old record stays in the files (4.10.200: `RSI_Constellation_Phoenix` and
@@ -1398,8 +1405,8 @@ supersedes the old one: the row holding the old record is a twin of the row hold
 record, and the old record is covered from then on (REQ-P4K-050) while no row holds it. A row
 holding the old record stays while no row holds the `_GS` record.
 
-Only these two rules merge away a row holding a P4K GUID; otherwise a P4K row is never merged away
-(REQ-P4K-007). A twin whose row is itself merged away is merged into that row's survivor.
+Only the rules for a departed or a superseded record merge away a row holding a P4K GUID; otherwise
+a P4K row is never merged away (REQ-P4K-007). A twin whose row is itself merged away is merged into that row's survivor.
 
 The twins are set aside while the run decides which rows move to their base or successor
 (REQ-P4K-051), since a twin's identity would block such a move. When the row a twin is merged into
@@ -1417,7 +1424,8 @@ preview reports the merges, writes nothing, and matches without the merged rows 
   base; so is a Wiki row whose in-game name is a row's name, and a row only UEX wrote whose full name
   is a row's name. A row both sources wrote is no twin by its full name.
 - [x] A row whose record left is merged into the row of its successor, with its hangar ships and its
-  UEX vehicle id.
+  UEX vehicle id; also into the row of a variant of its name, and, as a vanished edition, into the
+  row of its ship. A vanished row whose name is no ship's stays.
 - [x] The row of a record a `_GS` record supersedes is merged into the row holding the `_GS` record,
   and the old record is covered in the next APPLY; it stays while no row holds the `_GS` record.
 - [x] A preview reports the merge as `MERGED` and changes no row.

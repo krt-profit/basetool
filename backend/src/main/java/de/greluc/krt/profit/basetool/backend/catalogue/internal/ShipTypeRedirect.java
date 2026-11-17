@@ -33,6 +33,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Keeps the id of a ship type merged into another as an alias of the one that stays; rows are
@@ -58,4 +59,12 @@ public class ShipTypeRedirect extends AbstractEntity<UUID> {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "retired_snapshot", nullable = false, columnDefinition = "jsonb")
   private String retiredSnapshot;
+
+  /**
+   * The UEX vehicle id the merged ship type held and the one that stays did not take, so the UEX
+   * sync knows that listing as a second listing of the ship (REQ-DATA-043).
+   */
+  @Column(name = "uex_vehicle_id")
+  @Nullable
+  private Integer uexVehicleId;
 }

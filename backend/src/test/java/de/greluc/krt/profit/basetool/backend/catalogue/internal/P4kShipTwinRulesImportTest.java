@@ -35,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * The twin rules besides the Wiki UUID: same variant group and name, Wiki in-game name, and a
@@ -155,6 +156,72 @@ class P4kShipTwinRulesImportTest {
   }
 
   @Test
+  void aRowWhoseRecordLeftMergesIntoTheRowOfAVariantOfItsName() {
+    ships.saveAndFlush(base());
+    ShipType edition = new ShipType();
+    edition.setName("Rules Test Ship Edition");
+    edition.setP4kUuid(EDITION);
+    edition.setClassName(EDITION_CLASS);
+    edition.setSourceSystems(GameItemSourceSystem.BOTH);
+    UUID editionId = ships.saveAndFlush(edition).getId();
+    ShipType departed = new ShipType();
+    departed.setName("Rules Test Ship Edition Old");
+    departed.setGameName("Rules Test Ship Edition");
+    departed.setP4kUuid(DEPARTED);
+    departed.setClassName("TEST_Rules_Edition_Old");
+    departed.setSourceSystems(GameItemSourceSystem.BOTH);
+    UUID departedId = ships.saveAndFlush(departed).getId();
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    runs.apply(namedEditionCatalogue(), false);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(count(departedId)).isZero();
+    assertThat(ships.findById(departedId)).map(ShipType::getId).contains(editionId);
+  }
+
+  @Test
+  void aVanishedEditionOfAShipMergesIntoTheShipsRow() {
+    ShipType survivor = ships.saveAndFlush(base());
+    ShipType edition = new ShipType();
+    edition.setName(NAME + " Emerald");
+    edition.setP4kUuid(DEPARTED);
+    edition.setClassName(BASE_CLASS + "_Emerald");
+    edition.setUexVehicleId(DEPARTED_UEX_ID);
+    edition.setSourceSystems(GameItemSourceSystem.BOTH);
+    UUID editionId = ships.saveAndFlush(edition).getId();
+    UUID ship = insertShip(editionId);
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    UUID runId = runs.apply(catalogue(), false).runId();
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(count(editionId)).isZero();
+    assertThat(jdbc.queryForObject("SELECT ship_type_id FROM ship WHERE id = ?", UUID.class, ship))
+        .isEqualTo(survivor.getId());
+    assertThat(merges(runId)).singleElement().extracting(P4kImportChange::getGuid).isEqualTo(BASE);
+  }
+
+  @Test
+  void aVanishedRowNamedLikeNoShipStays() {
+    ships.saveAndFlush(base());
+    ShipType other = new ShipType();
+    other.setName("Another Test Ship");
+    other.setP4kUuid(DEPARTED);
+    other.setClassName(BASE_CLASS + "_Other");
+    other.setSourceSystems(GameItemSourceSystem.BOTH);
+    UUID otherId = ships.saveAndFlush(other).getId();
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    UUID runId = runs.apply(catalogue(), false).runId();
+
+    assertThat(count(otherId)).isOne();
+    assertThat(merges(runId)).isEmpty();
+  }
+
+  @Test
   void aPreviewReportsADepartedRowsMergeAndKeepsIt() {
     ships.saveAndFlush(base());
     ShipType departed = new ShipType();
@@ -240,5 +307,13 @@ class P4kShipTwinRulesImportTest {
   private static byte[] catalogue() {
     return P4kTestCatalogues.bytes(
         P4kTestCatalogues.withEdition(BASE, BASE_CLASS, EDITION, EDITION_CLASS, NAME));
+  }
+
+  /** Builds the fixture whose edition carries a name of its own. */
+  private static byte[] namedEditionCatalogue() {
+    ObjectNode root = P4kTestCatalogues.withEdition(BASE, BASE_CLASS, EDITION, EDITION_CLASS, NAME);
+    ObjectNode edition = P4kTestCatalogues.record(root, "ships", EDITION);
+    ((ObjectNode) edition.get("name")).put("en", "Rules Test Ship Edition");
+    return P4kTestCatalogues.bytes(root);
   }
 }
