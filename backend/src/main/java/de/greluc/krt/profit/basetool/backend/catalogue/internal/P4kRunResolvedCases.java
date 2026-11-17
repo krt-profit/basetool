@@ -31,10 +31,10 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The lifecycle of the review cases an APPLY derives from rows that carry no GUID of their own
- * (REQ-P4K-016): a run closes an open case it no longer finds as {@code RESOLVED} and reopens such
- * a case once it finds it again; an admin's decision is never reopened. The case GUID is a
- * name-based UUID of a stable key.
+ * The lifecycle of the review cases an APPLY settles itself (REQ-P4K-016): a run closes an open
+ * case it no longer finds as {@code RESOLVED} and reopens such a case once it finds it again; an
+ * admin's decision is never reopened. A case about a row that carries no GUID of its own has a
+ * name-based UUID of a stable key as its GUID; a ship case keeps its record's GUID (REQ-P4K-050).
  */
 @Component
 @RequiredArgsConstructor

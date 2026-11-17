@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -45,8 +46,9 @@ import org.springframework.stereotype.Component;
  * Reconciles the catalogue's {@code ships} with {@code ship_type}: match (REQ-P4K-007, the class
  * name step includes the UEX alias of REQ-DATA-026), write the base data the catalogue leads
  * (REQ-P4K-031), fill the descriptions where empty, stamp, create a playable unmatched ship behind
- * the run's checkbox (REQ-P4K-009), keep the variant groups (REQ-P4K-032) and cross-check the store
- * slugs.
+ * the run's checkbox (REQ-P4K-009), keep the variant groups (REQ-P4K-032), cross-check the store
+ * slugs, and settle the ship cases an APPLY no longer finds; a ship a stored ship type already
+ * stands for is covered (REQ-P4K-050).
  */
 @Component
 @RequiredArgsConstructor
@@ -58,6 +60,13 @@ public class P4kShipReconciler {
   /** The catalogue field holding a ship's vehicle kind. */
   private static final String VEHICLE_KIND = "vehicleKind";
 
+  /** The reasons of the ship cases a run settles itself. */
+  private static final List<P4kReviewReason> SETTLED_REASONS =
+      List.of(
+          P4kReviewReason.GUID_CONFLICT,
+          P4kReviewReason.UNCLEAR_PLAYABILITY,
+          P4kReviewReason.SEEDED_NOT_CREATABLE);
+
   private final ShipTypeRepository shipTypeRepository;
   private final P4kShipBaseData baseData;
   private final P4kShipVariants variants;
@@ -65,6 +74,7 @@ public class P4kShipReconciler {
   private final P4kShipStoreSlugCheck storeSlugCheck;
   private final P4kManufacturerReconciler manufacturerReconciler;
   private final P4kShipClassAliases classAliases;
+  private final P4kRunResolvedCases resolvedCases;
 
   /**
    * Reconciles every ship, then the variant groups and the store slugs; the manufacturers must be
@@ -100,6 +110,7 @@ public class P4kShipReconciler {
       aliased.replaceAll((_, matches) ->
           matches.stream().filter(row -> !repairRows.contains(row.getId())).toList());
     }
+    P4kShipCoverage coverage = P4kShipCoverage.of(catalogue.ships());
     P4kRowMatcher<ShipType> matcher =
         new P4kRowMatcher<>(
             P4kKind.SHIP,
@@ -109,7 +120,8 @@ public class P4kShipReconciler {
             "external_uuid",
             className -> P4kShipClassAliases.classMatches(rows, aliased, className),
             rows::byName,
-            row -> row.getSourceSystems() == GameItemSourceSystem.P4K);
+            row -> row.getSourceSystems() == GameItemSourceSystem.P4K,
+            coverage::covers);
     Set<UUID> bases =
         repairs.stream()
             .map(repair -> repair.selection().getGuid())
@@ -145,7 +157,37 @@ public class P4kShipReconciler {
     }
     variants.write(catalogue.ships(), catalogue.head().isComplete(P4kKind.SHIP), context);
     storeSlugCheck.check(catalogue.shipStoreSlugs(), context);
+    if (context.isApply()) {
+      settleCases(catalogue, context);
+    }
     return repairs;
+  }
+
+  /**
+   * Closes the open ship cases this run no longer finds and reopens those it finds again
+   * (REQ-P4K-016, REQ-P4K-050); a partial ships kind settles only the GUIDs it lists.
+   *
+   * @param catalogue the catalogue
+   * @param context the run
+   */
+  private void settleCases(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
+    Set<P4kRunResolvedCases.Found> found =
+        context.getReport().reviews().stream()
+            .filter(finding -> finding.kind() == P4kKind.SHIP)
+            .map(finding -> new P4kRunResolvedCases.Found(finding.guid(), finding.reason()))
+            .collect(Collectors.toUnmodifiableSet());
+    Predicate<UUID> evaluated;
+    if (catalogue.head().isComplete(P4kKind.SHIP)) {
+      evaluated = _ -> true;
+    } else {
+      Set<UUID> listed =
+          catalogue.ships().stream()
+              .map(P4kShipDto::parsedGuid)
+              .filter(Objects::nonNull)
+              .collect(Collectors.toUnmodifiableSet());
+      evaluated = listed::contains;
+    }
+    resolvedCases.settleWithin(P4kKind.SHIP, SETTLED_REASONS, found, evaluated, context.getNow());
   }
 
   /**
