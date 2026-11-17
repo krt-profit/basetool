@@ -33,23 +33,31 @@ client changed a watched key in between, Redis discards the writes and the clien
 ## Decision
 
 1. **No script.** The budget step, the quota's add and refund and the claim release run as
-   optimistic transactions through one helper, `OptimisticTransaction`: it watches the keys a step
-   reads, lets the step read and decide, and queues the step's writes between `MULTI` and `EXEC`.
-   An aborted `EXEC` runs the step again on the new state, up to **32 attempts** with a random pause
-   of up to **8 ms** between them; when every attempt is aborted, the step fails as an unreachable
-   Redis does (`503` with `Retry-After`, REQ-XCH-023). The `Retry-After` walk reads without a
-   transaction: its answer is a hint and was never written.
+   optimistic transactions through one component, `OptimisticTransactions`: it watches the keys a
+   step reads, lets the step read and decide, and queues the step's writes between `MULTI` and
+   `EXEC`. An aborted `EXEC` — recognised by the connection's own `null` reply, not by an empty list
+   — runs the step again on the new state, up to **32 attempts** and **2 s**, with a random pause
+   whose bound doubles from 2 ms up to **32 ms**; when every attempt is aborted, the step fails as an
+   unreachable Redis does (`503` with `Retry-After`, REQ-XCH-023) and is counted in
+   `basetool_ingest_exchange_store_conflicts_total`, which `ExchangeStoreStepsExhausted` watches. A
+   budget step that leaves every scope as it found it writes nothing, so it never aborts another.
+   The `Retry-After` walk reads without a transaction: its answer is a hint and was never written.
 2. **The rules stay.** The budget step keeps every rule of ADR-0221 amendment 1 — up to 1000
    expired entries pruned per set, three limits, 512 bytes charged per entry, a missing total
    rebuilt from its set, an entry's expiry only ever raised, and the sets and totals kept at least as
    long as their longest entry (`SET … KEEPTTL`, `PEXPIRE … NX` and `GT`). The quota's add never
    creates a counter and its refund never goes below zero; a claim is released only while it holds
    the caller's token.
-3. **A pooled connection per transaction.** `WATCH` and `MULTI` need a connection of their own, so
-   the gateway gets the Lettuce connection pool (`commons-pool2`, version from the Spring Boot BOM):
-   at most 8 connections, waiting at most 2 s for one. Every other command keeps the shared
-   connection, which Lettuce takes from the same pool and holds for good, so 7 are left for
-   transactions; a step that waits longer for one fails like an unreachable Redis.
+3. **Every command at most once, on a pooled connection.** `WATCH` and `MULTI` need a connection of
+   their own, and Lettuce's defaults would re-establish a dropped connection and replay what it had
+   not answered — the queued writes of a transaction outside it, a refund twice. So the gateway has
+   one explicit connection factory, `RedisClientConfig`: a pool (`commons-pool2`, version from the
+   Spring Boot BOM) of at most 16 connections that tests each before lending it, waiting at most 2 s
+   for one; no shared connection, so a step's reads, watch and writes run on the connection it
+   borrowed; no reconnect, so a dropped connection fails its commands and is replaced on the next
+   borrow; and a 2 s command and connect timeout. An attempt that fails for any reason, an `Error`
+   included, closes its connection, so no watch, open transaction or unanswered command reaches the
+   next borrower.
 4. **The ACL changes in two steps.** This change grants `basetool-ingest` `WATCH`, `UNWATCH`,
    `MULTI`, `EXEC`, `DISCARD`, `INCRBY`, `DECRBY` and `ZCARD` and keeps `EVAL`/`EVALSHA`, so one
    rendered ACL serves both the running release and this one. Once production runs this release, a
@@ -62,10 +70,14 @@ client changed a watched key in between, Redis discards the writes and the clien
   Redis user.
 - A step costs a few reads per scope and one transaction instead of one `EVALSHA`. At the gateway's
   write rate that is a few milliseconds per write.
-- Every write touches the total scope, so parallel writes conflict and retry. The budget still
-  never overshoots — the parallel tests of `ExchangeStoreRedisIntegrationTest` run under the ingest
-  user — and sustained contention beyond 32 attempts turns into `503`s, never into an overshoot. An
-  exhausted step logs a warning naming `OptimisticLockingFailureException`.
+- Every write that changes the budget touches the total scope, so concurrent writes conflict and
+  retry: the gateway carries a few hundred committing budget steps per second, far above the
+  exchange's write rate. The budget still never overshoots — the parallel tests of
+  `ExchangeStoreRedisIntegrationTest` run under the ingest user on the production connection
+  settings — and sustained contention beyond 32 attempts or 2 s turns into `503`s, never into an
+  overshoot; `ExchangeStoreStepsExhausted` reports it.
+- A dropped Redis connection costs the requests in flight on it a `503` instead of a silent
+  replay; the next request gets a fresh connection.
 - The owner renders and loads the expanded ACL before this release, and the reduced one after the
   follow-up (ADR-0207: an ACL change is a render and an `ACL LOAD` on the host).
 - REQ-SEC-068's command list and REQ-XCH-023's description of the budget step move with this

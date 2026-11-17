@@ -271,7 +271,7 @@ refuses, writing nothing, when a variable is missing or the result lacks exactly
 |---|---|---|
 | `default` | `REDIS_PASSWORD` | everything while `REDIS_DEFAULT_USER` is `on` (the default); **nothing** once it is `off` |
 | `admin` | `REDIS_PASSWORD` | everything — the operator's user for `ACL LOAD` and inspection; only the redis container's own environment carries it |
-| `monitoring` | `REDIS_EXPORTER_PASSWORD` | introspection for `redis-exporter`; no key, no `SCAN` (a key's name is a session id) |
+| `monitoring` | `REDIS_EXPORTER_PASSWORD` | only the commands `redis-exporter` sends (`PING`, `CLIENT SETNAME`/`SETINFO`, `COMMAND INFO`, `INFO`, `CONFIG GET`, `LATENCY LATEST`/`HISTOGRAM`); no key, no `SCAN`, no `CLIENT TRACKING`/`LIST`/`KILL`/`PAUSE`, no `SLOWLOG` (a key's name is a session id) |
 | `basetool-frontend` | `REDIS_FRONTEND_PASSWORD` | `basetool:session:*`, `GETDEL` of `ingest:handoff:*`, the session-event, keyspace-event and live-sync channels, `SCAN`, `INFO` |
 | `basetool-backend` | `REDIS_BACKEND_PASSWORD` | `GET`/`SET` on `exchange:*` (the exchange registry mirror, ADR-0221), publish/subscribe on `basetool:livesync:changed` and `basetool:notify:published`, `INFO` |
 | `basetool-ingest` | `REDIS_INGEST_PASSWORD` | strings, lists and sorted sets on `ingest:*` (`GET`, `SET`, `SETEX`, `PSETEX`, `INCR`, `INCRBY`, `DECRBY`, `RPUSH`, `LPOP`, `ZADD`, `ZRANGE`, `ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `EXPIRE`, `PEXPIRE`, `DEL`) and the optimistic transactions of the exchange's budget, quotas and idempotency lock (`WATCH`, `UNWATCH`, `MULTI`, `EXEC`, `DISCARD`, ADR-0389); `EVAL`/`EVALSHA` only until production runs the release without scripts; read-only `GET` of `exchange:*`; `INFO`; no channel, no `SCAN` |
@@ -282,7 +282,9 @@ commands and `EVAL`/`EVALSHA`: the running release still sends scripts, the new 
 transactions. Once production runs that release, the follow-up change (#3494) drops `EVAL`/`EVALSHA`
 from the template; render and load it again, and `ACL DRYRUN basetool-ingest EVAL "return 1" 0` must answer
 with a refusal. In the other order every exchange write is refused `503` until the second step
-follows.
+follows. The same first render narrows `monitoring` to the exporter's own commands; until the
+release's `redis-exporter` (started with `REDIS_EXPORTER_EXCLUDE_SLOWLOG_METRICS`) replaces the
+running one, each scrape's `SLOWLOG GET` is refused and `RedisAclDenials` may fire for it.
 
 An application reaches Redis as its own user only when its `REDIS_<SVC>_USERNAME` is set; with it
 empty it sends a password-only `AUTH` with the shared `REDIS_PASSWORD`, which is the `default` user —

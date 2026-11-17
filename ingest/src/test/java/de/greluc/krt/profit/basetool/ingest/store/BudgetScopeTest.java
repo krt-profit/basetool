@@ -71,49 +71,49 @@ class BudgetScopeTest {
   void aStepThatDoesNotApplyOnlyPrunes() {
     BudgetScope.Change change = scope(3000L, 2, true, null).change(false, RELEASE, ADD, EXPIRY);
 
-    assertThat(change).isEqualTo(new BudgetScope.Change(3000L, false, false, false));
+    assertThat(change).isEqualTo(new BudgetScope.Change(3000L, false, false, false, false));
   }
 
   @Test
   void aPrunedScopeWithNothingLeftIsEmpty() {
     BudgetScope.Change change = scope(0L, 0, false, null).change(false, "", "", EXPIRY);
 
-    assertThat(change).isEqualTo(new BudgetScope.Change(0L, true, false, false));
+    assertThat(change).isEqualTo(new BudgetScope.Change(0L, true, false, false, true));
   }
 
   @Test
   void aSettleReplacesTheReservationWithTheValue() {
     BudgetScope.Change change = scope(2512L, 1, true, null).change(true, RELEASE, ADD, EXPIRY);
 
-    assertThat(change).isEqualTo(new BudgetScope.Change(1512L, false, true, true));
+    assertThat(change).isEqualTo(new BudgetScope.Change(1512L, false, true, true, true));
   }
 
   @Test
   void anEntryHeldWithAnEarlierExpiryIsRaisedAndCountedOnce() {
     BudgetScope.Change change = scope(1512L, 1, false, 5_000d).change(true, "", ADD, EXPIRY);
 
-    assertThat(change).isEqualTo(new BudgetScope.Change(1512L, false, false, true));
+    assertThat(change).isEqualTo(new BudgetScope.Change(1512L, false, false, true, true));
   }
 
   @Test
   void anEntryHeldWithALaterExpiryIsLeftAlone() {
     BudgetScope.Change change = scope(1512L, 1, false, 20_000d).change(true, "", ADD, EXPIRY);
 
-    assertThat(change).isEqualTo(new BudgetScope.Change(1512L, false, false, false));
+    assertThat(change).isEqualTo(new BudgetScope.Change(1512L, false, false, false, false));
   }
 
   @Test
   void anEntryReleasedAndAddedUnderTheSameNameIsAddedAgain() {
     BudgetScope.Change change = scope(1512L, 1, true, 5_000d).change(true, ADD, ADD, EXPIRY);
 
-    assertThat(change).isEqualTo(new BudgetScope.Change(1512L, false, true, true));
+    assertThat(change).isEqualTo(new BudgetScope.Change(1512L, false, true, true, true));
   }
 
   @Test
   void releasingTheLastEntryEmptiesTheScope() {
     BudgetScope.Change change = scope(2512L, 1, true, null).change(true, RELEASE, "", EXPIRY);
 
-    assertThat(change).isEqualTo(new BudgetScope.Change(0L, true, true, false));
+    assertThat(change).isEqualTo(new BudgetScope.Change(0L, true, true, false, true));
   }
 
   @Test
@@ -124,8 +124,37 @@ class BudgetScopeTest {
     assertThat(change.empty()).isFalse();
   }
 
+  @Test
+  void aStepThatChangesNothingWritesNothing() {
+    assertThat(scope(1512L, 1, true, null).change(false, RELEASE, ADD, EXPIRY).alters()).isFalse();
+    assertThat(scope(1512L, 1, false, 20_000d).change(true, "", ADD, EXPIRY).alters()).isFalse();
+  }
+
+  @Test
+  void aMissingOrDifferentStoredTotalIsWritten() {
+    assertThat(scope(null, 1512L, 1, false, Set.of()).change(false, "", "", EXPIRY).alters())
+        .as("a total rebuilt from the set is stored")
+        .isTrue();
+    assertThat(scope(999L, 1512L, 1, false, Set.of()).change(false, "", "", EXPIRY).alters())
+        .as("a stored total that differs from the set is corrected")
+        .isTrue();
+  }
+
+  @Test
+  void anEmptyScopeWithoutATotalIsLeftAlone() {
+    assertThat(scope(null, 0L, 0, false, Set.of()).change(false, "", "", EXPIRY).alters())
+        .isFalse();
+  }
+
+  @Test
+  void pruningAnExpiredEntryIsAWrite() {
+    BudgetScope pruning = scope(1512L, 1512L, 1, false, Set.of("ingest:xch:idem:a:m1:old|512"));
+
+    assertThat(pruning.change(false, "", "", EXPIRY).alters()).isTrue();
+  }
+
   /**
-   * Builds a scope as a step would have read it.
+   * Builds a scope as a step would have read it, its stored total equal to what it counts.
    *
    * @param used the bytes counted after pruning
    * @param remaining the entries held after pruning
@@ -139,9 +168,33 @@ class BudgetScopeTest {
         "ingest:xch:budget:m:a:m1",
         "ingest:xch:budget-sum:m:a:m1",
         used,
+        used,
         Set.of(),
         remaining,
         releaseHeld,
         addExpiry);
+  }
+
+  /**
+   * Builds a scope with a stored total of its own and the expired entries a step prunes.
+   *
+   * @param stored the running total as stored, or {@code null}
+   * @param used the bytes counted after pruning
+   * @param remaining the entries held after pruning
+   * @param releaseHeld whether the release is still held
+   * @param expired the expired entries
+   * @return the scope
+   */
+  private static BudgetScope scope(
+      @Nullable Long stored, long used, long remaining, boolean releaseHeld, Set<String> expired) {
+    return new BudgetScope(
+        "ingest:xch:budget:m:a:m1",
+        "ingest:xch:budget-sum:m:a:m1",
+        stored,
+        used,
+        expired,
+        remaining,
+        releaseHeld,
+        null);
   }
 }

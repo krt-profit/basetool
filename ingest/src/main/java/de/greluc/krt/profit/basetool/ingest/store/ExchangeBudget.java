@@ -98,7 +98,11 @@ public class ExchangeBudget {
   /** The {@code Retry-After} of a budget refusal whose wait cannot be read. */
   static final long FALLBACK_RETRY_AFTER_SECONDS = 60;
 
+  /** The step name of a budget update on the conflict counter. */
+  static final String STEP = "budget";
+
   private final StringRedisTemplate redisTemplate;
+  private final OptimisticTransactions transactions;
   private final ExchangeStoreProperties properties;
   private final MeterRegistry meterRegistry;
   private final Clock clock;
@@ -111,31 +115,36 @@ public class ExchangeBudget {
    * Creates the budget on the system clock and registers its gauge.
    *
    * @param redisTemplate the Redis access
+   * @param transactions runs the budget's read-check-write steps
    * @param properties the budgets
    * @param meterRegistry receives the usage gauge
    */
   @Autowired
   public ExchangeBudget(
       @NotNull StringRedisTemplate redisTemplate,
+      @NotNull OptimisticTransactions transactions,
       @NotNull ExchangeStoreProperties properties,
       @NotNull MeterRegistry meterRegistry) {
-    this(redisTemplate, properties, meterRegistry, Clock.systemUTC());
+    this(redisTemplate, transactions, properties, meterRegistry, Clock.systemUTC());
   }
 
   /**
    * Creates the budget on the given clock.
    *
    * @param redisTemplate the Redis access
+   * @param transactions runs the budget's read-check-write steps
    * @param properties the budgets
    * @param meterRegistry receives the usage gauge
    * @param clock the time source
    */
   ExchangeBudget(
       @NotNull StringRedisTemplate redisTemplate,
+      @NotNull OptimisticTransactions transactions,
       @NotNull ExchangeStoreProperties properties,
       @NotNull MeterRegistry meterRegistry,
       @NotNull Clock clock) {
     this.redisTemplate = redisTemplate;
+    this.transactions = transactions;
     this.properties = properties;
     this.meterRegistry = meterRegistry;
     this.clock = clock;
@@ -271,8 +280,8 @@ public class ExchangeBudget {
     Outcome outcome;
     try {
       outcome =
-          OptimisticTransaction.run(
-              redisTemplate, keys, () -> plan(sets, limits, now, release, add, expiry, ttlMillis));
+          transactions.run(
+              STEP, keys, () -> plan(sets, limits, now, release, add, expiry, ttlMillis));
     } catch (RuntimeException e) {
       log.warn("Exchange budget update failed: {}", e.getClass().getSimpleName());
       throw new ExchangeUnavailableException("The exchange budget cannot be reached.", e);
@@ -284,7 +293,8 @@ public class ExchangeBudget {
 
   /**
    * Reads the three scopes of a step and plans its writes: it prunes their expired entries and,
-   * when the added entry fits all three limits, releases and adds.
+   * when the added entry fits all three limits, releases and adds. A step that leaves every scope
+   * as it found it plans no write, so it never aborts a concurrent step.
    *
    * @param sets the member's, the client's and the whole exchange's scope
    * @param limits their limits, {@link #UNCHECKED} for none
@@ -295,7 +305,7 @@ public class ExchangeBudget {
    * @param ttlMillis the least lifetime the sets and totals keep
    * @return whether the entry fitted and what the client's and the total scope count afterwards
    */
-  private OptimisticTransaction.@NotNull Plan<Outcome> plan(
+  private OptimisticTransactions.@NotNull Plan<Outcome> plan(
       @NotNull List<String> sets,
       long @NotNull [] limits,
       long now,
@@ -314,8 +324,12 @@ public class ExchangeBudget {
                 .allMatch(i -> scopes.get(i).admits(release, add, limits[i]));
     List<BudgetScope.Change> changes =
         scopes.stream().map(scope -> scope.change(fits, release, add, expiry)).toList();
-    return OptimisticTransaction.Plan.write(
-        new Outcome(fits, changes.get(CLIENT).used(), changes.get(TOTAL).used()),
+    Outcome outcome = new Outcome(fits, changes.get(CLIENT).used(), changes.get(TOTAL).used());
+    if (changes.stream().noneMatch(BudgetScope.Change::alters)) {
+      return OptimisticTransactions.Plan.read(outcome);
+    }
+    return OptimisticTransactions.Plan.write(
+        outcome,
         () -> {
           for (int i = 0; i < scopes.size(); i++) {
             scopes.get(i).write(redisTemplate, changes.get(i), release, add, expiry, ttlMillis);
