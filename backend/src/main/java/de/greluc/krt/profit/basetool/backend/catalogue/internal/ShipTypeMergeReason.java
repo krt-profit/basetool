@@ -39,6 +39,12 @@ enum ShipTypeMergeReason {
   WIKI_GAME_NAME_IS_P4K_NAME(false),
 
   /**
+   * The UEX full name of a row only UEX wrote is the surviving row's P4K-led name (REQ-P4K-053,
+   * REQ-DATA-043).
+   */
+  UEX_FULL_NAME_IS_P4K_NAME(false),
+
+  /**
    * The merged row's GUID left a complete catalogue, and the surviving row holds the record that
    * succeeds it (REQ-P4K-053).
    */

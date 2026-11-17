@@ -51,6 +51,7 @@ class P4kShipTwinRulesImportTest {
   private static final String EDITION_CLASS = "TEST_Rules_Edition";
   private static final String NAME = "Rules Test Ship";
   private static final int DEPARTED_UEX_ID = 990_101;
+  private static final int UEX_TWIN_ID = 990_102;
 
   @Autowired private P4kImportService imports;
   @Autowired private P4kImportJobRepository jobs;
@@ -97,6 +98,33 @@ class P4kShipTwinRulesImportTest {
 
     assertThat(count(twinId)).isZero();
     assertThat(ships.findById(movingId).orElseThrow().getP4kUuid()).isEqualTo(BASE);
+  }
+
+  @Test
+  void aRowOnlyUexWroteWhoseFullNameIsARowsNameMergesIntoIt() {
+    assertMerged(
+        twin -> {
+          twin.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
+          twin.setNameFull(NAME);
+          twin.setUexVehicleId(UEX_TWIN_ID);
+        },
+        ShipTypeMergeReason.UEX_FULL_NAME_IS_P4K_NAME);
+  }
+
+  @Test
+  void aRowBothSourcesWroteIsNoTwinByItsFullName() {
+    ships.saveAndFlush(base());
+    ShipType other = new ShipType();
+    other.setName("Rules Test Other");
+    other.setNameFull(NAME);
+    other.setSourceSystems(GameItemSourceSystem.BOTH);
+    UUID otherId = ships.saveAndFlush(other).getId();
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    UUID runId = runs.apply(catalogue(), false).runId();
+
+    assertThat(count(otherId)).isOne();
+    assertThat(merges(runId)).isEmpty();
   }
 
   @Test

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
@@ -40,10 +41,11 @@ import org.springframework.stereotype.Component;
  * Merges a second ship type of a game ship into the row of its P4K record (REQ-P4K-053). A row
  * without a P4K GUID is merged into the unretired row whose GUID is its Wiki UUID; else into the
  * single row holding a same-name record of its own record's variant group; else into the single row
- * whose name is its Wiki in-game name. A row whose GUID left a complete catalogue is merged into
- * the row holding the record that succeeds it. The twins are found before the run decides which
- * rows move to their base or successor (REQ-P4K-051), since a twin's identity would block such a
- * move, and are merged once it has: a row that moves keeps its own Wiki identity.
+ * whose name is its Wiki in-game name or, for a row only UEX wrote, its UEX full name. A row whose
+ * GUID left a complete catalogue is merged into the row holding the record that succeeds it. The
+ * twins are found before the run decides which rows move to their base or successor (REQ-P4K-051),
+ * since a twin's identity would block such a move, and are merged once it has: a row that moves
+ * keeps its own Wiki identity.
  */
 @Component
 @RequiredArgsConstructor
@@ -118,7 +120,7 @@ class P4kShipTwins {
 
   /**
    * Finds the row a ship type without a P4K GUID copies, by its Wiki UUID, its record's variant
-   * group and name, or its Wiki in-game name.
+   * group and name, its Wiki in-game name, or, for a row only UEX wrote, its UEX full name.
    *
    * @param row the ship type
    * @param catalogue the catalogue's ships
@@ -143,12 +145,41 @@ class P4kShipTwins {
         return sameGroup;
       }
     }
-    List<ShipType> named = holders.named(row.getGameName());
+    Twin byGameName =
+        named(
+            row,
+            row.getGameName(),
+            catalogue,
+            holders,
+            ShipTypeMergeReason.WIKI_GAME_NAME_IS_P4K_NAME);
+    if (byGameName != null || row.getSourceSystems() != GameItemSourceSystem.UEX_ONLY) {
+      return byGameName;
+    }
+    return named(
+        row, row.getNameFull(), catalogue, holders, ShipTypeMergeReason.UEX_FULL_NAME_IS_P4K_NAME);
+  }
+
+  /**
+   * Finds the single row whose name is a given in-game name of a ship type.
+   *
+   * @param row the ship type
+   * @param name its Wiki in-game name or UEX full name, or {@code null}
+   * @param catalogue the catalogue's ships
+   * @param holders the rows holding a GUID
+   * @param reason the evidence the name gives
+   * @return the twin, or {@code null} when no single row carries the name
+   */
+  @Nullable
+  private static Twin named(
+      @NotNull ShipType row,
+      @Nullable String name,
+      @NotNull Catalogue catalogue,
+      @NotNull Holders holders,
+      @NotNull ShipTypeMergeReason reason) {
+    List<ShipType> named = holders.named(name);
     ShipType survivor = named.size() == 1 ? named.getFirst() : null;
     P4kShipDto record = survivor == null ? null : settledRecord(survivor, catalogue, holders);
-    return survivor == null || record == null
-        ? null
-        : new Twin(row, survivor, record, ShipTypeMergeReason.WIKI_GAME_NAME_IS_P4K_NAME);
+    return survivor == null || record == null ? null : new Twin(row, survivor, record, reason);
   }
 
   /**

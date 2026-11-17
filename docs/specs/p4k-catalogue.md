@@ -1378,8 +1378,13 @@ is neither retired nor retiring. A row without a P4K GUID is a twin of, in this 
    record;
 2. else the single row holding a record of the same variant group and in-game name as its own
    record, which its Wiki UUID or its class name names;
-3. else the single row whose name is its Wiki in-game name, also when that row's GUID left the
-   catalogue and it moves to a successor no other row holds.
+3. else the single row whose name is its Wiki in-game name;
+4. else, for a row only UEX wrote, the single row whose name is its UEX full name. The row it is
+   merged into keeps its own UEX vehicle id when it has one; the UEX sync then settles which of the
+   two listings it keeps (REQ-DATA-043).
+
+Rules 3 and 4 also find a row whose GUID left the catalogue and that moves to a successor no other
+row holds.
 
 A row whose GUID left a complete catalogue is a twin of the row holding the record that succeeds it:
 the single player base carrying one of its names (REQ-P4K-051). Only this rule merges away a row
@@ -1398,7 +1403,8 @@ preview reports the merges, writes nothing, and matches without the merged rows 
 - [x] A Wiki row of the edition a row leaves for its base is merged, and the row keeps its own Wiki
   UUID.
 - [x] A Wiki row of an edition, or a row carrying an edition's class, is merged into the row of its
-  base; so is a Wiki row whose in-game name is a row's name.
+  base; so is a Wiki row whose in-game name is a row's name, and a row only UEX wrote whose full name
+  is a row's name. A row both sources wrote is no twin by its full name.
 - [x] A row whose record left is merged into the row of its successor, with its hangar ships and its
   UEX vehicle id.
 - [x] A preview reports the merge as `MERGED` and changes no row.
