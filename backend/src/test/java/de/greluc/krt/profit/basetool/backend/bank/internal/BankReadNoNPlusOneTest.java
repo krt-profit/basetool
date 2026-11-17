@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,19 +30,15 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -77,10 +75,9 @@ class BankReadNoNPlusOneTest {
   @Autowired private BankLedgerService bankLedgerService;
   @Autowired private BankAccountRepository accountRepository;
   @Autowired private BankHolderRepository holderRepository;
-  @Autowired private EntityManagerFactory entityManagerFactory;
 
   @Test
-  void dashboardAndAccountListStayStatementBounded_independentOfAccountCount() {
+  void dashboardAndAccountListStayStatementBounded_independentOfAccountCount() throws Exception {
     BankHolder holder = newHolder("vol-holder-" + UUID.randomUUID());
     UUID managerId = UUID.randomUUID();
     for (int i = 0; i < ACCOUNTS; i++) {
@@ -88,23 +85,21 @@ class BankReadNoNPlusOneTest {
       bankLedgerService.bookDeposit(
           new BankDepositRequest(account.getId(), holder.getId(), new BigDecimal("100"), null));
     }
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
 
-    stats.clear();
-    bankDashboardService.getDashboard(true, managerId);
-    long dashboardStatements = stats.getPrepareStatementCount();
+    long dashboardStatements = preparedBy(() -> bankDashboardService.getDashboard(true, managerId));
 
-    stats.clear();
-    bankAccountService.getAccounts(
-        true,
-        managerId,
-        null,
-        java.util.EnumSet.allOf(BankAccountStatus.class),
-        java.util.EnumSet.allOf(BankAccountType.class),
-        PageRequest.of(0, 50));
-    long listStatements = stats.getPrepareStatementCount();
+    long listStatements =
+        preparedBy(() ->
+            bankAccountService.getAccounts(
+                true,
+                managerId,
+                null,
+                java.util.EnumSet.allOf(BankAccountStatus.class),
+                java.util.EnumSet.allOf(BankAccountType.class),
+                PageRequest.of(0, 50)));
 
+    assertTrue(dashboardStatements > 0, "the dashboard read issued no statement");
+    assertTrue(listStatements > 0, "the account list read issued no statement");
     assertTrue(
         dashboardStatements <= STATEMENT_BOUND,
         () ->
@@ -124,7 +119,7 @@ class BankReadNoNPlusOneTest {
    * (REQ-BANK-023).
    */
   @Test
-  void requestQueueMarksConfirmCapabilityStatementBounded_independentOfRowCount() {
+  void requestQueueMarksConfirmCapabilityStatementBounded_independentOfRowCount() throws Exception {
     User employee = newUser("queue-emp-" + UUID.randomUUID());
     employee.setApprovalStatus(ApprovalStatus.ACTIVE);
     employee.getRoles().add(roleRepository.findByCode(Roles.BANK_EMPLOYEE).orElseThrow());
@@ -139,8 +134,6 @@ class BankReadNoNPlusOneTest {
       }
       newPendingDeposit(account);
     }
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
     JwtAuthenticationToken authentication =
         new JwtAuthenticationToken(
             Jwt.withTokenValue("queue-test")
@@ -150,21 +143,22 @@ class BankReadNoNPlusOneTest {
             List.of(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE")));
     SecurityContextHolder.getContext().setAuthentication(authentication);
     try {
-      stats.clear();
-      Page<BankBookingRequestDto> queue =
-          bankBookingRequestService.listQueue(
-              Set.of(BankBookingRequestStatus.PENDING), PageRequest.of(0, QUEUE_ACCOUNTS));
-      long queueStatements = stats.getPrepareStatementCount();
+      var queue =
+          measured(() ->
+              bankBookingRequestService.listQueue(
+                  Set.of(BankBookingRequestStatus.PENDING), PageRequest.of(0, QUEUE_ACCOUNTS)));
+      List<BankBookingRequestDto> rows = queue.result().getContent();
 
-      assertEquals(QUEUE_ACCOUNTS, queue.getContent().size());
+      assertEquals(QUEUE_ACCOUNTS, rows.size());
       Set<UUID> depositAccountIds =
           depositOnly.stream().map(BankAccount::getId).collect(Collectors.toSet());
-      for (BankBookingRequestDto row : queue.getContent()) {
+      for (BankBookingRequestDto row : rows) {
         assertEquals(depositAccountIds.contains(row.accountId()), row.callerMayConfirm());
       }
+      assertTrue(queue.statements() > 0, "the request queue read issued no statement");
       assertTrue(
-          queueStatements <= STATEMENT_BOUND,
-          () -> "request queue issued " + queueStatements + " statements (suspected N+1)");
+          queue.statements() <= STATEMENT_BOUND,
+          () -> "request queue issued " + queue.statements() + " statements (suspected N+1)");
     } finally {
       SecurityContextHolder.clearContext();
     }

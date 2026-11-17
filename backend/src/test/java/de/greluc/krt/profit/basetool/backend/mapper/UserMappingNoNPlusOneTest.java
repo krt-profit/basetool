@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -40,14 +41,10 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,7 +78,6 @@ class UserMappingNoNPlusOneTest {
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private OrgUnitMembershipRepository membershipRepository;
   @Autowired private EntityManager entityManager;
-  @Autowired private EntityManagerFactory entityManagerFactory;
 
   private Squadron staffelA;
   private Squadron staffelB;
@@ -99,13 +95,15 @@ class UserMappingNoNPlusOneTest {
   }
 
   @Test
-  void missionDetail_rosterMappingIsStatementConstant_fiveVersusThirtyParticipants() {
+  void missionDetail_rosterMappingIsStatementConstant_fiveVersusThirtyParticipants()
+      throws Exception {
     UUID small = seedMission(5);
     UUID large = seedMission(30);
 
     long smallStatements = statementsToMapMission(small);
     long largeStatements = statementsToMapMission(large);
 
+    assertTrue(smallStatements > 0, "mapping 5 participants issued no statement");
     assertEquals(
         smallStatements,
         largeStatements,
@@ -140,7 +138,7 @@ class UserMappingNoNPlusOneTest {
   }
 
   @Test
-  void userPage_mappingIsStatementConstant_tenVersusFiftyUsers() {
+  void userPage_mappingIsStatementConstant_tenVersusFiftyUsers() throws Exception {
     String prefix = "perf-page-" + UUID.randomUUID() + "-";
     for (int i = 0; i < 50; i++) {
       newMember(prefix + i);
@@ -149,6 +147,7 @@ class UserMappingNoNPlusOneTest {
     long tenStatements = statementsToMapUserPage(prefix, 10);
     long fiftyStatements = statementsToMapUserPage(prefix, 50);
 
+    assertTrue(tenStatements > 0, "mapping 10 users issued no statement");
     assertEquals(
         tenStatements,
         fiftyStatements,
@@ -161,39 +160,31 @@ class UserMappingNoNPlusOneTest {
   }
 
   /** Loads the mission cold and counts the statements of load + full DTO mapping. */
-  private long statementsToMapMission(UUID missionId) {
+  private long statementsToMapMission(UUID missionId) throws Exception {
     entityManager.flush();
     entityManager.clear();
     bindRequest();
-    Statistics stats = statistics();
-    stats.clear();
-    MissionDto dto = missionMapper.toDto(missionRepository.findById(missionId).orElseThrow());
-    long count = stats.getPrepareStatementCount();
-    assertTrue(!dto.participants().isEmpty());
-    return count;
+    var mapped =
+        measured(() -> missionMapper.toDto(missionRepository.findById(missionId).orElseThrow()));
+    assertTrue(!mapped.result().participants().isEmpty());
+    return mapped.statements();
   }
 
   /** Loads a page from one seeded population and counts load plus primed DTO mapping statements. */
-  private long statementsToMapUserPage(String prefix, int size) {
+  private long statementsToMapUserPage(String prefix, int size) throws Exception {
     entityManager.flush();
     entityManager.clear();
     bindRequest();
-    Statistics stats = statistics();
-    stats.clear();
-    Page<User> page =
-        userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-            prefix, prefix, PageRequest.of(0, size, Sort.by("username")));
-    userMapper.primeStaffelMemberships(page.getContent());
-    List<UserDto> dtos = page.map(userMapper::toDto).getContent();
-    long count = stats.getPrepareStatementCount();
-    assertEquals(size, dtos.size());
-    return count;
-  }
-
-  private Statistics statistics() {
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
-    return stats;
+    var mapped =
+        measured(() -> {
+          Page<User> page =
+              userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
+                  prefix, prefix, PageRequest.of(0, size, Sort.by("username")));
+          userMapper.primeStaffelMemberships(page.getContent());
+          return page.map(userMapper::toDto).getContent();
+        });
+    assertEquals(size, mapped.result().size());
+    return mapped.statements();
   }
 
   /** Binds a fresh servlet request, so every measurement starts with an empty request memo. */

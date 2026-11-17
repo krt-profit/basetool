@@ -1,4 +1,4 @@
 ### Changed
 
-- P4K import: an item an earlier import created for a world or NPC object (consoles, doors, screens, hair colours …)
-  that no member uses is now hidden from the pickers instead of waiting as a review case; a used one stays a case.
+- **P4K-Import, Gegenstände.** Früher angelegte Welt- und NPC-Objekte (Konsolen, Türen, Bildschirme, Haarfarben …), die
+  kein Mitglied verwendet, verschwinden aus den Auswahllisten, statt als Prüffall zu warten; verwendete bleiben ein Fall.

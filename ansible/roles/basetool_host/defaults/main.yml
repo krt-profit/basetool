@@ -97,10 +97,12 @@ basetool_host_container_owners:
       - "{{ basetool_host_log_dir }}/keycloak"
   - container_uid: 999
     reason: >-
-      redis cannot chown its own /data because users.acl is mounted :ro from the same directory,
-      so it dies on "Can't open or create append-only dir" and the health gate rolls the deploy back
+      redis runs as container uid 999 and cannot chown its own /data, so it dies on
+      "Can't open or create append-only dir" and the health gate rolls the deploy back;
+      redis-session keeps the original redis directory, redis-shared has its own
     paths:
       - "{{ basetool_host_data_dir }}/redis"
+      - "{{ basetool_host_data_dir }}/redis-shared"
   - container_uid: 70
     reason: "the postgres data directories"
     paths:
@@ -110,6 +112,7 @@ basetool_host_container_owners:
 basetool_host_root_dirs:
   - "{{ basetool_host_config_dir }}"
   - "{{ basetool_host_config_dir }}/monitoring"
+  - "{{ basetool_host_config_dir }}/redis"
   - "{{ basetool_host_data_dir }}"
   - "{{ basetool_host_log_dir }}"
   - "{{ basetool_host_cache_dir }}"
