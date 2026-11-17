@@ -95,7 +95,7 @@ public class ScWikiVehicleSyncService {
     }
     Map<String, Long> nameCounts =
         valid.stream()
-            .map(dto -> dto.name().toLowerCase(Locale.ROOT))
+            .flatMap(dto -> nameKeys(dto).stream().map(ScWikiVehicleSyncService::fold))
             .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
     UUID runId = syncReportService.beginRun();
     Instant now = Instant.now();
@@ -181,7 +181,7 @@ public class ScWikiVehicleSyncService {
 
   /**
    * Links or seeds the ship type of one Wiki vehicle, resolved by game UUID, P4K GUID, aliased
-   * class name, then name (REQ-DATA-026).
+   * class name, then name and in-game name (REQ-DATA-026, REQ-DATA-041).
    *
    * @param dto the Wiki vehicle
    * @param run the census-wide facts of this run
@@ -204,9 +204,9 @@ public class ScWikiVehicleSyncService {
     }
     if (match.isEmpty()) {
       matchedBy = MatchKey.NAME;
-      Optional<ShipType> named = shipTypeRepository.findByNameIgnoreCase(dto.name());
-      if (named.isPresent() && run.sharesName(dto)) {
-        ShipType holder = named.get();
+      Optional<NameHit> named = findByName(dto);
+      if (named.isPresent() && run.sharesName(named.get().key())) {
+        ShipType holder = named.get().ship();
         if (run.covers(holder)) {
           return reportSiblingVariant(dto, run.runId());
         }
@@ -214,7 +214,7 @@ public class ScWikiVehicleSyncService {
             ? reportNameHeldByOtherVehicle(dto, run.runId())
             : reportIdentityConflict(dto, run.runId(), "Name is shared by several Wiki vehicles.");
       }
-      match = named;
+      match = named.map(NameHit::ship);
     }
     ShipType ship = match.orElseGet(ShipType::new);
     UUID stored = ship.getExternalUuid();
@@ -249,6 +249,54 @@ public class ScWikiVehicleSyncService {
     shipTypeRepository.save(ship);
     return Disposition.WRITTEN;
   }
+
+  /**
+   * Finds the ship type carrying the Wiki vehicle's name, else its in-game name, which the P4K
+   * import leads into {@code ship_type.name} (REQ-DATA-041).
+   *
+   * @param dto the Wiki vehicle
+   * @return the ship type and the name that found it, or empty when neither name is stored
+   */
+  private Optional<NameHit> findByName(ScWikiVehicleDto dto) {
+    for (String key : nameKeys(dto)) {
+      Optional<ShipType> ship = shipTypeRepository.findByNameIgnoreCase(key);
+      if (ship.isPresent()) {
+        return Optional.of(new NameHit(ship.get(), key));
+      }
+    }
+    return Optional.empty();
+  }
+
+  /**
+   * Lists the Wiki vehicle's name and, when it differs, its in-game name, in that lookup order.
+   *
+   * @param dto the Wiki vehicle
+   * @return the nonblank names
+   */
+  private static List<String> nameKeys(ScWikiVehicleDto dto) {
+    String gameName = dto.gameName();
+    return StringUtils.hasText(gameName) && !fold(gameName).equals(fold(dto.name()))
+        ? List.of(dto.name(), gameName)
+        : List.of(dto.name());
+  }
+
+  /**
+   * Folds a name to its census key, ignoring case as the name lookup does.
+   *
+   * @param name the name
+   * @return the lower-cased name
+   */
+  private static String fold(String name) {
+    return name.toLowerCase(Locale.ROOT);
+  }
+
+  /**
+   * A ship type found by one of a Wiki vehicle's names.
+   *
+   * @param ship the stored ship type
+   * @param key the name that found it
+   */
+  private record NameHit(ShipType ship, String key) {}
 
   /**
    * Reports a Wiki variant left without a row of its own because a ship type linked to another
@@ -351,7 +399,8 @@ public class ScWikiVehicleSyncService {
   /**
    * The census-wide facts one vehicle upsert reads.
    *
-   * @param nameCounts how many valid Wiki vehicles carry each lower-cased name
+   * @param nameCounts how many valid Wiki vehicles carry each lower-cased name as their name or
+   *     in-game name
    * @param census the UUIDs of every valid Wiki vehicle of this run
    * @param runId the sync run the events belong to
    * @param now the sync time
@@ -360,13 +409,14 @@ public class ScWikiVehicleSyncService {
       Map<String, Long> nameCounts, Set<UUID> census, UUID runId, Instant now) {
 
     /**
-     * Tells whether more than one Wiki vehicle of this census carries the vehicle's name.
+     * Tells whether more than one Wiki vehicle of this census carries a name as its name or in-game
+     * name.
      *
-     * @param dto the Wiki vehicle
+     * @param name the name that found a stored ship type
      * @return {@code true} when the name is shared, ignoring case
      */
-    boolean sharesName(ScWikiVehicleDto dto) {
-      return nameCounts.getOrDefault(dto.name().toLowerCase(Locale.ROOT), 0L) > 1;
+    boolean sharesName(String name) {
+      return nameCounts.getOrDefault(fold(name), 0L) > 1;
     }
 
     /**
