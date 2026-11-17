@@ -11,6 +11,7 @@ DropCapability=ALL
 NoNewPrivileges=true
 Network=net-monitoring-core.network
 Network=net-monitoring-scrape.network
+Network=net-monitoring-redis.network
 Volume=/opt/basetool/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 Volume=/opt/basetool/monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
 Volume=/etc/basetool/monitoring/secrets/prometheus-web.yml:/etc/prometheus/web.yml:ro

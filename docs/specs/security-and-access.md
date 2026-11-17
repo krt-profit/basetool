@@ -5959,17 +5959,18 @@ the internet-facing ingest gateway above all — was a compromise of every membe
 2026-07-10 incident (a `default` user left `nopass`) showed how quietly that user can go wrong
 (APPSEC-04, improvement audit 2026-09-22).
 
-**The rule:** every service authenticates as its own ACL user, and each user can reach exactly what
-its service does:
+**The rule:** every service authenticates as its own ACL user on each instance it reaches
+(REQ-SEC-089), and each user can reach exactly what its service does there:
 
-| User | Keys | Channels | Commands beyond `@connection` |
-| --- | --- | --- | --- |
-| `basetool-frontend` | `basetool:session:*`, `ingest:handoff:*` | `basetool:session:*`, the created-event pattern, `__keyevent@0__:del` / `:expired`, `basetool:livesync:changed` / `:presence` | read, write, keyspace, hash, set, sorted set, string, pub/sub, transaction, `INFO`; no dangerous command, no `CONFIG` |
-| `basetool-backend` | `exchange:*` | `basetool:livesync:changed`, `basetool:notify:published` | `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `GET`, `SET`, `INFO` |
-| `basetool-ingest` | `ingest:*`, read-only `exchange:*` | none | `GET`, `SET`/`SETEX`/`PSETEX`, `INCR`/`INCRBY`/`DECRBY`, `ZADD`, `ZRANGE`/`ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `RPUSH`, `LPOP`, `EXPIRE`/`PEXPIRE`, `DEL`, `WATCH`/`UNWATCH`/`MULTI`/`EXEC`/`DISCARD`, `INFO`; `EVAL`/`EVALSHA` until the follow-up of ADR-0389 |
-| `monitoring` | none | none | only what `redis_exporter` sends: `PING`, `CLIENT SETNAME`/`SETINFO`, `COMMAND INFO`, `INFO`, `CONFIG GET`, `LATENCY LATEST`/`HISTOGRAM`; **not** `SCAN`, `RANDOMKEY`, `CLIENT TRACKING`, `CLIENT LIST`/`KILL`/`PAUSE` or `SLOWLOG`, which are not key-checked and would list session ids, show command arguments or stop the frontend |
-| `admin` | all | all | all — the operator's, never in an application's environment |
-| `default` | — | — | switched **off** at the end of the rollout |
+| Instance | User | Keys | Channels | Commands beyond `@connection` |
+| --- | --- | --- | --- | --- |
+| `redis-session` | `basetool-frontend` | `basetool:session:*` | `basetool:session:*`, the created-event pattern, `__keyevent@0__:del` / `:expired` | read, write, keyspace, hash, set, sorted set, string, pub/sub, transaction, `INFO`; no dangerous command, no `CONFIG` |
+| `redis-shared` | `basetool-frontend` | `ingest:handoff:*` | `basetool:livesync:changed` / `:presence` | `GETDEL`, `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `INFO` |
+| `redis-shared` | `basetool-backend` | `exchange:*` | `basetool:livesync:changed`, `basetool:notify:published` | `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `GET`, `SET`, `INFO` |
+| `redis-shared` | `basetool-ingest` | `ingest:*`, read-only `exchange:*` | none | `GET`, `SET`/`SETEX`/`PSETEX`, `INCR`/`INCRBY`/`DECRBY`, `ZADD`, `ZRANGE`/`ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `RPUSH`, `LPOP`, `EXPIRE`/`PEXPIRE`, `DEL`, `WATCH`/`UNWATCH`/`MULTI`/`EXEC`/`DISCARD`, `INFO`; no script |
+| both | `monitoring` | none | none | only what `redis_exporter` sends: `PING`, `CLIENT SETNAME`/`SETINFO`, `COMMAND INFO`, `INFO`, `CONFIG GET`, `LATENCY LATEST`/`HISTOGRAM`; **not** `SCAN` or `RANDOMKEY`, which are not key-checked and would list every session id, nor `CLIENT TRACKING`/`LIST`/`KILL`/`PAUSE` or `SLOWLOG` |
+| both | `admin` | all | all | all — the operator's, never in an application's environment |
+| both | `default` | — | — | switched **off** at the end of the rollout |
 
 - **The exchange's two key families** (ADR-0221, REQ-XCH-003/-008/-020/-023). The backend writes
   and reads the registry mirror and the revocation and deny-list keys under `exchange:*`
@@ -5979,7 +5980,7 @@ its service does:
   `ZADD`, `ZRANGE` / `ZRANGEBYSCORE`, `ZREM`, `ZSCORE` and `ZCARD` for the byte budget, `SET … NX`
   for the idempotency locks, and `WATCH`, `MULTI`, `EXEC`, `UNWATCH` and `DISCARD` for the
   optimistic transactions that check and record the budget, add to and refund a quota and release
-  an idempotency claim atomically (`OptimisticTransaction`, ADR-0389). `WATCH` is key-checked like
+  an idempotency claim atomically (`OptimisticTransactions`, ADR-0389). `WATCH` is key-checked like
   every other command.
 - **No user but `admin` may track keys.** `CLIENT TRACKING` in broadcast mode is not key-checked:
   a user holding it would be sent the name — for a session, the id — of every key written under a
@@ -5988,13 +5989,18 @@ its service does:
   runs with `REDIS_EXPORTER_EXCLUDE_SLOWLOG_METRICS`, because `SLOWLOG GET` returns command
   arguments.
 - **The gateway's user runs no script** (ADR-0389). The Lua interpreter runs inside the server,
-  where a fault in it reaches past the ACL, and the gateway is the internet-facing service. Its user
-  keeps `EVAL`/`EVALSHA` only until production runs the release that sends transactions instead;
-  the follow-up drops them from the template, and from then on `ACL DRYRUN` refuses them.
-- **The rules are code.** `scripts/redis-users.acl.tmpl` is the single source; `render-redis-acl.py`
-  renders it on the host with SHA-256 hashes (never a clear-text password) and refuses a partial
-  render or a file without exactly one `default` line. The Testcontainers suites and the E2E stack
-  load the same template.
+  where a fault in it reaches past the ACL, and the gateway is the internet-facing service.
+  `redis-shared` only ever serves the gateway that sends transactions instead, so its template grants
+  neither `EVAL` nor `EVALSHA` and `ACL DRYRUN` refuses both.
+- **The rules are code.** `scripts/redis-session-users.acl.tmpl` and
+  `scripts/redis-shared-users.acl.tmpl` are the single sources, one per instance;
+  `render-redis-acl.py` renders each on the host with SHA-256 hashes (never a clear-text password)
+  and refuses, naming variables only: a partial render, an unset `REDIS_DEFAULT_USER` (it has no
+  default), one password under two variables — on one instance or across both —, an application
+  user granted a key or channel outside its instance's prefixes (the session store:
+  `basetool:session:` and the keyspace events; the shared Redis: `ingest:`, `exchange:`, the
+  live-sync and notification channels), and a file without exactly one `default` line. The
+  Testcontainers suites and the E2E stack load the same templates.
 - **Merging changes nothing for the applications.** A service uses its own user only when its
   `REDIS_<SVC>_USERNAME` is set; empty, it sends a password-only `AUTH` with the shared
   `REDIS_PASSWORD`, which is `default`, exactly as before.
@@ -6020,10 +6026,11 @@ its service does:
 
 **Acceptance**
 
-- [x] Under the template with `default` off, the frontend's real Spring Session repository stores,
-  indexes, renames and deletes a session and receives its created and deleted events; live sync
-  publishes and receives on both channels; a handoff is consumed; `SCAN` and `INFO` answer.
-  *`RedisAclFrontendIntegrationTest`.*
+- [x] Under the templates with `default` off, the frontend's real Spring Session repository
+  stores, indexes, renames and deletes a session on `redis-session` and receives its created and
+  deleted events; live sync publishes and receives on both channels of `redis-shared`; a handoff is
+  consumed there; `SCAN` and `INFO` answer; neither instance grants the frontend the other's keys or
+  channels. *`RedisAclFrontendIntegrationTest`.*
 - [x] The backend's notification fan-out and live-sync channel work under its user; the gateway's
   real staging, cap eviction included, works under its user. *`RedisAclBackendIntegrationTest`,
   `RedisAclIngestIntegrationTest#stagingAndTheCapEvictionRunUnderTheIngestUser`.*
@@ -6036,29 +6043,36 @@ its service does:
   discards the writes and the step runs again, and a failed step leaves the pooled connection
   without a watch or an open transaction.
   *`RedisAclIngestIntegrationTest#anOptimisticTransactionRunsUnderTheIngestUserOnItsOwnKeysOnly`,
-  `OptimisticTransactionRedisIntegrationTest`, `ExchangeStoreRedisIntegrationTest`.*
-- [ ] The gateway's user can run no script: `EVAL` and `EVALSHA` are refused. *(The follow-up step
-  of ADR-0389, #3494, once production runs the release without scripts.)*
+  `OptimisticTransactionsRedisIntegrationTest`, `ExchangeStoreRedisIntegrationTest`.*
+- [x] The gateway's user can run no script: `EVAL` and `EVALSHA` are refused.
+  *`RedisAclIngestIntegrationTest#theIngestUserRunsNoScript`.*
 - [x] The frontend's startup step under its own user leaves `acl_access_denied_cmd` unchanged and
   sends no `CONFIG`; under `default` it still sends `CONFIG GET`; switched off it sends nothing; a
   wrong password still fails it. *`RedisAclFrontendIntegrationTest`, `RedisSessionConfigTest`.*
 - [x] `ACL DRYRUN` refuses, per user, every foreign key, foreign channel, `CONFIG`, `KEYS`,
   `FLUSHALL`/`FLUSHDB`, `SCAN` for backend, ingest and monitoring, and `ACL` for every non-admin user.
-  *`RedisAclFrontendIntegrationTest#theAclMatrixHoldsForEveryUser`; `monitoring` keeps `CONFIG GET`
-  by design and is refused `CONFIG SET`.*
-- [x] `monitoring` is refused `CLIENT TRACKING`, `CLIENT LIST`, `CLIENT KILL`, `CLIENT PAUSE` and
-  `SLOWLOG GET`, every application user `CLIENT TRACKING`, and the exporter scrapes every metric
-  the alerts and dashboards read without one refusal.
-  *`RedisAclFrontendIntegrationTest#theAclMatrixHoldsForEveryUser`; measured against
-  `redis_exporter` v1.97.0 with `ACL LOG` empty.*
-- [x] A password-only `AUTH` works while `default` is on and fails once it is off.
-  *`RedisAclFrontendIntegrationTest`.*
+  *`RedisAclFrontendIntegrationTest#theSessionStoreAclMatrixHoldsForEveryUser` and
+  `#theSharedAclMatrixHoldsForEveryUser`; `monitoring` keeps `CONFIG GET` by design and is refused
+  `CONFIG SET`.*
+- [x] On both instances `monitoring` is refused `CLIENT TRACKING`, `CLIENT LIST`, `CLIENT KILL`,
+  `CLIENT PAUSE` and `SLOWLOG GET`, every application user `CLIENT TRACKING`, and the exporter
+  scrapes every metric the alerts and dashboards read without one refusal.
+  *`RedisAclFrontendIntegrationTest#theSessionStoreAclMatrixHoldsForEveryUser` and
+  `#theSharedAclMatrixHoldsForEveryUser`; measured against `redis_exporter` v1.97.0 with `ACL LOG`
+  empty.*
+- [x] A password-only `AUTH` works while `default` is on and fails once it is off; on a host both
+  instances prove it with their own admin password, which never leaves the container.
+  *`RedisAclFrontendIntegrationTest`; `check-conformance.py` `redis-default-user-off`,
+  `check-conformance.test.sh`.*
+- [x] The renderer refuses an unset `REDIS_DEFAULT_USER`, one password under two variables of
+  either instance and an application grant outside its instance's prefixes, and never prints a
+  value. *`render-redis-acl.py --selftest`.*
 - [x] Under `prod` the gateway refuses to start with a blank or `default` Redis username, read
   through the shipped `application.yml`; `dev` and `test` keep the fallback.
   *`RedisUsernameGuardTest`.*
-- [x] The committed E2E ACL equals the template rendered with the E2E passwords, and the E2E stack
-  runs every application on its own user with `default` off.
-  *`RedisAclFrontendIntegrationTest#theCommittedE2eAclIsTheTemplate`, `E2eStackExtension`.*
+- [x] The two committed E2E ACLs equal their templates rendered with the E2E passwords, and the E2E
+  stack runs every application on its own user with `default` off.
+  *`RedisAclFrontendIntegrationTest#theCommittedE2eAclsAreTheTemplates`, `E2eStackExtension`.*
 - [x] Refusals are alerted on (`RedisAclDenials`). *`redis_acl_denials_test.yml`.*
 - [x] Production runs every application on its own user with `default` off. _(2026-09-25, rollout
   steps 2–5 at ~15:47–15:51 UTC, owner-approved: six users; backend and frontend connected as their
@@ -6079,13 +6093,15 @@ counted in `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire f
 `RedisAclBackendIntegrationTest`,
 `RedisAclIngestIntegrationTest`, `render-redis-acl.py --selftest` (`repo-lint.yml`), the E2E suite
 (`docker-compose.e2e.yml`, `E2eStackExtension`, `IngestHandoffE2eTest`) ·
-`monitoring/prometheus/tests/redis_acl_denials_test.yml` · **Code:** `scripts/redis-users.acl.tmpl`,
+`monitoring/prometheus/tests/redis_acl_denials_test.yml` · **Code:**
+`scripts/redis-session-users.acl.tmpl`, `scripts/redis-shared-users.acl.tmpl`,
 `scripts/render-redis-acl.py`, `RedisSessionConfig.selectConfigureRedisAction`,
 `ServerConfiguredKeyspaceNotificationsAction`, `TolerantKeyspaceNotificationsAction`, the three apps'
 `spring.data.redis.username` · **Monitoring:** `RedisAclDenials` · **Runbook:**
 [`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl) · **ADR:** [ADR-0207](../adr/0207-each-service-reaches-redis-as-its-own-acl-user.md),
-[ADR-0389](../adr/0389-the-ingest-gateway-runs-no-lua-in-redis.md) ·
-**Related:** REQ-SEC-025, REQ-OPS-018
+[ADR-0389](../adr/0389-the-ingest-gateway-runs-no-lua-in-redis.md),
+[ADR-0388](../adr/0388-the-session-store-gets-a-redis-the-ingest-gateway-cannot-reach.md) ·
+**Related:** REQ-SEC-025, REQ-SEC-089, REQ-OPS-018
 
 ### REQ-SEC-069 — The frontend is a confidential OAuth2 client whenever it holds a secret
 
@@ -6740,9 +6756,10 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 
 ### REQ-SEC-089 — The session store is a Redis only the frontend reaches
 
-> [!note] Planned — the second instance (#3493)
-> The frontend already holds its two connections, both pointing at the one instance. Splitting the
-> instance, its ACL file, network, monitoring and backup, and the production cut-over follow.
+> [!note] Planned — the production cut-over (#3493)
+> The two instances, their ACL files, networks, exporters and backup artifacts are in the stacks and
+> the Quadlet units. Production moves over with the owner-approved cut-over in `docs/deployment.md`
+> → *Cut-over: the session store gets its own instance*.
 
 Every member's OAuth2 access and refresh token lives in the session store. The ACL users of
 REQ-SEC-068 bound what a compromised **client** reaches, not a fault in the Redis **server**: a
@@ -6766,11 +6783,26 @@ state, the ingest handoff and the three pub/sub channels live in `redis-shared`.
   `RedisFanoutUnsubscribed` report it.
 - **The environment names them apart.** `REDIS_USERNAME` / `REDIS_PASSWORD` reach the session store,
   `REDIS_SHARED_USERNAME` / `REDIS_SHARED_PASSWORD` the shared Redis; compose and
-  `quadlet/env.d/frontend.env.tmpl` fill both from `REDIS_FRONTEND_*` while one instance serves
-  both.
+  `quadlet/env.d/frontend.env.tmpl` fill the first from `REDIS_FRONTEND_USERNAME` and
+  `REDIS_SESSION_FRONTEND_PASSWORD`, the second from `REDIS_FRONTEND_*`.
+- **Two instances, two networks.** `redis-session` (`maxmemory 384mb` in 512 MB, AOF `everysec`,
+  `noeviction`, `--notify-keyspace-events Egx`) sits on `net-redis-session` alone, which the frontend
+  and `redis-session-exporter` join; `redis-shared` (`768mb` in 1024 MB, AOF, `noeviction`) keeps
+  `net-redis-frontend`, `net-redis-ingest` and `net-redis-backend`. `frontend` requires
+  `redis-session`, `ingest` requires `redis-shared`; the backend requires neither.
+- **Each instance has its own ACL file and admin password** (`REDIS_SESSION_PASSWORD`,
+  `REDIS_PASSWORD`), rendered from its own template into the root-owned `/etc/basetool/redis/`,
+  outside the data directories the containers own; the session store's file names no user of the
+  backend or the gateway. Both files are backup artifacts and restore-drill checks
+  (`redis_session_acl`, `redis_shared_acl`); the data of neither is (REQ-OPS-010).
+- **Monitoring tells them apart.** Each instance has its own exporter, every Redis series carries a
+  `redis` label (`session` / `shared`), and every Redis alert fires and is named per instance
+  (REQ-OBS-014).
 
 **Code:** `frontend/kernel/redis/SharedRedis`, `SharedRedisConfig`, `SharedRedisProperties`,
-`kernel/livesync/LiveSyncRedisConfig`, `kernel/backend/IngestHandoffService`
+`kernel/livesync/LiveSyncRedisConfig`, `kernel/backend/IngestHandoffService`,
+`scripts/redis-session-users.acl.tmpl`, `scripts/redis-shared-users.acl.tmpl`, the `redis-session`
+and `redis-shared` services of the compose files and their Quadlet units
 
 **Acceptance**
 
@@ -6778,12 +6810,19 @@ state, the ingest handoff and the three pub/sub channels live in `redis-shared`.
   one `StringRedisTemplate`, both on the session store, and a write through each connection lands
   only in its own store; a blank `app.shared-redis.host` fails the start.
   *`SharedRedisIntegrationTest`, `SharedRedisConfigTest`.*
+- [x] `redis-session` and `redis-shared` run as separate containers, and only `frontend` and the
+  session exporter join `net-redis-session`, so the ingest gateway has no route to the session store.
+  *`generate-quadlet.py --check`, `generate-quadlet.test.sh` (every Redis network `Internal=true`);
+  on a host `check-conformance.py` `redis-session-isolated`, `check-conformance.test.sh`.*
+- [x] Each instance loads its own ACL file with exactly one `default` line, off in the E2E stack; the
+  session store knows no backend or gateway user, and the shared Redis grants the frontend no
+  session key. *`RedisAclFrontendIntegrationTest`, `render-redis-acl.py --selftest`.*
+- [x] Both instances refuse an unauthenticated `PING`. *`check-conformance.py`
+  `redis-requires-auth`, `check-conformance.test.sh`.*
 - [x] With the shared Redis unreachable, the live-sync container starts unsubscribed instead of
   failing the context, and its gauge reads 0. *`LiveSyncRedisStartTest`,
   `ResilientRedisMessageListenerContainerTest`, `redis_fanout_unsubscribed_test.yml`.*
-- [ ] `redis-session` and `redis-shared` run as separate containers on separate networks, and the
-  ingest gateway has no route to `redis-session` (#3493).
-- [ ] Each instance loads its own ACL file with exactly one `default` line, `off` (#3493).
+- [ ] Production runs both instances (#3493, the owner's cut-over).
 
 ## Out of scope
 
