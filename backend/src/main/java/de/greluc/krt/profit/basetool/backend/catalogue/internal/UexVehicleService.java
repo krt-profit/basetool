@@ -57,10 +57,15 @@ import org.springframework.util.StringUtils;
  *   <li>a new row stamped {@link GameItemSourceSystem#UEX_ONLY}.
  * </ol>
  *
- * <p>A found row that holds another live UEX vehicle id or another game UUID is not written; a game
- * UUID several UEX vehicles carry is no evidence either way. A row found by its own UEX vehicle id
- * whose game UUID is its P4K GUID keeps that UUID, and a differing UEX one is reported as a
- * disagreement (REQ-DATA-041).
+ * <p>A found row that holds another fetched UEX vehicle id belongs to one of the two listings
+ * (REQ-DATA-043): the vehicle takes the row over when its game UUID alone confirms the row's P4K
+ * GUID, or when its name is the row's name and the other listing's is not; otherwise it is a
+ * secondary listing, which writes nothing and creates no row. So is a vehicle no step places whose
+ * shared name is the name of a row holding another listing of that name. A found row that holds an
+ * unfetched UEX vehicle id of a partial fetch, or another game UUID, is not written; a game UUID
+ * several UEX vehicles carry is no evidence either way. A row found by its own UEX vehicle id whose
+ * game UUID is its P4K GUID keeps that UUID, and a differing UEX one is reported as a disagreement
+ * (REQ-DATA-041).
  *
  * <p>On a row with a P4K GUID the manufacturer, cargo, maximum crew and mass are written only while
  * empty; a differing UEX value is reported as {@link SyncEventType#P4K_DISAGREEMENT} (REQ-P4K-031).
@@ -110,13 +115,14 @@ public class UexVehicleService {
             List.of(UexVehicleDto::name, UexVehicleDto::nameFull),
             fetched.complete());
     Set<Integer> seenUexVehicleIds = census.ids();
+    UexVehicleListings listings = UexVehicleListings.of(vehicles, census);
     SyncChunkWriter.Outcome<VehicleOutcome> outcome =
         chunkWriter.write(
             vehicles,
             SyncChunkWriter.DEFAULT_CHUNK_SIZE,
             chunk ->
                 chunk.stream()
-                    .map(dto -> upsertVehicle(dto, now, census, runId))
+                    .map(dto -> upsertVehicle(dto, now, census, listings, runId))
                     .filter(result -> result != VehicleOutcome.SKIPPED)
                     .toList(),
             "vehicle",
@@ -128,6 +134,8 @@ public class UexVehicleService {
                     + "')");
     final long added = outcome.results().stream().filter(VehicleOutcome.CREATED::equals).count();
     final long updated = outcome.results().stream().filter(VehicleOutcome.UPDATED::equals).count();
+    final long secondary =
+        outcome.results().stream().filter(VehicleOutcome.SECONDARY::equals).count();
     long declined = (long) vehicles.size() - outcome.results().size() - outcome.failedRows();
     long skipped = outcome.failedRows() + declined;
     if (!census.complete() || declined > 0) {
@@ -152,7 +160,11 @@ public class UexVehicleService {
     syncReportService.recordSweep(sweep);
 
     log.info(
-        "Finished UEX vehicle sync: {} added, {} updated, {} skipped", added, updated, skipped);
+        "Finished UEX vehicle sync: {} added, {} updated, {} secondary listings, {} skipped",
+        added,
+        updated,
+        secondary,
+        skipped);
   }
 
   /**
@@ -161,11 +173,16 @@ public class UexVehicleService {
    * @param dto inbound UEX row
    * @param now timestamp to stamp on the row
    * @param census validated source identities and UUID claims
+   * @param listings the fetched listings, which decide between two listings of one ship
    * @param runId current report run
-   * @return whether the row was created, updated or rejected
+   * @return whether the row was created, updated, left to another listing or rejected
    */
   private VehicleOutcome upsertVehicle(
-      UexVehicleDto dto, Instant now, UexIdentityCensus census, UUID runId) {
+      UexVehicleDto dto,
+      Instant now,
+      UexIdentityCensus census,
+      UexVehicleListings listings,
+      UUID runId) {
     if (dto.id() == null || dto.id() <= 0 || !StringUtils.hasText(dto.name())) {
       log.debug("Skipping UEX vehicle with missing name (id={}, uuid={})", dto.id(), dto.uuid());
       return VehicleOutcome.SKIPPED;
@@ -192,13 +209,19 @@ public class UexVehicleService {
     if (existingOpt.isEmpty()) {
       existingOpt = findByUniqueName(dto, census);
     }
+    if (existingOpt.isEmpty()
+        && listings.isSecondary(dto, shipTypeRepository::findByNameIgnoreCase)) {
+      return VehicleOutcome.SECONDARY;
+    }
 
     if (existingOpt.isPresent()) {
       ShipType candidate = existingOpt.orElseThrow();
-      boolean sourceConflict =
-          candidate.getUexVehicleId() != null
-              && !dto.id().equals(candidate.getUexVehicleId())
-              && (!census.complete() || census.containsId(candidate.getUexVehicleId()));
+      Integer held = candidate.getUexVehicleId();
+      boolean heldByAnother = held != null && !dto.id().equals(held);
+      if (heldByAnother && census.containsId(held) && !listings.takesOver(candidate, dto)) {
+        return VehicleOutcome.SECONDARY;
+      }
+      boolean sourceConflict = heldByAnother && !census.complete() && !census.containsId(held);
       boolean uuidConflict =
           candidate.getExternalUuid() != null
               && externalUuid != null
@@ -306,6 +329,7 @@ public class UexVehicleService {
   private enum VehicleOutcome {
     CREATED,
     UPDATED,
+    SECONDARY,
     SKIPPED
   }
 
