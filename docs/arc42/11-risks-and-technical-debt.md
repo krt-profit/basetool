@@ -98,10 +98,13 @@ it with one source, the host's own public address (measured 2026-10-24). That ad
 does not reach the Keycloak console. ADR-0318 takes the frontend's and the backend's Keycloak calls
 off the hairpin once `BASETOOL_KEYCLOAK_BACKCHANNEL_URI` is set; their aliases can then go.
 
-Two things to know before changing it. Podman **replaces** its own `--map-guest-addr` rather than
+Three things to know before changing it. Podman **replaces** its own `--map-guest-addr` rather than
 appending, so dropping the v4 entry from `pasta_options` takes `host-gateway` from open to
-unreachable — measured. And if a future podman drops `pasta_options` for the rootless namespace,
-the fallback on record is to move the IPv6 assertion to a host-level probe.
+unreachable — measured. The setting lives in the drop-in `containers.conf.d/50-basetool.conf`, never
+in a main user `containers.conf`, because Podman 6 reads only the highest-precedence main file and
+would then skip the vendor one (ADR-0196 Amendment 2); `check-conformance.py`'s
+`pasta-maps-host-aliases` reads the running pasta. And if a future podman drops `pasta_options` for
+the rootless namespace, the fallback on record is to move the IPv6 assertion to a host-level probe.
 
 ## 11.5b The alias drop-ins depend on an inventory this repository cannot see
 
