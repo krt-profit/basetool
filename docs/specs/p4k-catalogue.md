@@ -948,6 +948,42 @@ page), whose item references carry a `ManufacturerRefDto` with the GUID.
 `catalogue/fragments/manufacturer-mark.html` · **ADR:**
 [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
+### REQ-P4K-058 — a brand's sibling records resolve to its row, and a borrowed name is never led
+
+The catalogue lists some brands more than once, and some records carry another brand's name.
+
+- **Brand siblings.** Canonical records sharing a `@manufacturer_Name…` key with the same or a
+  blank `code` are one brand (`RSI` / `RSI_2025`, `MISC` / `MISC_ENV`, `XNAA` / `XIAN`). The
+  brand's **primary** is the record whose class name is the key's suffix, else the one with the
+  shortest class name; the others are its **siblings**.
+  - A sibling is covered by the brand's row: it needs no row and no case, the report logs it
+    `COVERED`, and items and ships naming it resolve to that row.
+  - A row holding a sibling moves to the primary while no row holds the primary, reported as
+    `CHANGED p4k_uuid`, and then leads the primary's name, code and description.
+  - A brand's name repeats in no repetition count, so a sibling never turns its brand's name step
+    into a conflict.
+- **Borrowed names.** A record sharing a brand's key under a different `code` borrows the brand's
+  name and description (`FSKI`, `MXOX`, `PRAR`, `TRAS` named "Aegis Dynamics"; `GHEX` named
+  "ArcCorp"). It never matches a row by that name, never leads the name, the German name or the
+  descriptions, and is never created; matched by its GUID it leads only its `code`. A row holding
+  such a record that carries the brand's name moves to the brand while no row holds the brand
+  (ArcCorp from `GHEX` to `ARCC`).
+- **Cases settle.** After items and ships, an APPLY closes the open manufacturer `GUID_CONFLICT`
+  and `NAME_CONFLICT` cases it no longer raises and reopens those it raises again (REQ-P4K-016); a
+  partial kind settles only the GUIDs it lists.
+
+**Acceptance**
+
+- [x] A sibling is covered by the brand's row, and an item naming it gets the brand as
+  manufacturer.
+- [x] A row holding a sibling moves to the free primary and takes its code.
+- [x] A record borrowing a brand's name keeps its own row's name and opens no name conflict.
+- [x] An APPLY closes a manufacturer case it no longer raises.
+
+**Enforced by:** `P4kManufacturerFamilyImportTest` · **Code:** `P4kManufacturerFamilies`,
+`P4kManufacturerRules`, `P4kManufacturerReconciler` · **ADR:**
+[ADR-0394](../adr/0394-the-p4k-import-resolves-manufacturer-families-and-borrowed-names-itself.md)
+
 ## Names
 
 ### REQ-P4K-023 — every page shows English catalogue source text

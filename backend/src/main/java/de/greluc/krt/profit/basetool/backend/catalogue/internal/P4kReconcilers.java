@@ -72,7 +72,7 @@ class P4kReconcilers {
     itemStatReconciler.reconcile(catalogue, context);
     final List<P4kShipBaseRepairs.Repair> shipRepairs =
         shipReconciler.reconcile(catalogue, loadouts, context);
-    manufacturerReconciler.finish(context);
+    manufacturerReconciler.finish(catalogue, context);
     resourceGroupReconciler.reconcile(catalogue, context);
     final P4kCommodityReconciler.Outcome commodities =
         commodityReconciler.reconcile(catalogue, context);

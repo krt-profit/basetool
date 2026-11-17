@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kManufacturerDto;
@@ -39,7 +40,8 @@ import org.springframework.stereotype.Component;
  * REQ-P4K-021): match by P4K GUID, SC Wiki UUID and name, never by abbreviation; write the name,
  * the abbreviation from {@code code}, the German name and both descriptions the catalogue leads;
  * leave a name another row holds on the review list. Auxiliary records and reviewed aliases can
- * resolve references without leading the brand's fields.
+ * resolve references without leading the brand's fields; a brand's siblings resolve to its row, and
+ * a record borrowing another brand's name never matches by it nor leads it (REQ-P4K-058).
  */
 @Component
 @RequiredArgsConstructor
@@ -57,12 +59,9 @@ public class P4kManufacturerReconciler {
    */
   public void reconcile(
       @NotNull List<P4kManufacturerDto> manufacturers, @NotNull P4kImportContext context) {
+    List<Manufacturer> stored = manufacturerRepository.findAll();
     P4kRowIndex<Manufacturer> rows =
-        new P4kRowIndex<>(
-            manufacturerRepository.findAll(),
-            Manufacturer::getScwikiUuid,
-            _ -> null,
-            Manufacturer::getName);
+        new P4kRowIndex<>(stored, Manufacturer::getScwikiUuid, _ -> null, Manufacturer::getName);
     context.indexManufacturerRows(rows);
     Set<UUID> aliasGuids = new HashSet<>();
     for (ManufacturerP4kAlias alias : p4kAliases.findLinkedAliases()) {
@@ -71,11 +70,17 @@ public class P4kManufacturerReconciler {
         context.indexManufacturer(alias.getP4kUuid(), alias.getManufacturer());
       }
     }
-    context.indexRepeated(
-        P4kKind.MANUFACTURER,
+    List<P4kManufacturerDto> canonical =
         manufacturers.stream()
             .filter(record -> !P4kManufacturerRecordPath.isAuxiliary(record.recordPath()))
+            .toList();
+    P4kManufacturerFamilies families = P4kManufacturerFamilies.of(canonical);
+    context.indexRepeated(
+        P4kKind.MANUFACTURER,
+        canonical.stream()
             .filter(record -> !aliasGuids.contains(record.parsedGuid()))
+            .filter(record -> !families.isSibling(record.parsedGuid()))
+            .filter(record -> families.lenderOf(record.parsedGuid()) == null)
             .toList());
     Set<UUID> auxiliaryGuids = new HashSet<>();
     Set<UUID> canonicalGuids = new HashSet<>();
@@ -88,7 +93,8 @@ public class P4kManufacturerReconciler {
             "scwiki_uuid",
             _ -> List.of(),
             rows::byName,
-            _ -> false);
+            _ -> false,
+            new P4kManufacturerRules(families, stored, rows::byP4kUuid));
     for (P4kManufacturerDto manufacturer : manufacturers) {
       UUID guid = manufacturer.parsedGuid();
       if (P4kManufacturerRecordPath.isAuxiliary(manufacturer.recordPath())) {
@@ -105,35 +111,30 @@ public class P4kManufacturerReconciler {
         context.getReport().matched(P4kKind.MANUFACTURER, false);
         continue;
       }
+      boolean borrower = families.lenderOf(guid) != null;
+      boolean ownBrand = !borrower && !families.isSibling(guid);
       matcher.reconcile(
           manufacturer,
           null,
-          manufacturer.nameEn(),
+          borrower ? null : manufacturer.nameEn(),
           false,
           context,
           rows,
           (row, matchedGuid) -> {
             context.indexManufacturer(matchedGuid, row);
-            return write(row, manufacturer, matchedGuid, context);
+            return write(row, manufacturer, matchedGuid, borrower, context);
           },
           unmatchedGuid -> {
-            if (unmatchedGuid == null) {
+            if (unmatchedGuid == null || !ownBrand) {
               context.getReport().unmatched(P4kKind.MANUFACTURER, manufacturer);
             } else {
               context.holdUnmatchedManufacturer(unmatchedGuid, manufacturer);
             }
-          });
+          },
+          (row, coveredGuid) -> context.indexManufacturer(coveredGuid, row));
     }
     auxiliaryGuids.removeAll(canonicalGuids);
     context.indexAuxiliaryManufacturers(auxiliaryGuids);
-    if (context.isApply() && !auxiliaryGuids.isEmpty()) {
-      resolvedCases.settleWithin(
-          P4kKind.MANUFACTURER,
-          List.of(P4kReviewReason.GUID_CONFLICT, P4kReviewReason.NAME_CONFLICT),
-          Set.of(),
-          auxiliaryGuids::contains,
-          context.getNow());
-    }
   }
 
   private static void observeAuxiliary(
@@ -230,22 +231,35 @@ public class P4kManufacturerReconciler {
   }
 
   /**
-   * Reports the unmatched manufacturers no seeded item or ship took; runs after items and ships.
+   * Reports the unmatched manufacturers no seeded item or ship took and, on an APPLY, settles the
+   * manufacturer cases the run no longer raises (REQ-P4K-016); runs after items and ships, whose
+   * seeding raises name conflicts.
    *
+   * @param catalogue the catalogue
    * @param context the run
    */
-  public void finish(@NotNull P4kImportContext context) {
+  public void finish(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
     context
         .heldUnmatchedManufacturers()
         .forEach(held -> context.getReport().unmatched(P4kKind.MANUFACTURER, held));
+    if (context.isApply()) {
+      resolvedCases.settleRun(
+          P4kKind.MANUFACTURER,
+          List.of(P4kReviewReason.GUID_CONFLICT, P4kReviewReason.NAME_CONFLICT),
+          catalogue.manufacturers(),
+          catalogue.head().isComplete(P4kKind.MANUFACTURER),
+          context);
+    }
   }
 
   /**
-   * Writes the values the catalogue leads onto a matched row.
+   * Writes the values the catalogue leads onto a matched row; a record borrowing another brand's
+   * name leads only its abbreviation (REQ-P4K-058).
    *
    * @param row the matched manufacturer
    * @param manufacturer the record
    * @param guid the record's GUID
+   * @param borrower whether the record borrows another brand's name and description
    * @param context the run
    * @return whether a field changes
    */
@@ -253,11 +267,15 @@ public class P4kManufacturerReconciler {
       @NotNull Manufacturer row,
       @NotNull P4kManufacturerDto manufacturer,
       @NotNull UUID guid,
+      boolean borrower,
       @NotNull P4kImportContext context) {
     P4kRowWriter writer = new P4kRowWriter(context, P4kKind.MANUFACTURER, manufacturer);
-    writeName(row, manufacturer, guid, writer, context);
     writer.lead(
         "abbreviation", row.getAbbreviation(), stripped(manufacturer.code()), row::setAbbreviation);
+    if (borrower) {
+      return writer.isChanged();
+    }
+    writeName(row, manufacturer, guid, writer, context);
     writer.lead(
         P4kReportColumns.NAME_DE,
         row.getNameDe(),
