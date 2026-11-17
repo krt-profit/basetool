@@ -124,7 +124,7 @@ public class P4kShipReconciler {
             coverage::covers);
     Set<UUID> bases =
         repairs.stream()
-            .map(repair -> repair.selection().getGuid())
+            .map(P4kShipBaseRepairs.Repair::baseGuid)
             .collect(Collectors.toUnmodifiableSet());
     for (P4kShipDto ship : catalogue.ships()) {
       UUID guid = ship.parsedGuid();
@@ -200,7 +200,7 @@ public class P4kShipReconciler {
       @NotNull P4kShipBaseRepairs.Repair repair, @NotNull P4kImportContext context) {
     ShipType row = repair.row();
     P4kShipDto base = repair.base();
-    UUID guid = repair.selection().getGuid();
+    UUID guid = repair.baseGuid();
     final UUID oldGuid = Objects.requireNonNull(row.getP4kUuid());
     if (!context.claim(P4kKind.SHIP, Objects.requireNonNull(row.getId()), guid)) {
       throw new IllegalStateException("A ship repair collided with another source record.");
