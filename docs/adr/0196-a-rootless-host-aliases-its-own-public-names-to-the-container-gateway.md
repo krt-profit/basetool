@@ -124,6 +124,26 @@ does. What it restores is parity between the two families and an alert that mean
 the question it answers (*"shouldn't this set `rootless_port_forwarder`?"*) is still asked and the
 answer is still no. A different setting arrived; that one did not.
 
+## Amendment 2 — the mapping moves into a drop-in — 2026-11-17
+
+Podman 6, which Rocky Linux 10.3 ships, reads only the **one** main `containers.conf` with the
+highest precedence, and a user's `~/.config/containers/containers.conf` outranks the vendor
+`/usr/share/containers/containers.conf`. With the role's file in that place, the vendor file is not
+read at all for the service user: measured under podman 6.1.1, its one active setting,
+`default_sysctls = ["net.ipv4.ping_group_range=0 0"]`, no longer applied (`65534 65534` in the
+container), while `pasta_options` still did.
+
+**The decision.** The role writes `pasta_options` as the drop-in
+`~/.config/containers/containers.conf.d/50-basetool.conf` and removes the main user file. Drop-ins
+are read after the main file in both podman generations: measured under podman 5.8.2 and 6.1.1, the
+rootless namespace's pasta received both `--map-guest-addr` addresses, a container reached a
+listener on the host through `169.254.1.2`, and `ping_group_range` was `0 0`. The decision above and
+Amendment 1 are unchanged; only the file that carries the setting moves.
+
+`check-conformance.py`'s `pasta-maps-host-aliases` now reads the running pasta's arguments and fails
+when an address an alias points at is not mapped, so a setting that is on disk but not in force is
+caught where the aliases depend on it.
+
 ## Consequences
 
 **The probes no longer traverse public DNS or internet routing.** TLS, the certificate, haproxy, the

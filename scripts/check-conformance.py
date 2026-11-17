@@ -95,12 +95,24 @@ REQUIRED_CONTAINER_SERIES = (
     "basetool:container:start_time_seconds",
 )
 
+UNIQUE_LOCAL_V6 = ipaddress.ip_network("fc00::/7")
+
 NEVER_A_CLIENT = (
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("fc00::/7"),
+    UNIQUE_LOCAL_V6,
 )
+
+QUADLET_SOURCE_DIRS = (
+    "/etc/containers/systemd",
+    "/etc/containers/systemd/users/*",
+    "/home/*/.config/containers/systemd",
+)
+
+# The address podman gives host-gateway under pasta. A configured --map-guest-addr replaces
+# podman's own mapping instead of adding to it (ADR-0196), so the role restates this one.
+PASTA_HOST_GATEWAY = ipaddress.ip_address("169.254.1.2")
 
 PROBE_HEADER = "X-Basetool-Conformance"
 
@@ -1367,6 +1379,115 @@ BAKED_INTO_UNITS = {
 }
 
 
+def _quadlet_sources_cmd(*patterns: str) -> str:
+    """Build a host command that prints every Quadlet source matching the patterns.
+
+    Args:
+        patterns: file globs relative to each of :data:`QUADLET_SOURCE_DIRS`, e.g. ``*.network``.
+
+    Returns:
+        A ``cat`` command line that prints nothing, rather than failing, when no file matches.
+    """
+    paths = " ".join(
+        f"{directory}/{pattern}" for directory in QUADLET_SOURCE_DIRS for pattern in patterns
+    )
+    return f"cat {paths} 2>/dev/null || true"
+
+
+def _pasta_alias_addresses(units: str) -> set[ipaddress._BaseAddress]:
+    """Collect the ``AddHost=`` targets that only pasta's guest-address mapping makes reachable.
+
+    ``host-gateway`` stands for :data:`PASTA_HOST_GATEWAY`. A link-local or IPv6 unique-local
+    target outside every ``Subnet=`` of the network units exists for a container only through such
+    a mapping; any other target is routed normally and is left out.
+
+    Args:
+        units: the concatenated ``.container``, drop-in and ``.network`` sources.
+
+    Returns:
+        The addresses the running pasta has to map.
+
+    Raises:
+        CheckFailed: when a ``Subnet=`` line does not parse.
+    """
+    subnets: list[ipaddress._BaseNetwork] = []
+    targets: list[str] = []
+    for line in units.splitlines():
+        key, _, value = line.strip().partition("=")
+        if key == "Subnet":
+            try:
+                subnets.append(ipaddress.ip_network(value.strip(), strict=False))
+            except ValueError as exc:
+                raise CheckFailed(
+                    f"a network unit carries an unreadable Subnet={value.strip()}"
+                ) from exc
+        elif key == "AddHost" and ":" in value:
+            targets.append(value.split(":", 1)[1].strip())
+
+    needed: set[ipaddress._BaseAddress] = set()
+    for target in targets:
+        if target == "host-gateway":
+            needed.add(PASTA_HOST_GATEWAY)
+            continue
+        address = _parse_address(target)
+        if address is None:
+            continue
+        local_only = address.is_link_local or address in UNIQUE_LOCAL_V6
+        if local_only and not any(
+            address in net for net in subnets if net.version == address.version
+        ):
+            needed.add(address)
+    return needed
+
+
+def check_pasta_maps_host_aliases(ctx: Context) -> str:
+    """Every host alias in the Quadlet sources must be an address the running pasta maps.
+
+    The mapping comes from the service user's ``containers.conf.d`` drop-in (ADR-0196). The check
+    reads the arguments of the running pasta, so a setting that is on disk but not in force fails.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming the alias addresses pasta maps.
+
+    Raises:
+        Skip: when no host access is configured, no unit aliases a name to such an address, or no
+            pasta process runs.
+        CheckFailed: when the running pasta does not map an alias address.
+    """
+    needed = _pasta_alias_addresses(
+        ctx.runner.run(_quadlet_sources_cmd("*.container", "*.container.d/*.conf", "*.network"))
+    )
+    if not needed:
+        raise Skip("no Quadlet unit aliases a name to host-gateway or a host-mapped address")
+
+    pasta = ctx.runner.run(
+        r"ps -eo args= | grep -E '(^|/)pasta(\.avx2)? ' || true", privileged=False
+    )
+    if not pasta.strip():
+        raise Skip("no pasta process runs, so no rootless container network is up to read")
+
+    mapped: set[ipaddress._BaseAddress] = set()
+    for line in pasta.splitlines():
+        args = line.split()
+        for flag, value in zip(args, args[1:]):
+            address = _parse_address(value) if flag == "--map-guest-addr" else None
+            if address is not None:
+                mapped.add(address)
+
+    missing = sorted(str(address) for address in needed - mapped)
+    if missing:
+        raise CheckFailed(
+            f"pasta maps {', '.join(sorted(str(a) for a in mapped)) or 'nothing'}, but the units "
+            f"alias names to {', '.join(missing)}: those names are unreachable from every "
+            "container. Check the service user's containers.conf.d drop-in, then restart the "
+            "rootless network."
+        )
+    return f"pasta maps every host-alias address ({', '.join(sorted(str(a) for a in needed))})"
+
+
 def check_env_reaches_the_units(ctx: Context) -> str:
     """A value set in the host `.env` must actually be in the units, or be absent from both.
 
@@ -1405,14 +1526,7 @@ def check_env_reaches_the_units(ctx: Context) -> str:
             key, value = line.split("=", 1)
             env[key.strip()] = value.strip()
 
-    units = ctx.runner.run(
-        "cat /etc/containers/systemd/*.container "
-        "/etc/containers/systemd/*.container.d/*.conf "
-        "/etc/containers/systemd/users/*/*.container "
-        "/etc/containers/systemd/users/*/*.container.d/*.conf "
-        "/home/*/.config/containers/systemd/*.container "
-        "/home/*/.config/containers/systemd/*.container.d/*.conf 2>/dev/null || true"
-    )
+    units = ctx.runner.run(_quadlet_sources_cmd("*.container", "*.container.d/*.conf"))
     if not units.strip():
         raise Skip("no Quadlet units found under /etc/containers/systemd or any home directory")
 
@@ -1764,6 +1878,7 @@ CHECKS: tuple[Check, ...] = (
     ),
     Check("containers-unprivileged", "REQ-OPS-014 / ADR-0189", True, check_containers_unprivileged),
     Check("env-reaches-the-units", "REQ-OPS-004 / REQ-OPS-022", True, check_env_reaches_the_units),
+    Check("pasta-maps-host-aliases", "REQ-OPS-022 / ADR-0196", True, check_pasta_maps_host_aliases),
     Check("containers-read-only", "REQ-OPS-014 / ADR-0190", True, check_containers_read_only),
     Check("host-exporter-versions", "REQ-OBS-005 / OPS-SEC-06", True, check_host_exporter_versions),
     Check("security-updates-enabled", "REQ-OPS-032", True, check_security_updates_enabled),
