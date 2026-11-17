@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemPrice;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemPriceRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemRedirectRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
@@ -70,6 +71,7 @@ class UexItemPriceSyncServiceTest {
   @Mock private GameItemRepository gameItemRepository;
   @Mock private GameItemPriceRepository gameItemPriceRepository;
   @Mock private TerminalRepository terminalRepository;
+  @Mock private GameItemRedirectRepository redirects;
 
   private final RecordingTransactionManager tx = new RecordingTransactionManager();
   private UexProperties properties;
@@ -98,7 +100,8 @@ class UexItemPriceSyncServiceTest {
             gameItemRepository,
             gameItemPriceRepository,
             terminalRepository,
-            new SyncChunkWriter(tx, new SyncRunProgress()));
+            new SyncChunkWriter(tx, new SyncRunProgress()),
+            redirects);
   }
 
   @Test
@@ -323,6 +326,40 @@ class UexItemPriceSyncServiceTest {
 
     verify(gameItemPriceRepository, never()).findIdsWithLivePrices();
     verify(gameItemPriceRepository, never()).clearPricesByIds(any());
+  }
+
+  @Test
+  void aMergedListingsPriceYieldsToTheItemsOwnAtATerminalBothList_andKeepsTheSweep() {
+    GameItem item = gameItem();
+    Terminal shared = terminal();
+    Terminal twinOnly = terminal();
+    when(uexClient.getItemPrices())
+        .thenReturn(
+            fetched(
+                List.of(
+                    dto(1, 107, 10.0, 0.0, 1L),
+                    dto(2, 107, 99.0, 0.0, 9L),
+                    dto(2, 108, 30.0, 0.0, 3L))));
+    knownItems(ref(1, item.getId()));
+    when(redirects.findMergedUexItemRefs()).thenReturn(List.of(ref(2, item.getId())));
+    knownTerminals(ref(107, shared.getId()), ref(108, twinOnly.getId()));
+    when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
+    when(gameItemRepository.getCanonicalReferenceById(item.getId())).thenReturn(item);
+    when(terminalRepository.getReferenceById(shared.getId())).thenReturn(shared);
+    when(terminalRepository.getReferenceById(twinOnly.getId())).thenReturn(twinOnly);
+    stubSaveAssigningId();
+
+    service.syncItemPrices();
+
+    ArgumentCaptor<GameItemPrice> saved = ArgumentCaptor.forClass(GameItemPrice.class);
+    verify(gameItemPriceRepository, times(2)).save(saved.capture());
+    Map<Terminal, Double> buyByTerminal = new HashMap<>();
+    for (GameItemPrice price : saved.getAllValues()) {
+      assertSame(item, price.getGameItem());
+      buyByTerminal.put(price.getTerminal(), price.getPriceBuy());
+    }
+    assertEquals(Map.of(shared, 10.0, twinOnly, 30.0), buyByTerminal);
+    verify(gameItemPriceRepository).findIdsWithLivePrices();
   }
 
   private void knownItems(de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef... refs) {

@@ -203,7 +203,7 @@ discovery.relabel "containers" {
 
 	rule {
 		source_labels = ["__journal_container_name"]
-		regex         = "(prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter)"
+		regex         = "(prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|postgres-exporter-backend|postgres-exporter-keycloak|redis-session-exporter|redis-shared-exporter|blackbox-exporter)"
 		target_label  = "app"
 		replacement   = "mon-$1"
 	}
@@ -224,7 +224,7 @@ discovery.relabel "containers" {
 
 	rule {
 		source_labels = ["__journal_container_name"]
-		regex         = "(npm|edge|acme|redis)"
+		regex         = "(npm|edge|acme|redis-session|redis-shared)"
 		target_label  = "app"
 		replacement   = "$1"
 	}

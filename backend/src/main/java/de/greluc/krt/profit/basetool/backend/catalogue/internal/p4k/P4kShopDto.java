@@ -30,9 +30,9 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * One entry of {@code shops} in catalogue version 2 (contract, "Shops"), bound to the fields the
- * import writes; every other field is skipped. Its identity is {@code key}, so the GUID the shared
- * P4K machinery keys it by is a name-based UUID of the key. Its names are names of containers and
- * entities, no game text.
+ * import writes or links the shop by; every other field is skipped. Its identity is {@code key}, so
+ * the GUID the shared P4K machinery keys it by is a name-based UUID of the key. Its names are names
+ * of containers and entities, no game text.
  *
  * @param key the identity: the comma-separated CryGUID chain down to the shop entity
  * @param entityGuid the CryGUID of the shop entity, shared by every placement of a shop module
@@ -46,6 +46,8 @@ import org.jetbrains.annotations.Nullable;
  * @param commodityExchange whether the shop is a commodity exchange or terminal
  * @param inventory the stem of the inventory file, {@code null} while the item list is unknown
  * @param itemGuids the item GUIDs of the inventory file, {@code null} exactly when unknown
+ * @param containers the names of the containers from the system root down to the one holding the
+ *     shop, or {@code null}
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kShopDto(
@@ -60,7 +62,8 @@ public record P4kShopDto(
     @Nullable String brand,
     @Nullable Boolean commodityExchange,
     @Nullable String inventory,
-    @Nullable List<String> itemGuids)
+    @Nullable List<String> itemGuids,
+    @Nullable List<String> containers)
     implements P4kRecord {
 
   /** Prefixes the key a shop's GUID is derived from. */

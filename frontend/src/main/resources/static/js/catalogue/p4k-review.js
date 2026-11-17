@@ -73,7 +73,7 @@ const RESOURCE_JOIN_REASONS = ['RESOURCE_JOIN_NONE', 'RESOURCE_JOIN_SEVERAL'];
 /**
  * Manages the grouped queue, individual review cases and assignment choices.
  *
- * @param {{pageUrl: (path: string) => string, readJson: (url: string, key: string) => Promise<any>, t: (key: string) => string, sections: KrtPageSections, kinds: string[], reasons: string[]}} config the page's localized transport
+ * @param {{pageUrl: (path: string) => string, readJson: (url: string, key: string, busy?: Element | null) => Promise<any>, t: (key: string) => string, sections: KrtPageSections, kinds: string[], reasons: string[]}} config the page's localized transport
  * @returns {{ init: () => void, refresh: (reloadAssignments?: boolean) => void }} the workspace lifecycle
  */
 export function createReviewWorkspace({ pageUrl, readJson, t, sections, kinds, reasons }) {
@@ -192,7 +192,7 @@ export function createReviewWorkspace({ pageUrl, readJson, t, sections, kinds, r
             page: String(page),
             ...currentFilters(),
         });
-        readJson(pageUrl(`${WORKSPACE}?${query}`), QUEUE_TARGET).then(
+        readJson(pageUrl(`${WORKSPACE}?${query}`), QUEUE_TARGET, $('krt-p4k-cases')).then(
             (/** @type {ApiPage<'P4kReviewGroupDto'> | null} */ result) => {
                 if (!result || reloadedBeyondEnd(page, result, loadQueue)) return;
                 const rows = result.content || [];
@@ -236,6 +236,7 @@ export function createReviewWorkspace({ pageUrl, readJson, t, sections, kinds, r
                 `${WORKSPACE}/groups/${encodeURIComponent(id)}?page=${page}&size=${GROUP_PAGE_SIZE}`,
             ),
             GROUP_TARGET,
+            $('krt-p4k-review-members'),
         ).then((/** @type {ApiPage<'P4kReviewCaseDto'> | null} */ result) => {
             if (!result || openGroup?.id !== id || reloadedBeyondEnd(page, result, loadMembers))
                 return;

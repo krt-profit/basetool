@@ -102,10 +102,19 @@ class FakeElement {
         this.dataset = {};
         this.markup = null;
         this.listeners = {};
+        this.attributes = {};
     }
 
     addEventListener(type, listener) {
         this.listeners[type] = listener;
+    }
+
+    setAttribute(name, value) {
+        this.attributes[name] = String(value);
+    }
+
+    getAttribute(name) {
+        return this.attributes[name] ?? null;
     }
 
     querySelectorAll() {
@@ -284,6 +293,37 @@ await test('a target emptied without a read drops the answer still pending', asy
     admin.forgetRead('terminals');
     admin.reads[0].resolve(['late']);
     assert.equal(await pendingRead, null);
+});
+
+await test('a result region stays busy until the current read of its target settles', async () => {
+    const admin = linkAdmin();
+    const list = new FakeElement('list');
+    const older = admin.readJson('/a?page=0', 'load failed', 'list', list);
+    const newer = admin.readJson('/a?page=1', 'load failed', 'list', list);
+    assert.equal(list.getAttribute('aria-busy'), 'true');
+    admin.reads[0].resolve({ page: 0 });
+    await older;
+    assert.equal(
+        list.getAttribute('aria-busy'),
+        'true',
+        'a superseded answer does not end the loading state',
+    );
+    admin.reads[1].reject(new Error('boom'));
+    await newer;
+    assert.equal(list.getAttribute('aria-busy'), 'false', 'a failed current read ends it');
+});
+
+await test('an answered read and an emptied target end the loading state of their regions', async () => {
+    const admin = linkAdmin();
+    const runs = new FakeElement('runs');
+    const members = new FakeElement('members');
+    const answered = admin.readJson('/runs', 'load failed', 'runs', runs);
+    admin.readJson('/members', 'load failed', 'members', members);
+    admin.forgetRead('members');
+    assert.equal(members.getAttribute('aria-busy'), 'false', 'emptying the target ends it');
+    admin.reads[0].resolve(['run']);
+    assert.deepEqual(await answered, ['run']);
+    assert.equal(runs.getAttribute('aria-busy'), 'false');
 });
 
 /**

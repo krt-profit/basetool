@@ -83,13 +83,14 @@ final class P4kShipGoldStandard {
   }
 
   /**
-   * Returns the folded class name a superseding record's folded class name reworks.
+   * Returns the folded class name a superseding record's folded class name reworks; the UEX item
+   * twin rule pairs items by it too (REQ-DATA-044).
    *
    * @param key a folded class name
    * @return the class name without the suffix, or {@code null} when it carries none
    */
   @Nullable
-  private static String oldClassName(@NotNull String key) {
+  static String oldClassName(@NotNull String key) {
     return key.length() > SUFFIX.length() && key.endsWith(SUFFIX)
         ? key.substring(0, key.length() - SUFFIX.length())
         : null;

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -81,4 +83,24 @@ public interface GameItemRedirectRepository extends JpaRepository<GameItemRedire
           """,
       nativeQuery = true)
   int repoint(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
+
+  /**
+   * Tells whether a UEX item id is a second listing an item merge left behind (REQ-DATA-044).
+   *
+   * @param uexItemId the UEX item id
+   * @return whether a redirect keeps it
+   */
+  @Query("SELECT COUNT(r) > 0 FROM GameItemRedirect r WHERE r.uexItemId = :uexItemId")
+  boolean isMergedUexItemId(@Param("uexItemId") int uexItemId);
+
+  /**
+   * Lists every merged second UEX listing with the item it was merged into, for the item-price sync
+   * (REQ-DATA-044).
+   *
+   * @return one (UEX item id, surviving item id) row per merged listing
+   */
+  @Query(
+      "SELECT r.uexItemId AS uexId, r.canonicalItem.id AS id FROM GameItemRedirect r"
+          + " WHERE r.uexItemId IS NOT NULL")
+  List<UexKeyRef> findMergedUexItemRefs();
 }
