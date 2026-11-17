@@ -51,6 +51,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -158,18 +159,7 @@ class HangarImportIntegrationTest {
             "[{\"name\":\"Choicetest Hornet\",\"shipname\":\"\",\"type\":\"ship\"}]"
                 .getBytes(StandardCharsets.UTF_8));
 
-    FleetviewImportResponseDto offered =
-        objectMapper.readValue(
-            mockMvc
-                .perform(
-                    multipart("/api/v1/hangar/import/ships")
-                        .file(file)
-                        .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString(),
-            FleetviewImportResponseDto.class);
+    FleetviewImportResponseDto offered = upload(file);
     assertEquals(0, offered.importedCount());
     assertEquals(1, offered.ambiguousShips().size());
     assertEquals(
@@ -185,19 +175,7 @@ class HangarImportIntegrationTest {
                     + mkII.getId()
                     + "\"}]}")
                 .getBytes(StandardCharsets.UTF_8));
-    FleetviewImportResponseDto chosen =
-        objectMapper.readValue(
-            mockMvc
-                .perform(
-                    multipart("/api/v1/hangar/import/ships")
-                        .file(file)
-                        .file(choices)
-                        .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString(),
-            FleetviewImportResponseDto.class);
+    FleetviewImportResponseDto chosen = upload(file, choices);
 
     assertEquals(1, chosen.importedCount());
     assertTrue(chosen.ambiguousShips().isEmpty());
@@ -574,14 +552,17 @@ class HangarImportIntegrationTest {
 
   private FleetviewImportResponseDto upload(String name, String type, String body)
       throws Exception {
-    MockMultipartFile file =
-        new MockMultipartFile("file", name, type, body.getBytes(StandardCharsets.UTF_8));
+    return upload(new MockMultipartFile("file", name, type, body.getBytes(StandardCharsets.UTF_8)));
+  }
+
+  private FleetviewImportResponseDto upload(MockMultipartFile... parts) throws Exception {
+    MockMultipartHttpServletRequestBuilder request = multipart("/api/v1/hangar/import/ships");
+    for (MockMultipartFile part : parts) {
+      request.file(part);
+    }
     String response =
         mockMvc
-            .perform(
-                multipart("/api/v1/hangar/import/ships")
-                    .file(file)
-                    .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
+            .perform(request.with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
