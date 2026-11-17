@@ -20,7 +20,10 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.kernel.redis.SharedRedis;
+import de.greluc.krt.profit.basetool.technical.redis.ResilientRedisMessageListenerContainer;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -109,9 +112,14 @@ public class LiveSyncRedisConfig {
    * Subscribes the Redis fan-out to both the {@code changed} relay channel (ADR-0094) and the
    * editor-presence channel (ADR-0126), dispatching on {@link #liveSyncRedisListenerExecutor()}.
    *
+   * <p>The container starts unsubscribed and retries in the background when the shared Redis is
+   * unreachable, so the frontend — and sign-in — starts without it (ADR-0143, ADR-0388); {@code
+   * basetool_redis_fanout_subscribed{fanout="livesync"}} reports the subscription.
+   *
    * @param sharedRedis the connection to the shared Redis the channels live on (ADR-0388)
    * @param fanout the Redis fan-out (also the message listener for both channels)
    * @param listenerExecutor the bounded dispatch executor, qualified by bean name
+   * @param meterRegistry registry the subscription gauge binds to
    * @return the message-listener container
    */
   @NotNull
@@ -119,12 +127,17 @@ public class LiveSyncRedisConfig {
   public RedisMessageListenerContainer liveSyncRedisMessageListenerContainer(
       SharedRedis sharedRedis,
       RedisLiveSyncFanout fanout,
-      @Qualifier("liveSyncRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor) {
-    RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+      @Qualifier("liveSyncRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor,
+      MeterRegistry meterRegistry) {
+    ResilientRedisMessageListenerContainer container = new ResilientRedisMessageListenerContainer();
     container.setConnectionFactory(sharedRedis.connectionFactory());
     container.setTaskExecutor(listenerExecutor);
     container.addMessageListener(fanout, new ChannelTopic(fanout.channel()));
     container.addMessageListener(fanout, new ChannelTopic(fanout.presenceChannel()));
+    Gauge.builder(MetricNames.REDIS_FANOUT_SUBSCRIBED, container, c -> c.isListening() ? 1d : 0d)
+        .tag(MetricNames.TAG_FANOUT, MetricNames.FANOUT_LIVESYNC)
+        .description("1 while this instance is subscribed to the shared Redis's live-sync channels")
+        .register(meterRegistry);
     return container;
   }
 }

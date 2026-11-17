@@ -42,6 +42,7 @@ import org.springframework.data.redis.core.types.Expiration;
  *
  * @param set the scope's sorted set
  * @param sum the key of the scope's running total
+ * @param stored the running total as stored, or {@code null} when it is missing or not a number
  * @param used the bytes the scope counts after pruning, never negative
  * @param expired the expired entries the step prunes
  * @param remaining how many entries the set holds after pruning
@@ -52,6 +53,7 @@ import org.springframework.data.redis.core.types.Expiration;
 record BudgetScope(
     @NotNull String set,
     @NotNull String sum,
+    @Nullable Long stored,
     long used,
     @NotNull @Unmodifiable Set<String> expired,
     long remaining,
@@ -102,6 +104,7 @@ record BudgetScope(
     return new BudgetScope(
         set,
         sum,
+        stored,
         remaining == 0 || total < 0 ? 0L : total,
         expired,
         remaining,
@@ -147,12 +150,17 @@ record BudgetScope(
       held++;
     }
     boolean raises = adds && !newEntry && addExpiry != null && addExpiry < expiry;
-    return new Change(held == 0 ? 0L : bytes, held == 0, removesRelease, newEntry || raises);
+    boolean empty = held == 0;
+    long after = empty ? 0L : bytes;
+    boolean totalStale = empty ? stored != null : stored == null || stored != after;
+    boolean alters = !expired.isEmpty() || removesRelease || newEntry || raises || totalStale;
+    return new Change(after, empty, removesRelease, newEntry || raises, alters);
   }
 
   /**
    * Queues the step's writes to this scope: the pruning, the release, the addition, the running
-   * total and the expiries, which only ever rise.
+   * total and the expiries, which only ever rise; nothing when the change leaves the scope as it
+   * was.
    *
    * @param template the Redis access, inside the step's transaction
    * @param change what the step leaves of the scope
@@ -168,6 +176,9 @@ record BudgetScope(
       @NotNull String add,
       long expiry,
       long ttlMillis) {
+    if (!change.alters()) {
+      return;
+    }
     ZSetOperations<String, String> entries = template.opsForZSet();
     if (!expired.isEmpty()) {
       entries.remove(set, expired.toArray());
@@ -232,6 +243,9 @@ record BudgetScope(
    * @param empty whether the scope holds no entry afterwards
    * @param removesRelease whether the step removes the released entry
    * @param writesAdd whether the step writes the added entry, new or with a later expiry
+   * @param alters whether the step writes to the scope at all: it prunes, removes or writes an
+   *     entry, or its running total differs from the one stored
    */
-  record Change(long used, boolean empty, boolean removesRelease, boolean writesAdd) {}
+  record Change(
+      long used, boolean empty, boolean removesRelease, boolean writesAdd, boolean alters) {}
 }

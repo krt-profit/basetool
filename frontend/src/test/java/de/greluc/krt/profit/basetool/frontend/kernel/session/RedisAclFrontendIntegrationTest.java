@@ -456,6 +456,15 @@ class RedisAclFrontendIntegrationTest {
     "monitoring, KEYS *, false",
     "monitoring, FLUSHALL, false",
     "monitoring, ACL LIST, false",
+    "monitoring, LATENCY LATEST, true",
+    "monitoring, PSUBSCRIBE basetool:session:event:0:created:*, false",
+    "monitoring, CLIENT TRACKING ON BCAST PREFIX basetool:session:, false",
+    "monitoring, CLIENT KILL USER basetool-frontend, false",
+    "monitoring, CLIENT PAUSE 1000 ALL, false",
+    "monitoring, CLIENT LIST, false",
+    "monitoring, SLOWLOG GET 10, false",
+    "basetool-frontend, CLIENT TRACKING ON BCAST PREFIX basetool:session:, false",
+    "basetool-frontend, EVAL return 0, false",
     "admin, ACL LOAD, true"
   })
   void theSessionStoreAclMatrixHoldsForEveryUser(String user, String command, boolean allowed) {
@@ -522,6 +531,12 @@ class RedisAclFrontendIntegrationTest {
     "basetool-ingest, CONFIG SET dir /tmp, false",
     "basetool-ingest, KEYS *, false",
     "basetool-ingest, ACL LIST, false",
+    "basetool-ingest, WATCH ingest:xch:budget:all, true",
+    "basetool-ingest, MULTI, true",
+    "basetool-ingest, EXEC, true",
+    "basetool-ingest, EVAL return 0, false",
+    "basetool-ingest, EVALSHA 0000000000000000000000000000000000000000 0, false",
+    "basetool-ingest, FUNCTION LIST, false",
     "monitoring, INFO, true",
     "monitoring, CONFIG GET maxmemory, true",
     "monitoring, SCAN 0, false",
@@ -533,6 +548,14 @@ class RedisAclFrontendIntegrationTest {
     "monitoring, FLUSHDB, false",
     "monitoring, ACL LIST, false",
     "monitoring, SUBSCRIBE basetool:livesync:changed, false",
+    "monitoring, CLIENT TRACKING ON BCAST PREFIX basetool:session:, false",
+    "monitoring, CLIENT KILL USER basetool-frontend, false",
+    "monitoring, CLIENT PAUSE 1000 ALL, false",
+    "monitoring, CLIENT LIST, false",
+    "monitoring, SLOWLOG GET 10, false",
+    "basetool-frontend, CLIENT TRACKING ON BCAST PREFIX basetool:session:, false",
+    "basetool-backend, CLIENT TRACKING ON BCAST PREFIX exchange:, false",
+    "basetool-ingest, CLIENT TRACKING ON BCAST PREFIX ingest:, false",
     "admin, ACL LOAD, true"
   })
   void theSharedAclMatrixHoldsForEveryUser(String user, String command, boolean allowed) {

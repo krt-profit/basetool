@@ -280,22 +280,16 @@ exactly one `default` line.
 |---|---|---|---|
 | both | `default` | `REDIS_SESSION_PASSWORD` / `REDIS_PASSWORD` | everything while `REDIS_DEFAULT_USER` is `on` (the default); **nothing** once it is `off` |
 | both | `admin` | `REDIS_SESSION_PASSWORD` / `REDIS_PASSWORD` | everything — the operator's user for `ACL LOAD` and inspection; only that instance's own container environment carries it, as `REDIS_PASSWORD` |
-| both | `monitoring` | `REDIS_SESSION_EXPORTER_PASSWORD` / `REDIS_EXPORTER_PASSWORD` | introspection for `redis-session-exporter` / `redis-shared-exporter`; no key, no `SCAN` (a session key's name is a session id) |
+| both | `monitoring` | `REDIS_SESSION_EXPORTER_PASSWORD` / `REDIS_EXPORTER_PASSWORD` | only the commands `redis-session-exporter` / `redis-shared-exporter` send (`PING`, `CLIENT SETNAME`/`SETINFO`, `COMMAND INFO`, `INFO`, `CONFIG GET`, `LATENCY LATEST`/`HISTOGRAM`); no key, no `SCAN` (a session key's name is a session id), no `CLIENT TRACKING`/`LIST`/`KILL`/`PAUSE`, no `SLOWLOG` |
 | `redis-session` | `basetool-frontend` | `REDIS_SESSION_FRONTEND_PASSWORD` | `basetool:session:*`, the session-event and keyspace-event channels, `SCAN`, `INFO` |
 | `redis-shared` | `basetool-frontend` | `REDIS_FRONTEND_PASSWORD` | `GETDEL` of `ingest:handoff:*`, publish/subscribe on `basetool:livesync:changed` and `:presence`, `INFO` |
 | `redis-shared` | `basetool-backend` | `REDIS_BACKEND_PASSWORD` | `GET`/`SET` on `exchange:*` (the exchange registry mirror, ADR-0221), publish/subscribe on `basetool:livesync:changed` and `basetool:notify:published`, `INFO` |
-| `redis-shared` | `basetool-ingest` | `REDIS_INGEST_PASSWORD` | strings, lists and sorted sets on `ingest:*` (`GET`, `SET`, `SETEX`, `PSETEX`, `INCR`, `INCRBY`, `DECRBY`, `RPUSH`, `LPOP`, `ZADD`, `ZRANGE`, `ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `EXPIRE`, `PEXPIRE`, `DEL`) and the optimistic transactions of the exchange's budget, quotas and idempotency lock (`WATCH`, `UNWATCH`, `MULTI`, `EXEC`, `DISCARD`, ADR-0389); `EVAL`/`EVALSHA` only until production runs the release without scripts; read-only `GET` of `exchange:*`; `INFO`; no channel, no `SCAN` |
+| `redis-shared` | `basetool-ingest` | `REDIS_INGEST_PASSWORD` | strings, lists and sorted sets on `ingest:*` (`GET`, `SET`, `SETEX`, `PSETEX`, `INCR`, `INCRBY`, `DECRBY`, `RPUSH`, `LPOP`, `ZADD`, `ZRANGE`, `ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `EXPIRE`, `PEXPIRE`, `DEL`) and the optimistic transactions of the exchange's budget, quotas and idempotency lock (`WATCH`, `UNWATCH`, `MULTI`, `EXEC`, `DISCARD`, ADR-0389); read-only `GET` of `exchange:*`; `INFO`; no script (`EVAL`/`EVALSHA`), no channel, no `SCAN` |
 
 `redis-session` knows no user of the backend or the gateway, and `redis-shared`'s frontend user
-reaches no session key.
-
-**Removing scripting from the gateway** (ADR-0389) takes two renders of the shared ACL. Before the release that runs the
-exchange's steps as transactions, render and load the template that grants both the transaction
-commands and `EVAL`/`EVALSHA`: the running release still sends scripts, the new one sends
-transactions. Once production runs that release, the follow-up change (#3494) drops `EVAL`/`EVALSHA`
-from the template; render and load it again, and `ACL DRYRUN basetool-ingest EVAL "return 1" 0` must answer
-with a refusal. In the other order every exchange write is refused `503` until the second step
-follows.
+reaches no session key. No user on either instance may run a script or `CLIENT TRACKING`:
+`redis-shared` only ever serves a gateway that runs the exchange's steps as transactions
+(ADR-0389), and `ACL DRYRUN basetool-ingest EVAL "return 1" 0` answers with a refusal.
 
 An application reaches Redis as its own user only when its `REDIS_<SVC>_USERNAME` is set; with it
 empty it sends a password-only `AUTH` with the shared `REDIS_PASSWORD`, which is the `default` user —
@@ -2240,8 +2234,8 @@ ansible-playbook site.yml --limit production --tags scripts
 ```
 
 Expected: `mint-internal-tls.sh`, `deploy.sh`, `backup.sh` changed under `/opt/basetool/scripts/`,
-plus `render-redis-acl.py` and `redis-users.acl.tmpl` if the Redis ACL renderer
-([The Redis ACL](#the-redis-acl)) was not installed before — the same run installs both.
+plus `render-redis-acl.py` and the two `redis-*-users.acl.tmpl` templates if the Redis ACL renderer
+([The Redis ACL](#the-redis-acl)) was not installed before — the same run installs all three.
 Rollback: re-run the role from the previous commit.
 
 ### Step 1 — check the names (independent of everything else)

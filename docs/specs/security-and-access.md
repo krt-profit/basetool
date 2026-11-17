@@ -5967,8 +5967,8 @@ the internet-facing ingest gateway above all — was a compromise of every membe
 | `redis-session` | `basetool-frontend` | `basetool:session:*` | `basetool:session:*`, the created-event pattern, `__keyevent@0__:del` / `:expired` | read, write, keyspace, hash, set, sorted set, string, pub/sub, transaction, `INFO`; no dangerous command, no `CONFIG` |
 | `redis-shared` | `basetool-frontend` | `ingest:handoff:*` | `basetool:livesync:changed` / `:presence` | `GETDEL`, `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `INFO` |
 | `redis-shared` | `basetool-backend` | `exchange:*` | `basetool:livesync:changed`, `basetool:notify:published` | `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `GET`, `SET`, `INFO` |
-| `redis-shared` | `basetool-ingest` | `ingest:*`, read-only `exchange:*` | none | `GET`, `SET`/`SETEX`/`PSETEX`, `INCR`/`INCRBY`/`DECRBY`, `ZADD`, `ZRANGE`/`ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `RPUSH`, `LPOP`, `EXPIRE`/`PEXPIRE`, `DEL`, `WATCH`/`UNWATCH`/`MULTI`/`EXEC`/`DISCARD`, `INFO`; `EVAL`/`EVALSHA` until the follow-up of ADR-0389 |
-| both | `monitoring` | none | none | introspection; **not** `SCAN` or `RANDOMKEY`, which are not key-checked and would list every session id |
+| `redis-shared` | `basetool-ingest` | `ingest:*`, read-only `exchange:*` | none | `GET`, `SET`/`SETEX`/`PSETEX`, `INCR`/`INCRBY`/`DECRBY`, `ZADD`, `ZRANGE`/`ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `RPUSH`, `LPOP`, `EXPIRE`/`PEXPIRE`, `DEL`, `WATCH`/`UNWATCH`/`MULTI`/`EXEC`/`DISCARD`, `INFO`; no script |
+| both | `monitoring` | none | none | only what `redis_exporter` sends: `PING`, `CLIENT SETNAME`/`SETINFO`, `COMMAND INFO`, `INFO`, `CONFIG GET`, `LATENCY LATEST`/`HISTOGRAM`; **not** `SCAN` or `RANDOMKEY`, which are not key-checked and would list every session id, nor `CLIENT TRACKING`/`LIST`/`KILL`/`PAUSE` or `SLOWLOG` |
 | both | `admin` | all | all | all — the operator's, never in an application's environment |
 | both | `default` | — | — | switched **off** at the end of the rollout |
 
@@ -5980,12 +5980,18 @@ the internet-facing ingest gateway above all — was a compromise of every membe
   `ZADD`, `ZRANGE` / `ZRANGEBYSCORE`, `ZREM`, `ZSCORE` and `ZCARD` for the byte budget, `SET … NX`
   for the idempotency locks, and `WATCH`, `MULTI`, `EXEC`, `UNWATCH` and `DISCARD` for the
   optimistic transactions that check and record the budget, add to and refund a quota and release
-  an idempotency claim atomically (`OptimisticTransaction`, ADR-0389). `WATCH` is key-checked like
+  an idempotency claim atomically (`OptimisticTransactions`, ADR-0389). `WATCH` is key-checked like
   every other command.
+- **No user but `admin` may track keys.** `CLIENT TRACKING` in broadcast mode is not key-checked:
+  a user holding it would be sent the name — for a session, the id — of every key written under a
+  prefix. Every application user drops `client|tracking` and `client|caching` after its
+  `@connection` grant, and `monitoring` is an allow-list of the exporter's own commands; the exporter
+  runs with `REDIS_EXPORTER_EXCLUDE_SLOWLOG_METRICS`, because `SLOWLOG GET` returns command
+  arguments.
 - **The gateway's user runs no script** (ADR-0389). The Lua interpreter runs inside the server,
-  where a fault in it reaches past the ACL, and the gateway is the internet-facing service. Its user
-  keeps `EVAL`/`EVALSHA` only until production runs the release that sends transactions instead;
-  the follow-up drops them from the template, and from then on `ACL DRYRUN` refuses them.
+  where a fault in it reaches past the ACL, and the gateway is the internet-facing service.
+  `redis-shared` only ever serves the gateway that sends transactions instead, so its template grants
+  neither `EVAL` nor `EVALSHA` and `ACL DRYRUN` refuses both.
 - **The rules are code.** `scripts/redis-session-users.acl.tmpl` and
   `scripts/redis-shared-users.acl.tmpl` are the single sources, one per instance;
   `render-redis-acl.py` renders each on the host with SHA-256 hashes (never a clear-text password),
@@ -6034,9 +6040,9 @@ the internet-facing ingest gateway above all — was a compromise of every membe
   discards the writes and the step runs again, and a failed step leaves the pooled connection
   without a watch or an open transaction.
   *`RedisAclIngestIntegrationTest#anOptimisticTransactionRunsUnderTheIngestUserOnItsOwnKeysOnly`,
-  `OptimisticTransactionRedisIntegrationTest`, `ExchangeStoreRedisIntegrationTest`.*
-- [ ] The gateway's user can run no script: `EVAL` and `EVALSHA` are refused. *(The follow-up step
-  of ADR-0389, #3494, once production runs the release without scripts.)*
+  `OptimisticTransactionsRedisIntegrationTest`, `ExchangeStoreRedisIntegrationTest`.*
+- [x] The gateway's user can run no script: `EVAL` and `EVALSHA` are refused.
+  *`RedisAclIngestIntegrationTest#theIngestUserRunsNoScript`.*
 - [x] The frontend's startup step under its own user leaves `acl_access_denied_cmd` unchanged and
   sends no `CONFIG`; under `default` it still sends `CONFIG GET`; switched off it sends nothing; a
   wrong password still fails it. *`RedisAclFrontendIntegrationTest`, `RedisSessionConfigTest`.*
@@ -6045,6 +6051,12 @@ the internet-facing ingest gateway above all — was a compromise of every membe
   *`RedisAclFrontendIntegrationTest#theSessionStoreAclMatrixHoldsForEveryUser` and
   `#theSharedAclMatrixHoldsForEveryUser`; `monitoring` keeps `CONFIG GET` by design and is refused
   `CONFIG SET`.*
+- [x] On both instances `monitoring` is refused `CLIENT TRACKING`, `CLIENT LIST`, `CLIENT KILL`,
+  `CLIENT PAUSE` and `SLOWLOG GET`, every application user `CLIENT TRACKING`, and the exporter
+  scrapes every metric the alerts and dashboards read without one refusal.
+  *`RedisAclFrontendIntegrationTest#theSessionStoreAclMatrixHoldsForEveryUser` and
+  `#theSharedAclMatrixHoldsForEveryUser`; measured against `redis_exporter` v1.97.0 with `ACL LOG`
+  empty.*
 - [x] A password-only `AUTH` works while `default` is on and fails once it is off.
   *`RedisAclFrontendIntegrationTest`.*
 - [x] Under `prod` the gateway refuses to start with a blank or `default` Redis username, read
@@ -6757,7 +6769,10 @@ state, the ingest handoff and the three pub/sub channels live in `redis-shared`.
   session store.
 - **Both share the Lettuce client resources and the timeouts** of `spring.data.redis.*`; the shared
   connection has no readiness contributor, because its loss degrades live sync to local delivery
-  and fails a handoff pickup, never a login.
+  and fails a handoff pickup, never a login. The live-sync subscription starts unsubscribed and
+  retries every 5 s while the shared Redis is unreachable (`ResilientRedisMessageListenerContainer`),
+  so the frontend starts without it; `basetool_redis_fanout_subscribed{fanout="livesync"}` and
+  `RedisFanoutUnsubscribed` report it.
 - **The environment names them apart.** `REDIS_USERNAME` / `REDIS_PASSWORD` reach the session store,
   `REDIS_SHARED_USERNAME` / `REDIS_SHARED_PASSWORD` the shared Redis; compose and
   `quadlet/env.d/frontend.env.tmpl` fill the first from `REDIS_FRONTEND_USERNAME` and
@@ -6794,6 +6809,9 @@ and `redis-shared` services of the compose files and their Quadlet units
   session key. *`RedisAclFrontendIntegrationTest`, `render-redis-acl.py --selftest`.*
 - [x] Both instances refuse an unauthenticated `PING`. *`check-conformance.py`
   `redis-requires-auth`, `check-conformance.test.sh`.*
+- [x] With the shared Redis unreachable, the live-sync container starts unsubscribed instead of
+  failing the context, and its gauge reads 0. *`LiveSyncRedisStartTest`,
+  `ResilientRedisMessageListenerContainerTest`, `redis_fanout_unsubscribed_test.yml`.*
 - [ ] Production runs both instances (#3493, the owner's cut-over).
 
 ## Out of scope

@@ -1689,9 +1689,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   from stat blocks of the P4K catalogue and of the Wiki item payload, so a renamed block or field
   empties them while the import or sync keeps succeeding; the gauge is what makes that visible.
   Backs `ScWikiItemStatsMissing` (the maximum over both sources == 0 for 48h, warning).
-- `basetool_redis_fanout_subscribed{fanout}` gauge (`LiveSyncRedisConfig`,
-  `NotificationRedisConfig`), 1 while the cross-instance pub/sub container is listening on
-  `redis-shared` and 0 while it is not; `fanout` is the two-valued literal `livesync` / `notifications`. Exists because the
+- `basetool_redis_fanout_subscribed{fanout}` gauge (the backend's `NotificationRedisConfig`, the
+  frontend's `LiveSyncRedisConfig`), 1 while the cross-instance pub/sub container is listening on
+  `redis-shared` and 0 while it is not; `fanout` is the two-valued literal `livesync` (frontend,
+  ADR-0388) / `notifications` (backend). Exists because the
   failure it watches used to be loud and is now quiet: until 2026-09-02 a Redis unreachable during
   context refresh threw out of `SmartLifecycle#start()` and aborted the refresh, so the backend
   crash-looped and needed no metric to be noticed. `ResilientRedisMessageListenerContainer` makes
@@ -1943,6 +1944,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `basetool_ingest_exchange_idempotent_replays_total` counts writes answered from the idempotency
   cache; `basetool_ingest_exchange_budget_used_ratio` is the total byte budget's use at the last
   measurement, and `ExchangeBudgetHigh` (warning, 10 m) fires above 0.8 (REQ-XCH-020, REQ-XCH-023).
+  `basetool_ingest_exchange_store_conflicts_total{step,outcome}` counts the gateway's optimistic
+  Redis transactions that met a changed key — `aborted` per discarded attempt, `exhausted` per step
+  that gave up and answered `503` — and `ExchangeStoreStepsExhausted` (warning, 5 m) fires when one
+  step gave up more than five times in ten minutes (ADR-0389;
+  `exchange_store_conflicts_alert_test.yml`).
   `basetool_ingest_exchange_client_budget_used_ratio{client_id}` is one client's use of its own
   budget at its last write, labelled with the admitted request's registry client id, so the
   registry bounds it; `ExchangeClientBudgetHigh` (warning, 10 m) fires above 0.8 of it, which the
@@ -2290,7 +2296,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 > `…_redis_consumed_total` and `…_redis_skipped_total`, together with the
 > `basetool_redis_fanout_subscribed{fanout="livesync"}` series — the backend publishes without
 > subscribing, so that gauge has no subscription to report and its **absence** is correct.
-> `RedisFanoutUnsubscribed` therefore watches one fan-out on this service, `notifications`.
+> `RedisFanoutUnsubscribed` therefore watches one fan-out on this service, `notifications`; the
+> frontend's `fanout="livesync"` series reports its own subscription on `redis-shared` (ADR-0388).
 >
 > **What stays, and what it now means.** `basetool_livesync_publish_accepted_total{topic_class}`
 > counts frames the backend raised after a committed write of its own — an exchange or ingest write

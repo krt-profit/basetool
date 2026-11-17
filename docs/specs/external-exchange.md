@@ -1517,7 +1517,8 @@ The lock is `ingest:xch:idem-lock:<client>:<member>:<sha256>`, taken with `SET N
 per-request token. Holding it, the gateway reads the cache again: a duplicate that looked before the
 first request stored its answer and took the lock after it was released replays that answer (or is
 refused with `422` for another body) instead of running the write twice. The lock is released by a
-compare-and-delete script only while it still holds the request's own token, so a request that
+compare-and-delete in one optimistic transaction (ADR-0389) only while it still holds the request's
+own token, so a request that
 outlived the two minutes never frees the lock of the request that took the key after it.
 
 **Acceptance**
@@ -1832,9 +1833,13 @@ optimistic transaction (ADR-0389): it watches the three sets and their totals, p
 expired entries per set (subtracting them from the total), checks all three limits and records the
 entry between `MULTI` and `EXEC`, and runs again when another write changed one of those keys in
 between — so parallel writes cannot overshoot a budget, and no step reads a whole set. A step that
-meets a changed key on 32 attempts in a row fails like an unreachable Redis. A total that is missing
-or garbled is rebuilt from its set once; the sets and totals expire together, never before their
-longest entry.
+leaves every scope as it found it writes nothing, so a refused reservation never aborts another
+write. A step that meets a changed key on 32 attempts in a row, or for 2 s, fails like an
+unreachable Redis and is counted in `basetool_ingest_exchange_store_conflicts_total`. The gateway
+runs every Redis command at most once: its connections are never re-established and replayed, an
+attempt that fails closes its connection, and every command times out after 2 s. A total that is
+missing or garbled is rebuilt from its set once; the sets and totals expire together, never before
+their longest entry.
 
 Before a write runs, the gateway reserves the largest cacheable answer (32 KiB) plus its lock against
 all three budgets under the lock's key and refuses with `503 EXCHANGE_BUDGET_EXHAUSTED` when one

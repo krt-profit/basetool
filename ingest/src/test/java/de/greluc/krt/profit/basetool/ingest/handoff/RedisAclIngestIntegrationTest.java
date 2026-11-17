@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
 import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import de.greluc.krt.profit.basetool.testsupport.redis.RedisAclTemplate;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -35,12 +36,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.ReturnType;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.data.redis.core.script.RedisScript;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.junit.jupiter.Container;
@@ -250,26 +251,23 @@ class RedisAclIngestIntegrationTest {
   }
 
   @Test
-  void aScriptRunsUnderTheIngestUsersOwnRules() {
-    template(admin).opsForValue().set("basetool:session:sessions:x", "secret");
-    StringRedisTemplate template = template(ingest);
-    RedisScript<String> get =
-        new DefaultRedisScript<>("return redis.call('GET', KEYS[1])", String.class);
-    RedisScript<String> getUndeclared =
-        new DefaultRedisScript<>(
-            "return redis.call('GET', 'basetool:session:sessions:x')", String.class);
-    RedisScript<Long> zrem =
-        new DefaultRedisScript<>("return redis.call('ZREM', KEYS[1], ARGV[1])", Long.class);
-    template.opsForValue().set("ingest:xch:idem-lock:acl", "token");
+  void theIngestUserRunsNoScript() {
+    byte[] script = "return redis.call('GET', KEYS[1])".getBytes(StandardCharsets.UTF_8);
+    byte[] ownKey = "ingest:xch:idem-lock:acl".getBytes(StandardCharsets.UTF_8);
+    String sha =
+        template(admin)
+            .execute((RedisCallback<String>) c -> c.scriptingCommands().scriptLoad(script));
 
-    assertThat(template.execute(get, List.of("ingest:xch:idem-lock:acl"))).isEqualTo("token");
-    assertThat(template.execute(zrem, List.of("ingest:xch:budget:all"), "x")).isZero();
-    assertThatThrownBy(() -> template.execute(get, List.of("basetool:session:sessions:x")))
-        .as("a declared foreign key is refused")
-        .isInstanceOf(DataAccessException.class);
-    assertThatThrownBy(() -> template.execute(getUndeclared, List.of()))
-        .as("a script cannot reach a key its user could not")
-        .isInstanceOf(DataAccessException.class);
+    try (RedisConnection connection = ingest.getConnection()) {
+      assertThatThrownBy(
+              () -> connection.scriptingCommands().eval(script, ReturnType.VALUE, 1, ownKey))
+          .as("EVAL is refused even on the user's own keys (ADR-0389)")
+          .isInstanceOf(DataAccessException.class);
+      assertThatThrownBy(
+              () -> connection.scriptingCommands().evalSha(sha, ReturnType.VALUE, 1, ownKey))
+          .as("EVALSHA of a script the admin loaded is refused")
+          .isInstanceOf(DataAccessException.class);
+    }
   }
 
   /**
