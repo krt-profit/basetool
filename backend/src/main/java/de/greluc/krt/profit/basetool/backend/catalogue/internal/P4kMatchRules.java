@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -76,5 +77,17 @@ public interface P4kMatchRules<T> {
   @Nullable
   default UUID followedGuid(@NotNull T row) {
     return null;
+  }
+
+  /**
+   * Finds a row that follows a GUID it does not hold and that no other step of the match would find
+   * for that GUID (REQ-P4K-058).
+   *
+   * @param guid the record's GUID
+   * @return the following row, empty when there is none
+   */
+  @NotNull
+  default Optional<T> follower(@NotNull UUID guid) {
+    return Optional.empty();
   }
 }

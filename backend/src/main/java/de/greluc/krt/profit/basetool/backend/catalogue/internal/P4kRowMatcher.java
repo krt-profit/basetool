@@ -23,8 +23,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -176,6 +178,34 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       @NotNull P4kRowIndex<T> rows,
       @NotNull Enricher<T> enricher,
       @NotNull Consumer<UUID> unmatched) {
+    reconcile(record, className, name, creatable, context, rows, enricher, unmatched, (_, _) -> {});
+  }
+
+  /**
+   * Matches one record as {@link #reconcile(P4kRecord, String, String, boolean, P4kImportContext,
+   * P4kRowIndex, Enricher, Consumer)} does, and hands a covered record's GUID and covering row to
+   * the caller.
+   *
+   * @param record the record
+   * @param className the record's class-name key, or {@code null} to skip that step
+   * @param name the record's name key, or {@code null} to skip that step
+   * @param creatable whether the current seeding rule of the kind would create the record
+   * @param context the run
+   * @param rows the kind's row index
+   * @param enricher writes the led values onto a matched row
+   * @param unmatched handles a record without a row, given its GUID or {@code null}
+   * @param covered receives the covering row and the covered record's GUID
+   */
+  public void reconcile(
+      @NotNull P4kRecord record,
+      @Nullable String className,
+      @Nullable String name,
+      boolean creatable,
+      @NotNull P4kImportContext context,
+      @NotNull P4kRowIndex<T> rows,
+      @NotNull Enricher<T> enricher,
+      @NotNull Consumer<UUID> unmatched,
+      @NotNull BiConsumer<T, UUID> covered) {
     switch (match(record, className, name, creatable, context)) {
       case Matched<T>(T row, UUID guid) -> {
         boolean changed = enricher.enrich(row, guid);
@@ -185,7 +215,10 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       }
       case Unmatched<T>(UUID guid) -> unmatched.accept(guid);
       case Held<T> _ -> {}
-      case Covered<T> _ -> context.getReport().covered(kind, record);
+      case Covered<T>(T row) -> {
+        context.getReport().covered(kind, record);
+        covered.accept(row, Objects.requireNonNull(record.parsedGuid()));
+      }
     }
   }
 
@@ -210,11 +243,14 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
     if (guid == null) {
       return new Unmatched<>(null);
     }
-    Optional<T> found =
-        byP4kUuid
-            .apply(guid)
-            .filter(row -> !followsAnother(row, guid))
-            .or(() -> byWikiUuid.apply(guid));
+    Optional<T> holder = byP4kUuid.apply(guid);
+    if (holder.isPresent() && followsAnother(holder.get(), guid)) {
+      if (rules.covers(guid, holder.get())) {
+        return new Covered<>(holder.get());
+      }
+      holder = Optional.empty();
+    }
+    Optional<T> found = holder.or(() -> rules.follower(guid)).or(() -> byWikiUuid.apply(guid));
     if (found.isPresent()) {
       return accept(record, guid, found.get(), creatable, context);
     }
