@@ -7,40 +7,45 @@ tests:
   - name: silent - idle store, snapshot two hours old, zero pending changes
     interval: 1m
     input_series:
-      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-session-exporter:9121",job="redis",redis="session"}'
         values: "0x150"
-      - series: 'redis_rdb_changes_since_last_save{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_changes_since_last_save{instance="redis-session-exporter:9121",job="redis",redis="session"}'
         values: "0x150"
     alert_rule_test:
       - eval_time: 120m
         alertname: RedisRdbStale
         exp_alerts: []
 
-  - name: fires - pending changes unsaved past the hour
+  - name: fires - pending changes unsaved past the hour, on redis-session only
     interval: 1m
     input_series:
-      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-session-exporter:9121",job="redis",redis="session"}'
         values: "0x150"
-      - series: 'redis_rdb_changes_since_last_save{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_changes_since_last_save{instance="redis-session-exporter:9121",job="redis",redis="session"}'
         values: "1+3x149"
+      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
+        values: "0x150"
+      - series: 'redis_rdb_changes_since_last_save{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
+        values: "0x150"
     alert_rule_test:
       - eval_time: 120m
         alertname: RedisRdbStale
         exp_alerts:
           - exp_labels:
               severity: critical
-              instance: redis-exporter:9121
+              instance: redis-session-exporter:9121
               job: redis
+              redis: session
             exp_annotations:
-              summary: "Redis has unsaved changes and no RDB snapshot for over 1h"
-              description: "Redis has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check the redis log for save errors and the disk free space on /var/lib/basetool/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
+              summary: "Redis has unsaved changes and no RDB snapshot for over 1h (redis-session)"
+              description: "redis-session has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check `journalctl CONTAINER_NAME=redis-session` for save errors and the disk free space on /var/lib/basetool/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
 
   - name: silent - pending changes but a recent save
     interval: 1m
     input_series:
-      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
         values: "7000x150"
-      - series: 'redis_rdb_changes_since_last_save{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_changes_since_last_save{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
         values: "4x150"
     alert_rule_test:
       - eval_time: 120m
@@ -50,11 +55,11 @@ tests:
   - name: fires - bgsave status err on an otherwise idle store
     interval: 1m
     input_series:
-      - series: 'redis_rdb_last_bgsave_status{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_last_bgsave_status{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
         values: "0x30"
-      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
         values: "0x30"
-      - series: 'redis_rdb_changes_since_last_save{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_changes_since_last_save{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
         values: "0x30"
     alert_rule_test:
       - eval_time: 20m
@@ -62,11 +67,12 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
-              instance: redis-exporter:9121
+              instance: redis-shared-exporter:9121
               job: redis
+              redis: shared
             exp_annotations:
-              summary: "Redis background save is failing"
-              description: "The last Redis RDB background save failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/lib/basetool/redis bind mount, or a fork refused for lack of memory — check the redis log and the host filesystem."
+              summary: "Redis background save is failing (redis-shared)"
+              description: "The last RDB background save of redis-shared failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/lib/basetool/redis-shared bind mount, or a fork refused for lack of memory — check `journalctl CONTAINER_NAME=redis-shared` and the host filesystem."
       - eval_time: 20m
         alertname: RedisRdbStale
         exp_alerts: []
@@ -74,19 +80,23 @@ tests:
   - name: silent - bgsave status ok
     interval: 1m
     input_series:
-      - series: 'redis_rdb_last_bgsave_status{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_rdb_last_bgsave_status{instance="redis-session-exporter:9121",job="redis",redis="session"}'
         values: "1x30"
     alert_rule_test:
       - eval_time: 20m
         alertname: RedisRdbSaveFailing
         exp_alerts: []
 
-  - name: fires - aof write status err while aof is enabled
+  - name: fires - aof write status err while aof is enabled, named per instance
     interval: 1m
     input_series:
-      - series: 'redis_aof_last_write_status{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_aof_last_write_status{instance="redis-session-exporter:9121",job="redis",redis="session"}'
         values: "0x30"
-      - series: 'redis_aof_enabled{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_aof_enabled{instance="redis-session-exporter:9121",job="redis",redis="session"}'
+        values: "1x30"
+      - series: 'redis_aof_last_write_status{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
+        values: "0x30"
+      - series: 'redis_aof_enabled{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
         values: "1x30"
     alert_rule_test:
       - eval_time: 20m
@@ -94,18 +104,27 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
-              instance: redis-exporter:9121
+              instance: redis-session-exporter:9121
               job: redis
+              redis: session
             exp_annotations:
-              summary: "Redis AOF writes are failing"
-              description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/lib/basetool/redis bind mount and the redis log."
+              summary: "Redis AOF writes are failing (redis-session)"
+              description: "The last AOF write of redis-session failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is its primary durability layer, so writes already acknowledged to its clients are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/lib/basetool/redis bind mount and `journalctl CONTAINER_NAME=redis-session`."
+          - exp_labels:
+              severity: critical
+              instance: redis-shared-exporter:9121
+              job: redis
+              redis: shared
+            exp_annotations:
+              summary: "Redis AOF writes are failing (redis-shared)"
+              description: "The last AOF write of redis-shared failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is its primary durability layer, so writes already acknowledged to its clients are not reaching disk; a crash loses them, after which the backend's 60-second reconcile rewrites the exchange registry and revocations from Postgres while gateway quotas, idempotency answers and staged handoffs restart empty. Check disk space and permissions on the /var/lib/basetool/redis-shared bind mount and `journalctl CONTAINER_NAME=redis-shared`."
 
   - name: silent - aof disabled
     interval: 1m
     input_series:
-      - series: 'redis_aof_last_write_status{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_aof_last_write_status{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
         values: "0x30"
-      - series: 'redis_aof_enabled{instance="redis-exporter:9121",job="redis"}'
+      - series: 'redis_aof_enabled{instance="redis-shared-exporter:9121",job="redis",redis="shared"}'
         values: "0x30"
     alert_rule_test:
       - eval_time: 20m

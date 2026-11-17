@@ -48,21 +48,20 @@ class TestImagesTest {
   }
 
   /**
-   * The generated Redis Quadlet unit names the constant's image reference, qualified with the
-   * registry the host pulls from.
+   * Both generated Redis Quadlet units, the session store's and the shared one's (ADR-0388), name
+   * the constant's image reference, qualified with the registry the host pulls from.
    *
-   * @throws IOException if the Quadlet unit cannot be read
+   * @throws IOException if a Quadlet unit cannot be read
    */
   @Test
   void theRedisConstantIsTheQuadletUnitsImage() throws IOException {
-    assertThat(
-            imageLines(
-                repositoryRoot().resolve("quadlet/systemd/redis.container"),
-                "Image=docker.io/redis:"))
-        .as(
-            "quadlet/systemd/redis.container must pin exactly the Redis image TestImages.REDIS"
-                + " names")
-        .containsExactly("Image=docker.io/" + TestImages.REDIS);
+    for (String unit :
+        List.of(
+            "quadlet/systemd/redis-session.container", "quadlet/systemd/redis-shared.container")) {
+      assertThat(imageLines(repositoryRoot().resolve(unit), "Image=docker.io/redis:"))
+          .as(unit + " must pin exactly the Redis image TestImages.REDIS names")
+          .containsExactly("Image=docker.io/" + TestImages.REDIS);
+    }
   }
 
   /** The constant is digest-pinned, so a rebuilt-in-place tag cannot change what the tests run. */

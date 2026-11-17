@@ -1892,3 +1892,32 @@ the append-only journal keeps the merged id. A row holding a P4K GUID is never m
 **Enforced by:** `ShipTypeMergeServiceTest` · **Code:** `ShipTypeMergeService`,
 `ShipTypeIdentityReferences`, `ShipTypeReassignmentParticipant` and its implementations · **ADR:**
 [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
+
+### REQ-DATA-043 — a ship UEX lists twice keeps one listing
+
+UEX lists some ships twice: under two ids sharing a game UUID (149 Prowler and 262 Prowler Utility),
+under a base and a variant name for one game ship (166 Retaliator and 167 Retaliator Bomber), or
+twice under the same name (290 and 291 Sabre Raven EX). When a resolution step of the UEX vehicle
+sync finds a row that holds another listing of the same fetch, one of the two keeps the row:
+
+1. the listing whose game UUID, carried by no other listing, is the row's P4K-confirmed
+   `external_uuid` (REQ-DATA-041);
+2. else the listing whose `name` or `name_full` is the row's name while the other's is not.
+
+A listing that keeps the row takes it over; the other listing then finds its own row by its own
+name. A listing that does not is a **secondary listing**: it writes nothing and creates no row. So
+is a listing no step places whose `name` or `name_full`, carried by another listing too, is the
+name of a row holding such a listing. A secondary listing is no rejected write: it neither marks
+the census incomplete nor suppresses the orphan sweep (REQ-DATA-035). A row holding a UEX id a
+partial fetch did not list is still not written.
+
+**Acceptance**
+
+- [x] A listing whose full name is the row's name takes the row from another ship's listing, and
+  that listing then finds its own row, in either order, without a conflict
+  (`UexVehicleServiceUuidMatchTest`).
+- [x] A second listing of a row whose other listing's game UUID confirms its P4K GUID writes nothing,
+  creates no row and leaves the sweep running (`UexVehicleServiceUuidMatchTest`).
+- [x] A second listing of a shared name creates no row (`UexVehicleServiceUuidMatchTest`).
+
+**Code:** `UexVehicleService`, `UexVehicleListings` · **ADR:** ADR-0392
