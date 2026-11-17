@@ -65,7 +65,15 @@ tmp="$(mktemp "${dir}/.host-updates.prom.XXXXXX" 2>/dev/null)" || {
     echo "# TYPE basetool_host_reboot_required gauge"
     echo "basetool_host_reboot_required ${reboot}"
   fi
-} > "${tmp}" || { rm -f "${tmp}"; echo "host-updates-metrics: cannot write ${tmp}" >&2; exit 1; }
+} >"${tmp}" || {
+  rm -f "${tmp}"
+  echo "host-updates-metrics: cannot write ${tmp}" >&2
+  exit 1
+}
 chmod 0644 "${tmp}"
-mv -f "${tmp}" "${OUT}" || { rm -f "${tmp}"; echo "host-updates-metrics: cannot move ${OUT} into place" >&2; exit 1; }
+mv -f "${tmp}" "${OUT}" || {
+  rm -f "${tmp}"
+  echo "host-updates-metrics: cannot move ${OUT} into place" >&2
+  exit 1
+}
 exit 0

@@ -123,19 +123,19 @@ scenario_apply_path_is_listed_and_complete() {
 scenario_generate_matches_sha256sum_and_verifies() {
   echo "Scenario: generate prints one sha256sum line per listed file, and sha256sum -c accepts it on the scripts directory"
   local out="${WORK}/manifest" n_list n_out rel want got
-  "${MANIFEST_TOOL}" generate > "${out}"
+  "${MANIFEST_TOOL}" generate >"${out}"
   n_list="$(list_entries | wc -l | tr -d '[:space:]')"
   n_out="$(grep -vc '  host/etc/' "${out}")"
   check "one line per listed file" test "${n_list}" = "${n_out}"
   rel="deploy.sh"
-  want="$(sha256sum < "${SCRIPT_DIR}/${rel}")"
+  want="$(sha256sum <"${SCRIPT_DIR}/${rel}")"
   got="$(grep -F "  ${rel}" "${out}" | cut -d' ' -f1)"
   check "deploy.sh carries its own sha256" test "${want%% *}" = "${got}"
-  grep -v '  host/etc/' "${out}" > "${out}.scripts"
+  grep -v '  host/etc/' "${out}" >"${out}.scripts"
   check "sha256sum -c accepts the script entries" bash -c "cd '${SCRIPT_DIR}' && sha256sum -c --quiet '${out}.scripts'"
-  printf 'x\n' >> "${WORK}/probe"
+  printf 'x\n' >>"${WORK}/probe"
   cp "${SCRIPT_DIR}/deploy.sh" "${WORK}/deploy.sh"
-  echo "changed" >> "${WORK}/deploy.sh"
+  echo "changed" >>"${WORK}/deploy.sh"
   if (cd "${WORK}" && sha256sum -c --quiet "${out}" >/dev/null 2>&1); then
     record 0 "sha256sum -c rejects a changed copy"
   else
@@ -151,8 +151,8 @@ scenario_rev_reads_bytes_exactly() {
   git -C "${repo}" config user.email t@example.invalid
   git -C "${repo}" config user.name t
   git -C "${repo}" config core.autocrlf false
-  printf 'one.sh\n' > "${repo}/scripts/host-scripts.list"
-  printf 'echo crlf\r\n' > "${repo}/scripts/one.sh"
+  printf 'one.sh\n' >"${repo}/scripts/host-scripts.list"
+  printf 'echo crlf\r\n' >"${repo}/scripts/one.sh"
   git -C "${repo}" add scripts
   git -C "${repo}" commit -q -m seed
   digest="$(printf 'echo crlf\r\n' | sha256sum)"
@@ -174,14 +174,14 @@ scenario_generate_refuses_bad_lists() {
   mkdir -p "${dir}"
   cp "${MANIFEST_TOOL}" "${dir}/host-scripts-manifest.sh"
   for bad in '../etc/passwd' '/etc/passwd' 'a b.sh' 'a/../b.sh' 'missing.sh'; do
-    printf '%s\n' "${bad}" > "${dir}/host-scripts.list"
+    printf '%s\n' "${bad}" >"${dir}/host-scripts.list"
     if bash "${dir}/host-scripts-manifest.sh" generate >/dev/null 2>&1; then
       record 0 "'${bad}' is refused"
     else
       record 1 "'${bad}' is refused"
     fi
   done
-  : > "${dir}/host-scripts.list"
+  : >"${dir}/host-scripts.list"
   if bash "${dir}/host-scripts-manifest.sh" generate >/dev/null 2>&1; then
     record 0 "an empty list is refused"
   else

@@ -49,8 +49,11 @@ def localise(node, prefix: str):
     """
     if isinstance(node, dict):
         return {
-            key: (value.replace(BASE, prefix, 1)
-                  if key == "$ref" and isinstance(value, str) else localise(value, prefix))
+            key: (
+                value.replace(BASE, prefix, 1)
+                if key == "$ref" and isinstance(value, str)
+                else localise(value, prefix)
+            )
             for key, value in node.items()
         }
     if isinstance(node, list):
@@ -76,8 +79,11 @@ def soften(node):
     for branch in ("then", "else"):
         properties = result.get(branch, {}).get("properties", {})
         for name, narrowed in properties.items():
-            if (isinstance(narrowed, dict) and narrowed.get("type") == "integer"
-                    and base.get(name, {}).get("type") == "number"):
+            if (
+                isinstance(narrowed, dict)
+                and narrowed.get("type") == "integer"
+                and base.get(name, {}).get("type") == "number"
+            ):
                 narrowed.pop("type")
                 narrowed["multipleOf"] = 1
     return result
@@ -99,13 +105,17 @@ def prepare(openapi: pathlib.Path, schemas: pathlib.Path, out: pathlib.Path) -> 
         document = json.loads(schema.read_text(encoding="utf-8"))
         document.pop("$id", None)
         (out / "schemas" / schema.name).write_text(
-            json.dumps(soften(localise(document, "")), indent=2), encoding="utf-8")
+            json.dumps(soften(localise(document, "")), indent=2), encoding="utf-8"
+        )
     prepared = out / SPEC
     document = json.loads(openapi.read_text(encoding="utf-8"))
-    prepared.write_text(json.dumps(soften(localise(document, "schemas/")), indent=2), encoding="utf-8")
+    prepared.write_text(
+        json.dumps(soften(localise(document, "schemas/")), indent=2), encoding="utf-8"
+    )
     (out / "index.html").write_text(
         PAGE.format(layout=LAYOUT, title=json.dumps(TITLE), spec=SPEC, bundle=BUNDLE),
-        encoding="utf-8")
+        encoding="utf-8",
+    )
     return prepared
 
 
@@ -181,20 +191,27 @@ def schema_index(schemas: pathlib.Path) -> pathlib.Path:
     rows = []
     for schema in sorted(schemas.glob("*.schema.json")):
         document = json.loads(schema.read_text(encoding="utf-8"))
-        rows.append(f"| [{schema.name}]({schema.name}) | {cell(document.get('title', ''))} "
-                    f"| {cell(document.get('description', ''))} |")
+        rows.append(
+            f"| [{schema.name}]({schema.name}) | {cell(document.get('title', ''))} "
+            f"| {cell(document.get('description', ''))} |"
+        )
     page = schemas / "index.md"
-    page.write_text("\n".join([
-        "# Schemas",
-        "",
-        "Every JSON Schema 2020-12 document of the Exchange API v1. Each is served at its `$id`,",
-        f"`{BASE}<name>.schema.json`; the files here are copies.",
-        "",
-        "| Schema | Title | Description |",
-        "| --- | --- | --- |",
-        *rows,
-        "",
-    ]), encoding="utf-8")
+    page.write_text(
+        "\n".join(
+            [
+                "# Schemas",
+                "",
+                "Every JSON Schema 2020-12 document of the Exchange API v1. Each is served at its `$id`,",
+                f"`{BASE}<name>.schema.json`; the files here are copies.",
+                "",
+                "| Schema | Title | Description |",
+                "| --- | --- | --- |",
+                *rows,
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     return page
 
 
@@ -204,27 +221,46 @@ def selftest() -> None:
         root = pathlib.Path(tmp)
         (root / "in").mkdir()
         (root / "in" / "a.schema.json").write_text(
-            json.dumps({"$id": BASE + "a.schema.json", "properties": {"b": {"$ref": "b.schema.json"}}}),
-            encoding="utf-8")
+            json.dumps(
+                {"$id": BASE + "a.schema.json", "properties": {"b": {"$ref": "b.schema.json"}}}
+            ),
+            encoding="utf-8",
+        )
         (root / "in" / "q.schema.json").write_text(
-            json.dumps({"properties": {"n": {"type": "number"}, "s": {"type": "string"}},
-                        "if": {"properties": {"s": {"const": "x"}}},
-                        "then": {"properties": {"n": {"type": "integer"}, "s": {"type": "integer"}}}}),
-            encoding="utf-8")
+            json.dumps(
+                {
+                    "properties": {"n": {"type": "number"}, "s": {"type": "string"}},
+                    "if": {"properties": {"s": {"const": "x"}}},
+                    "then": {"properties": {"n": {"type": "integer"}, "s": {"type": "integer"}}},
+                }
+            ),
+            encoding="utf-8",
+        )
         (root / "api.json").write_text(
-            json.dumps({"paths": {"/x": {"$ref": BASE + "a.schema.json#/$defs/y"}}}), encoding="utf-8")
+            json.dumps({"paths": {"/x": {"$ref": BASE + "a.schema.json#/$defs/y"}}}),
+            encoding="utf-8",
+        )
         prepared = prepare(root / "api.json", root / "in", root / "out")
         api = json.loads(prepared.read_text(encoding="utf-8"))
         assert api["paths"]["/x"]["$ref"] == "schemas/a.schema.json#/$defs/y", api
-        schema = json.loads((root / "out" / "schemas" / "a.schema.json").read_text(encoding="utf-8"))
+        schema = json.loads(
+            (root / "out" / "schemas" / "a.schema.json").read_text(encoding="utf-8")
+        )
         assert "$id" not in schema and schema["properties"]["b"]["$ref"] == "b.schema.json", schema
-        conditional = json.loads((root / "out" / "schemas" / "q.schema.json").read_text(encoding="utf-8"))
+        conditional = json.loads(
+            (root / "out" / "schemas" / "q.schema.json").read_text(encoding="utf-8")
+        )
         assert conditional["then"]["properties"]["n"] == {"multipleOf": 1}, conditional
         assert conditional["then"]["properties"]["s"] == {"type": "integer"}, conditional
         page = (root / "out" / "index.html").read_text(encoding="utf-8")
         meta, body = front_matter(page)
-        assert meta == {"layout": LAYOUT, "title": json.dumps(TITLE), "generated": "true",
-                        "spec": SPEC, "bundle": BUNDLE}, meta
+        assert meta == {
+            "layout": LAYOUT,
+            "title": json.dumps(TITLE),
+            "generated": "true",
+            "spec": SPEC,
+            "bundle": BUNDLE,
+        }, meta
         assert f'data-spec="{SPEC}"' in body and "<script" not in body, body
         docs = root / "docs"
         (docs / "_layouts").mkdir(parents=True)
@@ -233,12 +269,16 @@ def selftest() -> None:
         (docs / "_layouts" / f"{LAYOUT}.html").write_text(
             '<script src="{{ page.bundle }}"></script>{{ page.spec }}'
             "<script src=\"{{ '/assets/js/reference.js' | relative_url }}\"></script>",
-            encoding="utf-8")
+            encoding="utf-8",
+        )
         (docs / "assets" / "js" / "reference.js").write_text(
             'Redoc.init(c.dataset.spec, { theme: { a: token("--color-primary"), '
-            'b: token("--color-gone") } });', encoding="utf-8")
+            'b: token("--color-gone") } });',
+            encoding="utf-8",
+        )
         (docs / "assets" / "css" / "krt-docs.css").write_text(
-            ":root {\n  --color-primary: #E77E23;\n}\n", encoding="utf-8")
+            ":root {\n  --color-primary: #E77E23;\n}\n", encoding="utf-8"
+        )
         problems = check_site(docs)
         assert problems == [
             "assets/js/reference.js reads --color-gone, which krt-docs.css does not define",
@@ -249,7 +289,8 @@ def selftest() -> None:
         problems = check_site(repo / "docs" / "exchange")
         assert problems == [], problems
         (root / "in" / "a.schema.json").write_text(
-            json.dumps({"title": "A", "description": "One | two\nthree"}), encoding="utf-8")
+            json.dumps({"title": "A", "description": "One | two\nthree"}), encoding="utf-8"
+        )
         index = schema_index(root / "in").read_text(encoding="utf-8")
         assert "| [a.schema.json](a.schema.json) | A | One \\| two three |" in index, index
         assert "| [q.schema.json](q.schema.json) |  |  |" in index, index
@@ -277,7 +318,8 @@ def main() -> int:
     prepared = prepare(
         repo / "ingest/src/main/resources/api/exchange-v1.openapi.json",
         repo / "ingest/src/main/resources/exchange/v1/schemas",
-        pathlib.Path(args.out))
+        pathlib.Path(args.out),
+    )
     print(prepared)
     return 0
 

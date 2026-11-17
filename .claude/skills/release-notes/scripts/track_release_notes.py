@@ -51,8 +51,11 @@ def do_set(repo: str, ref: str, force: bool) -> int:
     """
     resolved = st.resolve_commit(repo, ref)
     if not resolved:
-        print(f"error: could not resolve {ref!r} to a commit "
-              "(unknown tag/commit, or a date before the first commit).", file=sys.stderr)
+        print(
+            f"error: could not resolve {ref!r} to a commit "
+            "(unknown tag/commit, or a date before the first commit).",
+            file=sys.stderr,
+        )
         return 1
     sha, date = resolved
 
@@ -60,11 +63,16 @@ def do_set(repo: str, ref: str, force: bool) -> int:
     old_sha = ((state or {}).get("last_covered") or {}).get("sha")
     if old_sha and old_sha != sha and not force:
         if st.commit_exists(repo, old_sha) and not st.is_ancestor(repo, old_sha, sha):
-            print(f"refusing to move the pointer: {sha[:12]} ({date}) is not ahead of the "
-                  f"current pointer {old_sha[:12]}.", file=sys.stderr)
-            print("This would make the next resume re-emit already-covered changes. "
-                  "Pass --force to override (e.g. after an intentional history rewrite).",
-                  file=sys.stderr)
+            print(
+                f"refusing to move the pointer: {sha[:12]} ({date}) is not ahead of the "
+                f"current pointer {old_sha[:12]}.",
+                file=sys.stderr,
+            )
+            print(
+                "This would make the next resume re-emit already-covered changes. "
+                "Pass --force to override (e.g. after an intentional history rewrite).",
+                file=sys.stderr,
+            )
             return 3
 
     tag = st.newest_version_tag(repo, sha)
@@ -74,31 +82,49 @@ def do_set(repo: str, ref: str, force: bool) -> int:
     print(f"Release-notes pointer set: notes now tracked as covered through {where}.")
     print(f"  file        : {result['path']}")
     if result["location"] == "git-common-dir":
-        print("  storage     : shared git dir (git rev-parse --git-common-dir) -- "
-              "shared by every worktree, never committed")
+        print(
+            "  storage     : shared git dir (git rev-parse --git-common-dir) -- "
+            "shared by every worktree, never committed"
+        )
     else:
         print(f"  .gitignore  : {result['gitignore']} (entry {st.GITIGNORE_ENTRY})")
     if result["ignored"]:
         print("  commit-safe : yes -- the pointer cannot be committed.")
     else:
-        print("  commit-safe : WARNING -- not protected from commits; check .gitignore.",
-              file=sys.stderr)
+        print(
+            "  commit-safe : WARNING -- not protected from commits; check .gitignore.",
+            file=sys.stderr,
+        )
     return 0
 
 
 def main() -> None:
     """Parse arguments and either show or advance the pointer."""
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--repo", default=os.getcwd(),
-                        help="Repository root. Default: current directory.")
-    parser.add_argument("--set", nargs="?", const="HEAD", default=None, metavar="REF",
-                        help="Advance the pointer to REF (a tag, commit, or date). "
-                             "Bare --set means HEAD. Run this after writing the notes.")
-    parser.add_argument("--show", action="store_true",
-                        help="Print the current pointer and exit (the default action).")
-    parser.add_argument("--force", action="store_true",
-                        help="Allow --set to move the pointer even if it would rewind.")
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--repo", default=os.getcwd(), help="Repository root. Default: current directory."
+    )
+    parser.add_argument(
+        "--set",
+        nargs="?",
+        const="HEAD",
+        default=None,
+        metavar="REF",
+        help="Advance the pointer to REF (a tag, commit, or date). "
+        "Bare --set means HEAD. Run this after writing the notes.",
+    )
+    parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Print the current pointer and exit (the default action).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow --set to move the pointer even if it would rewind.",
+    )
     args = parser.parse_args()
 
     repo = os.path.abspath(args.repo)

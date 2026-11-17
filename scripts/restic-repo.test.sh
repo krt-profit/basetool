@@ -3,19 +3,28 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB="${HERE}/lib/restic-repo.sh"
-[[ -f "${LIB}" ]] || { echo "FATAL: ${LIB} not found" >&2; exit 1; }
+[[ -f "${LIB}" ]] || {
+  echo "FATAL: ${LIB} not found" >&2
+  exit 1
+}
 
 PASSED=0
 FAILED=0
-ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
-bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
+ok() {
+  PASSED=$((PASSED + 1))
+  printf '  ok    %s\n' "$*"
+}
+bad() {
+  FAILED=$((FAILED + 1))
+  printf '  FAIL  %s\n' "$*"
+}
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/restic-repo-test.XXXXXX")"
 trap 'rm -rf "${WORK}"' EXIT
 mkdir -p "${WORK}/bin"
 CALLS="${WORK}/calls"
 
-cat > "${WORK}/bin/restic" <<'STUB'
+cat >"${WORK}/bin/restic" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${STUB_CALLS}"
 case "$1" in
@@ -36,15 +45,16 @@ chmod +x "${WORK}/bin/restic"
 
 run() {
   local -a call
-  read -ra call <<< "$1"; shift
-  : > "${CALLS}"
+  read -ra call <<<"$1"
+  shift
+  : >"${CALLS}"
   # shellcheck disable=SC2016
   env -i PATH="${WORK}/bin:/usr/bin:/bin" STUB_CALLS="${CALLS}" HOME="${WORK}" \
     RESTIC_REPOSITORY="rclone:nextcloud:Test" BACKUP_ENV="/etc/basetool/deploy/backup.env" "$@" \
     bash -c 'set -euo pipefail
       log() { printf "[t] %s\n" "$*"; }
       fail() { log "FATAL: $*"; exit 1; }
-      . "$1"; shift; "$@"' _ "${LIB}" "${call[@]}" > "${WORK}/out" 2>&1
+      . "$1"; shift; "$@"' _ "${LIB}" "${call[@]}" >"${WORK}/out" 2>&1
 }
 
 called() { grep -q -- "$1" "${CALLS}"; }

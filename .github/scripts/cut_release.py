@@ -80,8 +80,11 @@ def cut(lines: list[str], version: str, date: str, repo_url: str) -> list[str]:
         sys.exit(f"error: a '## [{version}]' section already exists -- nothing to cut")
 
     start = next(
-        (i for i, line in enumerate(lines)
-         if line.startswith("## ") and "unreleased" in line.lower()),
+        (
+            i
+            for i, line in enumerate(lines)
+            if line.startswith("## ") and "unreleased" in line.lower()
+        ),
         None,
     )
     if start is None:
@@ -93,7 +96,7 @@ def cut(lines: list[str], version: str, date: str, repo_url: str) -> list[str]:
         "",
         f"## [{version}]({url}) - {date}",
     ]
-    return lines[:start] + replacement + lines[start + 1:]
+    return lines[:start] + replacement + lines[start + 1 :]
 
 
 def fold(lines: list[str], version: str, additions: dict[str, list[tuple[str, ...]]]) -> list[str]:
@@ -111,7 +114,7 @@ def fold(lines: list[str], version: str, additions: dict[str, list[tuple[str, ..
     end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
     preamble: list[str] = []
     blocks: list[tuple[str, list[str]]] = []
-    for line in lines[start + 1:end]:
+    for line in lines[start + 1 : end]:
         if line.startswith("### "):
             blocks.append((line, []))
         elif blocks:
@@ -127,9 +130,14 @@ def fold(lines: list[str], version: str, additions: dict[str, list[tuple[str, ..
         index = next((i for i, (head, _) in enumerate(blocks) if head.strip() == heading), None)
         if index is None:
             rank = SECTIONS.index(section)
-            index = next((i for i, (head, _) in enumerate(blocks)
-                          if head[4:].strip() in SECTIONS and SECTIONS.index(head[4:].strip()) > rank),
-                         len(blocks))
+            index = next(
+                (
+                    i
+                    for i, (head, _) in enumerate(blocks)
+                    if head[4:].strip() in SECTIONS and SECTIONS.index(head[4:].strip()) > rank
+                ),
+                len(blocks),
+            )
             blocks.insert(index, (heading, []))
         body = _trim(blocks[index][1])
         for item in items:
@@ -140,14 +148,14 @@ def fold(lines: list[str], version: str, additions: dict[str, list[tuple[str, ..
     for head, body in blocks:
         section_lines.extend(([""] if section_lines else []) + [head, ""] + _trim(body))
     tail = [""] if end < len(lines) else []
-    return lines[:start + 1] + [""] + section_lines + tail + lines[end:]
+    return lines[: start + 1] + [""] + section_lines + tail + lines[end:]
 
 
 def _trim(lines: list[str]) -> list[str]:
     """Return ``lines`` without leading and trailing blank lines."""
     first = next((i for i, line in enumerate(lines) if line.strip()), len(lines))
     last = next((i for i in range(len(lines) - 1, -1, -1) if lines[i].strip()), -1)
-    return list(lines[first:last + 1])
+    return list(lines[first : last + 1])
 
 
 def attribute(repo: str, fragments: list[Fragment]) -> list[tuple[Fragment, str | None, tuple]]:
@@ -160,23 +168,38 @@ def attribute(repo: str, fragments: list[Fragment]) -> list[tuple[Fragment, str 
     attributed = []
     for fragment in fragments:
         path = f"{FRAGMENT_DIR}/{fragment.name}"
-        added = run_git(repo, ["log", "-1", "--diff-filter=A", "--format=%H %ct", "--", path]).split()
+        added = run_git(
+            repo, ["log", "-1", "--diff-filter=A", "--format=%H %ct", "--", path]
+        ).split()
         if not added:
             attributed.append((fragment, None, (float("inf"), fragment.name)))
             continue
         sha, timestamp = added
-        tags = [tag for tag in run_git(repo, ["tag", "--contains", sha]).split()
-                if VERSION_TAG_RE.match(tag)]
-        earliest = min(tags, key=lambda tag: tuple(int(p) for p in tag[1:].split("."))) if tags else None
+        tags = [
+            tag
+            for tag in run_git(repo, ["tag", "--contains", sha]).split()
+            if VERSION_TAG_RE.match(tag)
+        ]
+        earliest = (
+            min(tags, key=lambda tag: tuple(int(p) for p in tag[1:].split("."))) if tags else None
+        )
         attributed.append((fragment, earliest, (int(timestamp), fragment.name)))
     return sorted(attributed, key=lambda entry: entry[2])
 
 
-HEAD_V100 ="## [v1.0.0](https://github.com/krt-profit/basetool/releases/tag/v1.0.0) - 2026-09-01"
+HEAD_V100 = "## [v1.0.0](https://github.com/krt-profit/basetool/releases/tag/v1.0.0) - 2026-09-01"
 HEAD_V110 = "## [v1.1.0](https://github.com/krt-profit/basetool/releases/tag/v1.1.0) - 2026-10-02"
-BASE = f"# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n- **Alt.** Noch offen.\n\n{HEAD_V100}\n\n" \
-       "### Added\n\n- **Erstes Release.**\n"
-CUT_ARGS = ("v1.1.0", "--date", "2026-10-02", "--repo-url", "https://github.com/krt-profit/basetool")
+BASE = (
+    f"# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n- **Alt.** Noch offen.\n\n{HEAD_V100}\n\n"
+    "### Added\n\n- **Erstes Release.**\n"
+)
+CUT_ARGS = (
+    "v1.1.0",
+    "--date",
+    "2026-10-02",
+    "--repo-url",
+    "https://github.com/krt-profit/basetool",
+)
 
 
 def _case_folds_and_deletes(repo) -> str | None:
@@ -184,7 +207,9 @@ def _case_folds_and_deletes(repo) -> str | None:
     repo.write("changelog.d/README.md", "# Changelog fragments\n")
     repo.write("changelog.d/suche.md", "### Fixed\n\n- **Suche.** Leerer Filter behoben.\n")
     repo.commit("fix: suche", "2026-10-01T10:00:00+00:00")
-    repo.write("changelog.d/hangar.md", "### Added\n\n- **Hangar.** Import\n  aus der Erweiterung.\n")
+    repo.write(
+        "changelog.d/hangar.md", "### Added\n\n- **Hangar.** Import\n  aus der Erweiterung.\n"
+    )
     repo.commit("feat: hangar", "2026-10-01T11:00:00+00:00")
     code, out = repo.run(SELF, *CUT_ARGS, "--repo", repo.path)
     expected = (
@@ -209,9 +234,14 @@ HEAD_V101 = "## [v1.0.1](https://github.com/krt-profit/basetool/releases/tag/v1.
 
 def _case_already_shipped(repo) -> str | None:
     """A fragment whose commit is already in an older tag joins that tag's section."""
-    repo.write("CHANGELOG.md", f"# Changelog\n\n## [Unreleased]\n\n{HEAD_V101}\n\n"
-                               f"### Added\n\n- **Punkt.**\n\n{HEAD_V100}\n\n### Added\n\n- **Erstes Release.**\n")
-    repo.write("changelog.d/nachzug.md", "### Fixed\n\n- **Nachzug.** Im Release-Fenster gemergt.\n")
+    repo.write(
+        "CHANGELOG.md",
+        f"# Changelog\n\n## [Unreleased]\n\n{HEAD_V101}\n\n"
+        f"### Added\n\n- **Punkt.**\n\n{HEAD_V100}\n\n### Added\n\n- **Erstes Release.**\n",
+    )
+    repo.write(
+        "changelog.d/nachzug.md", "### Fixed\n\n- **Nachzug.** Im Release-Fenster gemergt.\n"
+    )
     repo.commit("fix: nachzug", "2026-09-20T10:00:00+00:00")
     repo.git("tag", "v1.0.1")
     repo.write("changelog.d/neu.md", "### Fixed\n\n- **Neu.** Danach gemergt.\n")
@@ -258,7 +288,9 @@ def _case_uncommitted_fragment(repo) -> str | None:
     repo.write("changelog.d/lokal.md", "### Security\n\n- **Lokal.**\n")
     code, out = repo.run(SELF, *CUT_ARGS, "--repo", repo.path)
     if code != 0 or "### Security\n\n- **Lokal.**\n\n" + HEAD_V100 not in repo.read("CHANGELOG.md"):
-        return f"expected the item in the new section, got {code}: {out}\n{repo.read('CHANGELOG.md')}"
+        return (
+            f"expected the item in the new section, got {code}: {out}\n{repo.read('CHANGELOG.md')}"
+        )
     return None
 
 
@@ -301,15 +333,19 @@ def main() -> None:
     if "--selftest" in sys.argv:
         raise SystemExit(selftest())
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("version", help="Release tag to cut, e.g. v0.3.55.")
     parser.add_argument("--repo", default=os.getcwd(), help="Repo root. Default: cwd.")
-    parser.add_argument("--changelog", default=None,
-                        help="Path to CHANGELOG.md. Default: <repo>/CHANGELOG.md.")
-    parser.add_argument("--date", default=None,
-                        help="Release date YYYY-MM-DD. Default: today (UTC).")
-    parser.add_argument("--repo-url", default=None,
-                        help="GitHub base URL. Default: derived from 'origin'.")
+    parser.add_argument(
+        "--changelog", default=None, help="Path to CHANGELOG.md. Default: <repo>/CHANGELOG.md."
+    )
+    parser.add_argument(
+        "--date", default=None, help="Release date YYYY-MM-DD. Default: today (UTC)."
+    )
+    parser.add_argument(
+        "--repo-url", default=None, help="GitHub base URL. Default: derived from 'origin'."
+    )
     args = parser.parse_args()
 
     if not VERSION_TAG_RE.match(args.version):
@@ -337,7 +373,11 @@ def main() -> None:
     new_lines = cut(lines, args.version, date, repo_url)
     targets: dict[str, dict[str, list[tuple[str, ...]]]] = {}
     for fragment, tag, _ in attribute(repo, fragments):
-        target = tag if tag and any(line.startswith(f"## [{tag}]") for line in new_lines) else args.version
+        target = (
+            tag
+            if tag and any(line.startswith(f"## [{tag}]") for line in new_lines)
+            else args.version
+        )
         if target != args.version:
             print(f"{FRAGMENT_DIR}/{fragment.name} already shipped with {target}; folded there")
         targets.setdefault(target, {}).setdefault(fragment.section, []).extend(fragment.items)

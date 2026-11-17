@@ -9,19 +9,19 @@ verify_signature() {
   local attempt delay err rc
   delay="${COSIGN_VERIFY_DELAY}"
   VERIFY_LAST_ERROR=""
-  for (( attempt = 1; attempt <= COSIGN_VERIFY_ATTEMPTS; attempt++ )); do
+  for ((attempt = 1; attempt <= COSIGN_VERIFY_ATTEMPTS; attempt++)); do
     rc=0
     err="$(cosign verify "${ref}" \
       --certificate-identity-regexp "${COSIGN_IDENTITY_REGEXP}" \
       --certificate-oidc-issuer "${COSIGN_OIDC_ISSUER}" 2>&1 >/dev/null)" || rc=$?
-    if (( rc == 0 )); then
+    if ((rc == 0)); then
       return 0
     fi
     VERIFY_LAST_ERROR="${err//$'\n'/ }"
-    if (( attempt < COSIGN_VERIFY_ATTEMPTS )); then
+    if ((attempt < COSIGN_VERIFY_ATTEMPTS)); then
       log "  ${ref}: verify attempt ${attempt}/${COSIGN_VERIFY_ATTEMPTS} failed (rc=${rc}), retrying in ${delay}s — ${VERIFY_LAST_ERROR}"
       sleep "${delay}"
-      delay=$(( delay * 2 ))
+      delay=$((delay * 2))
     fi
   done
   return 1
@@ -71,13 +71,13 @@ mixed_release_waited_seconds() {
   local now since=""
   now="$(date +%s)"
   if [[ -f "${MIXED_RELEASE_FILE}" ]]; then
-    read -r since _ < "${MIXED_RELEASE_FILE}" || true
+    read -r since _ <"${MIXED_RELEASE_FILE}" || true
   fi
-  if ! [[ "${since}" =~ ^[0-9]+$ ]] || (( 10#${since} > now )); then
+  if ! [[ "${since}" =~ ^[0-9]+$ ]] || ((10#${since} > now)); then
     since="${now}"
-    printf '%d\n' "${since}" > "${MIXED_RELEASE_FILE}"
+    printf '%d\n' "${since}" >"${MIXED_RELEASE_FILE}"
   fi
-  echo $(( now - 10#${since} ))
+  echo $((now - 10#${since}))
 }
 
 assert_one_release_or_die() {
@@ -97,7 +97,7 @@ assert_one_release_or_die() {
     fail "the ${TARGET_TAG} set cannot be shown to be one release: ${problem} — refusing to deploy, the next tick retries (BASETOOL_REQUIRE_ONE_RELEASE=false is the break-glass)"
   fi
   waited="$(mixed_release_waited_seconds)"
-  if (( waited < MIXED_RELEASE_GRACE )); then
+  if ((waited < MIXED_RELEASE_GRACE)); then
     log "the ${TARGET_TAG} set is not one release yet: ${problem} — a promotion is probably in progress; waiting for it to finish (${waited}s/${MIXED_RELEASE_GRACE}s), nothing applied, the next tick retries"
     exit 0
   fi

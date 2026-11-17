@@ -92,10 +92,14 @@ def render(template: str, env: dict[str, str]) -> str:
             raise Refusal(f"template line {number} is neither a comment nor a `user` rule")
         rendered = PLACEHOLDER.sub(substitute, line)
         if "{{" in rendered or "}}" in rendered:
-            raise Refusal(f"template line {number} carries a placeholder this renderer does not know")
+            raise Refusal(
+                f"template line {number} carries a placeholder this renderer does not know"
+            )
         out.append(rendered)
     if problems:
-        raise Refusal("required values are missing or invalid:\n  " + "\n  ".join(sorted(set(problems))))
+        raise Refusal(
+            "required values are missing or invalid:\n  " + "\n  ".join(sorted(set(problems)))
+        )
     defaults = [line for line in out if line.split()[1] == "default"]
     if len(defaults) != 1:
         raise Refusal(
@@ -159,9 +163,15 @@ def selftest() -> int:
     check("hash, never the password", ">pw" not in out and " pw " not in out)
     check("sha256 of the value", sha256_password("pw") in out)
     check("a $ and a space survive into the hash", sha256_password("a$b c") in out)
-    check("known digest", sha256_password("pw")
-          == "#30c952fab122c3f9759f02a6d95c3758b246b4fee239957b2d4fee46e26170c4")
-    check("state off", render(template, {**env, "REDIS_DEFAULT_USER": "OFF"}).startswith("user default off "))
+    check(
+        "known digest",
+        sha256_password("pw")
+        == "#30c952fab122c3f9759f02a6d95c3758b246b4fee239957b2d4fee46e26170c4",
+    )
+    check(
+        "state off",
+        render(template, {**env, "REDIS_DEFAULT_USER": "OFF"}).startswith("user default off "),
+    )
     for broken, label in (
         ({"REDIS_PASSWORD": "pw"}, "missing variable refuses"),
         ({**env, "SVC_PASSWORD": ""}, "empty variable refuses"),
@@ -216,7 +226,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="render-redis-acl.py")
     parser.add_argument("--env", help="the host .env")
     parser.add_argument("--template", help="scripts/redis-users.acl.tmpl")
-    parser.add_argument("--out", help="the ACL file to write, normally /var/lib/basetool/redis/users.acl")
+    parser.add_argument(
+        "--out", help="the ACL file to write, normally /var/lib/basetool/redis/users.acl"
+    )
     parser.add_argument("--check", action="store_true", help="report drift and write nothing")
     parser.add_argument("--selftest", action="store_true", help="run the regression tests")
     args = parser.parse_args(argv)
@@ -240,14 +252,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         except OSError:
             current = None
         if current != content:
-            print(f"render-redis-acl: DRIFT - {args.out} does not match the template and the .env",
-                  file=sys.stderr)
+            print(
+                f"render-redis-acl: DRIFT - {args.out} does not match the template and the .env",
+                file=sys.stderr,
+            )
             return 1
         print(f"render-redis-acl: {args.out} matches ({', '.join(users)}; default {default_state})")
         return 0
     write_atomically(args.out, content)
-    print(f"render-redis-acl: wrote {args.out} ({', '.join(users)}; default {default_state}). "
-          "Apply it with ACL LOAD.")
+    print(
+        f"render-redis-acl: wrote {args.out} ({', '.join(users)}; default {default_state}). "
+        "Apply it with ACL LOAD."
+    )
     return 0
 
 

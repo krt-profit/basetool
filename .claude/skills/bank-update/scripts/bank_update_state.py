@@ -26,10 +26,12 @@ def marker_path() -> Path:
     with contextlib.suppress(Exception):
         common = subprocess.run(
             ["git", "rev-parse", "--git-common-dir"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         if common:
-            return (Path(common).resolve() / FILENAME)
+            return Path(common).resolve() / FILENAME
     return Path.cwd() / FILENAME
 
 
@@ -48,10 +50,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--show", action="store_true", help="print the last covered month")
-    group.add_argument("--set", dest="value", metavar="YYYY-MM",
-                       help="record this month as covered")
-    parser.add_argument("--force", action="store_true",
-                        help="allow moving the marker backwards")
+    group.add_argument(
+        "--set", dest="value", metavar="YYYY-MM", help="record this month as covered"
+    )
+    parser.add_argument("--force", action="store_true", help="allow moving the marker backwards")
     args = parser.parse_args()
 
     path = marker_path()

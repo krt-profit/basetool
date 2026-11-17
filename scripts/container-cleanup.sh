@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
       DRY_RUN=true
       shift
       ;;
-    -h|--help)
+    -h | --help)
       cat <<'USAGE'
 Usage: container-cleanup.sh [--dry-run]
 
@@ -104,7 +104,7 @@ df_total_bytes() {
   local total=0 line b
   while IFS= read -r line; do
     b="$(to_bytes "${line}")"
-    total=$(( total + b ))
+    total=$((total + b))
   done < <(${RT_CLI} system df --format '{{.Size}}' 2>/dev/null || true)
   printf '%d' "${total}"
 }
@@ -116,7 +116,7 @@ write_cleanup_metrics() {
     [[ "${previous}" =~ ^[0-9]+$ ]] || previous=0
   fi
   now="$(date +%s)"
-  dur=$(( now - START_EPOCH ))
+  dur=$((now - START_EPOCH))
   {
     echo "# HELP basetool_container_cleanup_last_success_timestamp Unix time of the last successful container cleanup."
     echo "# TYPE basetool_container_cleanup_last_success_timestamp gauge"
@@ -144,7 +144,7 @@ rt_detect
 rt_wait_for_startup
 log "runtime: ${RT_BACKEND} (${RT_CLI})"
 
-read -r -a RT_CLI_ARGV <<< "${RT_CLI}"
+read -r -a RT_CLI_ARGV <<<"${RT_CLI}"
 
 echo "================================================================"
 log "starting container cleanup${RUN_LABEL}"
@@ -170,8 +170,8 @@ ${RT_CLI} system df || true
 
 if [[ "${DRY_RUN}" != "true" ]]; then
   AFTER_BYTES="$(df_total_bytes)"
-  RECLAIMED=$(( BEFORE_BYTES - AFTER_BYTES ))
-  (( RECLAIMED < 0 )) && RECLAIMED=0
+  RECLAIMED=$((BEFORE_BYTES - AFTER_BYTES))
+  ((RECLAIMED < 0)) && RECLAIMED=0
   write_cleanup_metrics "${RECLAIMED}"
   log "textfile metric written: basetool_container_cleanup_* (reclaimed=${RECLAIMED} bytes)"
 fi

@@ -51,10 +51,16 @@ RETIRED_DPOP_PROFILE = "krt-mobile-dpop"
 RETIRED_DPOP_POLICY = "krt-mobile-dpop-policy"
 RETIRED_REASON = "retired with the Android app, ADR-0268"
 
-BUILTIN_CLIENTS = frozenset({
-    "account", "account-console", "admin-cli", "broker", "realm-management",
-    "security-admin-console",
-})
+BUILTIN_CLIENTS = frozenset(
+    {
+        "account",
+        "account-console",
+        "admin-cli",
+        "broker",
+        "realm-management",
+        "security-admin-console",
+    }
+)
 
 SEED_CLIENT_ID = "basetool-seed"
 PRODUCTION_HOST_MARKERS = ("profit-base.online", "krt-profit.de")
@@ -77,8 +83,10 @@ def load_session_windows(profile: str = "active") -> dict[str, int]:
         data = json.loads(SESSION_WINDOWS_FILE.read_text(encoding="utf-8"))
         return {key: int(value) for key, value in data[profile].items()}
     except (OSError, ValueError, KeyError) as error:
-        raise SystemExit(f"FATAL: cannot read the session windows ({profile}) from "
-                         f"{SESSION_WINDOWS_FILE}: {error}")
+        raise SystemExit(
+            f"FATAL: cannot read the session windows ({profile}) from "
+            f"{SESSION_WINDOWS_FILE}: {error}"
+        )
 
 
 SESSION_WINDOWS = load_session_windows()
@@ -143,9 +151,13 @@ EXCHANGE_SCOPES: list[tuple[str, str]] = [
 ]
 EXCHANGE_SCOPE_NAMES = [name for name, _ in EXCHANGE_SCOPES]
 
-EXTRACTOR_EXCHANGE_SCOPES = ["exchange.connect", "exchange.blueprints.read",
-                             "exchange.blueprints.write", "exchange.drafts.blueprints",
-                             "exchange.drafts.refinery"]
+EXTRACTOR_EXCHANGE_SCOPES = [
+    "exchange.connect",
+    "exchange.blueprints.read",
+    "exchange.blueprints.write",
+    "exchange.drafts.blueprints",
+    "exchange.drafts.refinery",
+]
 
 AUDIENCE_MAPPER_CONFIG = {
     "access.token.claim": "true",
@@ -175,31 +187,50 @@ SCOPES = [
     ScopeSpec(
         name="extractor-ingest",
         attributes={**_SCOPE_ATTRIBUTES_COMMON, "include.in.token.scope": "false"},
-        mappers=[{
-            "name": "aud-basetool-backend",
-            "protocolMapper": "oidc-audience-mapper",
-            "config": {**AUDIENCE_MAPPER_CONFIG, "included.custom.audience": "basetool-backend"},
-        }],
+        mappers=[
+            {
+                "name": "aud-basetool-backend",
+                "protocolMapper": "oidc-audience-mapper",
+                "config": {
+                    **AUDIENCE_MAPPER_CONFIG,
+                    "included.custom.audience": "basetool-backend",
+                },
+            }
+        ],
     ),
     ScopeSpec(
         name="extractor-ingest-only",
         attributes={**_SCOPE_ATTRIBUTES_COMMON, "include.in.token.scope": "true"},
-        mappers=[{
-            "name": "aud-basetool-ingest",
-            "protocolMapper": "oidc-audience-mapper",
-            "config": {**AUDIENCE_MAPPER_CONFIG, "included.custom.audience": "basetool-ingest"},
-        }],
+        mappers=[
+            {
+                "name": "aud-basetool-ingest",
+                "protocolMapper": "oidc-audience-mapper",
+                "config": {**AUDIENCE_MAPPER_CONFIG, "included.custom.audience": "basetool-ingest"},
+            }
+        ],
     ),
-    *[ScopeSpec(
-        name=name,
-        attributes={**_SCOPE_ATTRIBUTES_COMMON, "include.in.token.scope": "true",
-                    "consent.screen.text": "${" + key + "}", "gui.order": str(order)},
-        mappers=[{
-            "name": "aud-basetool-ingest",
-            "protocolMapper": "oidc-audience-mapper",
-            "config": {**AUDIENCE_MAPPER_CONFIG, "included.custom.audience": "basetool-ingest"},
-        }],
-    ) for order, (name, key) in enumerate(EXCHANGE_SCOPES, 1)],
+    *[
+        ScopeSpec(
+            name=name,
+            attributes={
+                **_SCOPE_ATTRIBUTES_COMMON,
+                "include.in.token.scope": "true",
+                "consent.screen.text": "${" + key + "}",
+                "gui.order": str(order),
+            },
+            mappers=[
+                {
+                    "name": "aud-basetool-ingest",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "config": {
+                        **AUDIENCE_MAPPER_CONFIG,
+                        "included.custom.audience": "basetool-ingest",
+                    },
+                }
+            ],
+        )
+        for order, (name, key) in enumerate(EXCHANGE_SCOPES, 1)
+    ],
 ]
 
 
@@ -246,8 +277,15 @@ class ClientSpec:
     credential_hint: str = ""
 
 
-def _flags(*, public: bool, standard: bool, service_accounts: bool, full_scope: bool,
-           frontchannel_logout: bool, consent: bool = False) -> dict:
+def _flags(
+    *,
+    public: bool,
+    standard: bool,
+    service_accounts: bool,
+    full_scope: bool,
+    frontchannel_logout: bool,
+    consent: bool = False,
+) -> dict:
     """The scalar client fields every Basetool client pins; the flows that differ are arguments."""
     fields = {
         "enabled": True,
@@ -267,8 +305,9 @@ def _flags(*, public: bool, standard: bool, service_accounts: bool, full_scope: 
     return fields
 
 
-def _user_attribute_mapper(name: str, json_type: str, *, introspection: bool,
-                           lightweight: bool) -> dict:
+def _user_attribute_mapper(
+    name: str, json_type: str, *, introspection: bool, lightweight: bool
+) -> dict:
     """An oidc-usermodel-attribute-mapper emitting user attribute `name` as claim `name`."""
     config = {
         "access.token.claim": "true",
@@ -305,7 +344,8 @@ def validate_origin(value: str, flag: str) -> str:
     if not re.fullmatch(r"https?://[a-z0-9.-]+(:[0-9]{1,5})?", value):
         raise SystemExit(
             f"{flag} must be a bare origin such as https://basetool.example — lower-case "
-            f"scheme and host, optional port, no path and no trailing slash (got {value!r})")
+            f"scheme and host, optional port, no path and no trailing slash (got {value!r})"
+        )
     return value
 
 
@@ -315,14 +355,20 @@ def seed_client_spec(realm: str) -> ClientSpec:
         client_id=SEED_CLIENT_ID,
         kind="confidential, password grant + service account (testing only: the briefing seed, ADR-0279)",
         fields={
-            **_flags(public=False, standard=False, service_accounts=True, full_scope=True,
-                     frontchannel_logout=True),
+            **_flags(
+                public=False,
+                standard=False,
+                service_accounts=True,
+                full_scope=True,
+                frontchannel_logout=True,
+            ),
             "directAccessGrantsEnabled": True,
         },
-        create_only={"name": "Basetool Briefing Seed",
-                     "description": "Testing system only: seeds and removes the briefing test data"},
-        attributes={**_CONFIDENTIAL_ATTRIBUTES,
-                    "oauth2.jwt.authorization.grant.enabled": "false"},
+        create_only={
+            "name": "Basetool Briefing Seed",
+            "description": "Testing system only: seeds and removes the briefing test data",
+        },
+        attributes={**_CONFIDENTIAL_ATTRIBUTES, "oauth2.jwt.authorization.grant.enabled": "false"},
         redirect_uris=[],
         web_origins=[],
         default_scopes=[*_STANDARD_DEFAULT, "extractor-ingest", "service_account"],
@@ -334,8 +380,10 @@ def seed_client_spec(realm: str) -> ClientSpec:
             "realm-management": ["manage-users", "query-users", "view-realm", "view-users"],
         },
         env_vars_to_fill=["SEED_CLIENT_SECRET"],
-        credential_hint=("scripts/seed-briefing.py reads it from $SEED_CLIENT_SECRET on the "
-                     "workstation that runs the seed; it goes into no host .env"),
+        credential_hint=(
+            "scripts/seed-briefing.py reads it from $SEED_CLIENT_SECRET on the "
+            "workstation that runs the seed; it goes into no host .env"
+        ),
     )
 
 
@@ -343,14 +391,20 @@ def reject_production_origin(public_origin: str) -> None:
     """Exit when `--seed-client` targets an origin that belongs to production."""
     host = public_origin.split("://", 1)[1].split(":", 1)[0]
     if any(host == marker or host.endswith("." + marker) for marker in PRODUCTION_HOST_MARKERS):
-        raise SystemExit(f"--seed-client is for the testing system only; {public_origin} is a "
-                         f"production origin (ADR-0279)")
+        raise SystemExit(
+            f"--seed-client is for the testing system only; {public_origin} is a "
+            f"production origin (ADR-0279)"
+        )
 
 
-def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
-                 frontend_client: str | None = None,
-                 external_clients: list[dict] | None = None,
-                 seed_client: bool = False) -> list[ClientSpec]:
+def client_specs(
+    realm: str,
+    public_origin: str,
+    grafana_origin: str | None,
+    frontend_client: str | None = None,
+    external_clients: list[dict] | None = None,
+    seed_client: bool = False,
+) -> list[ClientSpec]:
     """Every Basetool client in its production shape, with the environment's origins filled in.
 
     The approved third-party clients follow the first-party ones and the Android client comes
@@ -361,7 +415,9 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
     if frontend_client is None:
         frontend_kind = "authorization code + PKCE S256 (the web login; client type left as it is)"
     elif frontend_confidential:
-        frontend_kind = "confidential, authorization code + client secret + PKCE S256 (the web login)"
+        frontend_kind = (
+            "confidential, authorization code + client secret + PKCE S256 (the web login)"
+        )
     else:
         frontend_kind = "public, authorization code + PKCE S256 (the web login)"
     specs = [
@@ -369,18 +425,25 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             client_id="basetool-frontend",
             kind=frontend_kind,
             fields={
-                **_flags(public=not frontend_confidential, standard=True,
-                         service_accounts=False, full_scope=True, frontchannel_logout=False),
+                **_flags(
+                    public=not frontend_confidential,
+                    standard=True,
+                    service_accounts=False,
+                    full_scope=True,
+                    frontchannel_logout=False,
+                ),
                 "baseUrl": f"{public_origin}/",
             },
-            unmanaged_fields=(set() if frontend_client
-                              else {"publicClient", "clientAuthenticatorType"}),
+            unmanaged_fields=(
+                set() if frontend_client else {"publicClient", "clientAuthenticatorType"}
+            ),
             value_env="KEYCLOAK_FRONTEND_CLIENT_SECRET" if frontend_confidential else None,
-            env_vars_to_fill=(["KEYCLOAK_FRONTEND_CLIENT_SECRET"] if frontend_confidential
-                              else []),
+            env_vars_to_fill=(["KEYCLOAK_FRONTEND_CLIENT_SECRET"] if frontend_confidential else []),
             env_doc_hint=" (the frontend's confidential login, ADR-0001)",
-            create_only={"name": "Profit Basetool Frontend",
-                         "description": "Frontend Application for Profit Basetool"},
+            create_only={
+                "name": "Profit Basetool Frontend",
+                "description": "Frontend Application for Profit Basetool",
+            },
             attributes={
                 "backchannel.logout.revoke.offline.tokens": "false",
                 "backchannel.logout.session.required": "false",
@@ -415,13 +478,15 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             withheld_scope_reason=_NO_OFFLINE_SESSION,
             withheld_scope_reasons={
                 ROLES_SCOPE: "the web login carries no role claim; roles are "
-                             + RETIRED_APPLICATION_ROLES_REASON,
+                + RETIRED_APPLICATION_ROLES_REASON,
             },
             mappers=[
-                _user_attribute_mapper("description", "String", introspection=False,
-                                       lightweight=False),
-                _user_attribute_mapper("discord_guild_nickname", "String", introspection=True,
-                                       lightweight=True),
+                _user_attribute_mapper(
+                    "description", "String", introspection=False, lightweight=False
+                ),
+                _user_attribute_mapper(
+                    "discord_guild_nickname", "String", introspection=True, lightweight=True
+                ),
                 {
                     "name": "discord_user_id",
                     "protocolMapper": "discord-federated-identity-mapper",
@@ -449,8 +514,13 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
         ClientSpec(
             client_id="backend-service",
             kind="confidential, service account (the backend's Admin API identity)",
-            fields=_flags(public=False, standard=False, service_accounts=True, full_scope=True,
-                          frontchannel_logout=True),
+            fields=_flags(
+                public=False,
+                standard=False,
+                service_accounts=True,
+                full_scope=True,
+                frontchannel_logout=True,
+            ),
             attributes={
                 **_CONFIDENTIAL_ATTRIBUTES,
                 "display.on.consent.screen": "false",
@@ -470,40 +540,60 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
                 "realm-management": ["manage-users", "view-users"],
             },
             withheld_service_account_roles={"realm-management": ["view-realm"]},
-            withheld_service_account_reason=("no Basetool call needs it; roles are "
-                                             + RETIRED_APPLICATION_ROLES_REASON),
+            withheld_service_account_reason=(
+                "no Basetool call needs it; roles are " + RETIRED_APPLICATION_ROLES_REASON
+            ),
             env_vars_to_fill=["KEYCLOAK_ADMIN_CLIENT_SECRET"],
             env_doc_hint=" (the backend's user sync authenticates with it)",
         ),
         ClientSpec(
             client_id="basetool-ingest-gateway",
             kind="confidential, service account (the gateway's own identity, ADR-0129)",
-            fields=_flags(public=False, standard=False, service_accounts=True, full_scope=True,
-                          frontchannel_logout=True),
+            fields=_flags(
+                public=False,
+                standard=False,
+                service_accounts=True,
+                full_scope=True,
+                frontchannel_logout=True,
+            ),
             create_only={"name": "Basetool Ingest Gateway"},
-            attributes={**_CONFIDENTIAL_ATTRIBUTES,
-                        "oauth2.jwt.authorization.grant.enabled": "false"},
+            attributes={
+                **_CONFIDENTIAL_ATTRIBUTES,
+                "oauth2.jwt.authorization.grant.enabled": "false",
+            },
             redirect_uris=[],
             web_origins=[],
-            default_scopes=[*_STANDARD_DEFAULT, "extractor-ingest", "extractor-ingest-only",
-                            "service_account"],
+            default_scopes=[
+                *_STANDARD_DEFAULT,
+                "extractor-ingest",
+                "extractor-ingest-only",
+                "service_account",
+            ],
             optional_scopes=list(_OPTIONAL_WITHOUT_OFFLINE),
             withheld_scopes=[OFFLINE_ACCESS],
             withheld_scope_reason=_NO_OFFLINE_SESSION,
             service_account_roles={"<realm>": [f"default-roles-{realm}"]},
             env_vars_to_fill=["BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET"],
-            env_doc_hint=(" together with the other four values of docs/archive/INGEST_KEYCLOAK_SETUP.md "
-                        "step 9b (BASETOOL_INGEST_PUBLIC_BASE_URL, "
-                        "BASETOOL_INGEST_SERVICE_ACCOUNT_TOKEN_URI, "
-                        "BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_ID=basetool-ingest-gateway, and "
-                        "BASETOOL_INGEST_GATEWAY_CLIENT_IDS=basetool-ingest-gateway for the backend) - "
-                        "the gateway refuses to send until all five are set"),
+            env_doc_hint=(
+                " together with the other four values of docs/archive/INGEST_KEYCLOAK_SETUP.md "
+                "step 9b (BASETOOL_INGEST_PUBLIC_BASE_URL, "
+                "BASETOOL_INGEST_SERVICE_ACCOUNT_TOKEN_URI, "
+                "BASETOOL_INGEST_SERVICE_ACCOUNT_CLIENT_ID=basetool-ingest-gateway, and "
+                "BASETOOL_INGEST_GATEWAY_CLIENT_IDS=basetool-ingest-gateway for the backend) - "
+                "the gateway refuses to send until all five are set"
+            ),
         ),
         ClientSpec(
             client_id="basetool-sc-extractor",
             kind="public, device grant, consent, DPoP-bound tokens, exchange scopes only (the SC Extractor)",
-            fields=_flags(public=True, standard=False, service_accounts=False, full_scope=False,
-                          frontchannel_logout=True, consent=True),
+            fields=_flags(
+                public=True,
+                standard=False,
+                service_accounts=False,
+                full_scope=False,
+                frontchannel_logout=True,
+                consent=True,
+            ),
             create_only={"name": "Basetool SC Extractor"},
             attributes={
                 "access.token.header.type.rfc9068": "false",
@@ -535,55 +625,78 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             web_origins=[],
             default_scopes=["basic"],
             optional_scopes=[*EXTRACTOR_EXCHANGE_SCOPES, "offline_access"],
-            withheld_scopes=["acr", "address", "email", "extractor-ingest", "extractor-ingest-only",
-                             "microprofile-jwt", "organization", "phone", "profile", "roles",
-                             "web-origins"],
+            withheld_scopes=[
+                "acr",
+                "address",
+                "email",
+                "extractor-ingest",
+                "extractor-ingest-only",
+                "microprofile-jwt",
+                "organization",
+                "phone",
+                "profile",
+                "roles",
+                "web-origins",
+            ],
             withheld_redirect_uris=["http://127.0.0.1/*", "http://localhost/*"],
             withheld_reason="exchange-only since the extractor's 2.10.0 (H1, #2088); unused code flow retired 2026-09-22",
             exact_mappers=True,
         ),
     ]
     if grafana_origin:
-        specs.append(ClientSpec(
-            client_id="grafana",
-            kind="confidential, authorization code (Grafana's OAuth login)",
-            fields=_flags(public=False, standard=True, service_accounts=False, full_scope=True,
-                          frontchannel_logout=True),
-            attributes={
-                **_CONFIDENTIAL_ATTRIBUTES,
-                "display.on.consent.screen": "false",
-                "frontchannel.logout.session.required": "true",
-                "logout.confirmation.enabled": "false",
-                "oauth2.jwt.authorization.grant.enabled": "false",
-            },
-            redirect_uris=[f"{grafana_origin}/login/generic_oauth"],
-            web_origins=["+"],
-            default_scopes=list(_STANDARD_DEFAULT),
-            optional_scopes=list(_OPTIONAL_WITHOUT_OFFLINE),
-            withheld_scopes=[OFFLINE_ACCESS],
-            withheld_scope_reason=_NO_OFFLINE_SESSION,
-            mappers=[{
-                "name": "client roles",
-                "protocolMapper": "oidc-usermodel-client-role-mapper",
-                "config": {
-                    "access.token.claim": "true",
-                    "claim.name": GRAFANA_ROLES_CLAIM,
-                    "id.token.claim": "true",
-                    "introspection.token.claim": "true",
-                    "jsonType.label": "String",
-                    "lightweight.claim": "false",
-                    "multivalued": "true",
-                    "usermodel.clientRoleMapping.clientId": "grafana",
-                    "userinfo.token.claim": "true",
+        specs.append(
+            ClientSpec(
+                client_id="grafana",
+                kind="confidential, authorization code (Grafana's OAuth login)",
+                fields=_flags(
+                    public=False,
+                    standard=True,
+                    service_accounts=False,
+                    full_scope=True,
+                    frontchannel_logout=True,
+                ),
+                attributes={
+                    **_CONFIDENTIAL_ATTRIBUTES,
+                    "display.on.consent.screen": "false",
+                    "frontchannel.logout.session.required": "true",
+                    "logout.confirmation.enabled": "false",
+                    "oauth2.jwt.authorization.grant.enabled": "false",
                 },
-            }],
-            exact_mappers=True,
-            client_roles=[{"name": GRAFANA_ADMIN_ROLE,
-                           "description": "Grafana server admin; assigned by hand to the "
-                                          "few Grafana admins"}],
-            env_vars_to_fill=["GRAFANA_OAUTH_CLIENT_SECRET"],
-            env_doc_hint=" (Grafana's generic_oauth login reads it)",
-        ))
+                redirect_uris=[f"{grafana_origin}/login/generic_oauth"],
+                web_origins=["+"],
+                default_scopes=list(_STANDARD_DEFAULT),
+                optional_scopes=list(_OPTIONAL_WITHOUT_OFFLINE),
+                withheld_scopes=[OFFLINE_ACCESS],
+                withheld_scope_reason=_NO_OFFLINE_SESSION,
+                mappers=[
+                    {
+                        "name": "client roles",
+                        "protocolMapper": "oidc-usermodel-client-role-mapper",
+                        "config": {
+                            "access.token.claim": "true",
+                            "claim.name": GRAFANA_ROLES_CLAIM,
+                            "id.token.claim": "true",
+                            "introspection.token.claim": "true",
+                            "jsonType.label": "String",
+                            "lightweight.claim": "false",
+                            "multivalued": "true",
+                            "usermodel.clientRoleMapping.clientId": "grafana",
+                            "userinfo.token.claim": "true",
+                        },
+                    }
+                ],
+                exact_mappers=True,
+                client_roles=[
+                    {
+                        "name": GRAFANA_ADMIN_ROLE,
+                        "description": "Grafana server admin; assigned by hand to the "
+                        "few Grafana admins",
+                    }
+                ],
+                env_vars_to_fill=["GRAFANA_OAUTH_CLIENT_SECRET"],
+                env_doc_hint=" (Grafana's generic_oauth login reads it)",
+            )
+        )
     if seed_client:
         specs.append(seed_client_spec(realm))
     specs.extend(external_client_spec(entry) for entry in (external_clients or []))
@@ -601,25 +714,37 @@ def load_external_clients(path: Path) -> list[dict]:
         raise SystemExit(f"cannot read the third-party client list {path}: {error}") from error
     if not isinstance(entries, list):
         raise SystemExit(f"{path}: expected a JSON list of clients")
-    reserved = BUILTIN_CLIENTS | {"basetool-frontend", "backend-service", "basetool-ingest-gateway",
-                                  "basetool-sc-extractor", "grafana", RETIRED_CLIENT_ID,
-                                  SEED_CLIENT_ID}
+    reserved = BUILTIN_CLIENTS | {
+        "basetool-frontend",
+        "backend-service",
+        "basetool-ingest-gateway",
+        "basetool-sc-extractor",
+        "grafana",
+        RETIRED_CLIENT_ID,
+        SEED_CLIENT_ID,
+    }
     seen: set[str] = set()
     for entry in entries:
         client_id = entry.get("clientId") if isinstance(entry, dict) else None
-        if not isinstance(client_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,62}",
-                                                               client_id):
-            raise SystemExit(f"{path}: every client needs a clientId of lower-case letters, "
-                             f"digits and hyphens (got {client_id!r})")
+        if not isinstance(client_id, str) or not re.fullmatch(
+            r"[a-z0-9][a-z0-9-]{1,62}", client_id
+        ):
+            raise SystemExit(
+                f"{path}: every client needs a clientId of lower-case letters, "
+                f"digits and hyphens (got {client_id!r})"
+            )
         if client_id in reserved or client_id in seen:
             raise SystemExit(f"{path}: clientId '{client_id}' is reserved or listed twice")
         if not isinstance(entry.get("name"), str) or not entry["name"].strip():
             raise SystemExit(f"{path}: client '{client_id}' needs a name for the consent page")
         origins = entry.get("extensionOrigins", [])
         if not isinstance(origins, list) or not all(
-                isinstance(o, str) and re.fullmatch(CHROMIUM_EXTENSION_ORIGIN, o) for o in origins):
-            raise SystemExit(f"{path}: client '{client_id}' lists extensionOrigins that are not "
-                             f"chrome-extension://<32 letters a-p> origins (ADR-0303)")
+            isinstance(o, str) and re.fullmatch(CHROMIUM_EXTENSION_ORIGIN, o) for o in origins
+        ):
+            raise SystemExit(
+                f"{path}: client '{client_id}' lists extensionOrigins that are not "
+                f"chrome-extension://<32 letters a-p> origins (ADR-0303)"
+            )
         if not isinstance(entry.get("firefoxExtension", False), bool):
             raise SystemExit(f"{path}: client '{client_id}' needs a true or false firefoxExtension")
         seen.add(client_id)
@@ -659,8 +784,14 @@ def external_client_spec(entry: dict) -> ClientSpec:
         client_id=entry["clientId"],
         kind="public, device grant, consent, DPoP-bound tokens (an approved third-party client)",
         fields={
-            **_flags(public=True, standard=False, service_accounts=False, full_scope=False,
-                     frontchannel_logout=True, consent=True),
+            **_flags(
+                public=True,
+                standard=False,
+                service_accounts=False,
+                full_scope=False,
+                frontchannel_logout=True,
+                consent=True,
+            ),
             "name": entry["name"],
             "description": entry.get("description", ""),
         },
@@ -687,9 +818,19 @@ def external_client_spec(entry: dict) -> ClientSpec:
         web_origins=external_web_origins(entry),
         default_scopes=["basic"],
         optional_scopes=[*EXCHANGE_SCOPE_NAMES, "offline_access"],
-        withheld_scopes=["acr", "address", "email", "extractor-ingest", "extractor-ingest-only",
-                         "microprofile-jwt", "organization", "phone", "profile", "roles",
-                         "web-origins"],
+        withheld_scopes=[
+            "acr",
+            "address",
+            "email",
+            "extractor-ingest",
+            "extractor-ingest-only",
+            "microprofile-jwt",
+            "organization",
+            "phone",
+            "profile",
+            "roles",
+            "web-origins",
+        ],
         withheld_reason="never offered to a third-party client, REQ-XCH-005",
         exact_mappers=True,
     )
@@ -700,8 +841,10 @@ class RealmKcadm(kcadm.Kcadm):
 
     def update_realm(self, payload: dict, what: str) -> None:
         """Partial update of the realm representation, which lives above the `-r` paths."""
-        self._run(["update", f"realms/{self.realm}", "-f", "-"],
-                  stdin=json.dumps(payload, indent=2, sort_keys=True))
+        self._run(
+            ["update", f"realms/{self.realm}", "-f", "-"],
+            stdin=json.dumps(payload, indent=2, sort_keys=True),
+        )
         print(f"  update realms/{self.realm} — {what}")
 
     def link(self, path: str, what: str) -> None:
@@ -754,8 +897,11 @@ def _realm_update_payload(diff: dict, live: dict) -> dict:
 
 def _redact(payload: dict) -> dict:
     """A client representation without `secret` and `registrationAccessToken`; Keycloak keeps the stored secret."""
-    return {key: value for key, value in payload.items()
-            if key not in {"secret", "registrationAccessToken"}}
+    return {
+        key: value
+        for key, value in payload.items()
+        if key not in {"secret", "registrationAccessToken"}
+    }
 
 
 class Planner:
@@ -775,7 +921,6 @@ class Planner:
         self.followup_notes: list[str] = []
         self._scope_cache: dict[str, dict] | None = None
 
-
     def find_client(self, client_id: str) -> dict | None:
         found = self.kc.get("clients", {"clientId": client_id}) or []
         exact = [c for c in found if c.get("clientId") == client_id]
@@ -784,8 +929,10 @@ class Planner:
     def client_uuid(self, client_id: str) -> str:
         client = self.find_client(client_id)
         if client is None:
-            raise KcadmError(f"client '{client_id}' does not exist (it should have been created "
-                             f"earlier in this run)")
+            raise KcadmError(
+                f"client '{client_id}' does not exist (it should have been created "
+                f"earlier in this run)"
+            )
         return client["id"]
 
     def scopes_by_name(self, refresh: bool = False) -> dict[str, dict]:
@@ -799,7 +946,6 @@ class Planner:
         if scope is None:
             raise KcadmError(f"client scope '{name}' does not exist in realm '{self.realm}'")
         return scope["id"]
-
 
     def section(self, title: str) -> list[Change]:
         changes: list[Change] = []
@@ -831,20 +977,30 @@ class Planner:
                 self.problems.append(
                     f"{spec.client_id}: scope '{name}' does not exist in this realm. It is a "
                     f"Keycloak built-in; upgrade the realm to the required Keycloak version "
-                    f"before assigning it. No built-in scope is created or modified.")
+                    f"before assigning it. No built-in scope is created or modified."
+                )
 
     def plan_realm_settings(self) -> None:
         changes = self.section("realm token and session settings")
         live = self.kc.get_realm()
-        diff = {key: value for key, value in REALM_SETTINGS.items()
-                if not _equal(value, live.get(key))}
+        diff = {
+            key: value for key, value in REALM_SETTINGS.items() if not _equal(value, live.get(key))
+        }
         for key, value in diff.items():
-            changes.append(Change(f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> "
-                                  f"{_normalise(value)}", lambda: None))
+            changes.append(
+                Change(
+                    f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> {_normalise(value)}",
+                    lambda: None,
+                )
+            )
         if diff:
             payload = _realm_update_payload(diff, live)
-            changes.append(Change("  (one partial update of the realm)",
-                                  lambda d=payload: self.kc.update_realm(d, "token settings")))
+            changes.append(
+                Change(
+                    "  (one partial update of the realm)",
+                    lambda d=payload: self.kc.update_realm(d, "token settings"),
+                )
+            )
 
     def default_role_name(self) -> str:
         """The realm's default role, which every account the realm creates holds."""
@@ -871,34 +1027,47 @@ class Planner:
             if name not in roles:
                 self.problems.append(
                     f"realm role '{name}' does not exist in realm '{self.realm}'. Keycloak creates "
-                    f"it with the realm; without it no member gets an offline token.")
+                    f"it with the realm; without it no member gets an offline token."
+                )
         if OFFLINE_ACCESS not in roles:
             return
         if default_role in roles:
-            held = {r.get("name") for r in
-                    (self.kc.get(f"roles/{default_role}/composites/realm") or [])}
+            held = {
+                r.get("name") for r in (self.kc.get(f"roles/{default_role}/composites/realm") or [])
+            }
             if OFFLINE_ACCESS not in held:
-                changes.append(Change(
-                    f"+ default role '{default_role}': composite realm role '{OFFLINE_ACCESS}' "
-                    f"(every member may hold an offline session)",
-                    lambda r=default_role: self._add_offline_access(
-                        f"roles/{r}/composites", f"'{OFFLINE_ACCESS}' added to '{r}'")))
+                changes.append(
+                    Change(
+                        f"+ default role '{default_role}': composite realm role '{OFFLINE_ACCESS}' "
+                        f"(every member may hold an offline session)",
+                        lambda r=default_role: self._add_offline_access(
+                            f"roles/{r}/composites", f"'{OFFLINE_ACCESS}' added to '{r}'"
+                        ),
+                    )
+                )
         scope = self.scopes_by_name().get(OFFLINE_ACCESS)
         if scope is None:
             self.problems.append(
                 f"client scope '{OFFLINE_ACCESS}' does not exist in realm '{self.realm}'. It is a "
                 f"Keycloak built-in; a realm without it predates the Keycloak version production "
-                f"runs.")
+                f"runs."
+            )
             return
-        mapped = {r.get("name") for r in
-                  (self.kc.get(f"client-scopes/{scope['id']}/scope-mappings/realm") or [])}
+        mapped = {
+            r.get("name")
+            for r in (self.kc.get(f"client-scopes/{scope['id']}/scope-mappings/realm") or [])
+        }
         if OFFLINE_ACCESS not in mapped:
-            changes.append(Change(
-                f"+ client scope '{OFFLINE_ACCESS}': realm role '{OFFLINE_ACCESS}' mapped (a client "
-                f"with fullScopeAllowed off may then issue an offline token)",
-                lambda: self._add_offline_access(
-                    f"client-scopes/{self.scope_id(OFFLINE_ACCESS)}/scope-mappings/realm",
-                    f"'{OFFLINE_ACCESS}' mapped on client scope '{OFFLINE_ACCESS}'")))
+            changes.append(
+                Change(
+                    f"+ client scope '{OFFLINE_ACCESS}': realm role '{OFFLINE_ACCESS}' mapped (a client "
+                    f"with fullScopeAllowed off may then issue an offline token)",
+                    lambda: self._add_offline_access(
+                        f"client-scopes/{self.scope_id(OFFLINE_ACCESS)}/scope-mappings/realm",
+                        f"'{OFFLINE_ACCESS}' mapped on client scope '{OFFLINE_ACCESS}'",
+                    ),
+                )
+            )
 
     def _plan_offline_realm_defaults(self) -> list[Change]:
         """Plan the removal of `offline_access` from the realm's default and optional client scopes."""
@@ -907,20 +1076,27 @@ class Planner:
             for scope in self.kc.get(f"default-{kind}-client-scopes") or []:
                 if scope.get("name") != OFFLINE_ACCESS:
                     continue
-                changes.append(Change(
-                    f"- realm {kind} client scope '{OFFLINE_ACCESS}' removed (a client created by "
-                    f"hand no longer inherits it; the exchange clients name it themselves)",
-                    lambda k=kind, sid=scope["id"]: self.kc.delete(
-                        f"default-{k}-client-scopes/{sid}",
-                        f"'{OFFLINE_ACCESS}' removed from the realm's {k} client scopes")))
+                changes.append(
+                    Change(
+                        f"- realm {kind} client scope '{OFFLINE_ACCESS}' removed (a client created by "
+                        f"hand no longer inherits it; the exchange clients name it themselves)",
+                        lambda k=kind, sid=scope["id"]: self.kc.delete(
+                            f"default-{k}-client-scopes/{sid}",
+                            f"'{OFFLINE_ACCESS}' removed from the realm's {k} client scopes",
+                        ),
+                    )
+                )
         return changes
 
     def _add_offline_access(self, path: str, what: str) -> None:
         """Post the `offline_access` realm role, resolved by name when the write runs, to `path`."""
-        role = next((r for r in (self.kc.get("roles") or []) if r.get("name") == OFFLINE_ACCESS),
-                    None)
+        role = next(
+            (r for r in (self.kc.get("roles") or []) if r.get("name") == OFFLINE_ACCESS), None
+        )
         if role is None:
-            raise KcadmError(f"realm role '{OFFLINE_ACCESS}' does not exist in realm '{self.realm}'")
+            raise KcadmError(
+                f"realm role '{OFFLINE_ACCESS}' does not exist in realm '{self.realm}'"
+            )
         self.kc.write("create", path, [{"id": role["id"], "name": OFFLINE_ACCESS}], what)
 
     def plan_scopes(self) -> None:
@@ -929,36 +1105,52 @@ class Planner:
         for spec in SCOPES:
             live = live_scopes.get(spec.name)
             if live is None:
-                changes.append(Change(
-                    f"+ create client scope '{spec.name}' "
-                    f"(include.in.token.scope={spec.attributes['include.in.token.scope']})",
-                    lambda s=spec: self._create_scope(s)))
+                changes.append(
+                    Change(
+                        f"+ create client scope '{spec.name}' "
+                        f"(include.in.token.scope={spec.attributes['include.in.token.scope']})",
+                        lambda s=spec: self._create_scope(s),
+                    )
+                )
                 for mapper in spec.mappers:
-                    changes.append(Change(
-                        f"+ {spec.name}: mapper '{mapper['name']}' -> "
-                        f"{self._mapper_summary(mapper)}",
-                        lambda s=spec, m=mapper: self._create_mapper(
-                            f"client-scopes/{self.scope_id(s.name)}", m)))
+                    changes.append(
+                        Change(
+                            f"+ {spec.name}: mapper '{mapper['name']}' -> "
+                            f"{self._mapper_summary(mapper)}",
+                            lambda s=spec, m=mapper: self._create_mapper(
+                                f"client-scopes/{self.scope_id(s.name)}", m
+                            ),
+                        )
+                    )
                 continue
             attributes = live.get("attributes") or {}
             diff = {k: v for k, v in spec.attributes.items() if not _equal(v, attributes.get(k))}
             if diff or live.get("protocol") != "openid-connect":
                 for key, value in diff.items():
-                    changes.append(Change(
-                        f"~ {spec.name}: attribute {key}: "
-                        f"{attributes.get(key, '<absent>')} -> {value!r}", lambda: None))
-                changes.append(Change(
-                    f"  (update of client scope '{spec.name}')",
-                    lambda s=spec, lv=live: self._update_scope(s, lv)))
+                    changes.append(
+                        Change(
+                            f"~ {spec.name}: attribute {key}: "
+                            f"{attributes.get(key, '<absent>')} -> {value!r}",
+                            lambda: None,
+                        )
+                    )
+                changes.append(
+                    Change(
+                        f"  (update of client scope '{spec.name}')",
+                        lambda s=spec, lv=live: self._update_scope(s, lv),
+                    )
+                )
             base = f"client-scopes/{live['id']}"
             live_mappers = self.kc.get(f"{base}/protocol-mappers/models") or []
             changes += self._mapper_changes(spec.name, base, spec.mappers, live_mappers)
 
     def _create_scope(self, spec: ScopeSpec) -> None:
-        self.kc.write("create", "client-scopes",
-                      {"name": spec.name, "protocol": "openid-connect",
-                       "attributes": dict(spec.attributes)},
-                      f"client scope '{spec.name}' created")
+        self.kc.write(
+            "create",
+            "client-scopes",
+            {"name": spec.name, "protocol": "openid-connect", "attributes": dict(spec.attributes)},
+            f"client scope '{spec.name}' created",
+        )
         self.scopes_by_name(refresh=True)
 
     def _update_scope(self, spec: ScopeSpec, live: dict) -> None:
@@ -966,26 +1158,42 @@ class Planner:
         payload["protocol"] = "openid-connect"
         payload["attributes"] = {**(live.get("attributes") or {}), **spec.attributes}
         payload.pop("protocolMappers", None)
-        self.kc.write("update", f"client-scopes/{live['id']}", payload,
-                      f"client scope '{spec.name}' updated")
+        self.kc.write(
+            "update", f"client-scopes/{live['id']}", payload, f"client scope '{spec.name}' updated"
+        )
 
     @staticmethod
     def _mapper_summary(mapper: dict) -> str:
         config = mapper.get("config") or {}
-        target = (config.get("included.custom.audience") or config.get("included.client.audience")
-                  or config.get("claim.name") or "")
+        target = (
+            config.get("included.custom.audience")
+            or config.get("included.client.audience")
+            or config.get("claim.name")
+            or ""
+        )
         return f"{mapper.get('protocolMapper') or '<no type>'} {target}".strip()
 
     def _create_mapper(self, base: str, mapper: dict) -> None:
-        self.kc.write("create", f"{base}/protocol-mappers/models",
-                      {"name": mapper["name"], "protocol": "openid-connect",
-                       "protocolMapper": mapper["protocolMapper"],
-                       "config": dict(mapper["config"])},
-                      f"mapper '{mapper['name']}' created")
+        self.kc.write(
+            "create",
+            f"{base}/protocol-mappers/models",
+            {
+                "name": mapper["name"],
+                "protocol": "openid-connect",
+                "protocolMapper": mapper["protocolMapper"],
+                "config": dict(mapper["config"]),
+            },
+            f"mapper '{mapper['name']}' created",
+        )
 
-    def _mapper_changes(self, owner: str, base: str, desired: list[dict],
-                        live_mappers: list[dict],
-                        exact: bool = False) -> list[Change]:
+    def _mapper_changes(
+        self,
+        owner: str,
+        base: str,
+        desired: list[dict],
+        live_mappers: list[dict],
+        exact: bool = False,
+    ) -> list[Change]:
         """Create missing mappers and correct drifted ones.
 
         With `exact`, every other live mapper is removed, a second one of a desired name included;
@@ -996,36 +1204,55 @@ class Planner:
         for mapper in desired:
             live = by_name.get(mapper["name"])
             if live is None:
-                changes.append(Change(
-                    f"+ {owner}: mapper '{mapper['name']}' -> {self._mapper_summary(mapper)}",
-                    lambda m=mapper: self._create_mapper(base, m)))
+                changes.append(
+                    Change(
+                        f"+ {owner}: mapper '{mapper['name']}' -> {self._mapper_summary(mapper)}",
+                        lambda m=mapper: self._create_mapper(base, m),
+                    )
+                )
                 continue
             config = live.get("config") or {}
             drift = {k: v for k, v in mapper["config"].items() if not _equal(v, config.get(k))}
             if drift or live.get("protocolMapper") != mapper["protocolMapper"]:
-                detail = ", ".join(f"{k}: {config.get(k, '<absent>')} -> {v}"
-                                   for k, v in drift.items())
+                detail = ", ".join(
+                    f"{k}: {config.get(k, '<absent>')} -> {v}" for k, v in drift.items()
+                )
                 if live.get("protocolMapper") != mapper["protocolMapper"]:
-                    detail = (f"type {live.get('protocolMapper')} -> {mapper['protocolMapper']}"
-                              + (f", {detail}" if detail else ""))
-                changes.append(Change(
-                    f"~ {owner}: mapper '{mapper['name']}': {detail}",
-                    lambda m=mapper, lv=live: self.kc.write(
-                        "update", f"{base}/protocol-mappers/models/{lv['id']}",
-                        {**lv, "protocolMapper": m["protocolMapper"],
-                         "config": {**(lv.get("config") or {}), **m["config"]}},
-                        f"mapper '{m['name']}' corrected")))
+                    detail = f"type {live.get('protocolMapper')} -> {mapper['protocolMapper']}" + (
+                        f", {detail}" if detail else ""
+                    )
+                changes.append(
+                    Change(
+                        f"~ {owner}: mapper '{mapper['name']}': {detail}",
+                        lambda m=mapper, lv=live: self.kc.write(
+                            "update",
+                            f"{base}/protocol-mappers/models/{lv['id']}",
+                            {
+                                **lv,
+                                "protocolMapper": m["protocolMapper"],
+                                "config": {**(lv.get("config") or {}), **m["config"]},
+                            },
+                            f"mapper '{m['name']}' corrected",
+                        ),
+                    )
+                )
         wanted = {m["name"] for m in desired}
         if exact:
             kept = {by_name[n].get("id") for n in wanted if n in by_name}
-            for extra in sorted((m for m in live_mappers if m.get("id") not in kept),
-                                key=lambda m: (str(m.get("name")), str(m.get("id")))):
-                changes.append(Change(
-                    f"- {owner}: mapper '{extra.get('name')}' ({self._mapper_summary(extra)}) "
-                    f"removed (not in this client's spec)",
-                    lambda m=extra: self.kc.delete(
-                        f"{base}/protocol-mappers/models/{m['id']}",
-                        f"mapper '{m.get('name')}' removed")))
+            for extra in sorted(
+                (m for m in live_mappers if m.get("id") not in kept),
+                key=lambda m: (str(m.get("name")), str(m.get("id"))),
+            ):
+                changes.append(
+                    Change(
+                        f"- {owner}: mapper '{extra.get('name')}' ({self._mapper_summary(extra)}) "
+                        f"removed (not in this client's spec)",
+                        lambda m=extra: self.kc.delete(
+                            f"{base}/protocol-mappers/models/{m['id']}",
+                            f"mapper '{m.get('name')}' removed",
+                        ),
+                    )
+                )
             return changes
         for name in sorted(n for n in by_name if n not in wanted):
             self.reports.append(f"{owner}: mapper '{name}' is not in the production shape")
@@ -1040,135 +1267,208 @@ class Planner:
             return changes
 
         uuid = live["id"]
-        field_diff = {k: v for k, v in spec.fields.items()
-                      if k not in spec.unmanaged_fields and not _equal(v, live.get(k))}
-        if spec.value_env and "publicClient" in field_diff and _normalise(
-                live.get("publicClient")) == "true":
+        field_diff = {
+            k: v
+            for k, v in spec.fields.items()
+            if k not in spec.unmanaged_fields and not _equal(v, live.get(k))
+        }
+        if (
+            spec.value_env
+            and "publicClient" in field_diff
+            and _normalise(live.get("publicClient")) == "true"
+        ):
             if not os.environ.get(spec.value_env):
                 self.problems.append(
                     f"{spec.client_id}: switching it to confidential needs ${spec.value_env} in "
                     f"this process's environment -- the value the frontend has in the host .env "
                     f"-- or Keycloak and the frontend would hold different secrets. Nothing about "
-                    f"this client is written.")
+                    f"this client is written."
+                )
             else:
                 self.followup_notes.append(
                     f"'{spec.client_id}' becomes confidential with the secret from "
                     f"${spec.value_env} (not printed). The frontend must already send that value "
-                    f"(docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).")
+                    f"(docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)."
+                )
         attributes = live.get("attributes") or {}
-        attribute_diff = {k: v for k, v in spec.attributes.items()
-                          if not _equal(v, attributes.get(k))}
-        missing_redirects = [u for u in spec.redirect_uris if u not in (live.get("redirectUris")
-                                                                        or [])]
+        attribute_diff = {
+            k: v for k, v in spec.attributes.items() if not _equal(v, attributes.get(k))
+        }
+        missing_redirects = [
+            u for u in spec.redirect_uris if u not in (live.get("redirectUris") or [])
+        ]
         missing_origins = [o for o in spec.web_origins if o not in (live.get("webOrigins") or [])]
-        retired_redirects = [u for u in spec.withheld_redirect_uris
-                             if u in (live.get("redirectUris") or [])]
-        retired_origins = [o for o in spec.withheld_web_origins
-                           if o in (live.get("webOrigins") or [])]
+        retired_redirects = [
+            u for u in spec.withheld_redirect_uris if u in (live.get("redirectUris") or [])
+        ]
+        retired_origins = [
+            o for o in spec.withheld_web_origins if o in (live.get("webOrigins") or [])
+        ]
         for key, value in field_diff.items():
-            changes.append(Change(f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> "
-                                  f"{_normalise(value)}", lambda: None))
+            changes.append(
+                Change(
+                    f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> {_normalise(value)}",
+                    lambda: None,
+                )
+            )
         if spec.value_env and "publicClient" in field_diff:
-            changes.append(Change(f"~ secret: set from ${spec.value_env} (the value is not "
-                                  f"printed)", lambda: None))
+            changes.append(
+                Change(
+                    f"~ secret: set from ${spec.value_env} (the value is not printed)", lambda: None
+                )
+            )
         for key, value in attribute_diff.items():
-            changes.append(Change(f"~ attribute {key}: {attributes.get(key, '<absent>')} -> "
-                                  f"{value!r}", lambda: None))
+            changes.append(
+                Change(
+                    f"~ attribute {key}: {attributes.get(key, '<absent>')} -> {value!r}",
+                    lambda: None,
+                )
+            )
         for uri in missing_redirects:
             changes.append(Change(f"+ redirect URI {uri}", lambda: None))
         for origin in missing_origins:
             changes.append(Change(f"+ web origin {origin}", lambda: None))
         for uri in retired_redirects:
-            changes.append(Change(f"- redirect URI {uri} withheld ({spec.withheld_reason})",
-                                  lambda: None))
+            changes.append(
+                Change(f"- redirect URI {uri} withheld ({spec.withheld_reason})", lambda: None)
+            )
         for origin in retired_origins:
-            changes.append(Change(f"- web origin {origin} withheld ({spec.withheld_reason})",
-                                  lambda: None))
-        if (field_diff or attribute_diff or missing_redirects or missing_origins
-                or retired_redirects or retired_origins):
-            changes.append(Change(
-                "  (one update of the client representation)",
-                lambda lv=live: self._update_client(spec, lv)))
-        for uri in sorted(set(live.get("redirectUris") or []) - set(spec.redirect_uris)
-                          - set(spec.withheld_redirect_uris)):
-            self.reports.append(f"{spec.client_id}: redirect URI '{uri}' is not in the "
-                                f"production shape")
-        for origin in sorted(set(live.get("webOrigins") or []) - set(spec.web_origins)
-                             - set(spec.withheld_web_origins)):
-            self.reports.append(f"{spec.client_id}: web origin '{origin}' is not in the "
-                                f"production shape")
+            changes.append(
+                Change(f"- web origin {origin} withheld ({spec.withheld_reason})", lambda: None)
+            )
+        if (
+            field_diff
+            or attribute_diff
+            or missing_redirects
+            or missing_origins
+            or retired_redirects
+            or retired_origins
+        ):
+            changes.append(
+                Change(
+                    "  (one update of the client representation)",
+                    lambda lv=live: self._update_client(spec, lv),
+                )
+            )
+        for uri in sorted(
+            set(live.get("redirectUris") or [])
+            - set(spec.redirect_uris)
+            - set(spec.withheld_redirect_uris)
+        ):
+            self.reports.append(
+                f"{spec.client_id}: redirect URI '{uri}' is not in the production shape"
+            )
+        for origin in sorted(
+            set(live.get("webOrigins") or [])
+            - set(spec.web_origins)
+            - set(spec.withheld_web_origins)
+        ):
+            self.reports.append(
+                f"{spec.client_id}: web origin '{origin}' is not in the production shape"
+            )
 
         changes += self._plan_scope_assignments(spec, uuid)
         changes += self._mapper_changes(
-            spec.client_id, f"clients/{uuid}", spec.mappers,
+            spec.client_id,
+            f"clients/{uuid}",
+            spec.mappers,
             self.kc.get(f"clients/{uuid}/protocol-mappers/models") or [],
-            exact=spec.exact_mappers)
+            exact=spec.exact_mappers,
+        )
         changes += self._plan_client_roles(spec, uuid)
         changes += self._plan_role_scope(spec, uuid)
         changes += self._plan_service_account_roles(spec, uuid)
         return changes
 
     def _plan_new_client(self, spec: ClientSpec) -> list[Change]:
-        changes = [Change(f"+ create client '{spec.client_id}'",
-                          lambda: self._create_client(spec))]
+        changes = [Change(f"+ create client '{spec.client_id}'", lambda: self._create_client(spec))]
         for uri in spec.redirect_uris:
             changes.append(Change(f"  redirect URI {uri}", lambda: None))
         for origin in spec.web_origins:
             changes.append(Change(f"  web origin {origin}", lambda: None))
-        changes.append(Change(
-            f"= default scopes [{', '.join(spec.default_scopes)}], optional scopes "
-            f"[{', '.join(spec.optional_scopes)}] — exactly; the realm defaults Keycloak attaches "
-            f"on creation are this run's own side effect and are replaced",
-            lambda: self._converge_new_client_scopes(spec)))
+        changes.append(
+            Change(
+                f"= default scopes [{', '.join(spec.default_scopes)}], optional scopes "
+                f"[{', '.join(spec.optional_scopes)}] — exactly; the realm defaults Keycloak attaches "
+                f"on creation are this run's own side effect and are replaced",
+                lambda: self._converge_new_client_scopes(spec),
+            )
+        )
         for mapper in spec.mappers:
-            changes.append(Change(
-                f"+ mapper '{mapper['name']}' -> {self._mapper_summary(mapper)}",
-                lambda m=mapper: self._create_mapper(
-                    f"clients/{self.client_uuid(spec.client_id)}", m)))
+            changes.append(
+                Change(
+                    f"+ mapper '{mapper['name']}' -> {self._mapper_summary(mapper)}",
+                    lambda m=mapper: self._create_mapper(
+                        f"clients/{self.client_uuid(spec.client_id)}", m
+                    ),
+                )
+            )
         for role in spec.client_roles:
-            changes.append(Change(
-                f"+ client role '{role['name']}'",
-                lambda r=role: self.kc.write(
-                    "create", f"clients/{self.client_uuid(spec.client_id)}/roles", dict(r),
-                    f"client role '{r['name']}' created")))
+            changes.append(
+                Change(
+                    f"+ client role '{role['name']}'",
+                    lambda r=role: self.kc.write(
+                        "create",
+                        f"clients/{self.client_uuid(spec.client_id)}/roles",
+                        dict(r),
+                        f"client role '{r['name']}' created",
+                    ),
+                )
+            )
         if spec.realm_role_scope is not None:
-            changes.append(Change(
-                f"= realm-role scope exactly [{', '.join(spec.realm_role_scope)}] "
-                f"(fullScopeAllowed off, REQ-SEC-035)",
-                lambda: self._converge_role_scope(spec, self.client_uuid(spec.client_id))))
+            changes.append(
+                Change(
+                    f"= realm-role scope exactly [{', '.join(spec.realm_role_scope)}] "
+                    f"(fullScopeAllowed off, REQ-SEC-035)",
+                    lambda: self._converge_role_scope(spec, self.client_uuid(spec.client_id)),
+                )
+            )
         if spec.service_account_roles:
-            changes.append(Change(
-                f"+ service-account roles {self._role_summary(spec.service_account_roles)}",
-                lambda: self._grant_service_account_roles(spec, self.client_uuid(spec.client_id),
-                                                          spec.service_account_roles),
-                service_account=True))
+            changes.append(
+                Change(
+                    f"+ service-account roles {self._role_summary(spec.service_account_roles)}",
+                    lambda: self._grant_service_account_roles(
+                        spec, self.client_uuid(spec.client_id), spec.service_account_roles
+                    ),
+                    service_account=True,
+                )
+            )
         if spec.env_vars_to_fill:
             self.followup_notes.append(self._confidential_client_note(spec))
         return changes
 
     @staticmethod
     def _role_summary(roles: dict[str, list[str]]) -> str:
-        return ", ".join(f"{container}:{name}" for container, names in sorted(roles.items())
-                         for name in names)
+        return ", ".join(
+            f"{container}:{name}" for container, names in sorted(roles.items()) for name in names
+        )
 
     def _confidential_client_note(self, spec: ClientSpec) -> str:
         if spec.credential_hint:
-            return (f"'{spec.client_id}' is created confidential, so Keycloak generates its client "
-                    f"secret. It is NOT printed here: read it in the Admin Console -> Clients -> "
-                    f"{spec.client_id} -> Credentials; {spec.credential_hint}")
-        return (f"'{spec.client_id}' is created confidential, so Keycloak generates its client "
+            return (
+                f"'{spec.client_id}' is created confidential, so Keycloak generates its client "
                 f"secret. It is NOT printed here: read it in the Admin Console -> Clients -> "
-                f"{spec.client_id} -> Credentials, and put it into "
-                f"{', '.join(spec.env_vars_to_fill)} in the host .env{spec.env_doc_hint}, then "
-                f"re-render env.d and restart the consumer.")
+                f"{spec.client_id} -> Credentials; {spec.credential_hint}"
+            )
+        return (
+            f"'{spec.client_id}' is created confidential, so Keycloak generates its client "
+            f"secret. It is NOT printed here: read it in the Admin Console -> Clients -> "
+            f"{spec.client_id} -> Credentials, and put it into "
+            f"{', '.join(spec.env_vars_to_fill)} in the host .env{spec.env_doc_hint}, then "
+            f"re-render env.d and restart the consumer."
+        )
 
     def _create_client(self, spec: ClientSpec) -> None:
-        payload = {"clientId": spec.client_id, **spec.create_only, **spec.fields,
-                   "attributes": dict(spec.attributes),
-                   "redirectUris": list(spec.redirect_uris),
-                   "webOrigins": list(spec.web_origins),
-                   "defaultClientScopes": list(spec.default_scopes),
-                   "optionalClientScopes": list(spec.optional_scopes)}
+        payload = {
+            "clientId": spec.client_id,
+            **spec.create_only,
+            **spec.fields,
+            "attributes": dict(spec.attributes),
+            "redirectUris": list(spec.redirect_uris),
+            "webOrigins": list(spec.web_origins),
+            "defaultClientScopes": list(spec.default_scopes),
+            "optionalClientScopes": list(spec.optional_scopes),
+        }
         if spec.value_env and os.environ.get(spec.value_env):
             payload["secret"] = os.environ[spec.value_env]
         self.kc.write("create", "clients", payload, f"client '{spec.client_id}' created")
@@ -1185,44 +1485,59 @@ class Planner:
         stored = created.get("attributes") or {}
         ignored = {k: v for k, v in spec.attributes.items() if not _equal(v, stored.get(k))}
         if ignored:
-            self.kc.write("update", f"clients/{created['id']}",
-                          _redact({**created, "attributes": {**stored, **ignored}}),
-                          f"client '{spec.client_id}': {', '.join(sorted(ignored))} set after "
-                          f"creation")
+            self.kc.write(
+                "update",
+                f"clients/{created['id']}",
+                _redact({**created, "attributes": {**stored, **ignored}}),
+                f"client '{spec.client_id}': {', '.join(sorted(ignored))} set after creation",
+            )
 
     def _update_client(self, spec: ClientSpec, planned_live: dict) -> None:
         live = self.find_client(spec.client_id) or planned_live
-        switching_to_confidential = (spec.value_env is not None
-                                     and _normalise(live.get("publicClient")) == "true"
-                                     and not spec.fields.get("publicClient", True))
+        switching_to_confidential = (
+            spec.value_env is not None
+            and _normalise(live.get("publicClient")) == "true"
+            and not spec.fields.get("publicClient", True)
+        )
         payload = dict(live)
         payload.update({k: v for k, v in spec.fields.items() if k not in spec.unmanaged_fields})
         payload["attributes"] = {**(live.get("attributes") or {}), **spec.attributes}
         payload["redirectUris"] = [
-            u for u in list(live.get("redirectUris") or []) + [
-                u for u in spec.redirect_uris if u not in (live.get("redirectUris") or [])]
-            if u not in spec.withheld_redirect_uris]
+            u
+            for u in list(live.get("redirectUris") or [])
+            + [u for u in spec.redirect_uris if u not in (live.get("redirectUris") or [])]
+            if u not in spec.withheld_redirect_uris
+        ]
         payload["webOrigins"] = [
-            o for o in list(live.get("webOrigins") or []) + [
-                o for o in spec.web_origins if o not in (live.get("webOrigins") or [])]
-            if o not in spec.withheld_web_origins]
+            o
+            for o in list(live.get("webOrigins") or [])
+            + [o for o in spec.web_origins if o not in (live.get("webOrigins") or [])]
+            if o not in spec.withheld_web_origins
+        ]
         payload = _redact(payload)
         if switching_to_confidential:
             payload["secret"] = os.environ[spec.value_env]
-        self.kc.write("update", f"clients/{live['id']}", payload,
-                      f"client '{spec.client_id}' updated")
+        self.kc.write(
+            "update", f"clients/{live['id']}", payload, f"client '{spec.client_id}' updated"
+        )
 
     def _assigned_scopes(self, uuid: str) -> tuple[dict[str, str], dict[str, str]]:
         """name -> id of the client's default and optional scopes."""
-        default = {s.get("name"): s.get("id")
-                   for s in (self.kc.get(f"clients/{uuid}/default-client-scopes") or [])}
-        optional = {s.get("name"): s.get("id")
-                    for s in (self.kc.get(f"clients/{uuid}/optional-client-scopes") or [])}
+        default = {
+            s.get("name"): s.get("id")
+            for s in (self.kc.get(f"clients/{uuid}/default-client-scopes") or [])
+        }
+        optional = {
+            s.get("name"): s.get("id")
+            for s in (self.kc.get(f"clients/{uuid}/optional-client-scopes") or [])
+        }
         return default, optional
 
     def _link_scope(self, uuid: str, kind: str, name: str) -> None:
-        self.kc.link(f"clients/{uuid}/{kind}-client-scopes/{self.scope_id(name)}",
-                     f"'{name}' assigned as {kind}")
+        self.kc.link(
+            f"clients/{uuid}/{kind}-client-scopes/{self.scope_id(name)}",
+            f"'{name}' assigned as {kind}",
+        )
 
     def _unlink_scope(self, uuid: str, kind: str, name: str, scope_id: str, why: str) -> None:
         self.kc.delete(f"clients/{uuid}/{kind}-client-scopes/{scope_id}", f"'{name}' {why}")
@@ -1246,53 +1561,84 @@ class Planner:
     def _plan_scope_assignments(self, spec: ClientSpec, uuid: str) -> list[Change]:
         changes: list[Change] = []
         default, optional = self._assigned_scopes(uuid)
-        for kind, wanted, have, other in (("default", spec.default_scopes, default, optional),
-                                          ("optional", spec.optional_scopes, optional, default)):
+        for kind, wanted, have, other in (
+            ("default", spec.default_scopes, default, optional),
+            ("optional", spec.optional_scopes, optional, default),
+        ):
             for name in wanted:
                 if name in have:
                     continue
                 if name in other:
-                    changes.append(Change(
-                        f"~ scope '{name}': {'optional' if kind == 'default' else 'default'} "
-                        f"-> {kind}",
-                        lambda n=name, k=kind, sid=other[name]: (
-                            self._unlink_scope(uuid, "optional" if k == "default" else "default",
-                                               n, sid, "moved"),
-                            self._link_scope(uuid, k, n))))
+                    changes.append(
+                        Change(
+                            f"~ scope '{name}': {'optional' if kind == 'default' else 'default'} "
+                            f"-> {kind}",
+                            lambda n=name, k=kind, sid=other[name]: (
+                                self._unlink_scope(
+                                    uuid,
+                                    "optional" if k == "default" else "default",
+                                    n,
+                                    sid,
+                                    "moved",
+                                ),
+                                self._link_scope(uuid, k, n),
+                            ),
+                        )
+                    )
                 else:
-                    changes.append(Change(f"+ {kind} scope '{name}'",
-                                          lambda n=name, k=kind: self._link_scope(uuid, k, n)))
+                    changes.append(
+                        Change(
+                            f"+ {kind} scope '{name}'",
+                            lambda n=name, k=kind: self._link_scope(uuid, k, n),
+                        )
+                    )
         for name in spec.withheld_scopes:
-            reason = (spec.withheld_scope_reasons.get(name) or spec.withheld_scope_reason
-                      or spec.withheld_reason)
+            reason = (
+                spec.withheld_scope_reasons.get(name)
+                or spec.withheld_scope_reason
+                or spec.withheld_reason
+            )
             for kind, have in (("default", default), ("optional", optional)):
                 if name in have:
-                    changes.append(Change(
-                        f"- {kind} scope '{name}' withheld ({reason})",
-                        lambda n=name, k=kind, sid=have[name]: self._unlink_scope(
-                            uuid, k, n, sid, "withheld")))
-        wanted_all = set(spec.default_scopes) | set(spec.optional_scopes) | set(
-            spec.withheld_scopes)
+                    changes.append(
+                        Change(
+                            f"- {kind} scope '{name}' withheld ({reason})",
+                            lambda n=name, k=kind, sid=have[name]: self._unlink_scope(
+                                uuid, k, n, sid, "withheld"
+                            ),
+                        )
+                    )
+        wanted_all = (
+            set(spec.default_scopes) | set(spec.optional_scopes) | set(spec.withheld_scopes)
+        )
         for kind, have in (("default", default), ("optional", optional)):
             for name in sorted(n for n in have if n not in wanted_all):
-                self.reports.append(f"{spec.client_id}: {kind} scope '{name}' is not in the "
-                                    f"production shape")
+                self.reports.append(
+                    f"{spec.client_id}: {kind} scope '{name}' is not in the production shape"
+                )
         return changes
 
     def _plan_client_roles(self, spec: ClientSpec, uuid: str) -> list[Change]:
         if not spec.client_roles:
             return []
         present = {r.get("name") for r in (self.kc.get(f"clients/{uuid}/roles") or [])}
-        return [Change(f"+ client role '{role['name']}'",
-                       lambda r=role: self.kc.write("create", f"clients/{uuid}/roles", dict(r),
-                                                    f"client role '{r['name']}' created"))
-                for role in spec.client_roles if role["name"] not in present]
+        return [
+            Change(
+                f"+ client role '{role['name']}'",
+                lambda r=role: self.kc.write(
+                    "create", f"clients/{uuid}/roles", dict(r), f"client role '{r['name']}' created"
+                ),
+            )
+            for role in spec.client_roles
+            if role["name"] not in present
+        ]
 
     def _plan_role_scope(self, spec: ClientSpec, uuid: str) -> list[Change]:
         if spec.realm_role_scope is None:
             return []
-        assigned = {r.get("name") for r in
-                    (self.kc.get(f"clients/{uuid}/scope-mappings/realm") or [])}
+        assigned = {
+            r.get("name") for r in (self.kc.get(f"clients/{uuid}/scope-mappings/realm") or [])
+        }
         missing = [n for n in spec.realm_role_scope if n not in assigned]
         surplus = sorted(assigned - set(spec.realm_role_scope))
         if not missing and not surplus:
@@ -1301,8 +1647,10 @@ class Planner:
         if missing:
             text += f" grant {', '.join(missing)}"
         if surplus:
-            text += (f"{';' if missing else ''} take back {', '.join(surplus)} (REQ-SEC-035: a "
-                     f"role added by hand does not survive a provisioning run)")
+            text += (
+                f"{';' if missing else ''} take back {', '.join(surplus)} (REQ-SEC-035: a "
+                f"role added by hand does not survive a provisioning run)"
+            )
         return [Change(text, lambda: self._converge_role_scope(spec, uuid))]
 
     def _converge_role_scope(self, spec: ClientSpec, uuid: str) -> None:
@@ -1312,51 +1660,66 @@ class Planner:
         missing = [n for n in spec.realm_role_scope if n not in names]
         unknown = [n for n in missing if n not in realm_roles]
         if unknown:
-            raise KcadmError(f"the realm has no role(s) {unknown}; with fullScopeAllowed off the "
-                             f"token would carry nothing for them")
+            raise KcadmError(
+                f"the realm has no role(s) {unknown}; with fullScopeAllowed off the "
+                f"token would carry nothing for them"
+            )
         if missing:
-            self.kc.write("create", f"clients/{uuid}/scope-mappings/realm",
-                          [{"id": realm_roles[n]["id"], "name": n} for n in missing],
-                          f"realm roles granted to the client scope: {', '.join(missing)}")
+            self.kc.write(
+                "create",
+                f"clients/{uuid}/scope-mappings/realm",
+                [{"id": realm_roles[n]["id"], "name": n} for n in missing],
+                f"realm roles granted to the client scope: {', '.join(missing)}",
+            )
         surplus = [r for r in assigned if r.get("name") not in spec.realm_role_scope]
         if surplus:
-            self.kc.delete(f"clients/{uuid}/scope-mappings/realm",
-                           "realm roles taken back: " + ", ".join(
-                               sorted(r.get("name") or "?" for r in surplus)), surplus)
+            self.kc.delete(
+                f"clients/{uuid}/scope-mappings/realm",
+                "realm roles taken back: "
+                + ", ".join(sorted(r.get("name") or "?" for r in surplus)),
+                surplus,
+            )
 
     def _service_account_state(self, uuid: str) -> tuple[str, dict[str, set[str]]]:
         """The service-account user's id and its realm role names, keyed `<realm>`."""
         user = self.kc.get(f"clients/{uuid}/service-account-user") or {}
         user_id = user["id"]
         held: dict[str, set[str]] = {
-            "<realm>": {r.get("name") for r in
-                        (self.kc.get(f"users/{user_id}/role-mappings/realm") or [])}}
+            "<realm>": {
+                r.get("name") for r in (self.kc.get(f"users/{user_id}/role-mappings/realm") or [])
+            }
+        }
         return user_id, held
 
     def _held_client_roles(self, user_id: str, container: str) -> set[str]:
         container_uuid = self.client_uuid(container)
-        return {r.get("name") for r in (self.kc.get(
-            f"users/{user_id}/role-mappings/clients/{container_uuid}") or [])}
+        return {
+            r.get("name")
+            for r in (self.kc.get(f"users/{user_id}/role-mappings/clients/{container_uuid}") or [])
+        }
 
-    def _manual_roles(self, spec: ClientSpec, roles: dict[str, list[str]], problem: str,
-                      instruction: str) -> None:
+    def _manual_roles(
+        self, spec: ClientSpec, roles: dict[str, list[str]], problem: str, instruction: str
+    ) -> None:
         """Hand a role change the provisioning identity cannot make to the operator."""
-        lines = [f"{spec.client_id}: service-account roles could not be {problem} — this needs an "
-                 f"identity holding manage-users (the provisioning client deliberately does not). "
-                 f"By hand: Admin Console -> Clients -> {spec.client_id} -> Service account "
-                 f"roles -> {instruction}"]
+        lines = [
+            f"{spec.client_id}: service-account roles could not be {problem} — this needs an "
+            f"identity holding manage-users (the provisioning client deliberately does not). "
+            f"By hand: Admin Console -> Clients -> {spec.client_id} -> Service account "
+            f"roles -> {instruction}"
+        ]
         for container, names in sorted(roles.items()):
             for name in names:
-                source = ("realm role" if container == "<realm>"
-                          else f"client '{container}' role")
+                source = "realm role" if container == "<realm>" else f"client '{container}' role"
                 lines.append(f"      {source} '{name}'")
         self.manual.append("\n".join(lines))
 
     def _manual_grant(self, spec: ClientSpec, missing: dict[str, list[str]], reason: str) -> None:
         self._manual_roles(spec, missing, reason, "Assign role:")
 
-    def _manual_withdrawal(self, spec: ClientSpec, surplus: dict[str, list[str]],
-                           reason: str) -> None:
+    def _manual_withdrawal(
+        self, spec: ClientSpec, surplus: dict[str, list[str]], reason: str
+    ) -> None:
         self._manual_roles(spec, surplus, reason, "select and Unassign, if held:")
 
     def _plan_service_account_roles(self, spec: ClientSpec, uuid: str) -> list[Change]:
@@ -1374,55 +1737,72 @@ class Planner:
             if withheld:
                 self._manual_withdrawal(spec, withheld, "read")
             return []
-        missing = {c: [n for n in names if n not in held.get(c, set())]
-                   for c, names in granted.items()}
+        missing = {
+            c: [n for n in names if n not in held.get(c, set())] for c, names in granted.items()
+        }
         missing = {c: names for c, names in missing.items() if names}
-        surplus = {c: [n for n in names if n in held.get(c, set())]
-                   for c, names in withheld.items()}
+        surplus = {
+            c: [n for n in names if n in held.get(c, set())] for c, names in withheld.items()
+        }
         surplus = {c: names for c, names in surplus.items() if names}
         changes: list[Change] = []
         if missing:
-            changes.append(Change(f"+ service-account roles {self._role_summary(missing)}",
-                                  lambda: self._grant_service_account_roles(spec, uuid, missing),
-                                  service_account=True))
+            changes.append(
+                Change(
+                    f"+ service-account roles {self._role_summary(missing)}",
+                    lambda: self._grant_service_account_roles(spec, uuid, missing),
+                    service_account=True,
+                )
+            )
         if surplus:
-            changes.append(Change(
-                f"- service-account roles {self._role_summary(surplus)} withdrawn "
-                f"({spec.withheld_service_account_reason})",
-                lambda: self._withdraw_service_account_roles(spec, uuid, surplus),
-                service_account=True))
+            changes.append(
+                Change(
+                    f"- service-account roles {self._role_summary(surplus)} withdrawn "
+                    f"({spec.withheld_service_account_reason})",
+                    lambda: self._withdraw_service_account_roles(spec, uuid, surplus),
+                    service_account=True,
+                )
+            )
         return changes
 
-    def _role_container(self, user_id: str, container: str,
-                        held: dict[str, set[str]]) -> tuple[dict[str, dict], str, set[str]]:
+    def _role_container(
+        self, user_id: str, container: str, held: dict[str, set[str]]
+    ) -> tuple[dict[str, dict], str, set[str]]:
         """One container's roles by name, the user's role-mapping path there, and the names held."""
         if container == "<realm>":
             available = {r.get("name"): r for r in (self.kc.get("roles") or [])}
             return available, f"users/{user_id}/role-mappings/realm", held["<realm>"]
         container_uuid = self.client_uuid(container)
-        available = {r.get("name"): r for r in
-                     (self.kc.get(f"clients/{container_uuid}/roles") or [])}
-        return (available, f"users/{user_id}/role-mappings/clients/{container_uuid}",
-                self._held_client_roles(user_id, container))
+        available = {
+            r.get("name"): r for r in (self.kc.get(f"clients/{container_uuid}/roles") or [])
+        }
+        return (
+            available,
+            f"users/{user_id}/role-mappings/clients/{container_uuid}",
+            self._held_client_roles(user_id, container),
+        )
 
-    def _withdraw_service_account_roles(self, spec: ClientSpec, uuid: str,
-                                        roles: dict[str, list[str]]) -> None:
+    def _withdraw_service_account_roles(
+        self, spec: ClientSpec, uuid: str, roles: dict[str, list[str]]
+    ) -> None:
         try:
             user_id, held = self._service_account_state(uuid)
             for container, names in sorted(roles.items()):
                 available, path, have = self._role_container(user_id, container, held)
                 take = [available[n] for n in names if n in have and n in available]
                 if take:
-                    self.kc.delete(path,
-                                   f"service-account roles withdrawn: "
-                                   f"{', '.join(r['name'] for r in take)}",
-                                   [{"id": r["id"], "name": r["name"]} for r in take])
+                    self.kc.delete(
+                        path,
+                        f"service-account roles withdrawn: {', '.join(r['name'] for r in take)}",
+                        [{"id": r["id"], "name": r["name"]} for r in take],
+                    )
         except (KcadmError, KeyError) as error:
             print(f"  could not withdraw: {str(error).splitlines()[0]}")
             self._manual_withdrawal(spec, roles, "withdrawn")
 
-    def _grant_service_account_roles(self, spec: ClientSpec, uuid: str,
-                                     roles: dict[str, list[str]]) -> None:
+    def _grant_service_account_roles(
+        self, spec: ClientSpec, uuid: str, roles: dict[str, list[str]]
+    ) -> None:
         try:
             user_id, held = self._service_account_state(uuid)
             for container, names in sorted(roles.items()):
@@ -1432,10 +1812,12 @@ class Planner:
                 if absent:
                     raise KcadmError(f"container '{container}' has no role(s) {absent}")
                 if grant:
-                    self.kc.write("create", path,
-                                  [{"id": r["id"], "name": r["name"]} for r in grant],
-                                  f"service-account roles granted: "
-                                  f"{', '.join(r['name'] for r in grant)}")
+                    self.kc.write(
+                        "create",
+                        path,
+                        [{"id": r["id"], "name": r["name"]} for r in grant],
+                        f"service-account roles granted: {', '.join(r['name'] for r in grant)}",
+                    )
         except (KcadmError, KeyError) as error:
             print(f"  could not grant: {str(error).splitlines()[0]}")
             self._manual_grant(spec, roles, "granted")
@@ -1446,37 +1828,54 @@ class Planner:
         The policy goes first, so the profile is no longer referenced and the client no longer
         matched; every other policy and profile is carried forward.
         """
-        changes = self.section(f"retired — '{RETIRED_CLIENT_ID}' and its DPoP policy and profile "
-                               f"(ADR-0268)")
+        changes = self.section(
+            f"retired — '{RETIRED_CLIENT_ID}' and its DPoP policy and profile (ADR-0268)"
+        )
         policies = kcadm.read_list(self.kc, "client-policies/policies", "policies")
         if any(p.get("name") == RETIRED_DPOP_POLICY for p in policies):
-            changes.append(Change(
-                f"- policy '{RETIRED_DPOP_POLICY}' detached ({RETIRED_REASON}; "
-                f"{len(policies) - 1} other policy(ies) carried forward)",
-                lambda: self._remove_named("client-policies/policies", "policies",
-                                           RETIRED_DPOP_POLICY)))
+            changes.append(
+                Change(
+                    f"- policy '{RETIRED_DPOP_POLICY}' detached ({RETIRED_REASON}; "
+                    f"{len(policies) - 1} other policy(ies) carried forward)",
+                    lambda: self._remove_named(
+                        "client-policies/policies", "policies", RETIRED_DPOP_POLICY
+                    ),
+                )
+            )
         profiles = kcadm.read_list(self.kc, "client-policies/profiles", "profiles")
         if any(p.get("name") == RETIRED_DPOP_PROFILE for p in profiles):
-            changes.append(Change(
-                f"- profile '{RETIRED_DPOP_PROFILE}' removed ({RETIRED_REASON}; "
-                f"{len(profiles) - 1} other profile(s) carried forward)",
-                lambda: self._remove_named("client-policies/profiles", "profiles",
-                                           RETIRED_DPOP_PROFILE)))
+            changes.append(
+                Change(
+                    f"- profile '{RETIRED_DPOP_PROFILE}' removed ({RETIRED_REASON}; "
+                    f"{len(profiles) - 1} other profile(s) carried forward)",
+                    lambda: self._remove_named(
+                        "client-policies/profiles", "profiles", RETIRED_DPOP_PROFILE
+                    ),
+                )
+            )
         if self.find_client(RETIRED_CLIENT_ID) is not None:
-            changes.append(Change(
-                f"- client '{RETIRED_CLIENT_ID}' deleted with its roles, mappers and scope "
-                f"mappings ({RETIRED_REASON})", self._delete_retired_client))
+            changes.append(
+                Change(
+                    f"- client '{RETIRED_CLIENT_ID}' deleted with its roles, mappers and scope "
+                    f"mappings ({RETIRED_REASON})",
+                    self._delete_retired_client,
+                )
+            )
 
     def plan_retired_realm_roles(self) -> None:
         """Delete the retired `Officer` realm role, ADR-0300; Keycloak drops its user mappings."""
         changes = self.section(f"retired — realm role '{RETIRED_REALM_ROLE}' (ADR-0300)")
         present = {role.get("name") for role in (self.kc.get("roles") or [])}
         if RETIRED_REALM_ROLE in present:
-            changes.append(Change(
-                f"- realm role '{RETIRED_REALM_ROLE}' deleted with its user mappings "
-                f"({RETIRED_ROLE_REASON})",
-                lambda: self.kc.delete(f"roles/{RETIRED_REALM_ROLE}",
-                                       f"realm role '{RETIRED_REALM_ROLE}' deleted")))
+            changes.append(
+                Change(
+                    f"- realm role '{RETIRED_REALM_ROLE}' deleted with its user mappings "
+                    f"({RETIRED_ROLE_REASON})",
+                    lambda: self.kc.delete(
+                        f"roles/{RETIRED_REALM_ROLE}", f"realm role '{RETIRED_REALM_ROLE}' deleted"
+                    ),
+                )
+            )
 
     def plan_retired_application_roles(self) -> None:
         """Delete the three retired application realm roles, ADR-0355, and keep `Admin`.
@@ -1491,15 +1890,20 @@ class Planner:
         if ADMIN_OTP_ROLE not in present:
             self.manual.append(
                 f"realm role '{ADMIN_OTP_ROLE}' is missing: create it and map every Basetool admin "
-                f"to it by hand, the admin OTP is conditioned on it (REQ-SEC-082)")
+                f"to it by hand, the admin OTP is conditioned on it (REQ-SEC-082)"
+            )
         default_role = self.default_role_name()
         for name in RETIRED_APPLICATION_ROLES:
             if name in present:
-                changes.append(Change(
-                    f"- realm role '{name}' deleted with its user mappings and its place in "
-                    f"'{default_role}' ({RETIRED_APPLICATION_ROLES_REASON})",
-                    lambda n=name, rid=present[name]["id"]: self.kc.delete(
-                        f"roles-by-id/{rid}", f"realm role '{n}' deleted")))
+                changes.append(
+                    Change(
+                        f"- realm role '{name}' deleted with its user mappings and its place in "
+                        f"'{default_role}' ({RETIRED_APPLICATION_ROLES_REASON})",
+                        lambda n=name, rid=present[name]["id"]: self.kc.delete(
+                            f"roles-by-id/{rid}", f"realm role '{n}' deleted"
+                        ),
+                    )
+                )
 
     def _remove_named(self, path: str, key: str, name: str) -> None:
         current = kcadm.read_list(self.kc, path, key)
@@ -1520,26 +1924,32 @@ class Planner:
                 continue
             hint = " (pass --grafana-origin to manage it)" if client_id == "grafana" else ""
             self.reports.append(f"client '{client_id}' is not in the production shape{hint}")
-        foreign = [p.get("name") for p in
-                   kcadm.read_list(self.kc, "client-policies/policies", "policies")
-                   if p.get("name") != RETIRED_DPOP_POLICY]
+        foreign = [
+            p.get("name")
+            for p in kcadm.read_list(self.kc, "client-policies/policies", "policies")
+            if p.get("name") != RETIRED_DPOP_POLICY
+        ]
         if foreign:
-            self.reports.append(f"client policies not in the production shape (kept): "
-                                f"{', '.join(sorted(str(n) for n in foreign))}")
-        realm_defaults = {s.get("name") for s in
-                          (self.kc.get("default-default-client-scopes") or [])}
+            self.reports.append(
+                f"client policies not in the production shape (kept): "
+                f"{', '.join(sorted(str(n) for n in foreign))}"
+            )
+        realm_defaults = {
+            s.get("name") for s in (self.kc.get("default-default-client-scopes") or [])
+        }
         for name in AUDIENCE_SCOPES:
             if name in realm_defaults:
                 self.reports.append(
                     f"'{name}' is a realm DEFAULT client scope — every client created from now "
                     f"on inherits its audience. Production removed it (hardening step 9a); remove "
-                    f"it here by hand: Client scopes -> {name} -> Assigned type: None")
-
+                    f"it here by hand: Client scopes -> {name} -> Assigned type: None"
+                )
 
     def change_count(self) -> int:
         """The differences the plan lists — detail and bookkeeping lines are not counted."""
-        return sum(1 for _, section in self.sections for c in section
-                   if not c.text.startswith("  "))
+        return sum(
+            1 for _, section in self.sections for c in section if not c.text.startswith("  ")
+        )
 
     def has_changes(self) -> bool:
         return any(section for _, section in self.sections)
@@ -1583,49 +1993,85 @@ class Planner:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Bring a Keycloak realm to the production shape of the Basetool's clients, "
-                    "scopes, policies and token settings. Dry run unless --apply.")
+        "scopes, policies and token settings. Dry run unless --apply."
+    )
     parser.add_argument("--realm", default="basetool", help="target realm (default: basetool)")
-    parser.add_argument("--public-origin", required=True,
-                        help="the environment's web origin, e.g. https://basetool.example — "
-                             "feeds the frontend's and the app's redirect URIs and web origins")
-    parser.add_argument("--grafana-origin",
-                        help="Grafana's origin; when given, the `grafana` OAuth client is "
-                             "managed too, otherwise it is left alone")
-    parser.add_argument("--frontend-client", choices=("public", "confidential"),
-                        help="converge basetool-frontend's client type (ADR-0001); without it the "
-                             "type of an existing client is left as it is. `confidential` needs "
-                             "KEYCLOAK_FRONTEND_CLIENT_SECRET in the environment when it switches "
-                             "a public client")
-    parser.add_argument("--external-clients", type=Path, default=EXTERNAL_CLIENTS_FILE,
-                        help="the approved third-party clients to create from the template "
-                             "(default: scripts/keycloak/external-clients.json)")
-    parser.add_argument("--seed-client", action="store_true",
-                        help="also manage the testing-only `basetool-seed` client that "
-                             "scripts/seed-briefing.py signs in with; refused for a production "
-                             "origin (ADR-0279)")
-    parser.add_argument("--apply", action="store_true",
-                        help="write the planned changes (default: dry run, writes nothing)")
-    parser.add_argument("--container", default="keycloak",
-                        help="Keycloak container for the default `docker exec` prefix")
-    parser.add_argument("--kcadm-command",
-                        help="the whole kcadm invocation, e.g. the rootless-Podman string of "
-                             "docs/keycloak/README.md (also used by the tests)")
+    parser.add_argument(
+        "--public-origin",
+        required=True,
+        help="the environment's web origin, e.g. https://basetool.example — "
+        "feeds the frontend's and the app's redirect URIs and web origins",
+    )
+    parser.add_argument(
+        "--grafana-origin",
+        help="Grafana's origin; when given, the `grafana` OAuth client is "
+        "managed too, otherwise it is left alone",
+    )
+    parser.add_argument(
+        "--frontend-client",
+        choices=("public", "confidential"),
+        help="converge basetool-frontend's client type (ADR-0001); without it the "
+        "type of an existing client is left as it is. `confidential` needs "
+        "KEYCLOAK_FRONTEND_CLIENT_SECRET in the environment when it switches "
+        "a public client",
+    )
+    parser.add_argument(
+        "--external-clients",
+        type=Path,
+        default=EXTERNAL_CLIENTS_FILE,
+        help="the approved third-party clients to create from the template "
+        "(default: scripts/keycloak/external-clients.json)",
+    )
+    parser.add_argument(
+        "--seed-client",
+        action="store_true",
+        help="also manage the testing-only `basetool-seed` client that "
+        "scripts/seed-briefing.py signs in with; refused for a production "
+        "origin (ADR-0279)",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="write the planned changes (default: dry run, writes nothing)",
+    )
+    parser.add_argument(
+        "--container",
+        default="keycloak",
+        help="Keycloak container for the default `docker exec` prefix",
+    )
+    parser.add_argument(
+        "--kcadm-command",
+        help="the whole kcadm invocation, e.g. the rootless-Podman string of "
+        "docs/keycloak/README.md (also used by the tests)",
+    )
     args = parser.parse_args()
 
     public_origin = validate_origin(args.public_origin, "--public-origin")
-    grafana_origin = (validate_origin(args.grafana_origin, "--grafana-origin")
-                      if args.grafana_origin else None)
+    grafana_origin = (
+        validate_origin(args.grafana_origin, "--grafana-origin") if args.grafana_origin else None
+    )
     if args.seed_client:
         reject_production_origin(public_origin)
-    prefix =(shlex.split(args.kcadm_command) if args.kcadm_command
-              else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"])
+    prefix = (
+        shlex.split(args.kcadm_command)
+        if args.kcadm_command
+        else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"]
+    )
     kc = RealmKcadm(prefix, args.realm, dry_run=False)
-    specs = client_specs(args.realm, public_origin, grafana_origin, args.frontend_client,
-                         load_external_clients(args.external_clients), args.seed_client)
+    specs = client_specs(
+        args.realm,
+        public_origin,
+        grafana_origin,
+        args.frontend_client,
+        load_external_clients(args.external_clients),
+        args.seed_client,
+    )
 
     mode = "APPLY" if args.apply else "DRY RUN — nothing is written"
-    print(f"Keycloak realm '{args.realm}' -> production shape, public origin {public_origin} "
-          f"[{mode}]\n")
+    print(
+        f"Keycloak realm '{args.realm}' -> production shape, public origin {public_origin} "
+        f"[{mode}]\n"
+    )
     try:
         planner = Planner(kc, args.realm, specs)
         planner.plan()
@@ -1635,8 +2081,10 @@ def main() -> int:
             if planner.problems:
                 return 1
             if planner.has_changes():
-                print(f"\n{planner.change_count()} change(s) planned. Review them, then re-run "
-                      f"with --apply.")
+                print(
+                    f"\n{planner.change_count()} change(s) planned. Review them, then re-run "
+                    f"with --apply."
+                )
                 return 2
             print("\nThe realm is in the production shape. Nothing to do.")
             return 3 if planner.manual else 0
@@ -1656,8 +2104,12 @@ def main() -> int:
         check.plan()
         check.manual = []
         check.print_tail()
-        remaining = [(title, change) for title, section in check.sections for change in section
-                     if not (change.service_account and planner.manual)]
+        remaining = [
+            (title, change)
+            for title, section in check.sections
+            for change in section
+            if not (change.service_account and planner.manual)
+        ]
         if remaining or check.problems:
             for title, change in remaining:
                 print(f"  STILL PLANNED ({title}): {change.text.strip()}")

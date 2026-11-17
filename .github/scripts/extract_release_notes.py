@@ -44,10 +44,7 @@ def changelog_section(tag: str, path: str) -> str:
     :return: the section body with ``### Foo`` headers remapped to ``## Rubrik``,
              or a neutral German placeholder line if the tag has no section.
     """
-    placeholder = (
-        f"Für {tag} sind keine nutzersichtbaren Änderungen "
-        "im Changelog vermerkt."
-    )
+    placeholder = f"Für {tag} sind keine nutzersichtbaren Änderungen im Changelog vermerkt."
     with open(path, encoding="utf-8") as handle:
         lines = handle.read().split("\n")
 
@@ -61,7 +58,7 @@ def changelog_section(tag: str, path: str) -> str:
     )
 
     out: list[str] = []
-    for line in lines[start + 1:end]:
+    for line in lines[start + 1 : end]:
         if line.startswith("### "):
             body = line[4:].strip()
             word = body.split()[0] if body else ""
@@ -113,8 +110,12 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("tag", help="Release tag, e.g. v0.3.55.")
-    parser.add_argument("changelog", nargs="?", default="CHANGELOG.md",
-                        help="Path to CHANGELOG.md. Default: CHANGELOG.md.")
+    parser.add_argument(
+        "changelog",
+        nargs="?",
+        default="CHANGELOG.md",
+        help="Path to CHANGELOG.md. Default: CHANGELOG.md.",
+    )
     parser.add_argument("--version", help="OCI image tag (git tag without 'v').")
     parser.add_argument("--registry", help="Container registry host, e.g. ghcr.io.")
     parser.add_argument("--owner", help="GHCR/GitHub owner, e.g. krt-profit.")

@@ -19,13 +19,20 @@ def normalized(data: bytes, ordering: bool, service_uid: int | None = None) -> b
     """Normalize only the generated systemd ordering file's uid and non-semantic comments."""
     if not ordering:
         return data
-    lines = [line.strip() for line in data.decode("utf-8").splitlines()
-             if line.strip() and not line.lstrip().startswith(("#", ";", "{{ ansible_managed"))]
+    lines = [
+        line.strip()
+        for line in data.decode("utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith(("#", ";", "{{ ansible_managed"))
+    ]
     text = "\n".join(lines) + "\n"
     text = text.replace("{{ basetool_host_service_uid }}", "SERVICE_UID")
-    return re.sub(r"user@([0-9]+)",
-                  lambda match: "user@SERVICE_UID" if service_uid is None
-                  or match[1] == str(service_uid) else match[0], text).encode("utf-8")
+    return re.sub(
+        r"user@([0-9]+)",
+        lambda match: (
+            "user@SERVICE_UID" if service_uid is None or match[1] == str(service_uid) else match[0]
+        ),
+        text,
+    ).encode("utf-8")
 
 
 def digest(data: bytes, ordering: bool = False, service_uid: int | None = None) -> str:
@@ -35,10 +42,16 @@ def digest(data: bytes, ordering: bool = False, service_uid: int | None = None) 
 
 def generate(revision: str | None = None) -> list[str]:
     """Return manifest entries for every inventory target, using committed bytes under --rev."""
+
     def source(path: str) -> bytes:
         if revision:
-            return subprocess.run(["git", "show", f"{revision}:{path}"], check=True,
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30).stdout
+            return subprocess.run(
+                ["git", "show", f"{revision}:{path}"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30,
+            ).stdout
         return (ROOT / path).read_bytes()
 
     try:
@@ -52,7 +65,9 @@ def generate(revision: str | None = None) -> list[str]:
         if not target.startswith("/etc/") or ".." in target or target in seen:
             raise ValueError("Invalid or duplicate host companion target")
         seen.add(target)
-        result.append(f"{digest(source(entry['source']), entry['kind'] == 'ordering')}  host{target}")
+        result.append(
+            f"{digest(source(entry['source']), entry['kind'] == 'ordering')}  host{target}"
+        )
     return result
 
 

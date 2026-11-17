@@ -110,12 +110,12 @@ def val_expressions(text: str) -> dict[str, str]:
                 depth += 1
             elif c in ")}":
                 depth -= 1
-            elif c == "\n" and depth <= 0 and text[m.end():i].strip():
-                rest = text[i + 1:].lstrip(" \t")
+            elif c == "\n" and depth <= 0 and text[m.end() : i].strip():
+                rest = text[i + 1 :].lstrip(" \t")
                 if not rest.startswith("."):
                     break
             i += 1
-        out.setdefault(m.group(1), text[m.end():i])
+        out.setdefault(m.group(1), text[m.end() : i])
     return out
 
 
@@ -169,7 +169,7 @@ def paths_in(expr: str, vals: dict[str, str], depth: int = 0) -> list[tuple[str,
             if m.start() in claimed:
                 continue
             claimed.update(range(m.start(), m.end()))
-            arg = expr[m.end():]
+            arg = expr[m.end() :]
             lit = STRING.match(arg)
             if lit:
                 if "$" not in lit.group(1):
@@ -197,7 +197,7 @@ def references(script: str, text: str) -> list[Reference]:
     out: list[Reference] = []
     for m in INPUT_CALL.finditer(text):
         end = balanced(text, m.end())
-        args = text[m.end():end - 1]
+        args = text[m.end() : end - 1]
         line = text.count("\n", 0, m.start()) + 1
         for arg in top_level_args(args):
             lit = STRING.fullmatch(arg)
@@ -231,7 +231,9 @@ def missing(refs: list[Reference], root: Path) -> list[str]:
         base = root if ref.base == "root" else (root / ref.script).parent
         target = Path(os.path.normpath(base / ref.path))
         if not target.exists():
-            problems.append(f"{ref.script}:{ref.line}: input path '{ref.path}' does not exist ({target})")
+            problems.append(
+                f"{ref.script}:{ref.line}: input path '{ref.path}' does not exist ({target})"
+            )
     return problems
 
 
@@ -274,7 +276,9 @@ def check(root: Path, verbose: bool = False) -> int:
     :return: 0 when every path exists and the floor holds, 1 otherwise.
     """
     refs: list[Reference] = []
-    texts = {script: (root / script).read_text(encoding="utf-8") for script in tracked_scripts(root)}
+    texts = {
+        script: (root / script).read_text(encoding="utf-8") for script in tracked_scripts(root)
+    }
     for script, text in texts.items():
         refs.extend(references(script, text))
     problems = missing(refs, root) + root_project_uses(texts)
@@ -313,26 +317,38 @@ def selftest() -> int:
         '  inputs\n    .files(fileTree(layout.settingsDirectory.dir(mirrorDir)) { include("*.java") })\n'
         '    .withPropertyName("mirror")\n'
         '  inputs.file("package.json")\n'
-        '  inputs.file(probe)\n'
-        '  inputs.file(generated)\n'
-        '  inputs.file(spec)\n'
+        "  inputs.file(probe)\n"
+        "  inputs.file(generated)\n"
+        "  inputs.file(spec)\n"
         '  inputs.dir(layout.settingsDirectory.dir("docs/exchange"))\n'
         '  inputs.dir(layout.projectDirectory.dir("../docs/legacy"))\n'
         '  inputs.files(fileTree("src/css") { include("**/*.css") }, file("oss.json"))\n'
         '  inputs.file("docs/${project.name}.json")\n'
-        '}\n'
+        "}\n"
     )
     refs = references("frontend/build.gradle.kts", script)
     got = {(r.path, r.base) for r in refs}
-    expect("a val holding a string, used in a settingsDirectory fileTree, resolves against the root",
-           ("backend/dto", "root") in got)
+    expect(
+        "a val holding a string, used in a settingsDirectory fileTree, resolves against the root",
+        ("backend/dto", "root") in got,
+    )
     expect("a bare string argument resolves against the module", ("package.json", "module") in got)
-    expect("a multi-line val holding layout.projectDirectory.file resolves", ("src/probe.js", "module") in got)
-    expect("a val holding layout.settingsDirectory.file resolves against the root",
-           ("backend/openapi.json", "root") in got)
-    expect("layout.settingsDirectory.dir resolves against the root", ("docs/exchange", "root") in got)
+    expect(
+        "a multi-line val holding layout.projectDirectory.file resolves",
+        ("src/probe.js", "module") in got,
+    )
+    expect(
+        "a val holding layout.settingsDirectory.file resolves against the root",
+        ("backend/openapi.json", "root") in got,
+    )
+    expect(
+        "layout.settingsDirectory.dir resolves against the root", ("docs/exchange", "root") in got
+    )
     expect("inputs.dir with a relative parent resolves", ("../docs/legacy", "module") in got)
-    expect("fileTree and file in one call both resolve", {("src/css", "module"), ("oss.json", "module")} <= got)
+    expect(
+        "fileTree and file in one call both resolve",
+        {("src/css", "module"), ("oss.json", "module")} <= got,
+    )
     expect("an include pattern is not taken for a path", not any("*" in p for p, _ in got))
     expect("a buildDirectory output is skipped", not any(p.startswith("gen/") for p, _ in got))
     expect("an interpolated string is skipped", not any("$" in p for p, _ in got))
@@ -340,19 +356,26 @@ def selftest() -> int:
 
     uses = root_project_uses(
         {
-            "build.gradle.kts": "rootProject.file(\"x\")\n",
-            "settings.gradle.kts": "rootProject.name = \"x\"\n",
-            "build-logic/settings.gradle.kts": "rootProject.name = \"y\"\n",
-            "ingest/build.gradle.kts": "val a = 1\ninputs.file(rootProject.file(\"x\"))\n",
+            "build.gradle.kts": 'rootProject.file("x")\n',
+            "settings.gradle.kts": 'rootProject.name = "x"\n',
+            "build-logic/settings.gradle.kts": 'rootProject.name = "y"\n',
+            "ingest/build.gradle.kts": 'val a = 1\ninputs.file(rootProject.file("x"))\n',
             "build-logic/src/main/kotlin/c.gradle.kts": "val s = project.rootProject\n",
             "frontend/build.gradle.kts": "val rootProjectDir = 1\nlayout.settingsDirectory\n",
         }
     )
-    expect("rootProject is reported in a module script and a convention script",
-           len(uses) == 2 and "ingest/build.gradle.kts:2" in uses[0] and "c.gradle.kts:1" in uses[1])
-    expect("rootProject is allowed in the root script and the settings files, and as part of a name",
-           not any(u.startswith(("build.gradle.kts", "settings.gradle.kts", "build-logic/settings")) for u in uses)
-           and not any("frontend/" in u for u in uses))
+    expect(
+        "rootProject is reported in a module script and a convention script",
+        len(uses) == 2 and "ingest/build.gradle.kts:2" in uses[0] and "c.gradle.kts:1" in uses[1],
+    )
+    expect(
+        "rootProject is allowed in the root script and the settings files, and as part of a name",
+        not any(
+            u.startswith(("build.gradle.kts", "settings.gradle.kts", "build-logic/settings"))
+            for u in uses
+        )
+        and not any("frontend/" in u for u in uses),
+    )
 
     import tempfile
 
@@ -362,12 +385,20 @@ def selftest() -> int:
         (root / "backend" / "dto").mkdir(parents=True)
         (root / "docs" / "exchange").mkdir(parents=True)
         (root / "docs" / "legacy").mkdir(parents=True)
-        for f in ("frontend/package.json", "frontend/src/probe.js", "backend/openapi.json", "frontend/oss.json"):
+        for f in (
+            "frontend/package.json",
+            "frontend/src/probe.js",
+            "backend/openapi.json",
+            "frontend/oss.json",
+        ):
             (root / f).write_text("x", encoding="utf-8")
         expect("every planted path exists: no problem", missing(refs, root) == [])
         (root / "backend" / "openapi.json").unlink()
         problems = missing(refs, root)
-        expect("a deleted input file is reported", len(problems) == 1 and "backend/openapi.json" in problems[0])
+        expect(
+            "a deleted input file is reported",
+            len(problems) == 1 and "backend/openapi.json" in problems[0],
+        )
         (root / "docs" / "exchange").rmdir()
         expect("a deleted input directory is reported", len(missing(refs, root)) == 2)
 

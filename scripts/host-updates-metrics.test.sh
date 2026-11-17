@@ -3,19 +3,28 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUT="${HERE}/host-updates-metrics.sh"
-[[ -f "${SUT}" ]] || { echo "FATAL: ${SUT} not found" >&2; exit 1; }
+[[ -f "${SUT}" ]] || {
+  echo "FATAL: ${SUT} not found" >&2
+  exit 1
+}
 
 PASSED=0
 FAILED=0
-ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
-bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
+ok() {
+  PASSED=$((PASSED + 1))
+  printf '  ok    %s\n' "$*"
+}
+bad() {
+  FAILED=$((FAILED + 1))
+  printf '  FAIL  %s\n' "$*"
+}
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/host-updates-test.XXXXXX")"
 trap 'rm -rf "${WORK}"' EXIT
 OUT="${WORK}/textfile/host-updates.prom"
 mkdir -p "${WORK}/textfile" "${WORK}/bin"
 
-cat > "${WORK}/bin/needs-restarting" <<'STUB'
+cat >"${WORK}/bin/needs-restarting" <<'STUB'
 #!/usr/bin/env bash
 exit "${NR_RC:-0}"
 STUB
@@ -29,7 +38,8 @@ run() {
 value() { awk -v n="$1" '$1 == n { print $2 }' "${OUT}" 2>/dev/null; }
 
 expect_value() {
-  local got; got="$(value "$2")"
+  local got
+  got="$(value "$2")"
   if [[ "${got}" == "$3" ]]; then ok "$1"; else bad "$1 -- wanted '$3', got '${got}'"; fi
 }
 
@@ -38,7 +48,7 @@ before="$(date +%s)"
 run SERVICE_RESULT=success NR_RC=0
 expect_value "the run counts as a success" basetool_host_updates_last_run_success 1
 ts="$(value basetool_host_updates_last_run_timestamp_seconds)"
-if [[ "${ts}" =~ ^[0-9]+$ ]] && (( ts >= before )); then ok "the run is timestamped now"; else bad "timestamp '${ts}' is not this run"; fi
+if [[ "${ts}" =~ ^[0-9]+$ ]] && ((ts >= before)); then ok "the run is timestamped now"; else bad "timestamp '${ts}' is not this run"; fi
 expect_value "no reboot is due" basetool_host_reboot_required 0
 
 echo "== a failed run reads as a failure, not as silence =="
@@ -50,7 +60,7 @@ run SERVICE_RESULT=success NR_RC=1
 expect_value "needs-restarting's exit 1 is a reboot required" basetool_host_reboot_required 1
 
 echo "== the boot refresh keeps the last run and re-reads only the reboot flag =="
-printf 'basetool_host_updates_last_run_timestamp_seconds 1700000000\nbasetool_host_updates_last_run_success 1\nbasetool_host_reboot_required 1\n' > "${OUT}"
+printf 'basetool_host_updates_last_run_timestamp_seconds 1700000000\nbasetool_host_updates_last_run_success 1\nbasetool_host_reboot_required 1\n' >"${OUT}"
 run NR_RC=0
 expect_value "the last run's timestamp survives a boot" basetool_host_updates_last_run_timestamp_seconds 1700000000
 expect_value "...and so does its outcome" basetool_host_updates_last_run_success 1
@@ -70,7 +80,7 @@ if ! grep -q '^basetool_host_reboot_required ' "${OUT}"; then
 else
   bad "an unreadable reboot state was written as $(value basetool_host_reboot_required)"
 fi
-printf 'basetool_host_updates_last_run_timestamp_seconds garbage\n' > "${OUT}"
+printf 'basetool_host_updates_last_run_timestamp_seconds garbage\n' >"${OUT}"
 run NR_RC=0
 if [[ -z "$(value basetool_host_updates_last_run_timestamp_seconds)" ]]; then
   ok "a corrupted previous value is not carried forward"

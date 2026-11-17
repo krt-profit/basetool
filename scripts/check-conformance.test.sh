@@ -16,8 +16,14 @@ FAILED=0
 RED_COVERED=""
 
 say() { printf '%s\n' "$*"; }
-ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
-bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
+ok() {
+  PASSED=$((PASSED + 1))
+  printf '  ok    %s\n' "$*"
+}
+bad() {
+  FAILED=$((FAILED + 1))
+  printf '  FAIL  %s\n' "$*"
+}
 
 stop_fixture() {
   if [ -n "$FIXTURE_PID" ]; then
@@ -43,12 +49,15 @@ gen_cert() {
 }
 
 say "generating throwaway TLS material in ${WORK}"
-gen_cert primary 3650 || { say "openssl failed - is it on PATH?"; exit 2; }
+gen_cert primary 3650 || {
+  say "openssl failed - is it on PATH?"
+  exit 2
+}
 gen_cert secondary 3650 || exit 2
 gen_cert expiring 1 || exit 2
-cat "${WORK}/primary.crt" "${WORK}/secondary.crt" "${WORK}/expiring.crt" > "${WORK}/bundle.pem"
+cat "${WORK}/primary.crt" "${WORK}/secondary.crt" "${WORK}/expiring.crt" >"${WORK}/bundle.pem"
 
-cat > "${WORK}/fixture.py" <<'FIXTURE'
+cat >"${WORK}/fixture.py" <<'FIXTURE'
 """A scriptable loopback HTTPS/HTTP fixture for the conformance suite's self-test."""
 import argparse
 import http.server
@@ -168,7 +177,7 @@ if __name__ == "__main__":
     main()
 FIXTURE
 
-cat > "${WORK}/hoststub.sh" <<'STUB'
+cat >"${WORK}/hoststub.sh" <<'STUB'
 #!/usr/bin/env bash
 cmd="${1:-}"
 scenario="${STUB_SCENARIO:-healthy}"
@@ -441,11 +450,11 @@ STUB
 chmod +x "${WORK}/hoststub.sh"
 
 ALL_LOCAL=(--host frontend=localhost --host ingest=localhost
-           --host grafana=localhost)
+  --host grafana=localhost)
 ALL_IP=(--host frontend=127.0.0.1 --host ingest=127.0.0.1
-        --host grafana=127.0.0.1)
+  --host grafana=127.0.0.1)
 MIXED=(--host frontend=localhost --host ingest=localhost
-       --host grafana=127.0.0.1)
+  --host grafana=127.0.0.1)
 STUB_ARGS=(--host-stub "bash ${WORK}/hoststub.sh")
 
 assert_status() {
@@ -491,10 +500,16 @@ start_fixture() {
   FIXTURE_PID=$!
   for _ in $(seq 1 60); do
     grep -q "fixture: ready" "${WORK}/fixture.log" 2>/dev/null && return 0
-    kill -0 "$FIXTURE_PID" 2>/dev/null || { say "fixture died:"; cat "${WORK}/fixture.log"; return 1; }
+    kill -0 "$FIXTURE_PID" 2>/dev/null || {
+      say "fixture died:"
+      cat "${WORK}/fixture.log"
+      return 1
+    }
     sleep 0.2
   done
-  say "fixture did not become ready"; cat "${WORK}/fixture.log"; return 1
+  say "fixture did not become ready"
+  cat "${WORK}/fixture.log"
+  return 1
 }
 
 export BASETOOL_CONFORMANCE_HTTPS_PORT="$HTTPS_PORT"
@@ -551,12 +566,12 @@ say ""
 say "== external checks go GREEN against a correct fixture =="
 export STUB_SCENARIO=healthy
 start_fixture || exit 2
-assert_status "vhost-reachable passes"    vhost-reachable    pass - -- "${ALL_LOCAL[@]}"
-assert_status "certificate-valid passes"  certificate-valid  pass - -- "${ALL_LOCAL[@]}"
+assert_status "vhost-reachable passes" vhost-reachable pass - -- "${ALL_LOCAL[@]}"
+assert_status "certificate-valid passes" certificate-valid pass - -- "${ALL_LOCAL[@]}"
 assert_status "certificate-shared passes" certificate-shared pass - \
   -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
-assert_status "http-redirects passes"     http-redirects     pass - -- "${ALL_LOCAL[@]}"
-assert_status "ipv6-reachable passes"     ipv6-reachable     pass - -- "${ALL_LOCAL[@]}"
+assert_status "http-redirects passes" http-redirects pass - -- "${ALL_LOCAL[@]}"
+assert_status "ipv6-reachable passes" ipv6-reachable pass - -- "${ALL_LOCAL[@]}"
 
 say ""
 say "== external checks go RED when the target is broken =="
@@ -607,9 +622,9 @@ assert_status "containers-unprivileged passes" containers-unprivileged pass "red
 assert_status "containers-read-only passes" containers-read-only pass "all 9 app containers" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=rootless-podman assert_status "containers-unprivileged passes through a rootless uid_map" containers-unprivileged pass "db-backend=70" -- "${STUB_ARGS[@]}"
 assert_status "redis-requires-auth passes" redis-requires-auth pass "NOAUTH" -- "${STUB_ARGS[@]}"
-assert_status "scrape-targets-up passes"  scrape-targets-up  pass "targets up"     -- "${STUB_ARGS[@]}"
-assert_status "container-metrics passes"  container-metrics  pass "populated"      -- "${STUB_ARGS[@]}"
-assert_status "log-streams passes"        log-streams        pass "ingesting"      -- "${STUB_ARGS[@]}"
+assert_status "scrape-targets-up passes" scrape-targets-up pass "targets up" -- "${STUB_ARGS[@]}"
+assert_status "container-metrics passes" container-metrics pass "populated" -- "${STUB_ARGS[@]}"
+assert_status "log-streams passes" log-streams pass "ingesting" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=traces-on assert_status \
   "trace-pipeline passes when spans are arriving" trace-pipeline pass "accepted" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=traces-off assert_status \
@@ -742,7 +757,8 @@ STUB_SCENARIO=healthy assert_status \
   "env-reaches-the-units passes when no per-host override is set at all" \
   env-reaches-the-units pass "uncontested" -- "${STUB_ARGS[@]}"
 
-pins="$("$PY" - "$SUITE" <<'PYEOF'
+pins="$(
+  "$PY" - "$SUITE" <<'PYEOF'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("cc", sys.argv[1])
 m = importlib.util.module_from_spec(spec)
@@ -751,7 +767,7 @@ spec.loader.exec_module(m)
 print(m._compose_pinned_version("node-exporter") or "", m._compose_pinned_version("alloy") or "")
 PYEOF
 )"
-read -r STUB_NODE_PIN STUB_ALLOY_PIN <<< "$pins"
+read -r STUB_NODE_PIN STUB_ALLOY_PIN <<<"$pins"
 export STUB_NODE_PIN STUB_ALLOY_PIN
 if [[ "$STUB_NODE_PIN" =~ ^[0-9]+\.[0-9]+ && "$STUB_ALLOY_PIN" =~ ^[0-9]+\.[0-9]+ ]]; then
   ok "the compose pins are readable without a YAML parser (node-exporter ${STUB_NODE_PIN}, alloy ${STUB_ALLOY_PIN})"
@@ -787,22 +803,22 @@ STUB_SCENARIO=updates-runtime assert_status \
 STUB_SCENARIO=healthy assert_status \
   "ssh-root-login-refused passes when root is refused and AllowUsers names the admin" \
   ssh-root-login-refused pass "allowusers greluc" -- "${STUB_ARGS[@]}"
-: > "${WORK}/stub-argv.log"
+: >"${WORK}/stub-argv.log"
 STUB_ARGV_LOG="${WORK}/stub-argv.log" ASSERT_STDIN=stub-sudo-pw STUB_SCENARIO=healthy assert_status \
   "ssh-root-login-refused passes through --sudo, the password on stdin" \
   ssh-root-login-refused pass "allowusers greluc" \
   -- --sudo --sudo-password-stdin "${STUB_ARGS[@]}"
 if grep -q "sudo -k -S -p '' bash -c 'cd /; c=" "${WORK}/stub-argv.log" \
-   && ! grep -q "stub-sudo-pw" "${WORK}/stub-argv.log"; then
+  && ! grep -q "stub-sudo-pw" "${WORK}/stub-argv.log"; then
   ok "--sudo wraps the command in sudo -k -S and never puts the password on a command line"
 else
-  bad "--sudo command lines: $(tr '\n' '|' < "${WORK}/stub-argv.log" | cut -c1-200)"
+  bad "--sudo command lines: $(tr '\n' '|' <"${WORK}/stub-argv.log" | cut -c1-200)"
 fi
 sudo_out="$(printf 'wrong-pw\n' | "$PY" "$SUITE" --json --only ssh-root-login-refused \
   --sudo --sudo-password-stdin "${STUB_ARGS[@]}" 2>&1)"
 sudo_rc=$?
 if [ "$sudo_rc" -ne 0 ] && [[ "$sudo_out" == *"did not accept the password, no check was run"* ]] \
-   && [[ "$sudo_out" != *'"status"'* ]]; then
+  && [[ "$sudo_out" != *'"status"'* ]]; then
   ok "--sudo stops before any check when sudo refuses the password"
 else
   bad "--sudo with a wrong password - rc=$sudo_rc: ${sudo_out:0:160}"
@@ -822,7 +838,8 @@ STUB_SCENARIO=no-allowusers assert_status \
 
 say ""
 say "== the client-address classifier, on the spellings a scenario cannot reach =="
-classifier_result="$("$PY" - "$SUITE" <<'PYEOF'
+classifier_result="$(
+  "$PY" - "$SUITE" <<'PYEOF'
 import importlib.util
 import sys
 
@@ -858,7 +875,7 @@ while IFS='|' read -r verdict text got why; do
   else
     bad "_is_private(${text}) = ${got} -- ${why}"
   fi
-done <<< "$classifier_result"
+done <<<"$classifier_result"
 
 say ""
 say "== every registered check has a red scenario that actually behaved =="
@@ -873,7 +890,8 @@ fi
 
 say ""
 say "== a connection failure carries its errno =="
-errno_probe="$("$PY" - "$SUITE" <<'PYEOF'
+errno_probe="$(
+  "$PY" - "$SUITE" <<'PYEOF'
 import importlib.util, socket, sys
 
 spec = importlib.util.spec_from_file_location("conf", sys.argv[1])
@@ -895,12 +913,15 @@ else:
 PYEOF
 )"
 case "$errno_probe" in
-  errno=None|errno=CONNECTED-UNEXPECTEDLY)
-    bad "_connect lost the errno ($errno_probe) - the ipv6-reachable skip path is dead again" ;;
+  errno=None | errno=CONNECTED-UNEXPECTEDLY)
+    bad "_connect lost the errno ($errno_probe) - the ipv6-reachable skip path is dead again"
+    ;;
   errno=*)
-    ok "_connect preserves the errno ($errno_probe)" ;;
+    ok "_connect preserves the errno ($errno_probe)"
+    ;;
   *)
-    bad "the errno probe produced nothing usable: $errno_probe" ;;
+    bad "the errno probe produced nothing usable: $errno_probe"
+    ;;
 esac
 
 say ""

@@ -115,11 +115,11 @@ expect "a console write in main is flagged" 1 \
 
 expect "a log-CAPTURE handle in a test is NOT flagged" 0 \
   "$(make_repo backend/src/main/java/p/Clean.java "$CLEAN_MAIN" \
-      backend/src/test/java/p/SomethingTest.java "$CAPTURE_TEST")" "Logging facade OK"
+    backend/src/test/java/p/SomethingTest.java "$CAPTURE_TEST")" "Logging facade OK"
 
 expect "deliberate console output in the e2e suite is NOT flagged" 0 \
   "$(make_repo frontend/src/main/java/p/Clean.java "$CLEAN_MAIN" \
-      frontend/src/e2e/java/p/SmokeE2eTest.java "$E2E_PRINT")" "Logging facade OK"
+    frontend/src/e2e/java/p/SmokeE2eTest.java "$E2E_PRINT")" "Logging facade OK"
 
 expect "a tree with no production sources says so" 0 \
   "$(make_repo docs/notes.md 'not java')" "nothing to check"

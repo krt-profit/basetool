@@ -59,7 +59,7 @@ generate() {
     [[ "${rel}" =~ ^[A-Za-z0-9._][A-Za-z0-9._/-]*$ && "${rel}" != *..* ]] || die "unsafe path in host-scripts.list: ${rel}"
     digest="$(read_script "${rev}" "${rel}" | sha256sum)" || die "cannot read scripts/${rel}${rev:+ at ${rev}}"
     printf '%s  %s\n' "${digest%% *}" "${rel}"
-  done <<< "${list}"
+  done <<<"${list}"
   if [[ -f "${SCRIPT_DIR}/host_companions.py" ]]; then
     if [[ -n "${rev}" ]]; then
       python3 "${SCRIPT_DIR}/host_companions.py" --rev "${rev}"

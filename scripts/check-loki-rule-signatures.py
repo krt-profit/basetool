@@ -154,8 +154,14 @@ def check(exprs: dict[str, str], signatures: dict[str, tuple[list[str], list[str
         if not filters:
             failures.append(f"{alert}: no line filter found in its expression")
             continue
-        failures += [f"{alert}: does NOT fire on {line!r}" for line in fire if not passes(line, filters)]
-        failures += [f"{alert}: fires on {line!r}, which it must ignore" for line in silent if passes(line, filters)]
+        failures += [
+            f"{alert}: does NOT fire on {line!r}" for line in fire if not passes(line, filters)
+        ]
+        failures += [
+            f"{alert}: fires on {line!r}, which it must ignore"
+            for line in silent
+            if passes(line, filters)
+        ]
     return failures
 
 
@@ -178,7 +184,9 @@ def selftest() -> int:
         ok = got == expected
         failures += not ok
         print(f"  [{'ok ' if ok else 'FAIL'}] {line!r} -> {got}")
-    broken = {"JvmStartupCacheRejected": 'sum(count_over_time({app="x"} |~ "nothing like it" [5m]))'}
+    broken = {
+        "JvmStartupCacheRejected": 'sum(count_over_time({app="x"} |~ "nothing like it" [5m]))'
+    }
     if not check(broken, {k: v for k, v in SIGNATURES.items() if k == "JvmStartupCacheRejected"}):
         print("  [FAIL] a filter that matches none of the recorded lines was not reported")
         failures += 1
@@ -201,7 +209,9 @@ def main() -> int:
         print(f"FAIL {failure}")
     if failures:
         return 1
-    print(f"OK: {len(SIGNATURES)} alert(s) fire on their recorded lines and stay silent on the others.")
+    print(
+        f"OK: {len(SIGNATURES)} alert(s) fire on their recorded lines and stay silent on the others."
+    )
     return 0
 
 
