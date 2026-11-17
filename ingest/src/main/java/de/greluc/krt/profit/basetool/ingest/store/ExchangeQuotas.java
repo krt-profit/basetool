@@ -30,8 +30,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 /**
@@ -63,40 +61,8 @@ public class ExchangeQuotas {
    */
   public static final String COUNTED_OPS = ExchangeQuotas.class.getName() + ".countedOps";
 
-  /**
-   * Takes up to {@code ARGV[1]} counts back from a counter that holds at least one, keeping its
-   * expiry and never going below zero; the result is the new count, or {@code -1} when there was
-   * nothing to take back.
-   */
-  private static final RedisScript<Long> REFUND_SCRIPT =
-      new DefaultRedisScript<>(
-          """
-          local count = tonumber(redis.call('GET', KEYS[1]))
-          if count == nil or count < 1 then
-            return -1
-          end
-          local left = math.max(count - tonumber(ARGV[1]), 0)
-          redis.call('SET', KEYS[1], string.format('%d', left), 'KEEPTTL')
-          return left
-          """,
-          Long.class);
-
-  /**
-   * Adds {@code ARGV[1]} counts to an existing counter, keeping its expiry; the result is the new
-   * count, or {@code -1} when there is no counter.
-   */
-  private static final RedisScript<Long> ADD_SCRIPT =
-      new DefaultRedisScript<>(
-          """
-          local count = tonumber(redis.call('GET', KEYS[1]))
-          if count == nil then
-            return -1
-          end
-          local added = count + tonumber(ARGV[1])
-          redis.call('SET', KEYS[1], string.format('%d', added), 'KEEPTTL')
-          return added
-          """,
-          Long.class);
+  /** The answer of {@link #add} when there is no counter to add to. */
+  private static final long NO_COUNTER = -1L;
 
   /** The bytes a counter is budgeted with: its key plus a long's decimal digits. */
   static final int VALUE_BYTES = 20;
@@ -190,8 +156,8 @@ public class ExchangeQuotas {
       return -1;
     }
     try {
-      Long count = redisTemplate.execute(ADD_SCRIPT, List.of(key), String.valueOf(ops));
-      if (count == null || count < 0) {
+      long count = add(key, ops);
+      if (count == NO_COUNTER) {
         throw new ExchangeUnavailableException("The write quota cannot be counted.", null);
       }
       long noted = request.getAttribute(COUNTED_OPS) instanceof Long extra ? extra : 0L;
@@ -237,10 +203,52 @@ public class ExchangeQuotas {
    */
   private void refund(@NotNull String key, long counts) {
     try {
-      redisTemplate.execute(REFUND_SCRIPT, List.of(key), String.valueOf(counts));
+      take(key, counts);
     } catch (RuntimeException e) {
       log.warn("Exchange quota refund failed: {}", e.getClass().getSimpleName());
     }
+  }
+
+  /**
+   * Adds counts to an existing counter, keeping its expiry, as one optimistic transaction.
+   *
+   * @param key the counter's key
+   * @param counts how many counts to add
+   * @return the new count, or {@link #NO_COUNTER} when there is no counter, which is not created
+   */
+  private long add(@NotNull String key, long counts) {
+    return OptimisticTransaction.run(
+        redisTemplate,
+        List.of(key),
+        () -> {
+          Long count = StoredNumbers.parse(redisTemplate.opsForValue().get(key));
+          return count == null
+              ? OptimisticTransaction.Plan.read(NO_COUNTER)
+              : OptimisticTransaction.Plan.write(
+                  count + counts, () -> redisTemplate.opsForValue().increment(key, counts));
+        });
+  }
+
+  /**
+   * Takes up to the given counts back from a counter that holds at least one, keeping its expiry
+   * and never going below zero, as one optimistic transaction; a missing counter is not created.
+   *
+   * @param key the counter's key
+   * @param counts how many counts to take back
+   */
+  private void take(@NotNull String key, long counts) {
+    OptimisticTransaction.run(
+        redisTemplate,
+        List.of(key),
+        () -> {
+          Long count = StoredNumbers.parse(redisTemplate.opsForValue().get(key));
+          if (count == null || count < 1) {
+            return OptimisticTransaction.Plan.read(Boolean.FALSE);
+          }
+          long taken = Math.min(count, counts);
+          return OptimisticTransaction.Plan.write(
+              Boolean.TRUE, () -> redisTemplate.opsForValue().decrement(key, taken));
+        });
   }
 
   /**

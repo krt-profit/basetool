@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.store;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeStoreProperties;
@@ -27,6 +28,7 @@ import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
 import de.greluc.krt.profit.basetool.ingest.idempotency.ExchangeIdempotencyFilter;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRefusals;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistry;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeUnavailableException;
 import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
@@ -72,10 +74,10 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The byte budget and the idempotency cache against a real Redis under the ingest ACL user
- * (REQ-XCH-020, REQ-XCH-023): filling one member's budget and then one client's leaves every other
- * member and client working, parallel writes never overshoot a budget, a day of periodic syncs fits
- * one member's budget, a duplicate that raced the first request replays its answer, and a lock is
- * released only by the request holding it.
+ * (REQ-XCH-020, REQ-XCH-023, ADR-0389): filling one member's budget and then one client's leaves
+ * every other member and client working, parallel writes never overshoot a budget, a day of
+ * periodic syncs fits one member's budget, a duplicate that raced the first request replays its
+ * answer, and a lock is released only by the request holding it.
  */
 @Testcontainers
 class ExchangeStoreRedisIntegrationTest {
@@ -285,8 +287,40 @@ class ExchangeStoreRedisIntegrationTest {
     Long totalExpiry =
         observer.getExpire(
             ExchangeBudget.sum(ExchangeBudget.memberScope("a", "m1")), TimeUnit.SECONDS);
-    assertThat(expiry).isGreaterThan(Duration.ofDays(4).toSeconds());
-    assertThat(totalExpiry).isGreaterThan(Duration.ofDays(4).toSeconds());
+    assertThat(expiry).isBetween(Duration.ofDays(4).toSeconds(), Duration.ofDays(5).toSeconds());
+    assertThat(totalExpiry)
+        .as("raised to the longest entry, in milliseconds and not read as seconds")
+        .isBetween(Duration.ofDays(4).toSeconds(), Duration.ofDays(5).toSeconds());
+  }
+
+  @Test
+  void aGarbledRunningTotalIsRebuiltFromItsSet() {
+    budget.record("a", "m1", "ingest:xch:idem:a:m1:1", 3000L, Duration.ofHours(1));
+    observer.opsForValue().set(ExchangeBudget.sum(ExchangeBudget.memberScope("a", "m1")), "x");
+
+    assertThat(budget.reserve("a", "m1", "ingest:xch:idem:a:m1:2", 100L, Duration.ofHours(1)))
+        .isFalse();
+    assertThat(total(ExchangeBudget.memberScope("a", "m1"))).isEqualTo(3512L);
+  }
+
+  @Test
+  void aChargeThatOverflowsAnEmptyScopeWaitsTheFallback() {
+    assertThat(budget.retryAfterSeconds("z", "m9", SMALL.memberBytes()))
+        .as("no entry of the scope ever expires to make room")
+        .isEqualTo(ExchangeBudget.FALLBACK_RETRY_AFTER_SECONDS);
+  }
+
+  @Test
+  void furtherOpsOnACounterThatIsGoneFailClosed() {
+    ExchangeQuotas quotas = new ExchangeQuotas(template, budget, clock);
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setAttribute(ExchangeQuotas.COUNTED, ExchangeQuotas.PREFIX + "a:m1:2026-09-27");
+
+    assertThatThrownBy(() -> quotas.countFurtherOps(request, 2))
+        .isInstanceOf(ExchangeUnavailableException.class);
+    assertThat(observer.hasKey(ExchangeQuotas.PREFIX + "a:m1:2026-09-27"))
+        .as("adding to a missing counter creates none")
+        .isFalse();
   }
 
   @Test

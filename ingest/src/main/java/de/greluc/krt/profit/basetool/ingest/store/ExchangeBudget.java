@@ -28,25 +28,29 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import org.springframework.stereotype.Component;
 
 /**
  * The hard byte budget of the exchange data the gateway writes to Redis: per client and member, per
  * client and in total (REQ-XCH-023, ADR-0221). Every stored value registers {@code <key>|<charge>}
  * in a sorted set per scope, scored by its expiry, and each scope keeps its running total beside
- * it. One Lua script prunes expired entries, checks all three limits and records the entry
- * atomically, so parallel writes cannot overshoot and no call reads a whole set. The total's use
- * and each registry client's use are published as gauges, and a refusal's wait is read from the
- * expiries the sets are scored by.
+ * it. Each step prunes expired entries, checks all three limits and records the entry in one
+ * optimistic transaction (ADR-0389), so parallel writes cannot overshoot and no step reads a whole
+ * set. The total's use and each registry client's use are published as gauges, and a refusal's wait
+ * is read from the expiries the sets are scored by.
  */
 @Slf4j
 @Component
@@ -74,140 +78,18 @@ public class ExchangeBudget {
   static final int PRUNE_BATCH = 1000;
 
   /** Marks a limit that is not checked. */
-  private static final String UNCHECKED = "-1";
+  private static final long UNCHECKED = -1L;
 
-  /**
-   * The check-and-record script; its result is {@code <fits>:<member>:<client>:<total>}, whether
-   * the step was applied and the bytes each scope holds after it.
-   */
-  private static final RedisScript<String> SCRIPT =
-      new DefaultRedisScript<>(
-          """
-          local release = ARGV[3]
-          local add = ARGV[4]
-          local expiry = ARGV[5]
-          local ttl = ARGV[6]
-          local function size(entry)
-            return tonumber(string.match(entry, '|(%d+)$')) or 0
-          end
-          local function empty(set)
-            return #redis.call('ZRANGE', set, 0, 0) == 0
-          end
-          local used = {}
-          local present = {}
-          for i = 1, 3 do
-            local set = KEYS[i]
-            local raw = redis.call('GET', KEYS[i + 3])
-            local total = nil
-            if raw then
-              total = tonumber(raw)
-            end
-            if total == nil then
-              total = 0
-              for _, entry in ipairs(redis.call('ZRANGE', set, 0, -1)) do
-                total = total + size(entry)
-              end
-            end
-            local expired = redis.call('ZRANGEBYSCORE', set, '-inf', ARGV[1], 'LIMIT', 0, ARGV[2])
-            if #expired > 0 then
-              for _, entry in ipairs(expired) do
-                total = total - size(entry)
-              end
-              redis.call('ZREM', set, unpack(expired))
-            end
-            if empty(set) or total < 0 then
-              total = 0
-            end
-            used[i] = total
-            present[i] = release ~= '' and redis.call('ZSCORE', set, release) ~= false
-          end
-          local fits = 1
-          if add ~= '' then
-            local bytes = size(add)
-            for i = 1, 3 do
-              local limit = tonumber(ARGV[6 + i])
-              local freed = present[i] and size(release) or 0
-              if limit >= 0 and used[i] - freed + bytes > limit then
-                fits = 0
-              end
-            end
-          end
-          if fits == 1 then
-            for i = 1, 3 do
-              if present[i] then
-                redis.call('ZREM', KEYS[i], release)
-                used[i] = math.max(0, used[i] - size(release))
-              end
-              if add ~= '' and redis.call('ZADD', KEYS[i], 'GT', expiry, add) == 1 then
-                used[i] = used[i] + size(add)
-              end
-            end
-          end
-          for i = 1, 3 do
-            if empty(KEYS[i]) then
-              redis.call('DEL', KEYS[i + 3])
-              used[i] = 0
-            else
-              redis.call('SET', KEYS[i + 3], string.format('%d', used[i]), 'KEEPTTL')
-              for _, key in ipairs({KEYS[i], KEYS[i + 3]}) do
-                redis.call('PEXPIRE', key, ttl, 'NX')
-                redis.call('PEXPIRE', key, ttl, 'GT')
-              end
-            end
-          end
-          return string.format('%d:%d:%d:%d', fits, used[1], used[2], used[3])
-          """,
-          String.class);
+  /** The position of the client's scope among a step's three scopes. */
+  private static final int CLIENT = 1;
 
-  /**
-   * The wait script: for every scope whose limit a charge would overflow, it walks the scope's
-   * entries by expiry until enough bytes expire, and returns the longest such wait in milliseconds,
-   * or {@code 0} when the charge fits. When the entries it may read do not free enough, the scope's
-   * latest expiry stands in, the moment the whole scope is empty; {@code -1} when an overflowing
-   * scope holds no entry.
-   */
-  private static final RedisScript<Long> WAIT_SCRIPT =
-      new DefaultRedisScript<>(
-          """
-          local now = tonumber(ARGV[1])
-          local charge = tonumber(ARGV[2])
-          local walk = tonumber(ARGV[3])
-          local function size(entry)
-            return tonumber(string.match(entry, '|(%d+)$')) or 0
-          end
-          local wait = 0
-          for i = 1, 3 do
-            local limit = tonumber(ARGV[3 + i])
-            local used = tonumber(redis.call('GET', KEYS[i + 3]) or '0') or 0
-            local over = used + charge - limit
-            if over > 0 then
-              local freed = 0
-              local at = nil
-              local entries = redis.call('ZRANGE', KEYS[i], 0, walk - 1, 'WITHSCORES')
-              for j = 1, #entries, 2 do
-                freed = freed + size(entries[j])
-                if freed >= over then
-                  at = tonumber(entries[j + 1])
-                  break
-                end
-              end
-              if at == nil then
-                local last = redis.call('ZRANGE', KEYS[i], -1, -1, 'WITHSCORES')
-                if #last == 0 then
-                  return -1
-                end
-                at = tonumber(last[2])
-              end
-              if at - now > wait then
-                wait = at - now
-              end
-            end
-          end
-          return wait
-          """,
-          Long.class);
+  /** The position of the whole exchange's scope among a step's three scopes. */
+  private static final int TOTAL = 2;
 
-  /** The most entries per scope the wait script reads. */
+  /** The wait of a charge that overflows a scope holding no entry, which no expiry frees. */
+  private static final long NO_WAIT = -1L;
+
+  /** The most entries per scope the wait reads. */
   static final int WAIT_WALK = 1000;
 
   /** The shortest {@code Retry-After} of a budget refusal, in seconds. */
@@ -359,7 +241,8 @@ public class ExchangeBudget {
   }
 
   /**
-   * Runs the script for one client and member and keeps the gauges current.
+   * Runs one budget step for a client and member as an optimistic transaction and keeps the gauges
+   * current.
    *
    * @param clientId the client
    * @param member the member
@@ -368,7 +251,8 @@ public class ExchangeBudget {
    * @param ttl the added entry's lifetime
    * @param checked whether the limits are checked
    * @return {@code true} when the step was applied
-   * @throws ExchangeUnavailableException if Redis cannot be reached
+   * @throws ExchangeUnavailableException if Redis cannot be reached, or the step met a changed key
+   *     on every attempt
    */
   private boolean run(
       @NotNull String clientId,
@@ -378,39 +262,65 @@ public class ExchangeBudget {
       @NotNull Duration ttl,
       boolean checked) {
     long now = clock.millis();
-    Duration setTtl = ttl.compareTo(SET_TTL) > 0 ? ttl : SET_TTL;
-    List<String> sets = List.of(memberScope(clientId, member), clientScope(clientId), totalScope());
+    long expiry = now + ttl.toMillis();
+    long ttlMillis = Math.max(ttl.toMillis(), SET_TTL.toMillis());
+    List<String> sets = scopes(clientId, member);
+    long[] limits = checked ? limits() : new long[] {UNCHECKED, UNCHECKED, UNCHECKED};
     List<String> keys =
-        List.of(
-            sets.getFirst(),
-            sets.get(1),
-            sets.get(2),
-            sum(sets.getFirst()),
-            sum(sets.get(1)),
-            sum(sets.get(2)));
-    String result;
+        Stream.concat(sets.stream(), sets.stream().map(ExchangeBudget::sum)).toList();
+    Outcome outcome;
     try {
-      result =
-          redisTemplate.execute(
-              SCRIPT,
-              keys,
-              Long.toString(now),
-              Integer.toString(PRUNE_BATCH),
-              release,
-              add,
-              Long.toString(now + ttl.toMillis()),
-              Long.toString(setTtl.toMillis()),
-              checked ? Long.toString(properties.memberBytes()) : UNCHECKED,
-              checked ? Long.toString(properties.clientBytes()) : UNCHECKED,
-              checked ? Long.toString(properties.totalBytes()) : UNCHECKED);
+      outcome =
+          OptimisticTransaction.run(
+              redisTemplate, keys, () -> plan(sets, limits, now, release, add, expiry, ttlMillis));
     } catch (RuntimeException e) {
       log.warn("Exchange budget update failed: {}", e.getClass().getSimpleName());
       throw new ExchangeUnavailableException("The exchange budget cannot be reached.", e);
     }
-    long[] answer = parse(result);
-    clientGauge(clientId).set(answer[2]);
-    totalUsed.set(answer[3]);
-    return answer[0] == 1L;
+    clientGauge(clientId).set(outcome.client());
+    totalUsed.set(outcome.total());
+    return outcome.fits();
+  }
+
+  /**
+   * Reads the three scopes of a step and plans its writes: it prunes their expired entries and,
+   * when the added entry fits all three limits, releases and adds.
+   *
+   * @param sets the member's, the client's and the whole exchange's scope
+   * @param limits their limits, {@link #UNCHECKED} for none
+   * @param now the current time in epoch milliseconds
+   * @param release the entry to remove, or empty
+   * @param add the entry to add, or empty
+   * @param expiry the added entry's expiry in epoch milliseconds
+   * @param ttlMillis the least lifetime the sets and totals keep
+   * @return whether the entry fitted and what the client's and the total scope count afterwards
+   */
+  private OptimisticTransaction.@NotNull Plan<Outcome> plan(
+      @NotNull List<String> sets,
+      long @NotNull [] limits,
+      long now,
+      @NotNull String release,
+      @NotNull String add,
+      long expiry,
+      long ttlMillis) {
+    List<BudgetScope> scopes =
+        sets.stream()
+            .map(set ->
+                BudgetScope.read(redisTemplate, set, sum(set), now, PRUNE_BATCH, release, add))
+            .toList();
+    boolean fits =
+        add.isEmpty()
+            || IntStream.range(0, scopes.size())
+                .allMatch(i -> scopes.get(i).admits(release, add, limits[i]));
+    List<BudgetScope.Change> changes =
+        scopes.stream().map(scope -> scope.change(fits, release, add, expiry)).toList();
+    return OptimisticTransaction.Plan.write(
+        new Outcome(fits, changes.get(CLIENT).used(), changes.get(TOTAL).used()),
+        () -> {
+          for (int i = 0; i < scopes.size(); i++) {
+            scopes.get(i).write(redisTemplate, changes.get(i), release, add, expiry, ttlMillis);
+          }
+        });
   }
 
   /**
@@ -426,60 +336,112 @@ public class ExchangeBudget {
    * @return the seconds for {@code Retry-After}
    */
   public long retryAfterSeconds(@NotNull String clientId, @NotNull String member, long bytes) {
-    List<String> sets = List.of(memberScope(clientId, member), clientScope(clientId), totalScope());
-    Long waitMillis;
+    long waitMillis;
     try {
-      waitMillis =
-          redisTemplate.execute(
-              WAIT_SCRIPT,
-              List.of(
-                  sets.getFirst(),
-                  sets.get(1),
-                  sets.get(2),
-                  sum(sets.getFirst()),
-                  sum(sets.get(1)),
-                  sum(sets.get(2))),
-              Long.toString(clock.millis()),
-              Long.toString(charge(bytes)),
-              Integer.toString(WAIT_WALK),
-              Long.toString(properties.memberBytes()),
-              Long.toString(properties.clientBytes()),
-              Long.toString(properties.totalBytes()));
+      waitMillis = waitMillis(scopes(clientId, member), limits(), clock.millis(), charge(bytes));
     } catch (RuntimeException e) {
       log.warn("Exchange budget wait could not be read: {}", e.getClass().getSimpleName());
       return FALLBACK_RETRY_AFTER_SECONDS;
     }
-    if (waitMillis == null || waitMillis < 0) {
+    if (waitMillis == NO_WAIT) {
       return FALLBACK_RETRY_AFTER_SECONDS;
     }
     return Math.max(MIN_RETRY_AFTER_SECONDS, Math.ceilDiv(waitMillis, 1000L));
   }
 
   /**
-   * Parses the check-and-record script's answer.
+   * Returns how long a charge waits before it fits every scope, read without a transaction since
+   * the answer is only a hint: for each scope it would overflow, the time until enough of the
+   * scope's entries expire.
    *
-   * @param result {@code <fits>:<member>:<client>:<total>}, or {@code null}
-   * @return the four numbers in that order
-   * @throws ExchangeUnavailableException if the answer is missing or malformed
+   * @param sets the member's, the client's and the whole exchange's scope
+   * @param limits their limits
+   * @param now the current time in epoch milliseconds
+   * @param charge the bytes the entry is charged with
+   * @return the longest wait in milliseconds, zero when the charge fits now, or {@link #NO_WAIT}
+   *     when an overflowing scope holds no entry
    */
-  static long @NotNull [] parse(@Nullable String result) {
-    if (result == null) {
-      throw new ExchangeUnavailableException("The exchange budget answered nothing.", null);
-    }
-    String[] parts = result.split(":", -1);
-    if (parts.length != 4) {
-      throw new ExchangeUnavailableException("The exchange budget answered malformed.", null);
-    }
-    long[] numbers = new long[4];
-    try {
-      for (int i = 0; i < 4; i++) {
-        numbers[i] = Long.parseLong(parts[i]);
+  private long waitMillis(
+      @NotNull List<String> sets, long @NotNull [] limits, long now, long charge) {
+    long wait = 0L;
+    for (int i = 0; i < sets.size(); i++) {
+      Long used = StoredNumbers.parse(redisTemplate.opsForValue().get(sum(sets.get(i))));
+      long over = (used == null ? 0L : used) + charge - limits[i];
+      if (over > 0) {
+        OptionalLong freed = expiryFreeing(sets.get(i), over);
+        if (freed.isEmpty()) {
+          return NO_WAIT;
+        }
+        wait = Math.max(wait, freed.getAsLong() - now);
       }
-    } catch (NumberFormatException e) {
-      throw new ExchangeUnavailableException("The exchange budget answered malformed.", e);
     }
-    return numbers;
+    return wait;
   }
+
+  /**
+   * Returns when enough of a scope's entries have expired to free the given bytes, walking at most
+   * {@link #WAIT_WALK} entries in expiry order; when they do not free enough, the scope's latest
+   * expiry, the moment the scope is empty.
+   *
+   * @param set the scope's sorted set
+   * @param bytes the bytes to free
+   * @return the expiry in epoch milliseconds, or empty when the scope holds no entry
+   */
+  private @NotNull OptionalLong expiryFreeing(@NotNull String set, long bytes) {
+    ZSetOperations<String, String> entries = redisTemplate.opsForZSet();
+    Set<TypedTuple<String>> walk = entries.rangeWithScores(set, 0, WAIT_WALK - 1L);
+    long freed = 0L;
+    for (TypedTuple<String> entry : walk == null ? Set.<TypedTuple<String>>of() : walk) {
+      String value = entry.getValue();
+      freed += value == null ? 0L : BudgetScope.chargeOf(value);
+      if (freed >= bytes) {
+        return expiryOf(entry);
+      }
+    }
+    Set<TypedTuple<String>> last = entries.rangeWithScores(set, -1, -1);
+    return last == null || last.isEmpty() ? OptionalLong.empty() : expiryOf(last.iterator().next());
+  }
+
+  /**
+   * Returns an entry's expiry, its score.
+   *
+   * @param entry the entry with its score
+   * @return the expiry in epoch milliseconds, or empty when Redis returned no score
+   */
+  private static @NotNull OptionalLong expiryOf(@NotNull TypedTuple<String> entry) {
+    Double score = entry.getScore();
+    return score == null ? OptionalLong.empty() : OptionalLong.of(score.longValue());
+  }
+
+  /**
+   * Returns the three scopes of a client and member.
+   *
+   * @param clientId the client
+   * @param member the member
+   * @return the member's, the client's and the whole exchange's sorted set, in that order
+   */
+  private static @NotNull @Unmodifiable List<String> scopes(
+      @NotNull String clientId, @NotNull String member) {
+    return List.of(memberScope(clientId, member), clientScope(clientId), totalScope());
+  }
+
+  /**
+   * Returns the configured limits in the order of {@link #scopes}.
+   *
+   * @return the member's, the client's and the total budget in bytes
+   */
+  private long @NotNull [] limits() {
+    return new long[] {properties.memberBytes(), properties.clientBytes(), properties.totalBytes()};
+  }
+
+  /**
+   * What a budget step did.
+   *
+   * @param fits whether the entry fitted, so the step released and added
+   * @param client the bytes the client's scope counts afterwards
+   * @param total the bytes the whole exchange's scope counts afterwards
+   */
+  private record Outcome(boolean fits, long client, long total) {}
 
   /**
    * Returns the holder of a client's last measured use, registering its gauge on first use; the

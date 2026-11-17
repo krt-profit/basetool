@@ -1782,8 +1782,8 @@ a per-period limit is `429 RATE_LIMITED`, over the quota `429 QUOTA_EXCEEDED`, e
 SERVICE_UNAVAILABLE` with `Retry-After: 30`, never a free pass. Every attempt at a write route
 counts, retries, replays and refusals included, except a `503 EXCHANGE_BUDGET_EXHAUSTED`: the
 limit filter notes the counter on the request (`ExchangeQuotas.COUNTED`) and a budget refusal gives
-that one count back (a Lua `GET` and `SET KEEPTTL` that never goes below zero or creates a
-counter). Before, a client that honoured the refusal's `Retry-After` burned its 500 writes in
+that one count back (a `GET` and a `DECRBY` in one optimistic transaction that never goes below
+zero or creates a counter, ADR-0389). Before, a client that honoured the refusal's `Retry-After` burned its 500 writes in
 about eight hours of refusals (load test of 2026-09-28, finding 5). Every admitted answer carries
 `RateLimit-Policy: <limit>;w=60` and `RateLimit: limit=…, remaining=…, reset=…` for the member's
 bucket. The in-process buckets live per gateway instance and are bounded (least recently used out).
@@ -1827,11 +1827,14 @@ needs these moved to Redis first — or accepted as a new risk — and this requ
 registers `<key>|<charge>` in three sorted sets — `ingest:xch:budget:m:<client>:<member>`,
 `…:c:<client>` and `…:all` — scored by its expiry, and each set keeps its running total beside it
 (`ingest:xch:budget-sum:m:…`, `…:c:…`, `…:all`). An entry's charge is the value's bytes plus a fixed
-512 bytes for its three set members and the key's own bookkeeping in Redis. One Lua script does each
-step atomically: it prunes up to 1000 expired entries per set (subtracting them from the total),
-checks all three limits and records the entry — so parallel writes cannot overshoot a budget, and no
-step reads a whole set. A total that is missing is rebuilt from its set once; the sets and totals
-expire together, never before their longest entry.
+512 bytes for its three set members and the key's own bookkeeping in Redis. Each step runs as one
+optimistic transaction (ADR-0389): it watches the three sets and their totals, prunes up to 1000
+expired entries per set (subtracting them from the total), checks all three limits and records the
+entry between `MULTI` and `EXEC`, and runs again when another write changed one of those keys in
+between — so parallel writes cannot overshoot a budget, and no step reads a whole set. A step that
+meets a changed key on 32 attempts in a row fails like an unreachable Redis. A total that is missing
+or garbled is rebuilt from its set once; the sets and totals expire together, never before their
+longest entry.
 
 Before a write runs, the gateway reserves the largest cacheable answer (32 KiB) plus its lock against
 all three budgets under the lock's key and refuses with `503 EXCHANGE_BUDGET_EXHAUSTED` when one
@@ -1874,8 +1877,9 @@ release under the owner's per-action approval and recorded in
 [`approved-clients.md`](../legal/approved-clients.md).
 
 **When a refused write may retry.** The sets are scored by expiry, so the refusal's
-`Retry-After` is read from them: for every scope the write's charge would overflow, a read-only
-script walks up to 1000 entries in expiry order until the bytes expiring cover the overflow, and
+`Retry-After` is read from them: for every scope the write's charge would overflow, the gateway
+reads up to 1000 entries in expiry order, without a transaction since the answer is a hint, until
+the bytes expiring cover the overflow, and
 the longest such wait is the answer, in whole seconds rounded up and at least 1. When the entries
 read never free enough, the scope's latest expiry stands in — the moment the scope is empty — so
 `Retry-After` is never shorter than the time until the write fits the budget as it stands. It
@@ -1895,8 +1899,9 @@ What the budget counts, and what stays an estimate:
 The budget therefore bounds the exchange's data within a known margin of Redis's real memory use;
 it is not a byte-exact measurement of it.
 
-The ingest ACL user runs these scripts with `EVAL`/`EVALSHA`; Redis checks every command a script
-issues against the same user's key patterns and commands (REQ-SEC-068).
+The ingest ACL user runs these steps with `WATCH`, `MULTI` and `EXEC` and sends no script; Redis
+checks every command, `WATCH` included, against the same user's key patterns and commands
+(REQ-SEC-068, ADR-0389).
 
 **Acceptance**
 

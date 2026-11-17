@@ -274,7 +274,15 @@ refuses, writing nothing, when a variable is missing or the result lacks exactly
 | `monitoring` | `REDIS_EXPORTER_PASSWORD` | introspection for `redis-exporter`; no key, no `SCAN` (a key's name is a session id) |
 | `basetool-frontend` | `REDIS_FRONTEND_PASSWORD` | `basetool:session:*`, `GETDEL` of `ingest:handoff:*`, the session-event, keyspace-event and live-sync channels, `SCAN`, `INFO` |
 | `basetool-backend` | `REDIS_BACKEND_PASSWORD` | `GET`/`SET` on `exchange:*` (the exchange registry mirror, ADR-0221), publish/subscribe on `basetool:livesync:changed` and `basetool:notify:published`, `INFO` |
-| `basetool-ingest` | `REDIS_INGEST_PASSWORD` | strings, lists and sorted sets on `ingest:*` (`GET`, `SET`, `SETEX`, `PSETEX`, `INCR`, `RPUSH`, `LPOP`, `ZADD`, `ZRANGE`, `ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `EXPIRE`, `PEXPIRE`, `DEL`) and `EVAL`/`EVALSHA` for the exchange's budget and idempotency-lock scripts, whose commands the same rules check; read-only `GET` of `exchange:*`; `INFO`; no channel, no `SCAN` |
+| `basetool-ingest` | `REDIS_INGEST_PASSWORD` | strings, lists and sorted sets on `ingest:*` (`GET`, `SET`, `SETEX`, `PSETEX`, `INCR`, `INCRBY`, `DECRBY`, `RPUSH`, `LPOP`, `ZADD`, `ZRANGE`, `ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `EXPIRE`, `PEXPIRE`, `DEL`) and the optimistic transactions of the exchange's budget, quotas and idempotency lock (`WATCH`, `UNWATCH`, `MULTI`, `EXEC`, `DISCARD`, ADR-0389); `EVAL`/`EVALSHA` only until production runs the release without scripts; read-only `GET` of `exchange:*`; `INFO`; no channel, no `SCAN` |
+
+**Removing scripting from the gateway** (ADR-0389) takes two renders. Before the release that runs the
+exchange's steps as transactions, render and load the template that grants both the transaction
+commands and `EVAL`/`EVALSHA`: the running release still sends scripts, the new one sends
+transactions. Once production runs that release, the follow-up change (#3494) drops `EVAL`/`EVALSHA`
+from the template; render and load it again, and `ACL DRYRUN basetool-ingest EVAL "return 1" 0` must answer
+with a refusal. In the other order every exchange write is refused `503` until the second step
+follows.
 
 An application reaches Redis as its own user only when its `REDIS_<SVC>_USERNAME` is set; with it
 empty it sends a password-only `AUTH` with the shared `REDIS_PASSWORD`, which is the `default` user —
