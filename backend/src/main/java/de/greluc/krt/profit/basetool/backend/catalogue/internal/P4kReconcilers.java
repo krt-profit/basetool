@@ -82,7 +82,7 @@ class P4kReconcilers {
         catalogue.paints(), catalogue.head().isComplete(P4kCatalogue.PAINTS), context);
     loadoutReconciler.reconcile(loadouts, catalogue, context);
     if (context.isApply()) {
-      shipRepairs.forEach(repair -> repair.selection().finishShipRepair(context.getNow()));
+      shipRepairs.forEach(repair -> repair.finish(context.getNow()));
     }
     if (!catalogue.starmapObjects().isEmpty()) {
       starmapLinker.link(starmapReconciler.reconcile(catalogue.starmapObjects(), context), context);
