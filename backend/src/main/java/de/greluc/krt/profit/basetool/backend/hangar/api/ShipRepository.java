@@ -116,6 +116,17 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   List<Ship> lockAllOwnedByOrderById(@Param("owner") UUID owner);
 
   /**
+   * Locks every ship of a ship type in ascending id order, so a ship-type merge can move them onto
+   * the ship type that stays (REQ-DATA-042).
+   *
+   * @param shipTypeId the ship type being merged away
+   * @return its ships, locked for this transaction, ordered by id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT s FROM Ship s WHERE s.shipType.id = :shipTypeId ORDER BY s.id")
+  List<Ship> lockAllByShipTypeId(@Param("shipTypeId") UUID shipTypeId);
+
+  /**
    * The ships a patch wipe removes (REQ-PATCH-015): bought in-game by the owner's choice, never a
    * ship whose origin an import or a pledge id locked, created before the cutoff or undated.
    */

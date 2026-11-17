@@ -37,6 +37,7 @@ const TYPES = [
     'REAPPEARED',
     'UNMATCHED',
     'COVERED',
+    'MERGED',
     'REVIEW',
     'IDENTITY_MISMATCH',
     'UNKNOWN_VALUE',

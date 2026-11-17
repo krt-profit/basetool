@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
@@ -36,12 +37,9 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import jakarta.persistence.EntityManagerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,7 +74,6 @@ class MissionOperationReadNoNPlusOneTest {
   @Autowired private MissionRepository missionRepository;
   @Autowired private OperationRepository operationRepository;
   @Autowired private SquadronRepository squadronRepository;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private PlatformTransactionManager transactionManager;
 
   private Squadron unit;
@@ -118,18 +115,15 @@ class MissionOperationReadNoNPlusOneTest {
   }
 
   @Test
-  void aPageOfMissionsEmbedsItsOperationsWithAStatementCountIndependentOfItsSize() {
+  void aPageOfMissionsEmbedsItsOperationsWithAStatementCountIndependentOfItsSize()
+      throws Exception {
     String fewTag = seed(FEW);
     String manyTag = seed(MANY);
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
 
-    stats.clear();
-    List<MissionListDto> few = listRows(fewTag);
-    long fewStatements = stats.getPrepareStatementCount();
-    stats.clear();
-    List<MissionListDto> many = listRows(manyTag);
-    long manyStatements = stats.getPrepareStatementCount();
+    var fewRead = measured(() -> listRows(fewTag));
+    var manyRead = measured(() -> listRows(manyTag));
+    List<MissionListDto> few = fewRead.result();
+    List<MissionListDto> many = manyRead.result();
 
     assertThat(few).hasSize(FEW + 1);
     assertThat(many).hasSize(MANY + 1);
@@ -141,9 +135,10 @@ class MissionOperationReadNoNPlusOneTest {
           assertThat(row.operation().owningSquadron().id()).isEqualTo(unit.getId());
         });
     assertThat(many).filteredOn(row -> row.operation() == null).hasSize(1);
-    assertThat(manyStatements)
+    assertThat(manyRead.statements())
         .as("statements for " + MANY + " missions against " + FEW + " (N+1)")
-        .isEqualTo(fewStatements)
+        .isPositive()
+        .isEqualTo(fewRead.statements())
         .isLessThanOrEqualTo(STATEMENT_BOUND);
   }
 

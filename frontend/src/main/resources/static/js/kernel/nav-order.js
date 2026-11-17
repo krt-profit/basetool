@@ -86,8 +86,9 @@ function conflict(state, status) {
 }
 
 /**
- * Saves the order of one scope and, on success, takes over the version the server returned. A
- * failed save puts the lists back as the server has them.
+ * Saves the order of one scope and, on success, takes over the version the server returned before
+ * the next write queued on {@link WRITE_LOCK} reads it. A failed save puts the lists back as the
+ * server has them.
  *
  * @param {'member' | 'admin'} mode the navigation mode
  * @param {string} scope {@link GROUPS_SCOPE} or the key of the group whose links moved
@@ -108,6 +109,16 @@ async function saveScope(mode, scope, keys) {
         toast: false,
         errorMessage: state.dataset.orderError,
         onError: (status) => conflict(state, status),
+        onSuccess: (body) => {
+            state.dataset[field] = String(body?.version ?? state.dataset[field]);
+            document
+                .querySelectorAll(`[data-trigger="nav-order-reset"][data-mode="${mode}"]`)
+                .forEach((button) => {
+                    if (button instanceof HTMLButtonElement) {
+                        button.disabled = false;
+                    }
+                });
+        },
     });
     if (!result.ok) {
         if (result.status !== 409) {
@@ -116,14 +127,6 @@ async function saveScope(mode, scope, keys) {
         focusFirst([TOGGLE_SELECTOR]);
         return false;
     }
-    state.dataset[field] = String(result.body?.version ?? state.dataset[field]);
-    document
-        .querySelectorAll(`[data-trigger="nav-order-reset"][data-mode="${mode}"]`)
-        .forEach((button) => {
-            if (button instanceof HTMLButtonElement) {
-                button.disabled = false;
-            }
-        });
     return true;
 }
 
@@ -182,8 +185,8 @@ function attachLinks(links) {
 
 /**
  * Saves the order of one mode's favourites and, on success, takes over the version the server
- * returned and tells the rail and the shortcut hints. A failed save puts the lists back as the
- * server has them.
+ * returned and the stored keys before the next write queued on {@link WRITE_LOCK} reads them, then
+ * tells the rail and the shortcut hints. A failed save puts the lists back as the server has them.
  *
  * @param {string[]} moved the mode's favourites in their new order
  * @returns {Promise<boolean>} whether the server accepted the order
@@ -202,6 +205,10 @@ async function saveFavourites(moved) {
         toast: false,
         errorMessage: state.dataset.error,
         onError: (status) => conflict(state, status),
+        onSuccess: (body) => {
+            state.dataset.version = String(body?.version ?? state.dataset.version);
+            state.dataset.keys = keys.join(' ');
+        },
     });
     if (!result.ok) {
         if (result.status !== 409) {
@@ -210,8 +217,6 @@ async function saveFavourites(moved) {
         focusFirst([TOGGLE_SELECTOR]);
         return false;
     }
-    state.dataset.version = String(result.body?.version ?? state.dataset.version);
-    state.dataset.keys = keys.join(' ');
     document.dispatchEvent(new CustomEvent(NAV_FAVOURITES_ORDER_EVENT, { detail: { keys } }));
     return true;
 }

@@ -34,6 +34,11 @@ public enum P4kChangeType {
    */
   COVERED,
 
+  /**
+   * A second ship type of a record's ship, merged into the row holding the record (REQ-P4K-053).
+   */
+  MERGED,
+
   /** A review case the run found (REQ-P4K-016); {@code field_name} holds its reason. */
   REVIEW,
 

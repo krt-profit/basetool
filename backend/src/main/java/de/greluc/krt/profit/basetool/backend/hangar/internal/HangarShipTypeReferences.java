@@ -19,10 +19,23 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeReassignmentParticipant;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeReferenceParticipant;
+import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,12 +44,20 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Reports the ship types a member's hangar ship is of (REQ-P4K-052). */
+/**
+ * The hangar's ship type references: the ship types a member's ship is of (REQ-P4K-052), moved onto
+ * the ship type that stays when two are merged (REQ-DATA-042).
+ */
 @Component
 @RequiredArgsConstructor
-public class HangarShipTypeReferences implements ShipTypeReferenceParticipant {
+public class HangarShipTypeReferences
+    implements ShipTypeReferenceParticipant, ShipTypeReassignmentParticipant {
 
   private final EntityManager entityManager;
+  private final ShipRepository shipRepository;
+  private final AuditRecorder auditRecorder;
+  private final LiveSyncPublisher liveSync;
+  private final HangarUnitLiveSync unitLiveSync;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
@@ -50,5 +71,36 @@ public class HangarShipTypeReferences implements ShipTypeReferenceParticipant {
                 "SELECT DISTINCT s.shipType.id FROM Ship s WHERE s.shipType.id IN :ids", UUID.class)
             .setParameter("ids", shipTypeIds)
             .getResultList());
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public int reassignShipType(@NotNull UUID retiredId, @NotNull UUID survivorId) {
+    List<Ship> ships = shipRepository.lockAllByShipTypeId(retiredId);
+    if (ships.isEmpty()) {
+      return 0;
+    }
+    ShipType survivor = entityManager.getReference(ShipType.class, survivorId);
+    Set<UUID> owners = new HashSet<>();
+    List<OrgUnit> units = new ArrayList<>();
+    for (Ship ship : ships) {
+      ship.setShipType(survivor);
+      UUID owner = ship.getOwner().getId();
+      owners.add(owner);
+      units.add(ship.getOwningOrgUnit());
+      auditRecorder.record(
+          AuditEventType.HANGAR_SHIP_CATALOGUE_REASSIGNED,
+          ship.getId(),
+          survivor.getName(),
+          owner,
+          AuditDetails.of("retiredShipType", retiredId).with("survivorShipType", survivorId));
+    }
+    entityManager.flush();
+    owners.forEach(owner ->
+        liveSync.publishAfterCommit(
+            LiveSyncTopic.of(LiveSyncTopicClass.HANGAR_OWN, owner),
+            List.of(HangarUnitLiveSync.SHIPS)));
+    unitLiveSync.shipsChanged(units);
+    return ships.size();
   }
 }

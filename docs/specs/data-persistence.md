@@ -1464,6 +1464,11 @@ request and no sync writes it.
     the census and its class name differs from the Wiki vehicle's — is reported as
     `SOURCE_IDENTITY_CONFLICT` and leaves the Wiki vehicle unlinked, but keeps the census complete.
     Without both class names, or with equal ones, it stays a blocking conflict.
+  - **A name shared by a base and its variants goes to the base.** When exactly one of the Wiki
+    vehicles carrying the name has a class name that every other carrier's class name extends by an
+    underscore suffix (`RSI_Galaxy` for `RSI_Galaxy_TEMP_Cargo` and `RSI_Galaxy_TEMP_Medical`), that
+    base vehicle links the holding row by name and the others are reported as covered siblings, so
+    the census stays complete. Without such a base the shared name stays a blocking conflict.
 - **The P4K import** resolves by `external_uuid`, then the class name, and when no row carries the
   class name, the ship type that holds the aliased UEX vehicle id, then the name.
 - A row matched through the alias keeps its own `name`; each source writes only its own columns, as
@@ -1489,6 +1494,8 @@ request and no sync writes it.
   moves a game UUID the census still carries.
 - [x] A name held by a departed vehicle of another class is reported without blocking the sweep;
   the same class name still blocks it.
+- [x] The base of a shared name links the stored row whatever the census order, its variants count
+  as covered and the sweep runs; carriers without a base among them still block it.
 - [x] The V310 merge moves every reference onto the survivor, carries the UEX columns over, bumps
   the versions and deletes the UEX half; a half that is not `UEX_ONLY`, or an ambiguous class name,
   merges nothing.
@@ -1869,6 +1876,29 @@ twin under the short name. So each name step tries the short name first, then th
   (`UexVehicleServiceUuidMatchTest`, `UexIdentityCensusTest`).
 - [x] A stale UEX game UUID neither replaces nor blocks a row whose UUID its P4K GUID confirms and is
   reported; an unconfirmed differing UUID still blocks the write (`UexVehicleServiceUuidMatchTest`).
+
+### REQ-DATA-042 — two ship types of one game ship merge without breaking references
+
+A ship type created a second time for the same game ship is merged into the one that stays, in
+the caller's transaction. Both rows are locked in id order first, which fences new references. Each
+module moves its own references through `ShipTypeReassignmentParticipant`: hangar ships, mission
+units, mission template units and the items the catalogue links to a vehicle. It works on the
+managed rows, so every changed row keeps its optimistic lock, and audits it in its own area:
+`HANGAR_SHIP_CATALOGUE_REASSIGNED`, `MISSION_CATALOGUE_REASSIGNED`. The catalogue records the merge
+as `CATALOGUE_SHIP_TYPE_MERGED` with the merged id, the evidence and the number of moved
+references. The open hangar and template views hear of the change through live sync.
+
+The survivor takes the Wiki identity of the merged row when it has none, or when the merged row's
+Wiki UUID is the P4K GUID the survivor holds once the caller's run is through, and the UEX identity
+when it has none. Both rows are kept as JSON in `ship_type_redirect`. The merged id stays
+resolvable through `findById`, `existsById`, `findAllById` and `getReferenceById` of
+`ShipTypeRepository`. The exchange resolves it as a `bt` reference and names journal entries by it;
+the append-only journal keeps the merged id. A row holding a P4K GUID is merged away only when its
+record left the catalogue (REQ-P4K-053); otherwise it never is (REQ-P4K-007).
+
+**Enforced by:** `ShipTypeMergeServiceTest` · **Code:** `ShipTypeMergeService`,
+`ShipTypeIdentityReferences`, `ShipTypeReassignmentParticipant` and its implementations · **ADR:**
+[ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
 
 ### REQ-DATA-043 — a ship UEX lists twice keeps one listing
 

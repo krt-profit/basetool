@@ -19,10 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeReassignmentParticipant;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeReferenceParticipant;
 import jakarta.persistence.EntityManager;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,10 +35,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Reports the ship types a catalogue item names as the vehicle it belongs to (REQ-P4K-052). */
+/**
+ * The catalogue's own ship type references: the vehicle a catalogue item belongs to (REQ-P4K-052),
+ * moved onto the ship type that stays when two are merged (REQ-DATA-042); the merge's own audit
+ * event counts them.
+ */
 @Component
 @RequiredArgsConstructor
-public class CatalogueShipTypeReferences implements ShipTypeReferenceParticipant {
+public class CatalogueShipTypeReferences
+    implements ShipTypeReferenceParticipant, ShipTypeReassignmentParticipant {
 
   private final EntityManager entityManager;
 
@@ -52,5 +61,23 @@ public class CatalogueShipTypeReferences implements ShipTypeReferenceParticipant
                 UUID.class)
             .setParameter("ids", shipTypeIds)
             .getResultList());
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public int reassignShipType(@NotNull UUID retiredId, @NotNull UUID survivorId) {
+    List<GameItem> items =
+        entityManager
+            .createQuery(
+                "SELECT g FROM GameItem g WHERE g.linkedShipType.id = :id ORDER BY g.id",
+                GameItem.class)
+            .setParameter("id", retiredId)
+            .getResultList();
+    ShipType survivor = entityManager.getReference(ShipType.class, survivorId);
+    items.forEach(item -> item.setLinkedShipType(survivor));
+    if (!items.isEmpty()) {
+      entityManager.flush();
+    }
+    return items.size();
   }
 }

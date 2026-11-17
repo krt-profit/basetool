@@ -132,6 +132,26 @@ public final class P4kImportReport {
   }
 
   /**
+   * Records a second row of a record's ship merged into the row of its GUID (REQ-P4K-053).
+   *
+   * @param kind the kind
+   * @param record the record the surviving row holds
+   * @param retiredName the name of the row merged away
+   * @param survivorName the name of the row that stays
+   */
+  public void merged(
+      @NotNull P4kKind kind,
+      @NotNull P4kRecord record,
+      @Nullable String retiredName,
+      @Nullable String survivorName) {
+    P4kImportChange change = row(kind, record, P4kChangeType.MERGED);
+    change.setFieldName("name");
+    change.setOldValue(shorten(retiredName));
+    change.setNewValue(shorten(survivorName));
+    add(change);
+  }
+
+  /**
    * Records a row the run created.
    *
    * @param kind the kind

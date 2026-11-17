@@ -48,7 +48,8 @@ import org.springframework.stereotype.Component;
  * (REQ-P4K-031), fill the descriptions where empty, stamp, create a playable unmatched ship behind
  * the run's checkbox (REQ-P4K-009), keep the variant groups (REQ-P4K-032), cross-check the store
  * slugs, and settle the ship cases an APPLY no longer finds; a ship a stored ship type already
- * stands for is covered (REQ-P4K-050).
+ * stands for is covered (REQ-P4K-050), and a second row of a record's ship is merged into the row
+ * of its GUID first (REQ-P4K-053).
  */
 @Component
 @RequiredArgsConstructor
@@ -76,6 +77,7 @@ public class P4kShipReconciler {
   private final P4kShipClassAliases classAliases;
   private final P4kRunResolvedCases resolvedCases;
   private final P4kSeededShipRetirement seededRetirement;
+  private final P4kShipTwins twins;
 
   /**
    * Reconciles every ship, then the variant groups and the store slugs; the manufacturers must be
@@ -90,27 +92,35 @@ public class P4kShipReconciler {
       @NotNull P4kCatalogue catalogue,
       @NotNull P4kLoadoutReconciler.LoadoutStream loadouts,
       @NotNull P4kImportContext context) {
-    List<ShipType> all = shipTypeRepository.findAll();
-    Set<UUID> retired = seededRetirement.retire(all, catalogue.ships(), context);
-    Map<String, List<ShipType>> aliased = classAliases.byClassName(all);
-    List<P4kShipBaseRepairs.Repair> repairs =
-        baseRepairs.eligible(catalogue, loadouts, all, aliased, retired, context);
-    Set<UUID> repairRows =
-        repairs.stream()
-            .map(repair -> Objects.requireNonNull(repair.row().getId()))
+    List<ShipType> found = shipTypeRepository.findAll();
+    Set<UUID> retired = seededRetirement.retire(found, catalogue.ships(), context);
+    List<P4kShipTwins.Twin> twinRows =
+        twins.find(found, catalogue.ships(), catalogue.head().isComplete(P4kKind.SHIP), retired);
+    Set<UUID> twinIds =
+        twinRows.stream()
+            .map(twin -> Objects.requireNonNull(twin.row().getId()))
             .collect(Collectors.toUnmodifiableSet());
-    List<ShipType> stored =
-        repairs.isEmpty()
-            ? all
-            : all.stream().filter(row -> !repairRows.contains(row.getId())).toList();
+    List<ShipType> candidates = withoutRows(found, twinIds);
+    Map<String, List<ShipType>> aliased = classAliases.byClassName(candidates);
+    List<P4kShipBaseRepairs.Repair> repairs =
+        baseRepairs.eligible(catalogue, loadouts, candidates, aliased, retired, context);
+    Map<UUID, UUID> moves =
+        repairs.stream()
+            .collect(
+                Collectors.toMap(
+                    repair -> Objects.requireNonNull(repair.row().getId()),
+                    P4kShipBaseRepairs.Repair::baseGuid,
+                    (first, _) -> first));
+    Set<UUID> repairRows = moves.keySet();
+    List<ShipType> all = withoutRows(found, twins.merge(twinRows, moves, context));
+    List<ShipType> stored = withoutRows(all, repairRows);
     P4kRowIndex<ShipType> rows =
         new P4kRowIndex<>(
             stored, ShipType::getExternalUuid, ShipType::getClassName, ShipType::getName);
     context.indexShipRows(rows);
     repairs.forEach(repair -> repair(repair, context));
     if (!repairRows.isEmpty()) {
-      aliased.replaceAll((_, matches) ->
-          matches.stream().filter(row -> !repairRows.contains(row.getId())).toList());
+      aliased.replaceAll((_, matches) -> withoutRows(matches, repairRows));
     }
     P4kShipCoverage coverage = P4kShipCoverage.of(catalogue.ships());
     P4kRowMatcher<ShipType> matcher =
@@ -163,6 +173,20 @@ public class P4kShipReconciler {
       settleCases(catalogue, context);
     }
     return repairs;
+  }
+
+  /**
+   * Leaves some ship types out of a list.
+   *
+   * @param rows the ship types
+   * @param left the ids to leave out
+   * @return the ship types whose id is not among them, in their order
+   */
+  @NotNull
+  private static List<ShipType> withoutRows(@NotNull List<ShipType> rows, @NotNull Set<UUID> left) {
+    return left.isEmpty()
+        ? rows
+        : rows.stream().filter(row -> !left.contains(row.getId())).toList();
   }
 
   /**

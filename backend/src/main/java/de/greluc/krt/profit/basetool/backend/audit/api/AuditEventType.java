@@ -44,6 +44,10 @@ public enum AuditEventType {
   PURCHASING_CATALOGUE_REASSIGNED(AuditDomain.PURCHASING),
   /** A Materialbörse item offer or request was linked to the surviving catalogue item. */
   MARKET_CATALOGUE_REASSIGNED(AuditDomain.MARKET),
+  /** A hangar ship was linked to the ship type its own was merged into. */
+  HANGAR_SHIP_CATALOGUE_REASSIGNED(AuditDomain.HANGAR),
+  /** A mission or template unit was linked to the ship type its own was merged into. */
+  MISSION_CATALOGUE_REASSIGNED(AuditDomain.MISSION),
   /** A warehouse inventory row was created. */
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
   /** A false original physical quantity and its connected retained stock facts were corrected. */
@@ -821,6 +825,8 @@ public enum AuditEventType {
   CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED(AuditDomain.CATALOGUE),
   /** An admin hid or showed a ship type. */
   CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
+  /** A ship type created a second time was merged into the ship type of the same game ship. */
+  CATALOGUE_SHIP_TYPE_MERGED(AuditDomain.CATALOGUE),
   /** An admin created a location. */
   CATALOGUE_LOCATION_CREATED(AuditDomain.CATALOGUE),
   /** An admin edited a location. */
