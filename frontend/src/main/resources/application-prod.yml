@@ -53,6 +53,11 @@ management:
 app:
   backend-url: ${BACKEND_URL:https://backend:11261}
   backend-health-url: ${BACKEND_HEALTH_URL:https://backend:11271}
+  shared-redis:
+    host: redis
+    port: 6379
+    username: ${REDIS_SHARED_USERNAME:}
+    password: ${REDIS_SHARED_PASSWORD}
   logging:
     structured-enabled: true
   client-ip:

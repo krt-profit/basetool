@@ -35,6 +35,7 @@ services:
       SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
       KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/basetool
       REDIS_HOST: redis
+      REDIS_SHARED_HOST: redis
       BACKEND_URL: https://backend:11261
     extra_hosts:
       - "host.docker.internal:host-gateway"

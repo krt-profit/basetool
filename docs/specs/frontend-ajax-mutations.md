@@ -2675,8 +2675,9 @@ check alongside the regular generated-source parity checks.
 Since 2026-10-10 (plan §5.9, F4) a domain's frontend code lives in its own package tree:
 `frontend.<domain>.web` holds its controllers, view rows and view helpers, `frontend.<domain>.model`
 its DTO mirrors, forms and view models, `frontend.<domain>.client` its typed backend client
-(REQ-FE-029). The kernel lives in eight packages: `kernel.backend`, `kernel.security`,
-`kernel.session`, `kernel.layout`, `kernel.web`, `kernel.livesync`, `kernel.observability` and
+(REQ-FE-029). The kernel lives in nine packages: `kernel.backend`, `kernel.security`,
+`kernel.session`, `kernel.redis`, `kernel.layout`, `kernel.web`, `kernel.livesync`,
+`kernel.observability` and
 `kernel.model` (`PageResponse`, `PayoutPreference`, the handoff types, `BackendEnumAsString`, the
 marker below and the reference DTOs several domains share).
 

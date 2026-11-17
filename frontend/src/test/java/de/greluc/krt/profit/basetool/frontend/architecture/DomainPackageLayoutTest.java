@@ -68,7 +68,8 @@ class DomainPackageLayoutTest {
   private static final Pattern KNOWN_PACKAGE =
       Pattern.compile(
           Pattern.quote(BASE)
-              + "\\.(kernel\\.(backend|security|session|layout|web|livesync|model|observability)"
+              + "\\.(kernel\\.(backend|security|session|redis|layout|web|livesync|model"
+              + "|observability)"
               + "|(?!kernel\\.)[a-z]+\\.(web|model|client))");
 
   /** The one class of the base package. */

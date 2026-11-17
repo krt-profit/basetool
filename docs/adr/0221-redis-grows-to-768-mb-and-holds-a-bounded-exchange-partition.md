@@ -5,7 +5,8 @@
   ACL rows with epic #2078); the production ACL render precedes the go-live release and the resize
   arrives with it ([#2092](https://github.com/krt-profit/basetool/issues/2092), amendment 2). Amends [ADR-0085](0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md) (the
   Redis ceiling) and [ADR-0207](0207-each-service-reaches-redis-as-its-own-acl-user.md) (two new key
-  families in the ACL).
+  families in the ACL). Amendment 1's scripts are replaced by optimistic transactions in
+  [ADR-0389](0389-the-ingest-gateway-runs-no-lua-in-redis.md).
 - **Date:** 2026-09-26
 - **Deciders:** @greluc
 - **Related:** `REQ-OPS-018`, `REQ-SEC-068` · [ADR-0079](0079-redis-session-store-aof-and-maxmemory-noeviction.md) ·

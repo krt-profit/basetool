@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.notification.internal;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationStreamService;
 import de.greluc.krt.profit.basetool.backend.notification.api.RedisNotificationFanout;
-import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
+import de.greluc.krt.profit.basetool.technical.redis.ResilientRedisMessageListenerContainer;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
