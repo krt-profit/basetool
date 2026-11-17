@@ -290,6 +290,13 @@ not happened.
   `REDIS_DEFAULT_USER` is `off` there
   ([`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl)). Left behind: a release
   rollback to 1.10.0 or older now needs `default` switched back on first.
+- **The session store shares one Redis process with the internet-facing ingest gateway.** The
+  per-service ACL bounds a compromised client, not a fault in the Redis server: a gateway compromise
+  combined with such a fault — the Lua faults of October 2025 were that class — reads every member's
+  OAuth2 tokens, and a full `noeviction` Redis refuses logins first. ADR-0389 takes scripting away
+  from the gateway's user (its ACL drops `EVAL`/`EVALSHA` once production runs the release without
+  scripts, #3494); [ADR-0388](../adr/0388-the-session-store-gets-a-redis-the-ingest-gateway-cannot-reach.md)
+  proposes a session store the gateway cannot reach at all (#3493).
 - ~~**One internal TLS key is every service's identity until the per-service rollout.**~~ —
   **closed on production 2026-09-25.** Backend, frontend, ingest and Keycloak served the same
   self-signed `keystore.p12`, which was also the anchor every client pinned — so the

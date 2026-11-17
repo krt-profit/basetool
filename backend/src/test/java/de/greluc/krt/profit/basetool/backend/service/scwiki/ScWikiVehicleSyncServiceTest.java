@@ -495,6 +495,81 @@ class ScWikiVehicleSyncServiceTest {
   }
 
   @Test
+  void aVariantOfAShipTypeTheP4kRenamedIsCoveredThroughTheInGameNameInsteadOfSeedingATwin() {
+    UUID baseUuid = UUID.randomUUID();
+    UUID variantUuid = UUID.randomUUID();
+    ShipType base = new ShipType();
+    base.setName("Anvil Carrack");
+    base.setClassName("ANVL_Carrack");
+    base.setExternalUuid(baseUuid);
+    var baseDto =
+        ScWikiVehicleDto.builder()
+            .uuid(baseUuid)
+            .name("Carrack")
+            .gameName("Anvil Carrack")
+            .className("ANVL_Carrack")
+            .build();
+    var variantDto =
+        ScWikiVehicleDto.builder()
+            .uuid(variantUuid)
+            .name("Carrack")
+            .gameName("Anvil Carrack")
+            .className("ANVL_Carrack_BIS2950")
+            .build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(baseDto, variantDto)));
+    when(shipTypeRepository.findByExternalUuid(baseUuid)).thenReturn(Optional.of(base));
+    when(shipTypeRepository.findByExternalUuid(variantUuid)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Carrack")).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Anvil Carrack")).thenReturn(Optional.of(base));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    assertEquals(1, service.syncVehicles());
+
+    verify(shipTypeRepository, times(1)).save(any(ShipType.class));
+    verify(shipTypeRepository).save(base);
+    assertEquals("Anvil Carrack", base.getName());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            eq(variantUuid),
+            eq("Carrack"),
+            eq("Name is held by a sibling Wiki vehicle of this census."));
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository).markScwikiDeletedExcept(eq(Set.of(baseUuid, variantUuid)), any());
+  }
+
+  @Test
+  void aVehicleWhoseNameNoRowCarriesLinksTheShipTypeHoldingItsInGameName() {
+    UUID uuid = UUID.randomUUID();
+    ShipType p4kSeeded = new ShipType();
+    p4kSeeded.setName("Drake Clipper");
+    p4kSeeded.setSourceSystems(GameItemSourceSystem.P4K);
+    var dto =
+        ScWikiVehicleDto.builder()
+            .uuid(uuid)
+            .name("Clipper")
+            .gameName("Drake Clipper")
+            .className("DRAK_Clipper")
+            .build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRepository.findByNameIgnoreCase("Clipper")).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Drake Clipper"))
+        .thenReturn(Optional.of(p4kSeeded));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    assertEquals(1, service.syncVehicles());
+
+    verify(shipTypeRepository).save(p4kSeeded);
+    assertEquals(uuid, p4kSeeded.getExternalUuid());
+    assertEquals("Drake Clipper", p4kSeeded.getName());
+    assertEquals("DRAK_Clipper", p4kSeeded.getClassName());
+  }
+
+  @Test
   void syncVehicles_rejectsAliasedRowWithDifferentUuid() {
     ShipType existing = new ShipType();
     UUID original = UUID.randomUUID();

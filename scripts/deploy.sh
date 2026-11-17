@@ -202,7 +202,6 @@ ENV_RENDERER="${BASETOOL_ENV_RENDERER:-${BASETOOL_SCRIPT_DIR}/render-env-d.py}"
 
 rt_detect
 export RT_HEALTH_TIMEOUT="${HEALTH_TIMEOUT}"
-export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak edge backend ingest frontend acme"
 log "container runtime: ${RT_BACKEND}"
 
 command -v skopeo >/dev/null 2>&1 \
@@ -220,6 +219,7 @@ fi
   || fail "the Quadlet generator is missing (looked in /usr/libexec/podman and /usr/lib/podman); this host cannot turn .container files into services"
 [[ -n "${RT_UNIT_DIR}" && -d "${RT_UNIT_DIR}" ]] \
   || fail "no Quadlet unit directory (${RT_UNIT_DIR:-unset}) — run the basetool_host role first; it creates the directory this fills"
+rt_use_installed_stack
 
 keystore_mount_sources() {
   local src=""
@@ -303,13 +303,22 @@ release_parts() {
   local config=no jar=no
   [[ "${CONFIG_CHANGED}" == "true" ]] && config=yes
   [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]] && jar=yes
-  printf 'app images [%s] · unit definitions [%s] · config bundle: %s · provider JAR: %s' \
-    "${APP_IMAGES_CHANGED:-none}" "${UNITS_REDEFINED:-none}" "${config}" "${jar}"
+  printf 'app images [%s] · unit definitions [%s] · retired units [%s] · config bundle: %s · provider JAR: %s' \
+    "${APP_IMAGES_CHANGED:-none}" "${UNITS_REDEFINED:-none}" "${UNITS_RETIRED:-none}" "${config}" "${jar}"
+}
+
+log_retire_failure() {
+  [[ -n "${RT_RETIRE_FAILED}" ]] || return 1
+  log "health gate: the retired unit(s) [${RT_RETIRE_FAILED}] could not be stopped — their unit files are kept, so no container runs without its unit, and nothing of this release was started"
 }
 
 explain_gate_failure() {
   local first="${RT_FAILED_SERVICES%% *}" img=no kc_redefined=false
   case " ${UNITS_REDEFINED} " in *" keycloak "*) kc_redefined=true ;; esac
+  if log_retire_failure; then
+    log "health gate: this release changed: $(release_parts)"
+    return 0
+  fi
   log "health gate: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
   log "health gate: this release changed: $(release_parts)"
   if [[ -z "${first}" ]]; then
@@ -346,6 +355,7 @@ PIN_HAD_PREVIOUS=false
 KEYCLOAK_SPI_TOUCHED=false
 KEYCLOAK_SPI_HAD_PREVIOUS=false
 UNITS_REDEFINED=""
+UNITS_RETIRED=""
 APP_IMAGES_CHANGED=""
 
 REAPPLY=false
@@ -842,6 +852,7 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   fi
 
   assert_config_tree_writable "${CONFIG_STAGE_DIR}"
+  assert_unit_mount_sources_exist "${CONFIG_STAGE_DIR}"
 
   if [[ "${REAPPLY}" == "true" ]]; then
     log "re-applying the deployed release's config — ${CONFIG_PREVIOUS_DIR} keeps the previous release as the rollback anchor"
@@ -862,10 +873,12 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
     || fail "POST-APPLY: ${ENV_FILE} vanished after config swap — aborting before up"
   install_quadlet_units "${COMPOSE_DIR}"
   rm -f "${CONFIG_APPLY_INCOMPLETE_FILE}"
-  log "config applied"
+  rt_use_installed_stack
+  log "config applied — stack units, from the installed units: [${RT_STACK_SERVICES}]"
 fi
 
 UNITS_REDEFINED="${RT_CHANGED_SERVICES}"
+UNITS_RETIRED="${RT_RETIRED_SERVICES}"
 APP_IMAGES_CHANGED=""
 for img_pair in "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
   "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
@@ -917,6 +930,9 @@ if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
 fi
 
 log "release parts: $(release_parts)"
+if [[ -n "${RT_RETIRED_SERVICES}" ]]; then
+  log "one restart window: retiring [${RT_RETIRED_SERVICES}] first — each is stopped, and its unit file removed once it is down"
+fi
 if [[ -n "${RT_CHANGED_SERVICES}" ]]; then
   log "one restart window: stopping [${RT_CHANGED_SERVICES}] and what requires them, then starting the stack in order"
 fi
@@ -968,7 +984,8 @@ fi
 
 if [[ "${REAPPLY}" == "true" ]]; then
   log "health check failed within ${HEALTH_TIMEOUT}s on a re-apply of the deployed release — not rolling back"
-  log "health gate: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
+  log_retire_failure \
+    || log "health gate: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
   record_reapply_failure "the running release could not be restored"
   exit 1
 fi
@@ -989,6 +1006,8 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
     echo "${EXPECTED_MARKER}" >"${CONFIG_APPLY_INCOMPLETE_FILE}" || true
     log "FATAL: the host config tree under ${COMPOSE_DIR} is INCONSISTENT after the rollback — ${CONFIG_PREVIOUS_DIR} is kept as the anchor; the pin is rolled back regardless"
   fi
+  rt_use_installed_stack
+  log "rollback: stack units, from the installed units: [${RT_STACK_SERVICES}]"
 fi
 
 ROLLBACK_PARTS="app digests"
@@ -1014,8 +1033,20 @@ rt_pin_rollback
 
 if rt_apply_stack; then
   log "rolled back to previous digest pin successfully — the previous ${ROLLBACK_PARTS} are live again and the stack is healthy"
+elif [[ -n "${RT_RETIRE_FAILED}" ]]; then
+  log "rollback ALSO failed — [${RT_RETIRE_FAILED}], which the previous release does not name, could not be stopped; their unit files are kept and the previous stack was not started"
 else
   log "rollback ALSO failed — did not come up: [${RT_FAILED_SERVICES:-none reported}] (the forward apply: [${FORWARD_FAILED_SERVICES:-none reported}]); one or more target digests broken or environment problem"
+fi
+
+if [[ "${CONFIG_CHANGED}" == "true" && "${BASETOOL_MONITORING_ENABLED:-false}" == "true" ]] \
+  && rt_monitoring_configured; then
+  mapfile -t ROLLBACK_MONITORING < <(rt_monitoring_services)
+  if rt_service_start "${ROLLBACK_MONITORING[@]}"; then
+    log "rollback: monitoring units started on the previous definitions [${ROLLBACK_MONITORING[*]}] (non-gating)"
+  else
+    log "WARN: rollback: a monitoring unit did not start [${ROLLBACK_MONITORING[*]}] — the rollback's outcome stands (non-gating)"
+  fi
 fi
 
 write_deploy_metric rollback

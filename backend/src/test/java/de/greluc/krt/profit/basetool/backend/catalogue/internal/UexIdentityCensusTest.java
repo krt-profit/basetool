@@ -41,7 +41,38 @@ class UexIdentityCensusTest {
     assertThat(census.complete()).isTrue();
     assertThat(census.ids()).containsExactlyInAnyOrder(149, 262);
     assertThat(census.uniqueUuid(shared)).isFalse();
+    assertThat(census.sharedUuid(shared)).isTrue();
     assertThat(census.uniqueName("Prowler")).isTrue();
+  }
+
+  @Test
+  void aGameUuidOneSourceIdCarriesIsNotShared() {
+    UUID single = UUID.randomUUID();
+    UexIdentityCensus census = census(List.of(new Claim(1, single.toString(), "Item")), false);
+
+    assertThat(census.sharedUuid(single)).isFalse();
+    assertThat(census.sharedUuid(UUID.randomUUID())).isFalse();
+    assertThat(census.sharedUuid(null)).isFalse();
+  }
+
+  @Test
+  void everyNameFieldClaimsItsNameAndAClaimUnderAnotherFieldMakesItShared() {
+    UexIdentityCensus census =
+        UexIdentityCensus.of(
+            List.of(
+                new Named(239, "Guardian QI", "Mirai Guardian QI"),
+                new Named(257, "Guardian MX", "Mirai Guardian MX"),
+                new Named(300, "Mirai Guardian MX", "Mirai Guardian MX Variant"),
+                new Named(301, "Nox", "Nox")),
+            Named::id,
+            _ -> "",
+            List.of(Named::name, Named::fullName),
+            true);
+
+    assertThat(census.uniqueName("Mirai Guardian QI")).isTrue();
+    assertThat(census.uniqueName("Guardian MX")).isTrue();
+    assertThat(census.uniqueName("Mirai Guardian MX")).isFalse();
+    assertThat(census.uniqueName("Nox")).isTrue();
   }
 
   @Test
@@ -91,4 +122,7 @@ class UexIdentityCensusTest {
 
   /** Source identities used to exercise the catalogue census independently of transport DTOs. */
   private record Claim(Integer id, String uuid, String name) {}
+
+  /** A source row carrying a short and a full display name. */
+  private record Named(Integer id, String name, String fullName) {}
 }

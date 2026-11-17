@@ -1445,10 +1445,12 @@ The `ship_type_uex_alias` table ties such a UEX vehicle id to the game class nam
 request and no sync writes it.
 
 - **The UEX vehicle sync** resolves by `external_uuid`, then `uex_vehicle_id`, then the aliased
-  class name when exactly one ship type carries it, then the name, and only then seeds.
+  class name when exactly one ship type carries it, then the name and the full name
+  (REQ-DATA-041), and only then seeds.
 - **The SC Wiki vehicle sync** resolves by `external_uuid`, then the ship type whose `p4k_uuid` is
   the Wiki vehicle's UUID, then the ship type that holds the UEX vehicle id aliased to its class
-  name, then the name when only one Wiki vehicle carries it (ADR-0379). A Wiki
+  name, then the name or the in-game name when only one Wiki vehicle carries it (ADR-0379,
+  REQ-DATA-041). A Wiki
   vehicle whose name several Wiki vehicles share (`AEGS_Hammerhead` / `AEGS_Hammerhead_GS`) and a
   stored ship type already holds stays unlinked and is reported as `SOURCE_IDENTITY_CONFLICT`; it
   never seeds a second row of that name, which `ship_type.name`'s unique key would refuse. When the
@@ -1836,6 +1838,38 @@ commit independently of the outer outcome, and every completion releases its own
 These are infrastructure guarantees; the regression tests do not establish a production user
 flow that previously exercised a conflicting nested resource.
 
+### REQ-DATA-041 — a ship type keeps its UEX and Wiki vehicle after the P4K renamed or re-identified it
+
+The P4K import names a ship type by its in-game name, `Anvil Carrack` (REQ-P4K-031). UEX serves
+that name as `name_full` and the SC Wiki as `game_name`; their `name` is the short `Carrack`. A
+sync whose name step tried only the short name would no longer find a renamed row and would seed a
+twin under the short name. So each name step tries the short name first, then the in-game name:
+
+- **The SC Wiki vehicle sync** looks a vehicle up by `name`, then by `game_name`. A name counts as
+  shared when another vehicle of the census carries it as either; a variant sharing the in-game
+  name of a base the census covers is reported as covered (REQ-DATA-026) and seeds nothing.
+- **The UEX vehicle sync** looks a vehicle up by `name`, then by `name_full`, each only while no
+  other vehicle of the feed carries that name under either field.
+- **A game UUID several UEX vehicles carry** is no identity evidence: it neither links a row nor
+  conflicts with the `external_uuid` of the row a UEX vehicle id found (REQ-DATA-033).
+- **A game UUID the P4K GUID confirms outranks UEX's.** When a game build gives a vehicle a new
+  UUID, the SC Wiki and the P4K carry it while UEX may still serve the old one. A row found by its
+  own UEX vehicle id whose `external_uuid` equals its `p4k_uuid` is written and keeps its UUID; the
+  UEX one is reported as a `P4K_DISAGREEMENT` (REQ-P4K-031). This also holds after the Wiki sync
+  moved the row to the new UUID (REQ-DATA-026). A game UUID the P4K does not confirm still blocks
+  the write.
+
+**Acceptance**
+
+- [x] A Wiki variant sharing the in-game name of a renamed base is covered and seeds no row; a Wiki
+  vehicle whose name no row carries links the row holding its in-game name
+  (`ScWikiVehicleSyncServiceTest`).
+- [x] A UEX vehicle finds the row holding its full name; a full name two UEX vehicles carry matches
+  nothing; the rows of two UEX ids sharing a game UUID are both written without a conflict
+  (`UexVehicleServiceUuidMatchTest`, `UexIdentityCensusTest`).
+- [x] A stale UEX game UUID neither replaces nor blocks a row whose UUID its P4K GUID confirms and is
+  reported; an unconfirmed differing UUID still blocks the write (`UexVehicleServiceUuidMatchTest`).
+
 ### REQ-DATA-042 — two ship types of one game ship merge without breaking references
 
 A ship type created a second time for the same game ship is merged into the one that stays, in
@@ -1849,12 +1883,11 @@ references. The open hangar and template views hear of the change through live s
 
 The survivor takes the Wiki identity of the merged row when it has none, or when the merged row's
 Wiki UUID is the P4K GUID the survivor holds once the caller's run is through, and the UEX identity
-when it has none. Both
-rows are kept as JSON in `ship_type_redirect`. The merged id stays resolvable through
-`findById`, `existsById`, `findAllById` and `getReferenceById` of `ShipTypeRepository`. The
-exchange resolves it as a `bt` reference and names journal entries by it; the append-only journal
-keeps the merged id. A row holding a P4K GUID is merged away only when its record left the
-catalogue (REQ-P4K-053); otherwise it never is (REQ-P4K-007).
+when it has none. Both rows are kept as JSON in `ship_type_redirect`. The merged id stays
+resolvable through `findById`, `existsById`, `findAllById` and `getReferenceById` of
+`ShipTypeRepository`. The exchange resolves it as a `bt` reference and names journal entries by it;
+the append-only journal keeps the merged id. A row holding a P4K GUID is merged away only when its
+record left the catalogue (REQ-P4K-053); otherwise it never is (REQ-P4K-007).
 
 **Enforced by:** `ShipTypeMergeServiceTest` · **Code:** `ShipTypeMergeService`,
 `ShipTypeIdentityReferences`, `ShipTypeReassignmentParticipant` and its implementations · **ADR:**

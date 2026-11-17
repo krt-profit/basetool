@@ -244,7 +244,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAutho
 import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.platform.api.RequestBodyLimitProperties;
-import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.privacy.api.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
@@ -517,7 +516,6 @@ class ArchitectureTest {
           RejectedRegistrationRetentionProperties.class,
           RequestBodyLimitProperties.class,
           RequestMemo.class,
-          ResilientRedisMessageListenerContainer.class,
           Roles.class,
           ScuAmounts.class,
           StaffelMembershipResolver.class,
