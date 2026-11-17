@@ -320,6 +320,23 @@ case "$cmd" in
       *)              printf 'POSTGRES_DB=basetool\n' ;;
     esac
     ;;
+  *"/*.network"*)
+    case "$scenario" in
+      pasta-no-alias)
+        printf '[Container]\nAddHost=localhost:127.0.0.1\n' ;;
+      *)
+        printf '[Container]\nAddHost=localhost:127.0.0.1\nAddHost=alloy:host-gateway\n'
+        printf '[Container]\nAddHost=ingest.example.test:fd00:169:254::2\nAddHost=edge.example.test:fd00:28:15::10\n'
+        printf '[Network]\nSubnet=172.28.15.0/24\nSubnet=fd00:28:15::/64\n' ;;
+    esac
+    ;;
+  *"ps -eo args="*)
+    case "$scenario" in
+      pasta-absent)  printf '' ;;
+      pasta-v6-only) echo "/usr/bin/pasta --config-net --map-guest-addr fd00:169:254::2 --quiet" ;;
+      *)             echo "/usr/bin/pasta --config-net --map-guest-addr 169.254.1.2 --map-guest-addr fd00:169:254::2 --dns-forward 169.254.1.1 --quiet" ;;
+    esac
+    ;;
   *".config/containers/systemd"*|*"/etc/containers/systemd/users/"*)
     case "$scenario" in
       env-no-units) echo "" ;;
@@ -852,6 +869,19 @@ STUB_SCENARIO=updates-everything assert_status \
 STUB_SCENARIO=updates-runtime assert_status \
   "security-updates-enabled fails when the container runtime is not excluded" \
   security-updates-enabled fail "runtime is not excluded" -- "${STUB_ARGS[@]}"
+
+STUB_SCENARIO=healthy assert_status \
+  "pasta-maps-host-aliases passes when pasta maps host-gateway and the v6 alias, not a subnet address" \
+  pasta-maps-host-aliases pass "every host-alias address (169.254.1.2, fd00:169:254::2)" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=pasta-v6-only assert_status \
+  "pasta-maps-host-aliases fails when a v6-only mapping replaced podman's host-gateway one" \
+  pasta-maps-host-aliases fail "alias names to 169.254.1.2" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=pasta-absent assert_status \
+  "pasta-maps-host-aliases skips when no rootless network runs" \
+  pasta-maps-host-aliases skip "no pasta process runs" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=pasta-no-alias assert_status \
+  "pasta-maps-host-aliases skips when no unit aliases a host-mapped address" \
+  pasta-maps-host-aliases skip "no Quadlet unit aliases" -- "${STUB_ARGS[@]}"
 
 STUB_SCENARIO=healthy assert_status \
   "ssh-root-login-refused passes when root is refused and AllowUsers names the admin" \
