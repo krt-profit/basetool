@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipProductionStatus;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipTypeOptionDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
@@ -42,6 +43,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -137,6 +140,72 @@ class HangarImportIntegrationTest {
     assertTrue(result.skippedShips().contains("unknown xz99"));
 
     assertEquals(2, shipRepository.findByOwnerId(user1.getId()).size());
+  }
+
+  @Test
+  void importFleetview_ambiguousName_isOfferedAndTheRepeatedImportTakesTheChoice()
+      throws Exception {
+    ShipType mkI = new ShipType();
+    mkI.setName("Choicetest Hornet Mk I");
+    mkI = shipTypeRepository.save(mkI);
+    ShipType mkII = new ShipType();
+    mkII.setName("Choicetest Hornet Mk II");
+    mkII = shipTypeRepository.save(mkII);
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file",
+            "fleetview.json",
+            "application/json",
+            "[{\"name\":\"Choicetest Hornet\",\"shipname\":\"\",\"type\":\"ship\"}]"
+                .getBytes(StandardCharsets.UTF_8));
+
+    FleetviewImportResponseDto offered = upload(file);
+    assertEquals(0, offered.importedCount());
+    assertEquals(1, offered.ambiguousShips().size());
+    assertEquals(
+        List.of(mkI.getId(), mkII.getId()),
+        offered.ambiguousShips().getFirst().options().stream().map(ShipTypeOptionDto::id).toList());
+
+    MockMultipartFile choices =
+        new MockMultipartFile(
+            "choices",
+            "",
+            "application/json",
+            ("{\"choices\":[{\"name\":\"Choicetest Hornet\",\"shipTypeId\":\""
+                    + mkII.getId()
+                    + "\"}]}")
+                .getBytes(StandardCharsets.UTF_8));
+    FleetviewImportResponseDto chosen = upload(file, choices);
+
+    assertEquals(1, chosen.importedCount());
+    assertTrue(chosen.ambiguousShips().isEmpty());
+    assertEquals(
+        mkII.getId(), shipRepository.findByOwnerId(user1.getId()).getFirst().getShipType().getId());
+  }
+
+  @Test
+  void importFleetview_choiceWithoutShipType_returns400() throws Exception {
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file",
+            "fleetview.json",
+            "application/json",
+            "[{\"name\":\"135c\",\"shipname\":\"\",\"type\":\"ship\"}]"
+                .getBytes(StandardCharsets.UTF_8));
+    MockMultipartFile choices =
+        new MockMultipartFile(
+            "choices",
+            "",
+            "application/json",
+            "{\"choices\":[{\"name\":\"135c\"}]}".getBytes(StandardCharsets.UTF_8));
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/hangar/import/ships")
+                .file(file)
+                .file(choices)
+                .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -483,14 +552,17 @@ class HangarImportIntegrationTest {
 
   private FleetviewImportResponseDto upload(String name, String type, String body)
       throws Exception {
-    MockMultipartFile file =
-        new MockMultipartFile("file", name, type, body.getBytes(StandardCharsets.UTF_8));
+    return upload(new MockMultipartFile("file", name, type, body.getBytes(StandardCharsets.UTF_8)));
+  }
+
+  private FleetviewImportResponseDto upload(MockMultipartFile... parts) throws Exception {
+    MockMultipartHttpServletRequestBuilder request = multipart("/api/v1/hangar/import/ships");
+    for (MockMultipartFile part : parts) {
+      request.file(part);
+    }
     String response =
         mockMvc
-            .perform(
-                multipart("/api/v1/hangar/import/ships")
-                    .file(file)
-                    .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
+            .perform(request.with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()

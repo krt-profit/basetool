@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.hangar.client;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.HangarImportChoicesDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
@@ -377,12 +378,18 @@ public class HangarBackendClient {
    * Imports a third-party ship export, whose format the backend detects.
    *
    * @param upload the uploaded file, streamed as the {@code file} part
+   * @param choices the member's choices for ambiguous names, sent as the JSON {@code choices} part,
+   *     or {@code null} on a first import (REQ-HANGAR-019)
    * @return the import result, or {@code null} when the backend sent no body
    */
   @Nullable
-  public FleetviewImportResponseDto importShips(@NotNull Resource upload) {
+  public FleetviewImportResponseDto importShips(
+      @NotNull Resource upload, @Nullable HangarImportChoicesDto choices) {
     MultipartBodyBuilder builder = new MultipartBodyBuilder();
     builder.part("file", upload).contentType(MediaType.APPLICATION_OCTET_STREAM);
+    if (choices != null) {
+      builder.part("choices", choices).contentType(MediaType.APPLICATION_JSON);
+    }
     return backendApiClient.execute(
         HttpMethod.POST,
         IMPORT_SHIPS,

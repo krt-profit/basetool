@@ -40,9 +40,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -61,11 +59,11 @@ import tools.jackson.databind.ObjectMapper;
  * Imports a third-party ship export into a user's hangar.
  *
  * <p>Accepts CCU Game Fleetview, HangarXPLOR Shiplist, Fleetyards, StarJump FleetViewer and the
- * Hangar Extension JSON and CSV exports, auto-detected from the payload. Each entry is resolved
- * against the cached {@code ShipType} rows — the CSV's name without its manufacturer word first —
- * by progressively looser name matching (exact, normalised, then unique token-subset in both
- * directions) and, for the slug-carrying formats, a final slug match; ambiguous entries stay
- * unresolved.
+ * Hangar Extension JSON and CSV exports, auto-detected from the payload. {@link
+ * ImportEntryResolver} resolves each entry against the {@code ShipType} rows by progressively
+ * looser name matching, the catalogue names with and without their manufacturer word, and, for the
+ * slug-carrying formats, a final slug match. A name that may mean several ships takes the member's
+ * choice or is reported with its options (REQ-HANGAR-019).
  *
  * <p>Per ship type, each entry is matched to one ship already in the hangar — first by pledge id,
  * then to a ship without a pledge id (preferring the same insurance) — and only the entries left
@@ -90,18 +88,22 @@ public class HangarImportService {
 
   /**
    * Parses an uploaded ship export, updates the hangar ships it matches and creates the ships it
-   * lists beyond them. Ambiguous or unknown names are returned in {@code skippedShips} rather than
-   * guessed.
+   * lists beyond them. Unknown names are returned in {@code skippedShips}; names that may mean
+   * several ships take the member's choice, else are returned with their options in {@code
+   * ambiguousShips} rather than guessed (REQ-HANGAR-019).
    *
    * @param userId user ID from the JWT {@code sub} claim
    * @param file the uploaded export in one of the supported formats
-   * @return import statistics and the deduplicated list of unmatched ship names
+   * @param choices the member's choices for ambiguous names, empty on a first import
+   * @return import statistics, the unmatched names and the ambiguous names with their options
    * @throws BadRequestException if the file is empty, unreadable, or in an unknown format
    * @throws NotFoundException if the user is not found
    */
   @Transactional
   public @NotNull FleetviewImportResponseDto importShips(
-      @NotNull UUID userId, @NotNull MultipartFile file) {
+      @NotNull UUID userId,
+      @NotNull MultipartFile file,
+      @NotNull List<HangarImportChoiceDto> choices) {
     if (file.isEmpty()) {
       throw new BadRequestException("The uploaded file is empty.");
     }
@@ -112,35 +114,8 @@ public class HangarImportService {
 
     ShipTypeMatcher.ShipTypeIndex index = ShipTypeMatcher.buildIndex(shipTypeRepository.findAll());
 
-    Set<String> seenSkipped = new HashSet<>();
-    List<String> skippedShips = new ArrayList<>();
-    Map<UUID, List<FleetExportParser.FleetImportEntry>> entriesByTypeId = new LinkedHashMap<>();
-    Map<UUID, ShipType> shipTypeById = new HashMap<>();
-
-    for (FleetExportParser.FleetImportEntry entry : entries) {
-      String trimmed = entry.name().trim();
-      ShipType match =
-          entry.unprefixedName() == null
-              ? null
-              : ShipTypeMatcher.resolve(index, entry.unprefixedName(), null);
-      if (match == null) {
-        match = ShipTypeMatcher.resolve(index, trimmed, entry.slug());
-      }
-
-      if (match == null) {
-        log.debug("Hangar import: no ShipType match for '{}' (user {})", entry.name(), userId);
-        if (seenSkipped.add(trimmed.toLowerCase(Locale.ROOT))) {
-          skippedShips.add(entry.name());
-        }
-        continue;
-      }
-
-      entriesByTypeId.computeIfAbsent(match.getId(), _ -> new ArrayList<>()).add(entry);
-      shipTypeById.putIfAbsent(match.getId(), match);
-    }
-
     Map<UUID, List<Ship>> hangarByTypeId = new HashMap<>();
-    if (!entriesByTypeId.isEmpty()) {
+    if (!entries.isEmpty()) {
       for (Ship ship : shipRepository.lockAllOwnedByOrderById(userId)) {
         if (ship.effectiveOrigin() == ShipOrigin.IN_GAME) {
           continue;
@@ -151,9 +126,13 @@ public class HangarImportService {
       }
     }
 
+    ImportEntryResolver.Resolution resolution =
+        ImportEntryResolver.resolve(entries, index, hangarByTypeId.keySet(), choices);
+
     ImportTally tally = new ImportTally();
-    for (Map.Entry<UUID, List<FleetExportParser.FleetImportEntry>> e : entriesByTypeId.entrySet()) {
-      ShipType shipType = Objects.requireNonNull(shipTypeById.get(e.getKey()));
+    for (Map.Entry<UUID, List<FleetExportParser.FleetImportEntry>> e :
+        resolution.entriesByShipType().entrySet()) {
+      ShipType shipType = Objects.requireNonNull(resolution.shipTypes().get(e.getKey()));
       List<Ship> pool = new ArrayList<>(hangarByTypeId.getOrDefault(e.getKey(), List.of()));
       List<FleetExportParser.FleetImportEntry> unplaced =
           matchByPledgeId(e.getValue(), pool, tally);
@@ -184,13 +163,17 @@ public class HangarImportService {
       }
     }
 
+    List<String> skippedShips = resolution.unmatched();
+    List<AmbiguousShipDto> ambiguousShips = resolution.ambiguous();
     log.info(
-        "Hangar import for user {}: imported={}, updated={}, alreadyPresent={}, skipped={}",
+        "Hangar import for user {}: imported={}, updated={}, alreadyPresent={}, skipped={},"
+            + " ambiguous={}",
         userId,
         tally.created,
         tally.updated,
         tally.alreadyPresent,
-        skippedShips.size());
+        skippedShips.size(),
+        ambiguousShips.size());
 
     if (tally.created > 0 || tally.updated > 0) {
       auditRecorder.record(
@@ -201,7 +184,8 @@ public class HangarImportService {
           AuditDetails.of("created", tally.created)
               .with("updated", tally.updated)
               .with("alreadyPresent", tally.alreadyPresent)
-              .with("unmatched", skippedShips.size()));
+              .with("unmatched", skippedShips.size())
+              .with("ambiguous", ambiguousShips.size()));
       unitLiveSync.shipsChanged(new ArrayList<>(tally.affectedUnits));
     }
 
@@ -211,7 +195,8 @@ public class HangarImportService {
         tally.alreadyPresent,
         skippedShips,
         List.of(),
-        tally.updated);
+        tally.updated,
+        ambiguousShips);
   }
 
   /**
