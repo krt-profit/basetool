@@ -215,7 +215,9 @@ before its commit; a failed write fails the change with `502` and changes nothin
 transaction completes — committed or rolled back — the committed state is written again; a failure
 there is counted and left to the reconcile, which compares the content (not `revision` and
 `writtenAt`) at startup and every 60 s (`app.exchange.mirror.reconcile-interval`) and rewrites a
-differing, missing or unreadable document. The mirror is written only while
+differing, missing or unreadable document — always **after** it has repaired the revocation mirror
+(REQ-XCH-008), and not at all when that repair failed, so an emptied Redis never holds a registry
+without the deny list and revocations it must enforce (`ExchangeRegistryReconcileTaskTest`). The mirror is written only while
 `APP_EXCHANGE_MIRROR_ENABLED=true`. While it is off nothing is mirrored, and a start switches off a
 document an earlier run left behind (`ExchangeRegistryMirrorClosure`, once when the application is
 ready): the document has no expiry, so it would otherwise keep admitting clients. It is rewritten
@@ -618,7 +620,7 @@ shared sessions to the gateway's `auth_time` check. Any other Keycloak failure f
 with `502` before anything
 is written, and the timestamp is read only after Keycloak answered, so no token refreshed in between
 carries a later `iat`. The 60-second reconcile writes
-back any enforced entry the mirror lacks. The backend's `@exchangeGate` refuses a revoked installation
+back any enforced entry the mirror lacks, before it touches the registry mirror. The backend's `@exchangeGate` refuses a revoked installation
 itself (`installation_revoked`), and re-checks the client revocation the way the gateway does, so a
 gateway that missed it is caught behind it (security review 2026-09-27): the gateway relays the
 connection time it compared — an offline token's `iat`, any other token's `auth_time`

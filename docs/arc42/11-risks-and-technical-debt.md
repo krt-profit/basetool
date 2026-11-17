@@ -295,8 +295,9 @@ not happened.
   combined with such a fault — the Lua faults of October 2025 were that class — reads every member's
   OAuth2 tokens, and a full `noeviction` Redis refuses logins first. ADR-0389 takes scripting away
   from the gateway's user (its ACL drops `EVAL`/`EVALSHA` once production runs the release without
-  scripts, #3494); [ADR-0388](../adr/0388-the-session-store-gets-a-redis-the-ingest-gateway-cannot-reach.md)
-  proposes a session store the gateway cannot reach at all (#3493).
+  scripts, #3494). [ADR-0388](../adr/0388-the-session-store-gets-a-redis-the-ingest-gateway-cannot-reach.md)
+  gives the sessions a Redis the gateway cannot reach: built in the stacks and the Quadlet units, it
+  closes this risk once production has run the cut-over (#3493).
 - ~~**One internal TLS key is every service's identity until the per-service rollout.**~~ —
   **closed on production 2026-09-25.** Backend, frontend, ingest and Keycloak served the same
   self-signed `keystore.p12`, which was also the anchor every client pinned — so the

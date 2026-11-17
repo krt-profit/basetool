@@ -554,8 +554,10 @@ assign) is neither counted nor logged again, so the report and the open list agr
   APPLY settles the ship cases (REQ-P4K-050) and the item cases itself: an open case of a GUID,
   conflict, seeded row or unclear playability that the run no longer raises closes as `RESOLVED`,
   one it raises again reopens, and a partial kind settles only the GUIDs it lists (ADR-0393);
-- a starmap link and a shop link that is ambiguous or not found (REQ-P4K-035, REQ-P4K-043); a shop
-  whose record names no place opens none;
+- a starmap link and a shop link that is ambiguous or not found (REQ-P4K-035, REQ-P4K-043), unless
+  the case could settle nothing (REQ-P4K-060): a row without a game counterpart, a terminal, an
+  orbit, a POI or outpost whose link feeds nothing, a shop without a place, without an item list or
+  without a free terminal around it opens none;
 - a blueprint ingredient's `resourceGuid` or a `refinedSubtypeGuid` that joins no commodity or
   several (REQ-P4K-024);
 - a material without a resource group after an APPLY, resolved by assigning a group
@@ -1647,18 +1649,26 @@ objects (`matched`, `enriched`, `created`) and the UEX rows left unlinked (`unma
 The nine UEX tables (`star_system`, `orbit`, `planet`, `moon`, `city`, `outpost`, `space_station`,
 `poi`, `terminal`) stay the trade layer and gain a nullable `starmap_object_id`. On APPLY the import
 links a row by normalised name + type + the already-linked parent: a unique hit links; an ambiguous
-hit or no hit opens a review case. A UEX-only row stays fully usable (terminals, prices, storage),
-unlinked, counted as unmatched in the report and absent from the starmap. An admin can set or clear
-a link by hand; a manual link is never overwritten by an import, and each manual change is an audit
-event (REQ-P4K-046).
+hit or no hit opens a review case unless the case could settle nothing (REQ-P4K-060). A UEX-only
+row stays fully usable (terminals, prices, storage), unlinked, counted as unmatched in the report
+and absent from the starmap. An admin can set or clear a link by hand; a manual link is never
+overwritten by an import, and each manual change is an audit event (REQ-P4K-046).
 
 **Acceptance**
 
 - [x] A city whose name, type and linked planet match one object is linked.
 - [x] Two candidates open one review case and link nothing.
 - [x] A manual link survives an APPLY that would link elsewhere.
+- [x] A station UEX names under a planet that the game hangs below the star system links through
+  the next linked parent.
+- [x] `Area 18`, `Pyro Gateway (Stanton)`, the nickname `Grim HEX`, `Mining Base #4RO-NVX` and
+  `Deakins Research` link to `Area18`, `Pyro Gateway`, `Grim HEX`, `Mining Base #4R0-NVX` and
+  `Deakins Research Outpost`; `Delamar`, a UEX planet, links to the game's only `Delamar`, a moon.
+- [x] Of a placed and an unplaced record of one name, the placed one links.
+- [x] An orbit takes the link of the planet with its UEX id; a terminal is never name-matched.
 
-The tables are linked parents first, in the order above. A name is normalised to lower case without
+The tables are linked parents first: `star_system`, `planet`, `orbit`, `moon`, `city`,
+`space_station`, `outpost`, `poi`, `terminal`. A name is normalised to lower case without
 accents, every other run of characters one space, and compared with the object's English name. The
 type is compared as a family, the type's lower-case name up to its first `_` (`Outpost_InvalidQT` is
 `outpost`), taken from the types of the LIVE catalogue: `star_system` takes `star` (the star
@@ -1667,12 +1677,37 @@ carries the system's name, `Stanton`) and `solarsystem`; `orbit` `planet`, `jump
 `landingzone` and `manmade` (Levski); `space_station` `manmade` (Everus Harbor) and
 `manmade_visibleoninteraction`'s family `manmade` (the Lagrange stations), and `landingzone`;
 `outpost` `outpost`, `manmade`; `poi` `pointofinterest`, `outpost`, `manmade`, `asteroid`,
-`navpoint`, `anomaly`; `terminal` `manmade`, `pointofinterest`, `outpost`, `landingzone`. The parent is the nearest parent the row names
-(UEX's `*_name` columns: city, space station, outpost, moon, planet, orbit, then the star system)
-that is linked; a candidate must lie below it at any depth, and with no linked parent every object of
-the name and type is a candidate. A parent name that rows of one table in one star system link to
-different objects names no parent. A stamped or hidden object links nothing new. A row left unlinked
-is one `UNMATCHED` row and one case `STARMAP_LINK_AMBIGUOUS` or `STARMAP_LINK_NOT_FOUND` of kind
+`navpoint`, `anomaly`; `terminal` `manmade`, `pointofinterest`, `outpost`, `landingzone`. A
+row's linked parents are the parents it names (UEX's `*_name` columns: city, space station,
+outpost, moon, planet, orbit) that are linked, nearest first, then its star system. A parent name
+that rows of one table in one star system link to different objects names no parent. A stamped or
+hidden object links nothing new.
+
+A row's candidates come from the first of these steps that yields one (`StarmapCandidates`):
+
+1. Each of the row's names in turn (`StarmapNameKeys`): its UEX name, the name without a trailing
+   `(<its star system>)` or `(<its star system> system)` (`Pyro Gateway (Stanton)`), its UEX
+   nickname (`Grim HEX` for Green Imperial Housing Exchange). A name finds the objects of its
+   normalised form, else those of its compact form without spaces (`Area 18`, `Area18`). Of these,
+   the objects of the row's type families below its nearest linked parent, else below the next
+   linked parent up to its star system; else the one object of the name in its star system,
+   whatever its type (`Delamar`, a moon in the game).
+2. The one object of the row's type families in its star system whose compact name equals the
+   row's with every `o` read as `0`, for a name that holds a digit (`Mining Base #4RO-NVX`).
+3. The one object of the row's type families below its nearest linked parent whose normalised name
+   is the row's plus whole trailing words, or the other way round (`Deakins Research`,
+   `Kudre Ore Mine (Closed)`).
+
+Of several candidates of one step, the only one the catalogue placed (with a `position`) wins; the
+others are unplaced duplicate records. A star system's candidates are the objects of its name and
+type. A terminal is never name-matched: it is no starmap object, its place is its nearest linked
+parent (REQ-P4K-043), and its own link is only ever an admin's. An orbit that shares its UEX id
+with a planet (`orbit.id_orbit = planet.id_planet`) takes that planet's link, and any other orbit
+(Lagrange point, jump point, belt, star) links nothing. A row of a star system that links to no
+object links nothing (`StarmapLinkRun`).
+
+One candidate links. A row left unlinked is one `UNMATCHED` row and, unless REQ-P4K-060 says the
+case could settle nothing, one case `STARMAP_LINK_AMBIGUOUS` or `STARMAP_LINK_NOT_FOUND` of kind
 `STARMAP_OBJECT`, whose GUID is a name-based UUID of the table and the row; the report names the row
 by its table and its UEX name, and a run that links the row closes the case as `RESOLVED`. A link
 the run changes is a `CHANGED` row (`<table>.starmap_object_id`, old and new GUID).
@@ -1684,9 +1719,12 @@ manual flag the admin saw and is a `409` when either changed meanwhile, so it ne
 edit of the row's UEX data. `SET` and `CLEAR` mark the link manual (`starmap_link_manual`), which
 every APPLY leaves alone.
 
-**Enforced by:** `P4kStarmapLinkTest`, `StarmapPlaceKindTest`, `StarmapParentLinksTest` ·
-**Code:** `P4kStarmapLinker`, `StarmapPlaceKind`, `StarmapParentLinks`,
-`StarmapPlaceRows`, `StarmapAdminService`, `P4kRunResolvedCases` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
+**Enforced by:** `P4kStarmapLinkTest`, `StarmapCandidatesTest`, `StarmapNameKeysTest`,
+`StarmapLinkRunTest`, `StarmapPlaceKindTest`, `StarmapParentLinksTest` ·
+**Code:** `P4kStarmapLinker`, `StarmapLinkRun`, `StarmapCandidates`, `StarmapNameKeys`,
+`StarmapPlaceKind`, `StarmapParentLinks`, `StarmapPlaceRows`, `StarmapAdminService`,
+`P4kRunResolvedCases` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md),
+[ADR-0395](../adr/0395-the-p4k-import-links-starmap-objects-and-shops-by-more-keys-and-opens-no-case-without-a-counterpart.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-036 — a storage place can sit on any visible starmap node an admin picks
 
@@ -1914,9 +1952,10 @@ their lists and their links as they are. The result's `shops` counts the shops (
 
 ### REQ-P4K-043 — a shop links to a UEX terminal by place, then by name
 
-On APPLY a shop links to a UEX terminal through its starmap object (REQ-P4K-035), then by name within
-that place. An ambiguous match opens a review case; a manual link by an admin wins, survives
-re-imports and is an audit event (REQ-P4K-046). An unlinked shop stays usable on the P4K side.
+On APPLY a shop links to a UEX terminal through its starmap object (REQ-P4K-035), then by name at
+or around that place. An ambiguous match opens a review case unless the case could settle nothing
+(REQ-P4K-060); a manual link by an admin wins, survives re-imports and is an audit event
+(REQ-P4K-046). An unlinked shop stays usable on the P4K side.
 
 **Acceptance**
 
@@ -1924,21 +1963,47 @@ re-imports and is an audit event (REQ-P4K-046). An unlinked shop stays usable on
   review case.
 - [x] A manual link survives the next APPLY.
 - [x] A shop whose record names no place is reported `UNMATCHED` and opens no review case.
+- [x] A shop inside a city links to the city's terminal; a shop whose containers place an outpost
+  below its coarser place links to the outpost's terminal.
+- [x] An item and a commodity terminal of one name are told apart by the shop's commodity facts,
+  two districts of a city by the shop's containers.
+- [x] A `Medical Shop` terminal links a pharmacy.
 
-A terminal's place is its own starmap link, else the link of its nearest linked UEX parent
-(REQ-P4K-035); the candidates are the terminals whose place is the shop's starmap object. The name
-match reads UEX's `<shop> - <place>` naming: a terminal's part before its first ` - `, normalised
-like a starmap name and without spaces, at least three characters, matches when the shop's
-registry name, entity name or brand, compacted the same way, contains it; the longest match wins
-(`ShopTerminalNames`). One candidate links; several or none leave the shop unlinked, one
-`UNMATCHED` row and one case `SHOP_LINK_AMBIGUOUS` or `SHOP_LINK_NOT_FOUND` of kind `SHOP` with the
-shop's GUID; a run that links the shop closes the case as `RESOLVED`, and a run whose catalogue
-leaves the shop out (a partial catalogue, REQ-P4K-006) leaves its case as it is. A shop whose record has no
-`starmapObjectGuid` has no place to link by: it is one `UNMATCHED` row of the change report and
-opens no case (owner decision, 2026-11-07), and a run closes such a shop's earlier case as
-`RESOLVED`. A link the
-run changes is a `CHANGED` row (`terminal_id`). The links are read as stored, so a preview links
-against the starmap links of the last APPLY.
+A terminal's place is its own starmap link (only ever an admin's), else the link of its nearest
+linked UEX parent (REQ-P4K-035). A shop's places are, nearest first (`ShopPlaces`): its starmap
+object, refined to the deepest object at or below it whose placing entity (the starmap record's
+`entityName`) is one of the shop's `containers`, ignoring case; then that object's ancestors up to,
+not including, the first celestial body (type family `star`, `solarsystem`, `planet`, `moon`,
+`asteroid`, `jumppoint` or `anomaly`). The entity names come from the run's catalogue, so a
+catalogue without starmap objects refines no place. The terminals whose place is one of these are
+the terminals around the shop.
+
+The name match reads UEX's `<shop> - <place>` naming: a terminal's part before its first ` - `,
+normalised like a starmap name and without spaces, at least three characters, matches when the
+shop's registry name, entity name or brand, compacted the same way, contains it; the longest match
+at the nearest place that holds one wins (`ShopTerminalNames`). Of several equally long matches
+(`ShopTerminalTieBreaks`), where they differ in UEX type, a commodity exchange or terminal, or a
+shop of no known kind whose compact names hold `commodit`, takes the `commodity` or `commodity_raw`
+terminal and any other shop the `item` terminal; else the terminal named
+`<shop> - <district> - <place>` whose compact district, or one of the district's words of at least
+five letters, is part of the shop's compact containers. Without a name match, a terminal around the
+shop matches by alias (`ShopTerminalAliases`) when its compact shop part is one of these and the
+shop's compact registry or entity name holds one of its words: `medicalshop` → `pharmacy`; `guns` →
+`blackmarketfpsitems`, `weaponsmith`; `shipparts` → `shipitems`, `shipweapons`; `refineryshop` →
+`refinerystore`, `refineryitemshop`; `refineryoresales` → `miningkiosks`; `filteredwater` →
+`waterstall`; `cargoservices` → `cargooffice`; `shopterminal` → `trdpst`, `tradingpost`;
+`friedgrubs` → `grubstallfried`; `clothingshop` → `clothingstall`; `hotdogs` → `hotdog`;
+`torpedoburrito` and `burritobar` → `burritocart`; `landingservices` → `cryastroresupply`.
+
+One candidate links; several or none leave the shop unlinked, one `UNMATCHED` row and, unless
+REQ-P4K-060 says the case could settle nothing, one case `SHOP_LINK_AMBIGUOUS` or
+`SHOP_LINK_NOT_FOUND` of kind `SHOP` with the shop's GUID; a run that links the shop closes the
+case as `RESOLVED`, and a run whose catalogue leaves the shop out (a partial catalogue,
+REQ-P4K-006) leaves its case as it is. A shop whose record has no `starmapObjectGuid` has no place
+to link by: it is one `UNMATCHED` row of the change report and opens no case (owner decision,
+2026-11-07), and a run closes such a shop's earlier case as `RESOLVED`. A link the run changes is a
+`CHANGED` row (`terminal_id`). The links are read as stored, so a preview links against the
+starmap links of the last APPLY.
 
 The link columns `shop.terminal_id` and `terminal_link_manual` are mapped read only and written
 only by `ShopRepository`'s statements. An admin sets (`SET`), clears (`CLEAR`) or hands back to the
@@ -1948,9 +2013,12 @@ every APPLY leaves alone. The admin page `/admin/shops` lists the shops with the
 terminals by name (`GET …/admin/shops/terminals`); a peer admin's link change and an APPLY reload
 the list in place through the `catalogue-admin` room's `shops` section (REQ-FE-010).
 
-**Enforced by:** `P4kShopTerminalLinkTest`, `ShopTerminalNamesTest`, `AdminShopsControllerMvcTest`
-· **Code:** `P4kShopLinker`, `ShopTerminalNames`, `ShopAdminService` · **ADR:**
-[ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md) · **Issues:** #3028, #3046
+**Enforced by:** `P4kShopTerminalLinkTest`, `ShopTerminalNamesTest`, `ShopPlacesTest`,
+`ShopTerminalTieBreaksTest`, `ShopTerminalAliasesTest`, `AdminShopsControllerMvcTest` · **Code:**
+`P4kShopLinker`, `ShopPlaces`, `ShopTerminalNames`, `ShopTerminalTieBreaks`,
+`ShopTerminalAliases`, `ShopAdminService` · **ADR:**
+[ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md),
+[ADR-0395](../adr/0395-the-p4k-import-links-starmap-objects-and-shops-by-more-keys-and-opens-no-case-without-a-counterpart.md) · **Issues:** #3028, #3046
 
 ### REQ-P4K-044 — a shop's item list shows on the item as "available at"
 
@@ -1974,6 +2042,44 @@ unknown, never as "not available". An item merge moves the rows onto the survivo
 **Enforced by:** `P4kShopImportTest`, `InventoryPageControllerMvcTest` · **Code:**
 `ItemCatalogueDetailsService`, `catalogue/fragments/item-catalogue.html` · **ADR:**
 [ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md) · **Issues:** #3028, #3046
+
+### REQ-P4K-060 — a link case opens only where the game has a counterpart and the link feeds something
+
+A UEX location row or a shop the import leaves unlinked opens a review case only where an admin's
+decision could settle something (owner decision, 2026-11-17). It opens none, and stays one
+`UNMATCHED` row of the change report, for:
+
+- a terminal, which is never a starmap object (REQ-P4K-035);
+- an orbit, which takes its planet's link or none (REQ-P4K-035);
+- a row of a star system that links to no object, as UEX lists systems the game lacks;
+- a row UEX does not report live (`is_available_live` false) for which the game has no candidate;
+- a POI or an outpost whose link would feed nothing: no UEX terminal names it as its place (the
+  terminal rows name outposts, never a POI) and no storage place sits on or below one of its
+  candidates;
+- a shop whose record names no place (REQ-P4K-043);
+- a shop without an item list, unknown or empty, whose link would show on no item (REQ-P4K-044);
+- a shop without a match around which every UEX terminal is linked to a shop of the run, none at
+  all included.
+
+**Acceptance**
+
+- [x] A planet of a UEX star system the game lacks links nothing and opens no case, even where an
+  object of its name exists in another system.
+- [x] A terminal and a Lagrange orbit open no case.
+- [x] A POI without terminals and storage places opens no case; an outpost a terminal names does.
+- [x] A shop with no terminal around it, one whose terminals around are all taken and one without
+  an item list open no case.
+- [x] A station UEX stops reporting live and a shop that loses its item list close their open
+  cases on the next APPLY.
+
+An APPLY closes an open case of such a row or shop as `RESOLVED`, as it does for every link case
+it no longer finds (REQ-P4K-016); an admin's link, clear or case resolution is never touched. A
+shop's surroundings are its places of REQ-P4K-043, and a terminal is taken when a shop of the run
+links to it after the run, an admin's link included.
+
+**Enforced by:** `StarmapLinkRunTest`, `P4kStarmapLinkTest`, `P4kShopTerminalLinkTest` ·
+**Code:** `StarmapLinkRun`, `StarmapCaseRules`, `P4kShopLinker` · **ADR:**
+[ADR-0395](../adr/0395-the-p4k-import-links-starmap-objects-and-shops-by-more-keys-and-opens-no-case-without-a-counterpart.md)
 
 ## Texts, audit and monitoring
 

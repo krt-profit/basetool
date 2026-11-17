@@ -224,7 +224,7 @@ groups:
           severity: warning
         annotations:
           summary: "Exchange registry mirror write failed ({{ $labels.phase }})"
-          description: "The backend could not write the exchange registry mirror to Redis ({{ $labels.phase }}). A failed pre_commit write refused an admin's restriction; switched_off means a start with APP_EXCHANGE_MIRROR_ENABLED=false could not switch off a registry document left in Redis, so the gateway may still admit clients on it until the next successful start; any other phase leaves the mirror behind the database until the 60-second reconcile succeeds. Check Redis and the basetool-backend ACL user's ~exchange:* grant (REQ-XCH-003)."
+          description: "The backend could not write the exchange registry mirror to redis-shared ({{ $labels.phase }}). A failed pre_commit write refused an admin's restriction; switched_off means a start with APP_EXCHANGE_MIRROR_ENABLED=false could not switch off a registry document left in redis-shared, so the gateway may still admit clients on it until the next successful start; any other phase leaves the mirror behind the database until the 60-second reconcile succeeds. Check redis-shared (RedisDown, RedisMemoryHigh) and the basetool-backend ACL user's ~exchange:* grant (REQ-XCH-003)."
 
       - alert: ExchangeBudgetHigh
         expr: max(basetool_ingest_exchange_budget_used_ratio) > 0.8
@@ -233,7 +233,7 @@ groups:
           severity: warning
         annotations:
           summary: "The exchange's Redis budget is more than 80 % used"
-          description: "The exchange data the ingest gateway keeps in Redis (the idempotency cache) uses more than 80 % of its 128 MiB budget. Above 100 % every exchange write is refused with 503 EXCHANGE_BUDGET_EXHAUSTED, while sessions keep their room (REQ-XCH-023, ADR-0221). Check which client writes most (the per-client sets under ingest:xch:budget:c:*) and whether a client loops."
+          description: "The exchange data the ingest gateway keeps in redis-shared (the idempotency cache) uses more than 80 % of its 128 MiB budget. Above 100 % every exchange write is refused with 503 EXCHANGE_BUDGET_EXHAUSTED, while the backend's registry mirror and revocations keep their room in redis-shared (REQ-XCH-023, ADR-0221). Check which client writes most (the per-client sets under ingest:xch:budget:c:*) and whether a client loops."
 
       - alert: ExchangeStoreStepsExhausted
         expr: sum by (step) (increase(basetool_ingest_exchange_store_conflicts_total{outcome="exhausted"}[10m])) > 5
@@ -251,7 +251,7 @@ groups:
           severity: warning
         annotations:
           summary: "Exchange client {{ $labels.client_id }} uses more than 80 % of its Redis budget"
-          description: "The exchange data the ingest gateway keeps in Redis for client {{ $labels.client_id }} (cached answers, quota counters, staged drafts) uses more than 80 % of the client's 64 MiB budget. When it is full every write of every member of that client is refused 503 EXCHANGE_BUDGET_EXHAUSTED, long before ExchangeBudgetHigh can fire, because one client's budget is half of the total (REQ-XCH-023). The budget frees as the cached answers expire, within about an hour. Check on the Exchange dashboard whether the client pushes its whole list every sync or keeps re-sending conflicting change sets, and contact its author; members of other clients are not affected."
+          description: "The exchange data the ingest gateway keeps in redis-shared for client {{ $labels.client_id }} (cached answers, quota counters, staged drafts) uses more than 80 % of the client's 64 MiB budget. When it is full every write of every member of that client is refused 503 EXCHANGE_BUDGET_EXHAUSTED, long before ExchangeBudgetHigh can fire, because one client's budget is half of the total (REQ-XCH-023). The budget frees as the cached answers expire, within about an hour. Check on the Exchange dashboard whether the client pushes its whole list every sync or keeps re-sending conflicting change sets, and contact its author; members of other clients are not affected."
 
       - alert: ExchangeRelayFailing
         expr: sum(increase(basetool_ingest_exchange_relay_total{outcome="failed"}[15m])) > 3
@@ -295,7 +295,7 @@ groups:
           severity: warning
         annotations:
           summary: "The ingest gateway cannot read the exchange registry"
-          description: "The ingest gateway cannot read the exchange registry mirror or the revocations in Redis and refuses exchange requests with 503 REGISTRY_UNAVAILABLE (fail-closed, REQ-XCH-003). Check that the backend writes exchange:registry (APP_EXCHANGE_MIRROR_ENABLED, ExchangeMirrorWriteFailed), that Redis is up, and that the ingest ACL user still reads ~exchange:*."
+          description: "The ingest gateway cannot read the exchange registry mirror or the revocations in redis-shared and refuses exchange requests with 503 REGISTRY_UNAVAILABLE (fail-closed, REQ-XCH-003). Check that the backend writes exchange:registry (APP_EXCHANGE_MIRROR_ENABLED, ExchangeMirrorWriteFailed), that redis-shared is up (RedisDown), and that the ingest ACL user still reads ~exchange:*. A new or emptied redis-shared holds no registry until the backend's 60-second reconcile has rewritten it from Postgres."
 
       - alert: ExchangeRegistryMirrorStaleAtGateway
         expr: ((basetool_exchange_registry_mirror_age_seconds > 300) or ((basetool_exchange_registry_mirror_age_seconds != basetool_exchange_registry_mirror_age_seconds) and on() (time() - max(process_start_time_seconds{job="basetool-ingest"})) > 300)) and on() (max(basetool_scheduled_job_enabled{task="exchange_registry_reconcile"}) == 1)
@@ -304,7 +304,7 @@ groups:
           severity: warning
         annotations:
           summary: "The ingest gateway has not read the exchange registry for over 5 minutes"
-          description: "The ingest gateway reads the exchange registry mirror every 30 seconds, and its last successful read is more than 5 minutes old - or it has not read it once since it started - while the backend's mirror is enabled. Exchange requests are refused 503 REGISTRY_UNAVAILABLE meanwhile, even when no client happens to call. Check that exchange:registry exists in Redis (ExchangeMirrorWriteFailed, ExchangeRegistryReconcileStale), that Redis is up, and that the ingest ACL user still reads ~exchange:* (REQ-XCH-003, REQ-XCH-028)."
+          description: "The ingest gateway reads the exchange registry mirror every 30 seconds, and its last successful read is more than 5 minutes old - or it has not read it once since it started - while the backend's mirror is enabled. Exchange requests are refused 503 REGISTRY_UNAVAILABLE meanwhile, even when no client happens to call. Check that exchange:registry exists in redis-shared (ExchangeMirrorWriteFailed, ExchangeRegistryReconcileStale), that redis-shared is up (RedisDown), and that the ingest ACL user still reads ~exchange:* (REQ-XCH-003, REQ-XCH-028)."
 
       - alert: ExchangeRegistryReconcileStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_registry_reconcile"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_registry_reconcile"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="exchange_registry_reconcile"} == 1))
@@ -754,7 +754,7 @@ groups:
           severity: warning
         annotations:
           summary: "Frontend session store growing unbounded (>2000 active sessions)"
-          description: "basetool_active_sessions has held above 2000 for 1h. Expected steady state is a few hundred; a sustained climb means anonymous/orphan sessions are accreting again (REQ-SEC-025 two-tier TTL regressed) and Redis is heading for its maxmemory noeviction ceiling. Check the session store size (redis SCAN 'basetool:session:sessions:*') and the created-vs-login ratio."
+          description: "basetool_active_sessions has held above 2000 for 1h. Expected steady state is a few hundred; a sustained climb means anonymous/orphan sessions are accreting again (REQ-SEC-025 two-tier TTL regressed) and redis-session is heading for its maxmemory noeviction ceiling (RedisMemoryHigh). Check the session store size (SCAN 'basetool:session:sessions:*' on redis-session) and the created-vs-login ratio."
 
       - alert: SessionValueDropsSustained
         expr: sum(increase(basetool_session_value_dropped_total[15m])) > 20
@@ -763,7 +763,7 @@ groups:
           severity: warning
         annotations:
           summary: "Frontend is dropping unreadable session values ({{ $value | printf \"%.0f\" }} per 15m)"
-          description: "Session values in Redis cannot be deserialized and are being dropped, so those attributes read as not set. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. Since ADR-0157 the value is REMOVED from the session on the request that dropped it, so each poisoned session drops exactly once: a burst that decays is a backlog being repaired and is expected on a deploy, while a rate that stays up for 30m means something is still WRITING an unreadable value every request — check that the frontend startup line \"Session serializer forces an @class type id for: [...]\" lists what you expect, and that no code path puts a final type into a session (REQ-SEC-049, REQ-SEC-050)."
+          description: "Session values in redis-session cannot be deserialized and are being dropped, so those attributes read as not set. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. Since ADR-0157 the value is REMOVED from the session on the request that dropped it, so each poisoned session drops exactly once: a burst that decays is a backlog being repaired and is expected on a deploy, while a rate that stays up for 30m means something is still WRITING an unreadable value every request — check that the frontend startup line \"Session serializer forces an @class type id for: [...]\" lists what you expect, and that no code path puts a final type into a session (REQ-SEC-049, REQ-SEC-050)."
 
       - alert: SessionUnmappableSustained
         expr: sum(increase(basetool_session_unmappable_total[15m])) > 20
@@ -772,7 +772,7 @@ groups:
           severity: warning
         annotations:
           summary: "Frontend cannot map session hashes ({{ $value | printf \"%.0f\" }} per 15m)"
-          description: "Session hashes in Redis exist but are missing a required field, so those requests are served as if they carried no session and the members are signed out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names which required field was absent. This is normally a hash that was lost and then half re-created by a delta write, so check Redis first — a restart, an AOF truncation or a session purge run against live traffic all produce it, and the burst should decay on its own once the affected browsers get fresh sessions. A rate that keeps climbing with no such event means session hashes are being lost in volume; a rate that covers the whole active population at once means the session wire format broke and everybody is being signed out (REQ-SEC-063). Before ADR-0186 this state answered HTTP 500 on every request from that browser for up to 30 days instead."
+          description: "Session hashes in redis-session exist but are missing a required field, so those requests are served as if they carried no session and the members are signed out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names which required field was absent. This is normally a hash that was lost and then half re-created by a delta write, so check redis-session first — a restart, an AOF truncation or a session purge run against live traffic all produce it, and the burst should decay on its own once the affected browsers get fresh sessions. A rate that keeps climbing with no such event means session hashes are being lost in volume; a rate that covers the whole active population at once means the session wire format broke and everybody is being signed out (REQ-SEC-063). Before ADR-0186 this state answered HTTP 500 on every request from that browser for up to 30 days instead."
 
       - alert: SessionTypeOutsideAllowList
         expr: sum by (mode) (increase(basetool_session_type_refused_total[1h])) > 0
@@ -780,7 +780,7 @@ groups:
           severity: warning
         annotations:
           summary: "A session value names a class outside the session type allow-list (mode={{ $labels.mode }})"
-          description: "The frontend read a session value whose @class type id is not on SessionTypeAllowList. Find the WARN line from SessionTypeAllowList in the frontend log: it names the class once per frontend lifetime. mode=report means the value was read as before and nothing broke, but APP_SESSION_TYPE_ALLOW_LIST=enforce would drop it: if the class is legitimately stored in the session (a new form or DTO outside frontend.model, a new Spring or container type) add it to the list and do not enforce until this has stayed silent; if it is not, something other than this frontend wrote into Redis. mode=enforce means the value was refused and that attribute reads as not set, which is correct for a foreign class and a defect for a legitimate one (REQ-SEC-067)."
+          description: "The frontend read a session value whose @class type id is not on SessionTypeAllowList. Find the WARN line from SessionTypeAllowList in the frontend log: it names the class once per frontend lifetime. mode=report means the value was read as before and nothing broke, but APP_SESSION_TYPE_ALLOW_LIST=enforce would drop it: if the class is legitimately stored in the session (a new form or DTO outside frontend.model, a new Spring or container type) add it to the list and do not enforce until this has stayed silent; if it is not, something other than this frontend wrote into redis-session. mode=enforce means the value was refused and that attribute reads as not set, which is correct for a foreign class and a defect for a legitimate one (REQ-SEC-067)."
 
       - alert: RedisFanoutUnsubscribed
         expr: basetool_redis_fanout_subscribed == 0
@@ -788,8 +788,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Redis {{ $labels.fanout }} fan-out has not been subscribed for 10m"
-          description: "The {{ $labels.fanout }} pub/sub container of {{ $labels.application }} is not listening, so cross-instance delivery for that channel is dead: a peer replica's change never reaches this instance (fanout=notifications on the backend, fanout=livesync on the frontend). The container retries every 5s, so 10 minutes means Redis is genuinely unreachable from that service rather than merely restarting — check the redis container and the service's net-redis-* network. The service deliberately stays up and serving while this is true (ADR-0084, ADR-0143), so nothing else will page."
+          summary: "Redis {{ $labels.fanout }} fan-out on redis-shared has not been subscribed for 10m"
+          description: "The {{ $labels.fanout }} pub/sub container of {{ $labels.application }} is not listening, so cross-instance delivery for that channel is dead: a peer replica's change never reaches this instance (fanout=notifications on the backend, fanout=livesync on the frontend). The container retries every 5s, so 10 minutes means redis-shared is genuinely unreachable from that service rather than merely restarting — check the redis-shared container (RedisDown) and the service's net-redis-* network. The service deliberately stays up and serving while this is true (ADR-0084, ADR-0143), so nothing else will page."
 
       - alert: SessionEvictionSpike
         expr: sum(increase(basetool_session_evicted_total[1h])) > 3
@@ -798,7 +798,7 @@ groups:
           severity: warning
         annotations:
           summary: "Concurrent-session evictions sustained (session registry may be stale)"
-          description: "The frontend has evicted more than 3 sessions per hour for 30 minutes because the per-principal concurrent-session cap (10) was full. Members are being logged out with 'This session has been expired'. A sustained stream means the session registry is holding dead Redis sessions against the cap rather than users genuinely cycling more than ten devices — check the registry against the live Redis keys (SCAN 'basetool:session:sessions:*') and correlate with ActiveSessionsRunaway; the backend log line names the cap and the victim's userId (sub)."
+          description: "The frontend has evicted more than 3 sessions per hour for 30 minutes because the per-principal concurrent-session cap (10) was full. Members are being logged out with 'This session has been expired'. A sustained stream means the session registry is holding dead sessions against the cap rather than users genuinely cycling more than ten devices — check the registry against the live keys in redis-session (SCAN 'basetool:session:sessions:*') and correlate with ActiveSessionsRunaway; the backend log line names the cap and the victim's userId (sub)."
 
       - alert: FrontendLoginBroken
         expr: sum(increase(basetool_login_total{outcome="failure", reason="provider_error"}[15m])) >= 3 unless sum(increase(basetool_login_total{outcome="success"}[15m])) > 0
@@ -807,7 +807,7 @@ groups:
           severity: warning
         annotations:
           summary: "Frontend logins failing at the token exchange with zero successes"
-          description: "The frontend recorded repeated OAuth2 provider errors (failed code-to-token exchange, JWKS or bad IdP response) and no successful logins in the last 15 minutes — login is likely broken for everyone at the token-exchange step. Check the frontend logs, Keycloak reachability from the frontend (issuer-uri / JWKS endpoint) and the OIDC client config. State/session-loss breaks surface as invalid_state and via the frontend redis readiness indicator instead."
+          description: "The frontend recorded repeated OAuth2 provider errors (failed code-to-token exchange, JWKS or bad IdP response) and no successful logins in the last 15 minutes — login is likely broken for everyone at the token-exchange step. Check the frontend logs, Keycloak reachability from the frontend (issuer-uri / JWKS endpoint) and the OIDC client config. State/session-loss breaks surface as invalid_state and via the frontend's redis readiness indicator (redis-session) instead."
 
       - alert: CsrfRejectionSpike
         expr: sum(rate(basetool_csrf_rejections_total[5m])) > 0.1
@@ -927,7 +927,7 @@ groups:
           severity: warning
         annotations:
           summary: "Ingest gateway errors ({{ $labels.reason }})"
-          description: "The ingest gateway is failing requests (reason: {{ $labels.reason }}) at an elevated rate — staging_unavailable: Redis refused a client's draft or held-back change set; internal: an unexpected gateway failure answered 500. Relay failures to the backend are ExchangeRelayFailing's, not this alert's."
+          description: "The ingest gateway is failing requests (reason: {{ $labels.reason }}) at an elevated rate — staging_unavailable: redis-shared refused a client's draft or held-back change set; internal: an unexpected gateway failure answered 500. Relay failures to the backend are ExchangeRelayFailing's, not this alert's."
 
       - alert: IngestStagingUnavailable
         expr: rate(basetool_ingest_handoff_errors_total{reason="staging_unavailable"}[5m]) > 0
@@ -935,8 +935,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Ingest cannot stage handoffs (Redis unreachable)"
-          description: "The ingest gateway could not stage a client's draft or held-back change set in Redis for browser pickup — the client gets a 503 and no pre-filled form or confirmation page opens. Check the redis container and the ingest Redis configuration."
+          summary: "Ingest cannot stage handoffs (redis-shared unreachable)"
+          description: "The ingest gateway could not stage a client's draft or held-back change set in redis-shared for browser pickup — the client gets a 503 and no pre-filled form or confirmation page opens. Check the redis-shared container (RedisDown, RedisMemoryHigh) and the ingest Redis configuration."
 
       - alert: IngestPayloadRejectedSpike
         expr: rate(basetool_ingest_payload_rejected_total[5m]) > 0.2
@@ -1013,7 +1013,7 @@ groups:
           severity: warning
         annotations:
           summary: "Backend exchange gate refusing ({{ $labels.reason }})"
-          description: "The backend's ExchangeGate has been refusing exchange requests the gateway let through for 15 minutes ({{ $labels.reason }}). The gateway checks the same registry first, so a sustained backend refusal means the two disagree: a stale gateway cache, a mirror that is behind the database (see ExchangeMirrorWriteFailed), or a gateway that no longer relays capabilities or the connection time. Members' clients get the gateway's own code for the reason meanwhile (CLIENT_SUSPENDED, SCOPE_MISSING, CLIENT_REVOKED ...); under revocations_unreadable the backend cannot read the Redis revocation mirror and answers 503 REGISTRY_UNAVAILABLE."
+          description: "The backend's ExchangeGate has been refusing exchange requests the gateway let through for 15 minutes ({{ $labels.reason }}). The gateway checks the same registry first, so a sustained backend refusal means the two disagree: a stale gateway cache, a mirror that is behind the database (see ExchangeMirrorWriteFailed), or a gateway that no longer relays capabilities or the connection time. Members' clients get the gateway's own code for the reason meanwhile (CLIENT_SUSPENDED, SCOPE_MISSING, CLIENT_REVOKED ...); under revocations_unreadable the backend cannot read the revocation mirror in redis-shared and answers 503 REGISTRY_UNAVAILABLE."
 
       - alert: ExchangeDepartureIncomplete
         expr: >-
@@ -1139,7 +1139,7 @@ groups:
           severity: warning
         annotations:
           summary: "Redis live-sync/notification fan-out publish errors (cross-replica delivery degraded)"
-          description: "The live-sync and/or notification Redis fan-out has failed to publish for 10 minutes — cross-replica live delivery is silently degraded to single-instance (a viewer on one replica stops seeing another replica's changes/notifications; same-replica delivery still works, no user-facing error). Check Redis reachability from the app replicas and the basetool:livesync:changed / basetool:notify:published pub/sub channels in each service's own ACL user (basetool-backend is granted both, basetool-frontend basetool:livesync:changed; a service whose REDIS_<SVC>_USERNAME is unset runs as the default user). RedisAclDenials fires alongside when a missing grant is the cause."
+          description: "The live-sync and/or notification Redis fan-out has failed to publish for 10 minutes — cross-replica live delivery is silently degraded to single-instance (a viewer on one replica stops seeing another replica's changes/notifications; same-replica delivery still works, no user-facing error). Check redis-shared reachability from the app replicas (RedisDown) and the basetool:livesync:changed / basetool:notify:published pub/sub channels in each service's own ACL user on redis-shared (basetool-backend is granted both, basetool-frontend basetool:livesync:changed; a service whose REDIS_<SVC>_USERNAME is unset runs as the default user). RedisAclDenials fires alongside when a missing grant is the cause."
 
       - alert: LiveSyncRelayDropsSustained
         expr: sum by (topic_class, reason) (increase(basetool_presence_relay_dropped_total{reason!="section_filtered"}[1h])) > 3

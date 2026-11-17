@@ -24,56 +24,82 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Locale;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The nine UEX location tables that link to the starmap tree (REQ-P4K-035, ADR-0345), in linking
- * order, parents first. Each names the starmap types it can link to, as type families (the type's
- * lower-case name up to its first {@code _}, so {@code Outpost_InvalidQT} is {@code outpost}) taken
- * from the LIVE catalogue's types, and the denormalised parent-name columns the UEX feed gives it,
- * nearest parent first.
+ * order, parents first; a planet comes before the orbit that takes its link. Each names the starmap
+ * types it can link to, as type families (the type's lower-case name up to its first {@code _}, so
+ * {@code Outpost_InvalidQT} is {@code outpost}) taken from the LIVE catalogue's types, and the
+ * denormalised parent-name columns the UEX feed gives it, nearest parent first.
  */
 @RequiredArgsConstructor
 @Getter
 public enum StarmapPlaceKind {
 
   /** {@code star_system}: the system's star, which carries its name ({@code Stanton}). */
-  STAR_SYSTEM("star_system", ImmutableSet.of("star", "solarsystem"), ImmutableList.of()),
-
-  /**
-   * {@code orbit}: a planet or a jump point ({@code JumpPoint}, {@code Anomaly} in Pyro and Nyx).
-   */
-  ORBIT("orbit", ImmutableSet.of("planet", "jumppoint", "anomaly"), ImmutableList.of()),
+  STAR_SYSTEM(
+      "star_system",
+      "id_system",
+      false,
+      ImmutableSet.of("star", "solarsystem"),
+      ImmutableList.of()),
 
   /** {@code planet}. */
-  PLANET("planet", ImmutableSet.of("planet"), ImmutableList.of()),
+  PLANET("planet", "id_planet", false, ImmutableSet.of("planet"), ImmutableList.of()),
+
+  /**
+   * {@code orbit}: a planet's orbit, which shares its UEX id with the planet and takes its link, or
+   * a jump point ({@code JumpPoint}, {@code Anomaly} in Pyro and Nyx), a Lagrange point, a belt or
+   * a star, which links nothing; the families serve the review's proposals.
+   */
+  ORBIT(
+      "orbit",
+      "id_orbit",
+      false,
+      ImmutableSet.of("planet", "jumppoint", "anomaly"),
+      ImmutableList.of()),
 
   /** {@code moon}. */
-  MOON("moon", ImmutableSet.of("moon"), ImmutableList.of(Parent.PLANET, Parent.ORBIT)),
+  MOON(
+      "moon",
+      "id_moon",
+      false,
+      ImmutableSet.of("moon"),
+      ImmutableList.of(Parent.PLANET, Parent.ORBIT)),
 
   /** {@code city}: a {@code LandingZone}, or a {@code Manmade} city such as Levski. */
   CITY(
       "city",
+      "id_city",
+      false,
       ImmutableSet.of("landingzone", "manmade"),
       ImmutableList.of(Parent.MOON, Parent.PLANET, Parent.ORBIT)),
 
   /** {@code space_station}: {@code Manmade} and {@code Manmade_VisibleOnInteraction} stations. */
   SPACE_STATION(
       "space_station",
+      "id_space_station",
+      true,
       ImmutableSet.of("manmade", "landingzone"),
       ImmutableList.of(Parent.MOON, Parent.PLANET, Parent.ORBIT)),
 
   /** {@code outpost}. */
   OUTPOST(
       "outpost",
+      "id_outpost",
+      true,
       ImmutableSet.of("outpost", "manmade"),
       ImmutableList.of(Parent.MOON, Parent.PLANET, Parent.ORBIT)),
 
   /** {@code poi}. */
   POI(
       "poi",
+      "id_poi",
+      true,
       ImmutableSet.of("pointofinterest", "outpost", "manmade", "asteroid", "navpoint", "anomaly"),
       ImmutableList.of(
           Parent.CITY,
@@ -83,9 +109,11 @@ public enum StarmapPlaceKind {
           Parent.PLANET,
           Parent.ORBIT)),
 
-  /** {@code terminal}. */
+  /** {@code terminal}: never a starmap object; its place is its nearest linked parent. */
   TERMINAL(
       "terminal",
+      "id_terminal",
+      true,
       ImmutableSet.of("manmade", "pointofinterest", "outpost", "landingzone"),
       ImmutableList.of(
           Parent.CITY,
@@ -95,8 +123,17 @@ public enum StarmapPlaceKind {
           Parent.PLANET,
           Parent.ORBIT));
 
+  /** The {@code NULL} literal a table without a column selects in its place. */
+  private static final String NO_TEXT = "CAST(NULL AS TEXT)";
+
   /** The table. */
   @NotNull private final String table;
+
+  /** The column of the row's UEX id. */
+  @NotNull private final String uexIdColumn;
+
+  /** Whether the table keeps UEX's {@code nickname}. */
+  private final boolean nicknamed;
 
   /** The type families of the starmap objects a row can link to. */
   @NotNull @Unmodifiable private final ImmutableSet<String> typeFamilies;
@@ -108,31 +145,48 @@ public enum StarmapPlaceKind {
   @NotNull @Unmodifiable private final ImmutableList<Parent> parents;
 
   /**
+   * Returns the family of a starmap type: its lower-case name up to its first {@code _}.
+   *
+   * @param type the object's type, or {@code null}
+   * @return the family, or {@code null} for a missing or blank type
+   */
+  @Contract(pure = true)
+  @Nullable
+  static String typeFamily(@Nullable String type) {
+    if (type == null || type.isBlank()) {
+      return null;
+    }
+    String family = type.strip().toLowerCase(Locale.ROOT);
+    int cut = family.indexOf('_');
+    return cut < 0 ? family : family.substring(0, cut);
+  }
+
+  /**
    * Whether a starmap type belongs to one of this kind's families.
    *
    * @param type the object's type, or {@code null}
    * @return {@code true} when its family is one of this kind's
    */
   public boolean accepts(@Nullable String type) {
-    if (type == null || type.isBlank()) {
-      return false;
-    }
-    String family = type.strip().toLowerCase(Locale.ROOT);
-    int cut = family.indexOf('_');
-    return typeFamilies.contains(cut < 0 ? family : family.substring(0, cut));
+    String family = typeFamily(type);
+    return family != null && typeFamilies.contains(family);
   }
 
   /**
-   * The native query that reads every row of the table as a {@link StarmapPlaceRow}: id, name, the
-   * star system, planet, orbit, moon, city, space station and outpost names, the link and its
-   * manual flag.
+   * The native query that reads every row of the table as a {@link StarmapPlaceRow}: id, UEX id,
+   * name, nickname, the star system, planet, orbit, moon, city, space station and outpost names,
+   * the live flag, the terminal type, the link and its manual flag.
    *
    * @return the query text
    */
   @NotNull
   String rowsQuery() {
     String system = this == STAR_SYSTEM ? "name" : "star_system_name";
-    return "SELECT id, name, "
+    return "SELECT id, "
+        + uexIdColumn
+        + ", name, "
+        + (nicknamed ? "nickname" : NO_TEXT)
+        + ", "
         + system
         + ", "
         + column(Parent.PLANET)
@@ -146,6 +200,8 @@ public enum StarmapPlaceKind {
         + column(Parent.SPACE_STATION)
         + ", "
         + column(Parent.OUTPOST)
+        + ", is_available_live, "
+        + (this == TERMINAL ? "type" : NO_TEXT)
         + ", starmap_object_id, starmap_link_manual FROM "
         + table;
   }
@@ -190,7 +246,7 @@ public enum StarmapPlaceKind {
    */
   @NotNull
   private String column(@NotNull Parent parent) {
-    return parents.contains(parent) ? parent.getColumn() : "CAST(NULL AS TEXT)";
+    return parents.contains(parent) ? parent.getColumn() : NO_TEXT;
   }
 
   /** A parent a UEX row names by a denormalised column. */

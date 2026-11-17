@@ -26,7 +26,10 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Normalises place names for the starmap linking and the visibility rule (REQ-P4K-035). */
+/**
+ * Normalises place names for the starmap linking, the shop links and the visibility rule
+ * (REQ-P4K-035, REQ-P4K-043).
+ */
 public final class StarmapNames {
 
   /** Combining marks left after decomposition. */
@@ -53,6 +56,19 @@ public final class StarmapNames {
     String plain = MARKS.matcher(Normalizer.normalize(name, Normalizer.Form.NFKD)).replaceAll("");
     String spaced = SEPARATORS.matcher(plain.toLowerCase(Locale.ROOT)).replaceAll(" ").strip();
     return spaced.isEmpty() ? null : spaced;
+  }
+
+  /**
+   * Compacts a name: normalised and without spaces, so {@code Area 18} and {@code Area18} meet.
+   *
+   * @param name the name, or {@code null}
+   * @return the compact name, or {@code null} when nothing is left
+   */
+  @Contract(pure = true)
+  @Nullable
+  public static String compact(@Nullable String name) {
+    String normalised = normalise(name);
+    return normalised == null ? null : normalised.replace(" ", "");
   }
 
   /**
