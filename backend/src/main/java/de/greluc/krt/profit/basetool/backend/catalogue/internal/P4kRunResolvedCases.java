@@ -20,12 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
@@ -77,6 +80,42 @@ public class P4kRunResolvedCases {
       @NotNull Set<Found> found,
       @NotNull Instant now) {
     settleWithin(kind, reasons, found, _ -> true, now);
+  }
+
+  /**
+   * Settles the cases of one kind's records after its pass: the cases the run raised stay or
+   * reopen, the others close; a partial kind settles only the GUIDs it lists (REQ-P4K-006,
+   * REQ-P4K-016).
+   *
+   * @param kind the kind
+   * @param reasons the reasons the caller owns
+   * @param records the kind's records of the catalogue
+   * @param complete whether the catalogue lists the kind completely
+   * @param context the run
+   */
+  public void settleRun(
+      @NotNull P4kKind kind,
+      @NotNull List<P4kReviewReason> reasons,
+      @NotNull List<? extends P4kRecord> records,
+      boolean complete,
+      @NotNull P4kImportContext context) {
+    Set<Found> found =
+        context.getReport().reviews().stream()
+            .filter(finding -> finding.kind() == kind)
+            .map(finding -> new Found(finding.guid(), finding.reason()))
+            .collect(Collectors.toUnmodifiableSet());
+    Predicate<UUID> evaluated;
+    if (complete) {
+      evaluated = _ -> true;
+    } else {
+      Set<UUID> listed =
+          records.stream()
+              .map(P4kRecord::parsedGuid)
+              .filter(Objects::nonNull)
+              .collect(Collectors.toUnmodifiableSet());
+      evaluated = listed::contains;
+    }
+    settleWithin(kind, reasons, found, evaluated, context.getNow());
   }
 
   /**

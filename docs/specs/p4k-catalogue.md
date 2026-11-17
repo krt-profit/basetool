@@ -291,7 +291,11 @@ its `playability` is `player`:
 
 - `ai` and `mission` are never created and only counted;
 - `null` and `special` are **unclear**: the record goes on the review list (REQ-P4K-016) instead of
-  being created; an unknown value reads as `null` (REQ-P4K-003).
+  being created; an unknown value reads as `null` (REQ-P4K-003). An unclear **item** goes there only
+  when the catalogue shows a player can obtain it — a shop's item list names it, or a blueprint
+  produces it; any other unclear item is only counted (ADR-0393);
+- an item without a usable name — none, an unresolved key, or a placeholder such as
+  `PH - hdh_boots_01_01_13` or `PLACEHOLDER - …` — is never created and only counted.
 
 A created row is visible to members at once; items and ships carry no review flag of their own.
 
@@ -299,13 +303,15 @@ A created row is visible to members at once; items and ships carry no review fla
 
 - [x] With the box ticked, a `player` ship is created; an `ai` and a `mission` ship are counted and
   not created; a `special` and a `null` ship each open a review case.
+- [x] An unclear item opens a review case only once a blueprint or a shop makes it obtainable; an
+  item without a usable name, placeholders included, is neither created nor reviewed.
 - [x] Without the box, nothing is created and the preview still shows the would-be count.
 
 The box is the APPLY parameter `createItemsAndShips`; a preview counts as if it were ticked. A
 created row has `source_systems = P4K`, and a created ship needs a name no ship holds yet.
 
-**Enforced by:** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2886,
-#2897
+**Enforced by:** `P4kImportServiceSeedingTest`, `P4kItemCaseRulesImportTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md),
+[ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md) · **Issues:** #2886, #2897
 
 ### REQ-P4K-010 — rows an earlier seeding created are kept, and those no rule would create are reviewed
 
@@ -541,7 +547,9 @@ assign) is neither counted nor logged again, so the report and the open list agr
 - a row an earlier seeding created that no current rule would create (REQ-P4K-010);
 - an unmatched item or ship of unclear playability (REQ-P4K-009);
 - a manufacturer name conflict (REQ-P4K-020, REQ-P4K-021) and a GUID conflict (REQ-P4K-007); an
-  APPLY settles the ship cases itself (REQ-P4K-050);
+  APPLY settles the ship cases (REQ-P4K-050) and the item cases itself: an open case of a GUID,
+  conflict, seeded row or unclear playability that the run no longer raises closes as `RESOLVED`,
+  one it raises again reopens, and a partial kind settles only the GUIDs it lists (ADR-0393);
 - a starmap link and a shop link that is ambiguous or not found (REQ-P4K-035, REQ-P4K-043), unless
   the case could settle nothing (REQ-P4K-060): a row without a game counterpart, a terminal, an
   orbit, a POI or outpost whose link feeds nothing, a shop without a place, without an item list or
@@ -563,6 +571,8 @@ lifts. The row records who resolved the case and when, and each resolution is an
 - [x] A case an admin kept is not logged or counted by the next APPLY or preview.
 - [x] "Hide" removes the row from the pickers; the next APPLY that matches it leaves it hidden.
 - [x] The resolution stores the admin and the time and writes one audit event.
+- [x] An APPLY closes the item cases it no longer raises and leaves an admin's decision; a refused
+  duplicate merge opens its closed case again.
 
 `p4k_review_case` holds `status` (`OPEN`, `REVIEWED`), `resolution` (`KEEP`, `HIDE`),
 `resolved_by` and `resolved_at`; a resolution echoes the case version (`409` when stale), and a
@@ -572,7 +582,8 @@ is refused with `409`, so it never writes a row beside them. An `ASSIGN` of a mi
 material no longer exists is refused and leaves the case open. A hide stamps `p4k_hidden_at` on
 the row. A GUID conflict
 between two rows, such as one the SC Wiki / UEX duplicate merge refuses (`P4kMergeConflictRecorder`),
-is one case per GUID about the row holding it, naming the row it collides with in `other_row_id`.
+is one case per GUID about the row holding it, naming the row it collides with in `other_row_id`;
+the merge opens such a case again when an APPLY closed it.
 A hide and an assignment evict the P4K-written caches after the commit and publish the global
 `CATALOGUE` event, as a committed APPLY does (REQ-DATA-011, `P4kCatalogueChange`).
 `/admin/p4k-import` reloads the resource groups and materials a case can assign after an APPLY,
@@ -583,7 +594,8 @@ sections, so a peer admin's open import page reloads its cases, its run history 
 banner in place (`CatalogueAdminLiveSync`, REQ-FE-015); a finished PREVIEW reloads none of them. A
 list that shrank below the page it shows reloads its last page.
 
-**Enforced by:** `P4kReviewServiceTest`, `P4kCatalogueChangeTest`, `CatalogueAdminLiveSyncTest`,
+**Enforced by:** `P4kReviewServiceTest`, `P4kItemCaseRulesImportTest`, `P4kMergeConflictRecorderTest`,
+`P4kCatalogueChangeTest`, `CatalogueAdminLiveSyncTest`,
 `frontend/scripts/catalogue-admin.test.mjs`, `AdminP4kImportPageControllerMvcTest`,
 `P4kImportReportControllerMvcTest`, `P4kImportReportE2eTest` · **Code:** `P4kReviewService` · **ADR:**
 [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2886, #2888
@@ -749,6 +761,28 @@ evicts the item-order picker's probe (`CacheDomain.ITEM_CATALOG`), and the gauge
 `StockLevelIntegrationTest`, `JobOrderItemServiceTest`, `UnobtainableItemBusinessGaugesTest`,
 `AdminItemsControllerMvcTest`, `frontend/scripts/catalogue-admin.test.mjs` · **Code:** `GameItemAdminService`,
 `SelectableGameItemJpql` · **ADR:** [ADR-0373](../adr/0373-an-admin-hides-a-game-item-as-not-obtainable-in-a-column-of-its-own.md)
+
+### REQ-P4K-054 — a row holding another listed item is no name candidate, and covers that item's copies
+
+The class-name and name steps of the item match (REQ-P4K-007) skip a stored item that holds the P4K
+GUID of **another item this catalogue lists**: that row already belongs to its own record, so it can
+neither take the found record nor make it a conflict. When both records carry the same English name,
+`type`, `subType` and `size` — a copy of an item such as `_tow`, `_LowPoly`, `invisible_…` — the row
+**covers** the record: it needs no row of its own and no case, and the report logs it `COVERED`
+(REQ-P4K-050). Any other such record is unmatched and follows the seeding rule (REQ-P4K-009). A row
+holding a GUID the catalogue no longer lists stays a candidate.
+
+A row an earlier seeding created for one record ("Door Control", "Door", "Corpse") therefore no
+longer turns every other record of that name into a `GUID_CONFLICT` case.
+
+**Acceptance**
+
+- [x] A copy of a stored item with the same name, type, sub-type and size is covered: no row, no
+  case, `COVERED` in the report.
+- [x] A namesake of another size opens no case; with the box ticked it is created as its own row.
+
+**Enforced by:** `P4kItemCaseRulesImportTest` · **Code:** `P4kItemCoverage`, `P4kRowMatcher` ·
+**ADR:** [ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
 
 ## Manufacturers
 

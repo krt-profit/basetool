@@ -86,7 +86,8 @@ public class P4kMergeConflictRecorder {
   }
 
   /**
-   * Creates the case of one GUID unless it exists; an existing case keeps its runs.
+   * Creates the case of one GUID unless it exists; an existing case keeps its runs, and one an
+   * APPLY closed because its run did not raise it opens again (REQ-P4K-016).
    *
    * @param guid the P4K GUID under review
    * @param rowId the row holding the GUID
@@ -112,6 +113,11 @@ public class P4kMergeConflictRecorder {
     }
     if (reviewCase.getOtherRowId() == null) {
       reviewCase.setOtherRowId(collidingRowId);
+    }
+    if (reviewCase.getResolution() == P4kReviewResolution.RESOLVED) {
+      reviewCase.setStatus(P4kReviewStatus.OPEN);
+      reviewCase.setResolution(null);
+      reviewCase.setResolvedAt(null);
     }
     reviewCases.save(reviewCase);
   }

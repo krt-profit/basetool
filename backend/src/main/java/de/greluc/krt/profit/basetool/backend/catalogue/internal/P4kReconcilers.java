@@ -68,7 +68,7 @@ class P4kReconcilers {
       @NotNull P4kLoadoutReconciler.LoadoutStream loadouts,
       @NotNull P4kImportContext context) {
     manufacturerReconciler.reconcile(catalogue.manufacturers(), context);
-    itemReconciler.reconcile(catalogue.items(), context);
+    itemReconciler.reconcile(catalogue, context);
     itemStatReconciler.reconcile(catalogue, context);
     final List<P4kShipBaseRepairs.Repair> shipRepairs =
         shipReconciler.reconcile(catalogue, loadouts, context);

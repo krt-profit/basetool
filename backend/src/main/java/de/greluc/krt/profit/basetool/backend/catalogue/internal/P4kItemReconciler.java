@@ -26,24 +26,33 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBlueprintDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kClosedSet;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kItemPlayability;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShopDto;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Reconciles the catalogue's {@code items} with {@code game_item}: match (REQ-P4K-007), lead the
- * attributes the P4K owns and fill the rest where empty (REQ-P4K-017…019), stamp, and create a
- * playable unmatched item behind the run's checkbox (REQ-P4K-009).
+ * Reconciles the catalogue's {@code items} with {@code game_item}: match (REQ-P4K-007, the
+ * candidates and coverage of REQ-P4K-054), lead the attributes the P4K owns and fill the rest where
+ * empty (REQ-P4K-017…019), stamp, create a playable unmatched item behind the run's checkbox
+ * (REQ-P4K-009), and settle the item cases an APPLY no longer finds (REQ-P4K-016).
  */
 @Component
 public class P4kItemReconciler {
@@ -66,6 +75,13 @@ public class P4kItemReconciler {
   /** The source name the class resolver logs. */
   private static final String SOURCE = "P4K";
 
+  /** The reasons of the item cases a run settles itself (REQ-P4K-016). */
+  private static final List<P4kReviewReason> SETTLED_REASONS =
+      List.of(
+          P4kReviewReason.GUID_CONFLICT,
+          P4kReviewReason.UNCLEAR_PLAYABILITY,
+          P4kReviewReason.SEEDED_NOT_CREATABLE);
+
   /** Finds and saves the items. */
   private final GameItemRepository gameItemRepository;
 
@@ -74,6 +90,9 @@ public class P4kItemReconciler {
 
   /** Resolves, counts and logs the catalogue's class values on an APPLY. */
   private final ItemClassResolver itemClassResolver;
+
+  /** Closes the item cases a run no longer finds and reopens those it finds again. */
+  private final P4kRunResolvedCases resolvedCases;
 
   /** {@code basetool_catalogue_item_grade_unknown_total}. */
   private final Counter unknownGrades;
@@ -84,26 +103,31 @@ public class P4kItemReconciler {
    * @param gameItemRepository the item repository
    * @param manufacturerReconciler creates the manufacturer a seeded item references
    * @param itemClassResolver resolves and counts the catalogue's class values
+   * @param resolvedCases settles the item cases of a run
    * @param meterRegistry the registry the counter lives in
    */
   public P4kItemReconciler(
       @NotNull GameItemRepository gameItemRepository,
       @NotNull P4kManufacturerReconciler manufacturerReconciler,
       @NotNull ItemClassResolver itemClassResolver,
+      @NotNull P4kRunResolvedCases resolvedCases,
       @NotNull MeterRegistry meterRegistry) {
     this.gameItemRepository = gameItemRepository;
     this.manufacturerReconciler = manufacturerReconciler;
     this.itemClassResolver = itemClassResolver;
+    this.resolvedCases = resolvedCases;
     this.unknownGrades = meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_GRADE_UNKNOWN);
   }
 
   /**
-   * Reconciles every item; the manufacturers must be reconciled first.
+   * Reconciles every item and, on an APPLY, settles the item cases the run no longer finds; the
+   * manufacturers must be reconciled first.
    *
-   * @param items the catalogue's items
+   * @param catalogue the catalogue
    * @param context the run
    */
-  public void reconcile(@NotNull List<P4kItemDto> items, @NotNull P4kImportContext context) {
+  public void reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
+    List<P4kItemDto> items = catalogue.items();
     P4kRowIndex<GameItem> rows =
         new P4kRowIndex<>(
             gameItemRepository.findAll(),
@@ -120,14 +144,18 @@ public class P4kItemReconciler {
             "external_uuid",
             rows::byClassName,
             rows::byName,
-            row -> row.getSourceSystems() == GameItemSourceSystem.P4K);
+            row -> row.getSourceSystems() == GameItemSourceSystem.P4K,
+            P4kItemCoverage.of(items));
+    Set<UUID> obtainable = obtainable(catalogue);
     for (P4kItemDto item : items) {
       String rawPlayability = item.playability();
       P4kItemPlayability playability = P4kClosedSet.parse(P4kItemPlayability.class, rawPlayability);
       if (rawPlayability != null && playability == null) {
         context.getReport().unknownValue(P4kKind.ITEM, item, PLAYABILITY, rawPlayability);
       }
-      P4kSeeding seeding = P4kSeeding.forItem(playability);
+      UUID itemGuid = item.parsedGuid();
+      P4kSeeding seeding =
+          P4kSeeding.forItem(playability, itemGuid != null && obtainable.contains(itemGuid));
       matcher.reconcile(
           item,
           item.className(),
@@ -138,6 +166,32 @@ public class P4kItemReconciler {
           (row, _) -> enrich(row, item, values(item, context), context),
           guid -> unmatched(item, guid, seeding, context));
     }
+    if (context.isApply()) {
+      resolvedCases.settleRun(
+          P4kKind.ITEM, SETTLED_REASONS, items, catalogue.head().isComplete(P4kKind.ITEM), context);
+    }
+  }
+
+  /**
+   * Collects the items a player can obtain by the catalogue's own facts: those a shop sells and
+   * those a blueprint produces.
+   *
+   * @param catalogue the catalogue
+   * @return their GUIDs
+   */
+  @NotNull
+  private static Set<UUID> obtainable(@NotNull P4kCatalogue catalogue) {
+    Stream<String> sold =
+        catalogue.shops().stream()
+            .map(P4kShopDto::itemGuids)
+            .filter(Objects::nonNull)
+            .flatMap(List::stream);
+    Stream<String> produced =
+        catalogue.blueprints().stream().map(P4kBlueprintDto::producedItemGuid);
+    return Stream.concat(sold, produced)
+        .map(P4kGuids::parse)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**
@@ -253,7 +307,7 @@ public class P4kItemReconciler {
 
   /**
    * Creates an unmatched item when the run's checkbox and the seeding rule allow it, else reports
-   * it unmatched.
+   * it unmatched; an item without a usable name is only counted.
    *
    * @param item the record
    * @param guid the record's GUID, or {@code null}
@@ -265,10 +319,11 @@ public class P4kItemReconciler {
       @Nullable UUID guid,
       @NotNull P4kSeeding seeding,
       @NotNull P4kImportContext context) {
-    if (guid == null
-        || !context.isCreateItemsAndShips()
-        || seeding != P4kSeeding.CREATE
-        || P4kItemValues.usableName(item.nameEn()) == null) {
+    if (P4kItemValues.usableName(item.nameEn()) == null) {
+      P4kSeeding.COUNT_ONLY.notCreated(P4kKind.ITEM, item, guid, context);
+      return;
+    }
+    if (guid == null || !context.isCreateItemsAndShips() || seeding != P4kSeeding.CREATE) {
       seeding.notCreated(P4kKind.ITEM, item, guid, context);
       return;
     }
