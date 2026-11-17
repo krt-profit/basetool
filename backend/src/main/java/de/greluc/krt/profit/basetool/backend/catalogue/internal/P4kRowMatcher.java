@@ -210,7 +210,11 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
     if (guid == null) {
       return new Unmatched<>(null);
     }
-    Optional<T> found = byP4kUuid.apply(guid).or(() -> byWikiUuid.apply(guid));
+    Optional<T> found =
+        byP4kUuid
+            .apply(guid)
+            .filter(row -> !followsAnother(row, guid))
+            .or(() -> byWikiUuid.apply(guid));
     if (found.isPresent()) {
       return accept(record, guid, found.get(), creatable, context);
     }
@@ -274,8 +278,22 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
   }
 
   /**
+   * Tells whether a row's own facts move it to the record of another GUID than the given one, so
+   * the given GUID no longer finds it (REQ-P4K-055).
+   *
+   * @param row the row holding the GUID
+   * @param guid the GUID that found it
+   * @return {@code true} when the row follows another record
+   */
+  private boolean followsAnother(@NotNull T row, @NotNull UUID guid) {
+    UUID followed = rules.followedGuid(row);
+    return followed != null && !followed.equals(guid);
+  }
+
+  /**
    * Accepts a found row unless another GUID holds or claimed it or it is held for review, and
-   * reports a SC Wiki UUID that differs from the GUID.
+   * reports a SC Wiki UUID that differs from the GUID; a row whose own facts name the record takes
+   * its GUID instead of the one it holds and reports the change (REQ-P4K-055).
    *
    * @param record the record
    * @param guid the record's GUID
@@ -293,12 +311,17 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       @NotNull P4kImportContext context) {
     P4kImportReport report = context.getReport();
     UUID held = row.getP4kUuid();
-    if (held != null && !held.equals(guid) && rules.covers(guid, row)) {
+    boolean foreign = held != null && !held.equals(guid);
+    if (foreign && rules.covers(guid, row)) {
       return new Covered<>(row);
     }
-    if ((held != null && !held.equals(guid)) || !context.claim(kind, row.getId(), guid)) {
+    boolean follows = foreign && guid.equals(rules.followedGuid(row));
+    if ((foreign && !follows) || !context.claim(kind, row.getId(), guid)) {
       report.review(kind, record, guid, P4kReviewReason.GUID_CONFLICT, row.getId());
       return new Held<>();
+    }
+    if (follows) {
+      report.changed(kind, record, "p4k_uuid", String.valueOf(held), guid.toString());
     }
     if (seeded.test(row) && !creatable) {
       if (row.getP4kHiddenAt() == null && !context.isRetired(kind, row.getId())) {
