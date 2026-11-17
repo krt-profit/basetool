@@ -598,6 +598,16 @@ role writes for the public-name aliases (`<svc>.container.d/10-host-alias.conf`)
 a privately signed edge, the JVM truststore (`20-jvm-truststore.conf`). `check-conformance.py`'s
 `env-reaches-the-units` fails when `basetool.env` and the units disagree without a drop-in to explain it.
 
+The aliases only work while pasta maps the addresses they point at. The role writes that mapping
+(`basetool_host_pasta_map_guest_addrs`) as the drop-in
+`~basetool/.config/containers/containers.conf.d/50-basetool.conf` and keeps no main
+`~basetool/.config/containers/containers.conf`: Podman 6 reads only the main file with the highest
+precedence, so a user's main file would stop the vendor `/usr/share/containers/containers.conf` from
+being read. `check-conformance.py`'s `pasta-maps-host-aliases` reads the running pasta's arguments
+and fails when an alias address (`host-gateway`, or a link-local or unique-local target outside every
+container subnet) is not mapped. A changed drop-in takes effect when the rootless network restarts,
+that is when every container of the service user has stopped, at the latest at the next reboot.
+
 ### On the host
 
 | Path | Written by | Content |
