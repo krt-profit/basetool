@@ -167,6 +167,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/prune_gradle_caches.py --selftest
 
+      - name: native-tool-updates / Self-test the proposal and the tool table against the repository
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/native_tool_updates.py --selftest
+
       - name: ingest-audience / Self-test the ingest audience checker
         if: ${{ !cancelled() }}
         run: python3 scripts/check-ingest-audience.py --selftest
