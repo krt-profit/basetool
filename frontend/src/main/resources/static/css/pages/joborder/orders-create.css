@@ -9,6 +9,12 @@
         flex-direction: column;
         gap: var(--space-6);
     }
+    /* WebKit can size the children of a flex fieldset to their content and past its width;
+       one grid column holds them to the section width. */
+    .orders-create .form-section {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+    }
     .orders-create .form-section__head {
         width: 100%;
         margin-bottom: var(--space-4);
@@ -45,7 +51,6 @@
     }
     .material-grid {
         display: grid;
-        min-width: 0;
         --remove-col: var(--touch-target-dense);
         grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) var(--remove-col);
         gap: var(--space-3);
