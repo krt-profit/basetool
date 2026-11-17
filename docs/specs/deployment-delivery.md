@@ -321,8 +321,10 @@ reloaded or started, so no container is left running without the unit that manag
 the old instance on its data directory beside the new one. A retired `.network` or `.volume` file is
 removed at the install, as before: it reaches nothing until the reload. **The stack is the units the
 host has**: the services the gated apply stops, starts and waits for are the installed `.container`
-units of the known stack order (`RT_STACK_ORDER`: `db-backend db-keycloak redis keycloak edge backend
-ingest frontend acme`), with any installed unit a stack unit `Requires=` placed before the first unit
+units of the known stack order (`RT_STACK_ORDER`: `db-backend db-keycloak redis redis-session
+redis-shared keycloak edge backend ingest frontend acme`; `redis` is the single instance a rollback to
+a release before ADR-0388 brings back, and both Redis instances start before the backend that uses
+`redis-shared` without `Requires=`), with any installed unit a stack unit `Requires=` placed before the first unit
 that requires it; every other installed unit is a monitoring unit. The list is derived again after a
 config apply and after a rollback's restore, so either side of a rename starts exactly the units its
 tree has. **Before anything is stopped or changed**, a new or changed unit whose `Volume=` mounts a

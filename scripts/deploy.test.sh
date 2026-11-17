@@ -3883,7 +3883,7 @@ scenario_rename_retires_the_old_unit_inside_the_restart_window() {
   assert_unit_gone redis-exporter "rename: a retired unit that is not loaded is removed without a stop"
   assert_no_docker "stop redis-exporter.service" "rename: ...which is not attempted"
   assert_unit_installed redis-session "rename: the new unit is installed"
-  assert_contains "stack units, from the installed units: [db-backend db-keycloak keycloak edge backend redis-session ingest frontend acme]" \
+  assert_contains "stack units, from the installed units: [db-backend db-keycloak redis-session keycloak edge backend ingest frontend acme]" \
     "rename: the stack is the installed units, the new one before the first unit that requires it"
   assert_before "systemctl --user start redis-session.service" "systemctl --user start ingest.service" \
     "rename: the new unit starts before what requires it"

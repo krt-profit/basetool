@@ -898,8 +898,9 @@ Within about five minutes the timer fires `deploy.sh`, which:
    `Requires=` them down with them,
    then a `start` of every stack unit in dependency order, each waited for until healthy. The stack
    units are the **installed** ones (`config applied — stack units, from the installed units: […]`):
-   `db-backend db-keycloak redis keycloak edge backend ingest frontend acme` as far as the host has
-   them, and an installed unit one of them `Requires=` (a renamed `redis-session`, say) right before
+   `db-backend db-keycloak redis redis-session redis-shared keycloak edge backend ingest frontend
+   acme` as far as the host has them (`redis` is the single instance a rollback to a release before
+   ADR-0388 brings back), and an installed unit one of them `Requires=` right before
    the first unit that requires it; every other installed unit is a monitoring unit. Keycloak
    comes up on the new JAR before backend starts, and one health gate covers everything (ADR-0213,
    since 2026-09-25 — until then the JAR was swapped only after this gate, and its keycloak restart
