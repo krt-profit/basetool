@@ -91,9 +91,7 @@ public class MaterialService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE, key = "'visible-' + #pageable")
   public Page<MaterialDto> getVisibleMaterials(@NotNull Pageable pageable) {
-    return materialRepository
-        .findByIsVisibleTrueAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(pageable)
-        .map(materialMapper::toDto);
+    return materialRepository.findSelectable(pageable).map(materialMapper::toDto);
   }
 
   /**

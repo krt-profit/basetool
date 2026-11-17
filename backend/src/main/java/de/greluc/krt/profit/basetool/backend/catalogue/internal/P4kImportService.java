@@ -203,7 +203,7 @@ public class P4kImportService {
       @NotNull P4kReconcilers.Outcome reconciled,
       boolean overrideMassGuard) {
     List<P4kKind> overridden = sweeper.sweep(catalogue, context, overrideMassGuard);
-    reconcilers.reviewMaterialGroups(reconciled, context);
+    reconcilers.reviewMaterials(reconciled, context);
     productKeyReview.follow(context, context.getNow());
     return overridden;
   }

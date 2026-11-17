@@ -97,10 +97,14 @@ public class P4kBlueprintReconciler {
    * reconciled first.
    *
    * @param catalogue the catalogue
+   * @param types the catalogue's resource types, which decide the commodity a resource joins
    * @param context the run
    * @return the recipe lines whose material or item the run resolved
    */
-  public int reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
+  public int reconcile(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kResourceTypes types,
+      @NotNull P4kImportContext context) {
     P4kRowIndex<Blueprint> stored =
         new P4kRowIndex<>(
             blueprintRepository.findAll(),
@@ -119,7 +123,10 @@ public class P4kBlueprintReconciler {
             _ -> false);
     P4kRecipeLinks links =
         new P4kRecipeLinks(
-            context, P4kCommodityJoin.of(catalogue), materialRepository, reviewCaseRepository);
+            context,
+            P4kCommodityJoin.of(catalogue, types),
+            materialRepository,
+            reviewCaseRepository);
     Map<UUID, P4kKeyedRow> items = context.stampedRows(P4kKind.ITEM);
     int resolved = 0;
     for (P4kBlueprintDto blueprint : catalogue.blueprints()) {

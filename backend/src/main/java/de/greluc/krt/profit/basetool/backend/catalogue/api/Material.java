@@ -305,4 +305,43 @@ public class Material extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(name = "p4k_seen_run_id")
   @Nullable
   private UUID p4kSeenRunId;
+
+  /**
+   * When a P4K APPLY found the row a UEX commodity no game source knows, without a price and
+   * without a reference (REQ-P4K-075), or {@code null}; it hides the row only while {@link
+   * #isSourcelessHidden()} holds.
+   */
+  @Column(name = "sourceless_hidden_at")
+  @Nullable
+  private Instant sourcelessHiddenAt;
+
+  /**
+   * Whether no game source knows the row: it holds no P4K GUID, no SC Wiki UUID and no {@code
+   * ResourceType}.
+   *
+   * @return {@code true} when all three are absent
+   */
+  public boolean isWithoutGameSource() {
+    return p4kUuid == null && scwikiUuid == null && p4kSubtypeUuid == null;
+  }
+
+  /**
+   * Whether UEX lists a buy or a sell price above zero for the row.
+   *
+   * @return {@code true} when either average price is positive
+   */
+  public boolean isPriced() {
+    return (priceBuy != null && priceBuy > 0) || (priceSell != null && priceSell > 0);
+  }
+
+  /**
+   * Whether the row is hidden as a commodity no game source knows (REQ-P4K-075): an APPLY marked
+   * it, and it is still without a game source and without a price; {@link
+   * SelectableMaterialJpql#SELECTABLE_MATERIAL} is the same rule in JPQL.
+   *
+   * @return {@code true} while the mark hides the row
+   */
+  public boolean isSourcelessHidden() {
+    return sourcelessHiddenAt != null && isWithoutGameSource() && !isPriced();
+  }
 }

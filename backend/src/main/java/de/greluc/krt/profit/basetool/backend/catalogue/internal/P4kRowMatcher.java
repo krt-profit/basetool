@@ -35,12 +35,13 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Matches catalogue records to Basetool rows the same way for every kind (REQ-P4K-007): the P4K
- * GUID first, then the SC Wiki UUID, then a class name and a name that each identify exactly one
- * row and one record. The import never merges: a key that several rows or records share, a row that
- * already holds another GUID and a row two records claim each open a {@code GUID_CONFLICT} review
- * case and leave the rows as they are, unless the kind's {@link P4kMatchRules} say a row the key
- * found already stands for the record (REQ-P4K-050), which then needs neither a row of its own nor
- * a case, or leave the row out of the class-name and name steps (REQ-P4K-054).
+ * GUID first, then the record's SC Wiki key (REQ-P4K-070), then a class name and a name that each
+ * identify exactly one row and one record. The import never merges: a key that several rows or
+ * records share, a row that already holds another GUID and a row two records claim each open a
+ * {@code GUID_CONFLICT} review case and leave the rows as they are, unless the kind's {@link
+ * P4kMatchRules} say a row the key found already stands for the record (REQ-P4K-050), which then
+ * needs neither a row of its own nor a case, or leave the row out of the class-name and name steps
+ * (REQ-P4K-054).
  *
  * @param <T> the row type
  * @param kind the kind
@@ -250,7 +251,8 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       }
       holder = Optional.empty();
     }
-    Optional<T> found = holder.or(() -> rules.follower(guid)).or(() -> byWikiUuid.apply(guid));
+    Optional<T> found =
+        holder.or(() -> rules.follower(guid)).or(() -> byWikiUuid.apply(rules.wikiKey(guid)));
     if (found.isPresent()) {
       return accept(record, guid, found.get(), creatable, context);
     }
@@ -328,8 +330,9 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
 
   /**
    * Accepts a found row unless another GUID holds or claimed it or it is held for review, and
-   * reports a SC Wiki UUID that differs from the GUID; a row whose own facts name the record takes
-   * its GUID instead of the one it holds and reports the change (REQ-P4K-055).
+   * reports a SC Wiki UUID that is neither the GUID nor the record's Wiki key; a row whose own
+   * facts name the record takes its GUID instead of the one it holds and reports the change
+   * (REQ-P4K-055).
    *
    * @param record the record
    * @param guid the record's GUID
@@ -366,7 +369,7 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       return new Held<>();
     }
     UUID wiki = wikiUuid.apply(row);
-    if (wiki != null && !wiki.equals(guid)) {
+    if (wiki != null && !wiki.equals(guid) && !wiki.equals(rules.wikiKey(guid))) {
       report.identityMismatch(kind, record, wikiColumn, wiki);
     }
     return new Matched<>(row, guid);

@@ -165,6 +165,7 @@ class P4kIdentityCleanupTest {
     UUID twinGuid = UUID.fromString("0f000000-0000-4000-8000-0000000000c1");
     twin.put("guid", twinGuid.toString());
     twin.put("className", "Aslarite_Twin");
+    twin.put("subtypeGuid", "0f000000-0000-4000-8000-0000000000c2");
     ((ArrayNode) root.get("commodities")).add(twin);
 
     runs.apply(P4kTestCatalogues.bytes(root), false);

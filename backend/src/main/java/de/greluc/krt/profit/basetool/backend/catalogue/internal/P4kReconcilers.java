@@ -43,6 +43,7 @@ class P4kReconcilers {
   private final P4kResourceGroupReconciler resourceGroupReconciler;
   private final P4kCommodityReconciler commodityReconciler;
   private final P4kMaterialGroupReview materialGroupReview;
+  private final P4kSourcelessMaterials sourcelessMaterials;
   private final P4kBlueprintCategoryReconciler blueprintCategoryReconciler;
   private final P4kBlueprintReconciler blueprintReconciler;
   private final P4kPaintReconciler paintReconciler;
@@ -73,11 +74,12 @@ class P4kReconcilers {
     final List<P4kShipBaseRepairs.Repair> shipRepairs =
         shipReconciler.reconcile(catalogue, loadouts, context);
     manufacturerReconciler.finish(catalogue, context);
-    resourceGroupReconciler.reconcile(catalogue, context);
+    final P4kResourceTypes types = P4kResourceTypes.of(catalogue);
+    resourceGroupReconciler.reconcile(catalogue, types, context);
     final P4kCommodityReconciler.Outcome commodities =
-        commodityReconciler.reconcile(catalogue, context);
+        commodityReconciler.reconcile(catalogue, types, context);
     blueprintCategoryReconciler.reconcile(catalogue.blueprintCategories(), context);
-    final int ingredientsResolved = blueprintReconciler.reconcile(catalogue, context);
+    final int ingredientsResolved = blueprintReconciler.reconcile(catalogue, types, context);
     paintReconciler.reconcile(
         catalogue.paints(), catalogue.head().isComplete(P4kCatalogue.PAINTS), context);
     loadoutReconciler.reconcile(loadouts, catalogue, context);
@@ -97,12 +99,14 @@ class P4kReconcilers {
   }
 
   /**
-   * Opens or settles resource-group cases for the materials left live after the sweep.
+   * Hides or shows the materials no game source knows (REQ-P4K-075), then opens or settles the
+   * resource-group cases of the materials left live after the sweep.
    *
    * @param outcome the commodities and their assigned groups
    * @param context the run
    */
-  void reviewMaterialGroups(@NotNull Outcome outcome, @NotNull P4kImportContext context) {
+  void reviewMaterials(@NotNull Outcome outcome, @NotNull P4kImportContext context) {
+    sourcelessMaterials.review(outcome.commodities().known(), context);
     context.setAdminCategoriesRetired(materialGroupReview.review(outcome.commodities(), context));
   }
 

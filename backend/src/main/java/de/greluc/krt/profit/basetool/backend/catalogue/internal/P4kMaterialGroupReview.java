@@ -22,8 +22,6 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,14 +32,14 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
  * The materials that end an APPLY without a resource group (REQ-P4K-025, ADR-0339): each live one
- * opens a {@code NO_RESOURCE_GROUP} case, which the admin resolves by picking an existing group,
- * and a case whose material gained a group is closed by the run. Once no material references an
- * admin category any longer, the APPLY deletes it.
+ * the game files know opens a {@code NO_RESOURCE_GROUP} case, which the admin resolves by picking
+ * an existing group, and a case whose material gained a group or that the game files lack is closed
+ * by the run (REQ-P4K-074). Once no material references an admin category any longer, the APPLY
+ * deletes it.
  */
 @Component
 @RequiredArgsConstructor
@@ -67,11 +65,12 @@ public class P4kMaterialGroupReview {
   private final P4kRunResolvedCases runResolvedCases;
 
   /**
-   * Opens a case for every live material without a resource group after the run and, on APPLY,
-   * closes the cases of materials that gained one and deletes the unreferenced admin categories.
+   * Opens a case for every live material the game files know that has no resource group after the
+   * run and, on APPLY, closes the other cases and deletes the unreferenced admin categories.
    *
-   * @param outcome the commodities' outcome: the materials the run gives a resource group and the
-   *     ones it creates without one, which an unwritten preview does not show yet
+   * @param outcome the commodities' outcome: the materials the run gives a resource group, the ones
+   *     the game files know and the ones it creates without a group, which an unwritten preview
+   *     does not show yet
    * @param context the run
    * @return the admin categories deleted, {@code 0} in a preview
    */
@@ -83,6 +82,7 @@ public class P4kMaterialGroupReview {
     for (Material material : entityManager.createQuery(UNGROUPED, Material.class).getResultList()) {
       UUID guid = material.getP4kUuid();
       if (!outcome.grouped().contains(material.getId())
+          && outcome.known().contains(material.getId())
           && (guid == null || !vanished.contains(guid))) {
         ungrouped.add(material);
       }
@@ -91,7 +91,7 @@ public class P4kMaterialGroupReview {
     ungrouped.sort(Comparator.comparing(Material::getName, String.CASE_INSENSITIVE_ORDER));
     Set<P4kRunResolvedCases.Found> found = new HashSet<>();
     for (Material material : ungrouped) {
-      MaterialRecord record = new MaterialRecord(material);
+      P4kMaterialRecord record = new P4kMaterialRecord(material);
       P4kRunResolvedCases.Found finding =
           new P4kRunResolvedCases.Found(record.caseGuid(), P4kReviewReason.NO_RESOURCE_GROUP);
       found.add(finding);
@@ -126,43 +126,5 @@ public class P4kMaterialGroupReview {
   @NotNull
   static UUID caseGuid(@NotNull String materialName) {
     return P4kRunResolvedCases.caseGuid(CASE_GUID_PREFIX + materialName.toLowerCase(Locale.ROOT));
-  }
-
-  /**
-   * A material as the record of its case.
-   *
-   * @param material the material
-   */
-  private record MaterialRecord(@NotNull Material material) implements P4kRecord {
-
-    /**
-     * Returns the case GUID of the material.
-     *
-     * @return the GUID
-     */
-    @NotNull
-    UUID caseGuid() {
-      return P4kMaterialGroupReview.caseGuid(material.getName());
-    }
-
-    @Override
-    public @NotNull String guid() {
-      return caseGuid().toString();
-    }
-
-    @Override
-    public @Nullable String className() {
-      return null;
-    }
-
-    @Override
-    public @Nullable String recordPath() {
-      return null;
-    }
-
-    @Override
-    public @NotNull P4kLocalisedText name() {
-      return new P4kLocalisedText(null, material.getName(), null);
-    }
   }
 }

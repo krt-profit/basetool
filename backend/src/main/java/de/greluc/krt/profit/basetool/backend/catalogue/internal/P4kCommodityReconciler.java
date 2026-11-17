@@ -30,7 +30,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -46,15 +49,17 @@ import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Component;
 
 /**
- * Reconciles the catalogue's {@code commodities} with {@code material} (REQ-P4K-024…026, ADR-0339):
- * match by the commodity's own GUID, the SC Wiki UUID and a name exactly one commodity carries; the
- * P4K leads the name, the group, the density, the {@code subtypeGuid} join and the refined-from
- * link, fills the empty description and refreshes the name key. A commodity is created only when a
- * record of the run references its {@code ResourceType} and that reference joins it alone; such a
- * row is visible at once. On a row UEX does not know, a commodity with a {@code refinedSubtypeGuid}
+ * Reconciles the catalogue's {@code commodities} with {@code material} (REQ-P4K-024…026, ADR-0339,
+ * ADR-0396): match by the commodity's own GUID, its SC Wiki key ({@link P4kCommodityRules}) and a
+ * name exactly one commodity carries, the packagings of one commodity counting once; the P4K leads
+ * the name, the group, the density, the {@code subtypeGuid} join and the refined-from link, fills
+ * the empty description and refreshes the name key. A commodity is created only when a record of
+ * the run references its {@code ResourceType} and that reference joins it alone; such a row is
+ * visible at once. On a row UEX does not know, a commodity with a {@code refinedSubtypeGuid}
  * becomes RAW and its resolved target REFINED. A group or refined-from link an admin overrides
  * ({@link MaterialP4kOverride}) is kept, and a differing P4K value is reported as {@code
- * P4K_DISAGREEMENT}.
+ * P4K_DISAGREEMENT}. A material no record reconciles takes the group of its {@code ResourceType}
+ * ({@link P4kMaterialTypeGroups}), and an APPLY settles the commodity cases it no longer raises.
  */
 @Component
 @RequiredArgsConstructor
@@ -63,25 +68,79 @@ public class P4kCommodityReconciler {
   /** The {@code external_sync_report} aggregate of a commodity disagreement. */
   private static final String REPORT_AGGREGATE = "commodity";
 
+  /** The reasons of the commodity cases a run settles itself (REQ-P4K-016). */
+  private static final List<P4kReviewReason> SETTLED_REASONS =
+      List.of(
+          P4kReviewReason.GUID_CONFLICT,
+          P4kReviewReason.SEEDED_NOT_CREATABLE,
+          P4kReviewReason.RESOURCE_JOIN_NONE,
+          P4kReviewReason.RESOURCE_JOIN_SEVERAL);
+
   private final MaterialRepository materialRepository;
   private final P4kReviewCaseRepository reviewCaseRepository;
   private final SyncReportService syncReportService;
+  private final P4kRunResolvedCases resolvedCases;
 
   /**
-   * Reconciles every commodity; the resource groups must be reconciled first.
+   * Reconciles every commodity, groups the other materials by their {@code ResourceType} and, on an
+   * APPLY, settles the commodity cases the run no longer raises; the resource groups must be
+   * reconciled first.
    *
    * @param catalogue the catalogue, whose blueprints and commodities reference the commodities
+   * @param types the catalogue's resource types
    * @param context the run
-   * @return which materials the run gives a resource group and which it creates without one
+   * @return which materials the run gives a resource group, which the game files know and which it
+   *     creates without a group
    */
   @NotNull
-  public Outcome reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
-    P4kCommodityJoin join = P4kCommodityJoin.of(catalogue);
+  public Outcome reconcile(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kResourceTypes types,
+      @NotNull P4kImportContext context) {
+    P4kCommodityJoin join = P4kCommodityJoin.of(catalogue, types);
     join.reviewUnresolved(context);
+    context.indexRepeated(P4kKind.COMMODITY, join.commodities());
+    List<Material> stored = materialRepository.findAll();
     P4kRowIndex<Material> materials =
-        new P4kRowIndex<>(
-            materialRepository.findAll(), Material::getScwikiUuid, _ -> null, Material::getName);
+        new P4kRowIndex<>(stored, Material::getScwikiUuid, _ -> null, Material::getName);
     context.indexCommodityRows(materials);
+    Map<P4kCommodityDto, Reconciled> rows =
+        match(
+            catalogue, join, P4kCommodityRules.of(catalogue.commodities(), join, stored), context);
+    link(rows, join, context);
+    rows.values().stream()
+        .map(Reconciled::writer)
+        .filter(Objects::nonNull)
+        .forEach(writer -> context.getReport().matched(P4kKind.COMMODITY, writer.isChanged()));
+    Outcome outcome = outcome(catalogue, types, stored, rows, context);
+    if (context.isApply()) {
+      resolvedCases.settleRun(
+          P4kKind.COMMODITY,
+          SETTLED_REASONS,
+          catalogue.commodities(),
+          catalogue.head().isComplete(P4kKind.COMMODITY),
+          context);
+    }
+    return outcome;
+  }
+
+  /**
+   * Matches every leading commodity record, enriches and stamps its row and creates a referenced
+   * one; a packaging another record leads is covered (REQ-P4K-071).
+   *
+   * @param catalogue the catalogue
+   * @param join the run's join
+   * @param rules the commodity rules of the match
+   * @param context the run
+   * @return the matched and created materials per record, in catalogue order
+   */
+  @NotNull
+  private Map<P4kCommodityDto, Reconciled> match(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kCommodityJoin join,
+      @NotNull P4kCommodityRules rules,
+      @NotNull P4kImportContext context) {
+    P4kRowIndex<Material> materials = context.commodityRows();
     P4kRowMatcher<Material> matcher =
         new P4kRowMatcher<>(
             P4kKind.COMMODITY,
@@ -91,9 +150,14 @@ public class P4kCommodityReconciler {
             "scwiki_uuid",
             _ -> List.of(),
             materials::byName,
-            row -> row.getSourceSystems() == MaterialSourceSystem.P4K);
+            row -> row.getSourceSystems() == MaterialSourceSystem.P4K,
+            rules);
     Map<P4kCommodityDto, Reconciled> rows = new LinkedHashMap<>();
     for (P4kCommodityDto commodity : catalogue.commodities()) {
+      if (!join.leads(commodity)) {
+        context.getReport().covered(P4kKind.COMMODITY, commodity);
+        continue;
+      }
       boolean creatable = join.isCreatable(commodity);
       P4kRowMatcher.Match<Material> match =
           matcher.match(commodity, null, commodity.nameEn(), creatable, context);
@@ -120,6 +184,21 @@ public class P4kCommodityReconciler {
         }
       }
     }
+    return rows;
+  }
+
+  /**
+   * Links every reconciled material to the material its {@code refinedSubtypeGuid} joins, or to the
+   * material an admin assigned to that resource.
+   *
+   * @param rows the reconciled materials per record
+   * @param join the run's join
+   * @param context the run
+   */
+  private void link(
+      @NotNull Map<P4kCommodityDto, Reconciled> rows,
+      @NotNull P4kCommodityJoin join,
+      @NotNull P4kImportContext context) {
     P4kResourceAssignments assignments =
         new P4kResourceAssignments(materialRepository, reviewCaseRepository);
     rows.forEach((commodity, source) -> {
@@ -131,35 +210,72 @@ public class P4kCommodityReconciler {
         linkAssigned(source, commodity, assignments, context);
       }
     });
-    rows.values().stream()
-        .map(Reconciled::writer)
-        .filter(Objects::nonNull)
-        .forEach(writer -> context.getReport().matched(P4kKind.COMMODITY, writer.isChanged()));
-    Set<UUID> grouped = new HashSet<>();
-    List<Material> createdWithoutGroup = new ArrayList<>();
-    rows.forEach((commodity, reconciled) -> {
-      Material row = reconciled.row();
-      if (context.resourceGroup(commodity.typeGuid()) == null) {
-        if (reconciled.writer() == null) {
-          createdWithoutGroup.add(row);
-        }
-      } else if (row.getId() != null && !row.isResourceGroupManual()) {
-        grouped.add(row.getId());
-      }
-    });
-    return new Outcome(Set.copyOf(grouped), List.copyOf(createdWithoutGroup));
   }
 
   /**
-   * What the commodities of a run leave for the group review (REQ-P4K-025).
+   * Collects what the group review needs, after the materials no record reconciled took the group
+   * of their {@code ResourceType} (REQ-P4K-073).
    *
-   * @param grouped the saved materials the run gives a resource group from their record; a material
-   *     whose group an admin overrides is left out, its stored group decides
+   * @param catalogue the catalogue
+   * @param types the catalogue's resource types
+   * @param stored the stored materials
+   * @param rows the reconciled materials per record
+   * @param context the run
+   * @return the outcome
+   */
+  @NotNull
+  private static Outcome outcome(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kResourceTypes types,
+      @NotNull List<Material> stored,
+      @NotNull Map<P4kCommodityDto, Reconciled> rows,
+      @NotNull P4kImportContext context) {
+    Set<UUID> grouped = new HashSet<>();
+    Set<UUID> known = new HashSet<>();
+    List<Material> createdWithoutGroup = new ArrayList<>();
+    Set<Material> reconciled = Collections.newSetFromMap(new IdentityHashMap<>());
+    rows.forEach((commodity, row) -> {
+      Material material = row.row();
+      reconciled.add(material);
+      if (material.getId() != null) {
+        known.add(material.getId());
+      }
+      if (context.resourceGroup(commodity.typeGuid()) == null) {
+        if (row.writer() == null) {
+          createdWithoutGroup.add(material);
+        }
+      } else if (material.getId() != null && !material.isResourceGroupManual()) {
+        grouped.add(material.getId());
+      }
+    });
+    List<Material> others = stored.stream().filter(row -> !reconciled.contains(row)).toList();
+    grouped.addAll(P4kMaterialTypeGroups.assign(others, types, context));
+    Set<UUID> listed =
+        catalogue.commodities().stream()
+            .map(P4kCommodityDto::parsedGuid)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toUnmodifiableSet());
+    others.stream()
+        .filter(row -> row.getId() != null && P4kMaterialTypeGroups.isKnown(row, listed, types))
+        .forEach(row -> known.add(row.getId()));
+    return new Outcome(Set.copyOf(grouped), Set.copyOf(known), List.copyOf(createdWithoutGroup));
+  }
+
+  /**
+   * What the commodities of a run leave for the group review (REQ-P4K-025, REQ-P4K-074) and the
+   * hide of the materials no game source knows (REQ-P4K-075).
+   *
+   * @param grouped the saved materials the run gives a resource group from their record or their
+   *     {@code ResourceType}; a material whose group an admin overrides is left out, its stored
+   *     group decides
+   * @param known the saved materials the game files know: those a record of the run reconciled,
+   *     those holding a listed commodity's GUID and those standing for a {@code ResourceType}
    * @param createdWithoutGroup the materials the run creates whose record names no group, unsaved
    *     in a preview
    */
   public record Outcome(
       @NotNull @Unmodifiable Set<UUID> grouped,
+      @NotNull @Unmodifiable Set<UUID> known,
       @NotNull @Unmodifiable List<Material> createdWithoutGroup) {}
 
   /**
