@@ -212,13 +212,13 @@ ArchUnit rules in each module's `ArchitectureTest.java` (`backend`, `frontend`, 
 ```bash
 ./gradlew check                                             # full sweep: Checkstyle + SpotBugs + tests + Spotless
 ./gradlew :backend:checkstyleMain :backend:spotbugsMain     # backend lint only
-./gradlew spotlessApply                                     # auto-format sources — run before every push
+./gradlew spotlessApply                                     # run every formatter (Java, Kotlin, JSON, Python, shell, CSS/JS) — before every push
 ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom      # SBOM on demand into <module>/docs/
 ./gradlew :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom   # the other two shipped modules (REQ-OPS-025); each self-verifies
 ./gradlew :backend:licensee                                 # third-party licence gate (runs in check, ADR-0197)
 ```
 
-Checkstyle runs with `maxWarnings = 0` and Spotless is wired into `check` — any unformatted file or new Checkstyle warning fails CI. The frontend additionally runs strict asset gates in `check` that Spotless does not cover — Stylelint (`:frontend:lintCss`, `:frontend:lintCssInline`), ESLint (`:frontend:lintJs`, `:frontend:lintProbeJs`), HTMLHint (`:frontend:lintHtml`) and Prettier (`:frontend:prettierCheck`); run `spotlessApply` **and** those before pushing changes under `src/main/resources/static/**` or `templates/**`. The task list and the auto-fix recipe are in the [`lint-gate`](.claude/skills/lint-gate/SKILL.md) skill.
+Checkstyle runs with `maxWarnings = 0` and Spotless is wired into `check` — any unformatted file or new Checkstyle warning fails CI. `spotlessApply` and `spotlessCheck` run every formatter of the repository: google-java-format, ktfmt and Gson through Spotless, Ruff for Python and shfmt for shell scripts as verified release binaries, and Prettier for the CSS/JS (REQ-OPS-058, ADR-0390). Turn on the push gate once per clone with `git config core.hooksPath .githooks`: its `pre-push` hook refuses a push while `spotlessCheck` fails. The frontend additionally runs strict asset gates in `check` that no formatter covers — Stylelint (`:frontend:lintCss`, `:frontend:lintCssInline`), ESLint (`:frontend:lintJs`, `:frontend:lintProbeJs`) and HTMLHint (`:frontend:lintHtml`); run `spotlessApply` **and** those before pushing changes under `src/main/resources/static/**` or `templates/**`. The task list and the auto-fix recipe are in the [`lint-gate`](.claude/skills/lint-gate/SKILL.md) skill.
 
 The frontend's browser scripts are also statically type-checked by `:frontend:typecheckJs` (strict, in `check`). TypeScript runs there as a **checker only** — `tsc --noEmit`, no compilation, no bundle, no renamed files; the sources stay JavaScript, every script is checked (`checkJs`, `noImplicitAny`), and a ratchet (`frontend/typecheck-ratchet.json`, `:frontend:testTypecheckRatchet`) keeps it that way. Backend DTO types are generated from `backend/src/main/resources/api/openapi.json` by `:frontend:generateApiTypes` on every build and are never committed, so the frontend's view of a DTO cannot drift from the published contract. See [ADR-0125](docs/adr/0125-typed-javascript-via-checkjs-not-typescript.md), REQ-FE-018, and the archived [`TYPESCRIPT_MIGRATION_PLAN.md`](docs/archive/TYPESCRIPT_MIGRATION_PLAN.md) for why the sources are not converted to TypeScript.
 
@@ -343,7 +343,7 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 ### Tech stack
 
 - **Language / framework** — Java 25, Spring Boot 4.1
-- **Build** — Gradle 9 (Kotlin DSL), versions in the `gradle/libs.versions.toml` catalog, updates surfaced by refreshVersions
+- **Build** — Gradle 9 (Kotlin DSL), versions in the `gradle/libs.versions.toml` catalog, updates surfaced by refreshVersions and, for Ruff, shfmt and Node.js, proposed weekly by `native-tool-updates.yml`
 - **Database** — PostgreSQL 18, schema owned by Flyway (Hibernate `ddl-auto=validate`)
 - **Session store** — Redis 8 (`spring-session-data-redis`)
 - **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.8)

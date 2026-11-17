@@ -3,12 +3,21 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="${HERE}/testing-reset.sh"
-[[ -f "$SCRIPT" ]] || { echo "FATAL: ${SCRIPT} not found" >&2; exit 1; }
+[[ -f "$SCRIPT" ]] || {
+  echo "FATAL: ${SCRIPT} not found" >&2
+  exit 1
+}
 
 PASSED=0
 FAILED=0
-ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
-bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
+ok() {
+  PASSED=$((PASSED + 1))
+  printf '  ok    %s\n' "$*"
+}
+bad() {
+  FAILED=$((FAILED + 1))
+  printf '  FAIL  %s\n' "$*"
+}
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/testing-reset-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
@@ -18,8 +27,9 @@ mkdir -p "$BIN" "${WORK}/code" "${WORK}/config"
 
 make_stub() {
   local name="$1"
-  local bash_path; bash_path="$(command -v bash)"
-  cat > "${BIN}/${name}" <<STUB
+  local bash_path
+  bash_path="$(command -v bash)"
+  cat >"${BIN}/${name}" <<STUB
 #!${bash_path}
 printf '%s %s\n' "${name}" "\$*" >> "${LOG}"
 for pat in \${STUB_FAIL:-}; do
@@ -35,14 +45,15 @@ make_stub systemctl
 make_stub flock
 
 run_reset() {
-  local env_body="$1"; shift
-  printf '%s\n' "$env_body" > "${WORK}/config/basetool.env"
-  : > "$LOG"
+  local env_body="$1"
+  shift
+  printf '%s\n' "$env_body" >"${WORK}/config/basetool.env"
+  : >"$LOG"
   PATH="${BIN}:${PATH}" RT_BACKEND=podman RT_CLI="" RT_SYSTEMCTL="" \
     BASETOOL_COMPOSE_DIR="${WORK}/code" BASETOOL_CONFIG_DIR="${WORK}/config" BASETOOL_LOCKFILE="${WORK}/lock" \
     BASETOOL_MONITORING_TEXTFILE_DIR="${WORK}/textfile" \
-    bash "$SCRIPT" "$@" > "${WORK}/out" 2>&1
-  echo $? > "${WORK}/rc"
+    bash "$SCRIPT" "$@" >"${WORK}/out" 2>&1
+  echo $? >"${WORK}/rc"
 }
 
 line_of() {
@@ -85,14 +96,14 @@ drop="$(line_of 'dropdb')"
 create="$(line_of 'createdb')"
 start="$(line_of 'start backend.service')"
 if [[ "$(cat "${WORK}/rc")" == "0" && -n "$stop" && -n "$drop" && -n "$create" && -n "$start" ]] \
-   && (( stop < drop && drop < create && create < start )); then
+  && ((stop < drop && drop < create && create < start)); then
   ok "the writers stop, the database is dropped and recreated, then the writers start"
 else
   bad "the writers stop, the database is dropped and recreated, then the writers start"
   sed 's/^/        /' "$LOG"
 fi
 if grep -q 'stop ingest.service' "$LOG" && grep -q 'stop backend.service' "$LOG" \
-   && grep -q 'start frontend.service' "$LOG"; then
+  && grep -q 'start frontend.service' "$LOG"; then
   ok "all three writers are stopped and started"
 else
   bad "all three writers are stopped and started"
@@ -105,7 +116,7 @@ fi
 
 STUB_FAIL=dropdb run_reset "$TESTING" --wipe-testing-database
 if [[ "$(cat "${WORK}/rc")" != "0" ]] && grep -q 'start backend.service' "$LOG" \
-   && ! grep -q 'createdb' "$LOG"; then
+  && ! grep -q 'createdb' "$LOG"; then
   ok "a failed drop starts the writers again on the old database"
 else
   bad "a failed drop starts the writers again on the old database"
@@ -119,4 +130,4 @@ else
 fi
 
 printf '\n%d passed, %d failed\n' "$PASSED" "$FAILED"
-(( FAILED == 0 ))
+((FAILED == 0))

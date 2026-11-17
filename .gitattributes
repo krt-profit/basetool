@@ -30,6 +30,7 @@ quadlet/env.d/*.env.tmpl text eol=lf
 *.md text eol=lf
 Dockerfile text eol=lf
 *.sh text eol=lf
+.githooks/* text eol=lf
 *.py text eol=lf
 *.j2 text eol=lf
 .editorconfig text eol=lf

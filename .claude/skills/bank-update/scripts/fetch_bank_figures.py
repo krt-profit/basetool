@@ -246,8 +246,18 @@ def de(value: Decimal, sign: bool = False) -> str:
 
 
 MONTHS = (
-    "Januar", "Februar", "M\u00e4rz", "April", "Mai", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "Dezember",
+    "Januar",
+    "Februar",
+    "M\u00e4rz",
+    "April",
+    "Mai",
+    "Juni",
+    "Juli",
+    "August",
+    "September",
+    "Oktober",
+    "November",
+    "Dezember",
 )
 
 
@@ -255,10 +265,14 @@ def main() -> None:
     """Parse arguments, run the read-only query and print the reconciled figures."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--month", help="calendar month as YYYY-MM (default: last complete month)")
-    parser.add_argument("--host", default=os.environ.get("BASETOOL_PROD_HOST"),
-                        help="production host, e.g. user@address (or set BASETOOL_PROD_HOST)")
-    parser.add_argument("--allow-partial", action="store_true",
-                        help="permit a month that has not ended yet")
+    parser.add_argument(
+        "--host",
+        default=os.environ.get("BASETOOL_PROD_HOST"),
+        help="production host, e.g. user@address (or set BASETOOL_PROD_HOST)",
+    )
+    parser.add_argument(
+        "--allow-partial", action="store_true", help="permit a month that has not ended yet"
+    )
     parser.add_argument("--print-sql", action="store_true", help="print the SQL and exit")
     args = parser.parse_args()
 
@@ -309,18 +323,30 @@ def main() -> None:
     print()
     print("GESAMTE KARTELLBANK")
     print(f"  Kontostand 01.{month:02d}.{year}   {de(f['bank_open']):>18}")
-    print(f"  Einzahlungen            {de(f['bank_dep_in'], sign=True):>18}   ({f['bank_dep_n']:.0f} Buchungen)")
-    print(f"  Auszahlungen            {de(f['bank_wdr_out'], sign=True):>18}   ({f['bank_wdr_n']:.0f} Buchungen)")
-    print(f"  Umbuchungen (netto)     {de(f['bank_xfer_net'], sign=True):>18}   ({f['bank_xfer_n']:.0f} Buchungen)")
-    print(f"  Stornierungen (netto)   {de(f['bank_rev_net'], sign=True):>18}   ({f['bank_rev_n']:.0f} Buchungen)")
+    print(
+        f"  Einzahlungen            {de(f['bank_dep_in'], sign=True):>18}   ({f['bank_dep_n']:.0f} Buchungen)"
+    )
+    print(
+        f"  Auszahlungen            {de(f['bank_wdr_out'], sign=True):>18}   ({f['bank_wdr_n']:.0f} Buchungen)"
+    )
+    print(
+        f"  Umbuchungen (netto)     {de(f['bank_xfer_net'], sign=True):>18}   ({f['bank_xfer_n']:.0f} Buchungen)"
+    )
+    print(
+        f"  Stornierungen (netto)   {de(f['bank_rev_net'], sign=True):>18}   ({f['bank_rev_n']:.0f} Buchungen)"
+    )
     print(f"  Saldo                   {de(bank_net, sign=True):>18}")
     print(f"  Kontostand {stand}   {de(f['bank_close']):>18}")
     print(f"  Transfergebuehren       {de(f['bank_fees']):>18}")
     print()
     print("KRT-KONTO")
     print(f"  Kontostand 01.{month:02d}.{year}   {de(f['krt_open']):>18}")
-    print(f"  Einzahlungen            {de(f['krt_dep_in'], sign=True):>18}   ({f['krt_dep_n']:.0f} Buchungen)")
-    print(f"  Auszahlungen            {de(f['krt_wdr_out'], sign=True):>18}   ({f['krt_wdr_n']:.0f} Buchungen)")
+    print(
+        f"  Einzahlungen            {de(f['krt_dep_in'], sign=True):>18}   ({f['krt_dep_n']:.0f} Buchungen)"
+    )
+    print(
+        f"  Auszahlungen            {de(f['krt_wdr_out'], sign=True):>18}   ({f['krt_wdr_n']:.0f} Buchungen)"
+    )
     print(f"  Umbuchungen (netto)     {de(f['krt_xfer_net'], sign=True):>18}")
     print(f"  Stornierungen (netto)   {de(f['krt_rev_net'], sign=True):>18}")
     print(f"  Saldo                   {de(krt_net, sign=True):>18}")
@@ -330,12 +356,20 @@ def main() -> None:
     print()
     print("ABRUFE (Buchungsantraege)")
     print(f"  Einzahlungsantraege bestaetigt   {f['req_dep_ok_n']:.0f}")
-    print(f"  Auszahlungsantraege bestaetigt   {f['req_wdr_ok_n']:.0f}  ueber {de(f['req_wdr_ok_sum'])} aUEC")
-    print(f"  davon KRT-Konto                  {f['req_krt_wdr_ok_n']:.0f}  ueber {de(f['req_krt_wdr_ok_sum'])} aUEC")
-    print(f"  davon Materialeinkauf            {f['req_buy_wdr_n']:.0f}  ueber {de(f['req_buy_wdr_sum'])} aUEC")
+    print(
+        f"  Auszahlungsantraege bestaetigt   {f['req_wdr_ok_n']:.0f}  ueber {de(f['req_wdr_ok_sum'])} aUEC"
+    )
+    print(
+        f"  davon KRT-Konto                  {f['req_krt_wdr_ok_n']:.0f}  ueber {de(f['req_krt_wdr_ok_sum'])} aUEC"
+    )
+    print(
+        f"  davon Materialeinkauf            {f['req_buy_wdr_n']:.0f}  ueber {de(f['req_buy_wdr_sum'])} aUEC"
+    )
     print(f"  Rueckfluesse Materialeinkauf     {de(f['req_buy_dep_sum'])} aUEC")
     print(f"  abgelehnt gesamt                 {f['req_rejected_n']:.0f}")
-    print(f"  davon KRT-Konto                  {f['req_krt_rej_n']:.0f}  ueber {de(f['req_krt_rej_sum'])} aUEC")
+    print(
+        f"  davon KRT-Konto                  {f['req_krt_rej_n']:.0f}  ueber {de(f['req_krt_rej_sum'])} aUEC"
+    )
     print()
     print("KONTEXT")
     print(f"  Konten mit Bewegung     {f['accounts_moved']:.0f}")

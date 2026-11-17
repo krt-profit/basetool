@@ -3,13 +3,22 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB="${HERE}/lib/container-runtime.sh"
-[[ -f "$LIB" ]] || { echo "FATAL: ${LIB} not found" >&2; exit 1; }
+[[ -f "$LIB" ]] || {
+  echo "FATAL: ${LIB} not found" >&2
+  exit 1
+}
 
 PASSED=0
 FAILED=0
 say() { printf '%s\n' "$*"; }
-ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
-bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
+ok() {
+  PASSED=$((PASSED + 1))
+  printf '  ok    %s\n' "$*"
+}
+bad() {
+  FAILED=$((FAILED + 1))
+  printf '  FAIL  %s\n' "$*"
+}
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/rt-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
@@ -19,8 +28,9 @@ mkdir -p "$BIN"
 
 make_stub() {
   local name="$1" extra="${2:-}"
-  local bash_path; bash_path="$(command -v bash)"
-  cat > "${BIN}/${name}" <<STUB
+  local bash_path
+  bash_path="$(command -v bash)"
+  cat >"${BIN}/${name}" <<STUB
 #!${bash_path}
 printf '%s %s\n' "${name}" "\$*" >> "${LOG}"
 for pat in \${STUB_FAIL:-}; do
@@ -52,7 +62,7 @@ export PATH="${BIN}:${PATH}"
 
 run_rt() {
   local backend="$1" snippet="$2"
-  : > "$LOG"
+  : >"$LOG"
   # shellcheck disable=SC2030,SC2031
   (
     set +e
@@ -71,7 +81,8 @@ expect_call() {
   if grep -qF -- "$want" "$LOG"; then ok "$label"; else
     bad "$label"
     printf '        wanted a call containing: %s\n' "$want"
-    printf '        recorded:\n'; sed 's/^/          /' "$LOG"
+    printf '        recorded:\n'
+    sed 's/^/          /' "$LOG"
   fi
 }
 
@@ -79,7 +90,8 @@ expect_no_call() {
   local label="$1" backend="$2" snippet="$3" unwanted="$4"
   run_rt "$backend" "$snippet" >/dev/null 2>&1
   if grep -qF -- "$unwanted" "$LOG"; then
-    bad "$label"; printf '        must not have called: %s\n' "$unwanted"
+    bad "$label"
+    printf '        must not have called: %s\n' "$unwanted"
   else ok "$label"; fi
 }
 
@@ -87,7 +99,8 @@ expect_out() {
   local label="$1" backend="$2" snippet="$3" want="$4" got
   got="$(run_rt "$backend" "$snippet" 2>/dev/null)"
   if [[ "$got" == *"$want"* ]]; then ok "$label"; else
-    bad "$label"; printf '        wanted: %s\n        got   : %s\n' "$want" "$got"
+    bad "$label"
+    printf '        wanted: %s\n        got   : %s\n' "$want" "$got"
   fi
 }
 
@@ -96,7 +109,7 @@ MINIMAL="${WORK}/coreutils"
 mkdir -p "$MINIMAL"
 for util in bash sh env id basename getent cut ls sudo sleep stat; do
   util_path="$(command -v "$util" 2>/dev/null)" || continue
-  ln -sf "$util_path" "${MINIMAL}/${util}" 2>/dev/null     || cp "$util_path" "${MINIMAL}/${util}" 2>/dev/null || true
+  ln -sf "$util_path" "${MINIMAL}/${util}" 2>/dev/null || cp "$util_path" "${MINIMAL}/${util}" 2>/dev/null || true
 done
 if ! PATH="${MINIMAL}" id -un >/dev/null 2>&1; then
   minimal_srcdir="$(dirname "$(command -v id)")"
@@ -106,7 +119,8 @@ if ! PATH="${MINIMAL}" id -un >/dev/null 2>&1; then
   done
 fi
 if [[ ! -x "${MINIMAL}/bash" ]]; then
-  say "  FATAL: could not stage a minimal PATH (no bash found)"; exit 2
+  say "  FATAL: could not stage a minimal PATH (no bash found)"
+  exit 2
 fi
 if PATH="${MINIMAL}" id -un >/dev/null 2>&1; then
   ok "the staged PATH can actually run its utilities"
@@ -114,9 +128,11 @@ else
   bad "the staged PATH cannot run \`id\` — every detection case below is meaningless"
 fi
 
-NO_LINGER="${WORK}/linger-none"; mkdir -p "$NO_LINGER"
-SELF_LINGER="${WORK}/linger-self"; mkdir -p "$SELF_LINGER"
-: > "${SELF_LINGER}/$(id -un)"
+NO_LINGER="${WORK}/linger-none"
+mkdir -p "$NO_LINGER"
+SELF_LINGER="${WORK}/linger-self"
+mkdir -p "$SELF_LINGER"
+: >"${SELF_LINGER}/$(id -un)"
 
 detect_in() {
   # shellcheck disable=SC2030,SC2031
@@ -152,10 +168,15 @@ else
   ok "the minimal PATH reaches no podman, so a host-installed one cannot leak in"
 fi
 
-ONLY_PODMAN="${WORK}/only-podman"; mkdir -p "$ONLY_PODMAN"; cp "${BIN}/podman" "$ONLY_PODMAN/"
-NEITHER="${WORK}/neither"; mkdir -p "$NEITHER"
-ONLY_DOCKER="${WORK}/only-docker"; mkdir -p "$ONLY_DOCKER"
-printf '#!/usr/bin/env bash\nexit 0\n' > "${ONLY_DOCKER}/docker"; chmod +x "${ONLY_DOCKER}/docker"
+ONLY_PODMAN="${WORK}/only-podman"
+mkdir -p "$ONLY_PODMAN"
+cp "${BIN}/podman" "$ONLY_PODMAN/"
+NEITHER="${WORK}/neither"
+mkdir -p "$NEITHER"
+ONLY_DOCKER="${WORK}/only-docker"
+mkdir -p "$ONLY_DOCKER"
+printf '#!/usr/bin/env bash\nexit 0\n' >"${ONLY_DOCKER}/docker"
+chmod +x "${ONLY_DOCKER}/docker"
 
 got="$(detect_in "$ONLY_PODMAN")"
 if [[ "$got" == podman ]]; then ok "a host with podman is podman"; else bad "expected podman, got '${got}'"; fi
@@ -181,15 +202,16 @@ fi
 
 say ""
 say "== the boot race: a lingering user whose runtime is not up YET =="
-BRIDGE="${WORK}/bridge"; mkdir -p "$BRIDGE"
+BRIDGE="${WORK}/bridge"
+mkdir -p "$BRIDGE"
 cp "${BIN}/podman" "$BRIDGE/"
 REAL_ID="$(command -v id)"
 ABS_BASH="$(command -v bash)"
 MY_UID="$("$REAL_ID" -u)"
 # shellcheck disable=SC2016
 printf '#!%s\nif [ "$1" = "-u" ] && [ "$2" = "svcuser" ]; then echo "${STUB_SVC_UID:-%s}"; exit 0; fi\nexec "%s" "$@"\n' \
-  "$ABS_BASH" "$MY_UID" "$REAL_ID" > "${BRIDGE}/id"
-cat > "${BRIDGE}/sudo" <<STUB
+  "$ABS_BASH" "$MY_UID" "$REAL_ID" >"${BRIDGE}/id"
+cat >"${BRIDGE}/sudo" <<STUB
 #!${ABS_BASH}
 printf '%s\n' "\$*" >> "${WORK}/sudo.log"
 case "\$*" in
@@ -206,19 +228,22 @@ esac
 exit 0
 STUB
 chmod +x "${BRIDGE}/id" "${BRIDGE}/sudo"
-LINGER_SVC="${WORK}/linger-svc"; mkdir -p "$LINGER_SVC"; : > "${LINGER_SVC}/svcuser"
-RUNBASE="${WORK}/run-user"; mkdir -p "$RUNBASE"
+LINGER_SVC="${WORK}/linger-svc"
+mkdir -p "$LINGER_SVC"
+: >"${LINGER_SVC}/svcuser"
+RUNBASE="${WORK}/run-user"
+mkdir -p "$RUNBASE"
 RUNDIR="${RUNBASE}/${MY_UID}"
 
 detect_bridge() {
   # shellcheck disable=SC2030,SC2031,SC2034
   (
     set +e
-    : > "${WORK}/sudo.log"
-    : > "${WORK}/detect-waits.log"
+    : >"${WORK}/sudo.log"
+    : >"${WORK}/detect-waits.log"
     # shellcheck disable=SC2317,SC2329
     sleep() {
-      printf '%s\n' "$*" >> "${WORK}/detect-waits.log"
+      printf '%s\n' "$*" >>"${WORK}/detect-waits.log"
       command sleep "$@"
     }
     PATH="${BRIDGE}:${MINIMAL}"
@@ -234,24 +259,30 @@ detect_bridge() {
     printf '%s|%s' "${RT_BACKEND}" "${RT_CLI}"
   )
 }
-detect_err() { tr '\n' ' ' < "${WORK}/detect.err"; }
+detect_err() { tr '\n' ' ' <"${WORK}/detect.err"; }
 detect_waits() {
   local count=0 interval
   while IFS= read -r interval; do
-    [[ "${interval}" == 1 ]] || { printf '%s' -1; return; }
-    count=$(( count + 1 ))
-  done < "${WORK}/detect-waits.log"
+    [[ "${interval}" == 1 ]] || {
+      printf '%s' -1
+      return
+    }
+    count=$((count + 1))
+  done <"${WORK}/detect-waits.log"
   printf '%s' "${count}"
 }
 
 rm -rf "${RUNDIR:?}"
 export STUB_READY_DIR="${RUNDIR}"
-( sleep 3; mkdir -p "${RUNDIR}" ) &
+(
+  sleep 3
+  mkdir -p "${RUNDIR}"
+) &
 got="$(detect_bridge 15)"
 waits="$(detect_waits)"
 wait
 if [[ "$got" == "podman|sudo -n -u svcuser podman" && $waits -ge 1 && $waits -le 15 ]] \
-   && grep -q "runtime answered after" "${WORK}/detect.err"; then
+  && grep -q "runtime answered after" "${WORK}/detect.err"; then
   ok "a runtime that comes up late is waited for, and then found (${waits} polls)"
 else
   bad "the boot race is not waited out: got '${got}' after ${waits} polls -- $(detect_err)"
@@ -261,7 +292,7 @@ rm -rf "${RUNDIR:?}"
 got="$(detect_bridge 3)"
 waits="$(detect_waits)"
 if [[ -z "$got" && $waits -eq 3 ]] && grep -q "after waiting 3s" "${WORK}/detect.err" \
-   && grep -q "never became visible" "${WORK}/detect.err"; then
+  && grep -q "never became visible" "${WORK}/detect.err"; then
   ok "...and the wait is bounded: it refuses after three polls and says the runtime never showed"
 else
   bad "a runtime that never comes up was not refused within the bound: got '${got}' after ${waits} polls -- $(detect_err)"
@@ -273,22 +304,25 @@ got="$(STUB_SVC_UID=4242 detect_bridge 3)"
 waits="$(detect_waits)"
 rm -rf "${RUNBASE:?}/4242"
 if [[ -z "$got" && $waits -eq 3 ]] && ! grep -q "podman" "${WORK}/sudo.log" \
-   && grep -q "20-service-user.conf" "${WORK}/detect.err"; then
+  && grep -q "20-service-user.conf" "${WORK}/detect.err"; then
   ok "a runtime directory the service user does not own is not a runtime: three polls, no podman, and the refusal names the ordering"
 else
-  bad "the bare mount point was taken for a runtime: got '${got}' after ${waits} polls, sudo calls: $(tr '\n' ';' < "${WORK}/sudo.log") -- $(detect_err)"
+  bad "the bare mount point was taken for a runtime: got '${got}' after ${waits} polls, sudo calls: $(tr '\n' ';' <"${WORK}/sudo.log") -- $(detect_err)"
 fi
 
 mkdir -p "${RUNDIR}"
 export STUB_READY_DIR="${WORK}/first-container"
 rm -rf "${STUB_READY_DIR:?}"
-( sleep 3; mkdir -p "${WORK}/first-container" ) &
+(
+  sleep 3
+  mkdir -p "${WORK}/first-container"
+) &
 got="$(STUB_MANAGER_STATE=starting detect_bridge 15)"
 waits="$(detect_waits)"
 wait
 if [[ "$got" == "podman|sudo -n -u svcuser podman" && $waits -ge 1 && $waits -le 15 ]] \
-   && grep -q "runtime answered after" "${WORK}/detect.err" \
-   && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -eq $(( waits + 1 )) ]]; then
+  && grep -q "runtime answered after" "${WORK}/detect.err" \
+  && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -eq $((waits + 1)) ]]; then
   ok "a visible runtime that refuses while its manager is STARTING is waited out, and then found (${waits} polls)"
 else
   bad "the visible starting manager is not waited out: got '${got}' after ${waits} polls -- $(detect_err)"
@@ -299,8 +333,8 @@ export STUB_READY_DIR="${WORK}/never-ready"
 got="$(STUB_MANAGER_STATE=- detect_bridge 3)"
 waits="$(detect_waits)"
 if [[ -z "$got" && $waits -eq 3 ]] && grep -q "after waiting 3s" "${WORK}/detect.err" \
-   && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -eq 4 ]] \
-   && grep -q "podman said: Error: set sticky bit on" "${WORK}/detect.err"; then
+  && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -eq 4 ]] \
+  && grep -q "podman said: Error: set sticky bit on" "${WORK}/detect.err"; then
   ok "...bounded too, for a manager that never answers, and the refusal quotes podman"
 else
   bad "a manager that never finishes coming up was not refused within the bound: got '${got}' after ${waits} polls -- $(detect_err)"
@@ -310,7 +344,7 @@ for state in running degraded; do
   got="$(STUB_MANAGER_STATE=${state} detect_bridge 15)"
   waits="$(detect_waits)"
   if [[ -z "$got" && $waits -eq 0 ]] && grep -q "podman said:" "${WORK}/detect.err" \
-     && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -eq 1 ]]; then
+    && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -eq 1 ]]; then
     ok "a runtime whose manager is ${state} but refuses is answered without waiting, with podman's reason"
   else
     bad "detection waited on a runtime that was already ${state}: got '${got}' after ${waits} polls -- $(detect_err)"
@@ -321,18 +355,19 @@ export STUB_READY_DIR="${RUNDIR}"
 got="$(detect_bridge 15)"
 waits="$(detect_waits)"
 if [[ "$got" == "podman|sudo -n -u svcuser podman" && $waits -eq 0 ]] \
-   && ! grep -q "is-system-running" "${WORK}/sudo.log"; then
+  && ! grep -q "is-system-running" "${WORK}/sudo.log"; then
   ok "a runtime that answers is used at once, without asking the manager anything"
 else
-  bad "the steady-state probe changed: got '${got}' after ${waits} polls, sudo calls: $(tr '\n' ';' < "${WORK}/sudo.log")"
+  bad "the steady-state probe changed: got '${got}' after ${waits} polls, sudo calls: $(tr '\n' ';' <"${WORK}/sudo.log")"
 fi
 unset STUB_READY_DIR
 
 say ""
 say "== waiting for the service user's manager to FINISH starting =="
-STARTUP="${WORK}/startup"; mkdir -p "$STARTUP"
-printf '#!%s\n' "$ABS_BASH" > "${STARTUP}/systemctl"
-cat >> "${STARTUP}/systemctl" <<'STUB'
+STARTUP="${WORK}/startup"
+mkdir -p "$STARTUP"
+printf '#!%s\n' "$ABS_BASH" >"${STARTUP}/systemctl"
+cat >>"${STARTUP}/systemctl" <<'STUB'
 read -r -a states <<< "${STUB_STATES}"
 n="$(cat "${STUB_COUNTER}" 2>/dev/null || echo 0)"
 i=$(( n < ${#states[@]} ? n : ${#states[@]} - 1 ))
@@ -356,34 +391,35 @@ startup_case() {
     # shellcheck disable=SC1090
     . "$LIB"
     rt_detect
-    ( rt_wait_for_startup ) 2>"${WORK}/startup.err"
+    (rt_wait_for_startup) 2>"${WORK}/startup.err"
     rc=$?
     printf 'rc=%s calls=%s' "$rc" "$(cat "${STUB_COUNTER}" 2>/dev/null || echo 0)"
   )
 }
 expect_startup() {
-  local got; got="$(startup_case "$2" "$3" "$4")"
+  local got
+  got="$(startup_case "$2" "$3" "$4")"
   if [[ "$got" == "$5" ]]; then ok "$1"; else
-    bad "$1 -- wanted '$5', got '${got}' ($(tr '\n' ' ' < "${WORK}/startup.err"))"
+    bad "$1 -- wanted '$5', got '${got}' ($(tr '\n' ' ' <"${WORK}/startup.err"))"
   fi
 }
-expect_startup "a manager that is running is not waited for"   podman "running"                  10 "rc=0 calls=1"
+expect_startup "a manager that is running is not waited for" podman "running" 10 "rc=0 calls=1"
 expect_startup "degraded is finished too -- a failed healthcheck unit is routine" \
-                                                                podman "degraded"                 10 "rc=0 calls=1"
-expect_startup "a manager still starting is waited out"        podman "starting starting running" 10 "rc=0 calls=3"
-expect_startup "a manager not answering yet is waited out too" podman "- - degraded"             10 "rc=0 calls=3"
+  podman "degraded" 10 "rc=0 calls=1"
+expect_startup "a manager still starting is waited out" podman "starting starting running" 10 "rc=0 calls=3"
+expect_startup "a manager not answering yet is waited out too" podman "- - degraded" 10 "rc=0 calls=3"
 expect_startup "shutting down is not a moment to start a job, and it says so at once" \
-                                                                podman "stopping"                 10 "rc=1 calls=1"
+  podman "stopping" 10 "rc=1 calls=1"
 got="$(startup_case podman "starting" 3)"
 if [[ "$got" == rc=1* ]] && grep -q "still 'starting' after 3s" "${WORK}/startup.err"; then
   ok "a startup that never finishes is refused after the bound, naming the state it was stuck in"
 else
-  bad "a stuck startup was not refused within the bound: got '${got}' ($(tr '\n' ' ' < "${WORK}/startup.err"))"
+  bad "a stuck startup was not refused within the bound: got '${got}' ($(tr '\n' ' ' <"${WORK}/startup.err"))"
 fi
 
 for job in backup restore-drill container-cleanup; do
   if awk '/^rt_detect$/ { d = 1; next } d && /^rt_wait_for_startup$/ { found = 1 } END { exit !found }' \
-       "${HERE}/${job}.sh"; then
+    "${HERE}/${job}.sh"; then
     ok "${job}.sh waits for the manager's startup after detecting the runtime"
   else
     bad "${job}.sh no longer calls rt_wait_for_startup after rt_detect"
@@ -413,13 +449,13 @@ for timer in "${HERE}"/basetool-*.timer; do
     bad "${name} does not name ${name%.timer}.service in Unit="
   fi
 done
-(( timers >= 6 )) || bad "expected the six basetool-*.timer files beside this suite, found ${timers}"
+((timers >= 6)) || bad "expected the six basetool-*.timer files beside this suite, found ${timers}"
 
 DEPLOY_TIMER="${HERE}/basetool-deploy.timer"
 if grep -Eq '^OnCalendar=\*-\*-\* \*:00/5:00$' "${DEPLOY_TIMER}" \
-   && grep -Eq '^AccuracySec=1s$' "${DEPLOY_TIMER}" \
-   && grep -Eq '^RandomizedDelaySec=0$' "${DEPLOY_TIMER}" \
-   && grep -Eq '^Persistent=false$' "${DEPLOY_TIMER}"; then
+  && grep -Eq '^AccuracySec=1s$' "${DEPLOY_TIMER}" \
+  && grep -Eq '^RandomizedDelaySec=0$' "${DEPLOY_TIMER}" \
+  && grep -Eq '^Persistent=false$' "${DEPLOY_TIMER}"; then
   ok "basetool-deploy.timer fires on the 5-minute wall-clock grid, to the second, without jitter or catch-up"
 else
   bad "basetool-deploy.timer must be OnCalendar=*-*-* *:00/5:00 with AccuracySec=1s, RandomizedDelaySec=0, Persistent=false"
@@ -433,7 +469,7 @@ fi
 ROLE="${HERE}/../ansible/roles/basetool_host"
 ORDER_TMPL="${ROLE}/templates/basetool-deploy-account-order.conf.j2"
 if grep -Eq '^After=.*systemd-logind\.service' "${ORDER_TMPL}" 2>/dev/null \
-   && grep -Eq '^After=.*user@\{\{ basetool_host_service_uid \}\}\.service' "${ORDER_TMPL}"; then
+  && grep -Eq '^After=.*user@\{\{ basetool_host_service_uid \}\}\.service' "${ORDER_TMPL}"; then
   ok "the ordering drop-in orders after systemd-logind and user@<service uid>"
 else
   bad "the ordering drop-in (${ORDER_TMPL}) does not order after systemd-logind.service and user@<uid>.service"
@@ -456,7 +492,7 @@ say ""
 say "== resolving a tag to a digest without pulling =="
 expect_call "podman asks skopeo, which is why the role installs it" podman \
   'rt_resolve_digest ghcr.io/x/y:stable' 'skopeo inspect --no-tags docker://ghcr.io/x/y:stable'
-expect_out  "podman returns the registry digest" podman \
+expect_out "podman returns the registry digest" podman \
   'rt_resolve_digest ghcr.io/x/y:stable' 'sha256:2222222222222222222222222222222222222222222222222222222222222222'
 expect_no_call "resolving a tag never PULLS it" podman \
   'rt_resolve_digest ghcr.io/x/y:stable' 'podman pull'
@@ -467,9 +503,9 @@ expect_call "podman reloads before starting, because units may have moved" podma
   'rt_apply backend' 'systemctl --user daemon-reload'
 expect_call "podman starts the unit, whose Type=notify IS the wait" podman \
   'rt_apply backend' 'systemctl --user start backend.service'
-expect_out  "podman reports failure when a start does not reach healthy" podman \
+expect_out "podman reports failure when a start does not reach healthy" podman \
   'STUB_FAIL="start_backend.service" rt_apply backend; echo "rc=$?"' 'rc=1'
-expect_out  "...and success when it does" podman \
+expect_out "...and success when it does" podman \
   'rt_apply backend; echo "rc=$?"' 'rc=0'
 
 say ""
@@ -492,7 +528,7 @@ say ""
 say "== finding the containers that belong to a service =="
 expect_call "podman filters on the label Quadlet stamps, not on the name" podman \
   'rt_service_container_ids backend' 'label=PODMAN_SYSTEMD_UNIT=backend.service'
-expect_out  "podman returns the id" podman 'rt_service_container_ids backend' 'cid-podman-1'
+expect_out "podman returns the id" podman 'rt_service_container_ids backend' 'cid-podman-1'
 
 say ""
 say "== judging one container =="
@@ -512,21 +548,23 @@ if grep -q '^Image=ghcr.io/x/backend@sha256:abc$' "$PIN" 2>/dev/null; then
 else bad "the drop-in does not set Image="; fi
 case "$(basename "$PIN")" in
   10-*) ok "numbered 10-, so an operator drop-in can still outrank it" ;;
-  *)    bad "the pin is not numbered, so ordering against an operator drop-in is undefined" ;;
+  *) bad "the pin is not numbered, so ordering against an operator drop-in is undefined" ;;
 esac
 run_rt podman 'rt_pin_write backend ghcr.io/x/backend@sha256:abc; rt_pin_clear backend' >/dev/null 2>&1
 if [[ ! -f "$PIN" ]]; then ok "clearing the pin removes the file"; else bad "the pin survived rt_pin_clear"; fi
 
 say ""
 say "== the pin's TWO halves, and the rollback that has to restore both =="
-PINDIR="${WORK}/pinstate"; mkdir -p "$PINDIR"
+PINDIR="${WORK}/pinstate"
+mkdir -p "$PINDIR"
 pin_env() {
   printf 'export RT_PIN_FILE=%q RT_PIN_FILE_PREVIOUS=%q;' \
     "${PINDIR}/current.yml" "${PINDIR}/previous.yml"
 }
 DROPIN="${WORK}/units/backend.container.d/10-digest-pin.conf"
 
-rm -rf "${WORK}/units" "$PINDIR"; mkdir -p "$PINDIR"
+rm -rf "${WORK}/units" "$PINDIR"
+mkdir -p "$PINDIR"
 run_rt podman "$(pin_env) rt_pin_apply backend=img@sha256:OLD ingest=img2@sha256:OLDI" >/dev/null 2>&1
 if grep -q 'image: img@sha256:OLD' "${PINDIR}/current.yml" 2>/dev/null; then
   ok "the record names the pinned reference"
@@ -561,22 +599,22 @@ say ""
 say "== lifting a file out of an image without running it =="
 expect_call "podman creates, streams a tar out, and removes" podman \
   'rt_extract_from_image img:tag /a /b' 'cp created-cid:/a -'
-expect_call "a trailing slash means a tree, unpacked in place" podman   'rt_extract_from_image img:tag /config/. /tmp/rt-extract-dir/' 'cp created-cid:/config/. -'
-expect_no_call "...and a tree is never streamed to a single file" podman   'rt_extract_from_image img:tag /config/. /tmp/rt-extract-dir/' 'xOf'
+expect_call "a trailing slash means a tree, unpacked in place" podman 'rt_extract_from_image img:tag /config/. /tmp/rt-extract-dir/' 'cp created-cid:/config/. -'
+expect_no_call "...and a tree is never streamed to a single file" podman 'rt_extract_from_image img:tag /config/. /tmp/rt-extract-dir/' 'xOf'
 
 expect_call "a command reaches create, for an image that declares none" podman \
   'rt_extract_from_image img:tag /a /b /bundle' 'create img:tag /bundle'
 expect_call "the container is removed even when the copy FAILS" podman \
   'STUB_FAIL="cp_created-cid" rt_extract_from_image img:tag /a /b' 'rm -f created-cid'
-expect_out  "...and the failure is still reported" podman \
+expect_out "...and the failure is still reported" podman \
   'STUB_FAIL="cp_created-cid" rt_extract_from_image img:tag /a /b; echo "rc=$?"' 'rc=1'
 
 say ""
 say "== pruning must never reach a volume, because they hold the databases =="
 expect_no_call "no system prune" podman 'rt_prune' 'system prune'
 expect_no_call "no volume prune" podman 'rt_prune' 'volume prune'
-expect_call    "images and networks only" podman 'rt_prune' 'image prune --force'
-expect_call    "the age filter that protects the rollback images" podman \
+expect_call "images and networks only" podman 'rt_prune' 'image prune --force'
+expect_call "the age filter that protects the rollback images" podman \
   'rt_prune_images 720h' 'image prune --force --filter until=720h'
 
 say ""
@@ -585,17 +623,17 @@ mon() { printf 'export RT_MONITORING_SERVICES=%q;' "prometheus loki grafana"; }
 
 # shellcheck disable=SC2016
 # shellcheck disable=SC2016
-expect_call "a service this run re-pinned is STOPPED, so the start that follows creates it anew" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:aaaa"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'systemctl --user stop backend.service'
+expect_call "a service this run re-pinned is STOPPED, so the start that follows creates it anew" podman 'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:aaaa"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack' 'systemctl --user stop backend.service'
 # shellcheck disable=SC2016
-expect_call "...and then started" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:abab"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'systemctl --user start backend.service'
+expect_call "...and then started" podman 'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:abab"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack' 'systemctl --user start backend.service'
 # shellcheck disable=SC2016
-expect_call "...and one it did not is merely started, so the databases stay up" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:bbbb"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'start db-backend.service'
+expect_call "...and one it did not is merely started, so the databases stay up" podman 'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:bbbb"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack' 'start db-backend.service'
 # shellcheck disable=SC2016
-expect_out "...and the database is never stopped for somebody else's change" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cccc"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack; echo "stops-naming-db=$(grep " stop " "${LOG}" | grep -c db-backend);"'   'stops-naming-db=0;'
+expect_out "...and the database is never stopped for somebody else's change" podman 'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cccc"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack; echo "stops-naming-db=$(grep " stop " "${LOG}" | grep -c db-backend);"' 'stops-naming-db=0;'
 # shellcheck disable=SC2016
-expect_no_call "...nor restarted" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cdcd"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'restart'
+expect_no_call "...nor restarted" podman 'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cdcd"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack' 'restart'
 # shellcheck disable=SC2016
-expect_no_call "an unchanged pin does not stop anything" podman   'RT_PIN_FILE="${WORK}/pin2.yml" RT_UNIT_DIR="${WORK}/units2" rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_CHANGED_SERVICES=""; rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_STACK_SERVICES="backend" rt_apply_stack'   ' stop '
+expect_no_call "an unchanged pin does not stop anything" podman 'RT_PIN_FILE="${WORK}/pin2.yml" RT_UNIT_DIR="${WORK}/units2" rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_CHANGED_SERVICES=""; rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_STACK_SERVICES="backend" rt_apply_stack' ' stop '
 
 say ""
 say "== one restart window: every re-defined unit goes down in ONE stop, then the stack starts in order =="
@@ -679,8 +717,9 @@ expect_no_call "...and never through the service user's, which has no such unit"
 expect_call "a containerised one still goes to the service user" podman \
   "$(mon) RT_HOST_SYSTEMCTL=systemctl rt_monitoring_recreate prometheus" 'systemctl --user restart prometheus.service'
 
-MONDIR="${WORK}/mon-units"; mkdir -p "$MONDIR"
-for u in backend db-backend prometheus loki acme; do printf '[Container]\n' > "${MONDIR}/${u}.container"; done
+MONDIR="${WORK}/mon-units"
+mkdir -p "$MONDIR"
+for u in backend db-backend prometheus loki acme; do printf '[Container]\n' >"${MONDIR}/${u}.container"; done
 got="$(run_rt podman "RT_MONITORING_SERVICES=''; RT_UNIT_DIR='${MONDIR}'; RT_STACK_SERVICES='db-backend backend acme'; rt_monitoring_services" 2>/dev/null | sort | tr '\n' ' ')"
 if [[ "$got" == "loki prometheus " ]]; then
   ok "the monitoring units are the unit directory minus the stack"
@@ -701,10 +740,11 @@ say "== the stack is the installed units, in the known order =="
 # shellcheck disable=SC2016
 expect_out "the known order starts the edge right after keycloak, before the applications" podman \
   'echo "[${RT_STACK_ORDER}]"' '[db-backend db-keycloak redis keycloak edge backend ingest frontend acme]'
-STACKDIR="${WORK}/stack-units"; mkdir -p "$STACKDIR"
-for u in db-backend keycloak backend legacy prometheus; do printf '[Container]\n' > "${STACKDIR}/${u}.container"; done
-printf '[Unit]\nRequires=backend.service keycloak.service cache.service\n[Container]\n' > "${STACKDIR}/frontend.container"
-printf '[Unit]\nRequires=db-backend.service\n[Container]\n' > "${STACKDIR}/cache.container"
+STACKDIR="${WORK}/stack-units"
+mkdir -p "$STACKDIR"
+for u in db-backend keycloak backend legacy prometheus; do printf '[Container]\n' >"${STACKDIR}/${u}.container"; done
+printf '[Unit]\nRequires=backend.service keycloak.service cache.service\n[Container]\n' >"${STACKDIR}/frontend.container"
+printf '[Unit]\nRequires=db-backend.service\n[Container]\n' >"${STACKDIR}/cache.container"
 stack_in="RT_UNIT_DIR='${STACKDIR}'; RT_STACK_ORDER='db-backend redis keycloak backend frontend';"
 expect_out "a known unit that is not installed is left out, an unknown one a stack unit Requires= comes before it" podman \
   "${stack_in} echo \"[\$(rt_installed_stack_services)]\"" '[db-backend keycloak backend cache frontend]'
@@ -775,9 +815,9 @@ say ""
 say "== the helper and drill image is db-backend's own digest pin (OPS-SEC-03) =="
 mkdir -p "${WORK}/units" "${WORK}/bundle"
 printf '[Container]\nImage=docker.io/postgres:18-alpine@sha256:%s\nContainerName=db-backend\n' \
-  "$(printf 'd%.0s' $(seq 1 64))" > "${WORK}/units/db-backend.container"
+  "$(printf 'd%.0s' $(seq 1 64))" >"${WORK}/units/db-backend.container"
 printf '[Container]\nImage=docker.io/postgres:18-alpine@sha256:%s\n' \
-  "$(printf 'b%.0s' $(seq 1 64))" > "${WORK}/bundle/db-backend.container"
+  "$(printf 'b%.0s' $(seq 1 64))" >"${WORK}/bundle/db-backend.container"
 expect_out "the installed unit's Image= is read, digest and all" podman \
   'rt_unit_image db-backend '"${WORK}"'/bundle' \
   'docker.io/postgres:18-alpine@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
@@ -794,7 +834,7 @@ expect_out "the generated db-backend unit carries a digest the backup can use" p
 say ""
 say "== the helper image fails closed: no digest pin, no run (S-09) =="
 mkdir -p "${WORK}/unpinned" "${WORK}/empty"
-printf '[Container]\nImage=docker.io/library/postgres:18-alpine\n' > "${WORK}/unpinned/db-backend.container"
+printf '[Container]\nImage=docker.io/library/postgres:18-alpine\n' >"${WORK}/unpinned/db-backend.container"
 expect_out "an unpinned tag in the unit is not an answer" podman \
   'RT_UNIT_DIR='"${WORK}"'/unpinned rt_unit_image db-backend '"${WORK}"'/nowhere; echo "rc=$?"' 'rc=1'
 expect_out "...but a pinned bundle copy behind it still is" podman \
@@ -822,19 +862,19 @@ expect_out "a truncated digest is not a pin" podman \
 SCRIPT_BIN="${WORK}/script-bin"
 mkdir -p "${SCRIPT_BIN}"
 cp "${BIN}/podman" "${SCRIPT_BIN}/podman"
-printf '#!%s\necho running\n' "$(command -v bash)" > "${SCRIPT_BIN}/systemctl"
+printf '#!%s\necho running\n' "$(command -v bash)" >"${SCRIPT_BIN}/systemctl"
 chmod +x "${SCRIPT_BIN}/systemctl"
 SCRIPT_COMPOSE="${WORK}/compose"
 mkdir -p "${SCRIPT_COMPOSE}/quadlet/systemd" "${WORK}/state"
 mkdir -p "${WORK}/config"
-: > "${WORK}/config/basetool.env"
-: > "${WORK}/backup.env"
+: >"${WORK}/config/basetool.env"
+: >"${WORK}/backup.env"
 
 run_job() {
   local job="$1" unit="$2"
-  : > "$LOG"
+  : >"$LOG"
   rm -f "${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
-  [[ -n "$unit" ]] && printf '%s\n' "$unit" > "${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
+  [[ -n "$unit" ]] && printf '%s\n' "$unit" >"${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
   # shellcheck disable=SC2031
   PATH="${SCRIPT_BIN}:${PATH}" RT_BACKEND=podman RT_UNIT_DIR="${WORK}/nowhere" RT_STARTUP_WAIT=0 \
     BASETOOL_COMPOSE_DIR="${SCRIPT_COMPOSE}" BASETOOL_CONFIG_DIR="${WORK}/config" BASETOOL_BACKUP_ENV="${WORK}/backup.env" BASETOOL_STATE_DIR="${WORK}/state" \
@@ -843,11 +883,13 @@ run_job() {
 }
 PIN="Image=docker.io/postgres:18-alpine@sha256:$(printf 'a%.0s' $(seq 1 64))"
 for job in backup restore-drill; do
-  got="$(run_job "$job" "")"; rc=$?
+  got="$(run_job "$job" "")"
+  rc=$?
   if [[ $rc -ne 0 && "$got" == *"refusing to run with an unpinned image"* ]] && ! grep -q ' run ' "$LOG"; then
     ok "${job}.sh refuses to start when db-backend's pin is unreadable"
   else bad "${job}.sh with no unit: rc=${rc} out='${got}'"; fi
-  got="$(run_job "$job" "Image=docker.io/library/postgres:18-alpine")"; rc=$?
+  got="$(run_job "$job" "Image=docker.io/library/postgres:18-alpine")"
+  rc=$?
   if [[ $rc -ne 0 && "$got" == *"refusing to run with an unpinned image"* ]] && ! grep -q ' run ' "$LOG"; then
     ok "${job}.sh refuses an unpinned tag"
   else bad "${job}.sh with an unpinned tag: rc=${rc} out='${got}'"; fi
@@ -894,7 +936,7 @@ expect_call "it is started detached, by name" podman \
   'run -d --name basetool-restore-drill -e POSTGRES_USER=drill postgres:18-alpine'
 expect_no_call "it joins none of the deployment's networks" podman \
   'rt_run_detached basetool-restore-drill img -e A=b' '--network'
-printf 'a dump\n' > "${WORK}/krt_basetool.dump"
+printf 'a dump\n' >"${WORK}/krt_basetool.dump"
 expect_call "a dump is streamed in on stdin, not read by the service user" podman \
   'rt_cp_to '"${WORK}"'/krt_basetool.dump basetool-restore-drill /tmp/krt_basetool.dump' \
   'exec -i basetool-restore-drill sh -c'
@@ -909,7 +951,7 @@ expect_call "and it is removed whatever state it is in" podman \
 
 say ""
 say "== credentials never reach a command line =="
-printf 'hunter2\n' > "${WORK}/token"
+printf 'hunter2\n' >"${WORK}/token"
 expect_call "the password is piped, not passed" podman \
   'rt_login ghcr.io someone '"${WORK}"'/token' '--password-stdin'
 expect_no_call "the value itself is never in an argv" podman \
@@ -918,12 +960,17 @@ expect_no_call "the value itself is never in an argv" podman \
 say ""
 say "== lib/common.sh: the helpers the four operational scripts share (OPS-SIMP-04) =="
 COMMON="${HERE}/lib/common.sh"
-CENV="${WORK}/common-env"; mkdir -p "${CENV}/textfile"
-printf 'A=1\nBASETOOL_MONITORING_ENABLED = "true"\nKEY=first\nKEY=last\nQ=\x27single\x27\n' > "${CENV}/basetool.env"
+CENV="${WORK}/common-env"
+mkdir -p "${CENV}/textfile"
+printf 'A=1\nBASETOOL_MONITORING_ENABLED = "true"\nKEY=first\nKEY=last\nQ=\x27single\x27\n' >"${CENV}/basetool.env"
 common() {
-  ( set +e; export CONFIG_DIR="${CENV}" TEXTFILE_DIR="${CENV}/textfile"
+  (
+    set +e
+    export CONFIG_DIR="${CENV}" TEXTFILE_DIR="${CENV}/textfile"
     # shellcheck disable=SC1090
-    . "$COMMON"; eval "$1" )
+    . "$COMMON"
+    eval "$1"
+  )
 }
 # shellcheck disable=SC2016
 got="$(env -u CONFIG_DIR -u ENV_FILE -u ENV_D_DIR -u COMPOSE_DIR bash -c '. "$1"; printf "%s %s %s %s" "$COMPOSE_DIR" "$CONFIG_DIR" "$ENV_FILE" "$ENV_D_DIR"' _ "$COMMON")"
@@ -953,7 +1000,7 @@ if [[ "$got" == *"FATAL: boom"* && "$got" != *survived* ]]; then ok "fail logs F
 for job in deploy backup restore-drill container-cleanup; do
   # shellcheck disable=SC2016
   if grep -q '^\. "\${[A-Z_]*SCRIPT_DIR}/lib/common.sh"' "${HERE}/${job}.sh" \
-     && ! grep -qE '^(log|fail|read_env)\(\)' "${HERE}/${job}.sh"; then
+    && ! grep -qE '^(log|fail|read_env)\(\)' "${HERE}/${job}.sh"; then
     ok "${job}.sh uses lib/common.sh and keeps no copy of its helpers"
   else
     bad "${job}.sh does not source lib/common.sh, or still defines its own log/fail/read_env"

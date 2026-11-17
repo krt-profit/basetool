@@ -60,7 +60,7 @@ def catalog_version(root: pathlib.Path) -> tuple[str | None, list[str]]:
     if not match:
         return None, [f"{CATALOG}: no keycloak version key -- update this script if it moved"]
     if not RELEASE.match(match.group(1)):
-        return None, [f"{CATALOG}: keycloak = \"{match.group(1)}\" is not a X.Y.Z release"]
+        return None, [f'{CATALOG}: keycloak = "{match.group(1)}" is not a X.Y.Z release']
     return match.group(1), []
 
 
@@ -91,7 +91,7 @@ def agrees(tag: str, version: str) -> str | None:
     wanted = version.split(".")[: len(parts)]
     if parts != wanted:
         scope = "major.minor" if len(parts) == 2 else "version"
-        return f"tag {tag} differs in {scope} from the catalog's keycloak = \"{version}\""
+        return f'tag {tag} differs in {scope} from the catalog\'s keycloak = "{version}"'
     return None
 
 
@@ -149,7 +149,10 @@ def selftest() -> int:
         "B: a runtime pin vanished": ({"docker/sandbox/keycloak/Dockerfile": "FROM scratch\n"}, 1),
         "C: catalog moved to another minor": ({CATALOG: catalog.replace("26.8.0", "26.9.0")}, 3),
         "C: catalog moved to another major": ({CATALOG: catalog.replace("26.8.0", "27.8.0")}, 3),
-        "C: catalog patch moves under a minor tag": ({CATALOG: catalog.replace("26.8.0", "26.8.4")}, 0),
+        "C: catalog patch moves under a minor tag": (
+            {CATALOG: catalog.replace("26.8.0", "26.8.4")},
+            0,
+        ),
         "C: exact tag, other patch": (pins("26.8.1"), 3),
         "C: tag too loose to compare": (pins("26"), 3),
         "C+D: one pin bumped alone": (
@@ -157,11 +160,19 @@ def selftest() -> int:
             2,
         ),
         "C+D: a new tracked file pins another minor": (
-            {"docker-compose.extra.yml": "    image: quay.io/keycloak/keycloak:26.7@" + digest + "\n"},
+            {
+                "docker-compose.extra.yml": "    image: quay.io/keycloak/keycloak:26.7@"
+                + digest
+                + "\n"
+            },
             2,
         ),
         "D: one pin on another digest": (
-            {"docker/sandbox/keycloak/Dockerfile": "FROM quay.io/keycloak/keycloak:26.8@" + other + "\n"},
+            {
+                "docker/sandbox/keycloak/Dockerfile": "FROM quay.io/keycloak/keycloak:26.8@"
+                + other
+                + "\n"
+            },
             1,
         ),
         "documentation is exempt": (

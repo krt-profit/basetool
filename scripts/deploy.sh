@@ -29,7 +29,6 @@ BASETOOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "${BASETOOL_SCRIPT_DIR}/lib/deploy-release.sh"
 
-
 cd /
 
 COMPOSE_DIR="${BASETOOL_COMPOSE_DIR:-/opt/basetool}"
@@ -81,7 +80,10 @@ HEALTH_RESTART_MAX="${BASETOOL_HEALTH_RESTART_MAX:-3600}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --tag)
-      [[ -n "${2:-}" ]] || { echo "FATAL: --tag requires a value" >&2; exit 1; }
+      [[ -n "${2:-}" ]] || {
+        echo "FATAL: --tag requires a value" >&2
+        exit 1
+      }
       TARGET_TAG="$2"
       TAG_GIVEN=true
       shift 2
@@ -98,7 +100,7 @@ while [[ $# -gt 0 ]]; do
       REAPPLY_REQUESTED=true
       shift
       ;;
-    -h|--help)
+    -h | --help)
       cat <<'USAGE'
 Usage: deploy.sh [--tag <ref> | --reapply] [--check-only] [--force]
 
@@ -207,7 +209,10 @@ command -v skopeo >/dev/null 2>&1 \
 QUADLET_BIN="${BASETOOL_QUADLET_BIN:-}"
 if [[ -z "${QUADLET_BIN}" ]]; then
   for candidate in /usr/libexec/podman/quadlet /usr/lib/podman/quadlet; do
-    [[ -x "${candidate}" ]] && { QUADLET_BIN="${candidate}"; break; }
+    [[ -x "${candidate}" ]] && {
+      QUADLET_BIN="${candidate}"
+      break
+    }
   done
 fi
 [[ -n "${QUADLET_BIN}" && -x "${QUADLET_BIN}" ]] \
@@ -219,7 +224,7 @@ rt_use_installed_stack
 keystore_mount_sources() {
   local src=""
   src="$(grep -h -E '^Volume=[^:]+:(/run/secrets/[A-Za-z0-9._-]+\.p12|/etc/nginx/[A-Za-z0-9._-]+\.crt)(:|$)' "${RT_UNIT_DIR}"/*.container \
-           2>/dev/null | sed -E 's/^Volume=([^:]+):.*/\1/' | sort -u || true)"
+    2>/dev/null | sed -E 's/^Volume=([^:]+):.*/\1/' | sort -u || true)"
   if [[ -z "${src}" ]]; then
     src="$(read_env BASETOOL_KEYSTORE_HOST_PATH || true)"
   fi
@@ -232,7 +237,7 @@ while IFS= read -r KEYSTORE_HOST_PATH; do
 done < <(keystore_mount_sources)
 
 if [[ "${COSIGN_VERIFY}" == "true" ]] && ! command -v cosign >/dev/null 2>&1; then
-  IFS=':' read -r -a _cosign_dirs <<< "${COSIGN_SEARCH_PATH}"
+  IFS=':' read -r -a _cosign_dirs <<<"${COSIGN_SEARCH_PATH}"
   for _cosign_dir in "${_cosign_dirs[@]}"; do
     [[ -n "${_cosign_dir}" && -x "${_cosign_dir}/cosign" ]] || continue
     PATH="${_cosign_dir}:${PATH}"
@@ -275,22 +280,22 @@ record_target_failure() {
   local file="${1:-${FAILED_FILE}}" prev_marker="" prev_count=""
   FAIL_COUNT=1
   if [[ -f "${file}" ]]; then
-    read -r prev_marker prev_count _ < "${file}" || true
+    read -r prev_marker prev_count _ <"${file}" || true
     if [[ "${prev_marker}" == "${EXPECTED_MARKER}" ]] && [[ "${prev_count}" =~ ^[0-9]+$ ]]; then
-      FAIL_COUNT=$(( 10#${prev_count} + 1 ))
+      FAIL_COUNT=$((10#${prev_count} + 1))
     fi
   fi
-  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${file}"
+  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" >"${file}"
 }
 
 backoff_seconds() {
   local base="$1" max="$2" count="$3" b
-  if (( 10#${count} > 20 )); then
+  if ((10#${count} > 20)); then
     echo "${max}"
     return 0
   fi
-  b=$(( base * (2 ** (10#${count} - 1)) ))
-  (( b > max )) && b="${max}"
+  b=$((base * (2 ** (10#${count} - 1))))
+  ((b > max)) && b="${max}"
   echo "${b}"
 }
 
@@ -367,7 +372,7 @@ record_reapply_failure() {
 on_pre_gate_exit() {
   local rc=$?
   [[ "${PRE_GATE_GUARD}" == "true" ]] || return 0
-  (( rc != 0 )) || return 0
+  ((rc != 0)) || return 0
   PRE_GATE_GUARD=false
   set +e
   log "FATAL: deploy aborted before the health gate — step '${DEPLOY_STEP:-unknown}' failed (exit ${rc})"
@@ -391,7 +396,9 @@ on_pre_gate_exit() {
       log "digest pin restored to the previous release"
     elif [[ "${PIN_HAD_PREVIOUS}" != "true" ]]; then
       rm -f "${PIN_FILE_CURRENT}"
-      rt_pin_clear backend; rt_pin_clear frontend; rt_pin_clear ingest
+      rt_pin_clear backend
+      rt_pin_clear frontend
+      rt_pin_clear ingest
       log "digest pin written by this run removed (there was none before it)"
     else
       log "WARNING: could not restore the previous digest pin from ${PIN_FILE_PREVIOUS}"
@@ -425,7 +432,7 @@ if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
   fi
   reapply_extra=""
   IFS='|' read -r REAPPLY_BACKEND REAPPLY_FRONTEND REAPPLY_INGEST REAPPLY_CONFIG REAPPLY_KCSPI reapply_extra \
-    < "${LAST_DEPLOYED_FILE}" || true
+    <"${LAST_DEPLOYED_FILE}" || true
   for reapply_field in REAPPLY_BACKEND REAPPLY_FRONTEND REAPPLY_INGEST REAPPLY_CONFIG REAPPLY_KCSPI; do
     case "${reapply_field}" in
       REAPPLY_BACKEND | REAPPLY_FRONTEND | REAPPLY_INGEST) reapply_optional=false ;;
@@ -507,7 +514,7 @@ EXPECTED_MARKER="${BACKEND_DIGEST}|${FRONTEND_DIGEST}|${INGEST_DIGEST}|${CONFIG_
 LAST_CONFIG_DIGEST=""
 LAST_KEYCLOAK_SPI_DIGEST=""
 if [[ -f "${LAST_DEPLOYED_FILE}" ]]; then
-  IFS='|' read -r _ _ _ LAST_CONFIG_DIGEST LAST_KEYCLOAK_SPI_DIGEST < "${LAST_DEPLOYED_FILE}" || true
+  IFS='|' read -r _ _ _ LAST_CONFIG_DIGEST LAST_KEYCLOAK_SPI_DIGEST <"${LAST_DEPLOYED_FILE}" || true
 fi
 CONFIG_CHANGED=false
 if [[ -n "${CONFIG_DIGEST}" ]] && [[ "${CONFIG_DIGEST}" != "${LAST_CONFIG_DIGEST}" ]]; then
@@ -526,9 +533,9 @@ fi
 
 if [[ "${CONFIG_CHANGED}" != "true" ]]; then
   shopt -s nullglob
-  host_units=( "${RT_UNIT_DIR}"/*.container )
+  host_units=("${RT_UNIT_DIR}"/*.container)
   shopt -u nullglob
-  if (( ${#host_units[@]} == 0 )); then
+  if ((${#host_units[@]} == 0)); then
     CONFIG_CHANGED=true
     log "no Quadlet units on this host — staging the config bundle to install them"
   fi
@@ -542,16 +549,16 @@ running_stack_drift() {
   local entry svc image digest cids cid state img_id repo_digests img_ok
   local -a units=()
   shopt -s nullglob
-  units=( "${RT_UNIT_DIR}"/*.container )
+  units=("${RT_UNIT_DIR}"/*.container)
   shopt -u nullglob
-  if (( ${#units[@]} == 0 )); then
+  if ((${#units[@]} == 0)); then
     echo "structural quadlet: no unit files in ${RT_UNIT_DIR}"
   fi
   for entry in \
     "backend|${BACKEND_IMAGE}|${BACKEND_DIGEST}" \
     "frontend|${FRONTEND_IMAGE}|${FRONTEND_DIGEST}" \
     "ingest|${INGEST_IMAGE}|${INGEST_DIGEST}"; do
-    IFS='|' read -r svc image digest <<< "${entry}"
+    IFS='|' read -r svc image digest <<<"${entry}"
     cids="$(rt_service_container_ids "${svc}")" || cids=""
     if [[ -z "${cids}" ]]; then
       echo "structural ${svc}: no container"
@@ -583,7 +590,7 @@ running_stack_drift() {
           fi
           ;;
       esac
-    done <<< "${cids}"
+    done <<<"${cids}"
   done
   return 0
 }
@@ -597,21 +604,21 @@ if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
   if [[ -n "${DRIFT_REPORT}" ]]; then
     while IFS= read -r drift_line; do
       log "drift: ${drift_line#* }"
-    done <<< "${DRIFT_REPORT}"
+    done <<<"${DRIFT_REPORT}"
   else
     log "--reapply: the running stack matches the deployed release — re-applying it anyway, as asked"
   fi
   DRIFTED=true
   REAPPLY=true
   log "--reapply: re-applying the deployed release — the rollback anchors keep naming the release before it"
-  HEALTH_LEFT_OVER="$(grep '^health ' <<< "${DRIFT_REPORT}" \
+  HEALTH_LEFT_OVER="$(grep '^health ' <<<"${DRIFT_REPORT}" \
     | sed -E 's/^health ([a-z]+):.*/\1/' | sort -u | tr '\n' ' ' || true)"
   HEALTH_LEFT_OVER="${HEALTH_LEFT_OVER% }"
   if [[ -n "${HEALTH_LEFT_OVER}" ]]; then
     log "drift: [${HEALTH_LEFT_OVER}] unhealthy on the deployed image — not recreated by this re-apply, left for the targeted heal"
   fi
 elif [[ -f "${LAST_DEPLOYED_FILE}" ]] \
-   && grep -qFx "${EXPECTED_MARKER}" "${LAST_DEPLOYED_FILE}"; then
+  && grep -qFx "${EXPECTED_MARKER}" "${LAST_DEPLOYED_FILE}"; then
   DRIFT_REPORT="$(running_stack_drift)"
   if [[ -z "${DRIFT_REPORT}" ]]; then
     if [[ "${CHECK_ONLY}" != "true" ]]; then
@@ -625,12 +632,12 @@ elif [[ -f "${LAST_DEPLOYED_FILE}" ]] \
   else
     while IFS= read -r drift_line; do
       log "drift: ${drift_line#* }"
-    done <<< "${DRIFT_REPORT}"
-    if grep -q '^structural ' <<< "${DRIFT_REPORT}"; then
+    done <<<"${DRIFT_REPORT}"
+    if grep -q '^structural ' <<<"${DRIFT_REPORT}"; then
       DRIFTED=true
       REAPPLY=true
       log "running stack does not match the last-deployed target — re-applying"
-      HEALTH_LEFT_OVER="$(grep '^health ' <<< "${DRIFT_REPORT}" \
+      HEALTH_LEFT_OVER="$(grep '^health ' <<<"${DRIFT_REPORT}" \
         | sed -E 's/^health ([a-z]+):.*/\1/' | sort -u | tr '\n' ' ' || true)"
       HEALTH_LEFT_OVER="${HEALTH_LEFT_OVER% }"
       if [[ -n "${HEALTH_LEFT_OVER}" ]]; then
@@ -657,9 +664,9 @@ if [[ "${CHECK_ONLY}" == "true" ]]; then
   fi
   log "check-only: verifying image signatures (cosign keyless)"
   co_rc=0
-  check_only_verify_one "backend"  "${BACKEND_IMAGE}@${BACKEND_DIGEST}"  || co_rc=1
+  check_only_verify_one "backend" "${BACKEND_IMAGE}@${BACKEND_DIGEST}" || co_rc=1
   check_only_verify_one "frontend" "${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" || co_rc=1
-  check_only_verify_one "ingest"   "${INGEST_IMAGE}@${INGEST_DIGEST}"     || co_rc=1
+  check_only_verify_one "ingest" "${INGEST_IMAGE}@${INGEST_DIGEST}" || co_rc=1
   if [[ -n "${CONFIG_DIGEST}" ]]; then
     check_only_verify_one "config" "${CONFIG_IMAGE}@${CONFIG_DIGEST}" || co_rc=1
   fi
@@ -682,24 +689,24 @@ if [[ "${CHECK_ONLY}" == "true" ]]; then
 fi
 
 if [[ "${HEALTH_DRIFT}" == "true" ]]; then
-  UNHEALTHY_SVCS="$(grep '^health ' <<< "${DRIFT_REPORT}" \
+  UNHEALTHY_SVCS="$(grep '^health ' <<<"${DRIFT_REPORT}" \
     | sed -E 's/^health ([a-z]+):.*/\1/' | sort -u | tr '\n' ' ')"
   UNHEALTHY_SVCS="${UNHEALTHY_SVCS% }"
 
   if [[ -f "${HEALTH_RESTART_FILE}" ]]; then
-    read -r HR_MARKER HR_COUNT HR_EPOCH _ < "${HEALTH_RESTART_FILE}" || true
+    read -r HR_MARKER HR_COUNT HR_EPOCH _ <"${HEALTH_RESTART_FILE}" || true
     if [[ "${HR_MARKER:-}" != "${EXPECTED_MARKER}" ]] \
-       || ! [[ "${HR_COUNT:-}" =~ ^[0-9]+$ ]] || ! [[ "${HR_EPOCH:-}" =~ ^[0-9]+$ ]]; then
+      || ! [[ "${HR_COUNT:-}" =~ ^[0-9]+$ ]] || ! [[ "${HR_EPOCH:-}" =~ ^[0-9]+$ ]]; then
       rm -f "${HEALTH_RESTART_FILE}"
     elif [[ "${FORCE}" == "true" ]]; then
       log "health drift on [${UNHEALTHY_SVCS}]: ${HR_COUNT} prior restart(s) failed; --force — restarting now"
     else
-      hr_backoff=$(( HEALTH_RESTART_BASE * (2 ** (10#${HR_COUNT} - 1)) ))
-      if (( hr_backoff > HEALTH_RESTART_MAX )); then
+      hr_backoff=$((HEALTH_RESTART_BASE * (2 ** (10#${HR_COUNT} - 1))))
+      if ((hr_backoff > HEALTH_RESTART_MAX)); then
         hr_backoff="${HEALTH_RESTART_MAX}"
       fi
-      hr_elapsed=$(( $(date +%s) - 10#${HR_EPOCH} ))
-      if (( hr_elapsed < hr_backoff )); then
+      hr_elapsed=$(($(date +%s) - 10#${HR_EPOCH}))
+      if ((hr_elapsed < hr_backoff)); then
         log "health drift on [${UNHEALTHY_SVCS}]: targeted restart failed ${HR_COUNT}x; in backoff (${hr_elapsed}s/${hr_backoff}s) — skipping tick (--force to retry now)"
         exit 1
       fi
@@ -723,12 +730,12 @@ if [[ "${HEALTH_DRIFT}" == "true" ]]; then
 
   HR_COUNT=1
   if [[ -f "${HEALTH_RESTART_FILE}" ]]; then
-    read -r PREV_HR_MARKER PREV_HR_COUNT _ < "${HEALTH_RESTART_FILE}" || true
+    read -r PREV_HR_MARKER PREV_HR_COUNT _ <"${HEALTH_RESTART_FILE}" || true
     if [[ "${PREV_HR_MARKER:-}" == "${EXPECTED_MARKER}" ]] && [[ "${PREV_HR_COUNT:-}" =~ ^[0-9]+$ ]]; then
-      HR_COUNT=$(( 10#${PREV_HR_COUNT} + 1 ))
+      HR_COUNT=$((10#${PREV_HR_COUNT} + 1))
     fi
   fi
-  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${HR_COUNT}" "$(date +%s)" > "${HEALTH_RESTART_FILE}"
+  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${HR_COUNT}" "$(date +%s)" >"${HEALTH_RESTART_FILE}"
   log "targeted restart of [${UNHEALTHY_SVCS}] did NOT restore health (attempt #${HR_COUNT}) — runtime fault on the deployed release; the release is left in place (no rollback)"
   write_stack_health_metric restart_failed
   exit 1
@@ -736,10 +743,10 @@ fi
 
 if [[ "${REAPPLY}" == "true" ]]; then
   if [[ -f "${REAPPLY_FAILED_FILE}" ]]; then
-    read -r REC_MARKER REC_COUNT REC_EPOCH _ < "${REAPPLY_FAILED_FILE}" || true
+    read -r REC_MARKER REC_COUNT REC_EPOCH _ <"${REAPPLY_FAILED_FILE}" || true
     if [[ "${REC_MARKER:-}" != "${EXPECTED_MARKER}" ]] \
-       || ! [[ "${REC_COUNT:-}" =~ ^[0-9]+$ ]] \
-       || ! [[ "${REC_EPOCH:-}" =~ ^[0-9]+$ ]]; then
+      || ! [[ "${REC_COUNT:-}" =~ ^[0-9]+$ ]] \
+      || ! [[ "${REC_EPOCH:-}" =~ ^[0-9]+$ ]]; then
       rm -f "${REAPPLY_FAILED_FILE}"
     elif [[ "${FORCE}" == "true" ]]; then
       log "re-apply of the deployed release previously failed ${REC_COUNT}x; --force given — retrying now"
@@ -747,8 +754,8 @@ if [[ "${REAPPLY}" == "true" ]]; then
       log "re-apply of the deployed release previously failed ${REC_COUNT}x; --reapply asked for it — retrying now"
     else
       backoff="$(backoff_seconds "${HEALTH_RESTART_BASE}" "${HEALTH_RESTART_MAX}" "${REC_COUNT}")"
-      elapsed=$(( $(date +%s) - 10#${REC_EPOCH} ))
-      if (( elapsed < backoff )); then
+      elapsed=$(($(date +%s) - 10#${REC_EPOCH}))
+      if ((elapsed < backoff)); then
         log "re-apply of the deployed release failed ${REC_COUNT}x; in backoff window (${elapsed}s/${backoff}s) — skipping this tick (deploy.sh --reapply or --force retries now)"
         exit 0
       fi
@@ -756,17 +763,17 @@ if [[ "${REAPPLY}" == "true" ]]; then
     fi
   fi
 elif [[ -f "${FAILED_FILE}" ]]; then
-  read -r REC_MARKER REC_COUNT REC_EPOCH _ < "${FAILED_FILE}" || true
+  read -r REC_MARKER REC_COUNT REC_EPOCH _ <"${FAILED_FILE}" || true
   if [[ "${REC_MARKER:-}" != "${EXPECTED_MARKER}" ]] \
-     || ! [[ "${REC_COUNT:-}" =~ ^[0-9]+$ ]] \
-     || ! [[ "${REC_EPOCH:-}" =~ ^[0-9]+$ ]]; then
+    || ! [[ "${REC_COUNT:-}" =~ ^[0-9]+$ ]] \
+    || ! [[ "${REC_EPOCH:-}" =~ ^[0-9]+$ ]]; then
     rm -f "${FAILED_FILE}"
   elif [[ "${FORCE}" == "true" ]]; then
     log "target previously failed ${REC_COUNT}x; --force given — retrying now"
   else
     backoff="$(backoff_seconds "${BACKOFF_BASE}" "${BACKOFF_MAX}" "${REC_COUNT}")"
-    elapsed=$(( $(date +%s) - 10#${REC_EPOCH} ))
-    if (( elapsed < backoff )); then
+    elapsed=$(($(date +%s) - 10#${REC_EPOCH}))
+    if ((elapsed < backoff)); then
       log "target failed ${REC_COUNT}x; in backoff window (${elapsed}s/${backoff}s) — skipping this tick (promote a fixed image or pass --force)"
       exit 0
     fi
@@ -775,10 +782,10 @@ elif [[ -f "${FAILED_FILE}" ]]; then
 fi
 
 log "verifying image signatures (cosign keyless)"
-verify_digest_or_die "backend"  "${BACKEND_IMAGE}@${BACKEND_DIGEST}"
+verify_digest_or_die "backend" "${BACKEND_IMAGE}@${BACKEND_DIGEST}"
 verify_digest_or_die "frontend" "${FRONTEND_IMAGE}@${FRONTEND_DIGEST}"
-verify_digest_or_die "ingest"   "${INGEST_IMAGE}@${INGEST_DIGEST}"
-[[ -n "${CONFIG_DIGEST}" ]]       && verify_digest_or_die "config"       "${CONFIG_IMAGE}@${CONFIG_DIGEST}"
+verify_digest_or_die "ingest" "${INGEST_IMAGE}@${INGEST_DIGEST}"
+[[ -n "${CONFIG_DIGEST}" ]] && verify_digest_or_die "config" "${CONFIG_IMAGE}@${CONFIG_DIGEST}"
 [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && verify_digest_or_die "keycloak-spi" "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}"
 
 if [[ "${REAPPLY_REQUESTED}" != "true" ]]; then
@@ -829,7 +836,7 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
         rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
         exit 0
       fi
-      echo "${EXPECTED_MARKER}" > "${CONFIG_BLOCKED_FILE}"
+      echo "${EXPECTED_MARKER}" >"${CONFIG_BLOCKED_FILE}"
       log "CARVE-OUT: postgres/Keycloak image pin changed — refusing to auto-apply a stateful-infra upgrade"
       log "  old: $(printf '%s' "${OLD_INFRA}" | tr '\n' ' ')"
       log "  new: $(printf '%s' "${NEW_INFRA}" | tr '\n' ' ')"
@@ -857,7 +864,7 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   fi
   DEPLOY_STEP="apply the config tree"
   if [[ "${REAPPLY}" != "true" ]]; then
-    echo "${EXPECTED_MARKER}" > "${CONFIG_APPLY_INCOMPLETE_FILE}"
+    echo "${EXPECTED_MARKER}" >"${CONFIG_APPLY_INCOMPLETE_FILE}"
   fi
   CONFIG_TREE_TOUCHED=true
   apply_config_tree "${CONFIG_STAGE_DIR}" "${COMPOSE_DIR}"
@@ -874,8 +881,8 @@ UNITS_REDEFINED="${RT_CHANGED_SERVICES}"
 UNITS_RETIRED="${RT_RETIRED_SERVICES}"
 APP_IMAGES_CHANGED=""
 for img_pair in "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
-                "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
-                "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"; do
+  "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
+  "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"; do
   img_bound="$(sed -n 's/^Image=//p' "$(rt_pin_path "${img_pair%%=*}")" 2>/dev/null || true)"
   if [[ "${img_bound}" != "${img_pair#*=}" ]]; then
     APP_IMAGES_CHANGED="${APP_IMAGES_CHANGED}${APP_IMAGES_CHANGED:+ }${img_pair%%=*}"
@@ -907,7 +914,7 @@ RT_PIN_FILE="${PIN_FILE_CURRENT}" rt_pull \
   "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
 if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" && "${REAPPLY}" == "true" && -f "${KEYCLOAK_SPI_JAR}" ]] \
-   && [[ "$(sha256sum < "${KEYCLOAK_SPI_STAGE_JAR}")" == "$(sha256sum < "${KEYCLOAK_SPI_JAR}")" ]]; then
+  && [[ "$(sha256sum <"${KEYCLOAK_SPI_STAGE_JAR}")" == "$(sha256sum <"${KEYCLOAK_SPI_JAR}")" ]]; then
   rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
   KEYCLOAK_SPI_CHANGED=false
   log "--reapply: the live provider JAR is the deployed release's — not swapped, keycloak is not restarted for it"
@@ -937,7 +944,7 @@ if rt_apply_stack; then
     log "keycloak-spi provider JAR applied with the release — keycloak and the application stack are healthy on it"
   fi
 
-  echo "${EXPECTED_MARKER}" > "${LAST_DEPLOYED_FILE}"
+  echo "${EXPECTED_MARKER}" >"${LAST_DEPLOYED_FILE}"
   if [[ "${REAPPLY}" == "true" ]]; then
     rm -f "${REAPPLY_FAILED_FILE}"
     if [[ -f "${FAILED_FILE}" ]] && grep -qF "${EXPECTED_MARKER} " "${FAILED_FILE}"; then
@@ -959,7 +966,7 @@ if rt_apply_stack; then
   if [[ "${BASETOOL_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
     log "applying monitoring stack (non-gating)"
     MONITORING_APPLY_RC=0
-    rt_monitoring_up > "${STATE_DIR}/monitoring-apply.log" 2>&1 || MONITORING_APPLY_RC=$?
+    rt_monitoring_up >"${STATE_DIR}/monitoring-apply.log" 2>&1 || MONITORING_APPLY_RC=$?
     sed 's/^/  monitoring: /' "${STATE_DIR}/monitoring-apply.log" 2>/dev/null || true
     if [[ "${MONITORING_APPLY_RC}" -eq 0 ]]; then
       log "monitoring stack reconciled"
@@ -995,8 +1002,8 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   restore_previous_config_tree
   RESTORE_RC=$?
   set -e
-  if (( RESTORE_RC == 1 )); then
-    echo "${EXPECTED_MARKER}" > "${CONFIG_APPLY_INCOMPLETE_FILE}" || true
+  if ((RESTORE_RC == 1)); then
+    echo "${EXPECTED_MARKER}" >"${CONFIG_APPLY_INCOMPLETE_FILE}" || true
     log "FATAL: the host config tree under ${COMPOSE_DIR} is INCONSISTENT after the rollback — ${CONFIG_PREVIOUS_DIR} is kept as the anchor; the pin is rolled back regardless"
   fi
   rt_use_installed_stack
@@ -1033,7 +1040,7 @@ else
 fi
 
 if [[ "${CONFIG_CHANGED}" == "true" && "${BASETOOL_MONITORING_ENABLED:-false}" == "true" ]] \
-   && rt_monitoring_configured; then
+  && rt_monitoring_configured; then
   mapfile -t ROLLBACK_MONITORING < <(rt_monitoring_services)
   if rt_service_start "${ROLLBACK_MONITORING[@]}"; then
     log "rollback: monitoring units started on the previous definitions [${ROLLBACK_MONITORING[*]}] (non-gating)"

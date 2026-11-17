@@ -19,15 +19,18 @@ tests_failed=0
 LAST_OUTPUT=""
 LAST_STATUS=0
 
-RELEASE_FLAG="$(cat <<'EOF'
+RELEASE_FLAG="$(
+  cat <<'EOF'
                  --certificate-identity-regexp "^https://github\\.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$" \
 EOF
 )"
-MAIN_FLAG="$(cat <<'EOF'
+MAIN_FLAG="$(
+  cat <<'EOF'
                  --certificate-identity-regexp "^https://github\\.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/heads/main$" \
 EOF
 )"
-DEPLOY_DEFAULT="$(cat <<'EOF'
+DEPLOY_DEFAULT="$(
+  cat <<'EOF'
 COSIGN_IDENTITY_REGEXP="${BASETOOL_COSIGN_IDENTITY_REGEXP:-^https://github\\.com/${COSIGN_REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$}"
 EOF
 )"
@@ -46,10 +49,10 @@ fixture() {
   root="$(mktemp -d)"
   mkdir -p "${root}/.github/workflows" "${root}/scripts"
   if [[ -n "$1" ]]; then
-    workflow_with_flag promote "$1" > "${root}/.github/workflows/promote.yml"
+    workflow_with_flag promote "$1" >"${root}/.github/workflows/promote.yml"
   fi
   if [[ -n "$2" ]]; then
-    workflow_with_flag plan "$2" > "${root}/.github/workflows/release-images.yml"
+    workflow_with_flag plan "$2" >"${root}/.github/workflows/release-images.yml"
   fi
   if [[ -n "$3" ]]; then
     {
@@ -58,8 +61,8 @@ fixture() {
 COSIGN_REPO="${BASETOOL_COSIGN_REPO:-krt-profit/basetool}"
 EOF
       printf '%s\n' "$3"
-    } > "${root}/scripts/deploy.sh"
-    printf -- '--certificate-identity-regexp "https://github.com/x/y"\n' > "${root}/scripts/deploy.test.sh"
+    } >"${root}/scripts/deploy.sh"
+    printf -- '--certificate-identity-regexp "https://github.com/x/y"\n' >"${root}/scripts/deploy.test.sh"
   fi
   printf '%s' "${root}"
 }

@@ -23,6 +23,20 @@ dependencyResolutionManagement {
       metadataSources { artifact() }
       content { includeModule("org.nodejs", "node") }
     }
+    ivy {
+      name = "Ruff"
+      setUrl("https://github.com/astral-sh/ruff/releases/download")
+      patternLayout { artifact("[revision]/[artifact]-[classifier].[ext]") }
+      metadataSources { artifact() }
+      content { includeModule("sh.astral", "ruff") }
+    }
+    ivy {
+      name = "shfmt"
+      setUrl("https://github.com/mvdan/sh/releases/download")
+      patternLayout { artifact("v[revision]/[artifact]_v[revision]_[classifier](.[ext])") }
+      metadataSources { artifact() }
+      content { includeModule("cc.mvdan", "shfmt") }
+    }
   }
 }
 

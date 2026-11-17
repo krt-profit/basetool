@@ -142,8 +142,7 @@ def split_sections(lines: list[str]) -> tuple[list[str], int, int, list[str]]:
     the next ``## `` header or ``len(lines)``.
     """
     start = next(
-        (i for i, ln in enumerate(lines)
-         if ln.startswith("## ") and "unreleased" in ln.lower()),
+        (i for i, ln in enumerate(lines) if ln.startswith("## ") and "unreleased" in ln.lower()),
         None,
     )
     if start is None:
@@ -287,8 +286,10 @@ def print_report(entries: list[Entry], anomalies: list[int], dates: DateResolver
         print(describe(tag))
 
     multi = [e for e in entries if len(set(e.tags)) > 1]
-    print(f"\n-- entries whose lines span >1 release tag: {len(multi)} "
-          "(release = earliest; verify these) --")
+    print(
+        f"\n-- entries whose lines span >1 release tag: {len(multi)} "
+        "(release = earliest; verify these) --"
+    )
     for entry in multi[:25]:
         head = entry.text[0][:88] if entry.text else "(empty)"
         print(f"   {entry.release} <= {sorted(set(entry.tags), key=version_key)}  {head}")
@@ -296,8 +297,10 @@ def print_report(entries: list[Entry], anomalies: list[int], dates: DateResolver
         print(f"   ... and {len(multi) - 25} more")
 
     if anomalies:
-        print(f"\n!! {len(anomalies)} non-blank line(s) fell outside any entry "
-              f"(lines: {anomalies[:20]}{' ...' if len(anomalies) > 20 else ''})")
+        print(
+            f"\n!! {len(anomalies)} non-blank line(s) fell outside any entry "
+            f"(lines: {anomalies[:20]}{' ...' if len(anomalies) > 20 else ''})"
+        )
         print("   These would be LOST on --write. Inspect before applying.")
     else:
         print("\nOK: every non-blank line in [Unreleased] was captured by an entry.")
@@ -306,17 +309,23 @@ def print_report(entries: list[Entry], anomalies: list[int], dates: DateResolver
 def main() -> None:
     """Parse args, map entries to releases, and either report or rewrite the file."""
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--repo", default=os.getcwd(), help="Repo root. Default: cwd.")
-    parser.add_argument("--changelog", default=None,
-                        help="Path to CHANGELOG.md. Default: <repo>/CHANGELOG.md.")
-    parser.add_argument("--rev", default="HEAD",
-                        help="Revision to blame the changelog at. Default: HEAD.")
-    parser.add_argument("--repo-url", default=None,
-                        help="GitHub base URL for version links. Default: derived "
-                             "from the 'origin' remote.")
-    parser.add_argument("--write", action="store_true",
-                        help="Rewrite CHANGELOG.md in place (default is a dry run).")
+    parser.add_argument(
+        "--changelog", default=None, help="Path to CHANGELOG.md. Default: <repo>/CHANGELOG.md."
+    )
+    parser.add_argument(
+        "--rev", default="HEAD", help="Revision to blame the changelog at. Default: HEAD."
+    )
+    parser.add_argument(
+        "--repo-url",
+        default=None,
+        help="GitHub base URL for version links. Default: derived from the 'origin' remote.",
+    )
+    parser.add_argument(
+        "--write", action="store_true", help="Rewrite CHANGELOG.md in place (default is a dry run)."
+    )
     args = parser.parse_args()
 
     repo = os.path.abspath(args.repo)
@@ -354,8 +363,7 @@ def main() -> None:
         print("\n(dry run -- re-run with --write to rewrite CHANGELOG.md)")
         return
     if anomalies:
-        sys.exit("\nrefusing to write: uncaptured non-blank lines would be lost "
-                 "(see report above)")
+        sys.exit("\nrefusing to write: uncaptured non-blank lines would be lost (see report above)")
 
     new_text = build_changelog(preamble, tail, entries, dates, repo_url)
     with open(changelog, "w", encoding="utf-8", newline="\n") as handle:

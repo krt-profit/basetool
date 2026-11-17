@@ -1,4 +1,3 @@
-
 @font-face {
     font-family: 'Lato';
     src: url('../fonts/Lato-Light.woff2') format('woff2');
@@ -24,35 +23,35 @@
 }
 
 :root {
-    --color-primary: #E77E23;
+    --color-primary: #e77e23;
     --color-bg-black: #000000;
-    --color-canvas: #0D0F12;
-    --color-bg-dark-gray: #1A1E24;
+    --color-canvas: #0d0f12;
+    --color-bg-dark-gray: #1a1e24;
 
-    --color-accent-light: #EEB64B;
-    --color-accent-dark: #C45C00;
+    --color-accent-light: #eeb64b;
+    --color-accent-dark: #c45c00;
 
-    --color-gray-1: #D7DADE;
-    --color-gray-2: #8F9399;
-    --color-gray-3: #2A3038;
-    --color-gray-4: #1A1E24;
-    --color-surface-input: #14171C;
-    --color-control: #2F3640;
-    --color-gray-2-text: #9AA1AB;
+    --color-gray-1: #d7dade;
+    --color-gray-2: #8f9399;
+    --color-gray-3: #2a3038;
+    --color-gray-4: #1a1e24;
+    --color-surface-input: #14171c;
+    --color-control: #2f3640;
+    --color-gray-2-text: #9aa1ab;
     --radius-control: 6px;
     --radius-box: 10px;
 
-    --color-danger: #A3000A;
-    --color-danger-text: #FF7A70;
-    --color-success: #239E33;
-    --color-warning: #FFD23F;
-    --color-info: #355DDC;
+    --color-danger: #a3000a;
+    --color-danger-text: #ff7a70;
+    --color-success: #239e33;
+    --color-warning: #ffd23f;
+    --color-info: #355ddc;
 
     --font-headline: 'Lato', sans-serif;
     --font-body: 'Lato', sans-serif;
 
     --glow-primary: 0 0 8px rgba(231, 126, 35, 0.25);
-    --glow-danger:  0 0 8px rgba(163, 0, 10, 0.30);
+    --glow-danger: 0 0 8px rgba(163, 0, 10, 0.3);
 }
 
 :root {
@@ -69,26 +68,37 @@
 
 body {
     background-color: var(--color-canvas);
-    background-image:
-        radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%);
+    background-image: radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.1), transparent 55%);
     background-repeat: no-repeat;
     background-attachment: fixed;
 }
 
-html, #app, main, .pf-c-page, .pf-c-page__main, .pf-c-page__main-section,
-.pf-v5-c-page, .pf-v5-c-page__main, .pf-v5-c-page__main-section, 
-.pf-v6-c-page, .pf-v6-c-page__main, .pf-v6-c-page__main-section,
-.keycloak-account-page, [class*="pf-c-background"], [class*="pf-v5-c-background"], [class*="pf-v6-c-background"] {
+html,
+#app,
+main,
+.pf-c-page,
+.pf-c-page__main,
+.pf-c-page__main-section,
+.pf-v5-c-page,
+.pf-v5-c-page__main,
+.pf-v5-c-page__main-section,
+.pf-v6-c-page,
+.pf-v6-c-page__main,
+.pf-v6-c-page__main-section,
+.keycloak-account-page,
+[class*='pf-c-background'],
+[class*='pf-v5-c-background'],
+[class*='pf-v6-c-background'] {
     background-image: none !important;
     background-color: var(--color-bg-dark-gray) !important;
 }
 
-[class*="pf-c-background"]::before,
-[class*="pf-v5-c-background"]::before,
-[class*="pf-v6-c-background"]::before,
-[class*="pf-c-background"]::after,
-[class*="pf-v5-c-background"]::after,
-[class*="pf-v6-c-background"]::after,
+[class*='pf-c-background']::before,
+[class*='pf-v5-c-background']::before,
+[class*='pf-v6-c-background']::before,
+[class*='pf-c-background']::after,
+[class*='pf-v5-c-background']::after,
+[class*='pf-v6-c-background']::after,
 .pf-c-background-image::before,
 .pf-v5-c-background-image::before,
 .pf-v6-c-background-image::before {
@@ -103,14 +113,14 @@ html, #app, main, .pf-c-page, .pf-c-page__main, .pf-c-page__main-section,
     --pf-c-background-image--BackgroundImage-sm-2x: none !important;
     --pf-c-background-image--BackgroundImage-lg: none !important;
     --pf-c-background-image--Filter: none !important;
-    
+
     --pf-v5-c-background-image--BackgroundImage: none !important;
     --pf-v5-c-background-image--BackgroundImage-2x: none !important;
     --pf-v5-c-background-image--BackgroundImage-sm: none !important;
     --pf-v5-c-background-image--BackgroundImage-sm-2x: none !important;
     --pf-v5-c-background-image--BackgroundImage-lg: none !important;
     --pf-v5-c-background-image--Filter: none !important;
-    
+
     --pf-v6-c-background-image--BackgroundImage: none !important;
     --pf-v6-c-background-image--BackgroundImage-2x: none !important;
     --pf-v6-c-background-image--BackgroundImage-sm: none !important;
@@ -119,7 +129,14 @@ html, #app, main, .pf-c-page, .pf-c-page__main, .pf-c-page__main-section,
     --pf-v6-c-background-image--Filter: none !important;
 }
 
-h1, h2, h3, h4, h5, h6, .pf-v5-c-title, .pf-v6-c-title {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.pf-v5-c-title,
+.pf-v6-c-title {
     font-family: var(--font-headline) !important;
     color: var(--color-primary) !important;
     text-transform: uppercase !important;
@@ -127,16 +144,19 @@ h1, h2, h3, h4, h5, h6, .pf-v5-c-title, .pf-v6-c-title {
     font-weight: 700 !important;
 }
 
-a, .pf-v5-c-button--m-link {
+a,
+.pf-v5-c-button--m-link {
     color: var(--color-primary) !important;
     text-decoration: none !important;
 }
 
-a:hover, .pf-v5-c-button--m-link:hover {
+a:hover,
+.pf-v5-c-button--m-link:hover {
     color: var(--color-accent-light) !important;
 }
 
-.pf-v5-c-nav__link, .pf-v6-c-nav__link {
+.pf-v5-c-nav__link,
+.pf-v6-c-nav__link {
     color: var(--color-gray-1) !important;
     font-family: var(--font-headline) !important;
     font-weight: 700 !important;
@@ -150,7 +170,8 @@ a:hover, .pf-v5-c-button--m-link:hover {
 .pf-v6-c-nav__item.pf-m-current > .pf-v6-c-nav__link,
 .pf-v5-c-nav__link.pf-m-current,
 .pf-v6-c-nav__link.pf-m-current,
-.pf-v5-c-nav__link:hover, .pf-v6-c-nav__link:hover {
+.pf-v5-c-nav__link:hover,
+.pf-v6-c-nav__link:hover {
     color: var(--color-primary) !important;
     background-color: var(--color-control) !important;
     border-left: 3px solid var(--color-primary) !important;
@@ -164,12 +185,14 @@ a:hover, .pf-v5-c-button--m-link:hover {
     display: none !important;
 }
 
-.pf-v5-c-page__sidebar, .pf-v6-c-page__sidebar {
+.pf-v5-c-page__sidebar,
+.pf-v6-c-page__sidebar {
     background-color: var(--color-bg-dark-gray) !important;
     border-right: 1px solid var(--color-gray-3) !important;
 }
 
-.pf-v5-c-form, .pf-v6-c-form {
+.pf-v5-c-form,
+.pf-v6-c-form {
     background-color: var(--color-bg-dark-gray) !important;
     border: 1px solid var(--color-gray-3) !important;
     border-top: 3px solid var(--color-primary) !important;
@@ -180,8 +203,10 @@ a:hover, .pf-v5-c-button--m-link:hover {
     margin-bottom: 30px !important;
 }
 
-.pf-v5-c-form::before, .pf-v5-c-form::after, 
-.pf-v6-c-form::before, .pf-v6-c-form::after {
+.pf-v5-c-form::before,
+.pf-v5-c-form::after,
+.pf-v6-c-form::before,
+.pf-v6-c-form::after {
     content: '' !important;
     position: absolute !important;
     width: 15px !important;
@@ -189,28 +214,42 @@ a:hover, .pf-v5-c-button--m-link:hover {
     border: 2px solid var(--color-primary) !important;
     pointer-events: none !important;
 }
-.pf-v5-c-form::before, .pf-v6-c-form::before {
-    top: -2px !important; left: -2px !important;
-    border-right: none !important; border-bottom: none !important;
+.pf-v5-c-form::before,
+.pf-v6-c-form::before {
+    top: -2px !important;
+    left: -2px !important;
+    border-right: none !important;
+    border-bottom: none !important;
     border-top-left-radius: var(--radius-box) !important;
 }
-.pf-v5-c-form::after, .pf-v6-c-form::after {
-    bottom: -2px !important; right: -2px !important;
-    border-left: none !important; border-top: none !important;
+.pf-v5-c-form::after,
+.pf-v6-c-form::after {
+    bottom: -2px !important;
+    right: -2px !important;
+    border-left: none !important;
+    border-top: none !important;
     border-bottom-right-radius: var(--radius-box) !important;
 }
 
-.pf-v5-c-form__label, .pf-v6-c-form__label {
+.pf-v5-c-form__label,
+.pf-v6-c-form__label {
     color: var(--color-gray-1) !important;
     text-transform: uppercase !important;
     font-size: 0.85em !important;
     letter-spacing: 1px !important;
 }
 
-.pf-v5-c-form-control, .pf-v6-c-form-control,
-.pf-v5-c-form-control input, .pf-v6-c-form-control input,
-.pf-v5-c-text-input, .pf-v6-c-text-input,
-input[type="text"], input[type="email"], input[type="password"], textarea, select {
+.pf-v5-c-form-control,
+.pf-v6-c-form-control,
+.pf-v5-c-form-control input,
+.pf-v6-c-form-control input,
+.pf-v5-c-text-input,
+.pf-v6-c-text-input,
+input[type='text'],
+input[type='email'],
+input[type='password'],
+textarea,
+select {
     background-color: var(--color-control) !important;
     border: 1px solid var(--color-gray-2) !important;
     border-bottom: 2px solid var(--color-primary) !important;
@@ -220,13 +259,19 @@ input[type="text"], input[type="email"], input[type="password"], textarea, selec
     border-radius: var(--radius-control) !important;
 }
 
-.pf-v5-c-form-control:focus, .pf-v6-c-form-control:focus,
-input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
+.pf-v5-c-form-control:focus,
+.pf-v6-c-form-control:focus,
+input[type='text']:focus,
+input[type='email']:focus,
+input[type='password']:focus,
+textarea:focus,
+select:focus {
     border-color: var(--color-primary) !important;
     box-shadow: 0 0 8px rgba(231, 126, 35, 0.2) !important;
 }
 
-.pf-v5-c-button.pf-m-primary, .pf-v6-c-button.pf-m-primary {
+.pf-v5-c-button.pf-m-primary,
+.pf-v6-c-button.pf-m-primary {
     background-color: var(--color-primary) !important;
     color: var(--color-bg-black) !important;
     font-family: var(--font-headline) !important;
@@ -239,11 +284,13 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     box-shadow: var(--glow-primary) !important;
 }
 
-.pf-v5-c-button.pf-m-primary:hover, .pf-v6-c-button.pf-m-primary:hover {
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-v6-c-button.pf-m-primary:hover {
     background-color: var(--color-accent-light) !important;
 }
 
-.pf-v5-c-button.pf-m-secondary, .pf-v6-c-button.pf-m-secondary {
+.pf-v5-c-button.pf-m-secondary,
+.pf-v6-c-button.pf-m-secondary {
     background-color: transparent !important;
     color: var(--color-primary) !important;
     border: 1px solid var(--color-primary) !important;
@@ -254,17 +301,20 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     letter-spacing: 1px !important;
 }
 
-.pf-v5-c-button.pf-m-secondary:hover, .pf-v6-c-button.pf-m-secondary:hover {
+.pf-v5-c-button.pf-m-secondary:hover,
+.pf-v6-c-button.pf-m-secondary:hover {
     background-color: rgba(231, 126, 35, 0.1) !important;
 }
 
-.pf-v5-c-card, .pf-v6-c-card {
+.pf-v5-c-card,
+.pf-v6-c-card {
     background-color: var(--color-bg-dark-gray) !important;
     border: 1px solid var(--color-gray-3) !important;
     border-radius: var(--radius-box) !important;
 }
 
-.pf-v5-c-page__header, .pf-v6-c-page__header {
+.pf-v5-c-page__header,
+.pf-v6-c-page__header {
     background-color: var(--color-surface-input) !important;
     border-bottom: 2px solid var(--color-primary) !important;
 }
@@ -289,9 +339,9 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     color: var(--color-danger-text) !important;
 }
 
-input[aria-invalid="true"],
-textarea[aria-invalid="true"],
-select[aria-invalid="true"],
+input[aria-invalid='true'],
+textarea[aria-invalid='true'],
+select[aria-invalid='true'],
 .pf-c-form-control.pf-m-error,
 .pf-v5-c-form-control.pf-m-error,
 .pf-v6-c-form-control.pf-m-error,
@@ -305,7 +355,7 @@ select[aria-invalid="true"],
 .pf-v5-c-button:focus-visible,
 .pf-v6-c-button:focus-visible,
 a:focus-visible,
-input[type="checkbox"]:focus-visible,
+input[type='checkbox']:focus-visible,
 .pf-v5-c-check__input:focus-visible,
 .pf-v6-c-check__input:focus-visible,
 .pf-v5-c-nav__link:focus-visible,

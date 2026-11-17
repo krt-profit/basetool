@@ -42,8 +42,8 @@ commit_all() {
 run_checker() {
   local repo="$1" base_ref="$2" rc=0
   LAST_OUTPUT="$(
-    cd "$repo" &&
-      FLYWAY_MIGRATION_DIR="$MIG_SUBDIR" FLYWAY_BASE_REF="$base_ref" \
+    cd "$repo" \
+      && FLYWAY_MIGRATION_DIR="$MIG_SUBDIR" FLYWAY_BASE_REF="$base_ref" \
         bash "$CHECKER" 2>&1
   )" || rc=$?
   return "$rc"

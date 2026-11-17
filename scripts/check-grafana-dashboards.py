@@ -55,11 +55,13 @@ def overlapping(panels):
     for panel in panels or []:
         pos = panel.get("gridPos") or {}
         if all(isinstance(pos.get(k), int) for k in ("x", "y", "w", "h")):
-            placed.append((panel.get("id"), pos["x"], pos["y"], pos["x"] + pos["w"], pos["y"] + pos["h"]))
+            placed.append(
+                (panel.get("id"), pos["x"], pos["y"], pos["x"] + pos["w"], pos["y"] + pos["h"])
+            )
         if panel.get("type") == "row" and panel.get("collapsed"):
             yield from overlapping(panel.get("panels"))
     for i, (a, ax0, ay0, ax1, ay1) in enumerate(placed):
-        for b, bx0, by0, bx1, by1 in placed[i + 1:]:
+        for b, bx0, by0, bx1, by1 in placed[i + 1 :]:
             if ax0 < bx1 and bx0 < ax1 and ay0 < by1 and by0 < ay1:
                 yield a, b
 
@@ -105,7 +107,9 @@ def main() -> int:
         try:
             doc = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            problems.append("%s: not valid UTF-8 JSON -- Grafana will skip it silently (%s)" % (name, exc))
+            problems.append(
+                "%s: not valid UTF-8 JSON -- Grafana will skip it silently (%s)" % (name, exc)
+            )
             continue
 
         uid, title = doc.get("uid"), doc.get("title")

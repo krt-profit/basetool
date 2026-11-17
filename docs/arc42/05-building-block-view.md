@@ -461,7 +461,8 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
 - **`build-logic`** — an included build, not a module of the product and never shipped: the
   `basetool.*` precompiled convention plugins (toolchain, annotation wiring, test and compile
   conventions, Checkstyle, Spotless, JaCoCo, PIT, SpotBugs, CycloneDX, Licensee, Spring Boot and
-  dependency management, Error Prone) that every module applies by id, the typed `basetool { }`
+  dependency management, Error Prone) that every module applies by id, the root project's formatter
+  conventions with the verified Ruff and shfmt binaries (REQ-OPS-058), the typed `basetool { }`
   extension and the reader of each module's `build-settings.properties` (REQ-OPS-046, ADR-0248). It is
   the place a Gradle module extracted later (plan §5.8) gets its conventions from. A library module of
   an application is named `<app>-<name>`: the image plan, the SBOM check and the application's JaCoCo

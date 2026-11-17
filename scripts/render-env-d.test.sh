@@ -16,8 +16,14 @@ fi
 PASSED=0
 FAILED=0
 say() { printf '%s\n' "$*"; }
-ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
-bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
+ok() {
+  PASSED=$((PASSED + 1))
+  printf '  ok    %s\n' "$*"
+}
+bad() {
+  FAILED=$((FAILED + 1))
+  printf '  FAIL  %s\n' "$*"
+}
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/render-env-d-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
@@ -25,8 +31,8 @@ trap 'rm -rf "$WORK"' EXIT
 scenario() {
   SC_DIR="${WORK}/$1"
   mkdir -p "${SC_DIR}/tmpl" "${SC_DIR}/out"
-  printf '%s\n' "$2" > "${SC_DIR}/env"
-  printf '%s\n' "$3" > "${SC_DIR}/tmpl/svc.env.tmpl"
+  printf '%s\n' "$2" >"${SC_DIR}/env"
+  printf '%s\n' "$3" >"${SC_DIR}/tmpl/svc.env.tmpl"
 }
 
 render() { "$PY" "$RENDERER" --env "${SC_DIR}/env" --templates "${SC_DIR}/tmpl" --out "${SC_DIR}/out" "$@"; }
@@ -48,13 +54,13 @@ expect_line() {
 
 say ""
 say "== interpolation semantics, as compose defines them =="
-expect_line "plain_reference"        'A=yes'            'K=${A}'                      'K=yes'
-expect_line "unset_is_empty"         'A=yes'            'K=${MISSING}'                'K='
-expect_line "default_when_unset"     'A=yes'            'K=${MISSING:-fallback}'      'K=fallback'
-expect_line "colon_dash_takes_empty" 'E='               'K=${E:-fallback}'            'K=fallback'
-expect_line "bare_dash_keeps_empty"  'E='               'K=${E-fallback}'             'K='
-expect_line "set_beats_default"      'A=yes'            'K=${A:-fallback}'            'K=yes'
-expect_line "embedded_in_a_string"   'A=yes'            'K=pre-${A}-post'             'K=pre-yes-post'
+expect_line "plain_reference" 'A=yes' 'K=${A}' 'K=yes'
+expect_line "unset_is_empty" 'A=yes' 'K=${MISSING}' 'K='
+expect_line "default_when_unset" 'A=yes' 'K=${MISSING:-fallback}' 'K=fallback'
+expect_line "colon_dash_takes_empty" 'E=' 'K=${E:-fallback}' 'K=fallback'
+expect_line "bare_dash_keeps_empty" 'E=' 'K=${E-fallback}' 'K='
+expect_line "set_beats_default" 'A=yes' 'K=${A:-fallback}' 'K=yes'
+expect_line "embedded_in_a_string" 'A=yes' 'K=pre-${A}-post' 'K=pre-yes-post'
 
 expect_line "nested_default" \
   'H=https://x.example/auth' \
@@ -65,8 +71,8 @@ expect_line "nested_default_all_unset" \
   'K=${ISS:-${H:-https://fallback/auth}/realms/basetool}' \
   'K=https://fallback/auth/realms/basetool'
 
-expect_line "dollar_in_value"        'P=aa$bb-cc'       'K=${P}'                      'K=aa$bb-cc'
-expect_line "quotes_are_stripped"    'P="quoted"'       'K=${P}'                      'K=quoted'
+expect_line "dollar_in_value" 'P=aa$bb-cc' 'K=${P}' 'K=aa$bb-cc'
+expect_line "quotes_are_stripped" 'P="quoted"' 'K=${P}' 'K=quoted'
 
 say ""
 say "== a required variable that is missing stops everything =="
@@ -122,7 +128,7 @@ scenario "header_survives" 'A=yes' "${HEADER}
 K=\${A}"
 if render >/dev/null 2>&1; then
   if rendered | grep -qF 'a ${NAME:-default} keeps its default' \
-     && rendered | grep -qF 'a ${NAME:?...} must be set'; then
+    && rendered | grep -qF 'a ${NAME:?...} must be set'; then
     ok "header_survives: the comment's own examples are untouched"
   else
     bad "header_survives: the header was interpolated -- its examples were mangled"
@@ -141,7 +147,7 @@ if render --check >/dev/null 2>&1; then
 else
   bad "check_detects_drift: reported drift against its own output"
 fi
-printf 'K=tampered\n' > "${SC_DIR}/out/svc.env"
+printf 'K=tampered\n' >"${SC_DIR}/out/svc.env"
 if render --check >/dev/null 2>&1; then
   bad "check_detects_drift: did not notice a tampered file"
 else
@@ -164,9 +170,9 @@ say ""
 say "== one file per service, which is what keeps the allow-list closed =="
 SC_DIR="${WORK}/per_service"
 mkdir -p "${SC_DIR}/tmpl" "${SC_DIR}/out"
-printf 'SHARED=s\nONLY_A=a\n' > "${SC_DIR}/env"
-printf 'K=${SHARED}\nSECRET=${ONLY_A}\n' > "${SC_DIR}/tmpl/alpha.env.tmpl"
-printf 'K=${SHARED}\n'                   > "${SC_DIR}/tmpl/beta.env.tmpl"
+printf 'SHARED=s\nONLY_A=a\n' >"${SC_DIR}/env"
+printf 'K=${SHARED}\nSECRET=${ONLY_A}\n' >"${SC_DIR}/tmpl/alpha.env.tmpl"
+printf 'K=${SHARED}\n' >"${SC_DIR}/tmpl/beta.env.tmpl"
 if render >/dev/null 2>&1; then
   if [[ -f "${SC_DIR}/out/alpha.env" && -f "${SC_DIR}/out/beta.env" ]]; then
     ok "per_service: one output file per template"
@@ -183,7 +189,8 @@ else
 fi
 
 probe="${WORK}/mode-probe"
-: > "$probe"; chmod 640 "$probe" 2>/dev/null
+: >"$probe"
+chmod 640 "$probe" 2>/dev/null
 if [[ "$(stat -c '%a' "$probe" 2>/dev/null)" == "640" ]]; then
   actual="$(stat -c '%a' "${SC_DIR}/out/alpha.env" 2>/dev/null)"
   if [[ "$actual" == "640" ]]; then
@@ -198,7 +205,7 @@ fi
 say ""
 say "== a retired service's rendered secrets do not stay on the host =="
 scenario "stale" 'A=yes' 'K=${A}'
-printf 'OLD_SECRET=leftover\n' > "${SC_DIR}/out/retired.env"
+printf 'OLD_SECRET=leftover\n' >"${SC_DIR}/out/retired.env"
 
 if render --check >/dev/null 2>"${SC_DIR}/check.err"; then
   bad "stale: --check reported success with an orphaned retired.env present"
@@ -210,7 +217,7 @@ else
   fi
 fi
 
-printf 'keep me\n' > "${SC_DIR}/out/notes.txt"
+printf 'keep me\n' >"${SC_DIR}/out/notes.txt"
 render >"${SC_DIR}/write.out" 2>&1
 if [[ -e "${SC_DIR}/out/retired.env" ]]; then
   bad "stale: a plain run left retired.env behind"
@@ -239,33 +246,33 @@ scenario "readonly" 'A=yes' 'K=${A}'
 render >/dev/null 2>&1
 chmod 0400 "${SC_DIR}/out/svc.env"
 case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*)
+  MINGW* | MSYS* | CYGWIN*)
     say "  skip  readonly target - os.replace over a read-only file is denied on Windows"
     chmod 0640 "${SC_DIR}/out/svc.env"
     ;;
   *)
-if : > "${SC_DIR}/out/svc.env" 2>/dev/null; then
-  say "  skip  readonly target - running as a user that ignores mode bits (root?)"
-  chmod 0640 "${SC_DIR}/out/svc.env"
-else
-  if render >"${SC_DIR}/ro.out" 2>&1; then
-    ok "readonly: a 0400 svc.env is replaced rather than opened"
-  else
-    bad "readonly: render failed on a 0400 target: $(cat "${SC_DIR}/ro.out")"
-  fi
-  if grep -q 'K=yes' "${SC_DIR}/out/svc.env" 2>/dev/null; then
-    ok "readonly: and the new content is what landed"
-  else
-    bad "readonly: the file was not updated: $(cat "${SC_DIR}/out/svc.env" 2>/dev/null)"
-  fi
-  if [[ "$(stat -c '%a' "$probe" 2>/dev/null)" != "640" ]]; then
-    say "  skip  readonly mode: this filesystem cannot express Unix modes"
-  elif [[ "$(stat -c '%a' "${SC_DIR}/out/svc.env")" == "640" ]]; then
-    ok "readonly: the replacement carries the requested mode, not the old one"
-  else
-    bad "readonly: mode is $(stat -c '%a' "${SC_DIR}/out/svc.env"), expected 640"
-  fi
-fi
+    if : >"${SC_DIR}/out/svc.env" 2>/dev/null; then
+      say "  skip  readonly target - running as a user that ignores mode bits (root?)"
+      chmod 0640 "${SC_DIR}/out/svc.env"
+    else
+      if render >"${SC_DIR}/ro.out" 2>&1; then
+        ok "readonly: a 0400 svc.env is replaced rather than opened"
+      else
+        bad "readonly: render failed on a 0400 target: $(cat "${SC_DIR}/ro.out")"
+      fi
+      if grep -q 'K=yes' "${SC_DIR}/out/svc.env" 2>/dev/null; then
+        ok "readonly: and the new content is what landed"
+      else
+        bad "readonly: the file was not updated: $(cat "${SC_DIR}/out/svc.env" 2>/dev/null)"
+      fi
+      if [[ "$(stat -c '%a' "$probe" 2>/dev/null)" != "640" ]]; then
+        say "  skip  readonly mode: this filesystem cannot express Unix modes"
+      elif [[ "$(stat -c '%a' "${SC_DIR}/out/svc.env")" == "640" ]]; then
+        ok "readonly: the replacement carries the requested mode, not the old one"
+      else
+        bad "readonly: mode is $(stat -c '%a' "${SC_DIR}/out/svc.env"), expected 640"
+      fi
+    fi
     ;;
 esac
 if find "${SC_DIR}/out" -maxdepth 1 -name '.*.tmp' | grep -q .; then

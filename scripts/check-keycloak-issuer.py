@@ -144,7 +144,10 @@ SCENARIOS = [
         "prod-issuer-override",
         [BASE],
         "prod",
-        {"BASETOOL_KEYCLOAK_HOSTNAME": FAKE_BASE, "BASETOOL_KEYCLOAK_ISSUER_URI": FAKE_ISSUER_OVERRIDE},
+        {
+            "BASETOOL_KEYCLOAK_HOSTNAME": FAKE_BASE,
+            "BASETOOL_KEYCLOAK_ISSUER_URI": FAKE_ISSUER_OVERRIDE,
+        },
         FAKE_ISSUER_OVERRIDE,
         "the explicit issuer still wins, for a deployment where the two genuinely differ",
         enforce_pair=False,
@@ -388,7 +391,14 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
             "under %r and ADVERTISE issuer links under %r, report healthy, and the apps would die "
             "at start-up on 'The Issuer ... did not match the requested issuer' -- which reads as a "
             "backend fault (ADR-0166)."
-            % (scenario.name, hostname, host_path or "/", relative_path, rel or "/", host_path or "/")
+            % (
+                scenario.name,
+                hostname,
+                host_path or "/",
+                relative_path,
+                rel or "/",
+                host_path or "/",
+            )
         )
 
     if not scenario.enforce_pair:
@@ -524,7 +534,9 @@ def check_monitoring_oidc(root: Path, problems: list) -> str:
                     "their tokens, and the login fails with nothing wrong in any log."
                     % (label, key, actual, base, REALM, expected)
                 )
-    return "monitoring-oidc: %d Grafana endpoint(s) follow the issuer, defaults and override" % checked
+    return (
+        "monitoring-oidc: %d Grafana endpoint(s) follow the issuer, defaults and override" % checked
+    )
 
 
 def check_prometheus_targets(root: Path, problems: list) -> str:
@@ -542,7 +554,9 @@ def check_prometheus_targets(root: Path, problems: list) -> str:
     """
     path = root / PROMETHEUS
     if not path.exists():
-        problems.append("prometheus-targets: %s does not exist -- the file list is stale" % PROMETHEUS)
+        problems.append(
+            "prometheus-targets: %s does not exist -- the file list is stale" % PROMETHEUS
+        )
         return "prometheus-targets: MISSING"
 
     identity_path = norm_path(urlsplit(PROD_BASE).path)

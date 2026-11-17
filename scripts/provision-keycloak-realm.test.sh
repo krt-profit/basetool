@@ -16,7 +16,10 @@ if [[ ! -f "$PROVISIONER" ]]; then
 fi
 
 PYTHON="${PYTHON:-python3}"
-command -v "$PYTHON" >/dev/null 2>&1 || { echo "FATAL: ${PYTHON} not found" >&2; exit 1; }
+command -v "$PYTHON" >/dev/null 2>&1 || {
+  echo "FATAL: ${PYTHON} not found" >&2
+  exit 1
+}
 
 tests_run=0
 tests_failed=0
@@ -459,7 +462,8 @@ to_child_path() {
 }
 
 run_provisioner() {
-  local state="$1"; shift
+  local state="$1"
+  shift
   local rc=0
   : >"${state}/calls.log"
   KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --realm basetool --public-origin "$ORIGIN" \
@@ -484,7 +488,10 @@ print(eval(os.environ["EXPR"]))
 '
 }
 
-pass() { tests_run=$((tests_run + 1)); printf '  ok   %s\n' "$1"; }
+pass() {
+  tests_run=$((tests_run + 1))
+  printf '  ok   %s\n' "$1"
+}
 fail() {
   tests_run=$((tests_run + 1))
   tests_failed=$((tests_failed + 1))
@@ -496,7 +503,8 @@ fail() {
 assert_eq() {
   local actual="$1" expected="$2" label="$3"
   if [[ "$actual" == "$expected" ]]; then pass "$label"; else
-    fail "$label" "expected [${expected}], got [${actual}]"; fi
+    fail "$label" "expected [${expected}], got [${actual}]"
+  fi
 }
 
 assert_contains() {
@@ -641,8 +649,8 @@ assert_eq "$(query "$state" "[p['name'] for p in d['profiles']['profiles']]")" \
 policy_line="$(grep -n '^update client-policies/policies$' "${state}/calls.log" | head -1 | cut -d: -f1)"
 profile_line="$(grep -n '^update client-policies/profiles$' "${state}/calls.log" | head -1 | cut -d: -f1)"
 delete_line="$(grep -n '^delete clients/c-android$' "${state}/calls.log" | head -1 | cut -d: -f1)"
-if [[ -n "$policy_line" && -n "$profile_line" && -n "$delete_line" \
-      && "$policy_line" -lt "$profile_line" && "$profile_line" -lt "$delete_line" ]]; then
+if [[ -n "$policy_line" && -n "$profile_line" && -n "$delete_line" &&
+  "$policy_line" -lt "$profile_line" && "$profile_line" -lt "$delete_line" ]]; then
   pass "policy detach < profile removal < client delete"
 else
   fail "policy detach < profile removal < client delete" \
@@ -785,7 +793,8 @@ assert_eq "$(query "$state" "'kc-admin-api' in scope_names('default', 'backend-s
 assert_eq "$(query "$state" "'kc-admin-api' in scope_names('optional', 'backend-service')")" \
   "False" "an optional Admin API scope is moved to default for client credentials"
 if [[ -e "${state}/SECRET_SENT_BACK" ]]; then fail "no client secret is sent back in an update"; else
-  pass "no client secret is sent back in an update"; fi
+  pass "no client secret is sent back in an update"
+fi
 assert_not_contains "$output" "$SECRET_MARKER" "the existing secret is never printed"
 assert_not_contains "$(cat "${state}/bodies.log")" "$SECRET_MARKER" "the existing secret is in no payload"
 rm -rf "$state"
@@ -1301,7 +1310,7 @@ for flavour in empty testing; do
   for mode in dry-run apply; do
     state="$(mktemp -d)"
     make_stub "$state" "$flavour"
-STUB_STATE="$state" "$PYTHON" -c '
+    STUB_STATE="$state" "$PYTHON" -c '
 import json, os, pathlib
 p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
 d = json.loads(p.read_text(encoding="utf-8"))

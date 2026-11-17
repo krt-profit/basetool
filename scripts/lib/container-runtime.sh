@@ -45,7 +45,10 @@ rt_die() {
 rt_detect() {
   if [[ -n "${RT_BACKEND}" ]]; then
     case "${RT_BACKEND}" in
-      podman) RT_CLI="${RT_CLI:-podman}"; RT_SYSTEMCTL="${RT_SYSTEMCTL:-systemctl --user}" ;;
+      podman)
+        RT_CLI="${RT_CLI:-podman}"
+        RT_SYSTEMCTL="${RT_SYSTEMCTL:-systemctl --user}"
+        ;;
       *) rt_die "RT_BACKEND=${RT_BACKEND} is not podman -- the Docker runtime was retired on 2026-09-22" ;;
     esac
     return 0
@@ -56,7 +59,7 @@ rt_detect() {
     local me
     me="$(id -un 2>/dev/null || true)"
     if [[ -n "${me}" && -e "${RT_LINGER_DIR}/${me}" ]] \
-       && podman ps --format '{{.Names}}' >/dev/null 2>&1; then
+      && podman ps --format '{{.Names}}' >/dev/null 2>&1; then
       RT_CLI=podman
       RT_SYSTEMCTL="systemctl --user"
       RT_HOST_SYSTEMCTL="${RT_HOST_SYSTEMCTL:-systemctl}"
@@ -77,8 +80,8 @@ rt_detect() {
       fi
     done
     local why=""
-    (( RT_RUNTIME_WAITED > 0 )) && why+=", after waiting ${RT_RUNTIME_WAITED}s for the service user's runtime under ${RT_RUNTIME_BASE} to come up"
-    if (( RT_RUNTIME_WAITED > 0 && RT_RUNTIME_SEEN == 0 )); then
+    ((RT_RUNTIME_WAITED > 0)) && why+=", after waiting ${RT_RUNTIME_WAITED}s for the service user's runtime under ${RT_RUNTIME_BASE} to come up"
+    if ((RT_RUNTIME_WAITED > 0 && RT_RUNTIME_SEEN == 0)); then
       why+="; it never became visible to this process -- a unit that starts before user@<uid>.service never sees it (the 20-service-user.conf ordering drop-in, ansible/roles/basetool_host/tasks/25-scripts.yml)"
     fi
     [[ -n "${RT_PROBE_ERROR}" ]] && why+="; podman said: ${RT_PROBE_ERROR}"
@@ -102,30 +105,30 @@ rt_probe_service_user() {
     if rt_runtime_visible "${uid}"; then
       RT_RUNTIME_SEEN=1
       if err="$(sudo -n -u "${u}" podman ps --format '{{.Names}}' 2>&1 >/dev/null)"; then
-        (( waited > 0 )) && echo "container-runtime: ${u}'s runtime answered after ${waited}s" >&2
+        ((waited > 0)) && echo "container-runtime: ${u}'s runtime answered after ${waited}s" >&2
         return 0
       fi
       err="${err%$'\n'}"
       RT_PROBE_ERROR="${err##*$'\n'}"
       state="$(sudo -n -u "${u}" XDG_RUNTIME_DIR="${RT_RUNTIME_BASE}/${uid}" systemctl --user is-system-running 2>/dev/null)" || true
       case "${state}" in
-        initializing|starting|"") ;;
+        initializing | starting | "") ;;
         *) return 1 ;;
       esac
     fi
-    (( waited >= RT_RUNTIME_WAIT )) && return 1
+    ((waited >= RT_RUNTIME_WAIT)) && return 1
     if [[ -z "${announced}" ]]; then
       announced=1
-      if (( RT_RUNTIME_SEEN )); then
+      if ((RT_RUNTIME_SEEN)); then
         echo "container-runtime: ${u}'s manager is '${state:-not answering}' and its runtime refuses yet --" \
-             "waiting up to ${RT_RUNTIME_WAIT}s for its first container" >&2
+          "waiting up to ${RT_RUNTIME_WAIT}s for its first container" >&2
       else
         echo "container-runtime: ${u} lingers but its runtime ${RT_RUNTIME_BASE}/${uid} is not up yet --" \
-             "waiting up to ${RT_RUNTIME_WAIT}s for its manager to start" >&2
+          "waiting up to ${RT_RUNTIME_WAIT}s for its manager to start" >&2
       fi
     fi
     sleep "${RT_POLL_INTERVAL}"
-    waited=$(( waited + RT_POLL_INTERVAL ))
+    waited=$((waited + RT_POLL_INTERVAL))
     RT_RUNTIME_WAITED=${waited}
   done
 }
@@ -135,18 +138,19 @@ rt_wait_for_startup() {
   while :; do
     state="$(${RT_SYSTEMCTL} is-system-running 2>/dev/null)" || true
     case "${state}" in
-      running|degraded)
-        (( waited > 0 )) && echo "container-runtime: the service user's manager is ${state} after ${waited}s" >&2
-        return 0 ;;
-      initializing|starting|"") ;;
+      running | degraded)
+        ((waited > 0)) && echo "container-runtime: the service user's manager is ${state} after ${waited}s" >&2
+        return 0
+        ;;
+      initializing | starting | "") ;;
       *) rt_die "the service user's manager reports '${state}' -- refusing to start a maintenance job now" ;;
     esac
-    if (( waited >= RT_STARTUP_WAIT )); then
+    if ((waited >= RT_STARTUP_WAIT)); then
       rt_die "the service user's manager was still '${state:-not answering}' after ${RT_STARTUP_WAIT}s -- refusing to run against a stack that has not finished starting"
     fi
-    (( waited == 0 )) && echo "container-runtime: the service user's manager is '${state:-not answering}' -- waiting up to ${RT_STARTUP_WAIT}s for its startup to finish" >&2
+    ((waited == 0)) && echo "container-runtime: the service user's manager is '${state:-not answering}' -- waiting up to ${RT_STARTUP_WAIT}s for its startup to finish" >&2
     sleep "${RT_POLL_INTERVAL}"
-    waited=$(( waited + RT_POLL_INTERVAL ))
+    waited=$((waited + RT_POLL_INTERVAL))
   done
 }
 
@@ -168,9 +172,9 @@ rt_image_revision() {
 
 rt_login() {
   local registry="$1" user="$2" pwfile="$3"
-  ${RT_CLI} login "${registry}" --username "${user}" --password-stdin < "${pwfile}" || return 1
+  ${RT_CLI} login "${registry}" --username "${user}" --password-stdin <"${pwfile}" || return 1
 
-  podman login "${registry}" --username "${user}" --password-stdin < "${pwfile}"
+  podman login "${registry}" --username "${user}" --password-stdin <"${pwfile}"
 }
 
 rt_service_container_ids() {
@@ -214,7 +218,7 @@ rt_unit_requires() {
   local line word
   local -a words=()
   while IFS= read -r line; do
-    read -ra words <<< "${line}"
+    read -ra words <<<"${line}"
     for word in "${words[@]}"; do
       if [[ "${word}" == *.service ]]; then
         printf '%s\n' "${word%.service}"
@@ -241,7 +245,7 @@ rt_stack_visit() {
 rt_installed_stack_services() {
   local seen=" " found="" svc
   local -a known=()
-  read -ra known <<< "${RT_STACK_ORDER}"
+  read -ra known <<<"${RT_STACK_ORDER}"
   for svc in "${known[@]}"; do
     rt_stack_visit "${svc}"
   done
@@ -286,7 +290,7 @@ rt_apply_stack() {
   local svc rc=0
   if [[ $# -eq 0 ]]; then
     local -a svcs=()
-    read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
+    read -ra svcs <<<"${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
     set -- "${svcs[@]}"
   fi
   local -a redefined=()
@@ -295,7 +299,7 @@ rt_apply_stack() {
       *" ${svc} "*) redefined+=("${svc}.service") ;;
     esac
   done
-  if (( ${#redefined[@]} > 0 )); then
+  if ((${#redefined[@]} > 0)); then
     ${RT_SYSTEMCTL} stop "${redefined[@]}" || rc=1
   fi
   rt_await_stack "$@" || rc=1
@@ -324,7 +328,7 @@ rt_await_stack() {
   RT_FAILED_SERVICES=""
   if [[ $# -eq 0 ]]; then
     local -a svcs=()
-    read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
+    read -ra svcs <<<"${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
     set -- "${svcs[@]}"
   fi
   for svc in "$@"; do
@@ -337,7 +341,8 @@ rt_await_stack() {
 }
 
 rt_exec() {
-  local c="$1"; shift
+  local c="$1"
+  shift
   ${RT_CLI} exec "${c}" "$@"
 }
 
@@ -351,7 +356,7 @@ rt_extract_from_image() {
   if [[ "${dst}" == */ || -d "${dst}" ]]; then
     ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xf - -C "${dst%/}" || rc=1
   else
-    ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xOf - > "${dst}" || rc=1
+    ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xOf - >"${dst}" || rc=1
   fi
   ${RT_CLI} rm -f "${cid}" >/dev/null 2>&1 || true
   return "${rc}"
@@ -367,7 +372,7 @@ rt_pin_write() {
   mkdir -p "$(dirname "${path}")"
   body="$(printf '# Written by deploy.sh. The digest this release pinned; do not edit.\n[Container]\nImage=%s\n' "${ref}")"
   if [[ ! -f "${path}" ]] || [[ "$(cat "${path}")" != "${body}" ]]; then
-    printf '%s\n' "${body}" > "${path}"
+    printf '%s\n' "${body}" >"${path}"
     rt_note_changed "${svc}"
   fi
 }
@@ -410,10 +415,11 @@ rt_pin_apply() {
     for pair in "$@"; do
       printf '  %s:\n    image: %s\n' "${pair%%=*}" "${pair#*=}"
     done
-  } > "${RT_PIN_FILE:?RT_PIN_FILE is unset}"
+  } >"${RT_PIN_FILE:?RT_PIN_FILE is unset}"
 
   for pair in "$@"; do
-    svc="${pair%%=*}"; ref="${pair#*=}"
+    svc="${pair%%=*}"
+    ref="${pair#*=}"
     rt_pin_write "${svc}" "${ref}"
   done
 }
@@ -437,7 +443,7 @@ rt_pin_rollback() {
 rt_monitoring_services() {
   if [[ -n "${RT_MONITORING_SERVICES:-}" ]]; then
     local -a listed=()
-    read -ra listed <<< "${RT_MONITORING_SERVICES}"
+    read -ra listed <<<"${RT_MONITORING_SERVICES}"
     printf '%s\n' "${listed[@]}"
     return 0
   fi
@@ -491,7 +497,7 @@ rt_monitoring_is_running() {
 rt_monitoring_recreate() {
   case " ${RT_HOST_SERVICES} " in
     *" $1 "*) ${RT_HOST_SYSTEMCTL:-systemctl} restart "$1.service" ;;
-    *)        ${RT_SYSTEMCTL} restart "$1.service" ;;
+    *) ${RT_SYSTEMCTL} restart "$1.service" ;;
   esac
 }
 
@@ -565,8 +571,8 @@ rt_run_detached() {
 rt_cp_to() {
   local src="$1" ctr="$2" dst="$3" want got
   # shellcheck disable=SC2016
-  ${RT_CLI} exec -i "${ctr}" sh -c 'cat > "$1"' sh "${dst}" < "${src}" || return 1
-  want="$(wc -c < "${src}" | tr -d '[:space:]')"
+  ${RT_CLI} exec -i "${ctr}" sh -c 'cat > "$1"' sh "${dst}" <"${src}" || return 1
+  want="$(wc -c <"${src}" | tr -d '[:space:]')"
   got="$(${RT_CLI} exec "${ctr}" stat -c %s "${dst}" 2>/dev/null | tr -d '[:space:]')"
   if [[ "${want}" != "${got}" ]]; then
     echo "rt_cp_to: ${dst} is ${got:-0} bytes in ${ctr}, expected ${want}" >&2
