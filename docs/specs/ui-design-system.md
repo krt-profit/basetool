@@ -864,7 +864,8 @@ a geometric check had no rule for:
   empty cell and a `.cell-block` cell take no separator, and neither does a cell whose next cell
   starts a new line (`stack-line-end`, measured on the page and again whenever a stacked table
   changes size, such as when a web font arrives after the rows). A page that loads its rows after the
-  document (the profit calculation and both starmap lists) marks each result region
+  document (the profit calculation, both starmap lists and the run, report, review and group lists
+  of the P4K import) marks each result region
   `aria-busy="true"` until its current request has rendered or failed. A superseded request does not
   clear the current request's loading state, and independent lists finish independently.
   `TouchClassLayoutE2eTest` measures a page only once nothing in `main` is busy. The status bar of a stacked row runs
