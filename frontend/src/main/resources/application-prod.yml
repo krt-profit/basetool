@@ -14,7 +14,7 @@ spring:
       flush-mode: immediate
   data:
     redis:
-      host: redis
+      host: redis-session
       port: 6379
       username: ${REDIS_USERNAME:}
       password: ${REDIS_PASSWORD}
@@ -54,7 +54,7 @@ app:
   backend-url: ${BACKEND_URL:https://backend:11261}
   backend-health-url: ${BACKEND_HEALTH_URL:https://backend:11271}
   shared-redis:
-    host: redis
+    host: redis-shared
     port: 6379
     username: ${REDIS_SHARED_USERNAME:}
     password: ${REDIS_SHARED_PASSWORD}

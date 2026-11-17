@@ -17,7 +17,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "The ingest gateway cannot read the exchange registry"
-              description: "The ingest gateway cannot read the exchange registry mirror or the revocations in Redis and refuses exchange requests with 503 REGISTRY_UNAVAILABLE (fail-closed, REQ-XCH-003). Check that the backend writes exchange:registry (APP_EXCHANGE_MIRROR_ENABLED, ExchangeMirrorWriteFailed), that Redis is up, and that the ingest ACL user still reads ~exchange:*."
+              description: "The ingest gateway cannot read the exchange registry mirror or the revocations in redis-shared and refuses exchange requests with 503 REGISTRY_UNAVAILABLE (fail-closed, REQ-XCH-003). Check that the backend writes exchange:registry (APP_EXCHANGE_MIRROR_ENABLED, ExchangeMirrorWriteFailed), that redis-shared is up (RedisDown), and that the ingest ACL user still reads ~exchange:*. A new or emptied redis-shared holds no registry until the backend's 60-second reconcile has rewritten it from Postgres."
 
   - name: silent - other refusals are the clients' own
     interval: 1m
@@ -114,7 +114,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "The exchange's Redis budget is more than 80 % used"
-              description: "The exchange data the ingest gateway keeps in Redis (the idempotency cache) uses more than 80 % of its 128 MiB budget. Above 100 % every exchange write is refused with 503 EXCHANGE_BUDGET_EXHAUSTED, while sessions keep their room (REQ-XCH-023, ADR-0221). Check which client writes most (the per-client sets under ingest:xch:budget:c:*) and whether a client loops."
+              description: "The exchange data the ingest gateway keeps in redis-shared (the idempotency cache) uses more than 80 % of its 128 MiB budget. Above 100 % every exchange write is refused with 503 EXCHANGE_BUDGET_EXHAUSTED, while the backend's registry mirror and revocations keep their room in redis-shared (REQ-XCH-023, ADR-0221). Check which client writes most (the per-client sets under ingest:xch:budget:c:*) and whether a client loops."
 
   - name: silent - a budget in normal use
     interval: 1m
