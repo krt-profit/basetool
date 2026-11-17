@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
@@ -45,15 +46,12 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
-import jakarta.persistence.EntityManagerFactory;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,7 +92,6 @@ class JobOrderLinkedStockReadNoNPlusOneTest {
   @Autowired private LocationRepository locationRepository;
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private SquadronRepository squadronRepository;
-  @Autowired private EntityManagerFactory entityManagerFactory;
 
   private Squadron unit;
 
@@ -145,7 +142,7 @@ class JobOrderLinkedStockReadNoNPlusOneTest {
   }
 
   @Test
-  void theOrderLinkedReadsStayStatementBoundedWhateverTheNumberOfRows() {
+  void theOrderLinkedReadsStayStatementBoundedWhateverTheNumberOfRows() throws Exception {
     Seed few = seed(FEW);
     Seed many = seed(MANY);
 
@@ -196,21 +193,16 @@ class JobOrderLinkedStockReadNoNPlusOneTest {
                 .suppliesFor(s.order().getId(), s.material().getId())
                 .size());
 
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
     for (Map.Entry<String, Function<Seed, Integer>> read : reads.entrySet()) {
-      stats.clear();
-      int fewRows = read.getValue().apply(few);
-      long fewStatements = stats.getPrepareStatementCount();
-      stats.clear();
-      int manyRows = read.getValue().apply(many);
-      long manyStatements = stats.getPrepareStatementCount();
+      var fewRead = measured(() -> read.getValue().apply(few));
+      var manyRead = measured(() -> read.getValue().apply(many));
 
-      assertThat(fewRows).as(read.getKey() + " rows for the small order").isEqualTo(FEW);
-      assertThat(manyRows).as(read.getKey() + " rows for the large order").isEqualTo(MANY);
-      assertThat(manyStatements)
+      assertThat(fewRead.result()).as(read.getKey() + " rows for the small order").isEqualTo(FEW);
+      assertThat(manyRead.result()).as(read.getKey() + " rows for the large order").isEqualTo(MANY);
+      assertThat(manyRead.statements())
           .as(read.getKey() + " statements for " + MANY + " rows against " + FEW + " (N+1)")
-          .isEqualTo(fewStatements)
+          .isPositive()
+          .isEqualTo(fewRead.statements())
           .isLessThanOrEqualTo(STATEMENT_BOUND);
     }
   }

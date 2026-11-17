@@ -88,7 +88,10 @@ class P4kReconcilers {
       starmapLinker.link(starmapReconciler.reconcile(catalogue.starmapObjects(), context), context);
     }
     if (!catalogue.shops().isEmpty()) {
-      shopLinker.link(shopReconciler.reconcile(catalogue.shops(), context), context);
+      shopLinker.link(
+          shopReconciler.reconcile(catalogue.shops(), context),
+          catalogue.starmapObjects(),
+          context);
     }
     return new Outcome(ingredientsResolved, commodities, shipRepairs.size());
   }

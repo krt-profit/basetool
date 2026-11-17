@@ -125,4 +125,21 @@ final class P4kShopFixtures {
     node.putNull("itemGuids");
     return node;
   }
+
+  /**
+   * Gives a shop record a known item list.
+   *
+   * @param shop the shop record
+   * @param items the GUIDs the list names
+   * @return the record
+   */
+  @NotNull
+  static ObjectNode withItems(@NotNull ObjectNode shop, @NotNull UUID... items) {
+    shop.put("inventory", "krt_inventory");
+    ArrayNode list = shop.putArray("itemGuids");
+    for (UUID item : items) {
+      list.add(item.toString());
+    }
+    return shop;
+  }
 }

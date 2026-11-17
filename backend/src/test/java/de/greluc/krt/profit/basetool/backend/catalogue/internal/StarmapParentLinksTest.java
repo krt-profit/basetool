@@ -32,35 +32,11 @@ class StarmapParentLinksTest {
   private static final UUID SECOND = UUID.fromString("5b000000-0000-4000-8000-000000000002");
 
   private static StarmapPlaceRow city(String name) {
-    return new StarmapPlaceRow(
-        StarmapPlaceKind.CITY,
-        UUID.randomUUID(),
-        name,
-        SYSTEM,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        false);
+    return StarmapPlaceRowBuilder.row(StarmapPlaceKind.CITY, name).starSystem(SYSTEM).build();
   }
 
   private static StarmapPlaceRow terminalIn(String city) {
-    return new StarmapPlaceRow(
-        StarmapPlaceKind.TERMINAL,
-        UUID.randomUUID(),
-        "Krt Terminal",
-        SYSTEM,
-        null,
-        null,
-        null,
-        city,
-        null,
-        null,
-        null,
-        false);
+    return StarmapPlaceRowBuilder.terminal("Krt Terminal", city, "item").starSystem(SYSTEM).build();
   }
 
   @Test

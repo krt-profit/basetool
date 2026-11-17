@@ -16,7 +16,7 @@ tests:
         values: "1x30"
       - series: "podman_container_health{id=\"bbb\", pod_id=\"\", pod_name=\"\"}"
         values: "2x30"
-      - series: "podman_container_info{id=\"ccc\", image=\"x\", name=\"redis\", pod_id=\"\", pod_name=\"\", ports=\"\"}"
+      - series: "podman_container_info{id=\"ccc\", image=\"x\", name=\"redis-shared\", pod_id=\"\", pod_name=\"\", ports=\"\"}"
         values: "1x30"
       - series: "podman_container_health{id=\"ccc\", pod_id=\"\", pod_name=\"\"}"
         values: "0x30"

@@ -103,8 +103,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Redis down"
-          description: "redis-exporter has not been able to reach Redis for 2 minutes (redis_up == 0) while the exporter itself answers. Redis holds every web session and the live-sync fan-out, so members are being logged out and live updates have stopped. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status redis.service` and `journalctl CONTAINER_NAME=redis`; a missing or unreadable /var/lib/basetool/redis/users.acl stops it from starting at all (ADR-0088)."
+          summary: "Redis down: redis-{{ $labels.redis }}"
+          description: "redis-{{ $labels.redis }}-exporter has not been able to reach redis-{{ $labels.redis }} for 2 minutes (redis_up == 0) while the exporter itself answers. {{ if eq $labels.redis \"session\" }}redis-session holds every web session, so members are being logged out and nobody can sign in.{{ else }}redis-shared holds the exchange registry mirror, the ingest handoffs and the live-sync and notification fan-out: sign-in keeps working, but the exchange answers 503 REGISTRY_UNAVAILABLE, handoffs can be neither staged nor picked up, and live updates reach only viewers on the same replica.{{ end }} Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status redis-{{ $labels.redis }}.service` and `journalctl CONTAINER_NAME=redis-{{ $labels.redis }}`; a missing or unreadable {{ if eq $labels.redis \"session\" }}/var/lib/basetool/redis/session-users.acl{{ else }}/var/lib/basetool/redis-shared/users.acl{{ end }} stops it from starting at all (ADR-0088)."
 
       - alert: PostgresConnectionsCritical
         expr: sum by (database) (pg_stat_activity_count) / on(database) pg_settings_max_connections > 0.80
@@ -123,8 +123,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Redis has unsaved changes and no RDB snapshot for over 1h"
-          description: "Redis has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check the redis log for save errors and the disk free space on /var/lib/basetool/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
+          summary: "Redis has unsaved changes and no RDB snapshot for over 1h (redis-{{ $labels.redis }})"
+          description: "redis-{{ $labels.redis }} has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check `journalctl CONTAINER_NAME=redis-{{ $labels.redis }}` for save errors and the disk free space on {{ if eq $labels.redis \"session\" }}/var/lib/basetool/redis{{ else }}/var/lib/basetool/redis-shared{{ end }}. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
 
       - alert: RedisRdbSaveFailing
         expr: redis_rdb_last_bgsave_status == 0
@@ -132,8 +132,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Redis background save is failing"
-          description: "The last Redis RDB background save failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/lib/basetool/redis bind mount, or a fork refused for lack of memory — check the redis log and the host filesystem."
+          summary: "Redis background save is failing (redis-{{ $labels.redis }})"
+          description: "The last RDB background save of redis-{{ $labels.redis }} failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the {{ if eq $labels.redis \"session\" }}/var/lib/basetool/redis{{ else }}/var/lib/basetool/redis-shared{{ end }} bind mount, or a fork refused for lack of memory — check `journalctl CONTAINER_NAME=redis-{{ $labels.redis }}` and the host filesystem."
 
       - alert: RedisAofWriteFailing
         expr: redis_aof_last_write_status == 0 and redis_aof_enabled == 1
@@ -141,22 +141,24 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Redis AOF writes are failing"
-          description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/lib/basetool/redis bind mount and the redis log."
+          summary: "Redis AOF writes are failing (redis-{{ $labels.redis }})"
+          description: "The last AOF write of redis-{{ $labels.redis }} failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is its primary durability layer, so writes already acknowledged to its clients are not reaching disk{{ if eq $labels.redis \"session\" }} and a crash would log those members out{{ else }}; a crash loses them, after which the backend's 60-second reconcile rewrites the exchange registry and revocations from Postgres while gateway quotas, idempotency answers and staged handoffs restart empty{{ end }}. Check disk space and permissions on the {{ if eq $labels.redis \"session\" }}/var/lib/basetool/redis{{ else }}/var/lib/basetool/redis-shared{{ end }} bind mount and `journalctl CONTAINER_NAME=redis-{{ $labels.redis }}`."
 
       - alert: RedisAclDenials
         expr: >-
-          (sum(increase(redis_acl_access_denied_auth_total[5m])) or vector(0))
-          + (sum(increase(redis_acl_access_denied_cmd_total[5m])) or vector(0))
-          + (sum(increase(redis_acl_access_denied_key_total[5m])) or vector(0))
-          + (sum(increase(redis_acl_access_denied_channel_total[5m])) or vector(0))
+          sum by (redis) (
+            label_replace(increase(redis_acl_access_denied_auth_total[5m]), "kind", "auth", "", "")
+            or label_replace(increase(redis_acl_access_denied_cmd_total[5m]), "kind", "cmd", "", "")
+            or label_replace(increase(redis_acl_access_denied_key_total[5m]), "kind", "key", "", "")
+            or label_replace(increase(redis_acl_access_denied_channel_total[5m]), "kind", "channel", "", "")
+          )
           > 0
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Redis is refusing authentication or commands under its ACL ({{ $value | printf \"%.0f\" }} in 5m)"
-          description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
+          summary: "Redis is refusing authentication or commands under its ACL on redis-{{ $labels.redis }} ({{ $value | printf \"%.0f\" }} in 5m)"
+          description: "redis-{{ $labels.redis }} counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose {{ if eq $labels.redis \"session\" }}REDIS_SESSION_FRONTEND_PASSWORD does not match the rendered /var/lib/basetool/redis/session-users.acl{{ else }}REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis-shared/users.acl{{ end }}, a rule in scripts/redis-{{ $labels.redis }}-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis-{{ $labels.redis }} container as the admin user and read the username, reason and context fields only — the object field can carry a key name, i.e. a session id or a handoff id. See docs/deployment.md, The Redis ACL."
 
       - alert: CertificateExpiringSoon
         expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 24 * 3600
@@ -331,14 +333,14 @@ groups:
 
       - alert: CoreContainerMetricsMissing
         expr: >-
-          count(basetool:container:present{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis"}) < 7
-          or absent(basetool:container:present{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis"})
+          count(basetool:container:present{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis-session|redis-shared"}) < 8
+          or absent(basetool:container:present{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis-session|redis-shared"})
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "A core app container stopped reporting metrics"
-          description: "Fewer than the 7 core app containers (backend/frontend/ingest/keycloak/db-backend/db-keycloak/redis) report container metrics — one is down, or the collector lost its series. Cross-check TargetDown and the container's health."
+          description: "Fewer than the 8 core app containers (backend/frontend/ingest/keycloak/db-backend/db-keycloak/redis-session/redis-shared) report container metrics — one is down, or the collector lost its series. Cross-check TargetDown and the container's health."
 
       - alert: ContainerOomKilled
         expr: increase(basetool:container:oom_kills_total[15m]) > 0
@@ -378,8 +380,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Redis is evicting keys"
-          description: "Redis evicted keys in the last 15 minutes. The session store runs maxmemory-policy noeviction, which never evicts — so any eviction means the policy was changed to an evicting one (allkeys-*/volatile-*), which silently logs users out. Restore noeviction and check what changed the config."
+          summary: "Redis is evicting keys (redis-{{ $labels.redis }})"
+          description: "redis-{{ $labels.redis }} evicted keys in the last 15 minutes. Both Redis instances run maxmemory-policy noeviction, which never evicts — so any eviction means its policy was changed to an evicting one (allkeys-*/volatile-*), which {{ if eq $labels.redis \"session\" }}silently logs users out{{ else }}can drop an exchange revocation, re-opening the access it withdrew, or a staged handoff{{ end }}. Restore noeviction and check what changed the config."
 
       - alert: RedisMemoryHigh
         expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85 and redis_memory_max_bytes > 0
@@ -387,8 +389,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Redis memory >85% of maxmemory"
-          description: "Redis has used more than 85% of its 768mb maxmemory for 10 minutes. Under noeviction, hitting the ceiling makes NEW session writes / logins fail (existing sessions survive) — investigate session growth or a leak before it does."
+          summary: "Redis memory >85% of maxmemory (redis-{{ $labels.redis }})"
+          description: "redis-{{ $labels.redis }} has used {{ $value | humanizePercentage }} of its maxmemory for 10 minutes; the Redis dashboard shows each instance's maxmemory. Under noeviction, hitting the ceiling refuses every write that needs memory: {{ if eq $labels.redis \"session\" }}NEW session writes / logins fail (existing sessions survive) — investigate session growth (ActiveSessionsRunaway) or a leak before it does.{{ else }}the backend can no longer refresh the exchange registry mirror and revocations, and the gateway can no longer stage handoffs or record quotas and idempotency answers, while sign-in is unaffected — check the exchange budget (ExchangeBudgetHigh, ExchangeClientBudgetHigh) and the handoff volume before it does.{{ end }}"
 
       - alert: RedisConnectionsRejected
         expr: increase(redis_rejected_connections_total[15m]) > 0
@@ -396,8 +398,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Redis rejected connections"
-          description: "Redis rejected new connections in the last 15 minutes — the maxclients limit was reached (a connection leak or storm). New sessions and Spring Session writes will start failing."
+          summary: "Redis rejected connections (redis-{{ $labels.redis }})"
+          description: "redis-{{ $labels.redis }} rejected new connections in the last 15 minutes — the maxclients limit was reached (a connection leak or storm). {{ if eq $labels.redis \"session\" }}New sessions and Spring Session writes will start failing.{{ else }}The exchange, handoff staging and pickup, and the live-sync and notification fan-out will start failing.{{ end }}"
 
       - alert: PostgresDeadlocks
         expr: increase(pg_stat_database_deadlocks{datname!~"template.*"}[15m]) > 0
