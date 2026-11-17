@@ -1835,3 +1835,25 @@ read or append to the suspended transaction's resources. Inner notifications fol
 commit independently of the outer outcome, and every completion releases its own resources.
 These are infrastructure guarantees; the regression tests do not establish a production user
 flow that previously exercised a conflicting nested resource.
+
+### REQ-DATA-042 — two ship types of one game ship merge without breaking references
+
+A ship type created a second time for the same game ship is merged into the one that stays, in
+the caller's transaction. Both rows are locked in id order first, which fences new references. Each
+module moves its own references through `ShipTypeReassignmentParticipant`: hangar ships, mission
+units, mission template units and the items the catalogue links to a vehicle. It works on the
+managed rows, so every changed row keeps its optimistic lock, and audits it in its own area:
+`HANGAR_SHIP_CATALOGUE_REASSIGNED`, `MISSION_CATALOGUE_REASSIGNED`. The catalogue records the merge
+as `CATALOGUE_SHIP_TYPE_MERGED` with the merged id, the evidence and the number of moved
+references. The open hangar and template views hear of the change through live sync.
+
+The survivor takes the Wiki identity of the merged row when it has none, or when the merged row's
+Wiki UUID is the survivor's P4K GUID, and the UEX identity when it has none. Both
+rows are kept as JSON in `ship_type_redirect`. The merged id stays resolvable through
+`findById`, `existsById`, `findAllById` and `getReferenceById` of `ShipTypeRepository`. The
+exchange resolves it as a `bt` reference and names journal entries by it; the append-only journal
+keeps the merged id. A row holding a P4K GUID is never merged away (REQ-P4K-007).
+
+**Enforced by:** `ShipTypeMergeServiceTest` · **Code:** `ShipTypeMergeService`,
+`ShipTypeIdentityReferences`, `ShipTypeReassignmentParticipant` and its implementations · **ADR:**
+[ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)

@@ -34,6 +34,12 @@ public enum P4kChangeType {
    */
   COVERED,
 
+  /**
+   * A ship type the Wiki or UEX created a second time, merged into the row of the record's GUID
+   * (REQ-P4K-053).
+   */
+  MERGED,
+
   /** A review case the run found (REQ-P4K-016); {@code field_name} holds its reason. */
   REVIEW,
 

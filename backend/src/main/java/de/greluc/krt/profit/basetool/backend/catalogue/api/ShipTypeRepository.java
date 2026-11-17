@@ -19,23 +19,57 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/** Spring Data repository for Ship Type. */
+/**
+ * Spring Data repository for Ship Type; the id lookups resolve the id of a merged ship type
+ * (REQ-DATA-042).
+ */
 @Repository
-public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID> {
+public interface ShipTypeRepository
+    extends LookupTableRepository<ShipType, UUID>, ShipTypeIdentityReferences {
+
+  @Override
+  @NotNull
+  Optional<ShipType> findById(@NotNull UUID id);
+
+  @Override
+  boolean existsById(@NotNull UUID id);
+
+  @Override
+  @NotNull
+  List<ShipType> findAllById(@NotNull Iterable<UUID> ids);
+
+  @Override
+  @NotNull
+  ShipType getReferenceById(@NotNull UUID id);
+
   /** Derived Spring-Data query - returns entities matching {@code NameIgnoreCase}. */
   Optional<ShipType> findByNameIgnoreCase(String name);
+
+  /**
+   * Locks the ship types a merge joins, in id order, so no row can take a new reference to either
+   * while the merge moves them (REQ-DATA-042).
+   *
+   * @param ids the ship types of the merge
+   * @return the locked rows that still exist
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT s FROM ShipType s WHERE s.id IN :ids ORDER BY s.id")
+  List<ShipType> lockMergeRows(@Param("ids") Collection<UUID> ids);
 
   /**
    * Resolution-chain step 1 (R2): match an inbound UEX vehicle DTO to an existing ship_type row via

@@ -1364,6 +1364,29 @@ run. A referenced one stays a case (REQ-P4K-010). The report lists the hide and 
 `ShipTypeReferenceParticipant` and its implementations · **ADR:**
 [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
 
+### REQ-P4K-053 — a second ship type of a record's ship is merged into the row of its GUID
+
+The Wiki and UEX create a ship type when their name steps find none, so a game ship can end up
+with a second row beside the one holding its P4K GUID. A row without a P4K GUID whose Wiki UUID is
+the GUID another row holds stands for that row's ship: the Wiki files the vehicle under the same
+UUID the game gives the record. After retiring the seeded NPC ship types (REQ-P4K-052) and before
+it matches, an APPLY merges each such row into the row of the GUID through the ship-type merge
+(REQ-DATA-042), when the catalogue lists the record and the row of the GUID is neither retired nor
+retiring. The report lists each merge as `MERGED`, with both names; a preview reports the merges,
+writes nothing, and matches without the merged rows as the APPLY does. A row holding a P4K GUID is
+never merged away (REQ-P4K-007).
+
+**Acceptance**
+
+- [x] A Wiki row whose UUID is a stored row's GUID is merged into that row in an APPLY: its hangar
+  ships, mission units and linked items move, its id resolves to the survivor, and the survivor takes
+  the Wiki UUID.
+- [x] A preview reports the merge as `MERGED` and changes no row.
+- [x] A second APPLY finds nothing to merge.
+
+**Enforced by:** `P4kShipTwinsImportTest` · **Code:** `P4kShipTwins`, `ShipTypeMergeService` ·
+**ADR:** [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
+
 ## Game texts
 
 ### REQ-P4K-033 — every column holding a game text is classified, and game texts and media stay with members

@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -32,6 +34,17 @@ import org.springframework.data.repository.query.Param;
 public interface MissionUnitRepository extends JpaRepository<MissionUnit, UUID> {
   /** Derived Spring-Data query - returns entities matching {@code ShipId}. */
   List<MissionUnit> findByShipId(UUID shipId);
+
+  /**
+   * Locks every mission unit planned with a ship type in ascending id order, so a ship-type merge
+   * can move them onto the ship type that stays (REQ-DATA-042).
+   *
+   * @param shipTypeId the ship type being merged away
+   * @return its units, locked for this transaction, ordered by id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT u FROM MissionUnit u WHERE u.shipType.id = :shipTypeId ORDER BY u.id")
+  List<MissionUnit> lockAllByShipTypeId(@Param("shipTypeId") UUID shipTypeId);
 
   /**
    * Reads every mission unit that carries a ship of the given owner, as a projection that loads no

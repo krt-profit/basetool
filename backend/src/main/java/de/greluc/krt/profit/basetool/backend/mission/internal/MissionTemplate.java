@@ -155,6 +155,34 @@ class MissionTemplate extends AbstractEntity<UUID> {
     return true;
   }
 
+  /**
+   * Points the units planned with a ship type being merged away at the ship type that stays
+   * (REQ-DATA-042).
+   *
+   * @param retiredId the ship type merged away
+   * @param survivorId the ship type that stays
+   * @return whether a unit changed
+   */
+  boolean reassignShipType(UUID retiredId, UUID survivorId) {
+    List<MissionTemplatePlan.Unit> replaced =
+        units.stream()
+            .map(unit ->
+                retiredId.equals(unit.shipTypeId())
+                    ? new MissionTemplatePlan.Unit(
+                        unit.name(),
+                        survivorId,
+                        unit.note(),
+                        unit.highValueUnit(),
+                        unit.frequency())
+                    : unit)
+            .toList();
+    if (replaced.equals(units)) {
+      return false;
+    }
+    replaceRows(units, replaced);
+    return true;
+  }
+
   private MissionTemplatePlan plan() {
     return new MissionTemplatePlan(
         description,

@@ -1030,6 +1030,12 @@ also records numeric before/after minimum and target settings. No note or member
 copied into details. Unchanged rows and rolled-back attempts emit no mutation event. These
 owner-domain events do not implement or replace the planned catalogue-admin audit domain.
 
+A ship-type merge (REQ-DATA-042) works the same way: `HANGAR_SHIP_CATALOGUE_REASSIGNED` per hangar
+ship and `MISSION_CATALOGUE_REASSIGNED` per mission unit or mission template, with the retired and
+surviving ship-type ids and a fixed subject token; the catalogue records the merge itself as
+`CATALOGUE_SHIP_TYPE_MERGED`, with the retired id, the evidence token and the number of moved
+references.
+
 The hierarchy foundation records every automatic ending of an ineligible legacy material promise
 as `JOB_ORDER_CLAIM_WITHDRAWN` with safe claim/unit identities and bounded reason `UNIT_INELIGIBLE`.
 An actual active-to-ended Staffel participation is recorded once as

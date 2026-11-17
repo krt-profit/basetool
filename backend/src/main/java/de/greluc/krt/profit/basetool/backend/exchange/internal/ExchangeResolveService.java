@@ -144,7 +144,7 @@ public class ExchangeResolveService {
           case BLUEPRINT -> blueprintCatalog(refs);
           case ITEM -> itemCatalog(refs);
           case MATERIAL -> materialCatalog();
-          case SHIP_TYPE -> shipTypeCatalog();
+          case SHIP_TYPE -> shipTypeCatalog(refs);
         };
 
     List<Outcome> outcomes = new ArrayList<>(refs.size());
@@ -523,12 +523,14 @@ public class ExchangeResolveService {
   /**
    * Builds the ship-type catalogue on the {@link ShipTypeMatcher} the hangar import uses
    * (REQ-P4K-032): class name else variant base, P4K GUID or Wiki UUID, UEX vehicle id else the
-   * curated alias, and the name as the last step, where a duplicate is ambiguous.
+   * curated alias, and the name as the last step, where a duplicate is ambiguous; the id of a
+   * merged ship type finds the one it was merged into (REQ-DATA-042).
    *
+   * @param refs the references
    * @return the catalogue
    */
   @NotNull
-  private Catalog shipTypeCatalog() {
+  private Catalog shipTypeCatalog(@NotNull List<ExchangeItemRef> refs) {
     List<ShipType> shipTypes = shipTypeRepository.findAll();
     Map<UUID, Set<Entry>> byId = new HashMap<>();
     Map<String, Set<Entry>> byLocKey = new HashMap<>();
@@ -536,6 +538,17 @@ public class ExchangeResolveService {
       Entry entry = toEntry(shipType);
       add(byId, shipType.getId(), entry);
       add(byLocKey, lower(shipType.getNameKey()), entry);
+    }
+    List<UUID> ids = present(refs, r -> parseUuid(r.bt()));
+    if (!ids.isEmpty()) {
+      shipTypeRepository
+          .findLocalIdRedirects(ids)
+          .forEach((merged, survivor) -> {
+            Set<Entry> entries = byId.get(survivor);
+            if (entries != null) {
+              byId.put(merged, entries);
+            }
+          });
     }
     ShipTypeMatcher.ShipTypeIndex index =
         ShipTypeMatcher.buildIndex(

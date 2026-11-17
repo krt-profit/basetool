@@ -48,7 +48,8 @@ import org.springframework.stereotype.Component;
  * (REQ-P4K-031), fill the descriptions where empty, stamp, create a playable unmatched ship behind
  * the run's checkbox (REQ-P4K-009), keep the variant groups (REQ-P4K-032), cross-check the store
  * slugs, and settle the ship cases an APPLY no longer finds; a ship a stored ship type already
- * stands for is covered (REQ-P4K-050).
+ * stands for is covered (REQ-P4K-050), and a second row of a record's ship is merged into the row
+ * of its GUID first (REQ-P4K-053).
  */
 @Component
 @RequiredArgsConstructor
@@ -76,6 +77,7 @@ public class P4kShipReconciler {
   private final P4kShipClassAliases classAliases;
   private final P4kRunResolvedCases resolvedCases;
   private final P4kSeededShipRetirement seededRetirement;
+  private final P4kShipTwins twins;
 
   /**
    * Reconciles every ship, then the variant groups and the store slugs; the manufacturers must be
@@ -90,8 +92,9 @@ public class P4kShipReconciler {
       @NotNull P4kCatalogue catalogue,
       @NotNull P4kLoadoutReconciler.LoadoutStream loadouts,
       @NotNull P4kImportContext context) {
-    List<ShipType> all = shipTypeRepository.findAll();
-    Set<UUID> retired = seededRetirement.retire(all, catalogue.ships(), context);
+    List<ShipType> found = shipTypeRepository.findAll();
+    Set<UUID> retired = seededRetirement.retire(found, catalogue.ships(), context);
+    List<ShipType> all = twins.converge(found, catalogue.ships(), retired, context);
     Map<String, List<ShipType>> aliased = classAliases.byClassName(all);
     List<P4kShipBaseRepairs.Repair> repairs =
         baseRepairs.eligible(catalogue, loadouts, all, aliased, retired, context);
