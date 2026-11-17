@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLoadoutDt
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipPlayability;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,7 +43,10 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-/** Validates deferred ship-base corrections against a complete archive and current identities. */
+/**
+ * Validates the ship-base corrections a complete archive can carry out against current identities:
+ * the ones an admin queued (REQ-P4K-049) and the moves the catalogue decides itself (REQ-P4K-051).
+ */
 @Component
 @RequiredArgsConstructor
 class P4kShipBaseRepairs {
@@ -52,7 +56,8 @@ class P4kShipBaseRepairs {
   private final EntityManager entityManager;
 
   /**
-   * Selects repairs whose source record, variant and dependent archive data can be refreshed.
+   * Selects the queued repairs and the catalogue's own moves whose source record, variant and
+   * dependent archive data can be refreshed; a ship type an admin queued is not moved otherwise.
    *
    * @param catalogue the incoming catalogue
    * @param loadouts the repeatable stream of its loadouts
@@ -74,10 +79,6 @@ class P4kShipBaseRepairs {
         || catalogue.paints().isEmpty()) {
       return List.of();
     }
-    List<P4kReviewCase> pending = cases.findByShipRepairRowIdIsNotNull();
-    if (pending.isEmpty()) {
-      return List.of();
-    }
     Map<UUID, ShipType> rows = new HashMap<>();
     ships.forEach(ship -> rows.put(Objects.requireNonNull(ship.getId()), ship));
     Map<UUID, List<P4kShipDto>> byGuid = new HashMap<>();
@@ -87,31 +88,42 @@ class P4kShipBaseRepairs {
         byGuid.computeIfAbsent(guid, _ -> new ArrayList<>()).add(record);
       }
     }
-    List<Repair> candidates = new ArrayList<>();
-    for (P4kReviewCase selection : pending) {
-      Repair repair = eligibleBase(selection, rows, byGuid, context);
-      if (repair != null
-          && ownsProjectedIdentity(repair, catalogue.ships(), ships, aliases)
-          && paintsResolve(catalogue, repair.base(), context)) {
-        candidates.add(repair);
+    List<Repair> proposed = new ArrayList<>();
+    for (P4kReviewCase selection : cases.findByShipRepairRowIdIsNotNull()) {
+      Repair repair = eligibleSelection(selection, rows, byGuid, context);
+      if (repair != null) {
+        proposed.add(repair);
       }
     }
+    Set<UUID> selected =
+        proposed.stream()
+            .map(repair -> repair.row().getId())
+            .collect(Collectors.toUnmodifiableSet());
+    for (P4kShipIdentityMoves.Move move :
+        P4kShipIdentityMoves.find(byGuid, true, ships, selected)) {
+      if (isValidBase(move.row(), move.base(), move.baseGuid(), move.variant(), rows, context)) {
+        proposed.add(new Repair(null, move.row(), move.base(), move.baseGuid()));
+      }
+    }
+    List<Repair> candidates =
+        proposed.stream()
+            .filter(repair -> ownsProjectedIdentity(repair, catalogue.ships(), ships, aliases))
+            .filter(repair -> paintsResolve(catalogue, repair.base(), context))
+            .toList();
     if (candidates.isEmpty()) {
       return List.of();
     }
     Set<UUID> targets =
-        candidates.stream()
-            .map(repair -> repair.selection().getGuid())
-            .collect(Collectors.toUnmodifiableSet());
+        candidates.stream().map(Repair::baseGuid).collect(Collectors.toUnmodifiableSet());
     Map<UUID, Boolean> loadoutProof = new HashMap<>();
     loadouts.forEach(loadout -> recordLoadoutProof(loadout, targets, loadoutProof));
     return candidates.stream()
-        .filter(repair -> Boolean.TRUE.equals(loadoutProof.get(repair.selection().getGuid())))
+        .filter(repair -> Boolean.TRUE.equals(loadoutProof.get(repair.baseGuid())))
         .toList();
   }
 
   /**
-   * Verifies the exact base and variant pair against the current stored row and incoming archive.
+   * Verifies an admin's base and variant pair against the current stored row and incoming archive.
    *
    * @param selection the pending choice
    * @param rows the stored ships by local id
@@ -120,7 +132,7 @@ class P4kShipBaseRepairs {
    * @return the approved base input, or null while proof is missing
    */
   @Nullable
-  private Repair eligibleBase(
+  private Repair eligibleSelection(
       @NotNull P4kReviewCase selection,
       @NotNull Map<UUID, ShipType> rows,
       @NotNull Map<UUID, List<P4kShipDto>> byGuid,
@@ -146,24 +158,49 @@ class P4kShipBaseRepairs {
         || !sameKey(selection.getShipRepairBaseClass(), base.className())
         || !sameKey(selection.getShipRepairVariantClass(), variant.className())
         || !baseGuid.equals(P4kGuids.parse(variant.variantOf()))
-        || StringUtils.hasText(base.variantOf())
-        || !StringUtils.hasText(base.nameEn())
-        || !StringUtils.hasText(base.className())
-        || P4kClosedSet.parse(P4kShipPlayability.class, base.playability())
-            != P4kShipPlayability.PLAYER
-        || P4kShipBaseData.vehicleKind(base) == null
-        || context.isRepeatedClassName(P4kKind.SHIP, base.className())
-        || context.isRepeatedClassName(P4kKind.SHIP, variant.className())
-        || rows.values().stream()
-            .anyMatch(other ->
+        || !isValidBase(row, base, baseGuid, variant, rows, context)) {
+      return null;
+    }
+    return new Repair(selection, row, base, baseGuid);
+  }
+
+  /**
+   * Checks the base a ship type moves to: a player ship heading its group, with a known vehicle
+   * kind, a class name no other record repeats, and a GUID, class name and name no other live ship
+   * type holds, whose base data can replace every stored fact.
+   *
+   * @param row the moving ship type
+   * @param base the base record
+   * @param baseGuid the base record's GUID
+   * @param variant the variant the ship type holds, or {@code null} for a departed GUID
+   * @param rows the stored ships by local id
+   * @param context the run
+   * @return whether the ship type may move to the base
+   */
+  private boolean isValidBase(
+      @NotNull ShipType row,
+      @NotNull P4kShipDto base,
+      @NotNull UUID baseGuid,
+      @Nullable P4kShipDto variant,
+      @NotNull Map<UUID, ShipType> rows,
+      @NotNull P4kImportContext context) {
+    UUID rowId = row.getId();
+    return !StringUtils.hasText(base.variantOf())
+        && StringUtils.hasText(base.nameEn())
+        && StringUtils.hasText(base.className())
+        && P4kClosedSet.parse(P4kShipPlayability.class, base.playability())
+            == P4kShipPlayability.PLAYER
+        && P4kShipBaseData.vehicleKind(base) != null
+        && !context.isRepeatedClassName(P4kKind.SHIP, base.className())
+        && (variant == null || !context.isRepeatedClassName(P4kKind.SHIP, variant.className()))
+        && rows.values().stream()
+            .noneMatch(other ->
                 !Objects.equals(rowId, other.getId())
+                    && !other.isP4kRetired()
                     && (baseGuid.equals(other.getP4kUuid())
                         || sameKey(base.className(), other.getClassName())
                         || sameKey(base.nameEn(), other.getName())))
-        || !baseData.canRefreshBase(row, base, context)) {
-      return null;
-    }
-    return new Repair(selection, row, base);
+        && baseData.canRefreshBase(row, base, context);
   }
 
   /**
@@ -182,7 +219,7 @@ class P4kShipBaseRepairs {
       @NotNull Map<String, List<ShipType>> aliases) {
     P4kShipDto base = repair.base();
     UUID rowId = Objects.requireNonNull(repair.row().getId());
-    UUID baseGuid = repair.selection().getGuid();
+    UUID baseGuid = repair.baseGuid();
     if (hasOtherAlias(base.className(), rowId, aliases)) {
       return false;
     }
@@ -200,6 +237,7 @@ class P4kShipBaseRepairs {
           || ships.stream()
               .anyMatch(other ->
                   !rowId.equals(other.getId())
+                      && !other.isP4kRetired()
                       && (guid.equals(other.getP4kUuid())
                           || guid.equals(other.getExternalUuid())
                           || sameKey(record.className(), other.getClassName())))) {
@@ -251,7 +289,8 @@ class P4kShipBaseRepairs {
   }
 
   /**
-   * Requires one parsed loadout with an explicit port tree and no extractor issues per repair.
+   * Requires one parsed ship loadout with an explicit port tree per repair; its issues are reported
+   * by the loadout reconciler as for every other ship (REQ-P4K-040).
    *
    * @param loadout one streamed record
    * @param targets the bases being considered
@@ -263,11 +302,7 @@ class P4kShipBaseRepairs {
       @NotNull Map<UUID, Boolean> proof) {
     UUID guid = P4kGuids.parse(loadout.entityGuid());
     if (guid != null && targets.contains(guid)) {
-      boolean valid =
-          loadout.isShip()
-              && loadout.ports() != null
-              && (loadout.issues() == null || loadout.issues().isEmpty());
-      proof.merge(guid, valid, (_, _) -> false);
+      proof.merge(guid, loadout.isShip() && loadout.ports() != null, (_, _) -> false);
     }
   }
 
@@ -297,10 +332,27 @@ class P4kShipBaseRepairs {
   /**
    * A repair with the authoritative source record and the existing local ship to retain.
    *
-   * @param selection the pending review choice
-   * @param row the selected stored row
+   * @param selection the admin's pending review choice, or {@code null} for a move the catalogue
+   *     decides (REQ-P4K-051)
+   * @param row the stored row that moves
    * @param base the current archive base record
+   * @param baseGuid the base record's GUID
    */
   record Repair(
-      @NotNull P4kReviewCase selection, @NotNull ShipType row, @NotNull P4kShipDto base) {}
+      @Nullable P4kReviewCase selection,
+      @NotNull ShipType row,
+      @NotNull P4kShipDto base,
+      @NotNull UUID baseGuid) {
+
+    /**
+     * Records an admin's repair as applied; a move the catalogue decided has no case to finish.
+     *
+     * @param now the run time
+     */
+    void finish(@NotNull Instant now) {
+      if (selection != null) {
+        selection.finishShipRepair(now);
+      }
+    }
+  }
 }

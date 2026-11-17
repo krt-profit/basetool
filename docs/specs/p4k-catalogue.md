@@ -1305,6 +1305,42 @@ never touched, nor one with a queued ship repair.
 `P4kRowMatcher`, `P4kShipReconciler`, `P4kRunResolvedCases` · **ADR:**
 [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
 
+### REQ-P4K-051 — a ship type's P4K identity follows its base and the record that replaced it
+
+A complete APPLY moves a ship type to another P4K GUID by itself, as a confirmed repair would
+(REQ-P4K-049), in two cases:
+
+- **Edition to base.** The ship type holds the GUID of a `player` variant whose group base carries
+  the same in-game name, is a `player` ship and is held by no ship type (as `p4k_uuid` or as
+  `external_uuid`); `ANVL_Carrack_BIS2950` gives way to `ANVL_Carrack`. A ship type holding an NPC
+  variant never moves to the base.
+- **Departed to successor.** The ship type's GUID is no longer in the complete catalogue, and
+  exactly one `player` ship heading its group, held by no ship type, carries one of the ship type's
+  names (`name`, UEX `name_full`, Wiki `game_name`) as its in-game name; `AEGS_Hammerhead` gives
+  way to `AEGS_Hammerhead_GS`.
+
+A target two ship types would take moves neither, and a ship type an admin queued a repair for,
+hid or retired through a case is left to that. The move must pass every check of a confirmed
+repair: a player base with a known vehicle kind and a class name no other record repeats; GUID,
+class name and name held by no other live ship type; every same-name record a variant of the base
+that no other live ship type holds; resolvable paints; a ship loadout with a port tree; base data
+that replaces every stored fact. Its issues are reported as for every other ship. The run writes
+the base data as for a matched ship and reports the move as `CHANGED p4k_uuid`; the sweep then
+finds the GUID listed.
+
+**Acceptance**
+
+- [x] A ship type stamped with an edition moves to its unclaimed base of the same name without a
+  case.
+- [x] A ship type whose GUID left the catalogue follows the one player record carrying its name,
+  and the sweep does not stamp it.
+- [x] Two candidate successors, a target another ship type holds and a target two ship types would
+  take move nothing.
+
+**Enforced by:** `P4kShipIdentityMovesTest`, `P4kShipIdentityFollowImportTest` · **Code:**
+`P4kShipIdentityMoves`, `P4kShipBaseRepairs` · **ADR:**
+[ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
+
 ## Game texts
 
 ### REQ-P4K-033 — every column holding a game text is classified, and game texts and media stay with members

@@ -1464,6 +1464,11 @@ request and no sync writes it.
     the census and its class name differs from the Wiki vehicle's — is reported as
     `SOURCE_IDENTITY_CONFLICT` and leaves the Wiki vehicle unlinked, but keeps the census complete.
     Without both class names, or with equal ones, it stays a blocking conflict.
+  - **A name shared by a base and its variants goes to the base.** When exactly one of the Wiki
+    vehicles carrying the name has a class name that every other carrier's class name extends by an
+    underscore suffix (`RSI_Galaxy` for `RSI_Galaxy_TEMP_Cargo` and `RSI_Galaxy_TEMP_Medical`), that
+    base vehicle links the holding row by name and the others are reported as covered siblings, so
+    the census stays complete. Without such a base the shared name stays a blocking conflict.
 - **The P4K import** resolves by `external_uuid`, then the class name, and when no row carries the
   class name, the ship type that holds the aliased UEX vehicle id, then the name.
 - A row matched through the alias keeps its own `name`; each source writes only its own columns, as
@@ -1489,6 +1494,8 @@ request and no sync writes it.
   moves a game UUID the census still carries.
 - [x] A name held by a departed vehicle of another class is reported without blocking the sweep;
   the same class name still blocks it.
+- [x] The base of a shared name links the stored row whatever the census order, its variants count
+  as covered and the sweep runs; carriers without a base among them still block it.
 - [x] The V310 merge moves every reference onto the survivor, carries the UEX columns over, bumps
   the versions and deletes the UEX half; a half that is not `UEX_ONLY`, or an ambiguous class name,
   merges nothing.
@@ -1869,3 +1876,32 @@ twin under the short name. So each name step tries the short name first, then th
   (`UexVehicleServiceUuidMatchTest`, `UexIdentityCensusTest`).
 - [x] A stale UEX game UUID neither replaces nor blocks a row whose UUID its P4K GUID confirms and is
   reported; an unconfirmed differing UUID still blocks the write (`UexVehicleServiceUuidMatchTest`).
+
+### REQ-DATA-043 — a ship UEX lists twice keeps one listing
+
+UEX lists some ships twice: under two ids sharing a game UUID (149 Prowler and 262 Prowler Utility),
+under a base and a variant name for one game ship (166 Retaliator and 167 Retaliator Bomber), or
+twice under the same name (290 and 291 Sabre Raven EX). When a resolution step of the UEX vehicle
+sync finds a row that holds another listing of the same fetch, one of the two keeps the row:
+
+1. the listing whose game UUID, carried by no other listing, is the row's P4K-confirmed
+   `external_uuid` (REQ-DATA-041);
+2. else the listing whose `name` or `name_full` is the row's name while the other's is not.
+
+A listing that keeps the row takes it over; the other listing then finds its own row by its own
+name. A listing that does not is a **secondary listing**: it writes nothing and creates no row. So
+is a listing no step places whose `name` or `name_full`, carried by another listing too, is the
+name of a row holding such a listing. A secondary listing is no rejected write: it neither marks
+the census incomplete nor suppresses the orphan sweep (REQ-DATA-035). A row holding a UEX id a
+partial fetch did not list is still not written.
+
+**Acceptance**
+
+- [x] A listing whose full name is the row's name takes the row from another ship's listing, and
+  that listing then finds its own row, in either order, without a conflict
+  (`UexVehicleServiceUuidMatchTest`).
+- [x] A second listing of a row whose other listing's game UUID confirms its P4K GUID writes nothing,
+  creates no row and leaves the sweep running (`UexVehicleServiceUuidMatchTest`).
+- [x] A second listing of a shared name creates no row (`UexVehicleServiceUuidMatchTest`).
+
+**Code:** `UexVehicleService`, `UexVehicleListings` · **ADR:** ADR-0392

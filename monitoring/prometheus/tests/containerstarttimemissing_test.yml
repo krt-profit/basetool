@@ -32,7 +32,7 @@ tests:
         values: "1x30"
       - series: 'podman_container_started_seconds{id="a06",pod_id="",pod_name=""}'
         values: "1000x30"
-      - series: 'podman_container_info{id="a07",name="redis",image="x",pod_id="",pod_name="",ports=""}'
+      - series: 'podman_container_info{id="a07",name="redis-session",image="x",pod_id="",pod_name="",ports=""}'
         values: "1x30"
       - series: 'podman_container_started_seconds{id="a07",pod_id="",pod_name=""}'
         values: "1000x30"
@@ -118,7 +118,7 @@ tests:
         values: "1x40"
       - series: 'podman_container_started_seconds{id="a06",pod_id="",pod_name=""}'
         values: "1000x40"
-      - series: 'podman_container_info{id="a07",name="redis",image="x",pod_id="",pod_name="",ports=""}'
+      - series: 'podman_container_info{id="a07",name="redis-session",image="x",pod_id="",pod_name="",ports=""}'
         values: "1x40"
       - series: 'podman_container_started_seconds{id="a07",pod_id="",pod_name=""}'
         values: "1000x40"

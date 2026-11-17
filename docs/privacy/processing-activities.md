@@ -210,7 +210,7 @@ requires it and duplicating it into further files spreads personal data for no g
   exchange like any other connected application. The Android app this activity also covered is
   discontinued (ADR-0268); the server processes nothing for it any more.
 - **Legal basis:** Art. 6(1)(b).
-- **Where:** the ingest handoff staging in Redis (REQ-INGEST-003, REQ-XCH-019); for the direct sync,
+- **Where:** the ingest handoff staging in the shared Redis, `redis-shared` (REQ-INGEST-003, REQ-XCH-019); for the direct sync,
   A11; on the member's own device.
 - **Retention:** a staged handoff expires after **30 minutes** unread; see [Retention](#retention).
 
@@ -291,7 +291,7 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Where:** `exchange_installation`, `exchange_client_revocation`, `exchange_change`,
   `exchange_journal`, `exchange_ship_link`, `exchange_refinery_order_link`,
   `exchange_bulk_undo_run` / `exchange_bulk_undo_skip`, `exchange_name_withholding`;
-  Redis `exchange:*` and `ingest:xch:*`; the Keycloak realm.
+  `redis-shared`'s `exchange:*` and `ingest:xch:*`; the Keycloak realm.
 - **Retention:** a connected installation for as long as it stays connected; a **disconnected
   installation with its label 90 days after the disconnection**, and a **client revocation 90 days
   after the revocation** (owner decision 2026-09-28, `ExchangeConnectionRetentionTask`, REQ-XCH-035;
@@ -348,8 +348,8 @@ The single table every other statement about retention must agree with.
 | Traces                                  | **14 days**                                                                    | Tempo retention                                                            | `block_retention` in `monitoring/tempo/tempo.yaml`      |
 | Keycloak realm events (login + admin)   | **30 days**                                                                    | Keycloak realm event expiration                                            | `events/config` + the `adminEventsExpiration` attribute |
 | Metrics (no personal data)              | 180 days                                                                       | Prometheus TSDB retention                                                  | `--storage.tsdb.retention.time` in `docker-compose.monitoring.yml` (→ `quadlet/systemd/prometheus.container`) |
-| Sessions                                | 30 days idle for an authenticated session                                      | Spring Session / Redis (REQ-SEC-025)                                       | `app.session.authenticated-timeout`                     |
-| Ingest handoff (companion import)       | **30 minutes**, single use                                                     | Redis key expiry (REQ-INGEST-003)                                          | `app.ingest.handoff-ttl`                                |
+| Sessions                                | 30 days idle for an authenticated session                                      | Spring Session / `redis-session` (REQ-SEC-025, REQ-SEC-089)                | `app.session.authenticated-timeout`                     |
+| Ingest handoff (companion import)       | **30 minutes**, single use                                                     | `redis-shared` key expiry (REQ-INGEST-003)                                 | `app.ingest.handoff-ttl`                                |
 | Exchange: disconnected installation with its label | **90 days** after the disconnection | `ExchangeConnectionRetentionTask` (REQ-XCH-035) | `app.exchange.connection-retention.max-age` |
 | Exchange: client revocation | **90 days** after the revocation | `ExchangeConnectionRetentionTask` (REQ-XCH-035) | `app.exchange.connection-retention.max-age` |
 | Exchange: connected installation, ship links | While connected; a ship link until its ship is deleted, at the latest with the account | Disconnection, then the sweep above; `ON DELETE CASCADE` (REQ-DATA-008) | — |
