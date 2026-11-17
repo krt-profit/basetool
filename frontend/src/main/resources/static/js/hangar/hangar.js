@@ -19,7 +19,7 @@
 
 /* global hangarI18n, hangarConflict */
 
-import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
@@ -34,6 +34,7 @@ import {
     reportBulkUnitOutcome,
 } from '/js/hangar/ship-unit-change.js';
 import { bindOriginField, bulkChangeOrigin } from '/js/hangar/ship-origin.js';
+import { initHangarImport } from '/js/hangar/hangar-import.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
@@ -552,167 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal();
     }
 
-    (function () {
-        const importBtn = document.getElementById('fleetview-import-btn');
-        const fileInput = /** @type {HTMLInputElement | null} */ (
-            document.getElementById('fleetview-file')
-        );
-        const resultModal = document.getElementById('import-result-modal');
-        const closeResultBtn = document.getElementById('import-result-close');
-        const closeResultX = document.getElementById('import-result-close-x');
-
-        /**
-         * Looks up an element of the import result dialog; the dialog always renders them.
-         *
-         * @param {string} id the element id
-         * @returns {HTMLElement} the element
-         */
-        function resultElement(id) {
-            return /** @type {HTMLElement} */ (document.getElementById(id));
-        }
-
-        /**
-         * Shows an error toast.
-         *
-         * @param {string} msg the message
-         */
-        function showError(msg) {
-            showFrontendErrorToast(msg);
-        }
-
-        /**
-         * Replaces the list's children with one paragraph per name.
-         *
-         * @param {HTMLElement} list the list container
-         * @param {string[]} names the names to show
-         */
-        function fillParagraphs(list, names) {
-            list.replaceChildren(
-                ...names.map((n) => {
-                    const p = document.createElement('p');
-                    p.textContent = n == null ? '' : String(n);
-                    return p;
-                }),
-            );
-        }
-
-        /**
-         * Fills and opens the import result dialog.
-         *
-         * @param {ApiDto<'FleetviewImportResponseDto'>} data the import outcome
-         */
-        function openResultModal(data) {
-            resultElement('import-res-imported').textContent = String(data.importedCount ?? '');
-            resultElement('import-res-updated').textContent = String(data.updatedCount ?? '');
-            resultElement('import-res-skipped').textContent = String(data.skippedCount ?? '');
-            resultElement('import-res-duplicates').textContent = String(data.duplicateCount ?? '');
-
-            const skipSection = resultElement('import-skip-section');
-            const skipList = resultElement('import-skip-list');
-            const hasSkipped = !!(data.skippedShips && data.skippedShips.length > 0);
-            if (hasSkipped) {
-                fillParagraphs(skipList, /** @type {string[]} */ (data.skippedShips));
-            }
-            skipSection.hidden = !hasSkipped;
-
-            const dupSection = resultElement('import-dup-section');
-            const dupList = resultElement('import-dup-list');
-            const hasDuplicates = !!(data.duplicateShips && data.duplicateShips.length > 0);
-            if (hasDuplicates) {
-                fillParagraphs(dupList, /** @type {string[]} */ (data.duplicateShips));
-            }
-            dupSection.hidden = !hasDuplicates;
-
-            krtModal.open(resultModal);
-        }
-
-        [closeResultBtn, closeResultX].forEach((btn) => {
-            if (!btn) return;
-            btn.addEventListener('click', () => {
-                krtModal.close(resultModal);
-                if (
-                    resultElement('import-res-imported').textContent !== '0' ||
-                    resultElement('import-res-updated').textContent !== '0'
-                ) {
-                    afterHangarWrite();
-                }
-            });
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target === resultModal) {
-                krtModal.close(resultModal);
-            }
-        });
-
-        /**
-         * Uploads the chosen ship export (JSON or Hangar Extension CSV) and shows the result dialog.
-         *
-         * @param {File} file the chosen file
-         */
-        function upload(file) {
-            if (!importBtn || !fileInput) return;
-            const button = importBtn;
-            const input = fileInput;
-            const maxBytes = Number(button.getAttribute('data-max-bytes'));
-            if (maxBytes > 0 && file.size > maxBytes) {
-                showError(/** @type {string} */ (button.getAttribute('data-error-toolarge')));
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', file);
-
-            /**
-             * Shows the upload failure toast with an optional detail.
-             *
-             * @param {string} detail the failure detail, empty for none
-             */
-            function showFailure(detail) {
-                showError(
-                    /** @type {string} */ (button.getAttribute('data-error-failed')) +
-                        (detail ? ` (${detail})` : ''),
-                );
-            }
-
-            button.setAttribute('aria-busy', 'true');
-            krtFetch
-                .submitForm({
-                    url: '/hangar/import/ships',
-                    method: 'POST',
-                    formData,
-                    submitter: button,
-                    toast: false,
-                    onSuccess(data) {
-                        openResultModal(data);
-                    },
-                    onError(status, body) {
-                        showFailure(body && body.detail ? body.detail : String(status));
-                        return true;
-                    },
-                    onNetworkError() {
-                        showFailure('');
-                        return true;
-                    },
-                })
-                .then(() => {
-                    button.removeAttribute('aria-busy');
-                    input.value = '';
-                });
-        }
-
-        if (importBtn && fileInput) {
-            importBtn.addEventListener('click', () => {
-                fileInput.click();
-            });
-            fileInput.addEventListener('change', () => {
-                const file = fileInput.files && fileInput.files[0];
-                if (file) {
-                    upload(file);
-                }
-            });
-        }
-    })();
+    initHangarImport(afterHangarWrite);
 
     (function () {
         const deleteAllBtn = /** @type {HTMLButtonElement | null} */ (

@@ -305,7 +305,8 @@ web, naming its client (REQ-AUDIT-005):
   user) —, delete (`HANGAR_SHIP_DELETED`, with the
   number of mission units detached), empty own hangar (`HANGAR_EMPTIED`), import of a hangar or
   Fleetview export (`HANGAR_IMPORTED`, only when it created or updated ships; created / updated /
-  already present / unmatched counts, never pledge values — REQ-HANGAR-015), the officer's fitted reset (`HANGAR_FITTED_RESET`, only when it cleared a
+  already present / unmatched / ambiguous counts, never pledge values or names — REQ-HANGAR-015,
+  REQ-HANGAR-019), the officer's fitted reset (`HANGAR_FITTED_RESET`, only when it cleared a
   flag; count and whether all units were in scope) and a member's home location for every ship
   (`HANGAR_HOME_LOCATION_SET`, subject the location). The admin paths on another member's hangar
   write the same events. The subject is the ship, labelled by its **ship-type name** — never the

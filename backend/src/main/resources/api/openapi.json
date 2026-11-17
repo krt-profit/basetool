@@ -21175,6 +21175,9 @@
               "schema" : {
                 "type" : "object",
                 "properties" : {
+                  "choices" : {
+                    "$ref" : "#/components/schemas/HangarImportChoicesDto"
+                  },
                   "file" : {
                     "type" : "string",
                     "format" : "binary"
@@ -89680,6 +89683,24 @@
         },
         "required" : [ "amount", "targetId" ]
       },
+      "AmbiguousShipDto" : {
+        "type" : "object",
+        "properties" : {
+          "count" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "options" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ShipTypeOptionDto"
+            }
+          }
+        }
+      },
       "AnnouncementDto" : {
         "type" : "object",
         "properties" : {
@@ -94274,6 +94295,12 @@
       "FleetviewImportResponseDto" : {
         "type" : "object",
         "properties" : {
+          "ambiguousShips" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AmbiguousShipDto"
+            }
+          },
           "duplicateCount" : {
             "type" : "integer",
             "format" : "int32"
@@ -94541,6 +94568,35 @@
           }
         },
         "required" : [ "handoverTime", "items", "jobOrderNumber", "recipientHandle" ]
+      },
+      "HangarImportChoiceDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "shipTypeId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "name", "shipTypeId" ]
+      },
+      "HangarImportChoicesDto" : {
+        "type" : "object",
+        "properties" : {
+          "choices" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/HangarImportChoiceDto"
+            },
+            "maxItems" : 1000,
+            "minItems" : 0
+          }
+        },
+        "required" : [ "choices" ]
       },
       "HiddenResponse" : {
         "type" : "object",
@@ -107273,6 +107329,18 @@
           },
           "scu" : {
             "type" : "number"
+          }
+        }
+      },
+      "ShipTypeOptionDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
           }
         }
       },
