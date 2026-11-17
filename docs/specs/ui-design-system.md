@@ -2573,6 +2573,9 @@ optimistic-lock version, so an edit in one never 409s another:
 - A write that meets a version conflict (409) is dropped, only the affected section reloads, and
   the hint „In einem anderen Fenster geändert – bitte erneut versuchen" shows; the other sections
   stay as they are.
+- A window never conflicts with itself: its writes run one at a time, and a write made while an
+  earlier one is still being saved is sent with the version and the stored state that save
+  returned.
 
 **Monitoring:** `basetool_navigation_preference_writes_total{section,outcome}` and
 `basetool_navigation_personalised_accounts{section}` (REQ-OBS-011); the endpoints count in
@@ -2594,8 +2597,8 @@ other sections, the reset, the deletion of entries, the metric), `NavigationOrde
 `NavigationMenuOrderTest` (the stored order and the placement of keys the store does not know),
 `NavigationOrderMvcTest` (the rendered order, the move controls, the relays),
 `NavigationOrderE2eTest` (moving by button and by Alt+Arrow without a drag, focus kept, the live
-announcement, reload, „Standardreihenfolge", the 409 hint, 44 px controls up to 1024 px and 32 px
-above), `NavigationTabBarResolverTest` (the automatic fill from the favourites, the frozen bar,
+announcement, reload, „Standardreihenfolge", the 409 hint, a reset and an unstar queued behind a
+save carrying its version, 44 px controls up to 1024 px and 32 px above), `NavigationTabBarResolverTest` (the automatic fill from the favourites, the frozen bar,
 the stand-in, the cleared slot, the deletion of lost keys), `NavigationTabBarMvcTest` (the bar
 per mode, the pickers, the relay), `NavigationTabBarE2eTest` (the freeze, the swap on a taken
 entry and by the neighbour buttons, the long press, the reset, the touch floor, the admin bar),

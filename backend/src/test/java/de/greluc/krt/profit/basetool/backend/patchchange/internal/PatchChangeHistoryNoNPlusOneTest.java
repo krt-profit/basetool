@@ -19,20 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import jakarta.persistence.EntityManagerFactory;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +60,6 @@ class PatchChangeHistoryNoNPlusOneTest {
 
   @Autowired private PatchChangeHistory history;
   @Autowired private UserRepository userRepository;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private JdbcTemplate jdbc;
 
   private UUID early;
@@ -96,7 +93,7 @@ class PatchChangeHistoryNoNPlusOneTest {
   }
 
   @Test
-  void theHistoryReadsAFixedNumberOfStatementsHoweverManyPhasesItHolds() {
+  void theHistoryReadsAFixedNumberOfStatementsHoweverManyPhasesItHolds() throws Exception {
     record(1, true);
     record(2, false);
     long few = statements();
@@ -108,6 +105,7 @@ class PatchChangeHistoryNoNPlusOneTest {
 
     assertThat(many)
         .as("statements for %d records, %d for two (suspected N+1)", RECORDS, few)
+        .isPositive()
         .isEqualTo(few);
   }
 
@@ -143,13 +141,10 @@ class PatchChangeHistoryNoNPlusOneTest {
    * Reads the history and counts the statements it prepared.
    *
    * @return the statement count
+   * @throws Exception whatever the read throws
    */
-  private long statements() {
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
-    stats.clear();
-    history.history();
-    return stats.getPrepareStatementCount();
+  private long statements() throws Exception {
+    return preparedBy(history::history);
   }
 
   /**
