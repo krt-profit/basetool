@@ -166,8 +166,9 @@ def read_cert(path: str) -> Cert:
     issuer = _openssl(path, "-issuer", "-nameopt", NAME_FORMAT).partition("=")[2].strip()
     not_after = _parse_date(_openssl(path, "-enddate"))
     not_before = _parse_date(_openssl(path, "-startdate"))
-    return Cert(path=path, subject=subject, issuer=issuer,
-                not_after=not_after, not_before=not_before)
+    return Cert(
+        path=path, subject=subject, issuer=issuer, not_after=not_after, not_before=not_before
+    )
 
 
 def discover(dirs: Iterable[str]) -> list[str]:
@@ -259,11 +260,17 @@ def main(argv: list[str] | None = None) -> int:
         invocation.
     """
     parser = argparse.ArgumentParser(prog="cert-expiry-metrics.py")
-    parser.add_argument("--dir", action="append", dest="dirs", default=None,
-                        help=f"directory to scan, repeatable (default: {', '.join(DEFAULT_DIRS)})")
+    parser.add_argument(
+        "--dir",
+        action="append",
+        dest="dirs",
+        default=None,
+        help=f"directory to scan, repeatable (default: {', '.join(DEFAULT_DIRS)})",
+    )
     parser.add_argument("--output", help="the .prom file to write")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="print what would be written and write nothing")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="print what would be written and write nothing"
+    )
     args = parser.parse_args(argv)
 
     if not args.output and not args.dry_run:
@@ -285,8 +292,10 @@ def main(argv: list[str] | None = None) -> int:
             failures += 1
 
     if not certs:
-        print("cert-expiry-metrics: no file under the scanned directories parsed as a certificate",
-              file=sys.stderr)
+        print(
+            "cert-expiry-metrics: no file under the scanned directories parsed as a certificate",
+            file=sys.stderr,
+        )
         return 1
 
     content = render(certs, int(time.time()))
@@ -298,8 +307,10 @@ def main(argv: list[str] | None = None) -> int:
     except CollectorError as exc:
         print(f"cert-expiry-metrics: {exc}", file=sys.stderr)
         return 1
-    print(f"wrote {len(certs)} certificate(s) to {args.output}"
-          + (f" ({failures} skipped)" if failures else ""))
+    print(
+        f"wrote {len(certs)} certificate(s) to {args.output}"
+        + (f" ({failures} skipped)" if failures else "")
+    )
     return 0
 
 

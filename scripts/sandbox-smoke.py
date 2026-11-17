@@ -40,9 +40,14 @@ class Smoke:
         self.args = args
         self.count = 0
         self.session = SandboxSession(
-            key, gateway=args.gateway, keycloak=args.keycloak, ca=args.ca, client=args.client,
+            key,
+            gateway=args.gateway,
+            keycloak=args.keycloak,
+            ca=args.ca,
+            client=args.client,
             step=self.step,
-            user_agent="BasetoolSandboxSmoke/1.0.0 (+https://krt-profit.github.io/basetool/)")
+            user_agent="BasetoolSandboxSmoke/1.0.0 (+https://krt-profit.github.io/basetool/)",
+        )
 
     def step(self, label: str, ok: bool, detail: str = "") -> None:
         """Reports a step and stops the run at the first failure."""
@@ -55,8 +60,9 @@ class Smoke:
         """Signs the member in through the device grant, checking every page on the way."""
         self.session.login(self.args.user, self.args.password)
 
-    def call(self, method: str, path: str, body: dict | None = None,
-             write: bool = False) -> tuple[int, dict]:
+    def call(
+        self, method: str, path: str, body: dict | None = None, write: bool = False
+    ) -> tuple[int, dict]:
         """Calls the gateway with a DPoP proof, retrying once on a nonce challenge."""
         return self.session.call(method, path, body, write)
 
@@ -72,7 +78,9 @@ class Smoke:
             if status != 503 or answer.get("code") != "EXCHANGE_DISABLED":
                 return
             if time.monotonic() >= deadline:
-                self.step("the exchange switch reaches the gateway", False, json.dumps(answer)[:300])
+                self.step(
+                    "the exchange switch reaches the gateway", False, json.dumps(answer)[:300]
+                )
             print("waiting for the exchange switch to reach the gateway")
             time.sleep(10)
 
@@ -82,8 +90,12 @@ class Smoke:
         self.wait_for_exchange()
         for label, method, path, body in [
             ("the service document", "GET", "/exchange/v1", None),
-            ("the installation is labelled", "POST", "/exchange/v1/me/installation",
-             {"label": "Sandbox smoke"}),
+            (
+                "the installation is labelled",
+                "POST",
+                "/exchange/v1/me/installation",
+                {"label": "Sandbox smoke"},
+            ),
             ("the blueprints", "GET", "/exchange/v1/me/blueprints", None),
             ("the stock", "GET", "/exchange/v1/me/stock", None),
             ("the ships", "GET", "/exchange/v1/me/ships", None),
@@ -100,31 +112,66 @@ class Smoke:
             if path == "/exchange/v1/me/org-demand":
                 self.check_org_demand(answer)
         refs = {}
-        for kind, ref in [("BLUEPRINT", {"scRecord": "BP_CRAFT_SBXM_HELMET_01"}),
-                          ("SHIP_TYPE", {"name": "Sandbox Miner"}),
-                          ("MATERIAL", {"name": "Sandbox Metal"})]:
-            status, answer = self.call("POST", "/exchange/v1/catalog/resolve",
-                                       {"kind": kind, "refs": [ref]})
+        for kind, ref in [
+            ("BLUEPRINT", {"scRecord": "BP_CRAFT_SBXM_HELMET_01"}),
+            ("SHIP_TYPE", {"name": "Sandbox Miner"}),
+            ("MATERIAL", {"name": "Sandbox Metal"}),
+        ]:
+            status, answer = self.call(
+                "POST", "/exchange/v1/catalog/resolve", {"kind": kind, "refs": [ref]}
+            )
             resolved = status == 200 and answer["results"][0].get("status") == "resolved"
             self.step(f"a {kind.lower()} resolves", resolved, json.dumps(answer)[:300])
             refs[kind] = answer["results"][0]["ref"]
-        held = next((lot["quantity"]["amount"] for lot in stock.get("items", [])
-                     if lot["material"]["bt"] == refs["MATERIAL"]["bt"]
-                     and lot["location"]["name"] == "Sandbox Station Storage"
-                     and lot["quality"] == 800 and not lot["stolen"]), 0)
+        held = next(
+            (
+                lot["quantity"]["amount"]
+                for lot in stock.get("items", [])
+                if lot["material"]["bt"] == refs["MATERIAL"]["bt"]
+                and lot["location"]["name"] == "Sandbox Station Storage"
+                and lot["quality"] == 800
+                and not lot["stolen"]
+            ),
+            0,
+        )
         for label, path, body in [
-            ("a blueprint syncs", "/exchange/v1/me/blueprints/changes",
-             {"ops": [{"op": "add", "ref": refs["BLUEPRINT"],
-                       "provenance": {"source": "log"}}]}),
-            ("a stock lot syncs", "/exchange/v1/me/stock/changes",
-             {"ops": [{"op": "set-quantity", "material": refs["MATERIAL"],
-                       "location": {"name": "Sandbox Station Storage"}, "quality": 800,
-                       "stolen": False, "quantity": {"amount": held + 2.5, "unit": "SCU"},
-                       "expectedQuantity": {"amount": held, "unit": "SCU"}}]}),
-            ("a ship syncs", "/exchange/v1/me/ships/changes",
-             {"ops": [{"op": "upsert", "externalId": f"smoke-{uuid.uuid4().hex[:8]}",
-                       "shipType": refs["SHIP_TYPE"], "name": "Smoke Miner",
-                       "insurance": {"kind": "LTI"}}]}),
+            (
+                "a blueprint syncs",
+                "/exchange/v1/me/blueprints/changes",
+                {"ops": [{"op": "add", "ref": refs["BLUEPRINT"], "provenance": {"source": "log"}}]},
+            ),
+            (
+                "a stock lot syncs",
+                "/exchange/v1/me/stock/changes",
+                {
+                    "ops": [
+                        {
+                            "op": "set-quantity",
+                            "material": refs["MATERIAL"],
+                            "location": {"name": "Sandbox Station Storage"},
+                            "quality": 800,
+                            "stolen": False,
+                            "quantity": {"amount": held + 2.5, "unit": "SCU"},
+                            "expectedQuantity": {"amount": held, "unit": "SCU"},
+                        }
+                    ]
+                },
+            ),
+            (
+                "a ship syncs",
+                "/exchange/v1/me/ships/changes",
+                {
+                    "ops": [
+                        {
+                            "op": "upsert",
+                            "externalId": f"smoke-{uuid.uuid4().hex[:8]}",
+                            "shipType": refs["SHIP_TYPE"],
+                            "name": "Smoke Miner",
+                            "insurance": {"kind": "LTI"},
+                        }
+                    ]
+                },
+            ),
         ]:
             self.sync(label, path, body)
         self.refinery_order(refs["MATERIAL"])
@@ -139,16 +186,26 @@ class Smoke:
         """Checks the seeded demand of both memberships or the withheld response."""
         detail = json.dumps(answer)[:600]
         if self.args.demand == "withheld":
-            self.step("the org demand is withheld as NOT_PERMITTED",
-                      answer.get("reason") == "NOT_PERMITTED" and answer.get("materials") == []
-                      and answer.get("items") == [] and "orders" not in answer, detail)
+            self.step(
+                "the org demand is withheld as NOT_PERMITTED",
+                answer.get("reason") == "NOT_PERMITTED"
+                and answer.get("materials") == []
+                and answer.get("items") == []
+                and "orders" not in answer,
+                detail,
+            )
             return
         self.step("the org demand is not withheld", "reason" not in answer, detail)
-        self.step("the org demand includes the Sandbox Squadron and IRIDIUM orders",
-                  any(line["material"]["name"] == "Sandbox Ore (Raw)"
-                      and line["source"] == "material-order" for line in answer["materials"])
-                  and any(line["item"]["name"] == "Sandbox Rifle" for line in answer["items"]),
-                  detail)
+        self.step(
+            "the org demand includes the Sandbox Squadron and IRIDIUM orders",
+            any(
+                line["material"]["name"] == "Sandbox Ore (Raw)"
+                and line["source"] == "material-order"
+                for line in answer["materials"]
+            )
+            and any(line["item"]["name"] == "Sandbox Rifle" for line in answer["items"]),
+            detail,
+        )
 
     def sync(self, label: str, path: str, body: dict) -> dict:
         """Sends a change set that must take every op, applied or unchanged.
@@ -173,32 +230,72 @@ class Smoke:
             metal: the resolved reference of Sandbox Metal, the ore's refined output.
         """
         status, answer = self.call("GET", "/exchange/v1/me/store-choices/receivers")
-        self.step("the store-choice receivers", status == 200, f"{status} {json.dumps(answer)[:300]}")
+        self.step(
+            "the store-choice receivers", status == 200, f"{status} {json.dumps(answer)[:300]}"
+        )
         me = next((receiver for receiver in answer.get("items", []) if receiver["self"]), {})
-        self.step("the member is a receiver with a unit", bool(me.get("orgUnits")),
-                  json.dumps(answer)[:300])
+        self.step(
+            "the member is a receiver with a unit",
+            bool(me.get("orgUnits")),
+            json.dumps(answer)[:300],
+        )
         unit = {"id": me["orgUnits"][0]["id"]}
         status, answer = self.call(
-            "GET", "/exchange/v1/me/store-choices/job-orders?"
-            + urllib.parse.urlencode({"material": metal["bt"]}))
-        self.step("the store-choice job orders", status == 200,
-                  f"{status} {json.dumps(answer)[:300]}")
+            "GET",
+            "/exchange/v1/me/store-choices/job-orders?"
+            + urllib.parse.urlencode({"material": metal["bt"]}),
+        )
+        self.step(
+            "the store-choice job orders", status == 200, f"{status} {json.dumps(answer)[:300]}"
+        )
         place = {"name": "Sandbox Station Storage"}
-        created = self.sync("a refinery order is created", "/exchange/v1/me/refinery-orders/changes",
-                            {"ops": [{"opId": "c1", "op": "create",
-                                      "clientKey": f"smoke-{uuid.uuid4().hex[:8]}",
-                                      "orgUnit": unit, "location": place,
-                                      "goods": [{"input": {"name": "Sandbox Ore (Raw)"},
-                                                 "inputQuantity": 1000, "outputQuantity": 800,
-                                                 "quality": 800}]}]})
+        created = self.sync(
+            "a refinery order is created",
+            "/exchange/v1/me/refinery-orders/changes",
+            {
+                "ops": [
+                    {
+                        "opId": "c1",
+                        "op": "create",
+                        "clientKey": f"smoke-{uuid.uuid4().hex[:8]}",
+                        "orgUnit": unit,
+                        "location": place,
+                        "goods": [
+                            {
+                                "input": {"name": "Sandbox Ore (Raw)"},
+                                "inputQuantity": 1000,
+                                "outputQuantity": 800,
+                                "quality": 800,
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
         order = created["orders"][0]
-        self.sync("a refinery order is picked up into stock",
-                  "/exchange/v1/me/refinery-orders/changes",
-                  {"ops": [{"opId": "p1", "op": "pickup", "id": order["id"],
-                            "versions": {"gameData": order["versions"]["gameData"]},
-                            "lines": [{"material": metal, "location": place, "quality": 800,
-                                       "quantity": {"amount": 8, "unit": "SCU"},
-                                       "orgUnit": unit}]}]})
+        self.sync(
+            "a refinery order is picked up into stock",
+            "/exchange/v1/me/refinery-orders/changes",
+            {
+                "ops": [
+                    {
+                        "opId": "p1",
+                        "op": "pickup",
+                        "id": order["id"],
+                        "versions": {"gameData": order["versions"]["gameData"]},
+                        "lines": [
+                            {
+                                "material": metal,
+                                "location": place,
+                                "quality": 800,
+                                "quantity": {"amount": 8, "unit": "SCU"},
+                                "orgUnit": unit,
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
 
     def default_blueprint(self, limit: float = 120.0) -> None:
         """Removes a default blueprint as a dry run, which must be refused `DEFAULT_NOT_REMOVABLE`.
@@ -206,12 +303,12 @@ class Smoke:
         The backend grants the defaults to every member once a minute, so a run right after the
         start waits while the removal is still answered `unchanged`.
         """
-        body = {"dryRun": True,
-                "ops": [{"op": "remove", "ref": {"name": "S-38 Pistol"}}]}
+        body = {"dryRun": True, "ops": [{"op": "remove", "ref": {"name": "S-38 Pistol"}}]}
         deadline = time.monotonic() + limit
         while True:
-            status, answer = self.call("POST", "/exchange/v1/me/blueprints/changes", body,
-                                       write=True)
+            status, answer = self.call(
+                "POST", "/exchange/v1/me/blueprints/changes", body, write=True
+            )
             result = (answer.get("results") or [{}])[0]
             if status != 200 or result.get("result") != "unchanged":
                 break
@@ -219,10 +316,13 @@ class Smoke:
                 break
             print("waiting for the default blueprints to be granted")
             time.sleep(10)
-        self.step("a default blueprint cannot be removed",
-                  status == 200 and result.get("result") == "rejected"
-                  and result.get("reason") == "DEFAULT_NOT_REMOVABLE",
-                  f"{status} {json.dumps(answer)[:300]}")
+        self.step(
+            "a default blueprint cannot be removed",
+            status == 200
+            and result.get("result") == "rejected"
+            and result.get("reason") == "DEFAULT_NOT_REMOVABLE",
+            f"{status} {json.dumps(answer)[:300]}",
+        )
 
     def proof_limit(self, requests: int = 800) -> None:
         """Sends one fresh proof per request until the member's cap answers `429 DPOP_PROOF_LIMIT`.
@@ -240,37 +340,52 @@ class Smoke:
             if answer.get("code") == "DPOP_PROOF_LIMIT":
                 break
         elapsed = time.monotonic() - started
-        self.step("the member's proof cap answers 429 DPOP_PROOF_LIMIT",
-                  seen.get("429 DPOP_PROOF_LIMIT", 0) == 1,
-                  f"{sum(seen.values())} requests in {elapsed:.1f} s: {json.dumps(seen)}")
-        print(f"proof cap reached after {sum(seen.values())} requests in {elapsed:.1f} s: "
-              f"{json.dumps(seen)}")
+        self.step(
+            "the member's proof cap answers 429 DPOP_PROOF_LIMIT",
+            seen.get("429 DPOP_PROOF_LIMIT", 0) == 1,
+            f"{sum(seen.values())} requests in {elapsed:.1f} s: {json.dumps(seen)}",
+        )
+        print(
+            f"proof cap reached after {sum(seen.values())} requests in {elapsed:.1f} s: "
+            f"{json.dumps(seen)}"
+        )
 
     def conformance(self) -> None:
         """Sends the change-set fixtures: valid ones as dry runs, invalid ones to be refused."""
         examples = ROOT / "docs" / "exchange" / "examples" / "v1"
-        routes = {"blueprintChangeSet": "/exchange/v1/me/blueprints/changes",
-                  "stockChangeSet": "/exchange/v1/me/stock/changes",
-                  "shipChangeSet": "/exchange/v1/me/ships/changes",
-                  "refineryOrderChangeSet": "/exchange/v1/me/refinery-orders/changes",
-                  "orgStockChangeSet": "/exchange/v1/org-stock/changes"}
+        routes = {
+            "blueprintChangeSet": "/exchange/v1/me/blueprints/changes",
+            "stockChangeSet": "/exchange/v1/me/stock/changes",
+            "shipChangeSet": "/exchange/v1/me/ships/changes",
+            "refineryOrderChangeSet": "/exchange/v1/me/refinery-orders/changes",
+            "orgStockChangeSet": "/exchange/v1/org-stock/changes",
+        }
         for folder in sorted(examples.glob("change-set--*")):
             kind = folder.name.split("--", 1)[1]
             if kind not in routes:
-                self.step(f"fixture folder {folder.name} has a route", False,
-                          f"add {kind} to the routes of scripts/sandbox-smoke.py")
+                self.step(
+                    f"fixture folder {folder.name} has a route",
+                    False,
+                    f"add {kind} to the routes of scripts/sandbox-smoke.py",
+                )
             path = routes[kind]
             for fixture in sorted((folder / "valid").glob("*.json")):
                 body = json.loads(fixture.read_text(encoding="utf-8"))
                 body["dryRun"] = True
                 status, answer = self.call("POST", path, body, write=True)
-                self.step(f"fixture {folder.name}/valid/{fixture.name} is accepted",
-                          status == 200, f"{status} {json.dumps(answer)[:300]}")
+                self.step(
+                    f"fixture {folder.name}/valid/{fixture.name} is accepted",
+                    status == 200,
+                    f"{status} {json.dumps(answer)[:300]}",
+                )
             for fixture in sorted((folder / "invalid").glob("*.json")):
                 body = json.loads(fixture.read_text(encoding="utf-8"))
                 status, answer = self.call("POST", path, body, write=True)
-                self.step(f"fixture {folder.name}/invalid/{fixture.name} is refused",
-                          status in (400, 413), f"{status} {json.dumps(answer)[:300]}")
+                self.step(
+                    f"fixture {folder.name}/invalid/{fixture.name} is refused",
+                    status in (400, 413),
+                    f"{status} {json.dumps(answer)[:300]}",
+                )
 
 
 def main() -> int:
@@ -282,20 +397,27 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gateway", default="https://127.0.0.1:11262")
     parser.add_argument("--keycloak", default="http://127.0.0.1:18080")
-    parser.add_argument("--ca", type=pathlib.Path,
-                        default=DEFAULT_CA)
+    parser.add_argument("--ca", type=pathlib.Path, default=DEFAULT_CA)
     parser.add_argument("--client", default="sandbox-client")
     parser.add_argument("--user", default="sandbox-member")
     parser.add_argument("--password", default="sandbox-member-pw-do-not-use-in-prod")
-    parser.add_argument("--conformance", action="store_true",
-                        help="also send the change-set conformance fixtures")
-    parser.add_argument("--demand", choices=("shown", "withheld"), default="shown",
-                        help="what the member's org demand must be: shown for sandbox-member, "
-                             "withheld for sandbox-member-2, whose only squadron is outside the "
-                             "active Profit hierarchy")
-    parser.add_argument("--proof-limit", action="store_true",
-                        help="finally flood the gateway until the member's proof cap answers "
-                             "429 DPOP_PROOF_LIMIT; the member is refused for about 30 s after")
+    parser.add_argument(
+        "--conformance", action="store_true", help="also send the change-set conformance fixtures"
+    )
+    parser.add_argument(
+        "--demand",
+        choices=("shown", "withheld"),
+        default="shown",
+        help="what the member's org demand must be: shown for sandbox-member, "
+        "withheld for sandbox-member-2, whose only squadron is outside the "
+        "active Profit hierarchy",
+    )
+    parser.add_argument(
+        "--proof-limit",
+        action="store_true",
+        help="finally flood the gateway until the member's proof cap answers "
+        "429 DPOP_PROOF_LIMIT; the member is refused for about 30 s after",
+    )
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as tmp:
         key_file = pathlib.Path(tmp) / "smoke-dpop.pem"

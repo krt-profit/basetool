@@ -56,7 +56,7 @@ A floor only has to clear its advisory: stay on the lines above rather than taki
 | `mockito` (keycloak-spi only) | 5.24.0 | Same reason as `junit`; backend, frontend and ingest keep Boot's managed Mockito. Kept in the catalog, not the build script, so refreshVersions can see it. The module's tests set `net.bytebuddy.experimental=true` because Byte Buddy does not yet officially support the JDK 25 toolchain. | Drop the Byte Buddy flag once Mockito's Byte Buddy officially supports JDK 25. |
 | `test-support`, `logging-support` | Boot BOM | Both import the Spring Boot BOM without the Boot plugin and pin nothing of their own; the root script's BOM property overrides reach them through the dependency-management plugin, so they compile against what the applications run. No `platform(libs.junit.bom)` on top (removed 2026-09-22: it put a second JUnit line into one module). | — |
 | `googleJavaFormat` | 2.0.0 (≥ 1.35.0) | Older google-java-format reflects on a javac method whose return type changed in JDK 25 and fails every file with `NoSuchMethodError`. | Keep ≥ 1.35.0. |
-| `node` | 26.13.1 | The Node.js runtime the node-gradle plugin downloads; not a Maven artifact, so refreshVersions cannot track it. Regenerate the `win-x64` and `linux-x64` verification entries on a bump (see CONTRIBUTING → *Dependency verification*). | Bump by hand against the active Node LTS line (26, "Lithium"); the exchange-docs workflow's `setup-node` major moves with it. |
+| `node` | the 26 line | The Node.js runtime the node-gradle plugin downloads; not a Maven artifact, so refreshVersions cannot track it. `native-tool-updates.yml` proposes the newest release of the line with both verification entries (REQ-OPS-059). | Move to the next active LTS line by hand; the exchange-docs workflow's `setup-node` major moves with it. |
 | pitest `addJUnitPlatformLauncher` (`build-logic`, `basetool.mutation-conventions`) | `false` | The plugin's launcher probe resolves a detached copy of `testImplementation` without the Boot BOM and its overrides. Nothing from it reaches a classpath, but the dependency-submission graph records it: in the backend it resolved tools.jackson 3.2.1 (json-schema-validator 3.0.7 asks for it), which raised Dependabot #40–#46 although every real configuration resolves 3.1.7. The pitest classpath includes the test runtime classpath, which already carries the Boot-managed `junit-platform-launcher` (declared `testRuntimeOnly` in backend and ingest, through `spring-boot-starter-test` in the frontend). | A pitest module's test runtime classpath loses the launcher. |
 | refreshVersions plugin (`settings.gradle.kts`) | 0.60.6 | Declared `apply false` so it still resolves, stays pinned and stays in the dependency verification metadata; applied only with `-PrefreshVersions` because it is not configuration-cache compatible. | Bump by hand. |
 
@@ -74,7 +74,8 @@ of `frontend/` and `.github/tools/markdownlint/`, and the CI's Python tools: its
 recompiles each `.github/requirements/<name>.txt` from the `<name>.in` beside it, with the options
 the file's uv header names. Keycloak is ignored there (`scripts/check-keycloak-version.py` moves the
 library and the image together), and `quadlet/` follows the compose files (ADR-0215). The Gradle
-graph is refreshVersions' (`node` and the refreshVersions plugin above are outside it too).
+graph is refreshVersions', except the Ivy modules `ruff`, `shfmt` and `node`, which
+`native-tool-updates.yml` proposes (REQ-OPS-059), and the refreshVersions plugin above.
 
 Dependabot cannot see the pins below. Each is bumped by hand, its version and checksum in the same
 change.

@@ -17,7 +17,7 @@ host_scripts_compare() {
     fi
     want="${BASH_REMATCH[1]}"
     rel="${BASH_REMATCH[2]}"
-    HS_CHECKED=$(( HS_CHECKED + 1 ))
+    HS_CHECKED=$((HS_CHECKED + 1))
     installed="${HOST_SCRIPTS_DIR}/${rel}"
     if [[ "${rel}" == host/etc/* ]]; then
       installed="${BASETOOL_HOST_ROOT:-}/${rel#host/}"
@@ -29,11 +29,11 @@ host_scripts_compare() {
     if [[ "${rel}" == host/etc/* ]]; then
       actual="$(python3 "${BASETOOL_SCRIPT_DIR}/host_companions.py" --inspect "${installed}" --service-uid "${service_uid}")" || return 2
     else
-      actual="$(sha256sum < "${installed}")"
+      actual="$(sha256sum <"${installed}")"
     fi
     [[ "${actual%% *}" == "${want}" ]] || HS_DIFFERS+=("${rel}")
-  done < "${manifest}"
-  (( HS_CHECKED > 0 )) || return 2
+  done <"${manifest}"
+  ((HS_CHECKED > 0)) || return 2
   return 0
 }
 
@@ -52,7 +52,7 @@ host_scripts_apply_path_drift() {
 write_host_scripts_metric() {
   local rel
   {
-    if (( ${#HS_DIFFERS[@]} + ${#HS_MISSING[@]} > 0 )); then
+    if ((${#HS_DIFFERS[@]} + ${#HS_MISSING[@]} > 0)); then
       echo "# HELP basetool_host_scripts_drift 1 for each host script whose sha256 differs from (kind=differs) or is absent against (kind=missing) the manifest of the release it is compared with."
       echo "# TYPE basetool_host_scripts_drift gauge"
       for rel in "${HS_DIFFERS[@]}"; do
@@ -71,7 +71,7 @@ write_host_scripts_metric() {
 report_host_scripts() {
   local label="$1" rel
   write_host_scripts_metric
-  if (( ${#HS_DIFFERS[@]} + ${#HS_MISSING[@]} == 0 )); then
+  if ((${#HS_DIFFERS[@]} + ${#HS_MISSING[@]} == 0)); then
     log "host scripts: all ${HS_CHECKED} match the manifest of the ${label}"
     return 0
   fi
@@ -96,7 +96,7 @@ check_host_scripts_applied() {
     return 0
   fi
   host_scripts_compare "${manifest}" || rc=$?
-  if (( rc != 0 )); then
+  if ((rc != 0)); then
     forget_host_scripts_metric
     log "host scripts: WARN ${manifest} is empty or malformed, so the host's scripts are not compared"
     return 0
@@ -111,7 +111,7 @@ assert_host_scripts_current_or_die() {
     return 0
   fi
   host_scripts_compare "${manifest}" || rc=$?
-  if (( rc != 0 )); then
+  if ((rc != 0)); then
     forget_host_scripts_metric
     log "host scripts: WARN the bundle's ${HOST_SCRIPTS_MANIFEST_NAME} is empty or malformed, so nothing is compared"
     return 0

@@ -271,10 +271,20 @@ refuses, writing nothing, when a variable is missing or the result lacks exactly
 |---|---|---|
 | `default` | `REDIS_PASSWORD` | everything while `REDIS_DEFAULT_USER` is `on` (the default); **nothing** once it is `off` |
 | `admin` | `REDIS_PASSWORD` | everything — the operator's user for `ACL LOAD` and inspection; only the redis container's own environment carries it |
-| `monitoring` | `REDIS_EXPORTER_PASSWORD` | introspection for `redis-exporter`; no key, no `SCAN` (a key's name is a session id) |
+| `monitoring` | `REDIS_EXPORTER_PASSWORD` | only the commands `redis-exporter` sends (`PING`, `CLIENT SETNAME`/`SETINFO`, `COMMAND INFO`, `INFO`, `CONFIG GET`, `LATENCY LATEST`/`HISTOGRAM`); no key, no `SCAN`, no `CLIENT TRACKING`/`LIST`/`KILL`/`PAUSE`, no `SLOWLOG` (a key's name is a session id) |
 | `basetool-frontend` | `REDIS_FRONTEND_PASSWORD` | `basetool:session:*`, `GETDEL` of `ingest:handoff:*`, the session-event, keyspace-event and live-sync channels, `SCAN`, `INFO` |
 | `basetool-backend` | `REDIS_BACKEND_PASSWORD` | `GET`/`SET` on `exchange:*` (the exchange registry mirror, ADR-0221), publish/subscribe on `basetool:livesync:changed` and `basetool:notify:published`, `INFO` |
-| `basetool-ingest` | `REDIS_INGEST_PASSWORD` | strings, lists and sorted sets on `ingest:*` (`GET`, `SET`, `SETEX`, `PSETEX`, `INCR`, `RPUSH`, `LPOP`, `ZADD`, `ZRANGE`, `ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `EXPIRE`, `PEXPIRE`, `DEL`) and `EVAL`/`EVALSHA` for the exchange's budget and idempotency-lock scripts, whose commands the same rules check; read-only `GET` of `exchange:*`; `INFO`; no channel, no `SCAN` |
+| `basetool-ingest` | `REDIS_INGEST_PASSWORD` | strings, lists and sorted sets on `ingest:*` (`GET`, `SET`, `SETEX`, `PSETEX`, `INCR`, `INCRBY`, `DECRBY`, `RPUSH`, `LPOP`, `ZADD`, `ZRANGE`, `ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `EXPIRE`, `PEXPIRE`, `DEL`) and the optimistic transactions of the exchange's budget, quotas and idempotency lock (`WATCH`, `UNWATCH`, `MULTI`, `EXEC`, `DISCARD`, ADR-0389); `EVAL`/`EVALSHA` only until production runs the release without scripts; read-only `GET` of `exchange:*`; `INFO`; no channel, no `SCAN` |
+
+**Removing scripting from the gateway** (ADR-0389) takes two renders. Before the release that runs the
+exchange's steps as transactions, render and load the template that grants both the transaction
+commands and `EVAL`/`EVALSHA`: the running release still sends scripts, the new one sends
+transactions. Once production runs that release, the follow-up change (#3494) drops `EVAL`/`EVALSHA`
+from the template; render and load it again, and `ACL DRYRUN basetool-ingest EVAL "return 1" 0` must answer
+with a refusal. In the other order every exchange write is refused `503` until the second step
+follows. The same first render narrows `monitoring` to the exporter's own commands; until the
+release's `redis-exporter` (started with `REDIS_EXPORTER_EXCLUDE_SLOWLOG_METRICS`) replaces the
+running one, each scrape's `SLOWLOG GET` is refused and `RedisAclDenials` may fire for it.
 
 An application reaches Redis as its own user only when its `REDIS_<SVC>_USERNAME` is set; with it
 empty it sends a password-only `AUTH` with the shared `REDIS_PASSWORD`, which is the `default` user —
@@ -556,8 +566,9 @@ skipped commit has no `:sha-<short>` tag. A release commit's run never skips. Th
 GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
 lets only that App and @greluc create `v*` tags, and an App token's events trigger
 `release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
-publish job stops with an error. `release-prepare.yml`, `refresh-versions.yml` and
-`release-publish.yml` read the key in the GitHub environment **`release`**, which only `main` may
+publish job stops with an error. `release-prepare.yml`, `refresh-versions.yml`,
+`native-tool-updates.yml` and `release-publish.yml` read the key in the GitHub environment
+**`release`**, which only `main` may
 deploy to (CI-SEC-16, ADR-0201 amendments 3 and 4). `release-publish.yml` runs on every push to
 `main`: its `detect` job looks up the pull request whose merge commit was pushed and ends green
 unless that is a merged `release/vX.Y.Z` PR; only then does the `publish` job enter the
@@ -749,9 +760,13 @@ Within about five minutes the timer fires `deploy.sh`, which:
    `render-env-d.py` differ** (`HOST SCRIPTS:` in the log, `DeployFailed`; the fix is the role from the
    release's tag, then the next tick applies it; `--force` or `BASETOOL_REQUIRE_CURRENT_SCRIPTS=false`
    bypass it), applies the stateful-infra gate (below), **checks that `deploy` owns and can write every directory it is
-   about to mirror into** (and the compose directory, the unit directory and `env.d/`), snapshots
+   about to mirror into** (and the compose directory, the unit directory and `env.d/`), **checks
+   that every host path a new or changed unit mounts exists** (`PRE-FLIGHT: required mount source
+   missing: <path> (<unit>)` refuses the release before anything changes; a named volume and a path
+   under `/opt/basetool` are not checked), snapshots
    the live tree to `config-previous/`, mirrors the new tree into `/opt/basetool`, **renders
-   `env.d/`**, installs changed units and stops-then-removes units the release no longer names. A
+   `env.d/`**, installs changed units and notes the units the release no longer names — they keep
+   running, and keep their files, until step 5 retires them. A
    unit whose rendered `env.d/<svc>.env` differs from the file it replaced counts as **re-defined**,
    exactly like a changed unit file (`env.d: <svc>.env differs from the one it replaced → <svc> is
    re-defined …` in the log, and under `unit definitions […]`): a container reads its
@@ -760,10 +775,19 @@ Within about five minutes the timer fires `deploy.sh`, which:
    the stateful-infra gate holds back leaves no pin behind — pulls the three app images, swaps a
    moved provider JAR into `keycloak/providers/` (the previous one kept as
    `keycloak-spi-previous.jar`), logs `release parts: …`, and applies the release in **one restart
-   window**: one `systemctl --user stop` of every unit it re-defined — re-pinned app services, units
+   window**: first each unit the release **retires** is stopped — while systemd still holds the
+   definition it was started from, which takes what `Requires=` it down too — and its unit file
+   removed once it is down (one already inactive or not loaded just loses its file; one that cannot
+   be stopped keeps it and fails the release: `health gate: the retired unit(s) […] could not be
+   stopped`, nothing of the release is reloaded or started, and step 7 rolls back); then the units
+   are reloaded, one `systemctl --user stop` takes down every unit it re-defined — re-pinned app services, units
    the config replaced or whose `env.d` file changed, keycloak for a moved JAR — which takes what
    `Requires=` them down with them,
-   then a `start` of every stack unit in dependency order, each waited for until healthy. Keycloak
+   then a `start` of every stack unit in dependency order, each waited for until healthy. The stack
+   units are the **installed** ones (`config applied — stack units, from the installed units: […]`):
+   `db-backend db-keycloak redis keycloak edge backend ingest frontend acme` as far as the host has
+   them, and an installed unit one of them `Requires=` (a renamed `redis-session`, say) right before
+   the first unit that requires it; every other installed unit is a monitoring unit. Keycloak
    comes up on the new JAR before backend starts, and one health gate covers everything (ADR-0213,
    since 2026-09-25 — until then the JAR was swapped only after this gate, and its keycloak restart
    took the app down a second time; see [Keycloak provider JAR](#keycloak-provider-jar));
@@ -774,8 +798,11 @@ Within about five minutes the timer fires `deploy.sh`, which:
 7. on a health failure logs which units did not come up and what the release changed, restores the
    previous config tree, the previous units, the previous `env.d/` (rendered again from the previous
    tree's templates), the previous pin drop-ins **and the previous provider JAR** — together, never
-   one without the other — applies them the same way (a monitoring unit was not restarted, so it
-   keeps the previous environment it is running on), records an
+   one without the other — stops and removes the units the release added, and applies the units the
+   restored tree has the same way (`rollback: stack units, from the installed units: […]`, so a
+   renamed unit comes back under its old name). A monitoring unit was not restarted, so it keeps the
+   previous environment it is running on; with `BASETOOL_MONITORING_ENABLED=true` the rollback then
+   `start`s the monitoring units, which brings back one the release had retired (non-gating). It records an
    exponential backoff for that target (600 s doubling, capped at 6 h; `--force` bypasses it) and
    exits non-zero — `DeployRolledBack` / `DeployFailed`. Only a new target gets here: a failed
    re-apply logs `health check failed … on a re-apply of the deployed release — not rolling back`,
@@ -795,8 +822,9 @@ or the provider JAR), a mirror, the `env.d` render, the unit install, the pull �
 way: a `FATAL: deploy aborted
 before the health gate — step '…' failed (exit N)` line, the previous config tree, units, pin and
 provider JAR put back if this run had changed them, the same backoff record, and `basetool_deploy_last_failure_timestamp`
-(`DeployFailed`). Nothing has been restarted at that point, so the stack keeps running the previous
-release. If the restore itself fails the log says the tree is **INCONSISTENT**, and
+(`DeployFailed`). Nothing has been stopped or restarted at that point — a unit the release retires
+is stopped only in step 5 — so the stack keeps running the previous release, and the restore removes
+again the files of the units the release added, which systemd never loaded. If the restore itself fails the log says the tree is **INCONSISTENT**, and
 `/var/lib/basetool/deploy/config-apply.incomplete` stays, which stops the next tick from snapshotting the
 half-applied tree over `config-previous/`. On a re-apply (drift or `--reapply`) a failure here
 restores nothing and leaves no marker — it mirrors the deployed release over itself, so the tree is
@@ -1088,6 +1116,18 @@ definition moved — a changed unit file, pin or rendered `env.d/<svc>.env` — 
 in the release's gated restart window, the monitoring units in the non-gating monitoring apply after
 it. A change to an `env.d` template alone (`quadlet/env.d/<svc>.env.tmpl`) therefore restarts that
 one service, with no hand restart. Dependabot's image-pin bumps take this path too.
+
+**Renaming or retiring a unit** rides it as well. The old unit keeps running through the pull and is
+stopped in the release's restart window, its file removed once it is down; a failed release puts it
+back and starts it again (step 7 of [What happens on the host](#what-happens-on-the-host)). Before
+such a release:
+
+- create every host path a new unit mounts (its data directory, an ACL file, a keystore): the deploy
+  refuses a release whose new or changed unit mounts a missing one, and names it;
+- a new **application** unit is part of the gated stack when a stack unit `Requires=` it, or when it
+  is added to `RT_STACK_ORDER` in `scripts/lib/container-runtime.sh` (which fixes its place in the
+  start order); any other new unit is treated as a monitoring unit and started after the gate,
+  non-gating.
 
 A change to `/etc/basetool/basetool.env` alone is not a release: no tick renders `env.d/` for it.
 Render and restart by hand as in the recipes below.
@@ -2696,6 +2736,8 @@ goes.
 | `health gate: did not come up, in start order: […]` with `provider JAR: yes` in the `this release changed:` line; `DeployRolledBack` fires | the `health gate:` lines of the deploy log, `${UPOD} logs --since 10m <first unit named>`, `${UCTL} status keycloak.service backend.service frontend.service ingest.service` | one release moved the JAR (and possibly images), and the whole of it — pin, config, units, JAR — was rolled back together (ADR-0213); the target backs off. `KEYCLOAK did not come up … the JAR is the likely cause` narrows it to the JAR; `keycloak is up on the new provider JAR; the first unit that did not come up is …` cannot tell a bad image from a bad JAR — read that unit's log. If it then says `rollback ALSO failed — did not come up: […]`, something outside the release is wrong — `${UCTL} start backend.service ingest.service frontend.service` waits for them without restarting anything. *(Before 2026-09-25 the JAR had its own post-gate step, logging `keycloak did not become healthy with the new provider JAR` and `DeployFailed`.)* See [Keycloak provider JAR](#keycloak-provider-jar) |
 | `FATAL: deploy aborted before the health gate — step 'extract the keycloak-spi provider JAR' failed`; `DeployFailed` fires | the deploy log; `skopeo inspect docker://ghcr.io/<owner>/basetool-keycloak-spi:stable` as `deploy` | the promoted provider-JAR image could not be read or carries no `/providers/keycloak-spi.jar`; nothing on the host was changed and the target backs off. Until 2026-09-25 this failed after the gate and recorded nothing |
 | Deploy stuck on a config apply: `PRE-FLIGHT: … is not owned or not writable by deploy`, or `FATAL: deploy aborted before the health gate — step 'mirror …' failed (exit 23)` after an `rsync: … mkstemp … Permission denied (13)`; `DeployFailed` fires, then `target failed Nx; in backoff window` | the deploy log, `find /opt/basetool/{docker,keycloak-theme,monitoring,quadlet} ! -user deploy` | a release-owned subtree (here `docker/acme`, 2026-09-25) was created or copied as root. Fix the owner — `chown -R deploy:deploy /opt/basetool/docker` (or the subtree named), or the role with `--tags directories` — then `sudo -u deploy /opt/basetool/scripts/deploy.sh --force` to skip the backoff. If the log also says **INCONSISTENT**, the restore failed too: the same fix, then `--force`; `config-previous/` was kept |
+| `PRE-FLIGHT: required mount source missing: <path> (<unit>)`; `DeployFailed` fires, then `target failed Nx; in backoff window` | the deploy log, `ls -ld <path>` | a new or changed unit of the release mounts a host path the host does not have (a new service's data directory, an ACL file); nothing was changed. Create it with the owner and mode the unit needs ([Secrets and host-only files](#secrets-and-host-only-files)), then `sudo -u deploy /opt/basetool/scripts/deploy.sh --force` |
+| `health gate: the retired unit(s) […] could not be stopped — their unit files are kept`; `DeployRolledBack` fires | `${UCTL} status <unit>.service`, `${UPOD} ps --filter label=PODMAN_SYSTEMD_UNIT=<unit>.service` | the release retires a unit whose `stop` failed (a stop job cancelled or timed out). Its file was kept so its container is not left running unmanaged, nothing of the release was started, and the release was rolled back. Find out why the unit does not stop and stop it (`${UCTL} stop <unit>.service`), then `--force` |
 | A promoted unit change is ignored | `ls ~basetool/.config/containers/systemd/` | a hand-placed unit of the same name shadows the delivered one |
 | Monitoring config changes never load | the deploy log (`BASETOOL_MONITORING_ENABLED != 'true'`) | set `BASETOOL_MONITORING_ENABLED=true` in `basetool.env`; `MonitoringReconcileDisabled` fires meanwhile |
 

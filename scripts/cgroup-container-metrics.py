@@ -139,9 +139,11 @@ def container_cgroup(unit_path: str) -> str:
         first by name; ``unit_path`` itself when there is no payload child.
     """
     try:
-        children = sorted(entry for entry in os.listdir(unit_path)
-                          if entry.startswith(PAYLOAD_PREFIX)
-                          and os.path.isdir(os.path.join(unit_path, entry)))
+        children = sorted(
+            entry
+            for entry in os.listdir(unit_path)
+            if entry.startswith(PAYLOAD_PREFIX) and os.path.isdir(os.path.join(unit_path, entry))
+        )
     except OSError:
         return unit_path
     payloads = [os.path.join(unit_path, child) for child in children]
@@ -235,15 +237,33 @@ def sample(path: str) -> dict[str, float]:
 
 
 HELP = {
-    "cpu_usage_seconds_total": ("counter", "Cumulative CPU time consumed, from cpu.stat usage_usec."),
+    "cpu_usage_seconds_total": (
+        "counter",
+        "Cumulative CPU time consumed, from cpu.stat usage_usec.",
+    ),
     "cpu_periods_total": ("counter", "Elapsed CFS enforcement periods, from cpu.stat nr_periods."),
     "cpu_throttled_periods_total": ("counter", "CFS periods in which the cgroup was throttled."),
-    "cpu_throttled_seconds_total": ("counter", "Time the cgroup spent throttled, from throttled_usec."),
-    "oom_kills_total": ("counter", "Processes killed by the OOM killer, from memory.events oom_kill."),
-    "memory_anon_bytes": ("gauge", "Anonymous memory in use, from memory.stat anon. The cgroup v2 analogue of RSS."),
+    "cpu_throttled_seconds_total": (
+        "counter",
+        "Time the cgroup spent throttled, from throttled_usec.",
+    ),
+    "oom_kills_total": (
+        "counter",
+        "Processes killed by the OOM killer, from memory.events oom_kill.",
+    ),
+    "memory_anon_bytes": (
+        "gauge",
+        "Anonymous memory in use, from memory.stat anon. The cgroup v2 analogue of RSS.",
+    ),
     "memory_usage_bytes": ("gauge", "Total memory charged to the cgroup, from memory.current."),
-    "memory_working_set_bytes": ("gauge", "memory.current minus reclaimable page cache, as cAdvisor computed it."),
-    "memory_mapped_file_bytes": ("gauge", "Mapped file pages, from memory.stat file_mapped -- binaries and libraries."),
+    "memory_working_set_bytes": (
+        "gauge",
+        "memory.current minus reclaimable page cache, as cAdvisor computed it.",
+    ),
+    "memory_mapped_file_bytes": (
+        "gauge",
+        "Mapped file pages, from memory.stat file_mapped -- binaries and libraries.",
+    ),
     "memory_limit_bytes": ("gauge", "Memory ceiling from memory.max; +Inf when unlimited."),
     "pids": ("gauge", "Processes and threads in the cgroup, from pids.current."),
     "pids_max": ("gauge", "Process ceiling from pids.max; +Inf when unlimited."),
@@ -275,13 +295,17 @@ def _format(value: float) -> str:
         return "+Inf"
     if value == float("-inf") or math.isnan(value):
         return "-Inf" if value == float("-inf") else "NaN"
-    if float(value).is_integer() and abs(value) < 2 ** 53:
+    if float(value).is_integer() and abs(value) < 2**53:
         return str(int(value))
     return repr(value)
 
 
-def render(samples: Sequence[tuple[str, dict[str, float]]], now: float,
-           containers: int | None = None, host_services: int = 0) -> str:
+def render(
+    samples: Sequence[tuple[str, dict[str, float]]],
+    now: float,
+    containers: int | None = None,
+    host_services: int = 0,
+) -> str:
     """Render the exposition-format text node_exporter will serve.
 
     Metrics are grouped by name with a single ``# HELP`` / ``# TYPE`` pair each.
@@ -310,8 +334,10 @@ def render(samples: Sequence[tuple[str, dict[str, float]]], now: float,
     lines.append(f"# TYPE {COLLECTOR_PREFIX}_containers gauge")
     container_count = len(samples) if containers is None else containers
     lines.append(f"{COLLECTOR_PREFIX}_containers {container_count}")
-    lines.append(f"# HELP {COLLECTOR_PREFIX}_host_services "
-                 "Host services (systemd system units) this collector found.")
+    lines.append(
+        f"# HELP {COLLECTOR_PREFIX}_host_services "
+        "Host services (systemd system units) this collector found."
+    )
     lines.append(f"# TYPE {COLLECTOR_PREFIX}_host_services gauge")
     lines.append(f"{COLLECTOR_PREFIX}_host_services {host_services}")
     lines.append(f"# HELP {COLLECTOR_PREFIX}_timestamp_seconds When this file was last written.")
@@ -360,8 +386,9 @@ def collect(cgroup_root: str, pattern: str) -> list[tuple[str, dict[str, float]]
     return _containers(cgroup_root, pattern, required=True)
 
 
-def _containers(cgroup_root: str, pattern: str,
-                required: bool) -> list[tuple[str, dict[str, float]]]:
+def _containers(
+    cgroup_root: str, pattern: str, required: bool
+) -> list[tuple[str, dict[str, float]]]:
     """Discover and sample the container cgroups, optionally insisting on finding one.
 
     Args:
@@ -385,19 +412,22 @@ def _containers(cgroup_root: str, pattern: str,
     if "name" not in (compiled.groupindex or {}):
         raise CollectorError("--pattern must contain a (?P<name>...) group")
 
-    samples = [(name, sample(container_cgroup(path)))
-               for name, path in discover(cgroup_root, compiled)]
+    samples = [
+        (name, sample(container_cgroup(path))) for name, path in discover(cgroup_root, compiled)
+    ]
     samples = [(name, values) for name, values in samples if values]
     if not samples and required:
         raise CollectorError(
             f"no container cgroups matched under {cgroup_root} - an empty metrics file and a "
             "broken pattern look identical to Prometheus, so this is an error rather than a "
-            "file with nothing in it")
+            "file with nothing in it"
+        )
     return samples
 
 
-def collect_all(cgroup_root: str, pattern: str, host_services: Sequence[str]
-                ) -> tuple[list[tuple[str, dict[str, float]]], int, int]:
+def collect_all(
+    cgroup_root: str, pattern: str, host_services: Sequence[str]
+) -> tuple[list[tuple[str, dict[str, float]]], int, int]:
     """Sample the containers and the named host services together.
 
     Finding no container is allowed while a host service was found.
@@ -416,15 +446,18 @@ def collect_all(cgroup_root: str, pattern: str, host_services: Sequence[str]
     """
     containers = _containers(cgroup_root, pattern, required=False)
     taken = {name for name, _ in containers}
-    hosts = [(name, sample(path))
-             for name, path in discover_host_services(cgroup_root, host_services)
-             if name not in taken]
+    hosts = [
+        (name, sample(path))
+        for name, path in discover_host_services(cgroup_root, host_services)
+        if name not in taken
+    ]
     hosts = [(name, values) for name, values in hosts if values]
     if not containers and not hosts:
         raise CollectorError(
             f"no container cgroups matched under {cgroup_root} and no host service was found - an "
             "empty metrics file and a broken pattern look identical to Prometheus, so this is an "
-            "error rather than a file with nothing in it")
+            "error rather than a file with nothing in it"
+        )
     return containers + hosts, len(containers), len(hosts)
 
 
@@ -439,21 +472,33 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(
         prog="cgroup-container-metrics.py",
-        description="Read container metrics from cgroup v2 for node_exporter's textfile collector.")
-    parser.add_argument("--cgroup-root", default=DEFAULT_CGROUP_ROOT,
-                        help=f"cgroup v2 mount point (default: {DEFAULT_CGROUP_ROOT})")
-    parser.add_argument("--pattern", default=DEFAULT_PATTERN,
-                        help="regex with a (?P<name>...) group, matched against each cgroup "
-                             "directory's path relative to --cgroup-root")
-    parser.add_argument("--host-service", action="append", metavar="UNIT=NAME",
-                        help="a systemd system unit to read as well, published as NAME; repeat "
-                             "for several (default: " + ", ".join(DEFAULT_HOST_SERVICES) + ")")
-    parser.add_argument("--no-host-services", action="store_true",
-                        help="read containers only")
-    parser.add_argument("--output", metavar="PATH",
-                        help="the .prom file to write; omit with --dry-run")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="render to stdout instead of writing")
+        description="Read container metrics from cgroup v2 for node_exporter's textfile collector.",
+    )
+    parser.add_argument(
+        "--cgroup-root",
+        default=DEFAULT_CGROUP_ROOT,
+        help=f"cgroup v2 mount point (default: {DEFAULT_CGROUP_ROOT})",
+    )
+    parser.add_argument(
+        "--pattern",
+        default=DEFAULT_PATTERN,
+        help="regex with a (?P<name>...) group, matched against each cgroup "
+        "directory's path relative to --cgroup-root",
+    )
+    parser.add_argument(
+        "--host-service",
+        action="append",
+        metavar="UNIT=NAME",
+        help="a systemd system unit to read as well, published as NAME; repeat "
+        "for several (default: " + ", ".join(DEFAULT_HOST_SERVICES) + ")",
+    )
+    parser.add_argument("--no-host-services", action="store_true", help="read containers only")
+    parser.add_argument(
+        "--output", metavar="PATH", help="the .prom file to write; omit with --dry-run"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="render to stdout instead of writing"
+    )
     args = parser.parse_args(list(sys.argv[1:] if argv is None else argv))
 
     if not args.dry_run and not args.output:

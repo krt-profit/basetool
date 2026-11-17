@@ -21,11 +21,14 @@ package de.greluc.krt.profit.basetool.frontend.kernel.backend;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.HandoffKind;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.StagedHandoff;
+import de.greluc.krt.profit.basetool.frontend.kernel.redis.SharedRedis;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -43,7 +46,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class IngestHandoffService {
 
   /** Redis key prefix shared with the gateway; full key is {@code ingest:handoff:<sub>:<id>}. */
@@ -55,12 +58,21 @@ public class IngestHandoffService {
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
   /**
-   * The auto-configured string Redis template (from {@code spring.data.redis.*}) — the same Redis
-   * the gateway stages handoffs into and Spring Session uses, with the {@code
-   * StringRedisSerializer} for both key and value so the gateway's entries round-trip
+   * The string template of the shared Redis the gateway stages handoffs into (ADR-0388), with the
+   * {@code StringRedisSerializer} for both key and value so the gateway's entries round-trip
    * byte-for-byte.
    */
-  private final StringRedisTemplate redisTemplate;
+  private final @NotNull StringRedisTemplate redisTemplate;
+
+  /**
+   * Creates the service on the shared Redis.
+   *
+   * @param sharedRedis the frontend's connection to the shared Redis
+   */
+  @Autowired
+  public IngestHandoffService(@NotNull SharedRedis sharedRedis) {
+    this(sharedRedis.template());
+  }
 
   /**
    * Atomically reads and deletes the staged draft for {@code (sub, handoffId)} and, when it is the

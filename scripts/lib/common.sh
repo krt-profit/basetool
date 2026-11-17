@@ -26,10 +26,13 @@ read_env() {
 
 write_textfile() {
   local name="$1" tmp
-  [[ "${name}" =~ ^[A-Za-z0-9_.-]+\.prom$ ]] || { log "WARN: refusing textfile name '${name}'"; return 1; }
+  [[ "${name}" =~ ^[A-Za-z0-9_.-]+\.prom$ ]] || {
+    log "WARN: refusing textfile name '${name}'"
+    return 1
+  }
   install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
   tmp="${TEXTFILE_DIR}/.${name}.$$"
-  if cat > "${tmp}" 2>/dev/null && mv -f "${tmp}" "${TEXTFILE_DIR}/${name}" 2>/dev/null; then
+  if cat >"${tmp}" 2>/dev/null && mv -f "${tmp}" "${TEXTFILE_DIR}/${name}" 2>/dev/null; then
     return 0
   fi
   rm -f "${tmp}" 2>/dev/null || true

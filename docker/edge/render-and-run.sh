@@ -21,7 +21,7 @@ EDGE_LISTEN_OPTS=''
 if [ -n "${EDGE_TRUSTED_PROXY:-}" ]; then
   for _tp in ${EDGE_TRUSTED_PROXY}; do
     case "${_tp}" in
-      0.0.0.0|::)
+      0.0.0.0 | ::)
         echo "edge: refusing to start - EDGE_TRUSTED_PROXY contains ${_tp}" >&2
         echo "edge: that trusts every client to forge its own address. Name each" >&2
         echo "edge: address the front end can reach the edge from (ADR-0187)," >&2
@@ -51,7 +51,7 @@ if [ -n "${EDGE_LISTEN_OPTS}" ]; then
 fi
 for a in ${EDGE_ADMIN_ALLOW:-}; do
   case "${a}" in
-    */*|0.0.0.0|::)
+    */* | 0.0.0.0 | ::)
       echo "edge: refusing to start - EDGE_ADMIN_ALLOW=${a}" >&2
       echo "edge: the Keycloak admin console is not handed a range. Name each" >&2
       echo "edge: address, the way EDGE_TRUSTED_PROXY is named (ADR-0187)." >&2
@@ -65,7 +65,7 @@ export EDGE_ADMIN_ALLOW_EXTRA
 
 GRAFANA_UPSTREAM_CERT=/etc/nginx/grafana-upstream.crt
 case "${EDGE_GRAFANA_UPSTREAM_VERIFY:-off}" in
-  on|true)
+  on | true)
     if [ ! -s "${GRAFANA_UPSTREAM_CERT}" ]; then
       echo "edge: refusing to start - EDGE_GRAFANA_UPSTREAM_VERIFY=on but ${GRAFANA_UPSTREAM_CERT}" >&2
       echo "edge: is missing or empty. It is Grafana's own certificate, mounted from" >&2
@@ -75,7 +75,7 @@ case "${EDGE_GRAFANA_UPSTREAM_VERIFY:-off}" in
     EDGE_GRAFANA_UPSTREAM_TLS='include /etc/nginx/edge/include/upstream-grafana-tls.conf;'
     echo "edge: Grafana's upstream certificate is verified (pinned)"
     ;;
-  off|false|'')
+  off | false | '')
     EDGE_GRAFANA_UPSTREAM_TLS='# EDGE_GRAFANA_UPSTREAM_VERIFY=off - Grafana upstream encrypted, not verified'
     echo "edge: Grafana's upstream certificate is NOT verified (EDGE_GRAFANA_UPSTREAM_VERIFY=off)"
     ;;
@@ -113,16 +113,16 @@ if [ -z "${RESOLVERS}" ]; then
     exit 1
   fi
 fi
-printf 'resolver %s valid=10s;\n' "${RESOLVERS% }" > "${CONF_OUT}/00-resolver.conf"
+printf 'resolver %s valid=10s;\n' "${RESOLVERS% }" >"${CONF_OUT}/00-resolver.conf"
 echo "edge: resolver ${RESOLVERS% }"
 
 if [ -n "${EDGE_TRUSTED_PROXY:-}" ]; then
-  : > "${CONF_OUT}/00-realip.conf"
+  : >"${CONF_OUT}/00-realip.conf"
   for _tp in ${EDGE_TRUSTED_PROXY}; do
-    printf 'set_real_ip_from %s;\n' "${_tp}" >> "${CONF_OUT}/00-realip.conf"
+    printf 'set_real_ip_from %s;\n' "${_tp}" >>"${CONF_OUT}/00-realip.conf"
   done
   unset _tp
-  printf 'real_ip_header proxy_protocol;\n' >> "${CONF_OUT}/00-realip.conf"
+  printf 'real_ip_header proxy_protocol;\n' >>"${CONF_OUT}/00-realip.conf"
   echo "edge: PROXY protocol on, trusting ${EDGE_TRUSTED_PROXY} only"
 else
   echo "edge: no front end configured - listeners are plain, no header is trusted"
@@ -137,10 +137,13 @@ rendered=0
 for t in "${CONF_SRC}"/*.conf.template; do
   [ -e "${t}" ] || continue
   out="${CONF_OUT}/$(basename "${t}" .template)"
-  envsubst "${SHELL_FORMAT}" < "${t}" > "${out}"
+  envsubst "${SHELL_FORMAT}" <"${t}" >"${out}"
   rendered=$((rendered + 1))
 done
-[ "${rendered}" -gt 0 ] || { echo "edge: no vhost templates found under ${CONF_SRC}" >&2; exit 1; }
+[ "${rendered}" -gt 0 ] || {
+  echo "edge: no vhost templates found under ${CONF_SRC}" >&2
+  exit 1
+}
 
 echo "edge: rendered ${rendered} vhost(s) into ${CONF_OUT}"
 

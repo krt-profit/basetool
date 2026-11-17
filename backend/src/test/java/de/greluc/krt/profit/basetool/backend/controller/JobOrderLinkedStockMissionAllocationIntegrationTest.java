@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -58,10 +59,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
-import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,7 +103,6 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
   @Autowired private MissionRepository missionRepository;
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private BankAccountRepository bankAccounts;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private TransactionTemplate transactionTemplate;
 
   private MockMvc mockMvc;
@@ -255,25 +253,21 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
   @Test
   void collectionRowCapabilitiesRemainStatementBoundedForARealReader() throws Exception {
     appendCollectionRows(1, 2);
-    var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    statistics.setStatisticsEnabled(true);
-    statistics.clear();
-    as(get(ORDERS + orderId + "/material-collection"), assigneeId, "ROLE_KRT_MEMBER")
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(3))
-        .andExpect(jsonPath("$[0].canEdit").value(false));
-    long few = statistics.getPrepareStatementCount();
+    long few = preparedBy(() -> readCollectionAsAssignee(3));
 
     appendCollectionRows(3, 24);
-    statistics.clear();
-    as(get(ORDERS + orderId + "/material-collection"), assigneeId, "ROLE_KRT_MEMBER")
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(25))
-        .andExpect(jsonPath("$[0].canEdit").value(false));
-    assertThat(statistics.getPrepareStatementCount()).isEqualTo(few);
+    assertThat(preparedBy(() -> readCollectionAsAssignee(25))).isPositive().isEqualTo(few);
     as(get(ORDERS + orderId + "/material-collection"), adminId, "ROLE_ADMIN")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].canEdit").value(true));
+  }
+
+  /** Reads the material collection as the external assignee, who may edit none of its rows. */
+  private ResultActions readCollectionAsAssignee(int rows) throws Exception {
+    return as(get(ORDERS + orderId + "/material-collection"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(rows))
+        .andExpect(jsonPath("$[0].canEdit").value(false));
   }
 
   /**

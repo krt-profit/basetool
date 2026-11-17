@@ -35,8 +35,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -66,21 +64,14 @@ public class ExchangeIdempotency {
   /** The characters of a claim token, URL-safe base64 without padding. */
   static final int TOKEN_LENGTH = 22;
 
-  /** Deletes a claim only while it holds the caller's token. */
-  private static final RedisScript<Long> RELEASE_CLAIM =
-      new DefaultRedisScript<>(
-          """
-          if redis.call('GET', KEYS[1]) == ARGV[1] then
-            return redis.call('DEL', KEYS[1])
-          end
-          return 0
-          """,
-          Long.class);
-
   private static final SecureRandom RANDOM = new SecureRandom();
   private static final Base64.Encoder TOKEN_ENCODER = Base64.getUrlEncoder().withoutPadding();
 
+  /** The step name of a claim release on the conflict counter. */
+  static final String STEP_RELEASE = "claim-release";
+
   private final StringRedisTemplate redisTemplate;
+  private final OptimisticTransactions transactions;
   private final ObjectMapper objectMapper;
   private final ExchangeStoreProperties properties;
 
@@ -183,18 +174,23 @@ public class ExchangeIdempotency {
   }
 
   /**
-   * Releases the claim on a namespace only while it still holds the given token, as one atomic
-   * step; a failure is logged, since the claim expires on its own.
+   * Releases the claim on a namespace only while it still holds the given token, as one optimistic
+   * transaction; a failure is logged, since the claim expires on its own.
    *
    * @param namespace the namespace
    * @param token the token {@link #claim(String)} returned
    * @return {@code true} when the claim was this request's and is released
    */
   public boolean releaseClaim(@NotNull String namespace, @NotNull String token) {
+    String key = CLAIM_PREFIX + namespace;
     try {
-      Long released =
-          redisTemplate.execute(RELEASE_CLAIM, List.of(CLAIM_PREFIX + namespace), token);
-      return released != null && released > 0L;
+      return transactions.run(
+          STEP_RELEASE,
+          List.of(key),
+          () ->
+              token.equals(redisTemplate.opsForValue().get(key))
+                  ? OptimisticTransactions.Plan.write(true, () -> redisTemplate.delete(key))
+                  : OptimisticTransactions.Plan.read(false));
     } catch (RuntimeException e) {
       log.warn("An idempotency claim could not be released: {}", e.getClass().getSimpleName());
       return false;

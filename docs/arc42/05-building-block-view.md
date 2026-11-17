@@ -379,7 +379,8 @@ anywhere else.
 | `<domain>.web` page reader | Pilot in `joborder.web` (`JobOrderPageReader`, ADR-0291): one read per page above the typed client, returning an immutable page record with the defaults, the logged `SectionFallback` fallbacks and the parallel load inside; the controller only maps the record into the model (`REQ-FE-036`) |
 | `kernel.backend` | The backend seam — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction`, `WebClientConfig` with Resilience4j, the outbound relays (org unit, client IP, locale, logging), Reactor context propagation, `ParallelPageLoader`, the ingest handoff |
 | `kernel.security` | `SecurityConfig`, the access gates (role sync, terms gate), `Roles`, CSP, Trusted Types and security headers, the login and logout handlers, the monitoring and management port security |
-| `kernel.session` | `RedisSessionConfig`, `SessionTypeAllowList`, the fault-tolerant serializer and same-request repair, session metrics and cookie settings |
+| `kernel.session` | `RedisSessionConfig`, `SessionTypeAllowList`, the fault-tolerant serializer and same-request repair, session metrics and cookie settings — all on the auto-configured connection to the session store |
+| `kernel.redis` | `SharedRedis`, the frontend's second connection, to the shared Redis that carries live sync and the ingest handoff (ADR-0388) |
 | `kernel.layout` | `UsesLayoutModel`, `LayoutContextLoader`, the layout advices and `ModuleImportMap`, which renders each page's import map of content-hashed module URLs (REQ-FE-035) |
 | `kernel.web` | `GlobalExceptionHandler`, `BackendErrorResponses`, `RelayParams`, binding and string normalisation, the request contexts (correlation id, client IP, active org unit), MVC and locale configuration, the template beans `moneyFormat`, `relativeDays`, `markdown` and `handles` |
 | `kernel.livesync` | `/ws/sync`, the handler, the Redis fanout and presence |
@@ -461,7 +462,8 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
 - **`build-logic`** — an included build, not a module of the product and never shipped: the
   `basetool.*` precompiled convention plugins (toolchain, annotation wiring, test and compile
   conventions, Checkstyle, Spotless, JaCoCo, PIT, SpotBugs, CycloneDX, Licensee, Spring Boot and
-  dependency management, Error Prone) that every module applies by id, the typed `basetool { }`
+  dependency management, Error Prone) that every module applies by id, the root project's formatter
+  conventions with the verified Ruff and shfmt binaries (REQ-OPS-058), the typed `basetool { }`
   extension and the reader of each module's `build-settings.properties` (REQ-OPS-046, ADR-0248). It is
   the place a Gradle module extracted later (plan §5.8) gets its conventions from. A library module of
   an application is named `<app>-<name>`: the image plan, the SBOM check and the application's JaCoCo

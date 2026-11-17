@@ -128,7 +128,9 @@ def collect_services() -> dict[str, dict]:
         for name, svc in (doc.get("services") or {}).items():
             if not isinstance(svc, dict):
                 continue
-            entry = merged.setdefault(name, {"init": None, "probe": None, "image": None, "files": []})
+            entry = merged.setdefault(
+                name, {"init": None, "probe": None, "image": None, "files": []}
+            )
             entry["files"].append(path.name)
             if "init" in svc:
                 entry["init"] = bool(svc["init"])
@@ -168,7 +170,10 @@ def selftest() -> int:
     """
     cases = [
         ("wget -q -O /dev/null --no-check-certificate https://localhost:3000/api/health", True),
-        ("wget -q --no-check-certificate -O /dev/null https://localhost:18091/actuator/health", True),
+        (
+            "wget -q --no-check-certificate -O /dev/null https://localhost:18091/actuator/health",
+            True,
+        ),
         ("wget -q -O /dev/null http://localhost:9093/-/ready", False),
         ("curl -fsS https://localhost:3000/api/health", False),
         ("exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1'", False),
@@ -191,17 +196,25 @@ def selftest() -> int:
         print("  [FAIL] a forking probe WITH init was wrongly reported")
         failures += 1
 
-    own_port = {"basetool-backend": "11261", "basetool-frontend": "18081", "basetool-ingest": "11262"}
+    own_port = {
+        "basetool-backend": "11261",
+        "basetool-frontend": "18081",
+        "basetool-ingest": "11262",
+    }
     for marker in IMAGE_DOCKERFILES:
         probe = dockerfile_probe(f"ghcr.io/krt-profit/{marker}:stable")
         if not probe or not probe_forks_tls_helper(probe):
-            print(f"  [FAIL] {marker}: image HEALTHCHECK did not resolve to a forking probe ({probe!r})")
+            print(
+                f"  [FAIL] {marker}: image HEALTHCHECK did not resolve to a forking probe ({probe!r})"
+            )
             failures += 1
         elif f"localhost:{own_port[marker]}/" not in probe:
             print(f"  [FAIL] {marker}: resolved another stage's probe ({probe!r})")
             failures += 1
         else:
-            print(f"  [ok ] {marker}: image HEALTHCHECK resolved from its own stage -> forking probe")
+            print(
+                f"  [ok ] {marker}: image HEALTHCHECK resolved from its own stage -> forking probe"
+            )
     if stage_text("FROM a AS runtime-backend\nHEALTHCHECK CMD x\n", "runtime-frontend") is not None:
         print("  [FAIL] stage_text returned a stage that does not exist")
         failures += 1
@@ -229,7 +242,9 @@ def main() -> int:
     for name, probe in violations:
         print(f"  service: {name}")
         print(f"    probe: {probe}")
-        print("    fix:   add `init: true` to this service (or to the compose template it inherits)")
+        print(
+            "    fix:   add `init: true` to this service (or to the compose template it inherits)"
+        )
     print(
         "\nBusyBox wget forks an `ssl_client` per https:// probe. Without an init as PID 1 it is\n"
         "never reaped, and one zombie per probe fills the service's `pids` cgroup cap until the\n"

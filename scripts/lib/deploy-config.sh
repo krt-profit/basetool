@@ -8,7 +8,7 @@ mirror_dir() {
   else
     { rm -rf "${dst}" && install -d "${dst%/*}" && cp -R "${src}" "${dst}"; } || rc=$?
   fi
-  if (( rc != 0 )); then
+  if ((rc != 0)); then
     log "mirror of ${src} onto ${dst} failed (exit ${rc}) — the tool's own error is above"
     return "${rc}"
   fi
@@ -26,13 +26,13 @@ extract_config_bundle() {
 assert_no_secrets() {
   local dir="$1"
   if find "${dir}" \( \
-        -iname '.env' -o -iname '*.p12' -o -iname '*.jks' \
-        -o -iname '*.pem' -o -iname '*.key' -o -iname 'realm-export.json' \
-      \) -print -quit 2>/dev/null | grep -q .; then
+    -iname '.env' -o -iname '*.p12' -o -iname '*.jks' \
+    -o -iname '*.pem' -o -iname '*.key' -o -iname 'realm-export.json' \
+    \) -print -quit 2>/dev/null | grep -q .; then
     local hit
     hit="$(find "${dir}" \( \
-        -iname '.env' -o -iname '*.p12' -o -iname '*.jks' \
-        -o -iname '*.pem' -o -iname '*.key' -o -iname 'realm-export.json' \
+      -iname '.env' -o -iname '*.p12' -o -iname '*.jks' \
+      -o -iname '*.pem' -o -iname '*.key' -o -iname 'realm-export.json' \
       \) -print -quit 2>/dev/null)"
     fail "SECURITY: promoted config bundle contains a forbidden secret-shaped file '${hit}' — aborting before apply"
   fi
@@ -46,7 +46,7 @@ infra_image_pins() {
   {
     [[ -d "${tree}/quadlet/systemd" ]] \
       && grep -Eho '^Image=((docker\.io/)?(library/)?postgres:[^[:space:]]+|quay\.io/keycloak/keycloak:[^[:space:]]+)' \
-           "${tree}"/quadlet/systemd/*.container 2>/dev/null
+        "${tree}"/quadlet/systemd/*.container 2>/dev/null
   } | sed -E 's/^Image=//; s#^docker\.io/(library/)?##; s/@sha256:[0-9a-f]+$//' | sort -u || true
 }
 
@@ -120,7 +120,7 @@ env_d_digests() {
   local f sum
   for f in "${ENV_D_DIR}"/*.env; do
     [[ -f "${f}" ]] || continue
-    sum="$(sha256sum < "${f}")"
+    sum="$(sha256sum <"${f}")"
     printf '%s %s\n' "$(basename "${f}" .env)" "${sum%% *}"
   done
 }
@@ -131,12 +131,12 @@ note_env_d_changes() {
   local before="$1" units="$2" line svc
   while IFS= read -r line; do
     [[ -n "${line}" ]] || continue
-    grep -qxF -- "${line}" <<< "${before}" && continue
+    grep -qxF -- "${line}" <<<"${before}" && continue
     svc="${line%% *}"
     [[ -f "${units}/${svc}.container" ]] || continue
     log "env.d: ${svc}.env differs from the one it replaced → ${svc} is re-defined and restarts with this apply"
     rt_note_changed "${svc}"
-  done <<< "$(env_d_digests)"
+  done <<<"$(env_d_digests)"
 }
 
 install_quadlet_units() {
@@ -155,7 +155,7 @@ install_quadlet_units() {
     if [[ -x "${ENV_RENDERER}" ]]; then
       local env_before
       env_before="$(env_d_digests)"
-      if ! "${ENV_RENDERER}" --env "${ENV_FILE}"              --templates "${src}/env.d" --out "${ENV_D_DIR}" >/dev/null; then
+      if ! "${ENV_RENDERER}" --env "${ENV_FILE}" --templates "${src}/env.d" --out "${ENV_D_DIR}" >/dev/null; then
         fail "rendering ${ENV_D_DIR} from the bundle's templates failed — a unit whose EnvironmentFile is missing does not start"
       fi
       log "rendered env.d from the bundle's templates"
@@ -172,25 +172,62 @@ install_quadlet_units() {
     base="$(basename "${f}")"
     if [[ ! -f "${unit_dir}/${base}" ]] || ! cmp -s "${f}" "${unit_dir}/${base}"; then
       install -m 0644 "${f}" "${unit_dir}/${base}"
-      installed=$(( installed + 1 ))
+      installed=$((installed + 1))
       [[ "${base}" == *.container ]] && rt_note_changed "${base%.container}"
     fi
   done
 
   local existing name
-  for existing in "${unit_dir}"/*.container "${unit_dir}"/*.network "${unit_dir}"/*.volume; do
+  for existing in "${unit_dir}"/*.network "${unit_dir}"/*.volume; do
     [[ -f "${existing}" ]] || continue
     name="$(basename "${existing}")"
     [[ -f "${src}/systemd/${name}" ]] && continue
-    if [[ "${name}" == *.container ]]; then
-      rt_service_stop "${name%.container}" >/dev/null 2>&1         || log "WARN: could not stop retired unit ${name%.container} before removing it"
-    fi
     rm -f "${existing}"
-    removed=$(( removed + 1 ))
+    removed=$((removed + 1))
   done
 
+  RT_RETIRED_SERVICES="$(retired_container_services "$1")"
+  local -a retired=()
+  read -ra retired <<<"${RT_RETIRED_SERVICES}"
+  removed=$((removed + ${#retired[@]}))
   log "quadlet units: ${installed} installed/updated, ${removed} retired (${unit_dir})"
+  if ((${#retired[@]} > 0)); then
+    log "quadlet units: [${RT_RETIRED_SERVICES}] are retired in the restart window — each is stopped there, and its unit file removed once it is down"
+  fi
   return 0
+}
+
+retired_container_services() {
+  local units="$1/quadlet/systemd" f name out=""
+  if [[ -d "${units}" ]]; then
+    for f in "${RT_UNIT_DIR:?RT_UNIT_DIR is unset}"/*.container; do
+      [[ -f "${f}" ]] || continue
+      name="$(basename "${f}")"
+      [[ -f "${units}/${name}" ]] || out="${out}${out:+ }${name%.container}"
+    done
+  fi
+  printf '%s\n' "${out}"
+}
+
+assert_unit_mount_sources_exist() {
+  local units="$1/quadlet/systemd" unit name src
+  local -a missing=()
+  [[ -d "${units}" ]] || return 0
+  DEPLOY_STEP="pre-flight: the host paths the new units mount exist"
+  for unit in "${units}"/*.container; do
+    [[ -f "${unit}" ]] || continue
+    name="$(basename "${unit}")"
+    cmp -s "${unit}" "${RT_UNIT_DIR}/${name}" && continue
+    # Only an absolute source is a host path (a named volume is not); the release tree under
+    # COMPOSE_DIR is delivered by this apply itself.
+    while IFS= read -r src; do
+      [[ "${src}" == "${COMPOSE_DIR}"/* || -e "${src}" ]] && continue
+      log "PRE-FLIGHT: ${name%.container} mounts ${src} (Volume=), which does not exist on this host"
+      missing+=("${src} (${name%.container})")
+    done < <(sed -n -E 's#^Volume=(/[^:]+):.*#\1#p' "${unit}")
+  done
+  ((${#missing[@]} == 0)) && return 0
+  fail "PRE-FLIGHT: required mount source missing: $(printf '%s, ' "${missing[@]}" | sed 's/, $//') — podman does not create a bind-mount source, so the unit would not start; nothing was changed. Create it on the host, then: deploy.sh --force"
 }
 
 assert_config_tree_writable() {
@@ -247,11 +284,19 @@ restore_previous_config_tree() {
   if [[ "${errexit_was_on}" == "true" ]]; then
     set -e
   fi
-  if (( rc != 0 )); then
+  if ((rc != 0)); then
+    RT_RETIRED_SERVICES=""
     log "restoring the previous host config FAILED (exit ${rc})"
     return 1
   fi
   log "previous host config restored"
+  RT_RETIRED_SERVICES="$(retired_container_services "${COMPOSE_DIR}")"
+  if [[ -n "${RT_RETIRED_SERVICES}" ]]; then
+    log "retiring [${RT_RETIRED_SERVICES}], which the previous release does not name"
+    if ! rt_retire_services; then
+      log "WARN: [${RT_RETIRE_FAILED}] could not be stopped — their unit files are kept until a stop succeeds"
+    fi
+  fi
   return 0
 }
 

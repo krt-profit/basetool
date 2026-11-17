@@ -230,7 +230,8 @@ memory (`P4kRowIndex`), answering every step as its query on the rows' current v
 APPLY's length does not grow with one round trip per record. A row that two P4K GUIDs would claim, or a P4K GUID that
 two rows would claim (also two catalogue records sharing a name, as three commodities named
 "SLAM" do), is not resolved by the import: the conflict goes to the review list (REQ-P4K-016) and
-the admin merges or splits; the import never merges. The Wiki/UEX duplicate merge
+the admin merges or splits; the import never merges. A ship record a stored ship type already
+stands for is covered instead and opens no case (REQ-P4K-050). The Wiki/UEX duplicate merge
 (`ItemReconciliationService.mergeExisting`, ADR-0349) keeps the same rule: it never joins two items
 with different P4K GUIDs but opens a `GUID_CONFLICT` case for each GUID and leaves both rows as they
 are; a GUID only the retired row holds moves with all its P4K columns (`P4kItemParticipation`, the
@@ -538,7 +539,8 @@ assign) is neither counted nor logged again, so the report and the open list agr
 
 - a row an earlier seeding created that no current rule would create (REQ-P4K-010);
 - an unmatched item or ship of unclear playability (REQ-P4K-009);
-- a manufacturer name conflict (REQ-P4K-020, REQ-P4K-021) and a GUID conflict (REQ-P4K-007);
+- a manufacturer name conflict (REQ-P4K-020, REQ-P4K-021) and a GUID conflict (REQ-P4K-007); an
+  APPLY settles the ship cases itself (REQ-P4K-050);
 - a starmap link and a shop link that is ambiguous or not found (REQ-P4K-035, REQ-P4K-043); a shop
   whose record names no place opens none;
 - a blueprint ingredient's `resourceGuid` or a `refinedSubtypeGuid` that joins no commodity or
@@ -1268,6 +1270,40 @@ that finds several ships is left for the member to choose
 **Enforced by:** `ShipTypeMatcherTest`, `ExchangeResolveServiceTest`, `P4kShipPrecedenceTest` ·
 **Code:** `ShipTypeMatcher`, `P4kShipVariants` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) ·
 **Issues:** #2897
+
+### REQ-P4K-050 — a ship a stored ship type already stands for needs no row and no review case
+
+Most ship records of a build are copies of a ship that already has a ship type: NPC crews, mission
+targets, wrecks, tutorial and event editions. They share the ship's in-game name and often its
+variant group (`variantOf`). A copy does not get a row of its own, and it does not open a
+`GUID_CONFLICT` case. It is **covered** by the stored ship type when the class or name step of the
+match (REQ-P4K-007) finds a ship type that carries the same in-game name and either
+
+- holds a P4K GUID of the copy's variant group, the copy being a variant (`variantOf` set), or
+- the copy is a ship no player owns (`playability` `ai`, `mission` or `special`).
+
+The base of a group is never covered by a ship type holding one of its variants: that ship type is
+stamped with the wrong member of the group, which stays a case. A covered record is listed as
+`COVERED` in the change report; nothing is stamped, created or reviewed.
+
+An APPLY settles the ship cases (`GUID_CONFLICT`, `UNCLEAR_PLAYABILITY`, `SEEDED_NOT_CREATABLE`)
+itself, as it does those of rows without a GUID of their own (REQ-P4K-016): an open case the run
+no longer finds is closed as `RESOLVED`, and a closed one it finds again reopens. A complete ships
+kind settles every case, a partial one only those of the GUIDs it lists; a case an admin decided is
+never touched, nor one with a queued ship repair.
+
+**Acceptance**
+
+- [x] An NPC ship of a stored ship type's name and a player variant of a stored base are covered:
+  no row, no case, a `COVERED` report row.
+- [x] The base of a group stays a `GUID_CONFLICT` case against a ship type holding one of its
+  variants.
+- [x] An APPLY closes an open ship case it no longer finds, also one whose record left the
+  catalogue.
+
+**Enforced by:** `P4kShipCoverageTest`, `P4kShipCoverageImportTest` · **Code:** `P4kShipCoverage`,
+`P4kRowMatcher`, `P4kShipReconciler`, `P4kRunResolvedCases` · **ADR:**
+[ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
 
 ## Game texts
 

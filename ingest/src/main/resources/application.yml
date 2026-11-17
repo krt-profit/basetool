@@ -31,6 +31,13 @@ spring:
       port: ${REDIS_PORT:6379}
       username: ${REDIS_USERNAME:}
       password: ${REDIS_PASSWORD:}
+      timeout: ${SPRING_DATA_REDIS_TIMEOUT:2s}
+      connect-timeout: ${SPRING_DATA_REDIS_CONNECT_TIMEOUT:2s}
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 16
+          max-wait: 2s
   security:
     oauth2:
       resourceserver:

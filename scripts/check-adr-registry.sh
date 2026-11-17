@@ -101,10 +101,10 @@ if [[ $rows -eq 0 ]]; then
 fi
 
 mapfile -t files < <(
-  find "$ADR_DIR" -maxdepth 1 -type f -name '*.md' |
-    sed 's#.*/##' |
-    grep -E '^[0-9]{4}-.*\.md$' |
-    sort || true
+  find "$ADR_DIR" -maxdepth 1 -type f -name '*.md' \
+    | sed 's#.*/##' \
+    | grep -E '^[0-9]{4}-.*\.md$' \
+    | sort || true
 )
 
 indexed=0

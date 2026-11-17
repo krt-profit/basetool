@@ -37,12 +37,19 @@ class Kcadm:
         try:
             options = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
             completed = subprocess.run(
-                command, capture_output=True, text=True, check=False,
-                timeout=self.timeout, **options,
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=self.timeout,
+                **options,
             )
         except subprocess.TimeoutExpired as error:
-            outcome = ("The server may have completed the mutation; read its current state before retrying."
-                       if args[0] != "get" else "No mutation was requested.")
+            outcome = (
+                "The server may have completed the mutation; read its current state before retrying."
+                if args[0] != "get"
+                else "No mutation was requested."
+            )
             raise KcadmError(f"kcadm {args[0]} exceeded {self.timeout:g}s. {outcome}") from error
         if completed.returncode != 0:
             raise KcadmError(
@@ -82,8 +89,10 @@ class Kcadm:
         if payload is None:
             self._run(["delete", path, "-r", self.realm])
         else:
-            self._run(["delete", path, "-r", self.realm, "-f", "-"],
-                      stdin=json.dumps(payload, indent=2, sort_keys=True))
+            self._run(
+                ["delete", path, "-r", self.realm, "-f", "-"],
+                stdin=json.dumps(payload, indent=2, sort_keys=True),
+            )
         print(f"  delete {path} — {what}")
 
 

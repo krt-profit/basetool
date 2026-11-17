@@ -39,7 +39,7 @@ echo "cache: ${CACHE_REPO} (write: ${CACHE_WRITE})"
 (
   build docker/app/Dockerfile "$INGEST_IMAGE" ingest --build-arg MODULE=ingest
   build docker/sandbox/keycloak/Dockerfile "$KEYCLOAK_IMAGE" keycloak
-) > side-builds.log 2>&1 &
+) >side-builds.log 2>&1 &
 side=$!
 status=0
 build docker/app/Dockerfile "$BACKEND_IMAGE" backend --build-arg MODULE=backend || status=1

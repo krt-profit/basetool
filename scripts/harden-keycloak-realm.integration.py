@@ -118,7 +118,13 @@ class SmtpSink:
         self.stack.docker("exec", "-d", self.stack.name, "java", "/tmp/Sink.java")
         for _ in range(60):
             probe = self.stack.docker(
-                "exec", self.stack.name, "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/2525", check=False)
+                "exec",
+                self.stack.name,
+                "bash",
+                "-c",
+                "exec 3<>/dev/tcp/127.0.0.1/2525",
+                check=False,
+            )
             if probe.returncode == 0:
                 return
             time.sleep(1)
@@ -126,8 +132,14 @@ class SmtpSink:
 
     def messages(self) -> list[dict]:
         """Every message received so far: the recipients and the body."""
-        completed = self.stack.docker("exec", self.stack.name, "bash", "-c",
-                                      f"cat {self.LOG} 2>/dev/null || true", check=False)
+        completed = self.stack.docker(
+            "exec",
+            self.stack.name,
+            "bash",
+            "-c",
+            f"cat {self.LOG} 2>/dev/null || true",
+            check=False,
+        )
         out = []
         for raw in completed.stdout.split("\n=====\n"):
             if raw.strip():
@@ -156,10 +168,22 @@ class Stack:
 
     def start(self) -> None:
         """Start the container and wait until the realm answers."""
-        self.docker("run", "-d", "--name", self.name, "-p", f"127.0.0.1:{self.port}:8080",
-                    "-e", f"KC_BOOTSTRAP_ADMIN_USERNAME={self.admin[0]}",
-                    "-e", f"KC_BOOTSTRAP_ADMIN_PASSWORD={self.admin[1]}",
-                    self.image, "start-dev", "--import-realm", "--cache=local")
+        self.docker(
+            "run",
+            "-d",
+            "--name",
+            self.name,
+            "-p",
+            f"127.0.0.1:{self.port}:8080",
+            "-e",
+            f"KC_BOOTSTRAP_ADMIN_USERNAME={self.admin[0]}",
+            "-e",
+            f"KC_BOOTSTRAP_ADMIN_PASSWORD={self.admin[1]}",
+            self.image,
+            "start-dev",
+            "--import-realm",
+            "--cache=local",
+        )
         url = f"{self.base}/realms/{REALM}/.well-known/openid-configuration"
         for _ in range(120):
             try:
@@ -170,8 +194,18 @@ class Stack:
                 time.sleep(2)
         else:
             raise SystemExit("FATAL: Keycloak did not come up in time")
-        self.kcadm("config", "credentials", "--server", "http://localhost:8080", "--realm", "master",
-                   "--user", self.admin[0], "--password", self.admin[1])
+        self.kcadm(
+            "config",
+            "credentials",
+            "--server",
+            "http://localhost:8080",
+            "--realm",
+            "master",
+            "--user",
+            self.admin[0],
+            "--password",
+            self.admin[1],
+        )
 
     def stop(self) -> None:
         """Remove the container."""
@@ -194,14 +228,35 @@ class Stack:
 
     def harden(self, *extra: str) -> subprocess.CompletedProcess:
         """Run the hardening script against the container."""
-        command = [sys.executable, str(HARDEN), "--kcadm-command", " ".join(self.kcadm_prefix()), *extra]
+        command = [
+            sys.executable,
+            str(HARDEN),
+            "--kcadm-command",
+            " ".join(self.kcadm_prefix()),
+            *extra,
+        ]
         return subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
 
     def create_user(self, username: str, password: str, role: str | None) -> None:
         """Create an enabled user with a password and optionally a realm role."""
-        self.kcadm("create", "users", "-r", REALM, "-s", f"username={username}", "-s", "enabled=true",
-                   "-s", f"email={username}@example.invalid", "-s", "emailVerified=true",
-                   "-s", "firstName=Probe", "-s", "lastName=User")
+        self.kcadm(
+            "create",
+            "users",
+            "-r",
+            REALM,
+            "-s",
+            f"username={username}",
+            "-s",
+            "enabled=true",
+            "-s",
+            f"email={username}@example.invalid",
+            "-s",
+            "emailVerified=true",
+            "-s",
+            "firstName=Probe",
+            "-s",
+            "lastName=User",
+        )
         self.kcadm("set-password", "-r", REALM, "--username", username, "--new-password", password)
         if role:
             self.kcadm("add-roles", "-r", REALM, "--uusername", username, "--rolename", role)
@@ -220,84 +275,154 @@ class Stack:
 def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
     """The scenario."""
     admin_pw = "probe-admin-" + secrets.token_hex(4)
-    stack.kcadm("create", "clients", "-r", REALM, "-s", f"clientId={CLIENT}", "-s", "publicClient=true",
-                "-s", "standardFlowEnabled=true", "-s", f'redirectUris=["{REDIRECT}"]')
+    stack.kcadm(
+        "create",
+        "clients",
+        "-r",
+        REALM,
+        "-s",
+        f"clientId={CLIENT}",
+        "-s",
+        "publicClient=true",
+        "-s",
+        "standardFlowEnabled=true",
+        "-s",
+        f'redirectUris=["{REDIRECT}"]',
+    )
     # The test realms hold no application role; production keeps Admin by hand as the OTP marker.
     stack.kcadm("create", "roles", "-r", REALM, "-s", "name=Admin")
     stack.create_user("probe-admin", admin_pw, "Admin")
     stack.create_user("probe-admin-rollback", admin_pw, "Admin")
     stack.create_user("probe-forgetful", admin_pw, None)
-    stack.kcadm("create", "identity-provider/instances", "-r", REALM, "-s", "alias=discord",
-                "-s", "providerId=oidc", "-s", "enabled=false", "-s", "config.clientId=sandbox",
-                "-s", "config.clientSecret=sandbox-not-a-secret",
-                "-s", "config.authorizationUrl=https://idp.invalid/authorize",
-                "-s", "config.tokenUrl=https://idp.invalid/token")
+    stack.kcadm(
+        "create",
+        "identity-provider/instances",
+        "-r",
+        REALM,
+        "-s",
+        "alias=discord",
+        "-s",
+        "providerId=oidc",
+        "-s",
+        "enabled=false",
+        "-s",
+        "config.clientId=sandbox",
+        "-s",
+        "config.clientSecret=sandbox-not-a-secret",
+        "-s",
+        "config.authorizationUrl=https://idp.invalid/authorize",
+        "-s",
+        "config.tokenUrl=https://idp.invalid/token",
+    )
     realm_before = stack.get_json(f"realms/{REALM}")
     backup = workdir / "hardening.before.json"
-    flags = ["--windows", "proposal", "--reset-password", "on", "--smtp-host", sink.HOST,
-             "--smtp-port", str(sink.PORT), "--smtp-from", "noreply@sandbox.invalid",
-             "--backup-file", str(backup)]
+    flags = [
+        "--windows",
+        "proposal",
+        "--reset-password",
+        "on",
+        "--smtp-host",
+        sink.HOST,
+        "--smtp-port",
+        str(sink.PORT),
+        "--smtp-from",
+        "noreply@sandbox.invalid",
+        "--backup-file",
+        str(backup),
+    ]
 
     print("before: a password is all an admin needs")
     browser = stack.browser()
-    stack.check(browser.login("probe-admin-rollback", admin_pw) == Outcome.CODE,
-                "an admin signs in with the password alone")
+    stack.check(
+        browser.login("probe-admin-rollback", admin_pw) == Outcome.CODE,
+        "an admin signs in with the password alone",
+    )
 
     print("dry run")
     dry = stack.harden(*flags)
     stack.check(dry.returncode == 2, f"a dry run with work to do exits 2 (got {dry.returncode})")
     realm_dry = stack.get_json(f"realms/{REALM}")
-    stack.check(realm_dry.get("browserFlow") == realm_before.get("browserFlow")
-                and realm_dry.get("ssoSessionMaxLifespan") == realm_before.get("ssoSessionMaxLifespan"),
-                "a dry run changes nothing in the realm")
+    stack.check(
+        realm_dry.get("browserFlow") == realm_before.get("browserFlow")
+        and realm_dry.get("ssoSessionMaxLifespan") == realm_before.get("ssoSessionMaxLifespan"),
+        "a dry run changes nothing in the realm",
+    )
     stack.check(not backup.exists(), "a dry run writes no rollback file")
 
     print("apply")
     applied = stack.harden("--apply", *flags)
     if applied.returncode != 0:
         print(applied.stdout[-1500:], applied.stderr[-800:])
-    stack.check(applied.returncode == 0, f"apply exits 0 after its own verify (got {applied.returncode})")
+    stack.check(
+        applied.returncode == 0, f"apply exits 0 after its own verify (got {applied.returncode})"
+    )
     stack.check(backup.exists(), "apply wrote the rollback file")
     again = stack.harden(*flags)
     stack.check(again.returncode == 0, f"a second run finds nothing to do (got {again.returncode})")
 
     print("step 12: session windows")
     realm = stack.get_json(f"realms/{REALM}")
-    stack.check(realm["ssoSessionMaxLifespan"] == 7776000 and realm["ssoSessionMaxLifespanRememberMe"] == 7776000
-                and realm["ssoSessionIdleTimeout"] == 2592000,
-                "the realm carries the proposal's session windows")
+    stack.check(
+        realm["ssoSessionMaxLifespan"] == 7776000
+        and realm["ssoSessionMaxLifespanRememberMe"] == 7776000
+        and realm["ssoSessionIdleTimeout"] == 2592000,
+        "the realm carries the proposal's session windows",
+    )
 
     print("step 11: OTP for admins")
     browser = stack.browser()
-    stack.check(browser.login("probe-admin", admin_pw) == Outcome.OTP_SETUP,
-                "an admin without a device is forced to set one up")
+    stack.check(
+        browser.login("probe-admin", admin_pw) == Outcome.OTP_SETUP,
+        "an admin without a device is forced to set one up",
+    )
     device = browser.setup_secret()
     stack.check(browser.finish_setup() == Outcome.CODE, "setting the device up completes the login")
     browser = stack.browser()
-    stack.check(browser.login("probe-admin", admin_pw) == Outcome.OTP_CODE,
-                "the next login asks the admin for the code")
+    stack.check(
+        browser.login("probe-admin", admin_pw) == Outcome.OTP_CODE,
+        "the next login asks the admin for the code",
+    )
     wrong = stack.browser()
     wrong.login("probe-admin", admin_pw)
     wrong.submit({"otp": "000000"})
     stack.check(wrong.outcome() == Outcome.OTP_CODE, "a wrong code is refused")
-    stack.check(browser.answer_otp(device) == Outcome.CODE, "the right code completes the login, asked once")
+    stack.check(
+        browser.answer_otp(device) == Outcome.CODE, "the right code completes the login, asked once"
+    )
     member = stack.browser()
     stack.check(member.login(*MEMBER) == Outcome.CODE, "a member signs in with the password alone")
-    stack.check(stack.browser().login("probe-admin-rollback", admin_pw) == Outcome.OTP_SETUP,
-                "a second admin is forced too")
+    stack.check(
+        stack.browser().login("probe-admin-rollback", admin_pw) == Outcome.OTP_SETUP,
+        "a second admin is forced too",
+    )
     idp = stack.get_json("identity-provider/instances/discord")
-    stack.check(idp.get("postBrokerLoginFlowAlias") == "post-broker-admin-otp",
-                "the identity provider runs the post-broker flow")
-    stack.check(idp.get("providerId") == "oidc" and idp.get("alias") == "discord",
-                "the bind left the identity provider's id and alias alone")
-    post_broker = [entry for entry in stack.get_json("authentication/flows/post-broker-admin-otp/executions")
-                   if entry.get("level", 0) == 0]
-    stack.check(any(entry.get("providerId") == "allow-access-authenticator"
-                    and entry.get("requirement") == "REQUIRED" for entry in post_broker),
-                "the post-broker flow carries a required 'Allow access', so a member's brokered login completes")
-    stack.check(bool(post_broker) and post_broker[-1].get("displayName") == "Admin OTP (post-broker)"
-                and post_broker[-1].get("requirement") == "CONDITIONAL",
-                "the Admin OTP block is the last entry of the post-broker flow")
+    stack.check(
+        idp.get("postBrokerLoginFlowAlias") == "post-broker-admin-otp",
+        "the identity provider runs the post-broker flow",
+    )
+    stack.check(
+        idp.get("providerId") == "oidc" and idp.get("alias") == "discord",
+        "the bind left the identity provider's id and alias alone",
+    )
+    post_broker = [
+        entry
+        for entry in stack.get_json("authentication/flows/post-broker-admin-otp/executions")
+        if entry.get("level", 0) == 0
+    ]
+    stack.check(
+        any(
+            entry.get("providerId") == "allow-access-authenticator"
+            and entry.get("requirement") == "REQUIRED"
+            for entry in post_broker
+        ),
+        "the post-broker flow carries a required 'Allow access', so a member's brokered login completes",
+    )
+    stack.check(
+        bool(post_broker)
+        and post_broker[-1].get("displayName") == "Admin OTP (post-broker)"
+        and post_broker[-1].get("requirement") == "CONDITIONAL",
+        "the Admin OTP block is the last entry of the post-broker flow",
+    )
 
     print("step 2: forgot password")
     before = len(sink.messages())
@@ -308,32 +433,46 @@ def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
     if link:
         page.open_link(link)
         forms = parse_forms(page.page)
-        stack.check(bool(forms) and "username" in forms[0]["inputs"], "the reset page asks for the username")
+        stack.check(
+            bool(forms) and "username" in forms[0]["inputs"], "the reset page asks for the username"
+        )
         if forms:
             page.submit({"username": "probe-forgetful"})
         deadline = time.time() + 20
         while len(sink.messages()) == before and time.time() < deadline:
             time.sleep(0.5)
-        stack.check(len(sink.messages()) > before, "the realm's sender hands a mail to the SMTP sink")
+        stack.check(
+            len(sink.messages()) > before, "the realm's sender hands a mail to the SMTP sink"
+        )
         if len(sink.messages()) > before:
             mail = sink.messages()[-1]
-            stack.check(any("probe-forgetful@example.invalid" in recipient for recipient in mail["to"]),
-                        "the mail goes to the member's address")
-            stack.check("action-token" in mail["data"] and "key=" in mail["data"],
-                        "the mail carries a reset link with an action token")
+            stack.check(
+                any("probe-forgetful@example.invalid" in recipient for recipient in mail["to"]),
+                "the mail goes to the member's address",
+            )
+            stack.check(
+                "action-token" in mail["data"] and "key=" in mail["data"],
+                "the mail carries a reset link with an action token",
+            )
 
     print("rollback")
     rolled = stack.harden("--apply", "--rollback", str(backup), "--backup-file", str(backup))
     stack.check(rolled.returncode == 0, f"the rollback exits 0 (got {rolled.returncode})")
     realm = stack.get_json(f"realms/{REALM}")
     stack.check(realm["browserFlow"] == "browser", "the built-in browser flow is bound again")
-    stack.check(realm["ssoSessionMaxLifespan"] == realm_before["ssoSessionMaxLifespan"],
-                "the session maximum is back")
-    stack.check(stack.browser().login("probe-admin-rollback", admin_pw) == Outcome.CODE,
-                "an admin signs in with the password alone again")
+    stack.check(
+        realm["ssoSessionMaxLifespan"] == realm_before["ssoSessionMaxLifespan"],
+        "the session maximum is back",
+    )
+    stack.check(
+        stack.browser().login("probe-admin-rollback", admin_pw) == Outcome.CODE,
+        "an admin signs in with the password alone again",
+    )
     idp = stack.get_json("identity-provider/instances/discord")
-    stack.check(not idp.get("postBrokerLoginFlowAlias") and idp.get("providerId") == "oidc",
-                "the rollback unbinds the post-broker flow and leaves the provider's id alone")
+    stack.check(
+        not idp.get("postBrokerLoginFlowAlias") and idp.get("providerId") == "oidc",
+        "the rollback unbinds the post-broker flow and leaves the provider's id alone",
+    )
     flows = {flow["alias"] for flow in stack.get_json("authentication/flows")}
     stack.check("browser-admin-otp" in flows, "the flow the run created is left in place, unbound")
 
@@ -343,7 +482,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--image", required=True, help="the sandbox Keycloak image")
     parser.add_argument("--port", type=int, default=0, help="host port (default: a free one)")
-    parser.add_argument("--keep", action="store_true", help="leave the container running afterwards")
+    parser.add_argument(
+        "--keep", action="store_true", help="leave the container running afterwards"
+    )
     args = parser.parse_args()
 
     port = args.port
@@ -361,7 +502,9 @@ def main() -> int:
     finally:
         if not args.keep:
             stack.stop()
-    print(f"\n{'FAILED: ' + str(len(stack.failures)) + ' check(s)' if stack.failures else 'all checks passed'}")
+    print(
+        f"\n{'FAILED: ' + str(len(stack.failures)) + ' check(s)' if stack.failures else 'all checks passed'}"
+    )
     return 1 if stack.failures else 0
 
 
