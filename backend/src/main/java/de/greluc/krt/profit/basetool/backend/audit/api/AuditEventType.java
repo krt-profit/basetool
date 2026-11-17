@@ -833,10 +833,17 @@ public enum AuditEventType {
   CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
   /** An admin chose which SC Wiki entry of a manufacturer listed twice in the Wiki is primary. */
   CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED(AuditDomain.CATALOGUE),
+  /**
+   * A manufacturer row only UEX created was merged into the row of the same brand that holds a P4K
+   * GUID (REQ-DATA-045).
+   */
+  CATALOGUE_MANUFACTURER_MERGED(AuditDomain.CATALOGUE),
   /** An admin hid or showed a ship type. */
   CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
   /** A ship type created a second time was merged into the ship type of the same game ship. */
   CATALOGUE_SHIP_TYPE_MERGED(AuditDomain.CATALOGUE),
+  /** A row a second UEX listing created was merged into the game row of the same item. */
+  CATALOGUE_ITEM_MERGED(AuditDomain.CATALOGUE),
   /** An admin created a location. */
   CATALOGUE_LOCATION_CREATED(AuditDomain.CATALOGUE),
   /** An admin edited a location. */

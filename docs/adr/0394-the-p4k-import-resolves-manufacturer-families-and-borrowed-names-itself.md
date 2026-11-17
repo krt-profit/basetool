@@ -45,8 +45,8 @@ indexes them.
 - The 20 remaining cases close with the next APPLY, and the 12 held GUIDs resolve. Items, ships
   and ship base repairs of those brands get their manufacturer; Aopoa's abbreviation becomes
   `XNAA`, and ArcCorp's becomes `ARCC`.
-- Two rows of one brand (a UEX twin beside the P4K row) are not merged by this rule; that is a
-  separate decision.
+- Two rows of one brand (a UEX twin beside the P4K row) are not merged by this rule; the amendment
+  on UEX twins below decides them.
 
 ## Amendment — the brand in a ship's name beats its manufacturer GUID (REQ-P4K-059)
 
@@ -57,3 +57,31 @@ name begins with wins over a contradicting GUID, as a general rule rather than a
 word must name exactly one matched manufacturer, by its name's first word, its code or its class
 name; a borrowed name names none. Checked against LIVE 4.10.200, the rule changes 17 records and
 two stored ship types.
+
+## Amendment — a manufacturer UEX names differently merges into its P4K row (REQ-DATA-045)
+
+Production held 12 manufacturer rows only UEX created beside the P4K row of their brand, because
+UEX spells the brand differently: "Musashi Industrial and Starflight Concern" beside MISC (29 ship
+types hung on the UEX row, 8 on the P4K row), "Vanduul Clans" beside Vanduul, "Behring Applied
+Technology" beside Behring, `Grey&apos;s Market` beside "Grey's Market", and eight more. The rules
+above leave them, and no review case opens for them.
+
+The owner decided on 2026-11-17 that such double listings merge automatically into the row holding
+the game identity, that their references move, that the UEX company id stays known, and that every
+merge is audited:
+
+1. **The twin rule.** A row is a twin when it holds a UEX company and no P4K GUID, SC Wiki UUID,
+   Wiki identity or P4K alias, and its folded name (HTML entities decoded, `&` as "and", every
+   other run of non-alphanumerics one blank, case ignored) names exactly one row holding a P4K
+   GUID, by that row's name or by one of its Wiki names. Against the production rows of 2026-11-17
+   the rule finds exactly the 12 twins and no other pair; nine are named only by a Wiki name,
+   three by the name.
+2. **The merge.** After a UEX manufacturer sync with a complete census, each twin merges in its own
+   transaction through the review-case merge, called without a case. The twin's UEX company stays
+   mapped to the surviving row, so the next sync resolves it there.
+3. **Prevention.** A company that no alias, name or code places joins the row its name names by
+   the same rule instead of creating a twin.
+4. **Audit.** Each merge records `CATALOGUE_MANUFACTURER_MERGED`.
+
+The rows keep the P4K name, so the UEX name of a merged company is reported as a name disagreement
+on each sync, like every other UEX name the P4K overrides (REQ-P4K-020).

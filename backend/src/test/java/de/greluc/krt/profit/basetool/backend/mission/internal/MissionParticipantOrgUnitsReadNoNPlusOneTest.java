@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
@@ -40,14 +42,11 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,7 +97,6 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private OrgUnitMembershipRepository membershipRepository;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private PlatformTransactionManager transactionManager;
 
   private User admin;
@@ -162,61 +160,55 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   }
 
   @Test
-  void theMissionDetailListsEachParticipantsOrgUnitsWithAStatementCountIndependentOfItsSize() {
+  void theMissionDetailListsEachParticipantsOrgUnitsWithAStatementCountIndependentOfItsSize()
+      throws Exception {
     UUID few = seed(FEW);
     UUID many = seed(MANY);
     missionController.getMissionById(few);
-    Statistics stats = statistics();
 
-    stats.clear();
-    MissionDto fewDto = missionController.getMissionById(few);
-    long fewStatements = stats.getPrepareStatementCount();
-    stats.clear();
-    MissionDto manyDto = missionController.getMissionById(many);
-    long manyStatements = stats.getPrepareStatementCount();
-    report("mission detail", fewStatements, manyStatements);
+    var fewDetail = measured(() -> missionController.getMissionById(few));
+    var manyDetail = measured(() -> missionController.getMissionById(many));
+    report("mission detail", fewDetail.statements(), manyDetail.statements());
 
-    assertThat(fewDto.participants()).hasSize(FEW);
-    assertThat(manyDto.participants()).hasSize(MANY);
-    manyDto.participants().forEach(this::assertStampedOrgUnits);
-    assertThat(manyStatements)
+    assertThat(fewDetail.result().participants()).hasSize(FEW);
+    assertThat(manyDetail.result().participants()).hasSize(MANY);
+    manyDetail.result().participants().forEach(this::assertStampedOrgUnits);
+    assertThat(manyDetail.statements())
         .as("detail statements for " + MANY + " participants against " + FEW + " (N+1)")
-        .isEqualTo(fewStatements)
+        .isPositive()
+        .isEqualTo(fewDetail.statements())
         .isLessThanOrEqualTo(DETAIL_BOUND);
   }
 
   @Test
-  void theUnassignedRosterListsEachParticipantsOrgUnitsWithAStatementCountIndependentOfItsSize() {
+  void theUnassignedRosterListsEachParticipantsOrgUnitsWithAStatementCountIndependentOfItsSize()
+      throws Exception {
     UUID few = seed(FEW);
     UUID many = seed(MANY);
     rosterController.getUnassignedParticipants(few);
-    Statistics stats = statistics();
 
-    stats.clear();
-    List<MissionParticipantDto> fewRows = rosterController.getUnassignedParticipants(few);
-    long fewStatements = stats.getPrepareStatementCount();
-    stats.clear();
-    List<MissionParticipantDto> manyRows = rosterController.getUnassignedParticipants(many);
-    long manyStatements = stats.getPrepareStatementCount();
-    report("unassigned roster", fewStatements, manyStatements);
+    var fewRows = measured(() -> rosterController.getUnassignedParticipants(few));
+    var manyRows = measured(() -> rosterController.getUnassignedParticipants(many));
+    report("unassigned roster", fewRows.statements(), manyRows.statements());
 
-    assertThat(fewRows).hasSize(FEW);
-    assertThat(manyRows).hasSize(MANY);
-    manyRows.forEach(this::assertStampedOrgUnits);
-    assertThat(manyStatements)
+    assertThat(fewRows.result()).hasSize(FEW);
+    assertThat(manyRows.result()).hasSize(MANY);
+    manyRows.result().forEach(this::assertStampedOrgUnits);
+    assertThat(manyRows.statements())
         .as("roster statements for " + MANY + " participants against " + FEW + " (N+1)")
-        .isEqualTo(fewStatements)
+        .isPositive()
+        .isEqualTo(fewRows.statements())
         .isLessThanOrEqualTo(ROSTER_BOUND);
   }
 
   @Test
-  void thePeerRedactionKeepsTheOrgUnitsAndNeedsNoFurtherStatementsPerParticipant() {
+  void thePeerRedactionKeepsTheOrgUnitsAndNeedsNoFurtherStatementsPerParticipant()
+      throws Exception {
     UUID few = seed(FEW);
     UUID many = seed(MANY);
-    Statistics stats = statistics();
 
-    long fewStatements = redactedStatements(few, stats);
-    long manyStatements = redactedStatements(many, stats);
+    long fewStatements = preparedBy(() -> redactedDetail(few));
+    long manyStatements = preparedBy(() -> redactedDetail(many));
     report("peer redaction", fewStatements, manyStatements);
 
     MissionDto redacted = redactedDetail(many);
@@ -224,64 +216,59 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
     redacted.participants().forEach(this::assertStampedOrgUnits);
     assertThat(manyStatements)
         .as("peer-redacted detail statements for " + MANY + " against " + FEW + " (N+1)")
+        .isPositive()
         .isEqualTo(fewStatements)
         .isLessThanOrEqualTo(REDACTION_BOUND);
   }
 
   @Test
-  void updatingAParticipantRestampsItsOrgUnitsWithAStatementCountIndependentOfTheRosterSize() {
+  void updatingAParticipantRestampsItsOrgUnitsWithAStatementCountIndependentOfTheRosterSize()
+      throws Exception {
     UUID few = seed(FEW);
     UUID many = seed(MANY);
     updateOrgUnits(firstParticipantOf(few), command.getId());
     updateOrgUnits(firstParticipantOf(many), command.getId());
     Target fewTarget = firstParticipantOf(few);
     Target manyTarget = firstParticipantOf(many);
-    Statistics stats = statistics();
 
-    stats.clear();
-    MissionParticipantDto fewDto = updateOrgUnits(fewTarget, staffel.getId());
-    long fewStatements = stats.getPrepareStatementCount();
-    stats.clear();
-    MissionParticipantDto manyDto = updateOrgUnits(manyTarget, staffel.getId());
-    long manyStatements = stats.getPrepareStatementCount();
-    report("participant update", fewStatements, manyStatements);
+    var fewUpdate = measured(() -> updateOrgUnits(fewTarget, staffel.getId()));
+    var manyUpdate = measured(() -> updateOrgUnits(manyTarget, staffel.getId()));
+    report("participant update", fewUpdate.statements(), manyUpdate.statements());
 
-    assertThat(fewDto.orgUnits())
+    assertThat(fewUpdate.result().orgUnits())
         .extracting(OrgUnitReferenceDto::id)
         .containsExactly(staffel.getId());
-    assertThat(manyDto.orgUnits())
+    assertThat(manyUpdate.result().orgUnits())
         .extracting(OrgUnitReferenceDto::id)
         .containsExactly(staffel.getId());
-    assertThat(manyStatements)
+    assertThat(manyUpdate.statements())
         .as("update statements on a roster of " + MANY + " against " + FEW + " (N+1)")
-        .isEqualTo(fewStatements)
+        .isPositive()
+        .isEqualTo(fewUpdate.statements())
         .isLessThanOrEqualTo(UPDATE_BOUND);
   }
 
   @Test
-  void aSingleParticipantEndpointListsItsOrgUnitsWithAStatementCountIndependentOfTheRosterSize() {
+  void aSingleParticipantEndpointListsItsOrgUnitsWithAStatementCountIndependentOfTheRosterSize()
+      throws Exception {
     UUID few = seed(FEW);
     UUID many = seed(MANY);
     Target fewTarget = firstParticipantOf(few);
     Target manyTarget = firstParticipantOf(many);
     changePayout(fewTarget);
     changePayout(manyTarget);
-    Statistics stats = statistics();
 
-    stats.clear();
-    MissionParticipantDto fewDto = changePayout(fewTarget);
-    long fewStatements = stats.getPrepareStatementCount();
-    stats.clear();
-    MissionParticipantDto manyDto = changePayout(manyTarget);
-    long manyStatements = stats.getPrepareStatementCount();
-    report("payout preference", fewStatements, manyStatements);
+    var fewChange = measured(() -> changePayout(fewTarget));
+    var manyChange = measured(() -> changePayout(manyTarget));
+    report("payout preference", fewChange.statements(), manyChange.statements());
 
-    assertThat(fewDto.orgUnits()).isNotEmpty();
-    assertStampedOrgUnits(fewDto);
-    assertStampedOrgUnits(manyDto);
-    assertThat(manyStatements)
+    assertThat(fewChange.result().orgUnits()).isNotEmpty();
+    assertStampedOrgUnits(fewChange.result());
+    assertStampedOrgUnits(manyChange.result());
+    assertThat(manyChange.statements())
         .as("payout statements on a roster of " + MANY + " against " + FEW + " (N+1)")
-        .isEqualTo(fewStatements)
+        .isPositive()
+        .isEqualTo(fewChange.statements())
         .isLessThanOrEqualTo(PAYOUT_BOUND);
   }
 
@@ -314,12 +301,6 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
 
   private record Target(UUID missionId, UUID participantId, Long version) {}
 
-  private long redactedStatements(UUID missionId, Statistics stats) {
-    stats.clear();
-    redactedDetail(missionId);
-    return stats.getPrepareStatementCount();
-  }
-
   private MissionDto redactedDetail(UUID missionId) {
     return inReadOnlyTransaction(() ->
         missionPeerRedactor.cleanupMissionForPeer(
@@ -346,12 +327,6 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
             even
                 ? List.of(OrgUnitKind.SQUADRON, OrgUnitKind.SPECIAL_COMMAND)
                 : List.of(OrgUnitKind.SPECIAL_COMMAND));
-  }
-
-  private Statistics statistics() {
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
-    return stats;
   }
 
   private void report(String path, long few, long many) {

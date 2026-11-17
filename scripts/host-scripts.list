@@ -15,7 +15,8 @@ host-companions.json
 host_companions.py
 render-redis-acl.py
 mint-internal-tls.sh
-redis-users.acl.tmpl
+redis-session-users.acl.tmpl
+redis-shared-users.acl.tmpl
 cgroup-container-metrics.py
 cert-expiry-metrics.py
 host-updates-metrics.sh

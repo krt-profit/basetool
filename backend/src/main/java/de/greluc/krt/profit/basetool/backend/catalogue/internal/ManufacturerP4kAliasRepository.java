@@ -44,4 +44,12 @@ public interface ManufacturerP4kAliasRepository extends JpaRepository<Manufactur
    */
   @Query("SELECT a FROM ManufacturerP4kAlias a WHERE a.manufacturer.id = :manufacturerId")
   List<ManufacturerP4kAlias> findOfManufacturer(@Param("manufacturerId") UUID manufacturerId);
+
+  /**
+   * Lists the manufacturers a reviewed P4K alias names, for the UEX twin rule (REQ-DATA-045).
+   *
+   * @return the id of every manufacturer that owns at least one alias
+   */
+  @Query("SELECT DISTINCT a.manufacturer.id FROM ManufacturerP4kAlias a")
+  List<UUID> findManufacturerIds();
 }

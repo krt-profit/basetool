@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
@@ -118,20 +119,18 @@ class StockLevelLowSubjectsTest {
   }
 
   @Test
-  void theBadgeReadLoadsNoOpenOrderAndIssuesFewerStatementsThanTheFullRead() {
+  void theBadgeReadLoadsNoOpenOrderAndIssuesFewerStatementsThanTheFullRead() throws Exception {
     Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
     stats.setStatisticsEnabled(true);
 
     stats.clear();
     entityManager.clear();
-    stockLevelService.list(null, true, null);
-    long fullStatements = stats.getPrepareStatementCount();
+    long fullStatements = preparedBy(() -> stockLevelService.list(null, true, null));
     long fullOrderLoads = orderLoads(stats);
 
     stats.clear();
     entityManager.clear();
-    stockLevelService.lowSubjects();
-    long badgeStatements = stats.getPrepareStatementCount();
+    long badgeStatements = preparedBy(stockLevelService::lowSubjects);
     long badgeOrderLoads = orderLoads(stats);
 
     assertThat(fullOrderLoads).as("the full read loads the open orders").isPositive();

@@ -5,10 +5,10 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
-  - name: "RedisDown - redis_up 0 pages after two minutes"
+  - name: "RedisDown - redis_up 0 on redis-session pages after two minutes"
     interval: 1m
     input_series:
-      - series: "redis_up{job=\"redis\", instance=\"redis-exporter:9121\"}"
+      - series: "redis_up{job=\"redis\", instance=\"redis-session-exporter:9121\", redis=\"session\"}"
         values: "1x2 0x10"
     alert_rule_test:
       - eval_time: 3m
@@ -20,7 +20,31 @@ tests:
           - exp_labels:
               severity: "critical"
               job: "redis"
-              instance: "redis-exporter:9121"
+              instance: "redis-session-exporter:9121"
+              redis: "session"
             exp_annotations:
-              summary: "Redis down"
-              description: "redis-exporter has not been able to reach Redis for 2 minutes (redis_up == 0) while the exporter itself answers. Redis holds every web session and the live-sync fan-out, so members are being logged out and live updates have stopped. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status redis.service` and `journalctl CONTAINER_NAME=redis`; a missing or unreadable /var/lib/basetool/redis/users.acl stops it from starting at all (ADR-0088)."
+              summary: "Redis down: redis-session"
+              description: "redis-session-exporter has not been able to reach redis-session for 2 minutes (redis_up == 0) while the exporter itself answers. redis-session holds every web session, so members are being logged out and nobody can sign in. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status redis-session.service` and `journalctl CONTAINER_NAME=redis-session`; a missing or unreadable /var/lib/basetool/redis/session-users.acl stops it from starting at all (ADR-0088)."
+
+  - name: "RedisDown - redis-shared down alone pages for redis-shared only"
+    interval: 1m
+    input_series:
+      - series: "redis_up{job=\"redis\", instance=\"redis-session-exporter:9121\", redis=\"session\"}"
+        values: "1x12"
+      - series: "redis_up{job=\"redis\", instance=\"redis-shared-exporter:9121\", redis=\"shared\"}"
+        values: "1x2 0x10"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: RedisDown
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: RedisDown
+        exp_alerts:
+          - exp_labels:
+              severity: "critical"
+              job: "redis"
+              instance: "redis-shared-exporter:9121"
+              redis: "shared"
+            exp_annotations:
+              summary: "Redis down: redis-shared"
+              description: "redis-shared-exporter has not been able to reach redis-shared for 2 minutes (redis_up == 0) while the exporter itself answers. redis-shared holds the exchange registry mirror, the ingest handoffs and the live-sync and notification fan-out: sign-in keeps working, but the exchange answers 503 REGISTRY_UNAVAILABLE, handoffs can be neither staged nor picked up, and live updates reach only viewers on the same replica. Check `sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user status redis-shared.service` and `journalctl CONTAINER_NAME=redis-shared`; a missing or unreadable /var/lib/basetool/redis-shared/users.acl stops it from starting at all (ADR-0088)."

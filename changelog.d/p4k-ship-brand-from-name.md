@@ -1,4 +1,4 @@
 ### Fixed
 
-- P4K import: a ship's manufacturer follows the brand its name begins with when the game files name another one, so
-  the Esperia Stinger is Esperia again and the Vanduul Scythe is Vanduul.
+- **P4K-Import, Schiffe.** Nennt der Schiffsname eine andere Marke als die Spieldateien, gilt der Name: Die Esperia
+  Stinger ist wieder Esperia, die Vanduul Scythe wieder Vanduul.

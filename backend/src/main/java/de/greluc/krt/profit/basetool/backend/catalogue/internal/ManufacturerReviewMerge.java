@@ -36,7 +36,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Moves every manufacturer reference and source identity to a confirmed review survivor. */
+/**
+ * Moves every manufacturer reference and source identity to the survivor of a confirmed review case
+ * or of a UEX twin (REQ-DATA-045).
+ */
 @Service
 @RequiredArgsConstructor
 class ManufacturerReviewMerge {
@@ -54,11 +57,14 @@ class ManufacturerReviewMerge {
    *
    * @param survivor the row with the canonical P4K identity
    * @param retired the source duplicate with no canonical P4K identity
-   * @param activeCaseId the case whose merge proposal is being applied
+   * @param activeCaseId the case whose merge proposal is being applied, which keeps its rows, or
+   *     {@code null} for a merge no review case asked for
+   * @return the item and ship type references moved to the survivor
    */
+  @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
-  void mergeWithinTransaction(
-      @NotNull Manufacturer survivor, @NotNull Manufacturer retired, @NotNull UUID activeCaseId) {
+  MovedReferences mergeWithinTransaction(
+      @NotNull Manufacturer survivor, @NotNull Manufacturer retired, @Nullable UUID activeCaseId) {
     UUID survivorId = survivor.getId();
     UUID retiredId = retired.getId();
     if (survivorId.equals(retiredId)
@@ -71,8 +77,8 @@ class ManufacturerReviewMerge {
     UUID retiredWiki = retired.getScwikiUuid();
     verifySourceOwnership(retired, retiredCompany, retiredWiki);
     movePrimaryIdentities(survivor, retired);
-    references.repointItems(retiredId, survivorId);
-    references.repointShips(retiredId, survivorId);
+    final int items = references.repointItems(retiredId, survivorId);
+    final int shipTypes = references.repointShips(retiredId, survivorId);
     p4kAliases.findOfManufacturer(retiredId).forEach(alias -> alias.setManufacturer(survivor));
     uexCompanies.findOfManufacturer(retiredId).forEach(alias -> alias.setManufacturer(survivor));
     wikiIdentities.findOfManufacturer(retiredId).forEach(alias -> alias.setManufacturer(survivor));
@@ -88,11 +94,14 @@ class ManufacturerReviewMerge {
     }
     entityManager.lock(survivor, LockModeType.OPTIMISTIC_FORCE_INCREMENT);
     manufacturers.delete(retired);
+    return new MovedReferences(items, shipTypes);
   }
 
-  private void repointOpenReviews(UUID retiredId, UUID survivorId, UUID activeCaseId) {
-    for (P4kReviewCase review :
-        reviewCases.findOpenReferences(P4kKind.MANUFACTURER, retiredId, activeCaseId)) {
+  private void repointOpenReviews(UUID retiredId, UUID survivorId, @Nullable UUID activeCaseId) {
+    for (P4kReviewCase review : reviewCases.findOpenReferences(P4kKind.MANUFACTURER, retiredId)) {
+      if (review.getId().equals(activeCaseId)) {
+        continue;
+      }
       UUID row = retiredId.equals(review.getRowId()) ? survivorId : review.getRowId();
       UUID other = retiredId.equals(review.getOtherRowId()) ? survivorId : review.getOtherRowId();
       review.setRowId(row);
@@ -170,4 +179,12 @@ class ManufacturerReviewMerge {
       survivor.setScwikiDeletedAt(retired.getScwikiDeletedAt());
     }
   }
+
+  /**
+   * The references a merge moved to the survivor.
+   *
+   * @param items the game items whose manufacturer or P4K manufacturer was the retired row
+   * @param shipTypes the ship types whose manufacturer was the retired row
+   */
+  record MovedReferences(int items, int shipTypes) {}
 }

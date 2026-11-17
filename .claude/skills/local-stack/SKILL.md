@@ -8,7 +8,7 @@ description: Start, configure or tear down the Profit Basetool local Docker Comp
 Use Docker Compose profiles:
 
 ```bash
-docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-dev   # deps only, run apps locally
+docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-session-dev redis-shared-dev   # deps only, run apps locally
 docker compose --profile dev up -d                                                          # full dev stack with host port exposure
 docker compose --profile prod up -d                                                         # prod-equivalent stack behind the nginx edge (needs the prod .env)
 docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
@@ -26,7 +26,7 @@ files (`scripts/generate-quadlet.py` → `quadlet/`). A change to a service in `
 therefore needs the units regenerated in the same change (`python3 scripts/generate-quadlet.py`;
 the `quadlet-drift` check in `repo-lint.yml` runs `--check`).
 
-Host ports (dev profile only, bound to `127.0.0.1`): backend `11261`, frontend `18081`, ingest `11262`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`. A `.env` at repo root is required for the regular dev/prod profiles (see README for keys). The isolated test stack instead reads `.env.test` and a stripped `realm-export.json`; its TLS material is the **committed** throwaway per-service keystores under `docker/test-tls/` (password `basetool-test`, ADR-0139), bound by a hardcoded path — nothing to generate. See the README's *Running the local test stack* section for setup, and never substitute production artifacts for those.
+Host ports (dev profile only, bound to `127.0.0.1`): backend `11261`, frontend `18081`, ingest `11262`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, shared Redis `6379`, session store `6380` (ADR-0388). A `.env` at repo root is required for the regular dev/prod profiles (see README for keys). The isolated test stack instead reads `.env.test` and a stripped `realm-export.json`; its TLS material is the **committed** throwaway per-service keystores under `docker/test-tls/` (password `basetool-test`, ADR-0139), bound by a hardcoded path — nothing to generate. See the README's *Running the local test stack* section for setup, and never substitute production artifacts for those.
 
 The backend always serves HTTPS (`server.ssl.enabled: true`, key alias `basetool`); the frontend reaches it at `https://backend:11261` by default (`BACKEND_URL`), so a frontend run from Gradle against a backend run from Gradle needs `BACKEND_URL=https://localhost:11261`. There is no Swagger UI — the backend's OpenAPI document is served at `https://localhost:11261/v3/api-docs` in the `dev`/`test` profiles only (disabled in `prod`), and the committed `backend/src/main/resources/api/openapi.json` is its API-documentation artifact. The ingest gateway has no generated document; its exchange contract `ingest/src/main/resources/api/exchange-v1.openapi.json` is served at `https://localhost:11262/exchange/v1/openapi.json` in every profile.
 

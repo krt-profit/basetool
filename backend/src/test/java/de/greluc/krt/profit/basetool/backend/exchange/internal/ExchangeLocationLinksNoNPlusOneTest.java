@@ -19,19 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeLocationLinks.Links;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationDto;
-import jakarta.persistence.EntityManagerFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -52,7 +50,6 @@ class ExchangeLocationLinksNoNPlusOneTest {
   private static final int PLACES_PER_KIND = 4;
 
   @Autowired private ExchangeLocationLinks links;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private JdbcTemplate jdbc;
 
   private final List<UUID> locations = new ArrayList<>();
@@ -67,7 +64,7 @@ class ExchangeLocationLinksNoNPlusOneTest {
   }
 
   @Test
-  void theLinksOfManyPlacesOnCitiesAndStationsComeFromOneStatement() {
+  void theLinksOfManyPlacesOnCitiesAndStationsComeFromOneStatement() throws Exception {
     Map<UUID, Integer> onCities = new HashMap<>();
     Map<UUID, Integer> onStations = new HashMap<>();
     for (int i = 0; i < PLACES_PER_KIND; i++) {
@@ -77,14 +74,11 @@ class ExchangeLocationLinksNoNPlusOneTest {
       onStations.put(location(null, station(uexStation)), uexStation);
     }
     UUID unlinked = location(city(null), null);
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
 
-    stats.clear();
-    Map<UUID, Links> read = links.byId(locations);
-    long statements = stats.getPrepareStatementCount();
+    var byId = measured(() -> links.byId(locations));
+    Map<UUID, Links> read = byId.result();
 
-    assertThat(statements)
+    assertThat(byId.statements())
         .as("statements for %d linked places (suspected N+1)", locations.size() - 1)
         .isOne();
     onCities.forEach((location, uex) ->

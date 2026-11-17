@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatProperty;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
@@ -34,6 +37,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +53,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ItemReconciliationService {
+
+  /** Orders prices by UEX's modification time, an unknown time first. */
+  private static final Comparator<Long> MODIFIED = Comparator.nullsFirst(Long::compareTo);
+
+  /** Orders prices by their last sync, an unknown time first. */
+  private static final Comparator<Instant> SYNCED = Comparator.nullsFirst(Instant::compareTo);
+
   private final GameItemRepository items;
   private final GameItemRedirectRepository redirects;
   private final CatalogueItemReassignmentRepository recipes;
@@ -57,6 +68,7 @@ public class ItemReconciliationService {
   private final List<GameItemReassignmentParticipant> participants;
   private final SyncReportService reports;
   private final P4kMergeConflictRecorder p4kConflicts;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Consolidates a uniquely matched uuid-less UEX row into an existing Wiki identity.
@@ -104,13 +116,8 @@ public class ItemReconciliationService {
       return null;
     }
     List<GameItem> locked = items.lockReconciliationRows(List.of(wikiItem.getId(), uexItemId));
-    GameItem source =
-        locked.stream().filter(item -> item.getId().equals(uexItemId)).findFirst().orElse(null);
-    GameItem target =
-        locked.stream()
-            .filter(item -> item.getId().equals(wikiItem.getId()))
-            .findFirst()
-            .orElse(null);
+    GameItem source = lockedRow(locked, uexItemId);
+    GameItem target = lockedRow(locked, wikiItem.getId());
     if (source == null || target == null || !compatible(source, target, incoming)) {
       return null;
     }
@@ -146,24 +153,7 @@ public class ItemReconciliationService {
     }
     target.setUexItemId(uexId);
     items.saveAndFlush(target);
-    for (GameItemReassignmentParticipant participant : participants) {
-      participant.reassignGameItem(uexItemId, target.getId());
-    }
-    recipes.blueprints(uexItemId, target.getId());
-    recipes.ingredients(uexItemId, target.getId());
-    recipes.loadoutPorts(uexItemId, target.getId());
-    recipes.paints(uexItemId, target.getId());
-    recipes.shopItems(uexItemId, target.getId());
-    movePrices(source, target);
-    moveStats(source, target);
-    redirects.repoint(uexItemId, target.getId());
-    GameItemRedirect redirect = new GameItemRedirect();
-    redirect.setId(uexItemId);
-    redirect.setCanonicalItem(target);
-    redirect.setRetiredSnapshot(archive);
-    redirects.saveAndFlush(redirect);
-    items.delete(source);
-    items.flush();
+    retire(source, target, archive, null, ItemReconciliationService::isNewer);
     if (runId != null) {
       reports.logScwikiEvent(
           runId,
@@ -174,6 +164,131 @@ public class ItemReconciliationService {
           mergeDetails(uexItemId, target).toString());
     }
     return target;
+  }
+
+  /**
+   * Merges a row a second UEX listing created into the game row of the same item (REQ-DATA-044)
+   * inside the caller's transaction. The game row keeps its own UEX listing and its own price at a
+   * terminal both rows list; the twin's UEX item id stays on the redirect, so the UEX item sync
+   * never creates the row again.
+   *
+   * @param twinId the UEX-only row to merge away
+   * @param targetId the game row that stays
+   * @param rule the evidence that both are the same item
+   * @param runId the UEX item sync run that found the pair
+   * @return whether the merge happened; {@code false} when a row is gone or no longer qualifies
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean mergeUexTwin(
+      @NotNull UUID twinId,
+      @NotNull UUID targetId,
+      @NotNull UexItemTwinRule rule,
+      @NotNull UUID runId) {
+    if (twinId.equals(targetId)) {
+      return false;
+    }
+    List<GameItem> locked = items.lockReconciliationRows(List.of(twinId, targetId));
+    GameItem twin = lockedRow(locked, twinId);
+    GameItem target = lockedRow(locked, targetId);
+    if (twin == null || target == null || !twinCompatible(twin, target, rule)) {
+      return false;
+    }
+    Integer twinUexId = twin.getUexItemId();
+    String archive = redirects.snapshot(twinId, targetId);
+    int references = retire(twin, target, archive, twinUexId, (_, _) -> false);
+    reports.logUexEvent(
+        runId,
+        SyncEventType.SOURCE_RECORDS_MERGED,
+        ExternalSyncReport.GAME_ITEM,
+        target.getExternalUuid(),
+        target.getName(),
+        mergeDetails(twinId, target).with("rule", rule).with("uexItemId", twinUexId).toString());
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_ITEM_MERGED,
+        targetId,
+        target.getName(),
+        null,
+        AuditDetails.of("retiredItem", twinId)
+            .with("rule", rule)
+            .with("uexItemId", twinUexId)
+            .with("references", references));
+    return true;
+  }
+
+  /**
+   * Picks a row out of the locked ones.
+   *
+   * @param locked the locked rows
+   * @param id the row's id
+   * @return the row, or {@code null} when it is gone
+   */
+  @Nullable
+  private static GameItem lockedRow(@NotNull List<GameItem> locked, @NotNull UUID id) {
+    return locked.stream().filter(row -> id.equals(row.getId())).findFirst().orElse(null);
+  }
+
+  /**
+   * Revalidates a twin pair under the row locks: the twin is still a UEX-only row without a game
+   * UUID, the target is a game row holding another UEX listing, and a name rule needs agreeing item
+   * facts.
+   *
+   * @param twin the locked twin
+   * @param target the locked game row
+   * @param rule the evidence
+   * @return whether the merge may proceed
+   */
+  private static boolean twinCompatible(
+      @NotNull GameItem twin, @NotNull GameItem target, @NotNull UexItemTwinRule rule) {
+    Integer own = target.getUexItemId();
+    return UexItemTwins.isTwinCandidate(twin)
+        && UexItemTwins.isGameRow(target)
+        && own != null
+        && !own.equals(twin.getUexItemId())
+        && (!rule.needsCompatibleFacts()
+            || ItemIdentityCompatibility.matches(
+                twin, target.getKind(), target.getManufacturer(), target.getClassName()));
+  }
+
+  /**
+   * Moves every reference, price and stat of a retired row onto the survivor, keeps the retired id
+   * as a redirect and deletes the row.
+   *
+   * @param source the retired row
+   * @param target the surviving row
+   * @param archive both rows as JSON, taken before either changed
+   * @param mergedUexItemId the retired row's UEX item id the survivor did not take, or {@code null}
+   * @param sourcePriceWins whether a retired row's price replaces the survivor's at one terminal
+   * @return the number of rows whose item reference moved
+   */
+  private int retire(
+      @NotNull GameItem source,
+      @NotNull GameItem target,
+      @NotNull String archive,
+      @Nullable Integer mergedUexItemId,
+      @NotNull BiPredicate<GameItemPrice, GameItemPrice> sourcePriceWins) {
+    UUID retiredId = source.getId();
+    UUID survivorId = target.getId();
+    int references = 0;
+    for (GameItemReassignmentParticipant participant : participants) {
+      references += participant.reassignGameItem(retiredId, survivorId);
+    }
+    references += recipes.blueprints(retiredId, survivorId);
+    references += recipes.ingredients(retiredId, survivorId);
+    references += recipes.loadoutPorts(retiredId, survivorId);
+    references += recipes.paints(retiredId, survivorId);
+    references += recipes.shopItems(retiredId, survivorId);
+    movePrices(source, target, sourcePriceWins);
+    moveStats(source, target);
+    redirects.repoint(retiredId, survivorId);
+    GameItemRedirect redirect = new GameItemRedirect();
+    redirect.setId(retiredId);
+    redirect.setCanonicalItem(target);
+    redirect.setRetiredSnapshot(archive);
+    redirect.setUexItemId(mergedUexItemId);
+    redirects.saveAndFlush(redirect);
+    items.delete(source);
+    items.flush();
+    return references;
   }
 
   static boolean compatible(GameItem source, GameItem target, WikiIdentity incoming) {
@@ -251,9 +366,15 @@ public class ItemReconciliationService {
     }
   }
 
-  private void movePrices(GameItem from, GameItem to) {
-    Comparator<Long> modified = Comparator.nullsFirst(Long::compareTo);
-    Comparator<Instant> synced = Comparator.nullsFirst(Instant::compareTo);
+  /**
+   * Moves the retired row's prices onto the survivor, one price per terminal.
+   *
+   * @param from the retired row
+   * @param to the surviving row
+   * @param sourcePriceWins whether a retired row's price replaces the survivor's at one terminal
+   */
+  private void movePrices(
+      GameItem from, GameItem to, BiPredicate<GameItemPrice, GameItemPrice> sourcePriceWins) {
     Map<UUID, GameItemPrice> targetPrices =
         prices.findByGameItemId(to.getId()).stream()
             .collect(Collectors.toMap(price -> price.getTerminal().getId(), Function.identity()));
@@ -264,10 +385,7 @@ public class ItemReconciliationService {
         prices.save(source);
         targetPrices.put(source.getTerminal().getId(), source);
       } else {
-        int dateOrder = modified.compare(source.getDateModified(), target.getDateModified());
-        if (dateOrder > 0
-            || (dateOrder == 0
-                && synced.compare(source.getUexSyncedAt(), target.getUexSyncedAt()) > 0)) {
+        if (sourcePriceWins.test(source, target)) {
           target.setPriceBuy(source.getPriceBuy());
           target.setPriceSell(source.getPriceSell());
           target.setPriceRent(source.getPriceRent());
@@ -282,6 +400,20 @@ public class ItemReconciliationService {
       }
     }
     prices.flush();
+  }
+
+  /**
+   * Tells whether a retired row's price was modified at UEX after the survivor's, the later sync
+   * deciding a tie.
+   *
+   * @param source the retired row's price
+   * @param target the survivor's price at the same terminal
+   * @return whether the retired row's price is newer
+   */
+  private static boolean isNewer(GameItemPrice source, GameItemPrice target) {
+    int dateOrder = MODIFIED.compare(source.getDateModified(), target.getDateModified());
+    return dateOrder > 0
+        || (dateOrder == 0 && SYNCED.compare(source.getUexSyncedAt(), target.getUexSyncedAt()) > 0);
   }
 
   private void moveStats(GameItem from, GameItem to) {

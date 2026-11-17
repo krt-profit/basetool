@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Modifying;
@@ -113,6 +114,17 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
   @Query("SELECT m.name AS name, m.id AS id FROM Manufacturer m")
   List<NameRef> findNameRefs();
 
+  /**
+   * The name and source identities of every manufacturer, in one query, for the UEX twin rule
+   * (REQ-DATA-045).
+   *
+   * @return one row per manufacturer
+   */
+  @Query(
+      "SELECT m.id AS id, m.name AS name, m.p4kUuid AS p4kUuid, m.scwikiUuid AS scwikiUuid,"
+          + " m.uexCompanyId AS uexCompanyId FROM Manufacturer m")
+  List<IdentityRef> findIdentityRefs();
+
   /** Projection row of {@link #findNameRefs()}. */
   interface NameRef {
 
@@ -129,5 +141,47 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
      * @return the id
      */
     UUID getId();
+  }
+
+  /** Projection row of {@link #findIdentityRefs()}. */
+  interface IdentityRef {
+
+    /**
+     * The manufacturer's id.
+     *
+     * @return the id
+     */
+    UUID getId();
+
+    /**
+     * The manufacturer's name as stored.
+     *
+     * @return the name
+     */
+    String getName();
+
+    /**
+     * The P4K GUID the manufacturer holds.
+     *
+     * @return the GUID, or {@code null} when the P4K knows no record of the row
+     */
+    @Nullable
+    UUID getP4kUuid();
+
+    /**
+     * The SC Wiki UUID the manufacturer holds.
+     *
+     * @return the Wiki UUID, or {@code null} when the row has no Wiki link
+     */
+    @Nullable
+    UUID getScwikiUuid();
+
+    /**
+     * The UEX company that owns the manufacturer's UEX identity.
+     *
+     * @return the UEX company id, or {@code null} when UEX names no company for the row
+     */
+    @Nullable
+    Integer getUexCompanyId();
   }
 }

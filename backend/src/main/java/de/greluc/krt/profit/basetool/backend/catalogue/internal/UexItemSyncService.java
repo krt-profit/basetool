@@ -56,7 +56,9 @@ import org.springframework.util.StringUtils;
  * game-related {@code uex_category}.
  *
  * <p>An item resolves by UEX item id, then an unambiguous external UUID or exact source name,
- * otherwise it is created as {@link GameItemSourceSystem#UEX_ONLY}. Verified source-id
+ * otherwise it is created as {@link GameItemSourceSystem#UEX_ONLY}, unless its id is a second
+ * listing an item merge left behind, which writes nothing. After a complete fetch the rows such
+ * second listings created are merged into their game rows (REQ-DATA-044). Verified source-id
  * reassignments release their old bindings before writes, after the complete feed validates their
  * UUIDs. Items missing from every response are marked UEX-deleted via {@link
  * GameItemRepository#markUexDeletedExcept(java.util.Collection, Instant)}, but only when every
@@ -91,6 +93,12 @@ public class UexItemSyncService {
 
   /** Runs the preload read and the orphan sweep in transactions of their own (BE-PERF-09). */
   private final SyncChunkWriter chunkWriter;
+
+  /** Knows the UEX item ids of second listings an item merge left behind (REQ-DATA-044). */
+  private final GameItemRedirectRepository redirects;
+
+  /** Merges the rows second UEX listings created into their game rows (REQ-DATA-044). */
+  private final UexItemTwinMerger twinMerger;
 
   /**
    * Runs the full UEX item sync: refreshes the category table, then walks every game-related
@@ -163,6 +171,8 @@ public class UexItemSyncService {
     for (DeferredItem input : inputs) {
       upsertAndTally(input.dto(), input.category(), now, lookups, tally);
     }
+    int twinsMerged =
+        twinMerger.mergeTwins(inputs.stream().map(DeferredItem::dto).toList(), census, runId);
     Set<Integer> seenUexItemIds = census.ids();
     int itemsProcessed = tally.itemsProcessed;
     int itemsCreated = tally.itemsCreated;
@@ -195,13 +205,15 @@ public class UexItemSyncService {
     log.info(
         "Finished UEX item sync: {} categories visited, {} items upserted ({} new, {} updated), {}"
             + " shared-uuid sibling(s) kept external_uuid null, {} reassigned UEX id(s) rebound by"
-            + " UUID",
+            + " UUID, {} merged listing(s) skipped, {} twin(s) merged",
         categoriesProcessed,
         itemsProcessed,
         itemsCreated,
         itemsProcessed - itemsCreated,
         sharedUuidDeclined,
-        tally.idsReassigned);
+        tally.idsReassigned,
+        tally.mergedListings,
+        twinsMerged);
 
     syncReportService.logUexEvent(
         runId,
@@ -210,7 +222,7 @@ public class UexItemSyncService {
         null,
         null,
         ("categories=%d, upserted=%d, created=%d, updated=%d, uexDeleted=%d, sharedUuidDeclined=%d,"
-                + " idsReassigned=%d")
+                + " idsReassigned=%d, mergedListings=%d, twinsMerged=%d")
             .formatted(
                 categoriesProcessed,
                 itemsProcessed,
@@ -218,7 +230,9 @@ public class UexItemSyncService {
                 itemsProcessed - itemsCreated,
                 marked,
                 sharedUuidDeclined,
-                tally.idsReassigned));
+                tally.idsReassigned,
+                tally.mergedListings,
+                twinsMerged));
     syncReportService.pruneRuns(SyncSourceSystem.UEX);
 
     return itemsProcessed;
@@ -256,6 +270,11 @@ public class UexItemSyncService {
     try {
       ItemWriteOutcome result =
           self.getObject().writeItemWithinTransaction(dto, category, now, lookups);
+      if (result.mergedListing()) {
+        tally.mergedListings++;
+        syncReportService.recordSkipped(1);
+        return;
+      }
       GameItem item = result.item();
       if (item == null) {
         tally.rejected++;
@@ -337,10 +356,13 @@ public class UexItemSyncService {
           dto.id(),
           dto.uuid(),
           LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH));
-      return new ItemWriteOutcome(null, false);
+      return ItemWriteOutcome.REJECTED;
     }
 
     GameItem item = resolveExistingItem(dto, category, lookups);
+    if (item == null && redirects.isMergedUexItemId(dto.id())) {
+      return ItemWriteOutcome.MERGED_LISTING;
+    }
     final boolean created = item == null;
     if (item == null) {
       item = new GameItem();
@@ -410,16 +432,26 @@ public class UexItemSyncService {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
     }
 
-    return new ItemWriteOutcome(gameItemRepository.save(item), created);
+    return new ItemWriteOutcome(gameItemRepository.save(item), created, false);
   }
 
   /**
    * One isolated UEX write, including whether it inserted the catalogue row.
    *
-   * @param item the persisted item, or {@code null} when input was rejected
+   * @param item the persisted item, or {@code null} when input was rejected or the listing is a
+   *     merged one
    * @param created whether the item was newly inserted
+   * @param mergedListing whether the listing is a second listing an item merge left behind, which
+   *     writes nothing and is no rejected write (REQ-DATA-044)
    */
-  public record ItemWriteOutcome(@Nullable GameItem item, boolean created) {}
+  public record ItemWriteOutcome(@Nullable GameItem item, boolean created, boolean mergedListing) {
+
+    /** The outcome of input without a usable id or name. */
+    static final ItemWriteOutcome REJECTED = new ItemWriteOutcome(null, false, false);
+
+    /** The outcome of a merged second listing no resolution step placed. */
+    static final ItemWriteOutcome MERGED_LISTING = new ItemWriteOutcome(null, false, true);
+  }
 
   /**
    * Clears {@code uex_item_id} on the row that holds the DTO's UEX id, in its own transaction, so a
@@ -674,6 +706,9 @@ public class UexItemSyncService {
 
     /** Source rows rejected before a database write. */
     private int rejected;
+
+    /** Second listings an item merge left behind, which wrote nothing (REQ-DATA-044). */
+    private int mergedListings;
   }
 
   /**

@@ -96,10 +96,12 @@ accidental. **Captured:** `pg_dump -Fc` of `krt_basetool`; `pg_dump -Fc` of `key
 source of truth — **not** the sanitized `realm-export.json`); the **edge's TLS material and ACME
 account state** (the `edge-certs`, `edge-acme-state` and `edge-acme-webroot` volumes); and the host
 secrets/config needed to stand the stack up (`basetool.env`, `keystore.p12`, `realm-export.json`,
-`keycloak/providers`, and the **redis `users.acl`**); and the monitoring plane (ADR-0072) — the
+`keycloak/providers`, and the **two Redis ACL files**, `session-users.acl` and `shared-users.acl`,
+ADR-0388); and the monitoring plane (ADR-0072) — the
 Grafana SQLite database, the rendered monitoring secrets/certs, the Alertmanager state, and a weekly
-Prometheus TSDB snapshot. **Excluded by design:** Redis *session* data — `appendonlydir` and
-`dump.rdb`, which transparently re-login — logs, and the Loki log store (its GFS retention would
+Prometheus TSDB snapshot. **Excluded by design:** the Redis data of both instances — `appendonlydir` and
+`dump.rdb`: the sessions transparently re-login, and the shared instance's exchange and ingest
+state is rewritten from Postgres or expires within the hour — logs, and the Loki log store (its GFS retention would
 silently extend the approved 31-day IP retention, ADR-0072); Tempo traces and exporter data are
 regenerable.
 
@@ -148,8 +150,8 @@ as clean. A restore for hardware loss / accidental deletion (no compromise suspe
 **Acceptance**
 
 - [ ] A backup contains both database dumps, the three `edge-*` volume archives, the host config
-  (including `users.acl`), and — where the monitoring stack runs — the monitoring artifacts.
-- [ ] Redis session data and the Loki log store are **not** in the backup set.
+  (including both Redis ACL files), and — where the monitoring stack runs — the monitoring artifacts.
+- [ ] The Redis data of both instances and the Loki log store are **not** in the backup set.
 - [ ] The Keycloak DB dump — not `realm-export.json` — is the documented restore source for
   realm/users/clients.
 - [ ] The restore runbook documents that a **compromise-driven** restore must be followed by
@@ -171,7 +173,7 @@ compares `realm` and `client`. Counts are read without logging row contents. The
 production state, and a failure makes the unit report `failed` so it is caught.
 
 **The databases are not the whole claim** (added 2026-09-18). A host whose dumps restore perfectly
-still does not come up without the edge's TLS material or the redis ACL, and for as long as the
+still does not come up without the edge's TLS material or the Redis ACLs, and for as long as the
 drill looked only at the dumps it reported green over a snapshot that held neither. It therefore
 also asserts the **presence** of the non-database artifacts REQ-OPS-010 names — presence only, never
 content, so nothing it logs can carry a key — and reports each through
@@ -184,8 +186,8 @@ content, so nothing it logs can carry a key — and reports each through
   production database, volume, or the live stack.
 - [ ] An empty/garbage restore (no `flyway_schema_history` rows, or table counts below the floor)
   exits non-zero (`failed`).
-- [ ] A snapshot missing the edge certificates, the ACME state or the redis ACL reports
-  `artifact_ok=0` for that artifact, which `RestoreDrillArtifactNotRestorable` pages on.
+- [ ] A snapshot missing the edge certificates, the ACME state or either Redis ACL reports
+  `artifact_ok=0` for that artifact (`redis_session_acl`, `redis_shared_acl`), which `RestoreDrillArtifactNotRestorable` pages on.
 - [ ] Every run writes `basetool_restore_drill_last_success_timestamp` (bumped only when both
   dumps restored and passed their content/constraint checks); `RestoreDrillStaleOrMissing` pages when it is older than 8 days — one weekly drill
   missed, plus a day of slack — or absent. It said 35 days until 2026-09-22, which let four
