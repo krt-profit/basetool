@@ -5966,8 +5966,8 @@ its service does:
 | --- | --- | --- | --- |
 | `basetool-frontend` | `basetool:session:*`, `ingest:handoff:*` | `basetool:session:*`, the created-event pattern, `__keyevent@0__:del` / `:expired`, `basetool:livesync:changed` / `:presence` | read, write, keyspace, hash, set, sorted set, string, pub/sub, transaction, `INFO`; no dangerous command, no `CONFIG` |
 | `basetool-backend` | `exchange:*` | `basetool:livesync:changed`, `basetool:notify:published` | `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `GET`, `SET`, `INFO` |
-| `basetool-ingest` | `ingest:*`, read-only `exchange:*` | none | `GET`, `SET`/`SETEX`/`PSETEX`, `INCR`, `ZADD`, `ZRANGE`/`ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `RPUSH`, `LPOP`, `EXPIRE`/`PEXPIRE`, `DEL`, `EVAL`/`EVALSHA`, `INFO` |
-| `monitoring` | none | none | introspection; **not** `SCAN` or `RANDOMKEY`, which are not key-checked and would list every session id |
+| `basetool-ingest` | `ingest:*`, read-only `exchange:*` | none | `GET`, `SET`/`SETEX`/`PSETEX`, `INCR`/`INCRBY`/`DECRBY`, `ZADD`, `ZRANGE`/`ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `RPUSH`, `LPOP`, `EXPIRE`/`PEXPIRE`, `DEL`, `WATCH`/`UNWATCH`/`MULTI`/`EXEC`/`DISCARD`, `INFO`; `EVAL`/`EVALSHA` until the follow-up of ADR-0389 |
+| `monitoring` | none | none | only what `redis_exporter` sends: `PING`, `CLIENT SETNAME`/`SETINFO`, `COMMAND INFO`, `INFO`, `CONFIG GET`, `LATENCY LATEST`/`HISTOGRAM`; **not** `SCAN`, `RANDOMKEY`, `CLIENT TRACKING`, `CLIENT LIST`/`KILL`/`PAUSE` or `SLOWLOG`, which are not key-checked and would list session ids, show command arguments or stop the frontend |
 | `admin` | all | all | all — the operator's, never in an application's environment |
 | `default` | — | — | switched **off** at the end of the rollout |
 
@@ -5975,11 +5975,22 @@ its service does:
   and reads the registry mirror and the revocation and deny-list keys under `exchange:*`
   (`exchange:registry`, `exchange:revoked:*`, `exchange:deny:*`) with `GET` and `SET`; ingest may
   only read them (`%R~exchange:*`), so the mirror never sits under `ingest:*`. ingest keeps its own
-  exchange state under `ingest:*`: `INCR` for the daily write quotas, `ZADD`, `ZRANGE` /
-  `ZRANGEBYSCORE`, `ZREM` and `ZSCORE` for the byte budget, `SET … NX` for the
-  idempotency locks, and `EVAL` / `EVALSHA` for the scripts that check and record the budget and
-  release an idempotency claim atomically (`ExchangeBudget`, `ExchangeIdempotency`, #2203). A script
-  runs under the same user's rules, so it reaches no key the user could not.
+  exchange state under `ingest:*`: `INCR`, `INCRBY` and `DECRBY` for the daily write quotas,
+  `ZADD`, `ZRANGE` / `ZRANGEBYSCORE`, `ZREM`, `ZSCORE` and `ZCARD` for the byte budget, `SET … NX`
+  for the idempotency locks, and `WATCH`, `MULTI`, `EXEC`, `UNWATCH` and `DISCARD` for the
+  optimistic transactions that check and record the budget, add to and refund a quota and release
+  an idempotency claim atomically (`OptimisticTransaction`, ADR-0389). `WATCH` is key-checked like
+  every other command.
+- **No user but `admin` may track keys.** `CLIENT TRACKING` in broadcast mode is not key-checked:
+  a user holding it would be sent the name — for a session, the id — of every key written under a
+  prefix. Every application user drops `client|tracking` and `client|caching` after its
+  `@connection` grant, and `monitoring` is an allow-list of the exporter's own commands; the exporter
+  runs with `REDIS_EXPORTER_EXCLUDE_SLOWLOG_METRICS`, because `SLOWLOG GET` returns command
+  arguments.
+- **The gateway's user runs no script** (ADR-0389). The Lua interpreter runs inside the server,
+  where a fault in it reaches past the ACL, and the gateway is the internet-facing service. Its user
+  keeps `EVAL`/`EVALSHA` only until production runs the release that sends transactions instead;
+  the follow-up drops them from the template, and from then on `ACL DRYRUN` refuses them.
 - **The rules are code.** `scripts/redis-users.acl.tmpl` is the single source; `render-redis-acl.py`
   renders it on the host with SHA-256 hashes (never a clear-text password) and refuses a partial
   render or a file without exactly one `default` line. The Testcontainers suites and the E2E stack
@@ -6018,8 +6029,16 @@ its service does:
   `RedisAclIngestIntegrationTest#stagingAndTheCapEvictionRunUnderTheIngestUser`.*
 - [x] The gateway's user holds no command its code does not send: `ZREMRANGEBYSCORE` and `UNLINK`
   are refused on its own keys. *`RedisAclIngestIntegrationTest#commandsNoCodePathSendsAreRefusedOnItsOwnKeys`
-  (security review G5, I4; the budget prunes with `ZRANGEBYSCORE` and `ZREM` in its script, keys
-  are deleted with `DEL`).*
+  (security review G5, I4; the budget prunes with `ZRANGEBYSCORE` and `ZREM` in its transaction,
+  keys are deleted with `DEL`).*
+- [x] The gateway's budget, quota and claim steps run as optimistic transactions under its user on
+  its own keys, and `WATCH` on a foreign key is refused; a key changed between read and `EXEC`
+  discards the writes and the step runs again, and a failed step leaves the pooled connection
+  without a watch or an open transaction.
+  *`RedisAclIngestIntegrationTest#anOptimisticTransactionRunsUnderTheIngestUserOnItsOwnKeysOnly`,
+  `OptimisticTransactionRedisIntegrationTest`, `ExchangeStoreRedisIntegrationTest`.*
+- [ ] The gateway's user can run no script: `EVAL` and `EVALSHA` are refused. *(The follow-up step
+  of ADR-0389, #3494, once production runs the release without scripts.)*
 - [x] The frontend's startup step under its own user leaves `acl_access_denied_cmd` unchanged and
   sends no `CONFIG`; under `default` it still sends `CONFIG GET`; switched off it sends nothing; a
   wrong password still fails it. *`RedisAclFrontendIntegrationTest`, `RedisSessionConfigTest`.*
@@ -6027,6 +6046,11 @@ its service does:
   `FLUSHALL`/`FLUSHDB`, `SCAN` for backend, ingest and monitoring, and `ACL` for every non-admin user.
   *`RedisAclFrontendIntegrationTest#theAclMatrixHoldsForEveryUser`; `monitoring` keeps `CONFIG GET`
   by design and is refused `CONFIG SET`.*
+- [x] `monitoring` is refused `CLIENT TRACKING`, `CLIENT LIST`, `CLIENT KILL`, `CLIENT PAUSE` and
+  `SLOWLOG GET`, every application user `CLIENT TRACKING`, and the exporter scrapes every metric
+  the alerts and dashboards read without one refusal.
+  *`RedisAclFrontendIntegrationTest#theAclMatrixHoldsForEveryUser`; measured against
+  `redis_exporter` v1.97.0 with `ACL LOG` empty.*
 - [x] A password-only `AUTH` works while `default` is on and fails once it is off.
   *`RedisAclFrontendIntegrationTest`.*
 - [x] Under `prod` the gateway refuses to start with a blank or `default` Redis username, read
@@ -6059,7 +6083,8 @@ counted in `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire f
 `scripts/render-redis-acl.py`, `RedisSessionConfig.selectConfigureRedisAction`,
 `ServerConfiguredKeyspaceNotificationsAction`, `TolerantKeyspaceNotificationsAction`, the three apps'
 `spring.data.redis.username` · **Monitoring:** `RedisAclDenials` · **Runbook:**
-[`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl) · **ADR:** [ADR-0207](../adr/0207-each-service-reaches-redis-as-its-own-acl-user.md) ·
+[`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl) · **ADR:** [ADR-0207](../adr/0207-each-service-reaches-redis-as-its-own-acl-user.md),
+[ADR-0389](../adr/0389-the-ingest-gateway-runs-no-lua-in-redis.md) ·
 **Related:** REQ-SEC-025, REQ-OPS-018
 
 ### REQ-SEC-069 — The frontend is a confidential OAuth2 client whenever it holds a secret

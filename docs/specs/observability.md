@@ -1943,6 +1943,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `basetool_ingest_exchange_idempotent_replays_total` counts writes answered from the idempotency
   cache; `basetool_ingest_exchange_budget_used_ratio` is the total byte budget's use at the last
   measurement, and `ExchangeBudgetHigh` (warning, 10 m) fires above 0.8 (REQ-XCH-020, REQ-XCH-023).
+  `basetool_ingest_exchange_store_conflicts_total{step,outcome}` counts the gateway's optimistic
+  Redis transactions that met a changed key — `aborted` per discarded attempt, `exhausted` per step
+  that gave up and answered `503` — and `ExchangeStoreStepsExhausted` (warning, 5 m) fires when one
+  step gave up more than five times in ten minutes (ADR-0389;
+  `exchange_store_conflicts_alert_test.yml`).
   `basetool_ingest_exchange_client_budget_used_ratio{client_id}` is one client's use of its own
   budget at its last write, labelled with the admitted request's registry client id, so the
   registry bounds it; `ExchangeClientBudgetHigh` (warning, 10 m) fires above 0.8 of it, which the

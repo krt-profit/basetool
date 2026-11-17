@@ -281,6 +281,7 @@ services:
       REDIS_ADDR: redis://redis:6379
       REDIS_USER: ${REDIS_EXPORTER_USER:-monitoring}
       REDIS_PASSWORD: ${REDIS_EXPORTER_PASSWORD:?REDIS_EXPORTER_PASSWORD must be set}
+      REDIS_EXPORTER_EXCLUDE_SLOWLOG_METRICS: "true"
     deploy:
       resources:
         limits:
