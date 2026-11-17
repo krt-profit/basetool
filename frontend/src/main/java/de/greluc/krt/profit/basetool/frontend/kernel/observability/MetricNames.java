@@ -83,6 +83,19 @@ public final class MetricNames {
   public static final String LIVESYNC_REDIS_PUBLISHED = "basetool.livesync.redis.published";
 
   /**
+   * Gauge {@code basetool_redis_fanout_subscribed} — tag {@code fanout} ({@link #FANOUT_LIVESYNC});
+   * 1 while this instance is subscribed to the shared Redis's live-sync channels, 0 while the
+   * subscription retries (ADR-0143, ADR-0388).
+   */
+  public static final String REDIS_FANOUT_SUBSCRIBED = "basetool.redis.fanout.subscribed";
+
+  /** Tag key: which pub/sub container a {@link #REDIS_FANOUT_SUBSCRIBED} sample describes. */
+  public static final String TAG_FANOUT = "fanout";
+
+  /** {@link #TAG_FANOUT} value of the frontend's live-sync container. */
+  public static final String FANOUT_LIVESYNC = "livesync";
+
+  /**
    * Counter {@code basetool_livesync_redis_consumed_total} — tag {@code topic_class}; {@code
    * changed} signals this instance consumed from a peer replica (own-origin messages excluded).
    */

@@ -789,7 +789,7 @@ groups:
           severity: warning
         annotations:
           summary: "Redis {{ $labels.fanout }} fan-out has not been subscribed for 10m"
-          description: "The {{ $labels.fanout }} pub/sub container on the backend is not listening, so cross-instance delivery for that channel is dead: a peer replica's change never reaches this instance. The container retries every 5s, so 10 minutes means Redis is genuinely unreachable from the backend rather than merely restarting — check the redis container and the net-redis-backend network. The backend deliberately stays up and serving while this is true (ADR-0084, ADR-0143), so nothing else will page."
+          description: "The {{ $labels.fanout }} pub/sub container of {{ $labels.application }} is not listening, so cross-instance delivery for that channel is dead: a peer replica's change never reaches this instance (fanout=notifications on the backend, fanout=livesync on the frontend). The container retries every 5s, so 10 minutes means Redis is genuinely unreachable from that service rather than merely restarting — check the redis container and the service's net-redis-* network. The service deliberately stays up and serving while this is true (ADR-0084, ADR-0143), so nothing else will page."
 
       - alert: SessionEvictionSpike
         expr: sum(increase(basetool_session_evicted_total[1h])) > 3

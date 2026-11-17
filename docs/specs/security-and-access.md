@@ -6760,7 +6760,10 @@ state, the ingest handoff and the three pub/sub channels live in `redis-shared`.
   session store.
 - **Both share the Lettuce client resources and the timeouts** of `spring.data.redis.*`; the shared
   connection has no readiness contributor, because its loss degrades live sync to local delivery
-  and fails a handoff pickup, never a login.
+  and fails a handoff pickup, never a login. The live-sync subscription starts unsubscribed and
+  retries every 5 s while the shared Redis is unreachable (`ResilientRedisMessageListenerContainer`),
+  so the frontend starts without it; `basetool_redis_fanout_subscribed{fanout="livesync"}` and
+  `RedisFanoutUnsubscribed` report it.
 - **The environment names them apart.** `REDIS_USERNAME` / `REDIS_PASSWORD` reach the session store,
   `REDIS_SHARED_USERNAME` / `REDIS_SHARED_PASSWORD` the shared Redis; compose and
   `quadlet/env.d/frontend.env.tmpl` fill both from `REDIS_FRONTEND_*` while one instance serves
@@ -6775,6 +6778,9 @@ state, the ingest handoff and the three pub/sub channels live in `redis-shared`.
   one `StringRedisTemplate`, both on the session store, and a write through each connection lands
   only in its own store; a blank `app.shared-redis.host` fails the start.
   *`SharedRedisIntegrationTest`, `SharedRedisConfigTest`.*
+- [x] With the shared Redis unreachable, the live-sync container starts unsubscribed instead of
+  failing the context, and its gauge reads 0. *`LiveSyncRedisStartTest`,
+  `ResilientRedisMessageListenerContainerTest`, `redis_fanout_unsubscribed_test.yml`.*
 - [ ] `redis-session` and `redis-shared` run as separate containers on separate networks, and the
   ingest gateway has no route to `redis-session` (#3493).
 - [ ] Each instance loads its own ACL file with exactly one `default` line, `off` (#3493).
