@@ -65,3 +65,17 @@ no stored item holds that GUID and the facts do not also name the GUID the row h
 asks the kind's rules for that GUID (`P4kMatchRules.followedGuid`): the held GUID no longer finds
 the row, and the named record takes it, reported as `CHANGED p4k_uuid`. This is the item form of
 ADR-0379's "identity follows the GUID the Wiki names"; ships keep their own moves (REQ-P4K-051).
+
+## Amendment — unreferenced seeded junk hides itself (REQ-P4K-056)
+
+The 412 `SEEDED_NOT_CREATABLE` item cases are rows an earlier seeding created for records that are
+now `null` (371) or `mission` (41): world objects (consoles, elevator controls, screens), loadout
+parts, turret parts, character appearance. Only two of their records are obtainable by the
+catalogue's facts. The owner decided on 2026-11-17 that unused leftovers hide themselves.
+
+A seeded item whose record the seeding rule would only count, and that no member row references,
+is hidden before matching, the item form of REQ-P4K-052; a referenced one stays a case. The member
+modules answer through a new observer SPI, `GameItemReferenceParticipant`, which the six modules
+holding member item references implement next to their `GameItemReassignmentParticipant`. The SC
+exchange journal is not asked: a hidden item still resolves by id, so hiding breaks no journal
+entry.

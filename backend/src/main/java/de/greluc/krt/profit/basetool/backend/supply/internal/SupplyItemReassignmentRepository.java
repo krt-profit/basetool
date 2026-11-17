@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -85,4 +86,20 @@ interface SupplyItemReassignmentRepository extends Repository<SupplyNeed, UUID> 
   @NotNull
   List<UUID> donations(
       @Param("retiredId") @NotNull UUID retiredId, @Param("survivorId") @NotNull UUID survivorId);
+
+  /**
+   * Lists which of the given items a supply need or donation references.
+   *
+   * @param ids the items asked about
+   * @return the referenced ones
+   */
+  @Query(
+      value =
+          """
+          SELECT game_item_id FROM supply_need WHERE game_item_id IN (:ids)
+          UNION SELECT game_item_id FROM supply_donation WHERE game_item_id IN (:ids)
+          """,
+      nativeQuery = true)
+  @NotNull
+  List<UUID> referenced(@Param("ids") @NotNull Collection<UUID> ids);
 }

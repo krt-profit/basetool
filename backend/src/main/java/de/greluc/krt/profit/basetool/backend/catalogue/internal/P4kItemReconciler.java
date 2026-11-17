@@ -52,8 +52,8 @@ import org.springframework.stereotype.Component;
  * Reconciles the catalogue's {@code items} with {@code game_item}: match (REQ-P4K-007, the
  * candidates and coverage of REQ-P4K-054, the identity of REQ-P4K-055), lead the attributes the P4K
  * owns and fill the rest where empty (REQ-P4K-017…019), stamp, create a playable unmatched item
- * behind the run's checkbox (REQ-P4K-009), and settle the item cases an APPLY no longer finds
- * (REQ-P4K-016).
+ * behind the run's checkbox (REQ-P4K-009), hide the unreferenced seeded items no rule would create
+ * (REQ-P4K-056), and settle the item cases an APPLY no longer finds (REQ-P4K-016).
  */
 @Component
 public class P4kItemReconciler {
@@ -95,6 +95,9 @@ public class P4kItemReconciler {
   /** Closes the item cases a run no longer finds and reopens those it finds again. */
   private final P4kRunResolvedCases resolvedCases;
 
+  /** Hides the seeded items no rule would create and no member references (REQ-P4K-056). */
+  private final P4kSeededItemRetirement seededRetirement;
+
   /** {@code basetool_catalogue_item_grade_unknown_total}. */
   private final Counter unknownGrades;
 
@@ -105,6 +108,7 @@ public class P4kItemReconciler {
    * @param manufacturerReconciler creates the manufacturer a seeded item references
    * @param itemClassResolver resolves and counts the catalogue's class values
    * @param resolvedCases settles the item cases of a run
+   * @param seededRetirement hides the unreferenced seeded items no rule would create
    * @param meterRegistry the registry the counter lives in
    */
   public P4kItemReconciler(
@@ -112,11 +116,13 @@ public class P4kItemReconciler {
       @NotNull P4kManufacturerReconciler manufacturerReconciler,
       @NotNull ItemClassResolver itemClassResolver,
       @NotNull P4kRunResolvedCases resolvedCases,
+      @NotNull P4kSeededItemRetirement seededRetirement,
       @NotNull MeterRegistry meterRegistry) {
     this.gameItemRepository = gameItemRepository;
     this.manufacturerReconciler = manufacturerReconciler;
     this.itemClassResolver = itemClassResolver;
     this.resolvedCases = resolvedCases;
+    this.seededRetirement = seededRetirement;
     this.unknownGrades = meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_GRADE_UNKNOWN);
   }
 
@@ -146,6 +152,7 @@ public class P4kItemReconciler {
             row -> row.getSourceSystems() == GameItemSourceSystem.P4K,
             P4kItemCoverage.of(items, stored));
     Set<UUID> obtainable = obtainable(catalogue);
+    seededRetirement.retire(stored, items, obtainable, context);
     for (P4kItemDto item : items) {
       String rawPlayability = item.playability();
       P4kItemPlayability playability = P4kClosedSet.parse(P4kItemPlayability.class, rawPlayability);
