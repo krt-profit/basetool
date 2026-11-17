@@ -392,7 +392,7 @@ def propose(root: Path, fetch: Fetch, today: date, cooldown_days: int) -> list[B
             tool.source.releases(fetch, current), current, today, cooldown_days
         )
         if release is None:
-            print(f"{tool.key} {current} is the newest qualifying release")
+            print(f"{tool.key} {current}: no newer qualifying release")
             continue
         checksums = release_checksums(tool, fetch, release)
         metadata = with_component(metadata, tool, current, release.version, checksums)
