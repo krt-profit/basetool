@@ -308,7 +308,9 @@ class OptimisticTransactionsRedisIntegrationTest {
   private void assertTheNextStepCommitsAtOnceAfter(@NotNull String watchedBefore) {
     observer.opsForValue().set(watchedBefore, "9");
     AtomicInteger attempts = new AtomicInteger();
-    String expected = Long.toString(Long.parseLong(observer.opsForValue().get(OTHER)) + 1);
+    Long before = StoredNumbers.parse(observer.opsForValue().get(OTHER));
+    assertThat(before).as("the other key holds a number").isNotNull();
+    String expected = Long.toString(before + 1);
 
     String result =
         transactions.run(
