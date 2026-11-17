@@ -146,6 +146,11 @@ along `Requires=`, and the restarts that followed ran the dependents again (ADR-
 `Type=notify`, bounded by its generated `TimeoutStartSec=` (so `BASETOOL_HEALTH_TIMEOUT` governs the
 Compose path only). A rollback that restored the record without re-materialising the drop-ins would
 roll forward into the failed release, so both move together, together with the previous unit files.
+The rollback applies the units the restored tree has: it retires the units the failed release added
+(stopped, then their files removed), derives the stack from the restored units — so a release that
+renamed a unit rolls back to the old name, not to a list that names units the host no longer has —
+and, with the monitoring stack enabled, starts the monitoring units on their previous definitions,
+a unit the release had retired included (non-gating, a `start`, never a `restart`).
 
 **A failure before the health gate is a deploy failure too, and is recorded as one.** Between the
 signature verification and the health gate `deploy.sh` extracts the config bundle, mirrors it onto
@@ -155,10 +160,14 @@ evidence as a failed health gate: a `FATAL` line naming the step and the exit co
 config tree, units and pin restored if the run had changed them, a bad-digest backoff record for the
 target, and `basetool_deploy_last_failure_timestamp` (`DeployFailed`). An EXIT trap armed for exactly
 that window (`on_pre_gate_exit`) is what guarantees it, because errexit ends the process without
-passing through any code that could record it. Where the cause can be seen beforehand it is refused
+passing through any code that could record it. **Nothing is stopped in that window**: a unit the
+release retires is stopped only by the gated apply (REQ-OPS-004), so a failure before the gate
+leaves the previous release's units running, and the restore removes again the files of units the
+release added, which systemd never loaded. Where the cause can be seen beforehand it is refused
 **before anything changes**: every directory in a subtree the apply mirrors must be owned and
 writable by the deploy account, and the compose directory, the unit directory and `env.d` writable
-(`assert_config_tree_writable`). The pin is written only after the config delivery, so a release
+(`assert_config_tree_writable`), and every host path a new or changed unit mounts must exist
+(`assert_unit_mount_sources_exist`). The pin is written only after the config delivery, so a release
 the stateful-infra gate holds back (REQ-OPS-006) leaves no pin behind. A restore that fails itself
 is reported as an inconsistent tree, and `config-apply.incomplete` stops the next tick from
 snapshotting that tree over `config-previous/`.
@@ -244,6 +253,12 @@ holds back the re-apply of another service's missing container. `--force` bypass
 - [ ] A directory the apply would mirror into that the deploy account does not own or cannot write
   is refused before the snapshot and before any mirror, with a line naming the path; a release held
   back by the stateful-infra gate writes no digest pin.
+- [ ] A failure between the config apply and the health gate — a failed pull included — has stopped
+  no unit, so the previous release keeps running; the restore puts back a unit the release would have
+  retired and removes the files of the units it added.
+- [ ] The rollback of a release that renamed or retired units starts the restored units (none it no
+  longer has), stops and removes the units the release added, and, with monitoring enabled, starts a
+  restored monitoring unit without restarting the others.
 - [ ] A drift re-apply of the deployed release — successful or not, with or without a config
   re-delivery — leaves `previous-digest-pin.yml`, `config-previous/` and
   `keycloak-spi-previous.jar` naming the release before it, and writes no `config-apply.incomplete`.
@@ -265,8 +280,8 @@ holds back the re-apply of another service's missing container. `--force` bypass
   anchors onto the deployed release (documented, not a way to re-apply).
 
 **Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `REAPPLY` / `record_reapply_failure`, `--reapply`, `backoff_seconds`, `assert_config_tree_writable`,
-`restore_previous_config_tree`) · `scripts/lib/container-runtime.sh`
-(`rt_pin_apply`, `rt_pin_rollback`, `rt_apply_stack`) · `frontend/src/main/resources/application.yml`
+`assert_unit_mount_sources_exist`, `restore_previous_config_tree`) · `scripts/lib/container-runtime.sh`
+(`rt_pin_apply`, `rt_pin_rollback`, `rt_apply_stack`, `rt_retire_services`, `rt_use_installed_stack`) · `frontend/src/main/resources/application.yml`
 (`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · `scripts/deploy.test.sh` · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Troubleshooting*
 
 ### REQ-OPS-004 — Host configuration delivered as a promotable, digest-pinned artifact
@@ -289,9 +304,31 @@ both are committed, and `repo-lint.yml` (`quadlet-drift`) fails a change whose u
 the compose files. A Dependabot compose bump regenerates them on its own branch (REQ-OPS-035). On a config change `deploy.sh` renders one environment file per service from the
 host's `basetool.env` (`scripts/render-env-d.py`, which refuses to write a half-rendered set), installs every
 unit the bundle names into the service user's delivery directory
-(`/etc/containers/systemd/users/<uid>/`), **stops** a unit the bundle no longer names before removing
-its file, and never touches the `.container.d/` drop-ins beside them. A host with no units at all is
-treated as a config change, so the first deploy on a freshly provisioned host installs them.
+(`/etc/containers/systemd/users/<uid>/`), and never touches the `.container.d/` drop-ins beside them.
+A host with no units at all is treated as a config change, so the first deploy on a freshly
+provisioned host installs them.
+
+**A unit the bundle no longer names is retired inside the release's restart window, not at the
+config apply.** The install only notes it (`quadlet units: … retired`); the unit and its file stay as
+they are through the pull, so a release that renames a unit others `Requires=` (`redis` →
+`redis-session`, which `frontend` and `ingest` require) does not take those down while the images
+download. The gated apply then stops each retired unit while systemd still holds the definition its
+container was started from, removes the unit file once the unit is down, and only then reloads the
+units and starts the stack. A retired unit that is already inactive or not loaded loses its file
+without a stop and is no error; one that **cannot be stopped keeps its unit file and fails the
+release** (`health gate: the retired unit(s) […] could not be stopped`), and nothing of the release is
+reloaded or started, so no container is left running without the unit that manages it — for Redis,
+the old instance on its data directory beside the new one. A retired `.network` or `.volume` file is
+removed at the install, as before: it reaches nothing until the reload. **The stack is the units the
+host has**: the services the gated apply stops, starts and waits for are the installed `.container`
+units of the known stack order (`RT_STACK_ORDER`: `db-backend db-keycloak redis keycloak edge backend
+ingest frontend acme`), with any installed unit a stack unit `Requires=` placed before the first unit
+that requires it; every other installed unit is a monitoring unit. The list is derived again after a
+config apply and after a rollback's restore, so either side of a rename starts exactly the units its
+tree has. **Before anything is stopped or changed**, a new or changed unit whose `Volume=` mounts a
+host path that does not exist is refused (`PRE-FLIGHT: required mount source missing: <path> (<unit>)`;
+podman does not create a bind-mount source); a named volume and a path inside the release tree, which
+the apply itself delivers, are not checked.
 
 **A network change is installed, not applied.** The networks are `.network` units, and Quadlet creates
 one with `podman network create --ignore`, so a changed unit leaves the existing network as it was.
@@ -330,6 +367,18 @@ Behind the PROXY-protocol front end the tunnel arrives as the host loopback, whi
   and what requires them, each once, stops a retired unit
   before removing it, and leaves every `.container.d/` drop-in in place. A changed monitoring or
   `acme` unit is restarted too (since 2026-09-22 — see REQ-OPS-013).
+- [ ] A release that retires a unit others `Requires=` stops it only inside the gated apply, after
+  the pull and before the units are reloaded; nothing is stopped while the images download.
+- [ ] A retired unit that cannot be stopped fails the release with a line naming it, keeps its unit
+  file, and nothing of the release is reloaded or started; a retired unit that is already inactive or
+  not loaded loses its file without a stop.
+- [ ] The units the gated apply stops, starts and waits for are the installed stack units — the known
+  order filtered to what is installed, an installed unit a stack unit `Requires=` before its first
+  dependent — on the release and on its rollback; `backup.sh` tells monitoring units from stack units
+  the same way.
+- [ ] A new or changed unit that mounts a host path (`Volume=/…:`) the host does not have is refused
+  before any snapshot, mirror, stop or start, with a line naming the path and the unit; a named volume
+  and a path inside the release tree are not checked.
 - [ ] Under Quadlet, a unit whose rendered `env.d/<svc>.env` differs from the file the render
   replaced is re-defined exactly like a unit whose file changed: `deploy.sh` logs one
   `env.d: <svc>.env differs …` line naming it, lists it under `unit definitions […]`, recreates an
@@ -344,8 +393,13 @@ Behind the PROXY-protocol front end the tunnel arrives as the host loopback, whi
   when it is missing after the swap (ADR-0319).
 
 **Enforced by:** `scripts/deploy.sh` (config-delivery block, `EXPECTED_MARKER`, `apply_config_tree`,
-`install_quadlet_units`, `note_env_d_changes`) · `scripts/render-env-d.py` ·
-`scripts/deploy.test.sh` (`scenario_podman_env_d_*`) ·
+`install_quadlet_units`, `note_env_d_changes`, `assert_unit_mount_sources_exist`,
+`retired_container_services`) · `scripts/lib/container-runtime.sh` (`rt_retire_services`,
+`rt_installed_stack_services`, `RT_STACK_ORDER`) · `scripts/render-env-d.py` ·
+`scripts/deploy.test.sh` (`scenario_podman_env_d_*`, `scenario_rename_*`,
+`scenario_retired_unit_that_cannot_be_stopped_fails_the_release`,
+`scenario_missing_mount_source_of_a_new_unit_refuses_before_anything_changes`) ·
+`scripts/container-runtime.test.sh` ·
 `scripts/generate-quadlet.py` (`repo-lint.yml` → `quadlet-drift`) · `docker/config/Dockerfile` ·
 `.github/workflows/release-images.yml` (`build-config`) · **Runbook:** `docs/deployment.md` →
 *Configuration changes that are not app releases*
@@ -447,8 +501,8 @@ If the gate fails, **everything the release changed is rolled back together** �
 (record and drop-ins), the config tree and units, and the previous JAR — and applied the same way; the
 run is recorded as rolled back (`DeployRolledBack`) with the bad-digest backoff, and the marker is not
 advanced. New app images never run on the old JAR, nor old images on the new one. The log names what
-the release changed (`release parts: app images […] · unit definitions […] · config bundle: … ·
-provider JAR: …`) and, on a failed gate, the units that did not come up in start order; when keycloak
+the release changed (`release parts: app images […] · unit definitions […] · retired units […] ·
+config bundle: … · provider JAR: …`) and, on a failed gate, the units that did not come up in start order; when keycloak
 is the first of them and the JAR is the only change to keycloak, it says the JAR is the likely cause
 (the cause, when the JAR is the release's only change). Exact blame between a JAR and an app image is
 not possible in one gate, and the log says so rather than guessing. **Expected outage:** one keycloak
@@ -598,7 +652,7 @@ is applied per service (a fast no-op otherwise).
 > `RT_CHANGED_SERVICES` exactly as `rt_apply_stack` does, and forgets a service once its restart
 > succeeded, because the success path calls it twice (the monitoring apply, then
 > `reconcile_monitoring_reloads`); a failed restart stays pending, so the second call is its retry.
-> `acme` is the last entry of `RT_STACK_SERVICES` and is gated like the rest of the stack, as it was
+> `acme` is the last entry of the stack order (`RT_STACK_ORDER`) and is gated like the rest of the stack, as it was
 > under Compose. Locked by `scripts/deploy.test.sh`
 > (`scenario_podman_changed_monitoring_and_acme_units_are_restarted`,
 > `scenario_podman_acme_is_part_of_the_stack`) and `scripts/container-runtime.test.sh`.
