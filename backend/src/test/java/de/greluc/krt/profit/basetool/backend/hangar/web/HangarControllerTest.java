@@ -35,6 +35,8 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportChoiceDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportChoicesDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarShipOriginService;
@@ -373,14 +375,29 @@ class HangarControllerTest {
     MultipartFile file =
         new MockMultipartFile("file", "ships.json", "application/json", "[]".getBytes());
     FleetviewImportResponseDto response =
-        new FleetviewImportResponseDto(3, 0, 0, List.of(), List.of(), 0);
+        new FleetviewImportResponseDto(3, 0, 0, List.of(), List.of(), 0, List.of());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(hangarImportService.importShips(ownerId, file)).thenReturn(response);
+    when(hangarImportService.importShips(ownerId, file, List.of())).thenReturn(response);
 
-    FleetviewImportResponseDto result = controller.importShips(jwt, file);
+    FleetviewImportResponseDto result = controller.importShips(jwt, file, null);
 
     assertThat(result).isSameAs(response);
-    verify(hangarImportService).importShips(ownerId, file);
+    verify(hangarImportService).importShips(ownerId, file, List.of());
+  }
+
+  @Test
+  void importShips_forwardsTheMembersChoicesToService() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    MultipartFile file =
+        new MockMultipartFile("file", "ships.json", "application/json", "[]".getBytes());
+    List<HangarImportChoiceDto> choices =
+        List.of(new HangarImportChoiceDto("Talon", UUID.randomUUID()));
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+
+    controller.importShips(jwt, file, new HangarImportChoicesDto(choices));
+
+    verify(hangarImportService).importShips(ownerId, file, choices);
   }
 
   @Test
