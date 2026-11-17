@@ -1714,8 +1714,10 @@ never merged automatically.
 An APPLY keeps the variant groups in `ship_type_p4k_variant` (variant GUID, class name, base GUID);
 a complete ships kind deletes the variants it no longer lists, and one that lists no variant at all
 deletes nothing. The hangar import's uploads carry
-only names and slugs, so it takes the name stages and then the slug; a name or slug that finds
-several ship types is skipped as unmatched.
+only names and slugs, so it takes the name stages, which there also match each catalogue name
+without its manufacturer word, and then the slug; rows of one ship count as one, and a name or slug
+that finds several ships is left for the member to choose
+([REQ-HANGAR-019](personal-hangar-overview.md#req-hangar-019--the-import-matches-names-without-the-manufacturer-word-and-lets-the-member-choose)).
 
 **Enforced by:** `ShipTypeMatcherTest`, `ExchangeResolveServiceTest`, `P4kShipPrecedenceTest` ·
 **Code:** `ShipTypeMatcher`, `P4kShipVariants` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) ·
