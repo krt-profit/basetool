@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-11-17
 - **Deciders:** @greluc
-- **Related:** REQ-OPS-058 · REQ-OPS-034 · REQ-OPS-055 · ADR-0208 · ADR-0248 · ADR-0327 ·
+- **Related:** REQ-OPS-058 · REQ-OPS-059 · REQ-OPS-034 · REQ-OPS-055 · ADR-0208 · ADR-0248 ·
+  ADR-0327 · ADR-0391 ·
   [`basetool.repository-format-conventions`](../../build-logic/src/main/kotlin/basetool.repository-format-conventions.gradle.kts) ·
   [`.githooks/pre-push`](../../.githooks/pre-push) · [`.editorconfig`](../../.editorconfig)
 
@@ -71,9 +72,9 @@ We will make one Gradle command the format of the repository and refuse a push t
   fresh worktree, which installs Node, Ruff and shfmt and formats every Java file once.
 - The hook checks the working tree, not the pushed commits; a dirty tree can fail or pass a push
   on files it does not carry.
-- Dependabot and refreshVersions do not see the Ivy modules. Bumping Ruff or shfmt is a manual
-  catalog change with both platforms' checksums — Windows from the build, Linux from the release
-  digest — and usually a reformat commit listed in `.git-blame-ignore-revs`.
+- Dependabot and refreshVersions do not see the Ivy modules. `native-tool-updates.yml` proposes
+  the Ruff and shfmt bumps every week, with both platforms' checksums from the release digests and
+  any reformat in a commit of its own listed in `.git-blame-ignore-revs` (REQ-OPS-059, ADR-0391).
 - There is no verified binary for macOS or ARM. There `install<Tool>` fails with a message naming
   the platform; no other task resolves the tools.
 - Formatting changed the bytes of host scripts, so the first promotion after it reports them as

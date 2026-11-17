@@ -2607,7 +2607,8 @@ that has no entry at all, before it is used.
   ([`CONTRIBUTING.md`](../../CONTRIBUTING.md) → *Dependency verification*). A catalog bump without it
   fails CI with the offending coordinates.
 - **The Node.js archive differs per operating system**, so its component carries one artifact per
-  platform the build runs on (`win-x64`, `linux-x64` at introduction).
+  platform the build runs on (`win-x64`, `linux-x64` at introduction). Its bumps, and those of
+  Ruff and shfmt, take both platforms' SHA-256 from the publisher's digests (REQ-OPS-059).
 
 **Acceptance**
 
@@ -3678,7 +3679,55 @@ vendor (ADR-0390).
 (`spotlessCheck`, `ruffFormatCheck`, `shfmtCheck`) · `:frontend:prettierCheck` · `.githooks/pre-push` ·
 `.github/workflows/ci.yml` · **Decision:**
 [ADR-0390](../adr/0390-every-formatter-runs-from-spotless-and-a-pre-push-hook-holds-every-agent-to-it.md)
-· **Related:** REQ-OPS-034, REQ-OPS-046, REQ-OPS-055
+· **Related:** REQ-OPS-034, REQ-OPS-046, REQ-OPS-055, REQ-OPS-059
+
+### REQ-OPS-059 — The native tools Gradle takes from their publishers get a weekly update proposal
+
+Ruff, shfmt and the Node.js archive are resolved through Ivy repositories from their publishers
+(REQ-OPS-034, REQ-OPS-058), where neither Dependabot nor refreshVersions looks. A weekly workflow
+proposes their bumps, so the formatters every agent runs do not fall behind (ADR-0391).
+
+- **One pull request.** `native-tool-updates.yml` runs every Monday and on dispatch against `main`
+  and opens or updates one pull request from `chore/native-tool-updates` through the
+  `basetool-release` App (ADR-0201), assigned to @greluc and labelled `dependencies` and
+  `automated`. While it is open, every run rebuilds it from the current `main`.
+- **Stable releases past a cooldown.** A tool moves to its newest release that is neither a draft
+  nor a prerelease and is at least seven days old: Ruff and shfmt from the GitHub releases of
+  `astral-sh/ruff` and `mvdan/sh`, Node.js from `https://nodejs.org/dist/index.json` on the major
+  line the catalog pins. A Node.js security release qualifies at once. A version never moves down;
+  another Node.js major line is a change by hand.
+- **Checksums from the publisher.** The catalog version moves, and the tool's component in
+  `gradle/verification-metadata.xml` is replaced by one entry per supported platform (Linux and
+  Windows on x86-64) carrying the SHA-256 the publisher states — the GitHub release asset `digest`,
+  the release's `SHASUMS256.txt` on nodejs.org — never one computed from a download. A file without
+  a published SHA-256 fails the run. The run's `./gradlew spotlessApply` verifies the Linux files.
+- **A reformat is a commit of its own.** Files `spotlessApply` changes after the bump form a second
+  commit, and a third appends its hash to `.git-blame-ignore-revs`; the merge queue's merge commit
+  keeps that hash on `main` (REQ-OPS-044). Every commit is GitHub-signed through
+  `createCommitOnBranch` and signed off by the App, as the `main` ruleset requires.
+- **Closing refuses.** A pull request closed unmerged is not proposed again with the same title,
+  which names every tool and version; an open one is closed with its branch once `main` carries
+  every qualifying release.
+
+**Acceptance**
+
+- [x] `python3 .github/scripts/native_tool_updates.py --selftest` passes: it takes the newest
+  stable release past the cooldown, a younger Node.js security release and nothing at or below the
+  pin, refuses an asset without a digest, rewrites only the moved tools' catalog entries and
+  components, proposes nothing on a second run, and finds each tool in the repository's catalog and
+  metadata with the artifact names it writes.
+- [x] On 2026-11-17, against a catalog pinning Ruff 0.17.3, shfmt 3.14.0 and Node.js 26.12.1, the
+  lookup proposed Ruff 0.17.4 (0.17.5 was five days old), shfmt 3.14.1 and Node.js 26.13.1, with
+  the SHA-256 the committed, Gradle-verified entries carry for shfmt 3.14.1 and Node.js 26.13.1.
+- [x] A file `createCommitOnBranch` modifies keeps its mode (`100755` stayed `100755`), and the
+  commit is verified.
+- [ ] The first run on `main` opens a pull request whose commits are verified and whose required
+  checks pass, or ends green without one while every tool is current.
+
+**Enforced by:** `.github/workflows/native-tool-updates.yml` ·
+`.github/scripts/native_tool_updates.py` (self-test in `repo-lint.yml`) · **Decision:**
+[ADR-0391](../adr/0391-native-tool-versions-are-proposed-weekly-from-their-publishers-digests.md)
+· **Related:** REQ-OPS-034, REQ-OPS-044, REQ-OPS-058
 
 ## Open questions
 
