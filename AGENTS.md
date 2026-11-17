@@ -74,9 +74,16 @@ Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. The `test` pr
 - **Fix every Checkstyle and SpotBugs error and warning your change introduces or touches.** No
   suppression unless the rule is genuinely wrong at that call site; the reason then goes into
   `@SuppressFBWarnings(justification = "…")` or the commit message, never a comment.
+- **One format, from one command** (REQ-OPS-058, ADR-0390): `./gradlew spotlessApply` formats
+  every file a formatter owns — Java, Gradle Kotlin, JSON, Python (Ruff), shell (shfmt), CSS/JS
+  (Prettier), whitespace of YAML, Markdown and `.properties`. Never format by hand or with other
+  settings; a file no formatter owns follows `.editorconfig`.
+- **Turn on the push gate once per clone: `git config core.hooksPath .githooks`** (Claude Code's
+  `SessionStart` hook does it). `.githooks/pre-push` refuses a push while `spotlessCheck` fails;
+  never skip it with `--no-verify`.
 - **Before every push: `./gradlew spotlessApply` (whole repo) and every lint gate green** — the
-  frontend's Stylelint, ESLint, HTMLHint, Prettier, `typecheckJs` and `checkExchangeDocs` fail CI
-  independently of Spotless and Checkstyle.
+  frontend's Stylelint, ESLint, HTMLHint, `typecheckJs` and `checkExchangeDocs` fail CI
+  independently of the formatters and Checkstyle.
 - The checklist and the tasks: [`docs/agents/lint-and-push.md`](docs/agents/lint-and-push.md); the
   recipe: the `lint-gate` skill. Read [`docs/agents/pitfalls.md`](docs/agents/pitfalls.md) before
   you push.

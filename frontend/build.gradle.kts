@@ -684,21 +684,34 @@ val lintJs =
     inputs.file("module-ratchet.json")
   }
 
+val prettierTargets =
+  listOf(
+    "src/main/resources/static/css/**/*.css",
+    "src/main/resources/static/js/**/*.js",
+    "types/**/*.d.ts",
+    "scripts/**/*.mjs",
+    "../keycloak-theme/krt-theme/**/*.{css,js}",
+    "../docs/exchange/assets/**/*.{css,js}",
+  )
+
+val prettierApply =
+  tasks.register<NpxTask>("prettierApply") {
+    group = "formatting"
+    description = "Reformats the repository's hand-written CSS/JS in place with Prettier."
+    dependsOn(tasks.named("npmInstall"))
+    command.set("prettier")
+    args.set(listOf("--write") + prettierTargets)
+    ignoreExitValue.set(false)
+  }
+
 val prettierCheck =
   tasks.register<NpxTask>("prettierCheck") {
     group = "verification"
-    description = "Checks CSS/JS formatting with Prettier (strict; fails the build on findings)."
+    description = "Checks the repository's CSS/JS formatting with Prettier (fails on findings)."
     dependsOn(tasks.named("npmInstall"))
+    mustRunAfter(prettierApply)
     command.set("prettier")
-    args.set(
-      listOf(
-        "--check",
-        "src/main/resources/static/css/**/*.css",
-        "src/main/resources/static/js/**/*.js",
-        "types/**/*.d.ts",
-        "scripts/**/*.mjs",
-      ),
-    )
+    args.set(listOf("--check") + prettierTargets)
     ignoreExitValue.set(false)
     inputs.files(fileTree("src/main/resources/static/css") { include("**/*.css") })
     inputs.files(
@@ -709,27 +722,25 @@ val prettierCheck =
     )
     inputs.files(fileTree("types") { include("**/*.d.ts") })
     inputs.files(fileTree("scripts") { include("**/*.mjs") })
+    inputs.files(
+      fileTree(layout.settingsDirectory.dir("keycloak-theme/krt-theme")) {
+        include("**/*.css", "**/*.js")
+      },
+    )
+    inputs.files(
+      fileTree(layout.settingsDirectory.dir("docs/exchange/assets")) {
+        include("**/*.css", "**/*.js")
+      },
+    )
     inputs.file("package.json")
-    inputs.file(".prettierrc.json")
+    inputs.file(layout.settingsDirectory.file(".prettierrc.json"))
+    inputs.file(layout.settingsDirectory.file(".editorconfig"))
     inputs.file(".prettierignore")
   }
 
-tasks.register<NpxTask>("prettierApply") {
-  group = "formatting"
-  description = "Reformats the hand-written CSS/JS in place with Prettier."
-  dependsOn(tasks.named("npmInstall"))
-  command.set("prettier")
-  args.set(
-    listOf(
-      "--write",
-      "src/main/resources/static/css/**/*.css",
-      "src/main/resources/static/js/**/*.js",
-      "types/**/*.d.ts",
-      "scripts/**/*.mjs",
-    ),
-  )
-  ignoreExitValue.set(false)
-}
+tasks.named("spotlessCheck") { dependsOn(prettierCheck) }
+
+tasks.named("spotlessApply") { dependsOn(prettierApply) }
 
 val openApiSpec = layout.settingsDirectory.file("backend/src/main/resources/api/openapi.json")
 val generatedWireRecords = layout.buildDirectory.dir("generated/wire-records")

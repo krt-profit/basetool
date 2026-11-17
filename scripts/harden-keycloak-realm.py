@@ -53,8 +53,12 @@ ROLE_PROVIDER = "conditional-user-role"
 CREDENTIAL_PROVIDER = "conditional-credential"
 OTP_PROVIDER = "auth-otp-form"
 ALLOW_PROVIDER = "allow-access-authenticator"
-WINDOW_FIELDS = ("ssoSessionIdleTimeout", "ssoSessionMaxLifespan",
-                 "ssoSessionIdleTimeoutRememberMe", "ssoSessionMaxLifespanRememberMe")
+WINDOW_FIELDS = (
+    "ssoSessionIdleTimeout",
+    "ssoSessionMaxLifespan",
+    "ssoSessionIdleTimeoutRememberMe",
+    "ssoSessionMaxLifespanRememberMe",
+)
 SMTP_FIELDS = ("host", "port", "from", "fromDisplayName", "auth", "user", "starttls", "ssl")
 KEEP_STORED_VALUE = "**********"
 
@@ -77,7 +81,9 @@ KcadmError = kcadm.KcadmError
 class HardenKcadm(kcadm.Kcadm):
     """The shared kcadm wrapper plus the two write shapes the flow endpoints need."""
 
-    def write(self, verb: str, path: str, payload: dict | list, what: str, merge: bool = False) -> None:
+    def write(
+        self, verb: str, path: str, payload: dict | list, what: str, merge: bool = False
+    ) -> None:
         """Create or update `path`; names what is written and never prints the payload.
 
         The shared wrapper prints payloads under --dry-run, which would show the SMTP password this
@@ -89,8 +95,10 @@ class HardenKcadm(kcadm.Kcadm):
         if self.dry_run:
             print(f"  [dry-run] {verb} {path} - {what}")
             return
-        self._run([verb, path, "-r", self.realm, *(["-m"] if merge else []), "-f", "-"],
-                  stdin=json.dumps(payload, indent=2, sort_keys=True))
+        self._run(
+            [verb, path, "-r", self.realm, *(["-m"] if merge else []), "-f", "-"],
+            stdin=json.dumps(payload, indent=2, sort_keys=True),
+        )
         print(f"  {verb} {path} - {what}")
 
     def post(self, path: str, payload: dict, what: str) -> None:
@@ -102,8 +110,10 @@ class HardenKcadm(kcadm.Kcadm):
         if self.dry_run:
             print(f"  [dry-run] update {path} - {what}")
             return
-        self._run(["update", path, "-r", self.realm, "-n", "-f", "-"],
-                  stdin=json.dumps(payload, indent=2, sort_keys=True))
+        self._run(
+            ["update", path, "-r", self.realm, "-n", "-f", "-"],
+            stdin=json.dumps(payload, indent=2, sort_keys=True),
+        )
         print(f"  update {path} - {what}")
 
 
@@ -151,17 +161,30 @@ def browser_block(forms_alias: str) -> Block:
 
 def post_broker_block() -> Block:
     """The block in the top-level post-broker flow, where nothing has asked for an OTP yet."""
-    return Block(POST_BROKER_FLOW, POST_BROKER_BLOCK, POST_BROKER_ROLE_CONDITION, None,
-                 allow_access=True)
+    return Block(
+        POST_BROKER_FLOW, POST_BROKER_BLOCK, POST_BROKER_ROLE_CONDITION, None, allow_access=True
+    )
 
 
 def desired_conditions(block: Block, role: str) -> list[tuple[str, str, str, dict[str, str]]]:
     """The block's conditions in order: (provider, label, config alias, config)."""
-    conditions = [(ROLE_PROVIDER, "Condition - User Role", block.role_alias,
-                   {"condUserRole": role, "negate": "false"})]
+    conditions = [
+        (
+            ROLE_PROVIDER,
+            "Condition - User Role",
+            block.role_alias,
+            {"condUserRole": role, "negate": "false"},
+        )
+    ]
     if block.credential_alias:
-        conditions.append((CREDENTIAL_PROVIDER, "Condition - credential", block.credential_alias,
-                           {"credentials": "otp", "included": "false"}))
+        conditions.append(
+            (
+                CREDENTIAL_PROVIDER,
+                "Condition - credential",
+                block.credential_alias,
+                {"credentials": "otp", "included": "false"},
+            )
+        )
     return conditions
 
 
@@ -176,8 +199,10 @@ def load_windows(profile: str) -> dict[str, int]:
         data = json.loads(SESSION_WINDOWS_FILE.read_text(encoding="utf-8"))
         return {key: int(value) for key, value in data[profile].items()}
     except (OSError, ValueError, KeyError) as error:
-        raise SystemExit(f"FATAL: cannot read the session windows ({profile}) from "
-                         f"{SESSION_WINDOWS_FILE}: {error}")
+        raise SystemExit(
+            f"FATAL: cannot read the session windows ({profile}) from "
+            f"{SESSION_WINDOWS_FILE}: {error}"
+        )
 
 
 def flows_by_alias(kc: HardenKcadm) -> dict[str, dict]:
@@ -233,8 +258,11 @@ def sink_to_end(kc: HardenKcadm, block: Block) -> None:
         if block.name not in names or names[-1] == block.name:
             return
         found = entries[names.index(block.name)]
-        kc.post(f"authentication/executions/{quote(found['id'], safe='')}/lower-priority", {},
-                f"'{block.name}' one place later in '{block.parent}'")
+        kc.post(
+            f"authentication/executions/{quote(found['id'], safe='')}/lower-priority",
+            {},
+            f"'{block.name}' one place later in '{block.parent}'",
+        )
         if kc.dry_run:
             return
 
@@ -258,17 +286,24 @@ def block_problems(kc: HardenKcadm, block: Block, role: str) -> list[str]:
     if block.allow_access:
         allow = find_provider(siblings(parent_executions), ALLOW_PROVIDER)
         if allow is None:
-            problems.append(f"'{block.parent}' has no 'Allow access': every brokered login of a user "
-                            f"who is not an admin fails the flow")
+            problems.append(
+                f"'{block.parent}' has no 'Allow access': every brokered login of a user "
+                f"who is not an admin fails the flow"
+            )
         elif allow.get("requirement") != "REQUIRED":
-            problems.append(f"'Allow access' in '{block.parent}' is {allow.get('requirement')}, "
-                            f"not REQUIRED")
+            problems.append(
+                f"'Allow access' in '{block.parent}' is {allow.get('requirement')}, not REQUIRED"
+            )
     if not block_is_last(parent_executions, block):
-        problems.append(f"sub-flow '{block.name}' is not the last entry of '{block.parent}': an "
-                        f"admin with an OTP device would be asked for the code twice")
+        problems.append(
+            f"sub-flow '{block.name}' is not the last entry of '{block.parent}': an "
+            f"admin with an OTP device would be asked for the code twice"
+        )
     if found.get("requirement") != "CONDITIONAL":
-        problems.append(f"sub-flow '{block.name}' in '{block.parent}' is "
-                        f"{found.get('requirement')}, not CONDITIONAL")
+        problems.append(
+            f"sub-flow '{block.name}' in '{block.parent}' is "
+            f"{found.get('requirement')}, not CONDITIONAL"
+        )
     inner = executions_of(kc, block.name)
     for provider, label, _alias, wanted in desired_conditions(block, role):
         condition = find_provider(inner, provider)
@@ -290,18 +325,24 @@ def block_problems(kc: HardenKcadm, block: Block, role: str) -> list[str]:
 
 def set_requirement(kc: HardenKcadm, parent_alias: str, execution: dict, requirement: str) -> None:
     """Set the requirement of one execution of a flow."""
-    kc.put(f"authentication/flows/{quote(parent_alias, safe='')}/executions",
-           {"id": execution["id"], "requirement": requirement},
-           f"'{execution.get('displayName')}' -> {requirement}")
+    kc.put(
+        f"authentication/flows/{quote(parent_alias, safe='')}/executions",
+        {"id": execution["id"], "requirement": requirement},
+        f"'{execution.get('displayName')}' -> {requirement}",
+    )
 
 
-def ensure_condition(kc: HardenKcadm, block: Block, provider: str, label: str, alias: str,
-                     wanted: dict[str, str]) -> None:
+def ensure_condition(
+    kc: HardenKcadm, block: Block, provider: str, label: str, alias: str, wanted: dict[str, str]
+) -> None:
     """Create one condition of the block, set it REQUIRED and give it its configuration."""
     condition = find_provider(executions_of(kc, block.name), provider)
     if condition is None:
-        kc.post(f"authentication/flows/{quote(block.name, safe='')}/executions/execution",
-                {"provider": provider}, f"execution '{label}'")
+        kc.post(
+            f"authentication/flows/{quote(block.name, safe='')}/executions/execution",
+            {"provider": provider},
+            f"execution '{label}'",
+        )
         condition = find_provider(executions_of(kc, block.name), provider)
     if condition is None:
         return
@@ -312,21 +353,32 @@ def ensure_condition(kc: HardenKcadm, block: Block, provider: str, label: str, a
         config = {"alias": alias, "config": wanted}
         if condition.get("authenticationConfig"):
             config_id = condition["authenticationConfig"]
-            kc.put(f"authentication/config/{quote(config_id, safe='')}",
-                   {"id": config_id, **config}, f"configuration of '{label}'")
+            kc.put(
+                f"authentication/config/{quote(config_id, safe='')}",
+                {"id": config_id, **config},
+                f"configuration of '{label}'",
+            )
         else:
-            kc.post(f"authentication/executions/{quote(condition['id'], safe='')}/config",
-                    config, f"configuration of '{label}'")
+            kc.post(
+                f"authentication/executions/{quote(condition['id'], safe='')}/config",
+                config,
+                f"configuration of '{label}'",
+            )
 
 
 def ensure_block(kc: HardenKcadm, block: Block, role: str) -> None:
     """Create or repair an Admin OTP sub-flow, one missing piece at a time."""
     found = find_block(executions_of(kc, block.parent), block.name)
     if found is None:
-        kc.post(f"authentication/flows/{quote(block.parent, safe='')}/executions/flow",
-                {"alias": block.name, "type": "basic-flow",
-                 "description": f"OTP for holders of the realm role {role}"},
-                f"sub-flow '{block.name}' in '{block.parent}'")
+        kc.post(
+            f"authentication/flows/{quote(block.parent, safe='')}/executions/flow",
+            {
+                "alias": block.name,
+                "type": "basic-flow",
+                "description": f"OTP for holders of the realm role {role}",
+            },
+            f"sub-flow '{block.name}' in '{block.parent}'",
+        )
         found = find_block(executions_of(kc, block.parent), block.name)
     if found is not None and found.get("requirement") != "CONDITIONAL":
         set_requirement(kc, block.parent, found, "CONDITIONAL")
@@ -339,8 +391,11 @@ def ensure_block(kc: HardenKcadm, block: Block, role: str) -> None:
 
     otp = find_provider(executions_of(kc, block.name), OTP_PROVIDER)
     if otp is None:
-        kc.post(f"authentication/flows/{quote(block.name, safe='')}/executions/execution",
-                {"provider": OTP_PROVIDER}, "execution 'OTP Form'")
+        kc.post(
+            f"authentication/flows/{quote(block.name, safe='')}/executions/execution",
+            {"provider": OTP_PROVIDER},
+            "execution 'OTP Form'",
+        )
         otp = find_provider(executions_of(kc, block.name), OTP_PROVIDER)
     if otp is not None and otp.get("requirement") != "REQUIRED":
         set_requirement(kc, block.name, otp, "REQUIRED")
@@ -350,8 +405,11 @@ def ensure_allow_access(kc: HardenKcadm, parent: str) -> None:
     """Create the required 'Allow access' step of a flow, or make an existing one required."""
     allow = find_provider(siblings(executions_of(kc, parent)), ALLOW_PROVIDER)
     if allow is None:
-        kc.post(f"authentication/flows/{quote(parent, safe='')}/executions/execution",
-                {"provider": ALLOW_PROVIDER}, f"execution 'Allow access' in '{parent}'")
+        kc.post(
+            f"authentication/flows/{quote(parent, safe='')}/executions/execution",
+            {"provider": ALLOW_PROVIDER},
+            f"execution 'Allow access' in '{parent}'",
+        )
         allow = find_provider(siblings(executions_of(kc, parent)), ALLOW_PROVIDER)
     if allow is not None and allow.get("requirement") != "REQUIRED":
         set_requirement(kc, parent, allow, "REQUIRED")
@@ -360,26 +418,36 @@ def ensure_allow_access(kc: HardenKcadm, parent: str) -> None:
 def ensure_browser_copy(kc: HardenKcadm) -> None:
     """Copy the built-in browser flow once; the copy is never edited in place later."""
     if BROWSER_FLOW not in flows_by_alias(kc):
-        kc.post(f"authentication/flows/{BROWSER_FLOW_BASE}/copy", {"newName": BROWSER_FLOW},
-                f"copy of the built-in flow '{BROWSER_FLOW_BASE}'")
+        kc.post(
+            f"authentication/flows/{BROWSER_FLOW_BASE}/copy",
+            {"newName": BROWSER_FLOW},
+            f"copy of the built-in flow '{BROWSER_FLOW_BASE}'",
+        )
 
 
 def ensure_post_broker_flow(kc: HardenKcadm) -> None:
     """Create the small top-level flow a brokered login runs after the identity provider."""
     if POST_BROKER_FLOW not in flows_by_alias(kc):
-        kc.post("authentication/flows",
-                {"alias": POST_BROKER_FLOW, "providerId": "basic-flow", "topLevel": True,
-                 "builtIn": False,
-                 "description": f"OTP for holders of the realm role {ADMIN_ROLE} after a brokered "
-                                f"login"},
-                f"top-level flow '{POST_BROKER_FLOW}'")
+        kc.post(
+            "authentication/flows",
+            {
+                "alias": POST_BROKER_FLOW,
+                "providerId": "basic-flow",
+                "topLevel": True,
+                "builtIn": False,
+                "description": f"OTP for holders of the realm role {ADMIN_ROLE} after a brokered "
+                f"login",
+            },
+            f"top-level flow '{POST_BROKER_FLOW}'",
+        )
 
 
 def forms_flow(kc: HardenKcadm) -> str | None:
     """The alias of the copied browser flow's forms sub-flow, where the block belongs."""
     for execution in executions_of(kc, BROWSER_FLOW):
-        if (execution.get("authenticationFlow")
-                and str(execution.get("displayName", "")).endswith("forms")):
+        if execution.get("authenticationFlow") and str(execution.get("displayName", "")).endswith(
+            "forms"
+        ):
             return execution["displayName"]
     return None
 
@@ -396,13 +464,20 @@ def ensure_required_action(kc: HardenKcadm) -> None:
     """Register and enable 'Configure OTP': without it an admin with no OTP device cannot log in."""
     action = required_action(kc, TOTP_ACTION)
     if action is None:
-        kc.post("authentication/register-required-action",
-                {"providerId": TOTP_ACTION, "name": "Configure OTP"},
-                f"required action {TOTP_ACTION}")
+        kc.post(
+            "authentication/register-required-action",
+            {"providerId": TOTP_ACTION, "name": "Configure OTP"},
+            f"required action {TOTP_ACTION}",
+        )
         action = required_action(kc, TOTP_ACTION)
     if action is not None and not action.get("enabled"):
-        kc.write("update", f"authentication/required-actions/{TOTP_ACTION}", {"enabled": True},
-                 f"enable {TOTP_ACTION}", merge=True)
+        kc.write(
+            "update",
+            f"authentication/required-actions/{TOTP_ACTION}",
+            {"enabled": True},
+            f"enable {TOTP_ACTION}",
+            merge=True,
+        )
 
 
 def plan_forgot_password(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
@@ -415,24 +490,44 @@ def plan_forgot_password(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
         f"forgot-password link {on_off(realm.get('resetPasswordAllowed'))}; smtpServer host="
         f"{smtp.get('host') or '<none>'} port={smtp.get('port') or '<default>'} from="
         f"{smtp.get('from') or '<none>'} auth={smtp.get('auth')} password "
-        f"{'set' if password_set else 'NOT set'}")
+        f"{'set' if password_set else 'NOT set'}"
+    )
     if realm.get("resetPasswordAllowed") and not (smtp.get("host") and smtp.get("from")):
-        plan.notes.append("WARNING: the link is offered but the realm has no sender, so a reset "
-                          "mail can never leave")
-    plan.notes.append("The sender's own test is the console's Realm settings > Email > Test "
-                      "connection; it mails the admin who clicks it, so it cannot run here")
+        plan.notes.append(
+            "WARNING: the link is offered but the realm has no sender, so a reset "
+            "mail can never leave"
+        )
+    plan.notes.append(
+        "The sender's own test is the console's Realm settings > Email > Test "
+        "connection; it mails the admin who clicks it, so it cannot run here"
+    )
 
     wanted = {"on": True, "off": False}.get(args.reset_password)
     if wanted is not None and realm.get("resetPasswordAllowed") != wanted:
-        plan.changes.append(Change(
-            f"~ forgot-password link: {on_off(realm.get('resetPasswordAllowed'))} -> {on_off(wanted)}",
-            lambda: kc.write("update", f"realms/{kc.realm}", {"resetPasswordAllowed": wanted},
-                             "Forgot password")))
+        plan.changes.append(
+            Change(
+                f"~ forgot-password link: {on_off(realm.get('resetPasswordAllowed'))} -> {on_off(wanted)}",
+                lambda: kc.write(
+                    "update",
+                    f"realms/{kc.realm}",
+                    {"resetPasswordAllowed": wanted},
+                    "Forgot password",
+                ),
+            )
+        )
 
-    desired = {key: value for key, value in {
-        "host": args.smtp_host, "port": args.smtp_port, "from": args.smtp_from,
-        "user": args.smtp_user, "starttls": args.smtp_starttls, "ssl": args.smtp_ssl,
-    }.items() if value is not None}
+    desired = {
+        key: value
+        for key, value in {
+            "host": args.smtp_host,
+            "port": args.smtp_port,
+            "from": args.smtp_from,
+            "user": args.smtp_user,
+            "starttls": args.smtp_starttls,
+            "ssl": args.smtp_ssl,
+        }.items()
+        if value is not None
+    }
     password = os.environ.get(args.smtp_password_env, "") if args.smtp_password_env else ""
     if args.smtp_password_env and not password:
         raise SystemExit(f"FATAL: ${args.smtp_password_env} is empty or unset")
@@ -445,13 +540,23 @@ def plan_forgot_password(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
             merged["password"] = password
         elif smtp.get("password"):
             merged["password"] = KEEP_STORED_VALUE
-        if any(str(smtp.get(key)) != str(value) for key, value in merged.items()
-               if key != "password") or password:
+        if (
+            any(
+                str(smtp.get(key)) != str(value)
+                for key, value in merged.items()
+                if key != "password"
+            )
+            or password
+        ):
             shown = dict(desired)
-            plan.changes.append(Change(
-                f"~ smtpServer: {shown}{' and a new password' if password else ''}",
-                lambda m=merged: kc.write("update", f"realms/{kc.realm}", {"smtpServer": m},
-                                          "the realm's SMTP sender")))
+            plan.changes.append(
+                Change(
+                    f"~ smtpServer: {shown}{' and a new password' if password else ''}",
+                    lambda m=merged: kc.write(
+                        "update", f"realms/{kc.realm}", {"smtpServer": m}, "the realm's SMTP sender"
+                    ),
+                )
+            )
     return plan
 
 
@@ -464,32 +569,43 @@ def plan_session_windows(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
     for key, value in diff.items():
         plan.changes.append(Change(f"~ {key}: {realm.get(key)} -> {value}", lambda: None))
     if diff:
-        plan.changes.append(Change(
-            "  (one partial update of the realm)",
-            lambda d=dict(diff): kc.write("update", f"realms/{kc.realm}", d, "session windows")))
+        plan.changes.append(
+            Change(
+                "  (one partial update of the realm)",
+                lambda d=dict(diff): kc.write("update", f"realms/{kc.realm}", d, "session windows"),
+            )
+        )
     max_allowed = windows["ssoSessionMaxLifespan"]
     idle_allowed = windows["ssoSessionIdleTimeout"]
     if args.windows != "active":
-        plan.notes.append(f"NOTE: scripts/provision-keycloak-realm.py reads the 'active' profile and "
-                          f"would plan to put the old windows back; make '{args.windows}' the "
-                          f"'active' profile in keycloak/session-windows.json in the same change")
+        plan.notes.append(
+            f"NOTE: scripts/provision-keycloak-realm.py reads the 'active' profile and "
+            f"would plan to put the old windows back; make '{args.windows}' the "
+            f"'active' profile in keycloak/session-windows.json in the same change"
+        )
     try:
         clients = kc.get("clients", {"max": "1000"}) or []
     except KcadmError:
         clients = []
-        plan.notes.append("the clients could not be read (no view-clients/manage-clients): the "
-                          "client session overrides above the new windows were not checked")
+        plan.notes.append(
+            "the clients could not be read (no view-clients/manage-clients): the "
+            "client session overrides above the new windows were not checked"
+        )
     for client in clients:
         attrs = client.get("attributes") or {}
         over = []
-        for attr, limit in (("client.session.max.lifespan", max_allowed),
-                            ("client.session.idle.timeout", idle_allowed)):
+        for attr, limit in (
+            ("client.session.max.lifespan", max_allowed),
+            ("client.session.idle.timeout", idle_allowed),
+        ):
             if attrs.get(attr) and int(attrs[attr]) > limit:
                 over.append(f"{attr}={attrs[attr]} > {limit}")
         if over:
-            plan.notes.append(f"REVIEW: client '{client.get('clientId')}' overrides above the realm "
-                              f"({', '.join(over)}); run scripts/provision-keycloak-realm.py, "
-                              f"which clamps the app and exchange clients")
+            plan.notes.append(
+                f"REVIEW: client '{client.get('clientId')}' overrides above the realm "
+                f"({', '.join(over)}); run scripts/provision-keycloak-realm.py, "
+                f"which clamps the app and exchange clients"
+            )
     return plan
 
 
@@ -502,33 +618,55 @@ def plan_admin_otp(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
 
     action = required_action(kc, TOTP_ACTION)
     if action is None or not action.get("enabled"):
-        plan.changes.append(Change(
-            f"+ required action {TOTP_ACTION}: "
-            f"{'not registered' if action is None else 'disabled'} -> enabled",
-            lambda: ensure_required_action(kc)))
-        plan.notes.append("Without the required action an admin who has no OTP device yet is "
-                          "refused with 'credential setup required' instead of being asked to "
-                          "set one up")
+        plan.changes.append(
+            Change(
+                f"+ required action {TOTP_ACTION}: "
+                f"{'not registered' if action is None else 'disabled'} -> enabled",
+                lambda: ensure_required_action(kc),
+            )
+        )
+        plan.notes.append(
+            "Without the required action an admin who has no OTP device yet is "
+            "refused with 'credential setup required' instead of being asked to "
+            "set one up"
+        )
 
     if BROWSER_FLOW not in flows:
-        plan.changes.append(Change(f"+ copy flow '{BROWSER_FLOW_BASE}' as '{BROWSER_FLOW}'",
-                                   lambda: ensure_browser_copy(kc)))
+        plan.changes.append(
+            Change(
+                f"+ copy flow '{BROWSER_FLOW_BASE}' as '{BROWSER_FLOW}'",
+                lambda: ensure_browser_copy(kc),
+            )
+        )
         browser_problems = [f"the block '{BROWSER_BLOCK}' does not exist yet"]
     else:
         forms_alias = forms_flow(kc)
-        browser_problems = (block_problems(kc, browser_block(forms_alias), role)
-                            if forms_alias else [f"'{BROWSER_FLOW}' has no forms sub-flow"])
+        browser_problems = (
+            block_problems(kc, browser_block(forms_alias), role)
+            if forms_alias
+            else [f"'{BROWSER_FLOW}' has no forms sub-flow"]
+        )
     for problem in browser_problems:
         plan.changes.append(Change(f"+ browser flow: {problem}", lambda: None))
     if browser_problems:
-        plan.changes.append(Change(
-            "  (build or repair the Admin OTP block in the browser copy)",
-            lambda: ensure_block(kc, browser_block(forms_flow(kc) or ""), role)))
+        plan.changes.append(
+            Change(
+                "  (build or repair the Admin OTP block in the browser copy)",
+                lambda: ensure_block(kc, browser_block(forms_flow(kc) or ""), role),
+            )
+        )
     if realm.get("browserFlow") != BROWSER_FLOW:
-        plan.changes.append(Change(
-            f"~ realm browserFlow: {realm.get('browserFlow')} -> {BROWSER_FLOW}",
-            lambda: kc.write("update", f"realms/{kc.realm}", {"browserFlow": BROWSER_FLOW},
-                             "bind the browser flow")))
+        plan.changes.append(
+            Change(
+                f"~ realm browserFlow: {realm.get('browserFlow')} -> {BROWSER_FLOW}",
+                lambda: kc.write(
+                    "update",
+                    f"realms/{kc.realm}",
+                    {"browserFlow": BROWSER_FLOW},
+                    "bind the browser flow",
+                ),
+            )
+        )
 
     idp_path = f"identity-provider/instances/{quote(args.idp_alias, safe='')}"
     try:
@@ -536,29 +674,49 @@ def plan_admin_otp(kc: HardenKcadm, args: argparse.Namespace) -> Plan:
     except KcadmError:
         idp = None
     if idp is None:
-        plan.notes.append(f"identity provider '{args.idp_alias}' not found: the post-broker half "
-                          f"is skipped (a realm without Discord has no brokered login)")
+        plan.notes.append(
+            f"identity provider '{args.idp_alias}' not found: the post-broker half "
+            f"is skipped (a realm without Discord has no brokered login)"
+        )
     else:
         if POST_BROKER_FLOW not in flows:
-            plan.changes.append(Change(f"+ top-level flow '{POST_BROKER_FLOW}'",
-                                       lambda: ensure_post_broker_flow(kc)))
-        pb_problems = (block_problems(kc, post_broker_block(), role) if POST_BROKER_FLOW in flows
-                       else [f"the block '{POST_BROKER_BLOCK}' does not exist yet"])
+            plan.changes.append(
+                Change(
+                    f"+ top-level flow '{POST_BROKER_FLOW}'", lambda: ensure_post_broker_flow(kc)
+                )
+            )
+        pb_problems = (
+            block_problems(kc, post_broker_block(), role)
+            if POST_BROKER_FLOW in flows
+            else [f"the block '{POST_BROKER_BLOCK}' does not exist yet"]
+        )
         for problem in pb_problems:
             plan.changes.append(Change(f"+ post-broker flow: {problem}", lambda: None))
         if pb_problems:
-            plan.changes.append(Change(
-                "  (build or repair the Admin OTP block in the post-broker flow)",
-                lambda: ensure_block(kc, post_broker_block(), role)))
+            plan.changes.append(
+                Change(
+                    "  (build or repair the Admin OTP block in the post-broker flow)",
+                    lambda: ensure_block(kc, post_broker_block(), role),
+                )
+            )
         if idp.get("postBrokerLoginFlowAlias") != POST_BROKER_FLOW:
-            plan.changes.append(Change(
-                f"~ identity provider '{args.idp_alias}' postBrokerLoginFlowAlias: "
-                f"{idp.get('postBrokerLoginFlowAlias') or '<none>'} -> {POST_BROKER_FLOW}",
-                lambda: kc.write("update", idp_path,
-                                 {"postBrokerLoginFlowAlias": POST_BROKER_FLOW},
-                                 "bind the post-login flow", merge=True)))
-    plan.notes.append("Keep a second admin session open in another browser while this runs; "
-                      "after the bind an admin account cannot authenticate to kcadm any more")
+            plan.changes.append(
+                Change(
+                    f"~ identity provider '{args.idp_alias}' postBrokerLoginFlowAlias: "
+                    f"{idp.get('postBrokerLoginFlowAlias') or '<none>'} -> {POST_BROKER_FLOW}",
+                    lambda: kc.write(
+                        "update",
+                        idp_path,
+                        {"postBrokerLoginFlowAlias": POST_BROKER_FLOW},
+                        "bind the post-login flow",
+                        merge=True,
+                    ),
+                )
+            )
+    plan.notes.append(
+        "Keep a second admin session open in another browser while this runs; "
+        "after the bind an admin account cannot authenticate to kcadm any more"
+    )
     return plan
 
 
@@ -569,7 +727,9 @@ def verify(kc: HardenKcadm, steps: set[str], args: argparse.Namespace) -> list[s
     if "2" in steps:
         wanted = {"on": True, "off": False}.get(args.reset_password)
         if wanted is not None and realm.get("resetPasswordAllowed") != wanted:
-            problems.append(f"the forgot-password link is {on_off(realm.get('resetPasswordAllowed'))}")
+            problems.append(
+                f"the forgot-password link is {on_off(realm.get('resetPasswordAllowed'))}"
+            )
     if "12" in steps:
         for key, value in load_windows(args.windows).items():
             if realm.get(key) != value:
@@ -584,17 +744,23 @@ def verify(kc: HardenKcadm, steps: set[str], args: argparse.Namespace) -> list[s
         if forms_alias is None:
             problems.append(f"'{BROWSER_FLOW}' has no forms sub-flow")
         else:
-            problems += [f"browser flow: {p}"
-                         for p in block_problems(kc, browser_block(forms_alias), args.admin_role)]
+            problems += [
+                f"browser flow: {p}"
+                for p in block_problems(kc, browser_block(forms_alias), args.admin_role)
+            ]
         try:
             idp = kc.get(f"identity-provider/instances/{quote(args.idp_alias, safe='')}")
         except KcadmError:
             idp = None
         if idp is not None:
             if idp.get("postBrokerLoginFlowAlias") != POST_BROKER_FLOW:
-                problems.append(f"postBrokerLoginFlowAlias is {idp.get('postBrokerLoginFlowAlias')}")
-            problems += [f"post-broker flow: {p}"
-                         for p in block_problems(kc, post_broker_block(), args.admin_role)]
+                problems.append(
+                    f"postBrokerLoginFlowAlias is {idp.get('postBrokerLoginFlowAlias')}"
+                )
+            problems += [
+                f"post-broker flow: {p}"
+                for p in block_problems(kc, post_broker_block(), args.admin_role)
+            ]
     return problems
 
 
@@ -606,10 +772,15 @@ def snapshot(kc: HardenKcadm, args: argparse.Namespace) -> dict:
     except KcadmError:
         idp = None
     return {
-        "realm": {key: realm.get(key) for key in
-                  ("resetPasswordAllowed", "browserFlow", *WINDOW_FIELDS)},
-        "identityProvider": None if idp is None else {
-            "alias": args.idp_alias, "postBrokerLoginFlowAlias": idp.get("postBrokerLoginFlowAlias")},
+        "realm": {
+            key: realm.get(key) for key in ("resetPasswordAllowed", "browserFlow", *WINDOW_FIELDS)
+        },
+        "identityProvider": None
+        if idp is None
+        else {
+            "alias": args.idp_alias,
+            "postBrokerLoginFlowAlias": idp.get("postBrokerLoginFlowAlias"),
+        },
     }
 
 
@@ -617,27 +788,48 @@ def plan_rollback(kc: HardenKcadm, backup: dict, args: argparse.Namespace) -> li
     """Put every value of the rollback file back; flows the script created stay, unbound."""
     plan = Plan("rollback - values from the rollback file")
     realm = kc.get_realm()
-    wanted = {key: value for key, value in backup["realm"].items()
-              if key != "smtpServer" and value is not None}
+    wanted = {
+        key: value
+        for key, value in backup["realm"].items()
+        if key != "smtpServer" and value is not None
+    }
     diff = {key: value for key, value in wanted.items() if realm.get(key) != value}
     for key, value in diff.items():
         plan.changes.append(Change(f"~ {key}: {realm.get(key)} -> {value}", lambda: None))
     if diff:
-        plan.changes.append(Change("  (one partial update of the realm)", lambda d=dict(diff): kc.write(
-            "update", f"realms/{kc.realm}", d, "restore the realm values")))
+        plan.changes.append(
+            Change(
+                "  (one partial update of the realm)",
+                lambda d=dict(diff): kc.write(
+                    "update", f"realms/{kc.realm}", d, "restore the realm values"
+                ),
+            )
+        )
     idp_backup = backup.get("identityProvider")
     if idp_backup:
         live = kc.get(f"identity-provider/instances/{quote(idp_backup['alias'], safe='')}")
-        if live is not None and live.get("postBrokerLoginFlowAlias") != idp_backup["postBrokerLoginFlowAlias"]:
-            plan.changes.append(Change(
-                f"~ identity provider '{idp_backup['alias']}' postBrokerLoginFlowAlias: "
-                f"{live.get('postBrokerLoginFlowAlias') or '<none>'} -> "
-                f"{idp_backup['postBrokerLoginFlowAlias'] or '<none>'}",
-                lambda: kc.write("update", f"identity-provider/instances/{quote(idp_backup['alias'], safe='')}",
-                                 {"postBrokerLoginFlowAlias": idp_backup["postBrokerLoginFlowAlias"] or ""},
-                                 "restore the post-login flow", merge=True)))
-    plan.notes.append(f"The flows '{BROWSER_FLOW}' and '{POST_BROKER_FLOW}' are left in the realm, "
-                      f"unbound; delete them in the console when they are no longer wanted")
+        if (
+            live is not None
+            and live.get("postBrokerLoginFlowAlias") != idp_backup["postBrokerLoginFlowAlias"]
+        ):
+            plan.changes.append(
+                Change(
+                    f"~ identity provider '{idp_backup['alias']}' postBrokerLoginFlowAlias: "
+                    f"{live.get('postBrokerLoginFlowAlias') or '<none>'} -> "
+                    f"{idp_backup['postBrokerLoginFlowAlias'] or '<none>'}",
+                    lambda: kc.write(
+                        "update",
+                        f"identity-provider/instances/{quote(idp_backup['alias'], safe='')}",
+                        {"postBrokerLoginFlowAlias": idp_backup["postBrokerLoginFlowAlias"] or ""},
+                        "restore the post-login flow",
+                        merge=True,
+                    ),
+                )
+            )
+    plan.notes.append(
+        f"The flows '{BROWSER_FLOW}' and '{POST_BROKER_FLOW}' are left in the realm, "
+        f"unbound; delete them in the console when they are no longer wanted"
+    )
     plan.notes.append("The SMTP sender is not restored (its password is masked in the file)")
     return [plan]
 
@@ -671,11 +863,14 @@ def run(kc: HardenKcadm, args: argparse.Namespace) -> int:
 
     if not args.rollback:
         if Path(args.backup_file).exists():
-            print(f"\nKeeping the existing rollback file {args.backup_file}: it holds the values "
-                  f"from before the first run.")
+            print(
+                f"\nKeeping the existing rollback file {args.backup_file}: it holds the values "
+                f"from before the first run."
+            )
         else:
             Path(args.backup_file).write_text(
-                json.dumps(snapshot(kc, args), indent=2, sort_keys=True), encoding="utf-8")
+                json.dumps(snapshot(kc, args), indent=2, sort_keys=True), encoding="utf-8"
+            )
             os.chmod(args.backup_file, stat.S_IRUSR | stat.S_IWUSR)
             print(f"\nRollback file written: {args.backup_file}")
     kc.dry_run = False
@@ -701,18 +896,35 @@ class FakeKeycloak:
     """An in-memory realm that answers the kcadm shapes this script emits, for --selftest."""
 
     def __init__(self) -> None:
-        self.realm = {"realm": "basetool", "resetPasswordAllowed": True, "browserFlow": "browser",
-                      "ssoSessionIdleTimeout": 2592000, "ssoSessionMaxLifespan": 15552000,
-                      "ssoSessionIdleTimeoutRememberMe": 2592000,
-                      "ssoSessionMaxLifespanRememberMe": 15552000,
-                      "smtpServer": {"host": "smtp.test", "from": "noreply@test", "password": KEEP_STORED_VALUE}}
+        self.realm = {
+            "realm": "basetool",
+            "resetPasswordAllowed": True,
+            "browserFlow": "browser",
+            "ssoSessionIdleTimeout": 2592000,
+            "ssoSessionMaxLifespan": 15552000,
+            "ssoSessionIdleTimeoutRememberMe": 2592000,
+            "ssoSessionMaxLifespanRememberMe": 15552000,
+            "smtpServer": {
+                "host": "smtp.test",
+                "from": "noreply@test",
+                "password": KEEP_STORED_VALUE,
+            },
+        }
         self.flows: dict[str, list[dict]] = {"browser": []}
         self.configs: dict[str, dict] = {}
         self.required_actions: dict[str, dict] = {}
-        self.idp = {"alias": "discord", "providerId": "oidc", "enabled": True,
-                    "postBrokerLoginFlowAlias": ""}
-        self.clients = [{"clientId": "basetool-android",
-                         "attributes": {"client.session.max.lifespan": "15552000"}}]
+        self.idp = {
+            "alias": "discord",
+            "providerId": "oidc",
+            "enabled": True,
+            "postBrokerLoginFlowAlias": "",
+        }
+        self.clients = [
+            {
+                "clientId": "basetool-android",
+                "attributes": {"client.session.max.lifespan": "15552000"},
+            }
+        ]
         self.counter = 0
         self.writes: list[str] = []
 
@@ -738,9 +950,14 @@ class FakeKeycloak:
         left that succeeded fails.
         """
         entries = [entry for entry in self.flows[flow] if entry.get("requirement") != "DISABLED"]
-        required = [entry for entry in entries if entry["requirement"] in ("REQUIRED", "CONDITIONAL")]
-        alternatives = [] if required else [entry for entry in entries
-                                            if entry["requirement"] == "ALTERNATIVE"]
+        required = [
+            entry for entry in entries if entry["requirement"] in ("REQUIRED", "CONDITIONAL")
+        ]
+        alternatives = (
+            []
+            if required
+            else [entry for entry in entries if entry["requirement"] == "ALTERNATIVE"]
+        )
         outcomes = []
         for entry in required:
             if entry["requirement"] == "CONDITIONAL":
@@ -775,7 +992,7 @@ class FakeKcadm(HardenKcadm):
         if path == "authentication/flows":
             return [{"alias": alias, "id": alias} for alias in fake.flows]
         if path.startswith("authentication/flows/") and path.endswith("/executions"):
-            alias = path[len("authentication/flows/"):-len("/executions")]
+            alias = path[len("authentication/flows/") : -len("/executions")]
             if alias not in fake.flows:
                 raise KcadmError(f"no flow {alias}")
             return json.loads(json.dumps(fake.flows[alias]))
@@ -803,22 +1020,40 @@ class FakeKcadm(HardenKcadm):
             fake.realm.update(payload)
         elif verb == "update" and path.startswith("identity-provider/instances/"):
             if not merge and not payload.get("providerId"):
-                raise KcadmError(f"exit 1: Invalid identity provider id [{payload.get('providerId')}]")
+                raise KcadmError(
+                    f"exit 1: Invalid identity provider id [{payload.get('providerId')}]"
+                )
             fake.idp.update(payload)
         elif verb == "create" and path == "authentication/flows/browser/copy":
             alias = payload["newName"]
-            fake.flows[alias] = [{"id": fake.next_id(), "displayName": f"{alias} forms",
-                                  "authenticationFlow": True, "requirement": "ALTERNATIVE"}]
-            fake.flows[f"{alias} forms"] = [{"id": fake.next_id(), "displayName": "Username Password Form",
-                                             "providerId": "auth-username-password-form",
-                                             "requirement": "REQUIRED", "level": 0}]
+            fake.flows[alias] = [
+                {
+                    "id": fake.next_id(),
+                    "displayName": f"{alias} forms",
+                    "authenticationFlow": True,
+                    "requirement": "ALTERNATIVE",
+                }
+            ]
+            fake.flows[f"{alias} forms"] = [
+                {
+                    "id": fake.next_id(),
+                    "displayName": "Username Password Form",
+                    "providerId": "auth-username-password-form",
+                    "requirement": "REQUIRED",
+                    "level": 0,
+                }
+            ]
         elif verb == "create" and path == "authentication/register-required-action":
             fake.required_actions[payload["providerId"]] = {
-                "alias": payload["providerId"], "enabled": True}
+                "alias": payload["providerId"],
+                "enabled": True,
+            }
         elif verb == "update" and path.startswith("authentication/required-actions/"):
             if not merge and not payload.get("alias"):
-                raise KcadmError("the update body names no alias; the server rebuilds the required "
-                                 "action from it and would blank its name and alias")
+                raise KcadmError(
+                    "the update body names no alias; the server rebuilds the required "
+                    "action from it and would blank its name and alias"
+                )
             fake.required_actions[path.rsplit("/", 1)[1]].update(payload)
         elif verb == "create" and path.endswith("/lower-priority"):
             execution_id = path.split("/")[2]
@@ -831,16 +1066,29 @@ class FakeKcadm(HardenKcadm):
         elif verb == "create" and path == "authentication/flows":
             fake.flows[payload["alias"]] = []
         elif verb == "create" and path.endswith("/executions/flow"):
-            parent = path[len("authentication/flows/"):-len("/executions/flow")]
-            fake.flows[parent].insert(0, {"id": fake.next_id(), "displayName": payload["alias"],
-                                          "authenticationFlow": True, "requirement": "DISABLED",
-                                          "level": 0})
+            parent = path[len("authentication/flows/") : -len("/executions/flow")]
+            fake.flows[parent].insert(
+                0,
+                {
+                    "id": fake.next_id(),
+                    "displayName": payload["alias"],
+                    "authenticationFlow": True,
+                    "requirement": "DISABLED",
+                    "level": 0,
+                },
+            )
             fake.flows[payload["alias"]] = []
         elif verb == "create" and path.endswith("/executions/execution"):
-            parent = path[len("authentication/flows/"):-len("/executions/execution")]
-            fake.flows[parent].append({"id": fake.next_id(), "providerId": payload["provider"],
-                                       "displayName": payload["provider"], "requirement": "DISABLED",
-                                       "level": 0})
+            parent = path[len("authentication/flows/") : -len("/executions/execution")]
+            fake.flows[parent].append(
+                {
+                    "id": fake.next_id(),
+                    "providerId": payload["provider"],
+                    "displayName": payload["provider"],
+                    "requirement": "DISABLED",
+                    "level": 0,
+                }
+            )
         elif verb == "create" and path.endswith("/config"):
             execution = fake.execution_by_id(path.split("/")[2])
             config_id = fake.next_id()
@@ -879,99 +1127,176 @@ def selftest() -> int:
 
     print("dry run writes nothing and plans every step")
     fake = FakeKeycloak()
-    code = run(FakeKcadm(fake, dry_run=True), arguments("--windows", "proposal", "--reset-password", "off"))
+    code = run(
+        FakeKcadm(fake, dry_run=True), arguments("--windows", "proposal", "--reset-password", "off")
+    )
     check(code == 2, "a dry run with work to do exits 2")
     check(fake.writes == [], "a dry run sends no write")
     check(not backup_path.exists(), "a dry run writes no rollback file")
 
     print("apply builds the flows, binds them and verifies")
-    code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--windows", "proposal", "--reset-password", "off"))
+    code = run(
+        FakeKcadm(fake, dry_run=True),
+        arguments("--apply", "--windows", "proposal", "--reset-password", "off"),
+    )
     check(code == 0, "apply exits 0 after the verify")
     check(fake.realm["browserFlow"] == BROWSER_FLOW, "the browser flow is bound")
     check(fake.realm["ssoSessionMaxLifespan"] == 7776000, "the session maximum is the proposal's")
     check(fake.realm["resetPasswordAllowed"] is False, "Forgot password is off")
-    check(fake.idp["postBrokerLoginFlowAlias"] == POST_BROKER_FLOW, "the Discord provider runs the post-broker flow")
+    check(
+        fake.idp["postBrokerLoginFlowAlias"] == POST_BROKER_FLOW,
+        "the Discord provider runs the post-broker flow",
+    )
     condition = find_provider(fake.flows[BROWSER_BLOCK], ROLE_PROVIDER)
-    check(condition is not None and fake.configs[condition["authenticationConfig"]]["config"]["condUserRole"] == "Admin",
-          "the condition names the Admin realm role")
+    check(
+        condition is not None
+        and fake.configs[condition["authenticationConfig"]]["config"]["condUserRole"] == "Admin",
+        "the condition names the Admin realm role",
+    )
     credential = find_provider(fake.flows[BROWSER_BLOCK], CREDENTIAL_PROVIDER)
-    check(credential is not None and fake.configs[credential["authenticationConfig"]]["config"] ==
-          {"credentials": "otp", "included": "false"},
-          "the browser block runs only while no OTP was presented in this login")
-    check(find_provider(fake.flows[POST_BROKER_BLOCK], CREDENTIAL_PROVIDER) is None,
-          "the post-broker block has no such condition: nothing asked for an OTP before it")
-    check(find_provider(fake.flows[BROWSER_BLOCK], OTP_PROVIDER)["requirement"] == "REQUIRED", "the OTP form is required")
-    check(backup_path.exists() and json.loads(backup_path.read_text())["realm"]["browserFlow"] == "browser",
-          "the rollback file holds the values from before")
-    check(fake.required_actions.get(TOTP_ACTION, {}).get("enabled") is True,
-          "Configure OTP is registered and enabled")
+    check(
+        credential is not None
+        and fake.configs[credential["authenticationConfig"]]["config"]
+        == {"credentials": "otp", "included": "false"},
+        "the browser block runs only while no OTP was presented in this login",
+    )
+    check(
+        find_provider(fake.flows[POST_BROKER_BLOCK], CREDENTIAL_PROVIDER) is None,
+        "the post-broker block has no such condition: nothing asked for an OTP before it",
+    )
+    check(
+        find_provider(fake.flows[BROWSER_BLOCK], OTP_PROVIDER)["requirement"] == "REQUIRED",
+        "the OTP form is required",
+    )
+    check(
+        backup_path.exists()
+        and json.loads(backup_path.read_text())["realm"]["browserFlow"] == "browser",
+        "the rollback file holds the values from before",
+    )
+    check(
+        fake.required_actions.get(TOTP_ACTION, {}).get("enabled") is True,
+        "Configure OTP is registered and enabled",
+    )
     allow = find_provider(fake.flows[POST_BROKER_FLOW], ALLOW_PROVIDER)
-    check(allow is not None and allow["requirement"] == "REQUIRED",
-          "the post-broker flow carries a required 'Allow access'")
-    check(fake.flows[POST_BROKER_FLOW][-1]["displayName"] == POST_BROKER_BLOCK,
-          "the Admin OTP block stays the last entry of the post-broker flow")
-    check(fake.brokered_login(POST_BROKER_FLOW, is_admin=False) == "allowed",
-          "a brokered login of a member completes")
-    check(fake.brokered_login(POST_BROKER_FLOW, is_admin=True) == "otp",
-          "a brokered login of an admin is asked for the code")
+    check(
+        allow is not None and allow["requirement"] == "REQUIRED",
+        "the post-broker flow carries a required 'Allow access'",
+    )
+    check(
+        fake.flows[POST_BROKER_FLOW][-1]["displayName"] == POST_BROKER_BLOCK,
+        "the Admin OTP block stays the last entry of the post-broker flow",
+    )
+    check(
+        fake.brokered_login(POST_BROKER_FLOW, is_admin=False) == "allowed",
+        "a brokered login of a member completes",
+    )
+    check(
+        fake.brokered_login(POST_BROKER_FLOW, is_admin=True) == "otp",
+        "a brokered login of an admin is asked for the code",
+    )
 
     print("a second run finds nothing to do")
     writes_before = len(fake.writes)
-    code = run(FakeKcadm(fake, dry_run=True), arguments("--windows", "proposal", "--reset-password", "off"))
-    check(code == 0 and len(fake.writes) == writes_before, "the second plan is empty and writes nothing")
+    code = run(
+        FakeKcadm(fake, dry_run=True), arguments("--windows", "proposal", "--reset-password", "off")
+    )
+    check(
+        code == 0 and len(fake.writes) == writes_before,
+        "the second plan is empty and writes nothing",
+    )
 
     print("a broken block is repaired, not duplicated")
-    fake.execution_by_id(find_provider(fake.flows[BROWSER_BLOCK], OTP_PROVIDER)["id"])["requirement"] = "DISABLED"
-    code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--windows", "proposal", "--reset-password", "off"))
-    check(code == 0 and len(fake.flows[BROWSER_BLOCK]) == 3, "the OTP form is required again and nothing was added twice")
+    fake.execution_by_id(find_provider(fake.flows[BROWSER_BLOCK], OTP_PROVIDER)["id"])[
+        "requirement"
+    ] = "DISABLED"
+    code = run(
+        FakeKcadm(fake, dry_run=True),
+        arguments("--apply", "--windows", "proposal", "--reset-password", "off"),
+    )
+    check(
+        code == 0 and len(fake.flows[BROWSER_BLOCK]) == 3,
+        "the OTP form is required again and nothing was added twice",
+    )
 
     print("a block that moved in front of the second-factor step is moved back")
     forms = fake.flows[f"{BROWSER_FLOW} forms"]
     check(forms[-1]["displayName"] == BROWSER_BLOCK, "the block starts behind the other entries")
     forms.insert(0, forms.pop())
-    code = run(FakeKcadm(fake, dry_run=True), arguments("--windows", "proposal", "--reset-password", "off"))
+    code = run(
+        FakeKcadm(fake, dry_run=True), arguments("--windows", "proposal", "--reset-password", "off")
+    )
     check(code == 2, "a dry run reports the misplaced block")
-    code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--windows", "proposal", "--reset-password", "off"))
-    check(code == 0 and forms[-1]["displayName"] == BROWSER_BLOCK, "apply moves it back behind them")
+    code = run(
+        FakeKcadm(fake, dry_run=True),
+        arguments("--apply", "--windows", "proposal", "--reset-password", "off"),
+    )
+    check(
+        code == 0 and forms[-1]["displayName"] == BROWSER_BLOCK, "apply moves it back behind them"
+    )
 
     print("a post-broker flow without 'Allow access' is repaired")
     pb = fake.flows[POST_BROKER_FLOW]
     pb.remove(find_provider(pb, ALLOW_PROVIDER))
-    check(fake.brokered_login(POST_BROKER_FLOW, is_admin=False) == "failed",
-          "without it a brokered login of a member fails")
-    code = run(FakeKcadm(fake, dry_run=True), arguments("--windows", "proposal", "--reset-password", "off"))
+    check(
+        fake.brokered_login(POST_BROKER_FLOW, is_admin=False) == "failed",
+        "without it a brokered login of a member fails",
+    )
+    code = run(
+        FakeKcadm(fake, dry_run=True), arguments("--windows", "proposal", "--reset-password", "off")
+    )
     check(code == 2, "a dry run reports the missing step")
-    code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--windows", "proposal", "--reset-password", "off"))
-    check(code == 0 and fake.brokered_login(POST_BROKER_FLOW, is_admin=False) == "allowed"
-          and fake.brokered_login(POST_BROKER_FLOW, is_admin=True) == "otp"
-          and pb[-1]["displayName"] == POST_BROKER_BLOCK,
-          "apply adds it in front of the block; members pass, admins are asked for the code")
+    code = run(
+        FakeKcadm(fake, dry_run=True),
+        arguments("--apply", "--windows", "proposal", "--reset-password", "off"),
+    )
+    check(
+        code == 0
+        and fake.brokered_login(POST_BROKER_FLOW, is_admin=False) == "allowed"
+        and fake.brokered_login(POST_BROKER_FLOW, is_admin=True) == "otp"
+        and pb[-1]["displayName"] == POST_BROKER_BLOCK,
+        "apply adds it in front of the block; members pass, admins are asked for the code",
+    )
 
     print("rollback puts the bound values back and deletes nothing")
     code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--rollback", str(backup_path)))
-    check(code == 0 and fake.realm["browserFlow"] == "browser", "the built-in browser flow is bound again")
+    check(
+        code == 0 and fake.realm["browserFlow"] == "browser",
+        "the built-in browser flow is bound again",
+    )
     check(fake.realm["ssoSessionMaxLifespan"] == 15552000, "the session maximum is back")
     check(fake.idp["postBrokerLoginFlowAlias"] == "", "the post-login flow is unbound")
-    check(BROWSER_FLOW in fake.flows and POST_BROKER_FLOW in fake.flows, "the created flows are left in place")
+    check(
+        BROWSER_FLOW in fake.flows and POST_BROKER_FLOW in fake.flows,
+        "the created flows are left in place",
+    )
 
     print("the active windows are the provisioner's")
     spec = importlib.util.spec_from_file_location(
-        "provision_keycloak_realm", SCRIPT_DIR / "provision-keycloak-realm.py")
+        "provision_keycloak_realm", SCRIPT_DIR / "provision-keycloak-realm.py"
+    )
     provisioner = importlib.util.module_from_spec(spec)
     sys.modules["provision_keycloak_realm"] = provisioner
     spec.loader.exec_module(provisioner)
     active = load_windows("active")
-    check(provisioner.REALM_SETTINGS["ssoSessionIdleTimeout"] == active["ssoSessionIdleTimeout"]
-          and provisioner.REALM_SETTINGS["ssoSessionMaxLifespan"] == active["ssoSessionMaxLifespan"],
-          "the provisioner reads the same file")
+    check(
+        provisioner.REALM_SETTINGS["ssoSessionIdleTimeout"] == active["ssoSessionIdleTimeout"]
+        and provisioner.REALM_SETTINGS["ssoSessionMaxLifespan"] == active["ssoSessionMaxLifespan"],
+        "the provisioner reads the same file",
+    )
 
     print("a missing Discord provider skips the post-broker half")
     fake = FakeKeycloak()
     kc = FakeKcadm(fake, dry_run=True)
-    kc.get = lambda path, query=None, _orig=kc.get: (_ for _ in ()).throw(KcadmError("404")) \
-        if path.startswith("identity-provider/") else _orig(path, query)
+    kc.get = lambda path, query=None, _orig=kc.get: (
+        (_ for _ in ()).throw(KcadmError("404"))
+        if path.startswith("identity-provider/")
+        else _orig(path, query)
+    )
     code = run(kc, arguments("--apply", "--step", "11"))
-    check(code == 0 and POST_BROKER_FLOW not in fake.flows, "no post-broker flow is created without the provider")
+    check(
+        code == 0 and POST_BROKER_FLOW not in fake.flows,
+        "no post-broker flow is created without the provider",
+    )
 
     print("the identity provider and the required action are updated in merge mode")
     sent: list[list[str]] = []
@@ -979,15 +1304,24 @@ def selftest() -> int:
     recorder._run = lambda argv, stdin=None: sent.append(argv) or ""
     recorder.write("update", "identity-provider/instances/discord", {"x": 1}, "idp", merge=True)
     recorder.write("update", "realms/basetool", {"x": 1}, "realm")
-    check(sent[0] == ["update", "identity-provider/instances/discord", "-r", "basetool", "-m", "-f", "-"],
-          "an identity-provider update sends -m before -f")
-    check(sent[1] == ["update", "realms/basetool", "-r", "basetool", "-f", "-"],
-          "a realm update stays a plain -f body")
+    check(
+        sent[0]
+        == ["update", "identity-provider/instances/discord", "-r", "basetool", "-m", "-f", "-"],
+        "an identity-provider update sends -m before -f",
+    )
+    check(
+        sent[1] == ["update", "realms/basetool", "-r", "basetool", "-f", "-"],
+        "a realm update stays a plain -f body",
+    )
     fake = FakeKeycloak()
     refused = False
     try:
         FakeKcadm(fake, dry_run=False).write(
-            "update", "identity-provider/instances/discord", {"postBrokerLoginFlowAlias": "x"}, "unmerged")
+            "update",
+            "identity-provider/instances/discord",
+            {"postBrokerLoginFlowAlias": "x"},
+            "unmerged",
+        )
     except KcadmError as error:
         refused = "Invalid identity provider id [None]" in str(error)
     check(refused, "the fake refuses an unmerged identity-provider body without providerId")
@@ -995,25 +1329,43 @@ def selftest() -> int:
     print("a bound Discord provider keeps its identity and is restored to its earlier flow")
     fake = FakeKeycloak()
     fake.idp["postBrokerLoginFlowAlias"] = "earlier-flow"
-    fake.required_actions[TOTP_ACTION] = {"alias": TOTP_ACTION, "name": "Configure OTP", "enabled": False}
+    fake.required_actions[TOTP_ACTION] = {
+        "alias": TOTP_ACTION,
+        "name": "Configure OTP",
+        "enabled": False,
+    }
     backup_path = Path(tempfile.mkdtemp()) / "earlier.json"
     code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--step", "11"))
-    check(code == 0 and fake.idp["postBrokerLoginFlowAlias"] == POST_BROKER_FLOW,
-          "the bind replaces a flow that was bound before")
-    check(fake.idp["providerId"] == "oidc" and fake.idp["alias"] == "discord",
-          "the bind leaves the provider's id and alias alone")
-    check(fake.required_actions[TOTP_ACTION]["enabled"] is True
-          and fake.required_actions[TOTP_ACTION]["name"] == "Configure OTP",
-          "a disabled Configure OTP is enabled without losing its name")
+    check(
+        code == 0 and fake.idp["postBrokerLoginFlowAlias"] == POST_BROKER_FLOW,
+        "the bind replaces a flow that was bound before",
+    )
+    check(
+        fake.idp["providerId"] == "oidc" and fake.idp["alias"] == "discord",
+        "the bind leaves the provider's id and alias alone",
+    )
+    check(
+        fake.required_actions[TOTP_ACTION]["enabled"] is True
+        and fake.required_actions[TOTP_ACTION]["name"] == "Configure OTP",
+        "a disabled Configure OTP is enabled without losing its name",
+    )
     writes_before = len(fake.writes)
     code = run(FakeKcadm(fake, dry_run=True), arguments("--step", "11"))
-    check(code == 0 and len(fake.writes) == writes_before, "with the provider already bound nothing is planned")
+    check(
+        code == 0 and len(fake.writes) == writes_before,
+        "with the provider already bound nothing is planned",
+    )
     code = run(FakeKcadm(fake, dry_run=True), arguments("--apply", "--rollback", str(backup_path)))
-    check(code == 0 and fake.idp["postBrokerLoginFlowAlias"] == "earlier-flow"
-          and fake.idp["providerId"] == "oidc",
-          "the rollback restores the earlier flow and leaves the provider's id alone")
+    check(
+        code == 0
+        and fake.idp["postBrokerLoginFlowAlias"] == "earlier-flow"
+        and fake.idp["providerId"] == "oidc",
+        "the rollback restores the earlier flow and leaves the provider's id alone",
+    )
 
-    print(f"\n{'selftest FAILED: ' + str(len(failures)) + ' check(s)' if failures else 'selftest passed'}")
+    print(
+        f"\n{'selftest FAILED: ' + str(len(failures)) + ' check(s)' if failures else 'selftest passed'}"
+    )
     return 1 if failures else 0
 
 
@@ -1022,15 +1374,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     parser.add_argument("--realm", default="basetool")
     parser.add_argument("--container", default="keycloak")
-    parser.add_argument("--kcadm-command", help="override the kcadm invocation (a quoted command line)")
-    parser.add_argument("--step", action="append", choices=["2", "11", "12", "all"],
-                        help="a step to run; repeatable; default: all three")
+    parser.add_argument(
+        "--kcadm-command", help="override the kcadm invocation (a quoted command line)"
+    )
+    parser.add_argument(
+        "--step",
+        action="append",
+        choices=["2", "11", "12", "all"],
+        help="a step to run; repeatable; default: all three",
+    )
     parser.add_argument("--apply", action="store_true", help="write; without it nothing is written")
-    parser.add_argument("--backup-file", default="keycloak-hardening.before.json",
-                        help="where --apply writes the rollback file (mode 0600)")
+    parser.add_argument(
+        "--backup-file",
+        default="keycloak-hardening.before.json",
+        help="where --apply writes the rollback file (mode 0600)",
+    )
     parser.add_argument("--rollback", metavar="FILE", help="put the values of a rollback file back")
-    parser.add_argument("--windows", choices=["active", "proposal"], default="active",
-                        help="which profile of keycloak/session-windows.json step 12 applies")
+    parser.add_argument(
+        "--windows",
+        choices=["active", "proposal"],
+        default="active",
+        help="which profile of keycloak/session-windows.json step 12 applies",
+    )
     parser.add_argument("--reset-password", choices=["leave", "on", "off"], default="leave")
     parser.add_argument("--smtp-host")
     parser.add_argument("--smtp-port", type=int)
@@ -1038,11 +1403,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--smtp-user")
     parser.add_argument("--smtp-starttls", choices=["true", "false"])
     parser.add_argument("--smtp-ssl", choices=["true", "false"])
-    parser.add_argument("--smtp-password-env", metavar="VAR",
-                        help="name of an environment variable holding the SMTP password; never printed")
+    parser.add_argument(
+        "--smtp-password-env",
+        metavar="VAR",
+        help="name of an environment variable holding the SMTP password; never printed",
+    )
     parser.add_argument("--admin-role", default=ADMIN_ROLE)
     parser.add_argument("--idp-alias", default=IDP_ALIAS)
-    parser.add_argument("--selftest", action="store_true", help="run the in-memory self-test and exit")
+    parser.add_argument(
+        "--selftest", action="store_true", help="run the in-memory self-test and exit"
+    )
     return parser
 
 
@@ -1051,16 +1421,21 @@ def main() -> int:
     args = build_parser().parse_args()
     if args.selftest:
         return selftest()
-    prefix = (shlex.split(args.kcadm_command) if args.kcadm_command
-              else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"])
+    prefix = (
+        shlex.split(args.kcadm_command)
+        if args.kcadm_command
+        else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"]
+    )
     kc = HardenKcadm(prefix, args.realm, dry_run=not args.apply)
     try:
         return run(kc, args)
     except KcadmError as error:
         print(f"\nFAILED: {error}", file=sys.stderr)
-        print("Nothing was deleted. Fix the cause and re-run: the script is idempotent; the "
-              "rollback file (if --apply got that far) holds the values from before.",
-              file=sys.stderr)
+        print(
+            "Nothing was deleted. Fix the cause and re-run: the script is idempotent; the "
+            "rollback file (if --apply got that far) holds the values from before.",
+            file=sys.stderr,
+        )
         return 1
 
 

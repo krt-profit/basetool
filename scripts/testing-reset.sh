@@ -62,7 +62,10 @@ ${RT_CLI} exec -i db-backend sh -c \
 # shellcheck disable=SC2016
 ${RT_CLI} exec -i db-backend sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" createdb -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 "$POSTGRES_DB"' \
-  || { STOPPED=false; fail "createdb failed; the writers stay stopped until the database exists again"; }
+  || {
+    STOPPED=false
+    fail "createdb failed; the writers stay stopped until the database exists again"
+  }
 
 restart_writers
 trap - EXIT

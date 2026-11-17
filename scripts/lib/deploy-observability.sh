@@ -13,7 +13,7 @@ reconcile_monitoring_reload() {
     install -d -m 0755 "${MON_RELOAD_STATE_DIR}" 2>/dev/null || true
     rm -rf "${snap}"
     if cp -R "${src}" "${snap}" 2>/dev/null; then
-      date +%s > "${MON_RELOAD_STATE_DIR}/${svc}.applied" 2>/dev/null || true
+      date +%s >"${MON_RELOAD_STATE_DIR}/${svc}.applied" 2>/dev/null || true
     else
       log "  monitoring: WARN could not snapshot ${subpath} baseline (will re-apply next tick)"
     fi
@@ -55,8 +55,8 @@ reconcile_edge() {
 
   if rt_is_running edge; then
     fp_lines="$(rt_exec edge sh -c \
-                  'find /etc/nginx/certs -name fullchain.pem -type f -exec sha256sum {} +' \
-                  2>/dev/null || true)"
+      'find /etc/nginx/certs -name fullchain.pem -type f -exec sha256sum {} +' \
+      2>/dev/null || true)"
   fi
   if [[ -n "${fp_lines}" ]]; then
     fp_now="$(printf '%s\n' "${fp_lines}" | awk '{print $1}' | sort | sha256sum | cut -d' ' -f1)"
@@ -73,12 +73,12 @@ reconcile_edge() {
     install -d -m 0755 "${EDGE_STATE_DIR}" 2>/dev/null || true
     rm -rf "${snap}"
     if cp -R "${src}" "${snap}" 2>/dev/null; then
-      date +%s > "${EDGE_STATE_DIR}/applied" 2>/dev/null || true
+      date +%s >"${EDGE_STATE_DIR}/applied" 2>/dev/null || true
     else
       log "  edge: WARN could not snapshot the config baseline (will re-apply next tick)"
     fi
     if [[ -n "${fp_now}" ]]; then
-      printf '%s\n' "${fp_now}" > "${fp_file}" 2>/dev/null || true
+      printf '%s\n' "${fp_now}" >"${fp_file}" 2>/dev/null || true
     fi
   else
     log "  edge: WARN recreate failed (non-gating) — will retry next tick"
@@ -110,7 +110,7 @@ write_token_expiry_metric() {
     rm -f "${TOKEN_METRIC_FILE}" 2>/dev/null || true
     return 0
   fi
-  raw="$(tr -d '[:space:]' < "${TOKEN_EXPIRY_FILE}" 2>/dev/null || true)"
+  raw="$(tr -d '[:space:]' <"${TOKEN_EXPIRY_FILE}" 2>/dev/null || true)"
   if [[ -z "${raw}" ]]; then
     rm -f "${TOKEN_METRIC_FILE}" 2>/dev/null || true
     return 0
@@ -130,7 +130,8 @@ write_token_expiry_metric() {
 
 write_deploy_metric() {
   local outcome="$1" now dur f v blocked
-  now="$(date +%s)"; dur=$(( now - START_EPOCH ))
+  now="$(date +%s)"
+  dur=$((now - START_EPOCH))
   f="${DEPLOY_METRIC_FILE}"
   local prev_success=0 prev_rollback=0 prev_failure=0 prev_blocked=0
   if [[ -f "${f}" ]]; then
@@ -143,12 +144,13 @@ write_deploy_metric() {
     [[ "${!v}" =~ ^[0-9]+$ ]] || printf -v "${v}" '%s' 0
   done
   case "${outcome}" in
-    success)  prev_success="${now}" ;;
+    success) prev_success="${now}" ;;
     rollback) prev_rollback="${now}" ;;
-    failure)  prev_failure="${now}" ;;
-    blocked)  prev_blocked="${now}" ;;
+    failure) prev_failure="${now}" ;;
+    blocked) prev_blocked="${now}" ;;
   esac
-  blocked=0; [[ -f "${CONFIG_BLOCKED_FILE}" ]] && blocked=1
+  blocked=0
+  [[ -f "${CONFIG_BLOCKED_FILE}" ]] && blocked=1
   {
     echo "# HELP basetool_deploy_last_success_timestamp Unix time of the last successful deploy."
     echo "# TYPE basetool_deploy_last_success_timestamp gauge"
@@ -184,7 +186,7 @@ write_stack_health_metric() {
   [[ "${prev_healthy}" =~ ^[0-9]+$ ]] || prev_healthy=0
   [[ "${prev_failed}" =~ ^[0-9]+$ ]] || prev_failed=0
   case "${outcome}" in
-    healthy)        prev_healthy="${now}" ;;
+    healthy) prev_healthy="${now}" ;;
     restart_failed) prev_failed="${now}" ;;
   esac
   {

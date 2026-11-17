@@ -3,6 +3,26 @@ root = true
 [*]
 charset = utf-8
 end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
 
 [*.bat]
 end_of_line = crlf
+
+[*.{java,kt,kts,css,js,mjs,ts,py}]
+max_line_length = 100
+
+[*.{css,js,mjs,ts,html,ftl,py,ps1,sql}]
+indent_size = 4
+
+# shfmt reads these keys; the shfmtCheck and shfmtApply tasks pass no printer flags.
+[{**.sh,.githooks/*}]
+switch_case_indent = true
+binary_next_line = true
+
+# Data whose bytes are checked: applied migrations by checksum, the rest by tests.
+[{backend/src/main/resources/db/migration/**,**/src/test/resources/**,**/src/e2e/resources/**,**.golden,CHANGELOG.md,CHANGELOG-ARCHIVE.md}]
+insert_final_newline = unset
+trim_trailing_whitespace = unset

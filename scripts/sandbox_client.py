@@ -41,13 +41,15 @@ from dpop_reference import (  # noqa: E402
 
 PUBLIC_KEYCLOAK = "http://host.docker.internal:18080"
 REALM = "/auth/realms/basetool"
-SCOPES = ("offline_access exchange.connect exchange.blueprints.read exchange.blueprints.write "
-          "exchange.stock.read exchange.stock.write exchange.hangar.read exchange.hangar.write "
-          "exchange.demand.read exchange.orgunits.read exchange.orgstock.read "
-          "exchange.orgstock.details exchange.orgstock.write exchange.demand.details "
-          "exchange.refinery.read exchange.refinery.write exchange.refinery.store "
-          "exchange.bank.read exchange.bank.request exchange.bank.queue "
-          "exchange.patch.read exchange.patch.write")
+SCOPES = (
+    "offline_access exchange.connect exchange.blueprints.read exchange.blueprints.write "
+    "exchange.stock.read exchange.stock.write exchange.hangar.read exchange.hangar.write "
+    "exchange.demand.read exchange.orgunits.read exchange.orgstock.read "
+    "exchange.orgstock.details exchange.orgstock.write exchange.demand.details "
+    "exchange.refinery.read exchange.refinery.write exchange.refinery.store "
+    "exchange.bank.read exchange.bank.request exchange.bank.queue "
+    "exchange.patch.read exchange.patch.write"
+)
 DEFAULT_CA = ROOT / "docker" / "test-tls" / "basetool-test-ca.crt"
 USER_AGENT = "BasetoolSandboxClient/1.0.0 (+https://krt-profit.github.io/basetool/)"
 
@@ -86,11 +88,18 @@ class Answer:
 class SandboxSession:
     """One installation of a sandbox client, signed in as one member."""
 
-    def __init__(self, key: DpopKey, *, gateway: str = "https://127.0.0.1:11262",
-                 keycloak: str = "http://127.0.0.1:18080", ca: pathlib.Path = DEFAULT_CA,
-                 client: str = "sandbox-client",
-                 step: Callable[[str, bool, str], None] = raising_step,
-                 user_agent: str = USER_AGENT, timeout: float = 120.0) -> None:
+    def __init__(
+        self,
+        key: DpopKey,
+        *,
+        gateway: str = "https://127.0.0.1:11262",
+        keycloak: str = "http://127.0.0.1:18080",
+        ca: pathlib.Path = DEFAULT_CA,
+        client: str = "sandbox-client",
+        step: Callable[[str, bool, str], None] = raising_step,
+        user_agent: str = USER_AGENT,
+        timeout: float = 120.0,
+    ) -> None:
         """Keeps the settings and the installation key.
 
         Args:
@@ -127,7 +136,8 @@ class SandboxSession:
                 return super().redirect_request(req, fp, code, msg, headers, session.local(newurl))
 
         self.browser = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(self.jar), Rewrite())
+            urllib.request.HTTPCookieProcessor(self.jar), Rewrite()
+        )
         self.tls = ssl.create_default_context(cafile=str(ca))
         self.nonces = NonceCache()
         self.token: dict | None = None
@@ -152,10 +162,13 @@ class SandboxSession:
         body = urllib.parse.urlencode(data).encode() if data is not None else None
         self.unsecure_cookies()
         request = urllib.request.Request(
-            self.local(url), data=body, headers={"Accept": "text/html,application/xhtml+xml"})
+            self.local(url), data=body, headers={"Accept": "text/html,application/xhtml+xml"}
+        )
         deadline = time.monotonic() + self.timeout
         with self.browser.open(request, timeout=connection_timeout(self.timeout)) as answer:
-            return answer.geturl(), read_before_deadline(answer, deadline).decode("utf-8", "replace")
+            return answer.geturl(), read_before_deadline(answer, deadline).decode(
+                "utf-8", "replace"
+            )
 
     @staticmethod
     def form(text: str) -> tuple[str | None, dict]:
@@ -177,17 +190,22 @@ class SandboxSession:
         if dpop:
             headers["DPoP"] = dpop
         request = urllib.request.Request(
-            self.local(url), data=urllib.parse.urlencode(data).encode(), headers=headers)
+            self.local(url), data=urllib.parse.urlencode(data).encode(), headers=headers
+        )
         deadline = time.monotonic() + self.timeout
         try:
-            with urllib.request.urlopen(request, timeout=connection_timeout(self.timeout)) as answer:
+            with urllib.request.urlopen(
+                request, timeout=connection_timeout(self.timeout)
+            ) as answer:
                 return answer.status, json.loads(read_before_deadline(answer, deadline))
         except urllib.error.HTTPError as error:
             with error:
                 return error.code, json.loads(read_before_deadline(error, deadline))
         except TimeoutError as error:
-            raise TimeoutError("Sandbox form request timed out; inspect authorization state before "
-                               "retrying because the server may have completed it.") from error
+            raise TimeoutError(
+                "Sandbox form request timed out; inspect authorization state before "
+                "retrying because the server may have completed it."
+            ) from error
 
     def login(self, user: str, password: str, scopes: str = SCOPES) -> None:
         """Runs the device grant: authorise, sign in and consent, then poll for the token.
@@ -202,11 +220,15 @@ class SandboxSession:
         """
         base = PUBLIC_KEYCLOAK + REALM + "/protocol/openid-connect"
         status, device = self.post_form(
-            base + "/auth/device", {"client_id": self.client, "scope": scopes})
+            base + "/auth/device", {"client_id": self.client, "scope": scopes}
+        )
         self.step("device authorization answers", status == 200, str(status))
         url, text = self.page(device["verification_uri"])
-        self.step("the code-entry page warns about device-code phishing",
-                  'id="krt-device-phishing-warning"' in text, url)
+        self.step(
+            "the code-entry page warns about device-code phishing",
+            'id="krt-device-phishing-warning"' in text,
+            url,
+        )
         consent_seen = False
         for _ in range(6):
             action, fields = self.form(text)
@@ -215,12 +237,17 @@ class SandboxSession:
             elif "password" in text and "username" in fields:
                 fields.update({"username": user, "password": password})
             elif 'name="accept"' in text:
-                self.step("the consent page warns about device-code phishing",
-                          'id="krt-device-consent-warning"' in text, url)
+                self.step(
+                    "the consent page warns about device-code phishing",
+                    'id="krt-device-consent-warning"' in text,
+                    url,
+                )
                 shown = re.search(r'id="krt-device-user-code"[^>]*>([^<]*)<', text)
-                self.step("the consent page shows the device login's user code",
-                          shown is not None and shown.group(1).strip() == device["user_code"],
-                          shown.group(1) if shown else "no code on the page")
+                self.step(
+                    "the consent page shows the device login's user code",
+                    shown is not None and shown.group(1).strip() == device["user_code"],
+                    shown.group(1) if shown else "no code on the page",
+                )
                 consent_seen = True
                 fields["accept"] = "yes"
             else:
@@ -233,9 +260,13 @@ class SandboxSession:
         for _ in range(10):
             status, answer = self.post_form(
                 base + "/token",
-                {"grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-                 "device_code": device["device_code"], "client_id": self.client},
-                build_proof(self.key, "POST", token_url))
+                {
+                    "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                    "device_code": device["device_code"],
+                    "client_id": self.client,
+                },
+                build_proof(self.key, "POST", token_url),
+            )
             if status == 200:
                 self.token = answer
                 break
@@ -243,15 +274,17 @@ class SandboxSession:
         self.step("the token endpoint issues a token", self.token is not None, str(status))
         claims = self.claims()
         self.subject = claims.get("sub")
-        self.step("the token is DPoP-bound to the installation key",
-                  claims.get("cnf", {}).get("jkt") == self.key.thumbprint(), "")
+        self.step(
+            "the token is DPoP-bound to the installation key",
+            claims.get("cnf", {}).get("jkt") == self.key.thumbprint(),
+            "",
+        )
         audience = claims["aud"] if isinstance(claims["aud"], list) else [claims["aud"]]
         self.step("the token names the gateway audience", "basetool-ingest" in audience, "")
 
     def claims(self) -> dict:
         """Decodes the current access token's claims without checking its signature."""
-        return json.loads(base64.urlsafe_b64decode(
-            self.token["access_token"].split(".")[1] + "=="))
+        return json.loads(base64.urlsafe_b64decode(self.token["access_token"].split(".")[1] + "=="))
 
     def refresh(self, margin: float = 30.0) -> None:
         """Renews the access token with the refresh token once it expires within `margin` seconds.
@@ -264,15 +297,25 @@ class SandboxSession:
         token_url = PUBLIC_KEYCLOAK + REALM + "/protocol/openid-connect/token"
         status, answer = self.post_form(
             token_url,
-            {"grant_type": "refresh_token", "refresh_token": self.token["refresh_token"],
-             "client_id": self.client},
-            build_proof(self.key, "POST", self.local(token_url)))
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": self.token["refresh_token"],
+                "client_id": self.client,
+            },
+            build_proof(self.key, "POST", self.local(token_url)),
+        )
         if status != 200:
             raise RuntimeError(f"token refresh refused: {status} {answer.get('error', '')}")
         self.token = answer
 
-    def request(self, method: str, path: str, body: dict | None = None, write: bool = False,
-                idempotency_key: str | None = None) -> Answer:
+    def request(
+        self,
+        method: str,
+        path: str,
+        body: dict | None = None,
+        write: bool = False,
+        idempotency_key: str | None = None,
+    ) -> Answer:
         """Calls the gateway with a fresh DPoP proof, retrying once on a nonce challenge.
 
         An access token about to expire is renewed first, and a connection the gateway closed
@@ -299,8 +342,9 @@ class SandboxSession:
         while True:
             headers = {
                 "Authorization": authorization_header(access),
-                "DPoP": build_proof(self.key, method, url, access_token=access,
-                                    nonce=self.nonces.get(url)),
+                "DPoP": build_proof(
+                    self.key, method, url, access_token=access, nonce=self.nonces.get(url)
+                ),
                 "Accept": "application/json",
                 "User-Agent": self.user_agent,
             }
@@ -310,8 +354,12 @@ class SandboxSession:
                 headers["Idempotency-Key"] = idempotency_key
             try:
                 status, answer_headers, raw = self._send(method, path, headers, data)
-            except (http.client.RemoteDisconnected, http.client.CannotSendRequest,
-                    ConnectionResetError, BrokenPipeError):
+            except (
+                http.client.RemoteDisconnected,
+                http.client.CannotSendRequest,
+                ConnectionResetError,
+                BrokenPipeError,
+            ):
                 self.close()
                 if reconnected:
                     raise
@@ -325,22 +373,30 @@ class SandboxSession:
                 parsed = json.loads(raw) if raw else {}
             except ValueError:
                 parsed = {}
-            return Answer(status, parsed if isinstance(parsed, dict) else {"items": parsed},
-                          answer_headers, len(raw), retries)
+            return Answer(
+                status,
+                parsed if isinstance(parsed, dict) else {"items": parsed},
+                answer_headers,
+                len(raw),
+                retries,
+            )
 
-    def call(self, method: str, path: str, body: dict | None = None,
-             write: bool = False) -> tuple[int, dict]:
+    def call(
+        self, method: str, path: str, body: dict | None = None, write: bool = False
+    ) -> tuple[int, dict]:
         """Calls the gateway and returns only the status and the decoded body."""
         answer = self.request(method, path, body, write)
         return answer.status, answer.body
 
-    def _send(self, method: str, path: str, headers: dict[str, str],
-              data: bytes | None) -> tuple[int, dict[str, str], bytes]:
+    def _send(
+        self, method: str, path: str, headers: dict[str, str], data: bytes | None
+    ) -> tuple[int, dict[str, str], bytes]:
         """Sends one request over the kept-alive connection and reads the whole answer."""
         if self.connection is None:
             parts = urllib.parse.urlsplit(self.gateway)
             self.connection = http.client.HTTPSConnection(
-                parts.hostname, parts.port or 443, context=self.tls, timeout=self.timeout)
+                parts.hostname, parts.port or 443, context=self.tls, timeout=self.timeout
+            )
         self.connection.request(method, path, body=data, headers=headers)
         response = self.connection.getresponse()
         raw = response.read()

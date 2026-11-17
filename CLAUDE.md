@@ -9,7 +9,8 @@ What only Claude Code has:
 
 - **SessionStart hook.** `.claude/settings.json` runs `.claude/hooks/ensure-design-system.ps1`
   (Windows) or `.sh` (elsewhere), which populates the design-system submodule and fast-forwards it
-  (ADR-0259). When the hook did not run and `.claude/skills/das-kartell-design/` is empty, run
+  (ADR-0259), and sets `core.hooksPath` to `.githooks`, which turns on the format gate of every
+  push (ADR-0390). When the hook did not run and `.claude/skills/das-kartell-design/` is empty, run
   `git submodule update --init .claude/skills/das-kartell-design` before any UI work.
 - **Skills.** The skills in `.claude/skills/` (`lint-gate`, `local-stack`, `ui-preview`,
   `release-notes`, `bank-update`, `das-kartell-design`) are invoked through the Skill tool. A new

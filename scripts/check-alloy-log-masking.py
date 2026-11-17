@@ -177,7 +177,7 @@ def main() -> int:
         groups = capturing_groups(unescape(expression))
         if groups > 1:
             problems.append(
-                "%s: expression = \"%s\" has %d capturing groups -- stage.replace overwrites EVERY one "
+                '%s: expression = "%s" has %d capturing groups -- stage.replace overwrites EVERY one '
                 "of them, so the field name in group 1 is destroyed along with the value. Wrap only "
                 "the value; use (?:...) for the rest." % (where, unescape(expression), groups)
             )

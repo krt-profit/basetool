@@ -65,14 +65,14 @@ expect_only_failure() {
 echo "check-monitoring-configs self-tests"
 
 root="$(fixture)"
-printf '\nno_such_top_level_key: true\n' >> "${root}/monitoring/prometheus/prometheus.yml"
+printf '\nno_such_top_level_key: true\n' >>"${root}/monitoring/prometheus/prometheus.yml"
 run_checker "$root"
 expect_only_failure "prometheus: promtool check config" "an unknown key in prometheus.yml fails promtool"
 rm -rf "$root"
 
 root="$(fixture)"
 printf 'groups:\n  - name: broken\n    rules:\n      - alert: Broken\n        expr: up ==\n' \
-  > "${root}/monitoring/prometheus/alerts/zz-broken.yml"
+  >"${root}/monitoring/prometheus/alerts/zz-broken.yml"
 run_checker "$root"
 expect_only_failure "prometheus: promtool check config" "a broken rule file under alerts/ fails check config"
 rm -rf "$root"
@@ -111,7 +111,7 @@ expect_only_failure "alloy: validate (empty output)" "an unknown Alloy component
 rm -rf "$root"
 
 root="$(fixture)"
-printf '\nno_such_top_level_key: true\n' >> "${root}/monitoring/loki/loki-config.yml"
+printf '\nno_such_top_level_key: true\n' >>"${root}/monitoring/loki/loki-config.yml"
 run_checker "$root"
 expect_only_failure "loki: -verify-config" "an unknown key in loki-config.yml fails -verify-config"
 rm -rf "$root"

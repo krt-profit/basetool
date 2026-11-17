@@ -6,7 +6,7 @@ restic_log_lines() {
   local prefix="$1" text="$2" line
   while IFS= read -r line; do
     [[ -n "${line}" ]] && log "${prefix}${line}"
-  done <<< "${text}"
+  done <<<"${text}"
   return 0
 }
 

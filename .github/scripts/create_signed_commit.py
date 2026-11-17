@@ -121,13 +121,19 @@ def create_commit(payload: dict, token: str, timeout: float = 60.0) -> str:
         with urllib.request.urlopen(request, timeout=connection_timeout(timeout)) as response:
             result = json.loads(read_before_deadline(response, deadline))
     except TimeoutError as error:
-        raise SystemExit("GraphQL commit request timed out; inspect the branch head before retrying, "
-                         "because the server may have created the commit.") from error
+        raise SystemExit(
+            "GraphQL commit request timed out; inspect the branch head before retrying, "
+            "because the server may have created the commit."
+        ) from error
     except urllib.error.HTTPError as error:
-        raise SystemExit(f"GraphQL HTTP {error.code}; inspect the branch head before retrying.") from error
+        raise SystemExit(
+            f"GraphQL HTTP {error.code}; inspect the branch head before retrying."
+        ) from error
     except urllib.error.URLError as error:
-        raise SystemExit("GraphQL transport failed; inspect the branch head before retrying, "
-                         "because the server may have created the commit.") from error
+        raise SystemExit(
+            "GraphQL transport failed; inspect the branch head before retrying, "
+            "because the server may have created the commit."
+        ) from error
 
     if result.get("errors"):
         raise SystemExit("GraphQL errors: " + json.dumps(result["errors"]))
@@ -146,8 +152,15 @@ def selftest() -> int:
         changelog = os.path.join(directory, "CHANGELOG.md")
         with open(changelog, "wb") as handle:
             handle.write(b"# Changelog\n")
-        payload = build_payload("krt-profit/basetool", "release/v1.0.0", "abc", "chore: x", [],
-                                [changelog], ["changelog.d/suche.md", "changelog.d/hangar.md"])
+        payload = build_payload(
+            "krt-profit/basetool",
+            "release/v1.0.0",
+            "abc",
+            "chore: x",
+            [],
+            [changelog],
+            ["changelog.d/suche.md", "changelog.d/hangar.md"],
+        )
     changes = payload["variables"]["input"]["fileChanges"]
     expected = {
         "additions": [{"path": changelog, "contents": "IyBDaGFuZ2Vsb2cK"}],
@@ -169,25 +182,41 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--repo", required=True, help="owner/name of the repo.")
-    parser.add_argument("--branch", required=True,
-                        help="Existing branch to commit onto.")
-    parser.add_argument("--expected-head-oid", required=True,
-                        help="Current branch tip SHA (optimistic-lock guard).")
+    parser.add_argument("--branch", required=True, help="Existing branch to commit onto.")
+    parser.add_argument(
+        "--expected-head-oid", required=True, help="Current branch tip SHA (optimistic-lock guard)."
+    )
     parser.add_argument("--message", required=True, help="Commit headline.")
-    parser.add_argument("--trailer", action="append", default=[],
-                        help="Commit-body line, repeatable (e.g. Signed-off-by).")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Print the payload (contents elided) without POSTing.")
-    parser.add_argument("--delete", action="append", default=[],
-                        help="Repository path the commit deletes, repeatable.")
+    parser.add_argument(
+        "--trailer",
+        action="append",
+        default=[],
+        help="Commit-body line, repeatable (e.g. Signed-off-by).",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the payload (contents elided) without POSTing.",
+    )
+    parser.add_argument(
+        "--delete",
+        action="append",
+        default=[],
+        help="Repository path the commit deletes, repeatable.",
+    )
     parser.add_argument("files", nargs="*", help="Working-tree paths to commit.")
     args = parser.parse_args()
     if not args.files and not args.delete:
         parser.error("nothing to commit: pass at least one FILE or --delete")
 
     payload = build_payload(
-        args.repo, args.branch, args.expected_head_oid,
-        args.message, args.trailer, args.files, args.delete,
+        args.repo,
+        args.branch,
+        args.expected_head_oid,
+        args.message,
+        args.trailer,
+        args.files,
+        args.delete,
     )
 
     if args.dry_run:

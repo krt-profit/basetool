@@ -62,7 +62,8 @@ assert_run() {
   echo "ok: ${name}"
 }
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "mask" {
 	stage.replace {
 		expression = "username=(\"[^\"]*\"|\\S+)"
@@ -74,7 +75,8 @@ ALLOY
 run_checker "$FIX"
 assert_run "a well-formed mask passes" 0 "Alloy log masking OK"
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "mask" {
 	stage.replace {
 		expression = "username=(\\S+)"
@@ -86,7 +88,8 @@ ALLOY
 run_checker "$FIX"
 assert_run "a \${1} back-reference is caught" 1 "expands no back-references"
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "mask" {
 	stage.replace {
 		expression = "(username=)(\\S+)"
@@ -98,7 +101,8 @@ ALLOY
 run_checker "$FIX"
 assert_run "a second capture group is caught on its own" 1 "has 2 capturing groups"
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "mask" {
 	stage.replace {
 		expression = "(ipAddress=)(\\S+)"
@@ -110,7 +114,8 @@ ALLOY
 run_checker "$FIX"
 assert_run "the pattern that shipped to production is caught" 1 "2 problem(s)"
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "mask" {
 	stage.replace {
 		expression = "(?i)(?:bearer\\s+|token\\s*[:=]?\\s*)([a-zA-Z0-9\\-_.+/=]+)"
@@ -122,7 +127,8 @@ ALLOY
 run_checker "$FIX"
 assert_run "(?:...) and the (?i) flag are not counted as groups" 0 "Alloy log masking OK"
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "mask" {
 	stage.replace {
 		expression = "pid \\(([0-9]+)[)]"
@@ -134,7 +140,8 @@ ALLOY
 run_checker "$FIX"
 assert_run "an escaped or bracketed parenthesis is not a group" 0 "Alloy log masking OK"
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "mask" {
 	stage.replace {
 		expression = "(?P<field>username=)(?P<value>\\S+)"
@@ -146,7 +153,8 @@ ALLOY
 run_checker "$FIX"
 assert_run "a named capture group is counted" 1 "has 2 capturing groups"
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "container_mask" {
 	stage.match {
 		selector = "{app=\"mon-grafana\"}"
@@ -162,7 +170,8 @@ ALLOY
 run_checker "$FIX"
 assert_run "a stage nested inside stage.match is checked" 1 "uname="
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "mask" {
 	stage.replace {
 		expression = "(eyJ[a-zA-Z0-9_-]{5,}\\.eyJ[a-zA-Z0-9_-]{5,})"
@@ -179,7 +188,8 @@ ALLOY
 run_checker "$FIX"
 assert_run "a regex quantifier brace does not hide the next stage" 1 "uname="
 
-FIX="$(fixture <<'ALLOY'
+FIX="$(
+  fixture <<'ALLOY'
 loki.process "mask" {
 	forward_to = [loki.write.default.receiver]
 }
