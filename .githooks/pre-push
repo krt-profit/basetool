@@ -1,0 +1,18 @@
+#!/bin/sh
+# Refuses a push that carries commits while ./gradlew spotlessCheck fails on the working tree.
+set -eu
+
+pushes_commits=false
+while read -r _ local_sha _; do
+  case $local_sha in
+    *[!0]*) pushes_commits=true ;;
+  esac
+done
+if [ "$pushes_commits" = false ]; then
+  exit 0
+fi
+
+if ! ./gradlew spotlessCheck --quiet; then
+  echo "pre-push: a formatter would change files. Run ./gradlew spotlessApply, commit, push again." >&2
+  exit 1
+fi

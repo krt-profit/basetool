@@ -36,7 +36,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          mapfile -t files < <(git ls-files '*.sh')
+          mapfile -t files < <(git ls-files '*.sh' '.githooks/*')
           if [ ${#files[@]} -eq 0 ]; then
             echo "No shell scripts tracked; nothing to lint."
             exit 0
