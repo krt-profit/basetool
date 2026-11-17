@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-17.
 > **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md), [ADR-0295](../adr/0295-a-hangar-import-matches-ships-by-pledge-and-keeps-pledge-data-private.md), [ADR-0386](../adr/0386-the-coarse-ship-origin-is-exchanged.md)
 
 # Personal hangar overview — pagination & server-side sort/filter
@@ -404,10 +404,11 @@ format is detected from the payload, like the other formats (REQ-HANGAR-014 keep
   owner's own hangar endpoints (`/my-ships`, the owner's add / edit / unit change) and on the
   admin member hangar; the mission views and every other `ShipDto` carry `pledge = null`. The
   production status is shown wherever the ship is.
-- **Result.** The result dialog shows „Importiert", „Aktualisiert", „Bereits im Hangar" and
-  „Nicht erkannt"; the list refreshes in place when ships were created or updated. The audit event
-  `HANGAR_IMPORTED` (REQ-HANGAR-004) is recorded when ships were created or updated, with the
-  counts `created`, `updated`, `alreadyPresent` and `unmatched`, never pledge values.
+- **Result.** The result dialog shows „Importiert", „Aktualisiert", „Nicht erkannt", „Nicht
+  eindeutig" (REQ-HANGAR-019) and „Bereits im Hangar"; the list refreshes in place when ships were
+  created or updated. The audit event `HANGAR_IMPORTED` (REQ-HANGAR-004) is recorded when ships
+  were created or updated, with the counts `created`, `updated`, `alreadyPresent`, `unmatched` and
+  `ambiguous`, never pledge values.
 
 **Acceptance**
 
@@ -568,6 +569,63 @@ with the selection bar of REQ-HANGAR-010 / -012.
 `MemberHangarShipProxyController#bulkChangeShipOrigin`, `hangar/hangar.js`,
 `hangar/member-hangar.js`, `hangar/ship-origin.js` · **Issues:** #3329 (epic #3328), decision
 #3250
+
+### REQ-HANGAR-019 — The import matches names without the manufacturer word and lets the member choose
+
+„Schiffsliste importieren" MUST resolve the bare model names the exports carry against catalogue
+names that open with the manufacturer, and MUST offer every name that may mean several ships for
+the member to choose in the result dialog instead of skipping it.
+
+- **Manufacturer word.** The P4K import names a ship type by its in-game name, which opens with the
+  manufacturer („Esperia Talon", „RSI Zeus Mk II ES", „C.O. Nomad"; REQ-P4K-032). The import's name
+  stages also run on each catalogue name without its first word when that word names a
+  manufacturer of the catalogue: the first word of the manufacturer's name, the initials of a name
+  of two or more words („and", „of", „the" skipped), its nickname or its abbreviation. The words
+  come from every manufacturer of the catalogue, so a ship type linked to the wrong manufacturer or
+  to none still loses its word. The order is exact full name, exact short name, normalised full
+  name, normalised short name, then the token subsets of the short name; the slug follows as
+  before. „Talon" resolves to „Esperia Talon" instead of tying with „Esperia Talon Shrike". The key
+  steps and the exchange's name step are unchanged.
+- **One ship, several rows.** Catalogue rows whose names agree without the manufacturer word
+  („Constellation Mk IV Andromeda" and „RSI Constellation Mk IV Andromeda") are one ship. Its
+  entries go to the row the member's hangar already holds, else to the row whose name carries the
+  manufacturer word, so a re-import never splits one ship across two rows.
+- **Ambiguous names.** A name that still means several ships is never guessed. The result dialog
+  counts it under „Nicht eindeutig" and lists it under „Nicht eindeutige Schiffe" with its number of
+  entries and a selection of its ships, preset to „Nicht importieren". „Auswahl importieren" sends
+  the same file again with the choices (multipart part `choices`, JSON `{choices: [{name,
+  shipTypeId}]}`, at most 1000); the run imports every entry of a chosen name as that ship and
+  reports the names left open again. A choice applies only when it names one of the name's current
+  options. The import matches before it creates (REQ-HANGAR-015), so the repeated run finds the
+  ships the first run created and creates only the chosen ones.
+- **Unknown names** that find no ship stay under „Nicht erkannt".
+- **Audit and live update.** `HANGAR_IMPORTED` (REQ-HANGAR-004) adds the count `ambiguous`, never a
+  name. The list refreshes in place when the dialog closes after a run that created or updated
+  ships (REQ-FE-001).
+
+**Acceptance**
+
+- [x] Catalogue names with the manufacturer word resolve the bare names of an upload, also for a
+  ship type with a wrong or missing manufacturer link. *`ShipTypeMatcherTest`,
+  `HangarImportServiceTest`.*
+- [x] Two rows of one ship resolve as one ship; the entries go to the row the hangar holds, else to
+  the row with the manufacturer word. *`ShipTypeMatcherTest`, `HangarImportServiceTest`.*
+- [x] An ambiguous name is reported with its options and entry count; a choice imports every entry
+  of the name as the chosen ship; a choice outside the options leaves the name ambiguous; an
+  invalid `choices` part is a `400`. *`HangarImportServiceTest`, `HangarImportIntegrationTest`.*
+- [x] The proxy relays the choices as a JSON part, and the dialog renders the section and the apply
+  button. *`HangarImportProxyControllerTest`, `HangarBackendClientTest`,
+  `HangarPagePatternRenderTest`.*
+- [x] In the browser, the member chooses an ambiguous name's ship, the choice imports in place, and
+  the list shows the ships after the dialog closes without a reload. *`HangarImportChoiceE2eTest`
+  (UC-48).*
+
+**Enforced by:** `ShipTypeMatcherTest`, `HangarImportServiceTest`, `HangarImportIntegrationTest`,
+`HangarControllerTest`, `HangarImportProxyControllerTest`, `HangarBackendClientTest`,
+`HangarPagePatternRenderTest`, `HangarImportChoiceE2eTest` · **Code:** `ShipTypeMatcher#resolveImport`, `ImportShipMatch`,
+`ImportEntryResolver`, `HangarImportService#importShips`, `HangarController#importShips`,
+`HangarImportProxyController`, `HangarBackendClient#importShips`, `hangar/hangar-import.js`,
+`templates/hangar/hangar.html`
 
 ## Out of scope
 

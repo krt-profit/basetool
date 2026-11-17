@@ -52,4 +52,22 @@
         margin: 0.2rem 0;
         color: var(--color-gray-2-text);
     }
+    #import-result-modal .import-choice-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+        max-height: 320px;
+        overflow-y: auto;
+    }
+    #import-result-modal .import-choice {
+        margin: 0;
+    }
+    #import-result-modal .import-choice select {
+        width: 100%;
+    }
+    #import-result-modal .import-choice__count {
+        color: var(--color-gray-2-text);
+        font-weight: 400;
+    }
 }

@@ -75,6 +75,7 @@
       "exchange/connected-apps.js"
     ],
     "hangar": [
+      "hangar/hangar-import.js",
       "hangar/hangar-squadron.js",
       "hangar/hangar.js",
       "hangar/member-hangar.js",
