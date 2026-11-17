@@ -269,6 +269,29 @@ public interface GameItemRepository
   List<GameItem> findAllByFoldedNames(@Param("names") Collection<String> names);
 
   /**
+   * Reads the rows carrying one of the names as their name or their UEX name, compared ignoring
+   * case and surrounding whitespace, for the UEX twin rule (REQ-DATA-044).
+   *
+   * @param names non-empty set of trimmed, lower-cased names
+   * @return the rows carrying any of them
+   */
+  @Query(
+      "SELECT item FROM GameItem item WHERE LOWER(TRIM(item.name)) IN :names"
+          + " OR LOWER(TRIM(item.uexName)) IN :names")
+  List<GameItem> findAllByFoldedNameOrUexName(@Param("names") Collection<String> names);
+
+  /**
+   * Reads the rows holding one of the game UUIDs as their P4K GUID or their external UUID, for the
+   * UEX twin rule (REQ-DATA-044).
+   *
+   * @param uuids non-empty set of game UUIDs
+   * @return the rows holding any of them
+   */
+  @Query(
+      "SELECT item FROM GameItem item WHERE item.p4kUuid IN :uuids OR item.externalUuid IN :uuids")
+  List<GameItem> findAllHoldingGameUuids(@Param("uuids") Collection<UUID> uuids);
+
+  /**
    * Finds the GameItem row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
    * (REQ-P4K-007).
    *

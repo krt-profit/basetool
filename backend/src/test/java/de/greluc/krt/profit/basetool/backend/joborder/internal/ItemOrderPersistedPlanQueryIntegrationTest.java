@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -39,13 +40,11 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemPlan;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
-import jakarta.persistence.EntityManagerFactory;
+import de.greluc.krt.profit.basetool.backend.support.StatementCounter.Measured;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,7 +58,6 @@ class ItemOrderPersistedPlanQueryIntegrationTest extends MaterialContributionTes
   @Autowired private BlueprintRepository blueprints;
   @Autowired private GameItemRepository gameItems;
   @Autowired private JobOrderItemService itemService;
-  @Autowired private EntityManagerFactory entityManagerFactory;
 
   /**
    * Real persisted lines, their ordered requested edits and their distinct exact material scopes.
@@ -67,51 +65,40 @@ class ItemOrderPersistedPlanQueryIntegrationTest extends MaterialContributionTes
   private record OrderFixture(
       UUID orderId, List<CreateJobOrderItemLineDto> inputs, Set<UUID> materialIds) {}
 
-  /** The published immutable result and the actual SQL statements needed to prepare it. */
-  private record Measurement(JobOrderItemPlan plan, long statements) {}
-
   @Test
   void preparingThreeOrThirtyDistinctKeptLinesHasTheSameReadCountAndNoMutation() throws Exception {
     OrderFixture few = itemOrder(3);
     OrderFixture many = itemOrder(30);
-    Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    boolean enabled = statistics.isStatisticsEnabled();
-    statistics.setStatisticsEnabled(true);
-    try {
-      Measurement small = prepare(few, statistics);
-      Measurement large = prepare(many, statistics);
-      assertThat(small.plan().materialIds()).containsExactlyInAnyOrderElementsOf(few.materialIds());
-      assertThat(large.plan().materialIds())
-          .containsExactlyInAnyOrderElementsOf(many.materialIds());
-      assertThat(small.plan().lines())
-          .extracting(JobOrderItemPlan.Line::payload)
-          .containsExactlyElementsOf(few.inputs());
-      assertThat(large.plan().lines())
-          .extracting(JobOrderItemPlan.Line::payload)
-          .containsExactlyElementsOf(many.inputs());
-      assertThat(large.plan().lines())
-          .allSatisfy(line -> {
-            assertThat(line.materials()).hasSize(1);
-            assertThat(line.materials().getFirst().requiredQuantity()).isEqualTo(2.0);
-          });
-      assertThat(large.statements())
-          .as("SQL preparation reads for thirty versus three distinct persisted ITEM lines")
-          .isEqualTo(small.statements());
-      assertUnchanged(few, 3);
-      assertUnchanged(many, 30);
-    } finally {
-      statistics.setStatisticsEnabled(enabled);
-    }
+    Measured<JobOrderItemPlan> small = prepare(few);
+    Measured<JobOrderItemPlan> large = prepare(many);
+    assertThat(small.result().materialIds()).containsExactlyInAnyOrderElementsOf(few.materialIds());
+    assertThat(large.result().materialIds())
+        .containsExactlyInAnyOrderElementsOf(many.materialIds());
+    assertThat(small.result().lines())
+        .extracting(JobOrderItemPlan.Line::payload)
+        .containsExactlyElementsOf(few.inputs());
+    assertThat(large.result().lines())
+        .extracting(JobOrderItemPlan.Line::payload)
+        .containsExactlyElementsOf(many.inputs());
+    assertThat(large.result().lines())
+        .allSatisfy(line -> {
+          assertThat(line.materials()).hasSize(1);
+          assertThat(line.materials().getFirst().requiredQuantity()).isEqualTo(2.0);
+        });
+    assertThat(large.statements())
+        .as("SQL preparation reads for thirty versus three distinct persisted ITEM lines")
+        .isPositive()
+        .isEqualTo(small.statements());
+    assertUnchanged(few, 3);
+    assertUnchanged(many, 30);
   }
 
-  private Measurement prepare(OrderFixture fixture, Statistics statistics) {
-    statistics.clear();
-    JobOrderItemPlan plan =
+  private Measured<JobOrderItemPlan> prepare(OrderFixture fixture) throws Exception {
+    return measured(() ->
         transactionTemplate.execute(_ -> {
           var order = jobOrderRepository.findById(fixture.orderId()).orElseThrow();
           return itemService.prepareItemLines(fixture.inputs(), order.getItems());
-        });
-    return new Measurement(plan, statistics.getPrepareStatementCount());
+        }));
   }
 
   private void assertUnchanged(OrderFixture fixture, int count) throws Exception {

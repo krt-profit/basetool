@@ -44,6 +44,8 @@ import org.springframework.util.StringUtils;
  * <p>The lowest company id of a brand owns the row's identity; the others register as {@link
  * ManufacturerUexCompany} aliases and only add their manufacturer-surface flags. Each company is
  * upserted in its own transaction (REQ-DATA-004); an empty response leaves local data untouched.
+ * After a complete census, the rows only UEX created beside the P4K row of their brand are merged
+ * into it (REQ-DATA-045).
  */
 @Slf4j
 @Service
@@ -64,6 +66,7 @@ public class UexManufacturerService {
   private final ManufacturerUexCompanyRepository aliasRepository;
   private final SyncRunProgress progress;
   private final SyncReportService syncReportService;
+  private final ManufacturerUexTwinService twins;
 
   /**
    * Self-reference, resolved lazily so each per-company upsert runs through the Spring transaction
@@ -89,7 +92,8 @@ public class UexManufacturerService {
 
   /**
    * Pulls the company catalogue and upserts every company in ascending id order, each in its own
-   * transaction, so a brand's canonical company is persisted before its aliases.
+   * transaction, so a brand's canonical company is persisted before its aliases; when the fetch was
+   * complete and every company carried its identity, merges the UEX twins (REQ-DATA-045).
    */
   public void syncManufacturers() {
     log.info("Starting synchronization of UEX manufacturers...");
@@ -106,6 +110,7 @@ public class UexManufacturerService {
             .toList();
 
     Instant now = Instant.now();
+    boolean censusComplete = fetched.complete();
     int added = 0;
     int updated = 0;
     int aliased = 0;
@@ -119,6 +124,7 @@ public class UexManufacturerService {
         skipped++;
         progress.skipped(1);
         progress.invalidateCensus();
+        censusComplete = false;
         continue;
       }
       try {
@@ -148,6 +154,11 @@ public class UexManufacturerService {
         updated,
         aliased,
         skipped);
+    if (censusComplete) {
+      twins.mergeTwins();
+    } else {
+      log.warn("Skipping the UEX manufacturer twin merge: the company census is incomplete.");
+    }
   }
 
   /**
@@ -155,9 +166,9 @@ public class UexManufacturerService {
    * brand onto one manufacturer row (ADR-0023, REQ-DATA-004). Must be invoked through the {@link
    * #self} proxy.
    *
-   * <p>Matches by alias id, then name, then oldest abbreviation. The company owns the row's
-   * identity when the row is new, unclaimed or already stamped with its id; otherwise it registers
-   * as an alias and refreshes only the surface flags.
+   * <p>Matches by alias id, then name, then oldest abbreviation, then the P4K row the name names
+   * (REQ-DATA-045). The company owns the row's identity when the row is new, unclaimed or already
+   * stamped with its id; otherwise it registers as an alias and refreshes only the surface flags.
    *
    * @param dto inbound UEX row
    * @param now timestamp to stamp on the row
@@ -203,7 +214,8 @@ public class UexManufacturerService {
   }
 
   /**
-   * Runs the alias-by-id → name → abbreviation match chain.
+   * Runs the alias-by-id → name → abbreviation → named P4K row match chain; the last step keeps the
+   * company from creating a twin of the P4K row its name names (REQ-DATA-045).
    *
    * @param dto inbound UEX row
    * @param abbreviation derived short code (nickname, falling back to name)
@@ -221,16 +233,20 @@ public class UexManufacturerService {
     if (byName.isPresent()) {
       return byName.get();
     }
-    return manufacturerRepository
-        .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(abbreviation)
-        .orElse(null);
+    Optional<Manufacturer> byAbbreviation =
+        manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(abbreviation);
+    if (byAbbreviation.isPresent()) {
+      return byAbbreviation.get();
+    }
+    return twins.resolve(dto.name()).orElse(null);
   }
 
   /**
    * Writes the canonical display identity + UEX cross-reference columns onto the row. Only the
    * canonical company of a brand calls this; duplicates leave these fields untouched. On a row the
-   * P4K knows, the P4K leads the name and abbreviation: they stay, and a differing UEX value is
-   * reported (REQ-P4K-020). The description is never written; the P4K leads it.
+   * P4K knows, the P4K leads the name and abbreviation: they stay, and a differing UEX name is
+   * reported; the UEX nickname is no code, so it is never compared with the abbreviation
+   * (REQ-P4K-020). The description is never written; the P4K leads it.
    *
    * @param manufacturer the row being stamped
    * @param dto inbound UEX row
@@ -252,14 +268,6 @@ public class UexManufacturerService {
           "name",
           manufacturer.getName(),
           dto.name());
-      syncReportService.logP4kDisagreement(
-          SyncSourceSystem.UEX,
-          runId,
-          AGGREGATE,
-          p4kUuid,
-          "abbreviation",
-          manufacturer.getAbbreviation(),
-          abbreviation);
     }
     if (StringUtils.hasText(dto.nickname())) {
       manufacturer.setNickname(dto.nickname());

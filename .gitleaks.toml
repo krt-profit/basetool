@@ -8,7 +8,7 @@ paths = [
   '''frontend/src/e2e/resources/realm-export\.e2e\.json$''',
   '''docker/test-tls/basetool-test-ca\.crt$''',
   '''docker/test-tls/basetool-test-(backend|frontend|ingest|keycloak|truststore)\.p12$''',
-  '''docker/test-redis/users\.acl$''',
+  '''docker/test-redis/(session-|shared-)?users\.acl$''',
 ]
 regexes = [
   '''123456789012345678''',

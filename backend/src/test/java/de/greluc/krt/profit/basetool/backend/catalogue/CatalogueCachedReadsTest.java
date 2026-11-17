@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
@@ -217,54 +219,47 @@ class CatalogueCachedReadsTest {
 
   @Test
   @DisplayName("every cached read shows its row, and a warm read costs no statement")
-  void everyCachedReadShowsItsRowAndAWarmReadCostsNoStatement() {
+  void everyCachedReadShowsItsRowAndAWarmReadCostsNoStatement() throws Exception {
     Statistics stats = statistics();
     for (Read read : reads()) {
       clearCaches();
+      var cold = measured(() -> json(read.call().get()));
       stats.clear();
-      JsonNode cold = json(read.call().get());
-      long coldStatements = stats.getPrepareStatementCount();
-      stats.clear();
-      JsonNode warm = json(read.call().get());
-      long warmStatements = stats.getPrepareStatementCount();
+      var warm = measured(() -> json(read.call().get()));
 
-      assertThat(warmStatements)
+      assertThat(warm.statements())
           .as("%s warm statements", read.label())
           .isLessThanOrEqualTo(TRANSACTION_STAMP_STATEMENTS);
-      assertThat(coldStatements)
+      assertThat(cold.statements())
           .as("%s cold statements", read.label())
-          .isGreaterThan(warmStatements);
+          .isGreaterThan(warm.statements());
       assertThat(stats.getQueryExecutionCount())
           .as("%s warm queries", read.label())
           .isLessThanOrEqualTo(TRANSACTION_STAMP_STATEMENTS);
       assertThat(stats.getEntityLoadCount()).as("%s warm entity loads", read.label()).isZero();
-      assertThat(warm).as("%s warm equals cold", read.label()).isEqualTo(cold);
-      read.pin().accept(cold);
+      assertThat(warm.result()).as("%s warm equals cold", read.label()).isEqualTo(cold.result());
+      read.pin().accept(cold.result());
     }
   }
 
   @Test
   @DisplayName("a mutator evicts its cache and the next read shows the change")
-  void aMutatorEvictsItsCacheAndTheNextReadShowsTheChange() {
-    Statistics stats = statistics();
+  void aMutatorEvictsItsCacheAndTheNextReadShowsTheChange() throws Exception {
     for (Eviction eviction : evictions()) {
       clearCaches();
       eviction.read().get();
-      stats.clear();
-      eviction.read().get();
-      long warmStatements = stats.getPrepareStatementCount();
+      long warmStatements = preparedBy(() -> eviction.read().get());
       assertThat(warmStatements)
           .as("%s is cached before the mutation", eviction.label())
           .isLessThanOrEqualTo(TRANSACTION_STAMP_STATEMENTS);
 
       eviction.mutation().run();
 
-      stats.clear();
-      JsonNode after = json(eviction.read().get());
-      assertThat(stats.getPrepareStatementCount())
+      var after = measured(() -> json(eviction.read().get()));
+      assertThat(after.statements())
           .as("%s is read cold after the mutation", eviction.label())
           .isGreaterThan(warmStatements);
-      eviction.pinAfter().accept(after);
+      eviction.pinAfter().accept(after.result());
     }
   }
 

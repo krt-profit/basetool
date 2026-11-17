@@ -206,7 +206,7 @@ x-backend: &backend-template
     APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-true}
     APP_MAIL_FROM_ADDRESS: ${APP_MAIL_FROM_ADDRESS:-no-reply@profit-base.online}
     APP_MAIL_FROM_NAME: ${APP_MAIL_FROM_NAME:-Profit Basetool}
-    REDIS_HOST: ${REDIS_HOST:-redis}
+    REDIS_HOST: ${REDIS_HOST:-redis-shared}
     REDIS_PORT: ${REDIS_PORT:-6379}
     REDIS_USERNAME: ${REDIS_BACKEND_USERNAME:-}
     REDIS_PASSWORD: ${REDIS_BACKEND_PASSWORD:-${REDIS_PASSWORD:-}}
@@ -309,7 +309,7 @@ x-frontend: &frontend-template
     APP_SECURITY_TRUSTED_TYPES: ${APP_SECURITY_TRUSTED_TYPES:-report}
     APP_INSTANCE_TEST_SYSTEM: ${APP_INSTANCE_TEST_SYSTEM:-false}
     REDIS_USERNAME: ${REDIS_FRONTEND_USERNAME:-}
-    REDIS_PASSWORD: ${REDIS_FRONTEND_PASSWORD:-${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}}
+    REDIS_PASSWORD: ${REDIS_SESSION_FRONTEND_PASSWORD:-${REDIS_SESSION_PASSWORD:?REDIS_SESSION_PASSWORD must be set in .env}}
     REDIS_SHARED_USERNAME: ${REDIS_FRONTEND_USERNAME:-}
     REDIS_SHARED_PASSWORD: ${REDIS_FRONTEND_PASSWORD:-${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}}
     MONITORING_SCRAPE_USER: ${MONITORING_SCRAPE_USER:-}
@@ -356,7 +356,7 @@ x-ingest: &ingest-template
     APP_INGEST_HANDOFF_TTL: ${BASETOOL_INGEST_HANDOFF_TTL:-PT30M}
     APP_RATE_LIMIT_IP_CAPACITY: ${BASETOOL_INGEST_RATE_LIMIT_IP_CAPACITY:-120}
     APP_RATE_LIMIT_IP_REFILL_TOKENS: ${BASETOOL_INGEST_RATE_LIMIT_IP_REFILL_TOKENS:-120}
-    REDIS_HOST: redis
+    REDIS_HOST: redis-shared
     REDIS_PORT: 6379
     REDIS_USERNAME: ${REDIS_INGEST_USERNAME:-}
     REDIS_PASSWORD: ${REDIS_INGEST_PASSWORD:-${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}}
@@ -385,36 +385,68 @@ x-ingest: &ingest-template
     - /var/log/basetool/ingest:/app/logs
 
 services:
-  redis:
+  redis-session:
     <<: *redis-template
     profiles: ["prod"]
-    container_name: redis
-    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --aclfile /etc/redis/users.acl
+    container_name: redis-session
+    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --aclfile /etc/redis/users.acl
+    deploy: &redis-session-deploy
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+          pids: 512
     volumes:
       - /var/lib/basetool/redis:/data
-      - ${BASETOOL_REDIS_ACL_HOST_PATH:-/var/lib/basetool/redis/users.acl}:/etc/redis/users.acl:ro
+      - ${BASETOOL_REDIS_SESSION_ACL_HOST_PATH:-/etc/basetool/redis/session-users.acl}:/etc/redis/users.acl:ro
+    networks:
+      - net-redis-session
+
+  redis-shared:
+    <<: *redis-template
+    profiles: ["prod"]
+    container_name: redis-shared
+    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl
+    volumes:
+      - /var/lib/basetool/redis-shared:/data
+      - ${BASETOOL_REDIS_SHARED_ACL_HOST_PATH:-/etc/basetool/redis/shared-users.acl}:/etc/redis/users.acl:ro
     networks:
       - net-redis-frontend
       - net-redis-ingest
       - net-redis-backend
 
-  redis-dev:
+  redis-session-dev:
     <<: *redis-template
     profiles: ["dev"]
+    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --requirepass ${REDIS_SESSION_PASSWORD:?REDIS_SESSION_PASSWORD must be set in .env}
+    deploy: *redis-session-deploy
     volumes:
-      - redis-dev-data:/data
+      - redis-session-dev-data:/data
+    ports:
+      - "127.0.0.1:6380:6379"
+    networks:
+      net-redis-session:
+        aliases:
+          - redis-session
+
+  redis-shared-dev:
+    <<: *redis-template
+    profiles: ["dev"]
+    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    volumes:
+      - redis-shared-dev-data:/data
     ports:
       - "127.0.0.1:6379:6379"
     networks:
       net-redis-frontend:
         aliases:
-          - redis
+          - redis-shared
       net-redis-ingest:
         aliases:
-          - redis
+          - redis-shared
       net-redis-backend:
         aliases:
-          - redis
+          - redis-shared
 
   db-backend:
     <<: *db-backend-template
@@ -559,7 +591,7 @@ services:
         condition: service_healthy
       keycloak-dev:
         condition: service_healthy
-      redis-dev:
+      redis-shared-dev:
         condition: service_healthy
     networks:
       net-db-backend:
@@ -603,12 +635,13 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
-      redis:
+      redis-session:
         condition: service_healthy
     networks:
       - net-backend-frontend
       - net-proxy-frontend
       - net-backend-keycloak
+      - net-redis-session
       - net-redis-frontend
       - net-monitoring-scrape
 
@@ -618,8 +651,9 @@ services:
     environment:
       <<: *frontend-env
       SPRING_PROFILES_ACTIVE: dev
-      REDIS_HOST: redis
-      REDIS_SHARED_HOST: redis
+      REDIS_HOST: redis-session
+      REDIS_PORT: 6379
+      REDIS_SHARED_HOST: redis-shared
     volumes:
       - type: tmpfs
         target: /app/logs
@@ -633,7 +667,7 @@ services:
         condition: service_healthy
       keycloak-dev:
         condition: service_healthy
-      redis-dev:
+      redis-session-dev:
         condition: service_healthy
     networks:
       net-backend-frontend:
@@ -643,6 +677,9 @@ services:
         aliases:
           - frontend
       net-backend-keycloak:
+        aliases:
+          - frontend
+      net-redis-session:
         aliases:
           - frontend
       net-redis-frontend:
@@ -672,7 +709,7 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-      redis:
+      redis-shared:
         condition: service_healthy
     networks:
       - net-proxy-ingest
@@ -697,7 +734,7 @@ services:
     depends_on:
       backend-dev:
         condition: service_healthy
-      redis-dev:
+      redis-shared-dev:
         condition: service_healthy
     networks:
       net-proxy-ingest:
@@ -801,7 +838,8 @@ volumes:
   edge-acme-state:
   db-backend-dev-data:
   db-keycloak-dev-data:
-  redis-dev-data:
+  redis-session-dev-data:
+  redis-shared-dev-data:
 
 networks:
   net-db-backend:
@@ -872,6 +910,13 @@ networks:
       config:
         - subnet: 172.28.6.0/24
           gateway: 172.28.6.1
+  net-redis-session:
+    name: net-redis-session
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.13.0/24
+          gateway: 172.28.13.1
   net-proxy-ingest:
     internal: true
     driver: bridge

@@ -1,7 +1,7 @@
-# Backend test fixtures and Spring test contexts
+# Backend test fixtures, Spring test contexts and statement bounds
 
-Read this before writing a backend unit test that wires real collaborators or a
-`@SpringBootTest`.
+Read this before writing a backend unit test that wires real collaborators, a `@SpringBootTest`
+or a statement bound.
 
 ## Test fixtures — wire a real collaborator through the constructor, never by reflection
 
@@ -47,3 +47,16 @@ grouping. Before declaring a mock or property on a `@SpringBootTest`:
   mock. A bean joins that set only when no security bean reaches it — `LeafServiceMockSecurityTest`
   enforces it; a test that must mock a security bean keeps its own context.
 - Mock a bean under the field name the other classes already use; the field name is part of the key.
+
+## Statement bounds — count on the calling thread (REQ-DATA-003)
+
+A test that bounds the SQL statements of a read or a write measures them with
+`support.StatementCounter`: `preparedBy(work)` returns the count, `measured(work)` returns the work's
+result beside it. Do not read `SessionFactory.getStatistics().getPrepareStatementCount()` for this.
+That statistic sums every thread of the shared test context, so an async listener or a scheduled job
+can add statements to the measured window. The counter sees only the calling thread, and a MockMvc
+request runs on it.
+
+- Assert the count is positive wherever a `0 == 0` pass would hide a broken measurement.
+- Hibernate's other statistics (entity loads and inserts, query executions, transactions) have no
+  thread-scoped counterpart here and stay on the global statistic.

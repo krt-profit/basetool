@@ -31,14 +31,16 @@
     acme (lego): writes edge-certs, answers HTTP-01 from edge-acme-webroot
 ```
 
-The drawing shows the request path only. Beside it: the frontend and ingest use redis too; the
+The drawing shows the request path only; `redis` stands for `redis-shared`. Beside it: the frontend and ingest use `redis-shared` too, and the frontend alone uses `redis-session` for its sessions; the
 frontend and backend reach keycloak (OIDC, the admin API) and keycloak's SPI calls the backend back;
 keycloak alone owns `db-keycloak`.
 
-The connections run over **seventeen** container networks, each named for what it joins
+The connections run over **nineteen** container networks, each named for what it joins
 (`net-proxy-*`, `net-db-*`, `net-redis-*`, `net-backend-*`, `net-edge-ingress`, `net-acme-egress`,
-`net-monitoring-core`, `net-monitoring-scrape`, `net-blackbox-v6`). Apart from the two monitoring
-networks each joins a small named set — usually one pair, plus a data store's exporter — and a
+`net-monitoring-core`, `net-monitoring-scrape`, `net-monitoring-redis`, `net-blackbox-v6`). Apart
+from `net-monitoring-core` and `net-monitoring-scrape` each joins a small named set — usually one
+pair, plus a data store's exporter; `net-monitoring-redis` holds Prometheus and the two Redis
+exporters alone — and a
 container reaches exactly the containers it shares a network with. The units are in
 [`quadlet/systemd/`](../../quadlet/systemd/).
 
@@ -52,7 +54,8 @@ container reaches exactly the containers it shares a network with. The units are
 | **ingest** | Gate, limit and relay the exchange API for approved clients, the SC Extractor included (§5.5); stage a returned draft in Redis for a one-time browser pickup | Own a database or save anything itself |
 | **keycloak** | Identity, OIDC tokens, the Discord provider and guild/role gate, the KRT theme, the device-grant consent for exchange clients and the `basetool-exchange` admin extension | Store domain data |
 | **db-backend / db-keycloak** | Two separate PostgreSQL instances | Share a cluster — a Keycloak upgrade must not be able to touch domain data |
-| **redis** | Spring Session store, the live-sync and notification pub/sub fanout, the ingest handoffs, the exchange registry mirror and the gateway's byte-bounded exchange partition (ADR-0221) — one instance on three separate networks | Be a cache of record for anything that matters |
+| **redis-session** | The Spring Session store, reached by the frontend alone on its own network (ADR-0388) | Hold anything but sessions |
+| **redis-shared** | The live-sync and notification pub/sub fanout, the ingest handoffs, the exchange registry mirror and the gateway's byte-bounded exchange partition (ADR-0221) — one instance on three separate networks | Be a cache of record for anything that matters |
 
 ## 5.2 Level 2 — inside `backend`
 
@@ -231,13 +234,15 @@ loadout trees, which point at the rows the base kinds matched (the loadouts stre
 pass, REQ-P4K-040, REQ-P4K-041), and the orphan sweep `P4kSweeper`; `P4kImportReportService` and `P4kReviewService` serve the run list, the change
 reports and the review list; its wire format and streaming reader are `catalogue.internal.p4k`
 (REQ-P4K-001…016). The grouped review workspace and per-kind proposal providers are described in REQ-P4K-049. The starmap tree (`StarmapObject`) is imported by `P4kStarmapReconciler`,
-`P4kStarmapLinker` links the nine UEX location tables to it through `StarmapPlaceRows`, and
+`P4kStarmapLinker` links the nine UEX location tables to it through `StarmapPlaceRows`, each row as
+`StarmapLinkRun` and `StarmapCandidates` decide (REQ-P4K-060 names the rows that open no case), and
 `StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038).
 `GameItemAdminService` serves the admin's hide of a game item as not obtainable, a state of its own
 that the item pickers and `SelectableGameItems` read beside the P4K retirement (REQ-P4K-048,
 ADR-0373). The shops
 (`Shop`, `ShopItem`) are imported by `P4kShopReconciler`, `P4kShopLinker` links each to a UEX
-terminal of its place by name (`ShopTerminalNames`), and `ShopAdminService` serves the admin's
+terminal at or around its place (`ShopPlaces`) by name, tie-break or alias (`ShopTerminalNames`,
+`ShopTerminalTieBreaks`, `ShopTerminalAliases`), and `ShopAdminService` serves the admin's
 manual links; `ItemCatalogueDetailsService` shows an item's shops as "available at"
 (REQ-P4K-042…044). The kernel types
 `AbstractEntity` and `PageResponse` lie in `kernel` since 2026-10-12, and the catalogue's entities,
@@ -538,7 +543,7 @@ Generated from its own compose file (`docker-compose.monitoring.yml`); it reache
 through `net-monitoring-scrape` and the exporters' data-store networks, and is reached from outside
 only through the edge's `net-proxy-grafana`: **prometheus**,
 **grafana**, **loki**, **tempo**, **alertmanager**, **blackbox-exporter**, two
-**postgres-exporters** and a **redis-exporter** as containers — and **node-exporter**, **alloy** and
+**postgres-exporters** and two **redis-exporters** as containers — and **node-exporter**, **alloy** and
 **podman-exporter** as *host* services. §7.3 says why those three are not containers, and what was
 deleted instead of being carried across. Every container that shares a network with an application
 reaches its management port, so health there is open and everything else answers only to the scrape
@@ -552,8 +557,10 @@ identity Prometheus sends (ADR-0265, REQ-OBS-005). Rules, dashboards and probes:
 `catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply,
 purchasing and the Materialbörse update only their own references and emit their own audit/live
 events. The catalogue archives both original item/price/stat sets in `game_item_redirect` before
-retiring the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical
-ids have a separate reference seam for bulk reads. The same six modules answer
+retiring the duplicate. `UexItemTwins` and `UexItemTwinMerger` hand it the rows a second UEX
+listing of an item created, and the redirect keeps that listing's UEX item id (REQ-DATA-044).
+Repository identity lookups resolve retained ids, while preloaded canonical ids have a separate
+reference seam for bulk reads. The same six modules answer
 `catalogue.api.GameItemReferenceParticipant`, so the P4K import hides a seeded item only when no
 member row references it (REQ-P4K-056). Inventory, job orders, supply, purchasing, the
 Materialbörse, the refinery and the catalogue itself answer `catalogue.api.MaterialReferenceParticipant`,

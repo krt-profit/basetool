@@ -33,7 +33,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -93,13 +92,16 @@ public class ScWikiVehicleSyncService {
     if (valid.size() != rows.size() || seen.size() != rows.size()) {
       syncReportService.recordIncomplete();
     }
-    Map<String, Long> nameCounts =
+    Map<String, List<ScWikiVehicleDto>> carriers =
         valid.stream()
-            .flatMap(dto -> nameKeys(dto).stream().map(ScWikiVehicleSyncService::fold))
-            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+            .flatMap(dto -> nameKeys(dto).stream().map(key -> Map.entry(fold(key), dto)))
+            .collect(
+                Collectors.groupingBy(
+                    Map.Entry::getKey,
+                    Collectors.mapping(Map.Entry::getValue, Collectors.toUnmodifiableList())));
     UUID runId = syncReportService.beginRun();
     Instant now = Instant.now();
-    var run = new VehicleRun(nameCounts, Set.copyOf(seen), runId, now);
+    var run = new VehicleRun(carriers, Set.copyOf(seen), runId, now);
     var outcome =
         chunkWriter.write(
             valid,
@@ -210,9 +212,17 @@ public class ScWikiVehicleSyncService {
         if (run.covers(holder)) {
           return reportSiblingVariant(dto, run.runId());
         }
-        return run.isOtherVehicle(holder, dto)
-            ? reportNameHeldByOtherVehicle(dto, run.runId())
-            : reportIdentityConflict(dto, run.runId(), "Name is shared by several Wiki vehicles.");
+        if (run.isOtherVehicle(holder, dto)) {
+          return reportNameHeldByOtherVehicle(dto, run.runId());
+        }
+        UUID base = run.baseOf(named.get().key());
+        if (base == null) {
+          return reportIdentityConflict(
+              dto, run.runId(), "Name is shared by several Wiki vehicles.");
+        }
+        if (!base.equals(dto.uuid())) {
+          return reportSiblingVariant(dto, run.runId());
+        }
       }
       match = named.map(NameHit::ship);
     }
@@ -399,14 +409,14 @@ public class ScWikiVehicleSyncService {
   /**
    * The census-wide facts one vehicle upsert reads.
    *
-   * @param nameCounts how many valid Wiki vehicles carry each lower-cased name as their name or
-   *     in-game name
+   * @param carriers the valid Wiki vehicles carrying each lower-cased name as their name or in-game
+   *     name
    * @param census the UUIDs of every valid Wiki vehicle of this run
    * @param runId the sync run the events belong to
    * @param now the sync time
    */
   private record VehicleRun(
-      Map<String, Long> nameCounts, Set<UUID> census, UUID runId, Instant now) {
+      Map<String, List<ScWikiVehicleDto>> carriers, Set<UUID> census, UUID runId, Instant now) {
 
     /**
      * Tells whether more than one Wiki vehicle of this census carries a name as its name or in-game
@@ -416,7 +426,39 @@ public class ScWikiVehicleSyncService {
      * @return {@code true} when the name is shared, ignoring case
      */
     boolean sharesName(String name) {
-      return nameCounts.getOrDefault(fold(name), 0L) > 1;
+      return carriersOf(name).size() > 1;
+    }
+
+    /**
+     * Finds the base among the Wiki vehicles sharing a name: the one whose class name every other
+     * carrier's class name extends by an underscore suffix ({@code RSI_Galaxy} for {@code
+     * RSI_Galaxy_TEMP_Cargo}).
+     *
+     * @param name the shared name
+     * @return the base vehicle's UUID, or {@code null} when no carrier is the base of all others
+     */
+    @Nullable
+    UUID baseOf(String name) {
+      List<ScWikiVehicleDto> shared = carriersOf(name);
+      for (ScWikiVehicleDto candidate : shared) {
+        String baseClass = candidate.className();
+        if (StringUtils.hasText(baseClass)
+            && shared.stream()
+                .filter(other -> !other.uuid().equals(candidate.uuid()))
+                .allMatch(other -> extendsClass(other.className(), baseClass))) {
+          return candidate.uuid();
+        }
+      }
+      return null;
+    }
+
+    private List<ScWikiVehicleDto> carriersOf(String name) {
+      return carriers.getOrDefault(fold(name), List.of());
+    }
+
+    private static boolean extendsClass(@Nullable String className, String baseClass) {
+      return StringUtils.hasText(className)
+          && fold(className.strip()).startsWith(fold(baseClass.strip()) + "_");
     }
 
     /**

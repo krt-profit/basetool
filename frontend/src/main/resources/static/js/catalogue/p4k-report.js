@@ -132,7 +132,7 @@ function runCounts(run) {
  * @param {number} page the zero-based page
  */
 function loadRuns(page) {
-    readJson(pageUrl(`/runs?page=${page}`), 'p4k-runs').then(
+    readJson(pageUrl(`/runs?page=${page}`), 'p4k-runs', $('krt-p4k-runs')).then(
         (/** @type {P4kRunsView | null} */ view) => {
             if (!view || !view.runs) return;
             if (reloadedBeyondEnd(page, view.runs, loadRuns)) return;
@@ -199,7 +199,7 @@ function loadReport(page) {
     const url = pageUrl(
         `/${reportTarget.source}/${encodeURIComponent(reportTarget.id)}/changes?${params}`,
     );
-    readJson(url, 'p4k-report').then(
+    readJson(url, 'p4k-report', $('krt-p4k-report-rows')).then(
         (/** @type {ApiPage<'P4kImportChangeDto'> | null} */ result) => {
             if (!result) return;
             if (reloadedBeyondEnd(page, result, loadReport)) return;

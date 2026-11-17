@@ -1,20 +1,28 @@
-# Test-stack Redis ACL
+# Test-stack Redis ACLs
 
-`users.acl` is the Redis ACL the **E2E stack** loads (`docker-compose.e2e.yml` → `redis-dev`). It is
-[`scripts/redis-users.acl.tmpl`](../../scripts/redis-users.acl.tmpl) — the rules production loads —
-rendered with the throwaway E2E passwords in `RedisAclTemplate.E2E_PASSWORDS` (test-support) and
-`REDIS_DEFAULT_USER=off`, the state production reaches at the end of its rollout (REQ-SEC-068,
-ADR-0207).
+The **E2E stack** runs both Redis instances (ADR-0388) and loads one ACL file each
+(`docker-compose.e2e.yml`, `docker-compose.sandbox.yml`):
 
-It carries SHA-256 hashes, never a password, and the passwords behind them are published on purpose:
-the E2E Redis is created and destroyed per run and holds nothing. Never a production value.
+| File | Instance | Template |
+|---|---|---|
+| `session-users.acl` | `redis-session-dev` | [`scripts/redis-session-users.acl.tmpl`](../../scripts/redis-session-users.acl.tmpl) |
+| `shared-users.acl` | `redis-shared-dev` | [`scripts/redis-shared-users.acl.tmpl`](../../scripts/redis-shared-users.acl.tmpl) |
 
-**It must equal the template.** `RedisAclFrontendIntegrationTest#theCommittedE2eAclIsTheTemplate`
-fails when it does not. After changing the template, re-render it from the repository root with a
+Each is its template — the rules production loads — rendered with the throwaway E2E passwords in
+`RedisAclTemplate.E2E_PASSWORDS` (test-support) and `REDIS_DEFAULT_USER=off`, the state production
+reaches at the end of its rollout (REQ-SEC-068, ADR-0207).
+
+They carry SHA-256 hashes, never a password, and the passwords behind them are published on purpose:
+the E2E Redis instances are created and destroyed per run and hold nothing. Never a production value.
+
+**They must equal their templates.** `RedisAclFrontendIntegrationTest#theCommittedE2eAclsAreTheTemplates`
+fails when one does not. After changing a template, re-render both from the repository root with a
 throwaway env file holding the values from `RedisAclTemplate.E2E_PASSWORDS` plus
 `REDIS_DEFAULT_USER=off`:
 
 ```bash
 python scripts/render-redis-acl.py --env <that file> \
-  --template scripts/redis-users.acl.tmpl --out docker/test-redis/users.acl
+  --template scripts/redis-session-users.acl.tmpl --out docker/test-redis/session-users.acl
+python scripts/render-redis-acl.py --env <that file> \
+  --template scripts/redis-shared-users.acl.tmpl --out docker/test-redis/shared-users.acl
 ```

@@ -72,11 +72,13 @@ The sandbox publishes seven ports, **each bound to `127.0.0.1` only**. All seven
 | 11261 | the backend REST API, HTTPS | nothing — the gateway relays to it; a client never calls it |
 | 15432 | PostgreSQL of the backend | nothing, unless you want to look into the database |
 | 15433 | PostgreSQL of Keycloak | nothing |
-| 6379 | Redis | nothing |
+| 6379 | the shared Redis | nothing |
+| 6380 | the session store, a Redis of its own | nothing |
 
 The stack also creates its own bridge networks in `172.28.0.0/16` (`172.28.0.0/24` to
-`172.28.9.0/24` and `172.28.12.0/24`); they must not overlap a network of your machine or another
-Docker network. [Troubleshooting](#troubleshooting) shows how to find what holds a port.
+`172.28.9.0/24`, `172.28.12.0/24` and `172.28.13.0/24`); they must not overlap a network of
+your machine or another Docker network. [Troubleshooting](#troubleshooting) shows how to find
+what holds a port.
 
 ### The issuer's host name
 
@@ -140,7 +142,8 @@ The scripts run this command line, which you can also use directly:
 ```bash
 docker compose --env-file docker/sandbox/sandbox.env \
   -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.sandbox.yml \
-  --profile sandbox up -d --wait redis-dev db-backend-dev db-keycloak-dev keycloak-dev \
+  --profile sandbox up -d --wait redis-session-dev redis-shared-dev db-backend-dev \
+  db-keycloak-dev keycloak-dev \
   backend-dev frontend-dev ingest-dev
 docker compose --env-file docker/sandbox/sandbox.env \
   -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.sandbox.yml \
@@ -631,7 +634,8 @@ worked example of a scripted device login.
 ## Troubleshooting
 
 **See what runs and read the logs.** The services are `keycloak-dev`, `backend-dev`,
-`frontend-dev`, `ingest-dev` (the gateway), `db-backend-dev`, `db-keycloak-dev` and `redis-dev`:
+`frontend-dev`, `ingest-dev` (the gateway), `db-backend-dev`, `db-keycloak-dev`,
+`redis-session-dev` and `redis-shared-dev`:
 
 ```sh
 docker compose --env-file docker/sandbox/sandbox.env \

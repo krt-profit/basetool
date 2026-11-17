@@ -86,3 +86,23 @@ entry.
 older Wiki served as items and 69 debris and AI templates. The pickers offered them beside the real
 ship names. Such an item is now not selectable, the same way a retired one is not, and selectable
 again once a source lists it.
+
+## Amendment — an item UEX lists twice keeps one row (REQ-DATA-044)
+
+Production held 995 `UEX_ONLY` items; 301 visible ones stood beside the game row of the same item
+because UEX lists the item twice: one listing sits on the game row, the second created a row of its
+own. Members saw both, and the SC Wiki item sync reported about 88 `MULTI_MATCH_AMBIGUOUS`
+events a day for them. The uuid-less merge of REQ-DATA-034 never took them, since their game row
+already holds a UEX listing. The owner decided on 2026-11-17 that such double listings merge
+automatically into the row holding the game identity, the way REQ-DATA-043 keeps one ship.
+
+After every complete UEX item fetch the UEX item sync merges such a twin into the game row its
+listing's game UUID names (only a row of the same name; a UUID on a row of another name merges
+nothing), else into the single visible game row carrying its name, else into the `_GS` row of a
+`<class>` / `<class>_GS` pair of that name. References and the twin's other prices move to the game
+row, which keeps its own listing and its own price at a shared terminal. The twin's UEX item id
+stays on the redirect, so the UEX item sync never creates the row again and the item-price sync
+reads its prices for the game row. Every merge is audited as `CATALOGUE_ITEM_MERGED`.
+
+A twin whose game row's own listing left UEX while the twin's listing stays is not merged by a
+name rule; with a game UUID its listing takes the row over instead.
