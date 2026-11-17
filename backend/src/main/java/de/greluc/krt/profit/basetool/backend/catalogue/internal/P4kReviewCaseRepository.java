@@ -110,11 +110,10 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
   Set<P4kReviewKey> findAdminClosedKeys();
 
   /**
-   * Finds other open cases whose catalogue references follow a retired row in a merge.
+   * Finds the open cases whose catalogue references follow a retired row in a merge.
    *
    * @param kind the review kind that owns the reference
    * @param retiredId the catalogue row being retired
-   * @param activeCaseId the case whose proposal is being applied
    * @return the open cases that reference the retired row
    */
   @Query(
@@ -122,13 +121,10 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
       SELECT c FROM P4kReviewCase c
       WHERE c.kind = :kind
         AND c.status = de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kReviewStatus.OPEN
-        AND c.id <> :activeCaseId
         AND (c.rowId = :retiredId OR c.otherRowId = :retiredId)
       """)
   List<P4kReviewCase> findOpenReferences(
-      @Param("kind") P4kKind kind,
-      @Param("retiredId") UUID retiredId,
-      @Param("activeCaseId") UUID activeCaseId);
+      @Param("kind") P4kKind kind, @Param("retiredId") UUID retiredId);
 
   /**
    * Finds the cases of one kind and set of reasons, whatever their status.

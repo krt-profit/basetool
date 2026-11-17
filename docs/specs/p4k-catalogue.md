@@ -2214,7 +2214,8 @@ control scrolls clear of the bottom navigation on touch devices.
 
 Manufacturer branding records do not supply canonical company fields. Confirmed manufacturer
 aliases survive later imports. Manufacturer and item merges retain source identities and catalogue
-references. Ship variant links preserve the distinct identity of the variant and its base. A confirmed base
+references. A manufacturer row only UEX created beside the row of its brand that holds the P4K GUID
+needs no case: the UEX sync merges it through the same merge (REQ-DATA-045). Ship variant links preserve the distinct identity of the variant and its base. A confirmed base
 repair stays open and waits for a compatible complete import that can rebuild the stored source
 data and its dependent catalogue relationships. The administrator can withdraw a pending repair
 and review the case again.

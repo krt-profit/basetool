@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompany;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompanyRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexTwinService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,7 +53,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 /**
  * Unit tests for {@link UexManufacturerService} (REQ-DATA-004): duplicate UEX companies of one
  * brand merge onto one manufacturer, owned by the lowest company id, with the others registered as
- * aliases; matching is alias id, then name, then abbreviation.
+ * aliases; matching is alias id, then name, then abbreviation, then the P4K row the name names, and
+ * a complete census merges the UEX twins (REQ-DATA-045).
  *
  * <p>The {@link #self} proxy is stubbed to return the service under test, so per-company failure
  * isolation is testable without transactions.
@@ -68,6 +71,7 @@ class UexManufacturerServiceTest {
   @Mock private ObjectProvider<UexManufacturerService> self;
   @Mock private SyncRunProgress progress;
   @Mock private SyncReportService syncReportService;
+  @Mock private ManufacturerUexTwinService twins;
 
   @InjectMocks private UexManufacturerService uexManufacturerService;
 
@@ -362,6 +366,7 @@ class UexManufacturerServiceTest {
 
     verify(manufacturerRepository, never()).save(any());
     verify(aliasRepository, never()).save(any());
+    verify(twins, never()).mergeTwins();
   }
 
   @Test
@@ -375,5 +380,72 @@ class UexManufacturerServiceTest {
     verify(progress).skipped(1);
     verify(progress).invalidateCensus();
     verify(progress, never()).applied(anyLong());
+    verify(twins, never()).mergeTwins();
+  }
+
+  @Test
+  void aCompleteCensus_mergesTheTwinsAfterTheUpserts() {
+    UexCompanyDto dto = UexCompanyDto.builder().id(280).name("Vanduul Clans").build();
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    uexManufacturerService.syncManufacturers();
+
+    InOrder order = inOrder(manufacturerRepository, twins);
+    order.verify(manufacturerRepository).save(any());
+    order.verify(twins).mergeTwins();
+  }
+
+  @Test
+  void aPartialFetch_mergesNoTwin() {
+    UexCompanyDto dto = UexCompanyDto.builder().id(280).name("Vanduul Clans").build();
+    when(uexClient.getCompanies()).thenReturn(UexClient.FetchResult.partial(List.of(dto)));
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    uexManufacturerService.syncManufacturers();
+
+    verify(manufacturerRepository).save(any());
+    verify(twins, never()).mergeTwins();
+  }
+
+  @Test
+  void aCompanyNamingAP4kRow_joinsItInsteadOfCreatingATwin() {
+    UexCompanyDto dto =
+        UexCompanyDto.builder().id(280).name("Vanduul Clans").nickname("Vanduul").build();
+    Manufacturer vanduul = new Manufacturer();
+    vanduul.setName("Vanduul");
+    vanduul.setAbbreviation("VNC");
+    vanduul.setP4kUuid(UUID.randomUUID());
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
+    when(twins.resolve("Vanduul Clans")).thenReturn(Optional.of(vanduul));
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
+
+    uexManufacturerService.syncManufacturers();
+
+    verify(manufacturerRepository).save(vanduul);
+    assertEquals("Vanduul", vanduul.getName(), "the P4K row keeps its name");
+    assertEquals(280, vanduul.getUexCompanyId(), "the company joins the P4K row");
+    ArgumentCaptor<ManufacturerUexCompany> alias =
+        ArgumentCaptor.forClass(ManufacturerUexCompany.class);
+    verify(aliasRepository).save(alias.capture());
+    assertEquals(280, alias.getValue().getUexCompanyId());
+    assertSame(vanduul, alias.getValue().getManufacturer());
+  }
+
+  @Test
+  void aCompanyMatchedByName_neverAsksTheTwinRule() {
+    UexCompanyDto dto = UexCompanyDto.builder().id(42).name("Aegis Dynamics").build();
+    Manufacturer legacy = new Manufacturer();
+    legacy.setName("Aegis Dynamics");
+    legacy.setAbbreviation("AEGS");
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
+    when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
+        .thenReturn(Optional.of(legacy));
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    uexManufacturerService.syncManufacturers();
+
+    verify(twins, never()).resolve(any());
   }
 }

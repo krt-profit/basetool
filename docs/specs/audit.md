@@ -591,6 +591,11 @@ The coverage list holds the **Katalog** area
     id, recorded in the transaction that stores the run's outcome, with `source`, `aggregate`,
     `status`, the committed counts (`fetched`, `applied`, `skipped`, `failed`) and `sweep`; the
     detail stays in `external_sync_report`;
+  - `CATALOGUE_MANUFACTURER_MERGED`, one event per manufacturer row only UEX created that the UEX
+    sync merges into the row of its brand holding the P4K GUID (REQ-DATA-045), actor `system`,
+    subject the surviving row, labelled by its name, recorded in the merge's transaction with
+    `retiredManufacturer`, `rule` (`NAME` or `WIKI_NAME`), `uexCompanyId`, `items` and
+    `shipTypes`, the moved references;
   - every catalogue master-data mutation: materials and material external aliases
     (`CATALOGUE_MATERIAL_*`, `CATALOGUE_MATERIAL_ALIAS_*`: created, updated, deleted; the material
     categories are the P4K resource groups, written only by the P4K APPLY of
@@ -640,6 +645,8 @@ counts them (REQ-OBS-011).
   (`AdminAuditLogPageControllerTest`).
 - [x] Each finished UEX or SC Wiki sync run records one `CATALOGUE_SYNC_RUN_FINISHED` summary with
   its committed outcome (`SyncRunServiceTest`).
+- [x] Each merged UEX manufacturer twin records one `CATALOGUE_MANUFACTURER_MERGED` event with the
+  moved references (`ManufacturerUexTwinSyncIntegrationTest`).
 - [x] The starmap links, the visibility overrides and the storage places on a starmap object record
   their events (`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`).
 - [ ] The shop link records its event (planned above).
