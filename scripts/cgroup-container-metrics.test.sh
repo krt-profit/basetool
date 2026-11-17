@@ -17,8 +17,14 @@ cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 
 say() { printf '%s\n' "$*"; }
-ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
-bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
+ok() {
+  PASSED=$((PASSED + 1))
+  printf '  ok    %s\n' "$*"
+}
+bad() {
+  FAILED=$((FAILED + 1))
+  printf '  FAIL  %s\n' "$*"
+}
 
 assert_line() {
   local label=$1 pattern=$2
@@ -43,7 +49,7 @@ USER_SLICE="${FAKE}/user.slice/user-1000.slice/user@1000.service"
 make_container() {
   local dir=$1 memmax=$2 pidsmax=$3 oom=$4 throttled=$5 periods=${6:-4200}
   mkdir -p "$dir"
-  cat > "${dir}/cpu.stat" <<EOF
+  cat >"${dir}/cpu.stat" <<EOF
 usage_usec 2500000
 user_usec 1500000
 system_usec 1000000
@@ -54,7 +60,7 @@ throttled_usec 1250000
 nr_bursts 0
 burst_usec 0
 EOF
-  cat > "${dir}/memory.events" <<EOF
+  cat >"${dir}/memory.events" <<EOF
 low 0
 high 0
 max 0
@@ -62,17 +68,17 @@ oom 0
 oom_kill ${oom}
 oom_group_kill 0
 EOF
-  cat > "${dir}/memory.stat" <<EOF
+  cat >"${dir}/memory.stat" <<EOF
 anon 104857600
 file 52428800
 file_mapped 31457280
 inactive_file 20971520
 slab 1048576
 EOF
-  printf '%s\n' "134217728"  > "${dir}/memory.current"
-  printf '%s\n' "${memmax}"  > "${dir}/memory.max"
-  printf '%s\n' "42"         > "${dir}/pids.current"
-  printf '%s\n' "${pidsmax}" > "${dir}/pids.max"
+  printf '%s\n' "134217728" >"${dir}/memory.current"
+  printf '%s\n' "${memmax}" >"${dir}/memory.max"
+  printf '%s\n' "42" >"${dir}/pids.current"
+  printf '%s\n' "${pidsmax}" >"${dir}/pids.max"
 }
 
 make_quadlet() {
@@ -80,7 +86,7 @@ make_quadlet() {
   make_container "$unit" max 97670 0 0 0
   make_container "${unit}/runtime" max max 0 0 0
   make_container "${unit}/libpod-payload-$(printf 'a%.0s' {1..64})" "$2" "$3" "$4" "$5"
-  printf '%s\n' "4242" > "${unit}/libpod-payload-$(printf 'a%.0s' {1..64})/cgroup.procs"
+  printf '%s\n' "4242" >"${unit}/libpod-payload-$(printf 'a%.0s' {1..64})/cgroup.procs"
 }
 
 say "building a fake cgroup tree in ${FAKE}"
@@ -96,7 +102,7 @@ make_container "${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf
 make_container "${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf 'f%.0s' {1..64})" \
   2684354560 2048 0 0
 printf '%s\n' "4343" \
-  > "${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf 'f%.0s' {1..64})/cgroup.procs"
+  >"${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf 'f%.0s' {1..64})/cgroup.procs"
 mkdir -p "${USER_SLICE}/ghost.service"
 make_container "${FAKE}/system.slice/alloy.service" 536870912 max 1 0
 make_container "${FAKE}/system.slice/prometheus-node-exporter.service" 67108864 max 0 0
@@ -108,17 +114,19 @@ if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --output "$OUT" >/dev/null 2>&1; the
   ok "exits 0 and writes the file"
 else
   bad "exits 0 and writes the file"
-  say "  (cannot continue without output)"; say "${PASSED} passed, ${FAILED} failed"; exit 1
+  say "  (cannot continue without output)"
+  say "${PASSED} passed, ${FAILED} failed"
+  exit 1
 fi
 
-assert_line "finds backend by its unit name"  '^basetool_container_pids\{name="backend"\} 42$'
-assert_line "finds edge below app.slice"      '^basetool_container_pids\{name="edge"\} 42$'
-assert_line "finds acme"                      '^basetool_container_pids\{name="acme"\} 42$'
+assert_line "finds backend by its unit name" '^basetool_container_pids\{name="backend"\} 42$'
+assert_line "finds edge below app.slice" '^basetool_container_pids\{name="edge"\} 42$'
+assert_line "finds acme" '^basetool_container_pids\{name="acme"\} 42$'
 assert_absent "drops a cgroup that publishes nothing" 'name="ghost"'
 assert_absent "a healthcheck's transient unit is not a container" 'name="[0-9a-f]{64}-'
 assert_absent "neither is the payload or conmon's runtime cgroup" 'name="(libpod-payload-|runtime)'
 assert_line "counts only the containers it emitted" '^basetool_container_metrics_containers 5$'
-assert_line "stamps when it ran"              '^basetool_container_metrics_timestamp_seconds [0-9]'
+assert_line "stamps when it ran" '^basetool_container_metrics_timestamp_seconds [0-9]'
 
 say ""
 say "== a Quadlet container is read from its payload cgroup, not from its unit =="
@@ -146,7 +154,7 @@ assert_line "host services are counted on their own" '^basetool_container_metric
 assert_line "...and not as containers" '^basetool_container_metrics_containers 5$'
 
 if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --no-host-services --dry-run 2>/dev/null \
-     | grep -q 'name="alloy"'; then
+  | grep -q 'name="alloy"'; then
   bad "--no-host-services reads containers only"
 else
   ok "--no-host-services reads containers only"
@@ -157,7 +165,7 @@ else
   ok "a --host-service without =NAME is rejected"
 fi
 if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --pattern 'nothing-(?P<name>x)$' --dry-run 2>/dev/null \
-     | grep -q '^basetool_container_metrics_containers 0$'; then
+  | grep -q '^basetool_container_metrics_containers 0$'; then
   ok "no containers but running host services writes containers 0"
 else
   bad "no containers but running host services writes containers 0"
@@ -218,7 +226,7 @@ fi
 say ""
 say "== it refuses to produce a misleading file =="
 if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --no-host-services --pattern 'nothing-(?P<name>x)$' \
-     --dry-run >/dev/null 2>&1; then
+  --dry-run >/dev/null 2>&1; then
   bad "a pattern that matches nothing is an error"
 else
   ok "a pattern that matches nothing is an error"
@@ -247,12 +255,12 @@ fi
 say ""
 say "== Prometheus itself accepts the output =="
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  if docker run --rm -i --entrypoint promtool prom/prometheus:v3.16.0 check metrics < "$OUT" \
-       >/dev/null 2>&1; then
+  if docker run --rm -i --entrypoint promtool prom/prometheus:v3.16.0 check metrics <"$OUT" \
+    >/dev/null 2>&1; then
     ok "promtool check metrics accepts the file"
   else
     bad "promtool check metrics accepts the file"
-    docker run --rm -i --entrypoint promtool prom/prometheus:v3.16.0 check metrics < "$OUT" 2>&1 \
+    docker run --rm -i --entrypoint promtool prom/prometheus:v3.16.0 check metrics <"$OUT" 2>&1 \
       | sed 's/^/      /' | head -10
   fi
 else

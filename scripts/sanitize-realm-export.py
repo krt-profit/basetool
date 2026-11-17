@@ -38,17 +38,34 @@ DROP_SECTIONS = (
 )
 
 BUILTIN_CLIENTS = frozenset(
-    {"account", "account-console", "admin-cli", "broker", "realm-management", "security-admin-console"}
+    {
+        "account",
+        "account-console",
+        "admin-cli",
+        "broker",
+        "realm-management",
+        "security-admin-console",
+    }
 )
 
-SECRET_KEYS = frozenset({"secret", "clientSecret", "password", "privateKey", "publicKey", "certificate"})
+SECRET_KEYS = frozenset(
+    {"secret", "clientSecret", "password", "privateKey", "publicKey", "certificate"}
+)
 
 IDP_SECRET_KEYS = frozenset({"clientId", "clientSecret"})
 
 GUARD_PATTERNS = (
-    (re.compile(r"[A-Za-z0-9._%+-]+@(?!example\.invalid)[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "e-mail address"),
+    (
+        re.compile(r"[A-Za-z0-9._%+-]+@(?!example\.invalid)[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),
+        "e-mail address",
+    ),
     (re.compile("|".join(re.escape(h) for h in REAL_HOSTS)), "real hostname"),
-    (re.compile(r'"(?:secret|clientSecret|password|privateKey)"\s*:\s*"(?!__SET_AT_DEPLOY__|\*+")[^"]+'), "secret value"),
+    (
+        re.compile(
+            r'"(?:secret|clientSecret|password|privateKey)"\s*:\s*"(?!__SET_AT_DEPLOY__|\*+")[^"]+'
+        ),
+        "secret value",
+    ),
 )
 
 
@@ -65,7 +82,12 @@ def scrub(node: Any, stats: dict[str, int]) -> Any:
             if key in SECRET_KEYS and isinstance(value, str):
                 out[key] = DEPLOY_PLACEHOLDER
                 stats["secrets"] = stats.get("secrets", 0) + 1
-            elif key == "id" or key.endswith("Id") and key not in IDP_SECRET_KEYS and _looks_like_uuid(value):
+            elif (
+                key == "id"
+                or key.endswith("Id")
+                and key not in IDP_SECRET_KEYS
+                and _looks_like_uuid(value)
+            ):
                 stats["ids"] = stats.get("ids", 0) + 1
             else:
                 out[key] = scrub(value, stats)
@@ -175,7 +197,9 @@ def selftest() -> int:
     raw = {
         "realm": "basetool",
         "users": [{"username": "someone", "email": "someone@mail.test"}],
-        "clientScopeMappings": {"account": [{"client": "account-console", "roles": ["manage-account"]}]},
+        "clientScopeMappings": {
+            "account": [{"client": "account-console", "roles": ["manage-account"]}]
+        },
         "scopeMappings": [
             {"clientScope": "offline_access", "roles": ["offline_access"]},
             {"client": "basetool-sc-extractor", "roles": ["KRT Member"]},
@@ -183,16 +207,21 @@ def selftest() -> int:
         ],
         "clients": [
             {"clientId": "account", "secret": "**********"},
-            {"clientId": "backend-service", "secret": "a-real-looking-secret",
-             "redirectUris": ["https://profit-base.online/*"]},
+            {
+                "clientId": "backend-service",
+                "secret": "a-real-looking-secret",
+                "redirectUris": ["https://profit-base.online/*"],
+            },
         ],
     }
     sanitized, _ = sanitize(raw)
     text = json.dumps(sanitized, indent=2, ensure_ascii=False)
     checks = {
-        "scopeMappings are kept": sanitized.get("scopeMappings") == [
+        "scopeMappings are kept": sanitized.get("scopeMappings")
+        == [
             {"clientScope": "offline_access", "roles": ["offline_access"]},
-            {"client": "basetool-sc-extractor", "roles": ["KRT Member"]}],
+            {"client": "basetool-sc-extractor", "roles": ["KRT Member"]},
+        ],
         "a built-in client's scope mapping is dropped": "admin-cli" not in text,
         "clientScopeMappings are dropped": "clientScopeMappings" not in sanitized,
         "users are dropped": "users" not in sanitized,

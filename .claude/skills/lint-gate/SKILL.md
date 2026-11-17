@@ -1,6 +1,6 @@
 ---
 name: lint-gate
-description: The full local lint gate that must be green before every push — Spotless, Checkstyle, SpotBugs, Prettier, the strict frontend asset linters (Stylelint, ESLint, HTMLHint) and the JS type check. Use when preparing to push, when CI fails on formatting or lint, or when auto-fixing CSS/JS findings with the Gradle Node plugin's private Node.
+description: The full local lint gate that must be green before every push — Spotless with Prettier, Ruff and shfmt, Checkstyle, SpotBugs, the strict frontend asset linters (Stylelint, ESLint, HTMLHint) and the JS type check. Use when preparing to push, when CI fails on formatting or lint, or when auto-fixing CSS/JS findings with the Gradle Node plugin's private Node.
 ---
 
 # Lint gate
@@ -11,11 +11,11 @@ the how-to behind that rule.
 
 ## Why `spotlessApply` alone is not enough
 
-**Run `./gradlew spotlessApply` (whole repo) locally before *every* push — no exceptions, even for a one-line test or comment edit.** It formats **all** Java source sets (incl. `e2e`), the Gradle Kotlin scripts, and the YAML / Markdown / `.properties` files (whitespace-level for the last three); running a narrower task (`:<module>:checkstyleMain`, `compileE2eJava`, …) is **not** a substitute and will let a formatting violation slip through to CI. Checkstyle does not help there: `checkstyleTest` and `checkstyleE2e` run only `InvalidJavadocPosition` (`config/checkstyle/javadoc_position.xml`, ADR-0222), so Spotless is the only gate on the `test` and `e2e` source sets' formatting. Spotless is wired into `check` via `isEnforceCheck = true`, and Checkstyle runs with `isIgnoreFailures = false` + `maxWarnings = 0` — any unformatted file or new Checkstyle warning fails CI immediately.
+**Run `./gradlew spotlessApply` (whole repo) locally before *every* push — no exceptions, even for a one-line test or comment edit.** It runs every formatter of the repository (REQ-OPS-058, ADR-0390): google-java-format over **all** Java source sets (incl. `e2e`), ktfmt over the Gradle Kotlin scripts, Gson over JSON, Ruff over the Python scripts (`:ruffFormatApply`), shfmt over the shell scripts and `.githooks/*` (`:shfmtApply`), Prettier over the CSS/JS of the frontend, the Keycloak theme and `docs/exchange/assets` (`:frontend:prettierApply`), and whitespace and the final newline of YAML / Markdown / `.properties`. `./gradlew spotlessCheck` checks all of them and is what the `pre-push` hook runs. Running a narrower task (`:<module>:checkstyleMain`, `compileE2eJava`, …) is **not** a substitute and will let a formatting violation slip through to CI. Checkstyle does not help there: `checkstyleTest` and `checkstyleE2e` run only `InvalidJavadocPosition` (`config/checkstyle/javadoc_position.xml`, ADR-0222), so Spotless is the only gate on the `test` and `e2e` source sets' formatting. Spotless is wired into `check` via `isEnforceCheck = true`, and Checkstyle runs with `isIgnoreFailures = false` + `maxWarnings = 0` — any unformatted file or new Checkstyle warning fails CI immediately.
 
 ## The strict frontend gates CI runs independently
 
-**ALL lint tasks must be green locally before *every* push — no exceptions.** Formatting (`spotlessApply` + `:frontend:prettierApply`) is necessary but **not sufficient**: `:frontend:check` also depends on strict gates that are **not** covered by Spotless or Checkstyle and fail the build on any finding (`frontend/build.gradle.kts`, the `check` wiring at the end of the Node section):
+**ALL lint tasks must be green locally before *every* push — no exceptions.** Formatting (`spotlessApply`) is necessary but **not sufficient**: `:frontend:check` also depends on strict gates that are **not** covered by Spotless or Checkstyle and fail the build on any finding (`frontend/build.gradle.kts`, the `check` wiring at the end of the Node section):
 
 | Task | Tool | Covers |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ the how-to behind that rule.
 | `:frontend:lintJs` | ESLint | `static/js/**` and the Node scripts `scripts/**/*.mjs` at ES2025 — `no-var` → `let`/`const`, `prefer-const`, `object-shorthand`, `prefer-template`, `prefer-arrow-callback`, `prefer-object-has-own`, `logical-assignment-operators` (all autofixable), `radix`, unused caught errors `_`-prefixed, any raw `fetch` / `XMLHttpRequest` outside the transport (REQ-FE-002, REQ-FE-031), `Promise.try` / `RegExp.escape` / `Float16Array` (above the browser floor, ADR-0239), any HTML or script sink outside `krt-html.js` / `krt-fetch.js` — `innerHTML =` (even `''`; use `replaceChildren()`), `insertAdjacentHTML`, `parseFromString`, `createPolicy`, `eval` — so markup goes through ``krtHtml.set(el, krtHtml`…`)`` (Trusted Types, REQ-FE-022), … |
 | `:frontend:lintProbeJs` | ESLint | the e2e probe script, extracted from its Java text block |
 | `:frontend:lintHtml` | HTMLHint | `templates/**` |
-| `:frontend:prettierCheck` | Prettier | CSS / JS / `types/**/*.d.ts` / `scripts/**/*.mjs` formatting |
+| `:frontend:prettierCheck` | Prettier | CSS / JS / `types/**/*.d.ts` / `scripts/**/*.mjs` formatting, plus the CSS/JS of the Keycloak theme and `docs/exchange/assets`; `spotlessCheck` runs it too |
 | `:frontend:typecheckJs` | `tsc --noEmit` | every script, strict with `noImplicitAny` (REQ-FE-018, ADR-0125) |
 | `:frontend:testGenApiTypes` | Node | the self-test of the OpenAPI → `.d.ts` emitter |
 | `:frontend:testKrtFetchReadJs` | Node | the read path `krtFetch.get` / `getJson` (REQ-FE-031) |
@@ -48,6 +48,6 @@ For a faster loop on a CSS/JS/template-only change, the frontend gates alone:
 
 ## Auto-fixing CSS / JS findings
 
-Prettier findings: `./gradlew :frontend:prettierApply`. Stylelint/ESLint auto-fix most of theirs — the Gradle Node plugin's private Node (not on `PATH`) lives under `frontend/.gradle/nodejs/node-v<version>-<os>/`; put it on `PATH` and run `node_modules/.bin/stylelint --fix <file.css>` / `node_modules/.bin/eslint --fix <file.js>` from `frontend/`, then re-run the Gradle lint task to confirm.
+Prettier findings: `./gradlew spotlessApply` (or `:frontend:prettierApply` alone). Stylelint/ESLint auto-fix most of theirs — the Gradle Node plugin's private Node (not on `PATH`) lives under `frontend/.gradle/nodejs/node-v<version>-<os>/`; put it on `PATH` and run `node_modules/.bin/stylelint --fix <file.css>` / `node_modules/.bin/eslint --fix <file.js>` from `frontend/`, then re-run the Gradle lint task to confirm.
 
 Never push relying only on the tests + Spotless being green.

@@ -1,0 +1,203 @@
+name: Native Tool Updates
+
+on:
+  schedule:
+    - cron: '41 4 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: native-tool-updates
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BRANCH: chore/native-tool-updates
+  APP_EMAIL: "332641749+basetool-release[bot]@users.noreply.github.com"
+
+jobs:
+  propose:
+    name: Propose native tool updates
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Self-test the update script
+        run: python3 .github/scripts/native_tool_updates.py --selftest
+
+      - name: Move every tool with a newer qualifying release
+        id: propose
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 .github/scripts/native_tool_updates.py propose
+          --body-file "${RUNNER_TEMP}/native-tool-updates.md"
+          --outputs "${GITHUB_OUTPUT}"
+
+      - name: Decide what happens to the pull request
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANGED: ${{ steps.propose.outputs.changed }}
+          TITLE: ${{ steps.propose.outputs.title }}
+        run: |
+          set -euo pipefail
+          open="$(gh pr list --repo "${GITHUB_REPOSITORY}" --head "${BRANCH}" --state open \
+            --json number --jq '.[0].number // ""')"
+          action=none
+          if [ "${CHANGED}" = "true" ]; then
+            refused="$(gh pr list --repo "${GITHUB_REPOSITORY}" --head "${BRANCH}" --state closed \
+              --limit 200 --json number,title,mergedAt |
+              jq -r --arg title "${TITLE}" \
+                '[.[] | select(.mergedAt == null and .title == $title) | .number] | first // ""')"
+            if [ -n "${refused}" ]; then
+              echo "::notice title=native-tool-updates::#${refused} proposed this set and was closed unmerged; not proposing it again"
+            else
+              action=publish
+            fi
+          elif [ -n "${open}" ]; then
+            action=close
+          fi
+          echo "action=${action}, open pull request: ${open:-none}"
+          {
+            echo "action=${action}"
+            echo "pr=${open}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 25 and Gradle
+        if: steps.plan.outputs.action == 'publish'
+        uses: ./.github/actions/setup-jdk-gradle
+        with:
+          cache-read-only: 'true'
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Verify the Linux files and reformat with spotlessApply
+        if: steps.plan.outputs.action == 'publish'
+        run: ./gradlew spotlessApply --stacktrace
+
+      - name: Collect what spotlessApply reformatted
+        id: reformat
+        if: steps.plan.outputs.action == 'publish'
+        run: |
+          set -euo pipefail
+          added="$(git ls-files --others --exclude-standard)"
+          deleted="$(git diff --name-only --diff-filter=D)"
+          if [ -n "${added}${deleted}" ]; then
+            printf '%s\n' "${added}" "${deleted}"
+            echo "::error title=native-tool-updates::spotlessApply added or deleted a file; a reformat only modifies files"
+            exit 1
+          fi
+          list="${RUNNER_TEMP}/reformatted.txt"
+          git diff --name-only --diff-filter=M -- . \
+            ':!gradle/libs.versions.toml' ':!gradle/verification-metadata.xml' > "${list}"
+          echo "$(wc -l < "${list}") file(s) reformatted"
+          echo "list=${list}" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse to continue without the release App's key
+        if: steps.plan.outputs.action != 'none'
+        env:
+          HAS_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "${HAS_KEY}" != "true" ]; then
+            echo "::error::secret RELEASE_APP_PRIVATE_KEY is not set in the release environment -- committing and opening the pull request needs the basetool-release GitHub App (ADR-0201); GITHUB_TOKEN may not open PRs in this organization"
+            exit 1
+          fi
+
+      - name: Mint a basetool-release App token
+        id: app
+        if: steps.plan.outputs.action != 'none'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          client-id: Iv23liHT1h5peKsDnrUD
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Commit the bump and the reformat (GitHub-signed via API)
+        id: commit
+        if: steps.plan.outputs.action == 'publish'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TITLE: ${{ steps.propose.outputs.title }}
+          REFORMAT_SUBJECT: ${{ steps.propose.outputs.reformat-subject }}
+          REFORMATTED: ${{ steps.reformat.outputs.list }}
+          BUILD_BRANCH: chore/native-tool-updates-build-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          base="$(git rev-parse HEAD)"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/heads/${BUILD_BRANCH}" -f "sha=${base}" --silent
+          echo "build-branch=${BUILD_BRANCH}" >> "$GITHUB_OUTPUT"
+          commit() {
+            local head="$1" message="$2"
+            shift 2
+            python3 .github/scripts/create_signed_commit.py \
+              --repo "${GITHUB_REPOSITORY}" \
+              --branch "${BUILD_BRANCH}" \
+              --expected-head-oid "${head}" \
+              --message "${message}" \
+              --trailer "Signed-off-by: basetool-release[bot] <${APP_EMAIL}>" \
+              "$@"
+          }
+          head="$(commit "${base}" "${TITLE}" gradle/libs.versions.toml gradle/verification-metadata.xml)"
+          if [ -s "${REFORMATTED}" ]; then
+            mapfile -t files < "${REFORMATTED}"
+            head="$(commit "${head}" "${REFORMAT_SUBJECT}" "${files[@]}")"
+            if [ -n "$(tail -c 1 .git-blame-ignore-revs)" ]; then
+              echo >> .git-blame-ignore-revs
+            fi
+            printf '%s\n' "${head}" >> .git-blame-ignore-revs
+            head="$(commit "${head}" "chore(format): leave the reformat out of git blame" .git-blame-ignore-revs)"
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${BRANCH}" --silent 2>/dev/null; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH}" \
+              -f "sha=${head}" -F force=true --silent
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f "ref=refs/heads/${BRANCH}" -f "sha=${head}" --silent
+          fi
+          echo "::notice title=native-tool-updates::${BRANCH} is at ${head}"
+
+      - name: Delete the build branch
+        if: always() && steps.commit.outputs.build-branch != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          BUILD_BRANCH: ${{ steps.commit.outputs.build-branch }}
+        run: gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BUILD_BRANCH}" --silent
+
+      - name: Open or update the pull request
+        if: steps.plan.outputs.action == 'publish'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TITLE: ${{ steps.propose.outputs.title }}
+          PR: ${{ steps.plan.outputs.pr }}
+        run: |
+          set -euo pipefail
+          body="${RUNNER_TEMP}/native-tool-updates.md"
+          if [ -n "${PR}" ]; then
+            gh pr edit "${PR}" --repo "${GITHUB_REPOSITORY}" --title "${TITLE}" --body-file "${body}"
+          else
+            gh pr create --repo "${GITHUB_REPOSITORY}" --base main --head "${BRANCH}" \
+              --title "${TITLE}" --body-file "${body}" --assignee greluc \
+              --label dependencies --label automated
+          fi
+
+      - name: Close the pull request main has caught up with
+        if: steps.plan.outputs.action == 'close'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR: ${{ steps.plan.outputs.pr }}
+        run: >-
+          gh pr close "${PR}" --repo "${GITHUB_REPOSITORY}" --delete-branch
+          --comment "main already carries the newest qualifying release of every tool."

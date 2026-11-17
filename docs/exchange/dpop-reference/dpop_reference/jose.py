@@ -155,7 +155,7 @@ def _der_length(der: bytes, offset: int) -> tuple[int, int]:
     count = first & 0x7F
     if count == 0 or count > 2 or offset + count > len(der):
         raise ValueError("unsupported DER length")
-    return int.from_bytes(der[offset:offset + count], "big"), offset + count
+    return int.from_bytes(der[offset : offset + count], "big"), offset + count
 
 
 def _der_integer(der: bytes, offset: int) -> tuple[bytes, int]:
@@ -165,7 +165,7 @@ def _der_integer(der: bytes, offset: int) -> tuple[bytes, int]:
     length, offset = _der_length(der, offset + 1)
     if length == 0 or offset + length > len(der):
         raise ValueError("truncated DER integer")
-    value = der[offset:offset + length]
+    value = der[offset : offset + length]
     if value[0] & 0x80:
         raise ValueError("negative DER integer")
     return value.lstrip(b"\x00"), offset + length

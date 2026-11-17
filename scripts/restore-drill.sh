@@ -37,13 +37,13 @@ KEEP=false
 write_drill_metrics() {
   local now dur prev
   now="$(date +%s)"
-  dur=$(( now - START_EPOCH ))
+  dur=$((now - START_EPOCH))
   prev=0
   if [[ -f "${TEXTFILE_DIR}/restore_drill.prom" ]]; then
     prev="$(awk '/^basetool_restore_drill_last_success_timestamp /{print $2}' "${TEXTFILE_DIR}/restore_drill.prom" 2>/dev/null || echo 0)"
     [[ "${prev}" =~ ^[0-9]+$ ]] || prev=0
   fi
-  if (( OK_DB_BACKEND == 1 && OK_DB_KEYCLOAK == 1 )); then
+  if ((OK_DB_BACKEND == 1 && OK_DB_KEYCLOAK == 1)); then
     prev="${now}"
   fi
   {
@@ -142,9 +142,9 @@ rt_run_detached "${CONTAINER}" "${DRILL_IMAGE}" \
   -e POSTGRES_USER=drill -e POSTGRES_PASSWORD=drill -e POSTGRES_DB=postgres
 
 log "waiting for it to become ready (timeout ${READY_TIMEOUT}s)"
-deadline=$(( $(date +%s) + READY_TIMEOUT ))
+deadline=$(($(date +%s) + READY_TIMEOUT))
 until rt_exec "${CONTAINER}" pg_isready -U drill -d postgres >/dev/null 2>&1; do
-  (( $(date +%s) < deadline )) || fail "throwaway Postgres did not become ready"
+  (($(date +%s) < deadline)) || fail "throwaway Postgres did not become ready"
   sleep 2
 done
 
@@ -196,8 +196,8 @@ KEYCLOAK_TABLES="$(q keycloak "select count(*) from information_schema.tables wh
 log "verification: flyway_schema_history rows=${FLYWAY_ROWS}, backend public tables=${BACKEND_TABLES}, keycloak public tables=${KEYCLOAK_TABLES}"
 
 ok=true
-if [[ "${FLYWAY_ROWS}" =~ ^[0-9]+$ && "${FLYWAY_ROWS}" -gt 0 \
-      && "${BACKEND_TABLES}" =~ ^[0-9]+$ && "${BACKEND_TABLES}" -ge "${MIN_BACKEND_TABLES}" ]]; then
+if [[ "${FLYWAY_ROWS}" =~ ^[0-9]+$ && "${FLYWAY_ROWS}" -gt 0 &&
+  "${BACKEND_TABLES}" =~ ^[0-9]+$ && "${BACKEND_TABLES}" -ge "${MIN_BACKEND_TABLES}" ]]; then
   OK_DB_BACKEND=1
 else
   log "FAIL: backend restore incomplete (flyway rows=${FLYWAY_ROWS}, public tables=${BACKEND_TABLES} < ${MIN_BACKEND_TABLES})"

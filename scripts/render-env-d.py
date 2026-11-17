@@ -81,9 +81,9 @@ def _split_operator(inner: str) -> tuple[str, str | None, str]:
             depth -= 1
         elif depth == 0 and char in (":", "-", "?"):
             if char == ":" and i + 1 < len(inner) and inner[i + 1] in ("-", "?"):
-                return inner[:i], inner[i:i + 2], inner[i + 2:]
+                return inner[:i], inner[i : i + 2], inner[i + 2 :]
             if char in ("-", "?"):
-                return inner[:i], char, inner[i + 1:]
+                return inner[:i], char, inner[i + 1 :]
     return inner, None, ""
 
 
@@ -107,7 +107,7 @@ def expand(text: str, env: dict[str, str], where: str, missing: list[str]) -> st
     while i < len(text):
         if text[i] == "$" and i + 1 < len(text) and text[i + 1] == "{":
             close = _matching_brace(text, i + 1)
-            inner = text[i + 2:close]
+            inner = text[i + 2 : close]
             name, op, rest = _split_operator(inner)
             value = env.get(name)
             if op in (":-", ":?"):
@@ -175,7 +175,8 @@ def _stale(out_dir: str, produced: dict[str, str]) -> list[str]:
         return []
     expected = {f"{service}.env" for service in produced}
     return sorted(
-        name for name in os.listdir(out_dir)
+        name
+        for name in os.listdir(out_dir)
         if name.endswith(".env")
         and name not in expected
         and os.path.isfile(os.path.join(out_dir, name))
@@ -223,8 +224,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--env", required=True, help="the host .env")
     parser.add_argument("--templates", required=True, help="directory holding <service>.env.tmpl")
     parser.add_argument("--out", required=True, help="directory to write <service>.env into")
-    parser.add_argument("--check", action="store_true",
-                        help="report what would change and write nothing")
+    parser.add_argument(
+        "--check", action="store_true", help="report what would change and write nothing"
+    )
     parser.add_argument("--mode", default="0640", help="mode for written files (default 0640)")
     args = parser.parse_args(argv)
 
@@ -250,12 +252,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     if missing:
-        print("render-env-d: REFUSING to write - required variables are unset in "
-              f"{args.env}:", file=sys.stderr)
+        print(
+            f"render-env-d: REFUSING to write - required variables are unset in {args.env}:",
+            file=sys.stderr,
+        )
         for entry in sorted(set(missing)):
             print(f"  {entry}", file=sys.stderr)
-        print("\nNothing was written. A container started against a half-rendered environment "
-              "comes up on its image defaults, which looks like a working service.", file=sys.stderr)
+        print(
+            "\nNothing was written. A container started against a half-rendered environment "
+            "comes up on its image defaults, which looks like a working service.",
+            file=sys.stderr,
+        )
         return 1
 
     stale = _stale(args.out, produced)
@@ -274,8 +281,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             if drift:
                 print("render-env-d: DRIFT in " + ", ".join(sorted(drift)), file=sys.stderr)
             if stale:
-                print("render-env-d: STALE, no template produces these: "
-                      + ", ".join(sorted(stale)), file=sys.stderr)
+                print(
+                    "render-env-d: STALE, no template produces these: " + ", ".join(sorted(stale)),
+                    file=sys.stderr,
+                )
             return 1
         print(f"render-env-d: {len(produced)} file(s) match the templates and the .env")
         return 0
@@ -290,8 +299,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         os.unlink(os.path.join(args.out, name))
         print(f"render-env-d: removed {name} - no template produces it any more")
 
-    values = sum(1 for c in produced.values() for line in c.splitlines()
-                 if line and not line.lstrip().startswith("#"))
+    values = sum(
+        1
+        for c in produced.values()
+        for line in c.splitlines()
+        if line and not line.lstrip().startswith("#")
+    )
     print(f"render-env-d: wrote {len(produced)} file(s), {values} assignment(s), into {args.out}")
     return 0
 

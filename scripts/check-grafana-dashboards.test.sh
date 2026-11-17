@@ -82,15 +82,20 @@ VALID='{
   ]
 }'
 
-FIX="$(mkfixture)"; dashboard "$FIX" 01.json "$VALID"
+FIX="$(mkfixture)"
+dashboard "$FIX" 01.json "$VALID"
 run_checker "$FIX"
 assert_run "a well-formed dashboard passes" 0 "Grafana dashboards OK"
 
-FIX="$(mkfixture)"; dashboard "$FIX" 01.json "$VALID"; dashboard "$FIX" 02.json '{ "uid": "two", '
+FIX="$(mkfixture)"
+dashboard "$FIX" 01.json "$VALID"
+dashboard "$FIX" 02.json '{ "uid": "two", '
 run_checker "$FIX"
 assert_run "invalid JSON is caught" 1 "not valid UTF-8 JSON"
 
-FIX="$(mkfixture)"; dashboard "$FIX" 01.json "$VALID"; dashboard "$FIX" 02.json "${VALID/\"One\"/\"Two\"}"
+FIX="$(mkfixture)"
+dashboard "$FIX" 01.json "$VALID"
+dashboard "$FIX" 02.json "${VALID/\"One\"/\"Two\"}"
 run_checker "$FIX"
 assert_run "a duplicate uid is caught" 1 "already used by"
 

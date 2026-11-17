@@ -55,16 +55,24 @@ def mismatches(sign: str | None, lines: list[tuple[str, str]], expected_count: i
     :return: human-readable problems; empty when consistent.
     """
     if sign is None:
-        return ["docker/app/Dockerfile: no single layout=\"-XX:(+|-)UseCompactObjectHeaders\" in the training run"]
+        return [
+            'docker/app/Dockerfile: no single layout="-XX:(+|-)UseCompactObjectHeaders" in the training run'
+        ]
     problems = []
     if len(lines) < expected_count:
-        problems.append(f"only {len(lines)} JAVA_TOOL_OPTIONS assignment(s) found, expected at least {expected_count}")
+        problems.append(
+            f"only {len(lines)} JAVA_TOOL_OPTIONS assignment(s) found, expected at least {expected_count}"
+        )
     for name, value in lines:
         flags = FLAG.findall(value)
         if not flags:
-            problems.append(f"{name}: JAVA_TOOL_OPTIONS does not set UseCompactObjectHeaders: {value.strip()[:90]}")
+            problems.append(
+                f"{name}: JAVA_TOOL_OPTIONS does not set UseCompactObjectHeaders: {value.strip()[:90]}"
+            )
         elif flags[-1] != sign:
-            problems.append(f"{name}: JAVA_TOOL_OPTIONS sets {flags[-1]}UseCompactObjectHeaders, the image cache is trained with {sign}")
+            problems.append(
+                f"{name}: JAVA_TOOL_OPTIONS sets {flags[-1]}UseCompactObjectHeaders, the image cache is trained with {sign}"
+            )
     return problems
 
 
@@ -83,18 +91,31 @@ def selftest() -> int:
     df = 'RUN set -eu; \\\n    layout="-XX:+UseCompactObjectHeaders"; \\\n'
     expect("the Dockerfile's layout is read", image_layout(df) == "+")
     expect("a missing layout is reported", image_layout("RUN true") is None)
-    ok = runtime_lines({"compose": "    JAVA_TOOL_OPTIONS: -XX:+UseG1GC -XX:+UseCompactObjectHeaders ${X:-}\n"})
+    ok = runtime_lines(
+        {"compose": "    JAVA_TOOL_OPTIONS: -XX:+UseG1GC -XX:+UseCompactObjectHeaders ${X:-}\n"}
+    )
     expect("a matching runtime line passes", mismatches("+", ok, 1) == [])
-    off = runtime_lines({"compose": "    JAVA_TOOL_OPTIONS: -XX:+UseG1GC -XX:-UseCompactObjectHeaders\n"})
+    off = runtime_lines(
+        {"compose": "    JAVA_TOOL_OPTIONS: -XX:+UseG1GC -XX:-UseCompactObjectHeaders\n"}
+    )
     expect("a flipped runtime line is reported", len(mismatches("+", off, 1)) == 1)
     none = runtime_lines({"env.d": "JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=50.0\n"})
     expect("a runtime line without the flag is reported", len(mismatches("+", none, 1)) == 1)
-    last = runtime_lines({"compose": "  JAVA_TOOL_OPTIONS: -XX:-UseCompactObjectHeaders -XX:+UseCompactObjectHeaders\n"})
+    last = runtime_lines(
+        {
+            "compose": "  JAVA_TOOL_OPTIONS: -XX:-UseCompactObjectHeaders -XX:+UseCompactObjectHeaders\n"
+        }
+    )
     expect("the last setting wins, as in the JVM", mismatches("+", last, 1) == [])
     expect("too few assignments are reported", len(mismatches("+", ok, 3)) == 1)
     real = collect()
-    expect("the real Dockerfile yields a layout", image_layout(DOCKERFILE.read_text(encoding="utf-8")) is not None)
-    expect("the real tree yields at least six JAVA_TOOL_OPTIONS lines", len(runtime_lines(real)) >= 6)
+    expect(
+        "the real Dockerfile yields a layout",
+        image_layout(DOCKERFILE.read_text(encoding="utf-8")) is not None,
+    )
+    expect(
+        "the real tree yields at least six JAVA_TOOL_OPTIONS lines", len(runtime_lines(real)) >= 6
+    )
     print("selftest: FAILED" if failures else "selftest: passed")
     return 1 if failures else 0
 
@@ -104,8 +125,12 @@ def collect() -> dict[str, str]:
 
     :return: repository-relative name mapped to text.
     """
-    paths = sorted(REPO.glob("docker-compose*.yml")) + sorted((REPO / "quadlet" / "env.d").glob("*.env.tmpl"))
-    return {str(p.relative_to(REPO)).replace("\\", "/"): p.read_text(encoding="utf-8") for p in paths}
+    paths = sorted(REPO.glob("docker-compose*.yml")) + sorted(
+        (REPO / "quadlet" / "env.d").glob("*.env.tmpl")
+    )
+    return {
+        str(p.relative_to(REPO)).replace("\\", "/"): p.read_text(encoding="utf-8") for p in paths
+    }
 
 
 def main() -> int:
@@ -121,10 +146,14 @@ def main() -> int:
     for problem in problems:
         print(f"FAIL {problem}")
     if problems:
-        print("REQ-OPS-030: the image's AOT cache and the runtime must use the same object layout; a"
-              " mismatch makes every JVM start without the cache (ADR-0180, ADR-0209).")
+        print(
+            "REQ-OPS-030: the image's AOT cache and the runtime must use the same object layout; a"
+            " mismatch makes every JVM start without the cache (ADR-0180, ADR-0209)."
+        )
         return 1
-    print(f"OK: the image cache and {len(lines)} JAVA_TOOL_OPTIONS assignment(s) all use {sign}UseCompactObjectHeaders.")
+    print(
+        f"OK: the image cache and {len(lines)} JAVA_TOOL_OPTIONS assignment(s) all use {sign}UseCompactObjectHeaders."
+    )
     return 0
 
 

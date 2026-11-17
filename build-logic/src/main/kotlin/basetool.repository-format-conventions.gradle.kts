@@ -1,25 +1,33 @@
 import com.diffplug.spotless.LineEnding
+import de.greluc.krt.profit.basetool.conventions.NativeToolPlatform
+import de.greluc.krt.profit.basetool.conventions.catalog
+import de.greluc.krt.profit.basetool.conventions.registerNativeFormatter
+import de.greluc.krt.profit.basetool.conventions.registerNativeTool
+import de.greluc.krt.profit.basetool.conventions.requiredVersion
 
 plugins { id("com.diffplug.spotless") }
+
+val vendored =
+  arrayOf(
+    "**/build/**",
+    "**/.gradle/**",
+    "**/node_modules/**",
+    "**/.claude/worktrees/**",
+    ".claude/skills/das-kartell-design/**",
+    "**/.git/**",
+    "ansible/collections/**",
+    "ansible/.ansible/**",
+  )
+
+fun sources(vararg includes: String) =
+  fileTree(rootDir) {
+    include(*includes)
+    exclude(*vendored)
+  }
 
 spotless {
   isEnforceCheck = true
   lineEndings = LineEnding.UNIX
-  val vendored =
-    arrayOf(
-      "**/build/**",
-      "**/.gradle/**",
-      "**/node_modules/**",
-      "**/.claude/**",
-      "**/.git/**",
-      "ansible/collections/**",
-      "ansible/.ansible/**",
-    )
-  fun sources(vararg includes: String) =
-    fileTree(rootDir) {
-      include(*includes)
-      exclude(*vendored)
-    }
 
   kotlinGradle {
     target(sources("**/*.gradle.kts", "build-logic/src/**/*.kt"))
@@ -59,4 +67,42 @@ spotless {
     targetExclude("versions.properties", "**/gradle-wrapper.properties")
     endWithNewline()
   }
+}
+
+run {
+  val version = catalog().requiredVersion("ruff")
+  val ruff =
+    registerNativeTool("ruff") {
+      when (it) {
+        NativeToolPlatform.LINUX_X64 -> "sh.astral:ruff:$version:x86_64-unknown-linux-gnu@tar.gz"
+        NativeToolPlatform.WINDOWS_X64 -> "sh.astral:ruff:$version:x86_64-pc-windows-msvc@zip"
+      }
+    }
+  registerNativeFormatter(
+    name = "ruffFormat",
+    tool = ruff,
+    sources = sources("**/*.py").matching { exclude("docs/archive/**") },
+    settings = files("ruff.toml"),
+    checkArguments = listOf("format", "--config", "ruff.toml", "--check", "--diff"),
+    applyArguments = listOf("format", "--config", "ruff.toml"),
+  )
+}
+
+run {
+  val version = catalog().requiredVersion("shfmt")
+  val shfmt =
+    registerNativeTool("shfmt") {
+      when (it) {
+        NativeToolPlatform.LINUX_X64 -> "cc.mvdan:shfmt:$version:linux_amd64@"
+        NativeToolPlatform.WINDOWS_X64 -> "cc.mvdan:shfmt:$version:windows_amd64@exe"
+      }
+    }
+  registerNativeFormatter(
+    name = "shfmt",
+    tool = shfmt,
+    sources = sources("**/*.sh", ".githooks/*").matching { exclude("docs/archive/**") },
+    settings = files(".editorconfig"),
+    checkArguments = listOf("--diff"),
+    applyArguments = listOf("--write"),
+  )
 }

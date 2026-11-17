@@ -17,15 +17,33 @@ USAGE
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --runtime)   RUNTIME="$2"; shift 2 ;;
-    --container) CONTAINER="$2"; shift 2 ;;
-    --port)      PORT="$2"; shift 2 ;;
-    -h|--help)   usage; exit 0 ;;
-    *) echo "unknown argument: $1" >&2; exit 2 ;;
+    --runtime)
+      RUNTIME="$2"
+      shift 2
+      ;;
+    --container)
+      CONTAINER="$2"
+      shift 2
+      ;;
+    --port)
+      PORT="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      exit 2
+      ;;
   esac
 done
 
-command -v "$RUNTIME" >/dev/null 2>&1 || { echo "FATAL: ${RUNTIME} is not on PATH" >&2; exit 2; }
+command -v "$RUNTIME" >/dev/null 2>&1 || {
+  echo "FATAL: ${RUNTIME} is not on PATH" >&2
+  exit 2
+}
 
 q() {
   local out err rc
@@ -169,21 +187,22 @@ echo "# A section that is silently empty defeats the whole point: two empty sect
 echo "# The first run of this script against production emitted ZERO client lines, because one"
 echo "# nullable column made every concatenated row NULL. It looked like a realm with no clients."
 expect() {
-  local have; have=$(q "$2")
+  local have
+  have=$(q "$2")
   if [[ "${have:-0}" =~ ^[0-9]+$ ]] && [[ "${have}" -gt 0 ]]; then
     echo "selfcheck|${1}|rows_in_db=${have}|ok"
   else
     echo "selfcheck|${1}|rows_in_db=${have:-?}|*** EMPTY OR UNREADABLE — this section proves nothing ***"
   fi
 }
-expect clients          "SELECT count(*) FROM client;"
-expect roles            "SELECT count(*) FROM keycloak_role;"
-expect client_scopes    "SELECT count(*) FROM client_scope;"
+expect clients "SELECT count(*) FROM client;"
+expect roles "SELECT count(*) FROM keycloak_role;"
+expect client_scopes "SELECT count(*) FROM client_scope;"
 expect protocol_mappers "SELECT count(*) FROM protocol_mapper;"
-expect flows            "SELECT count(*) FROM authentication_flow;"
-expect executions       "SELECT count(*) FROM authentication_execution;"
-expect components       "SELECT count(*) FROM component;"
-expect users            "SELECT count(*) FROM user_entity;"
+expect flows "SELECT count(*) FROM authentication_flow;"
+expect executions "SELECT count(*) FROM authentication_execution;"
+expect components "SELECT count(*) FROM component;"
+expect users "SELECT count(*) FROM user_entity;"
 echo
 echo "# Compare each rows_in_db above with the number of matching lines in this file:"
 echo "#   grep -c '^client|'  fingerprint     should equal selfcheck|clients"

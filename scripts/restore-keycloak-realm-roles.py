@@ -59,8 +59,9 @@ ROLE_NAMES = {
 DEFAULT_ROLE_MEMBER = "KRT_MEMBER"
 DEFAULT_ROLE = "default-roles-basetool"
 DEPARTED = "DEPARTED"
-REQUIRED_IDENTITY = ("a kcadm session with the realm-management roles view-users, manage-users "
-                     "and manage-realm")
+REQUIRED_IDENTITY = (
+    "a kcadm session with the realm-management roles view-users, manage-users and manage-realm"
+)
 # kcadm.sh prints this for an HTTP 404; every other failure is a refusal or an outage.
 NOT_FOUND = re.compile(r"Resource not found|HTTP error - 404")
 
@@ -89,18 +90,24 @@ def parse_export(text: str) -> tuple[dict[str, set[str]], set[str]]:
         if not line.strip():
             continue
         parts = line.strip().split("\t")
-        if (len(parts) != 2 or not UUID_PATTERN.fullmatch(parts[0])
-                or parts[1] not in {*ROLE_NAMES, DEPARTED}):
-            raise SystemExit(f"FATAL: line {number} is not '<user id>\\t<code>' with one of "
-                             f"{sorted({*ROLE_NAMES, DEPARTED})}")
+        if (
+            len(parts) != 2
+            or not UUID_PATTERN.fullmatch(parts[0])
+            or parts[1] not in {*ROLE_NAMES, DEPARTED}
+        ):
+            raise SystemExit(
+                f"FATAL: line {number} is not '<user id>\\t<code>' with one of "
+                f"{sorted({*ROLE_NAMES, DEPARTED})}"
+            )
         if parts[1] == DEPARTED:
             departed.add(parts[0])
         else:
             held.setdefault(parts[0], set()).add(parts[1])
     contradicted = sorted(u for u in departed if DEFAULT_ROLE_MEMBER in held.get(u, set()))
     if contradicted:
-        raise SystemExit(f"FATAL: departed account(s) {contradicted} also hold KRT_MEMBER; "
-                         f"export again")
+        raise SystemExit(
+            f"FATAL: departed account(s) {contradicted} also hold KRT_MEMBER; export again"
+        )
     return held, departed
 
 
@@ -117,12 +124,15 @@ def mapped_roles(kc, user_id: str) -> set[str] | None:
     except kcadm.KcadmError as error:
         if NOT_FOUND.search(str(error)):
             return None
-        raise ReadRefused(f"reading the role mappings of user {user_id} failed; the rollback "
-                          f"needs {REQUIRED_IDENTITY}:\n{error}") from error
+        raise ReadRefused(
+            f"reading the role mappings of user {user_id} failed; the rollback "
+            f"needs {REQUIRED_IDENTITY}:\n{error}"
+        ) from error
 
 
-def plan(kc, held: dict[str, set[str]],
-         departed: set[str]) -> tuple[list[tuple[str, callable]], list[str]]:
+def plan(
+    kc, held: dict[str, set[str]], departed: set[str]
+) -> tuple[list[tuple[str, callable]], list[str]]:
     """Plan the writes: the default-role composite, each account's missing role mappings and the
     removal of the default role and KRT Member from departed accounts.
 
@@ -136,47 +146,74 @@ def plan(kc, held: dict[str, set[str]],
     roles = {r.get("name"): r for r in (kc.get("roles") or [])}
     missing = sorted(name for name in ROLE_NAMES.values() if name not in roles)
     if missing:
-        raise MissingRoles(f"the realm lacks the realm role(s) {missing}; run the previous "
-                           f"release's provisioner first, which creates them")
+        raise MissingRoles(
+            f"the realm lacks the realm role(s) {missing}; run the previous "
+            f"release's provisioner first, which creates them"
+        )
     changes: list[tuple[str, callable]] = []
-    default_name = ((kc.get_realm().get("defaultRole") or {}).get("name")
-                    or f"default-roles-{kc.realm}")
+    default_name = (kc.get_realm().get("defaultRole") or {}).get(
+        "name"
+    ) or f"default-roles-{kc.realm}"
     member = roles[ROLE_NAMES[DEFAULT_ROLE_MEMBER]]
     composites = {r.get("name") for r in (kc.get(f"roles/{default_name}/composites/realm") or [])}
     if member["name"] not in composites:
-        changes.append((f"+ default role '{default_name}': composite '{member['name']}'",
-                        lambda: kc.write("create", f"roles/{default_name}/composites",
-                                         [{"id": member["id"], "name": member["name"]}],
-                                         f"'{member['name']}' added to '{default_name}'")))
+        changes.append(
+            (
+                f"+ default role '{default_name}': composite '{member['name']}'",
+                lambda: kc.write(
+                    "create",
+                    f"roles/{default_name}/composites",
+                    [{"id": member["id"], "name": member["name"]}],
+                    f"'{member['name']}' added to '{default_name}'",
+                ),
+            )
+        )
     skipped: list[str] = []
     for user_id in sorted(held):
         mapped = mapped_roles(kc, user_id)
         if mapped is None:
             skipped.append(user_id)
             continue
-        grant = [roles[ROLE_NAMES[code]] for code in sorted(held[user_id])
-                 if ROLE_NAMES[code] not in mapped]
+        grant = [
+            roles[ROLE_NAMES[code]]
+            for code in sorted(held[user_id])
+            if ROLE_NAMES[code] not in mapped
+        ]
         if grant:
             names = ", ".join(r["name"] for r in grant)
-            changes.append((f"+ user {user_id}: {names}",
-                            lambda u=user_id, g=grant: kc.write(
-                                "create", f"users/{u}/role-mappings/realm",
-                                [{"id": r["id"], "name": r["name"]} for r in g],
-                                f"realm roles mapped: {', '.join(r['name'] for r in g)}")))
+            changes.append(
+                (
+                    f"+ user {user_id}: {names}",
+                    lambda u=user_id, g=grant: kc.write(
+                        "create",
+                        f"users/{u}/role-mappings/realm",
+                        [{"id": r["id"], "name": r["name"]} for r in g],
+                        f"realm roles mapped: {', '.join(r['name'] for r in g)}",
+                    ),
+                )
+            )
     for user_id in sorted(departed):
         mapped = mapped_roles(kc, user_id)
         if mapped is None:
             skipped.append(user_id)
             continue
-        strip = [roles[name] for name in (default_name, member["name"])
-                 if name in mapped and name in roles]
+        strip = [
+            roles[name]
+            for name in (default_name, member["name"])
+            if name in mapped and name in roles
+        ]
         if strip:
             names = ", ".join(r["name"] for r in strip)
-            changes.append((f"- user {user_id}: {names} (departed in the Basetool)",
-                            lambda u=user_id, s=strip: kc.delete(
-                                f"users/{u}/role-mappings/realm",
-                                f"realm roles unmapped: {', '.join(r['name'] for r in s)}",
-                                [{"id": r["id"], "name": r["name"]} for r in s])))
+            changes.append(
+                (
+                    f"- user {user_id}: {names} (departed in the Basetool)",
+                    lambda u=user_id, s=strip: kc.delete(
+                        f"users/{u}/role-mappings/realm",
+                        f"realm roles unmapped: {', '.join(r['name'] for r in s)}",
+                        [{"id": r["id"], "name": r["name"]} for r in s],
+                    ),
+                )
+            )
     problems = [f"user {u} is not in the realm and is skipped" for u in skipped]
     return changes, problems
 
@@ -191,8 +228,10 @@ def run(kc, held: dict[str, set[str]], departed: set[str], apply: bool) -> int:
     :return: 0 when nothing is left to do, 2 when a dry run planned writes, 1 on a problem
     """
     if not held:
-        print("PROBLEM: the export holds no role assignment; export again before rolling back",
-              file=sys.stderr)
+        print(
+            "PROBLEM: the export holds no role assignment; export again before rolling back",
+            file=sys.stderr,
+        )
         return 1
     try:
         changes, problems = plan(kc, held, departed)
@@ -200,8 +239,10 @@ def run(kc, held: dict[str, set[str]], departed: set[str], apply: bool) -> int:
         print(f"PROBLEM: {refused}", file=sys.stderr)
         return 1
     mode = "APPLY" if apply else "DRY RUN — nothing is written"
-    print(f"Keycloak realm '{kc.realm}' <- {len(held)} account(s) from user_roles, "
-          f"{len(departed)} departed [{mode}]")
+    print(
+        f"Keycloak realm '{kc.realm}' <- {len(held)} account(s) from user_roles, "
+        f"{len(departed)} departed [{mode}]"
+    )
     for text, _ in changes:
         print(f"  {text}")
     for line in problems:
@@ -219,8 +260,13 @@ def run(kc, held: dict[str, set[str]], departed: set[str], apply: bool) -> int:
 class FakeKc:
     """An in-memory realm for the self-test."""
 
-    def __init__(self, roles: list[str], composite: list[str], users: dict[str, list[str]],
-                 forbidden: set[str] | None = None):
+    def __init__(
+        self,
+        roles: list[str],
+        composite: list[str],
+        users: dict[str, list[str]],
+        forbidden: set[str] | None = None,
+    ):
         self.realm = "basetool"
         self.roles = [{"id": f"r-{n}", "name": n} for n in roles]
         self.composite = list(composite)
@@ -236,8 +282,10 @@ class FakeKc:
         if user in self.forbidden:
             raise kcadm.KcadmError(f"kcadm.sh get {path}\n  exit 1: HTTP error - 403, Forbidden")
         if user not in self.users:
-            raise kcadm.KcadmError(f"kcadm.sh get {path}\n  exit 1: Resource not found for url: "
-                                   f"http://localhost:8080/admin/realms/basetool/{path}")
+            raise kcadm.KcadmError(
+                f"kcadm.sh get {path}\n  exit 1: Resource not found for url: "
+                f"http://localhost:8080/admin/realms/basetool/{path}"
+            )
         return [r for r in self.roles if r["name"] in self.users[user]]
 
     def get_realm(self) -> dict:
@@ -269,27 +317,41 @@ def selftest() -> int:
             failures.append(label)
 
     def realm(users: dict[str, list[str]], forbidden: set[str] | None = None) -> FakeKc:
-        return FakeKc(list(ROLE_NAMES.values()) + ["offline_access", DEFAULT_ROLE],
-                      ["offline_access"], users, forbidden or set())
+        return FakeKc(
+            list(ROLE_NAMES.values()) + ["offline_access", DEFAULT_ROLE],
+            ["offline_access"],
+            users,
+            forbidden or set(),
+        )
 
     a, b, gone, left = (f"00000000-0000-4000-8000-00000000000{n}" for n in (1, 2, 3, 4))
-    export = (f"{a}\tADMIN\n{a}\tKRT_MEMBER\n\n{b}\tKRT_MEMBER\n{gone}\tADMIN\n"
-              f"{left}\t{DEPARTED}\n")
+    export = f"{a}\tADMIN\n{a}\tKRT_MEMBER\n\n{b}\tKRT_MEMBER\n{gone}\tADMIN\n{left}\t{DEPARTED}\n"
     held, departed = parse_export(export)
-    expect("the export is read per user", held == {a: {"ADMIN", "KRT_MEMBER"}, b: {"KRT_MEMBER"},
-                                                     gone: {"ADMIN"}})
+    expect(
+        "the export is read per user",
+        held == {a: {"ADMIN", "KRT_MEMBER"}, b: {"KRT_MEMBER"}, gone: {"ADMIN"}},
+    )
     expect("the departed accounts are read apart", departed == {left})
-    kc = realm({a: ["KRT Member", DEFAULT_ROLE], b: [DEFAULT_ROLE],
-                left: [DEFAULT_ROLE, "KRT Member", "offline_access"]})
+    kc = realm(
+        {
+            a: ["KRT Member", DEFAULT_ROLE],
+            b: [DEFAULT_ROLE],
+            left: [DEFAULT_ROLE, "KRT Member", "offline_access"],
+        }
+    )
     changes, problems = plan(kc, held, departed)
     for _, action in changes:
         action()
     expect("the default role gets KRT Member back", "KRT Member" in kc.composite)
-    expect("an account gets only the roles it lacks",
-           sorted(kc.users[a]) == sorted(["Admin", "KRT Member", DEFAULT_ROLE]))
+    expect(
+        "an account gets only the roles it lacks",
+        sorted(kc.users[a]) == sorted(["Admin", "KRT Member", DEFAULT_ROLE]),
+    )
     expect("a member gets KRT Member", sorted(kc.users[b]) == sorted([DEFAULT_ROLE, "KRT Member"]))
-    expect("a departed account loses the default role and KRT Member",
-           kc.users[left] == ["offline_access"])
+    expect(
+        "a departed account loses the default role and KRT Member",
+        kc.users[left] == ["offline_access"],
+    )
     expect("an account missing from the realm is reported", any(gone in p for p in problems))
     again, _ = plan(kc, held, departed)
     expect("a second run plans nothing", again == [])
@@ -306,13 +368,21 @@ def selftest() -> int:
     kc = realm({a: [], b: []})
     expect("an apply that skipped an account exits 1", run(kc, held, set(), apply=True) == 1)
     expect("and still writes the accounts it could read", kc.users[b] == ["KRT Member"])
-    expect("an apply without a skip exits 0",
-           run(realm({a: [], b: []}), {a: {"ADMIN"}}, set(), apply=True) == 0)
-    expect("an empty export exits 1 and writes nothing",
-           run(realm({a: []}), {}, set(), apply=True) == 1)
-    for label, text in (("an unknown role code is refused", f"{a}\tOFFICER\n"),
-                        ("a departed account that holds KRT Member is refused",
-                         f"{a}\tKRT_MEMBER\n{a}\t{DEPARTED}\n")):
+    expect(
+        "an apply without a skip exits 0",
+        run(realm({a: [], b: []}), {a: {"ADMIN"}}, set(), apply=True) == 0,
+    )
+    expect(
+        "an empty export exits 1 and writes nothing",
+        run(realm({a: []}), {}, set(), apply=True) == 1,
+    )
+    for label, text in (
+        ("an unknown role code is refused", f"{a}\tOFFICER\n"),
+        (
+            "a departed account that holds KRT Member is refused",
+            f"{a}\tKRT_MEMBER\n{a}\t{DEPARTED}\n",
+        ),
+    ):
         try:
             parse_export(text)
             expect(label, False)
@@ -331,15 +401,26 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(prog="restore-keycloak-realm-roles.py")
     parser.add_argument("--realm", default="basetool", help="target realm (default: basetool)")
-    parser.add_argument("--assignments", type=Path,
-                        help="the user_roles export, one '<user id>\\t<role code>' line each")
-    parser.add_argument("--apply", action="store_true",
-                        help="write the planned mappings (default: dry run, writes nothing)")
-    parser.add_argument("--container", default="keycloak",
-                        help="Keycloak container for the default `docker exec` prefix")
-    parser.add_argument("--kcadm-command",
-                        help=f"the whole kcadm invocation, e.g. the rootless-Podman string of "
-                             f"docs/keycloak/README.md; needs {REQUIRED_IDENTITY}")
+    parser.add_argument(
+        "--assignments",
+        type=Path,
+        help="the user_roles export, one '<user id>\\t<role code>' line each",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="write the planned mappings (default: dry run, writes nothing)",
+    )
+    parser.add_argument(
+        "--container",
+        default="keycloak",
+        help="Keycloak container for the default `docker exec` prefix",
+    )
+    parser.add_argument(
+        "--kcadm-command",
+        help=f"the whole kcadm invocation, e.g. the rootless-Podman string of "
+        f"docs/keycloak/README.md; needs {REQUIRED_IDENTITY}",
+    )
     parser.add_argument("--selftest", action="store_true", help="prove the planning logic")
     args = parser.parse_args(argv)
     if args.selftest:
@@ -347,8 +428,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.assignments is None:
         parser.error("--assignments is required")
     held, departed = parse_export(args.assignments.read_text(encoding="utf-8"))
-    prefix = (shlex.split(args.kcadm_command) if args.kcadm_command
-              else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"])
+    prefix = (
+        shlex.split(args.kcadm_command)
+        if args.kcadm_command
+        else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"]
+    )
     return run(kcadm.Kcadm(prefix, args.realm, dry_run=False), held, departed, args.apply)
 
 

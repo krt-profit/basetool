@@ -58,11 +58,21 @@ class BuildProofTest(unittest.TestCase):
     def test_token_endpoint_claims(self) -> None:
         """Without a token or nonce the proof has exactly ``jti``, ``htm``, ``htu`` and ``iat``."""
         _, claims, signing_input, signature = decode_proof(
-            build_proof(self.key, "post", "https://profit-base.online/auth/realms/basetool/protocol/"
-                        "openid-connect/token", issued_at=1_790_000_000, jti="fixed-id"))
+            build_proof(
+                self.key,
+                "post",
+                "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token",
+                issued_at=1_790_000_000,
+                jti="fixed-id",
+            )
+        )
         self.assertEqual(
-            {"jti": "fixed-id", "htm": "POST", "iat": 1_790_000_000,
-             "htu": "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token"},
+            {
+                "jti": "fixed-id",
+                "htm": "POST",
+                "iat": 1_790_000_000,
+                "htu": "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token",
+            },
             claims,
         )
         self.assertEqual([signing_input], self.key.signed)
@@ -72,7 +82,8 @@ class BuildProofTest(unittest.TestCase):
         """With a token and nonce the proof adds ``ath`` and ``nonce``; ``htu`` drops the query."""
         token = "Kz~8mXK1EalYznwH-LC-1fBAo.4Ljp~zsPE_NeO.gxU"
         _, claims, _, _ = decode_proof(
-            build_proof(self.key, "GET", URL, access_token=token, nonce="eyJ7S_zG.eyJH0-Z.HX4w-7v"))
+            build_proof(self.key, "GET", URL, access_token=token, nonce="eyJ7S_zG.eyJH0-Z.HX4w-7v")
+        )
         self.assertEqual("https://ingest.profit-base.online/exchange/v1/me/stock", claims["htu"])
         self.assertEqual("fUHyO2r2Z3DZ53EsNrWBb0xWXoaNy59IiKCAqksmQEo", claims["ath"])
         self.assertEqual(access_token_hash(token), claims["ath"])
@@ -99,18 +110,24 @@ class NonceTest(unittest.TestCase):
     """Recognising a nonce challenge and remembering the latest nonce."""
 
     CHALLENGE = (
-        'DPoP algs="ES256 ES384 ES512 RS256 RS384 RS512 PS256 PS384 PS512", '
-        'error="use_dpop_nonce"'
+        'DPoP algs="ES256 ES384 ES512 RS256 RS384 RS512 PS256 PS384 PS512", error="use_dpop_nonce"'
     )
 
     def test_gateway_challenge(self) -> None:
         """A 401 with ``use_dpop_nonce`` and a nonce is a challenge; other 401s are not."""
-        self.assertTrue(asks_for_nonce(401, {"www-authenticate": self.CHALLENGE,
-                                             "dpop-nonce": "n1"}))
+        self.assertTrue(
+            asks_for_nonce(401, {"www-authenticate": self.CHALLENGE, "dpop-nonce": "n1"})
+        )
         self.assertFalse(asks_for_nonce(401, {"WWW-Authenticate": self.CHALLENGE}))
-        self.assertFalse(asks_for_nonce(401, {
-            "WWW-Authenticate": 'DPoP algs="ES256", error="invalid_dpop_proof"',
-            "DPoP-Nonce": "n1"}))
+        self.assertFalse(
+            asks_for_nonce(
+                401,
+                {
+                    "WWW-Authenticate": 'DPoP algs="ES256", error="invalid_dpop_proof"',
+                    "DPoP-Nonce": "n1",
+                },
+            )
+        )
 
     def test_authorization_server_challenge(self) -> None:
         """A 400 with the JSON error ``use_dpop_nonce`` and a nonce is a challenge."""
@@ -122,10 +139,14 @@ class NonceTest(unittest.TestCase):
         cache = NonceCache()
         cache.update(URL, {"DPoP-Nonce": "gateway-nonce"})
         cache.update("https://ingest.profit-base.online/exchange/v1", {"Other": "x"})
-        self.assertEqual("gateway-nonce",
-                         cache.get("https://INGEST.profit-base.online:443/exchange/v1/me/ships"))
-        self.assertIsNone(cache.get("https://profit-base.online/auth/realms/basetool/protocol/"
-                                    "openid-connect/token"))
+        self.assertEqual(
+            "gateway-nonce", cache.get("https://INGEST.profit-base.online:443/exchange/v1/me/ships")
+        )
+        self.assertIsNone(
+            cache.get(
+                "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token"
+            )
+        )
         cache.update(URL, {"dpop-nonce": "newer"})
         self.assertEqual("newer", cache.get(URL))
 

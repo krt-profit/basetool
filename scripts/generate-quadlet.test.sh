@@ -17,11 +17,17 @@ fi
 
 PASSED=0
 FAILED=0
-ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
-bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
+ok() {
+  PASSED=$((PASSED + 1))
+  printf '  ok    %s\n' "$*"
+}
+bad() {
+  FAILED=$((FAILED + 1))
+  printf '  FAIL  %s\n' "$*"
+}
 
 run_py() {
-  "$PY" - "$GENERATOR" <<'PYEOF' "$1"
+  "$PY" - "$GENERATOR" "$1" <<'PYEOF'
 import importlib.util
 import sys
 

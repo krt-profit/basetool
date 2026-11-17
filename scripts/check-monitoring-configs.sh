@@ -86,7 +86,7 @@ check_alertmanager() {
     for name in "${!AM_DUMMY[@]}"; do
       export "${name}=${AM_DUMMY[$name]}"
     done
-    envsubst < "$template" > "$rendered"
+    envsubst <"$template" >"$rendered"
   )
   if grep -nF "\${" "$rendered" | grep -v '^[0-9]*:[[:space:]]*#'; then
     echo "the rendered alertmanager.yml still contains \${...}" >&2
@@ -109,7 +109,7 @@ check_alloy_validate() {
   local image out status=0
   image="$(image_of alloy)" || return 1
   out="$(docker run --rm -v "${MONITORING_DIR}/alloy:/cfg:ro" "$image" validate /cfg/config.alloy 2>&1)" || status=$?
-  if (( status != 0 )) || [[ -n "$out" ]]; then
+  if ((status != 0)) || [[ -n "$out" ]]; then
     printf '%s\n' "$out" >&2
     return 1
   fi

@@ -167,9 +167,17 @@ def _shown(hits: list[str]) -> str:
     return ", ".join(hits[:3]) + (f" and {len(hits) - 3} more" if len(hits) > 3 else "")
 
 
-def decide(base: str, head: str, dockerfile: str | None, changed: list[str] | None,
-           changelog_head: str, changelog_base: str, base_is_ancestor: bool,
-           extra_own: dict[str, list[str]] | None = None, extra_shared: list[str] | None = None) -> dict:
+def decide(
+    base: str,
+    head: str,
+    dockerfile: str | None,
+    changed: list[str] | None,
+    changelog_head: str,
+    changelog_base: str,
+    base_is_ancestor: bool,
+    extra_own: dict[str, list[str]] | None = None,
+    extra_shared: list[str] | None = None,
+) -> dict:
     """Return the git-side decision for one push, per module.
 
     :param base: the previous main tip (``github.event.before``).
@@ -183,9 +191,16 @@ def decide(base: str, head: str, dockerfile: str | None, changed: list[str] | No
     :param extra_shared: additional shared inputs (the dry run's legacy copies).
     :return: the decision described in the module docstring.
     """
+
     def everything(reason: str) -> dict:
-        return {"rebuild": list(MODULES), "reuse": [], "reason": reason,
-                "modules": {m: {"rebuild": True, "reason": reason, "inputs_changed": []} for m in MODULES}}
+        return {
+            "rebuild": list(MODULES),
+            "reuse": [],
+            "reason": reason,
+            "modules": {
+                m: {"rebuild": True, "reason": reason, "inputs_changed": []} for m in MODULES
+            },
+        }
 
     if not re.fullmatch(r"[0-9a-f]{40}", base or "") or base == ZERO_SHA:
         return everything(f"no previous main tip to compare against (base={base!r})")
@@ -214,14 +229,23 @@ def decide(base: str, head: str, dockerfile: str | None, changed: list[str] | No
     for m in MODULES:
         hits = touched_inputs(changed, own[m])
         if hits:
-            modules[m] = {"rebuild": True, "reason": f"{len(hits)} own input(s) changed: {_shown(hits)}",
-                          "inputs_changed": hits}
+            modules[m] = {
+                "rebuild": True,
+                "reason": f"{len(hits)} own input(s) changed: {_shown(hits)}",
+                "inputs_changed": hits,
+            }
         else:
-            modules[m] = {"rebuild": False, "reason": "no own or shared input changed", "inputs_changed": []}
+            modules[m] = {
+                "rebuild": False,
+                "reason": "no own or shared input changed",
+                "inputs_changed": [],
+            }
     rebuild = [m for m in MODULES if modules[m]["rebuild"]]
     reuse = [m for m in MODULES if not modules[m]["rebuild"]]
-    reason = (f"rebuild {', '.join(rebuild) or 'nothing'}, re-tag {', '.join(reuse) or 'nothing'} "
-              f"({len(changed)} changed file(s), no shared input among them)")
+    reason = (
+        f"rebuild {', '.join(rebuild) or 'nothing'}, re-tag {', '.join(reuse) or 'nothing'} "
+        f"({len(changed)} changed file(s), no shared input among them)"
+    )
     return {"rebuild": rebuild, "reuse": reuse, "reason": reason, "modules": modules}
 
 
@@ -245,8 +269,9 @@ def show(rev: str, path: str) -> str | None:
     return proc.stdout if proc.returncode == 0 else None
 
 
-def decide_from_git(base: str, head: str, dockerfile_override: str | None = None,
-                    legacy: bool = False) -> dict:
+def decide_from_git(
+    base: str, head: str, dockerfile_override: str | None = None, legacy: bool = False
+) -> dict:
     """Gather the git facts for one push and decide.
 
     :param base: the previous main tip.
@@ -300,11 +325,17 @@ def dry_run(count: int, ref: str) -> int:
         marks = "".join(m[0].upper() if m in decision["reuse"] else "." for m in MODULES)
         print(f"re-tag[{marks}] {head[:9]} {subject[:55]:<55} | {decision['reason'][:80]}")
     saved = sum(jobs.values())
-    print(f"\n{len(revs)} commits, {len(revs) * len(MODULES)} module builds "
-          f"({len(revs) * len(MODULES) * 2} build jobs, two platforms each).")
-    print(f"per-module reuse: {saved} module builds re-tagged ({saved * 2} build jobs) -- "
-          + ", ".join(f"{m} {n}" for m, n in jobs.items()))
-    print(f"all-three reuse (for comparison): {whole} commits ({whole * len(MODULES) * 2} build jobs).")
+    print(
+        f"\n{len(revs)} commits, {len(revs) * len(MODULES)} module builds "
+        f"({len(revs) * len(MODULES) * 2} build jobs, two platforms each)."
+    )
+    print(
+        f"per-module reuse: {saved} module builds re-tagged ({saved * 2} build jobs) -- "
+        + ", ".join(f"{m} {n}" for m, n in jobs.items())
+    )
+    print(
+        f"all-three reuse (for comparison): {whole} commits ({whole * len(MODULES) * 2} build jobs)."
+    )
     return 0
 
 
@@ -313,8 +344,9 @@ SHA_RE = re.compile(r"[0-9a-f]{40}")
 BASE_SEARCH_LIMIT = 20
 
 
-def skip_decision(event: str, pushed_ref: str, head: str, tip: str, head_behind_tip: bool,
-                  release_in_range: bool) -> dict:
+def skip_decision(
+    event: str, pushed_ref: str, head: str, tip: str, head_behind_tip: bool, release_in_range: bool
+) -> dict:
     """Decide whether a main-push run is superseded and may skip everything (ADR-0137).
 
     Skips only a ``push`` to ``refs/heads/main`` whose commit is a strict ancestor of the current
@@ -329,6 +361,7 @@ def skip_decision(event: str, pushed_ref: str, head: str, tip: str, head_behind_
         section.
     :return: ``{"skip": bool, "reason": str}``.
     """
+
     def result(skip: bool, reason: str) -> dict:
         return {"skip": skip, "reason": reason}
 
@@ -339,12 +372,20 @@ def skip_decision(event: str, pushed_ref: str, head: str, tip: str, head_behind_
     if tip == head:
         return result(False, "this commit is the tip of main")
     if not head_behind_tip:
-        return result(False, f"this commit is not an ancestor of main's tip {tip[:12]} (force push?)")
+        return result(
+            False, f"this commit is not an ancestor of main's tip {tip[:12]} (force push?)"
+        )
     if release_in_range:
-        return result(False, f"superseded by {tip[:12]}, but the range contains a release commit, "
-                             "whose images the tag run re-tags")
-    return result(True, f"superseded: main's tip is already {tip[:12]}, whose own run publishes the "
-                        f"newer state; building {head[:12]} would only move :edge back")
+        return result(
+            False,
+            f"superseded by {tip[:12]}, but the range contains a release commit, "
+            "whose images the tag run re-tags",
+        )
+    return result(
+        True,
+        f"superseded: main's tip is already {tip[:12]}, whose own run publishes the "
+        f"newer state; building {head[:12]} would only move :edge back",
+    )
 
 
 def skip_from_git(event: str, pushed_ref: str, head: str, before: str, tip: str) -> dict:
@@ -357,17 +398,24 @@ def skip_from_git(event: str, pushed_ref: str, head: str, before: str, tip: str)
     :param tip: ``origin/main`` as fetched at plan time.
     :return: the decision, plus ``head`` and ``tip``.
     """
-    behind = (bool(SHA_RE.fullmatch(tip or "")) and tip != head
-              and git("merge-base", "--is-ancestor", head, tip).returncode == 0)
+    behind = (
+        bool(SHA_RE.fullmatch(tip or ""))
+        and tip != head
+        and git("merge-base", "--is-ancestor", head, tip).returncode == 0
+    )
     release = True
     if SHA_RE.fullmatch(before or "") and before != ZERO_SHA:
-        release = is_release_commit(show(head, "CHANGELOG.md") or "", show(before, "CHANGELOG.md") or "")
+        release = is_release_commit(
+            show(head, "CHANGELOG.md") or "", show(before, "CHANGELOG.md") or ""
+        )
     decision = skip_decision(event, pushed_ref, head, tip, behind, release)
     decision.update({"head": head, "tip": tip})
     return decision
 
 
-def base_candidates(chain: list[str], before_is_ancestor: bool, limit: int = BASE_SEARCH_LIMIT) -> list[str]:
+def base_candidates(
+    chain: list[str], before_is_ancestor: bool, limit: int = BASE_SEARCH_LIMIT
+) -> list[str]:
     """Order the commits the main path may take its reuse base from.
 
     The workflow takes the first candidate whose three images exist and decides against it.
@@ -424,17 +472,36 @@ def selftest() -> int:
     )
     own, shared = input_sets(dockerfile)
     check("COPY flags are dropped, the wrapper is shared", "gradlew" in shared)
-    check("a continued COPY line is joined, logging-support is shared", "logging-support/src/main" in shared)
+    check(
+        "a continued COPY line is joined, logging-support is shared",
+        "logging-support/src/main" in shared,
+    )
     check("technical-support is a shared source input", "technical-support/src/main" in shared)
-    check("${MODULE} sources become each module's own input",
-          all(own[m] == [f"{m}/src/main"] + (["frontend/oss-bundled-components.json"] if m == "frontend" else [])
-              for m in MODULES))
-    check("module build scripts are shared (Licensee reports, project configuration)",
-          "backend/build.gradle.kts" in shared and "frontend/build.gradle.kts" in shared)
+    check(
+        "${MODULE} sources become each module's own input",
+        all(
+            own[m]
+            == [f"{m}/src/main"]
+            + (["frontend/oss-bundled-components.json"] if m == "frontend" else [])
+            for m in MODULES
+        ),
+    )
+    check(
+        "module build scripts are shared (Licensee reports, project configuration)",
+        "backend/build.gradle.kts" in shared and "frontend/build.gradle.kts" in shared,
+    )
     check("COPY --from reads no context path", not any("extracted" in s for s in shared))
-    check("the Dockerfile, .dockerignore and the workflow are shared",
-          all(p in shared for p in (APP_DOCKERFILE, ".dockerignore", ".github/workflows/release-images.yml")))
-    check("a prefix match needs a path boundary", touched_inputs(["gradle.properties.bak", "gradlew.bat"], shared) == [])
+    check(
+        "the Dockerfile, .dockerignore and the workflow are shared",
+        all(
+            p in shared
+            for p in (APP_DOCKERFILE, ".dockerignore", ".github/workflows/release-images.yml")
+        ),
+    )
+    check(
+        "a prefix match needs a path boundary",
+        touched_inputs(["gradle.properties.bak", "gradlew.bat"], shared) == [],
+    )
 
     library_dockerfile = (
         dockerfile
@@ -445,106 +512,206 @@ def selftest() -> int:
         + "COPY test-support/src/main/ test-support/src/main/\n"
     )
     lib_own, lib_shared = input_sets(library_dockerfile)
-    check("a <app>-<name> src/main tree is the application's own input",
-          {"backend-exchange/src/main", "backend-bank/src/main"} <= set(lib_own["backend"])
-          and not any(p.startswith("backend-") for p in lib_own["frontend"] + lib_own["ingest"]))
-    check("a library module's build script and settings stay shared",
-          "backend-exchange/build.gradle.kts" in lib_shared
-          and "backend-exchange/build-settings.properties" in lib_shared)
-    check("a name without the hyphen boundary, and test-support, stay shared",
-          "backendx/src/main" in lib_shared and "test-support/src/main" in lib_shared)
-    check("library_owner reads only <app>-<name>/src/main",
-          library_owner("backend-exchange/src/main/java") == "backend"
-          and library_owner("ingest-relay/src/main") == "ingest"
-          and library_owner("backend-exchange/src/test") is None
-          and library_owner("backend-/src/main") is None
-          and library_owner("backend/src/main") is None)
-    lib_decision = decide("a" * 40, "b" * 40, library_dockerfile,
-                          ["backend-exchange/src/main/java/A.java", "docs/a.md"],
-                          "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n",
-                          "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n", True)
-    check("a library module's source rebuilds its application only",
-          lib_decision["rebuild"] == ["backend"] and lib_decision["reuse"] == ["frontend", "ingest"])
-    lib_shared_decision = decide("a" * 40, "b" * 40, library_dockerfile,
-                                 ["backend-exchange/build.gradle.kts"],
-                                 "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n",
-                                 "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n", True)
-    check("a library module's build script rebuilds all three", lib_shared_decision["rebuild"] == list(MODULES))
+    check(
+        "a <app>-<name> src/main tree is the application's own input",
+        {"backend-exchange/src/main", "backend-bank/src/main"} <= set(lib_own["backend"])
+        and not any(p.startswith("backend-") for p in lib_own["frontend"] + lib_own["ingest"]),
+    )
+    check(
+        "a library module's build script and settings stay shared",
+        "backend-exchange/build.gradle.kts" in lib_shared
+        and "backend-exchange/build-settings.properties" in lib_shared,
+    )
+    check(
+        "a name without the hyphen boundary, and test-support, stay shared",
+        "backendx/src/main" in lib_shared and "test-support/src/main" in lib_shared,
+    )
+    check(
+        "library_owner reads only <app>-<name>/src/main",
+        library_owner("backend-exchange/src/main/java") == "backend"
+        and library_owner("ingest-relay/src/main") == "ingest"
+        and library_owner("backend-exchange/src/test") is None
+        and library_owner("backend-/src/main") is None
+        and library_owner("backend/src/main") is None,
+    )
+    lib_decision = decide(
+        "a" * 40,
+        "b" * 40,
+        library_dockerfile,
+        ["backend-exchange/src/main/java/A.java", "docs/a.md"],
+        "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n",
+        "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n",
+        True,
+    )
+    check(
+        "a library module's source rebuilds its application only",
+        lib_decision["rebuild"] == ["backend"] and lib_decision["reuse"] == ["frontend", "ingest"],
+    )
+    lib_shared_decision = decide(
+        "a" * 40,
+        "b" * 40,
+        library_dockerfile,
+        ["backend-exchange/build.gradle.kts"],
+        "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n",
+        "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n",
+        True,
+    )
+    check(
+        "a library module's build script rebuilds all three",
+        lib_shared_decision["rebuild"] == list(MODULES),
+    )
 
     base, head = "a" * 40, "b" * 40
     cut = "## [v1.8.5](https://x/v1.8.5) - 2026-09-20\n"
     old = "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n"
 
     def d(changed, head_log=old, **kw):
-        return decide(base, head, kw.get("df", dockerfile), changed, head_log, old, kw.get("anc", True))
+        return decide(
+            base, head, kw.get("df", dockerfile), changed, head_log, old, kw.get("anc", True)
+        )
 
     r = d(["docs/a.md", "frontend/src/test/java/ATest.java"])
-    check("docs and tests only: all three re-tag", r["reuse"] == list(MODULES) and r["rebuild"] == [])
+    check(
+        "docs and tests only: all three re-tag", r["reuse"] == list(MODULES) and r["rebuild"] == []
+    )
     r = d(["frontend/src/main/resources/static/css/app.css"])
-    check("a frontend source rebuilds the frontend only",
-          r["rebuild"] == ["frontend"] and r["reuse"] == ["backend", "ingest"])
+    check(
+        "a frontend source rebuilds the frontend only",
+        r["rebuild"] == ["frontend"] and r["reuse"] == ["backend", "ingest"],
+    )
     r = d(["frontend/oss-bundled-components.json"])
     check("the OSS component list rebuilds the frontend only", r["rebuild"] == ["frontend"])
     r = d(["backend/src/main/A.java", "ingest/src/main/B.java"])
-    check("backend and ingest sources rebuild those two", r["rebuild"] == ["backend", "ingest"] and r["reuse"] == ["frontend"])
-    for path in ("logging-support/src/main/L.java", "technical-support/src/main/T.java", "gradle/verification-metadata.xml", "gradle/libs.versions.toml",
-                 "backend/build.gradle.kts", APP_DOCKERFILE, ".dockerignore",
-                 ".github/actions/setup-buildx/Dockerfile", ".github/scripts/app_version.py"):
+    check(
+        "backend and ingest sources rebuild those two",
+        r["rebuild"] == ["backend", "ingest"] and r["reuse"] == ["frontend"],
+    )
+    for path in (
+        "logging-support/src/main/L.java",
+        "technical-support/src/main/T.java",
+        "gradle/verification-metadata.xml",
+        "gradle/libs.versions.toml",
+        "backend/build.gradle.kts",
+        APP_DOCKERFILE,
+        ".dockerignore",
+        ".github/actions/setup-buildx/Dockerfile",
+        ".github/scripts/app_version.py",
+    ):
         r = d([path, "frontend/src/main/C.java"])
         check(f"shared input {path} rebuilds all three", r["rebuild"] == list(MODULES))
-    check("a release commit rebuilds all three, even docs-only",
-          d(["CHANGELOG.md"], head_log=cut + old)["rebuild"] == list(MODULES))
-    check("the all-zero base of a new branch rebuilds all three",
-          decide(ZERO_SHA, head, dockerfile, [], old, old, True)["rebuild"] == list(MODULES))
+    check(
+        "a release commit rebuilds all three, even docs-only",
+        d(["CHANGELOG.md"], head_log=cut + old)["rebuild"] == list(MODULES),
+    )
+    check(
+        "the all-zero base of a new branch rebuilds all three",
+        decide(ZERO_SHA, head, dockerfile, [], old, old, True)["rebuild"] == list(MODULES),
+    )
     check("a non-ancestor base rebuilds all three", d([], anc=False)["rebuild"] == list(MODULES))
     check("an unreadable Dockerfile rebuilds all three", d([], df=None)["rebuild"] == list(MODULES))
-    check("a failed diff rebuilds all three",
-          decide(base, head, dockerfile, None, old, old, True)["rebuild"] == list(MODULES))
+    check(
+        "a failed diff rebuilds all three",
+        decide(base, head, dockerfile, None, old, old, True)["rebuild"] == list(MODULES),
+    )
     r = d(["ingest/src/main/X.java"])
-    check("rebuild and reuse partition the three modules",
-          sorted(r["rebuild"] + r["reuse"]) == sorted(MODULES) and not set(r["rebuild"]) & set(r["reuse"]))
-    r = decide(base, head, dockerfile, ["backend/Dockerfile"], old, old, True, LEGACY_OWN, LEGACY_SHARED)
-    check("dry run: a legacy per-module Dockerfile rebuilds its module", r["rebuild"] == ["backend"])
+    check(
+        "rebuild and reuse partition the three modules",
+        sorted(r["rebuild"] + r["reuse"]) == sorted(MODULES)
+        and not set(r["rebuild"]) & set(r["reuse"]),
+    )
+    r = decide(
+        base, head, dockerfile, ["backend/Dockerfile"], old, old, True, LEGACY_OWN, LEGACY_SHARED
+    )
+    check(
+        "dry run: a legacy per-module Dockerfile rebuilds its module", r["rebuild"] == ["backend"]
+    )
 
     tip, h = "c" * 40, "b" * 40
     main = ("push", "refs/heads/main")
     check("skip: a superseded main push skips", skip_decision(*main, h, tip, True, False)["skip"])
     check("skip: the tip of main builds", not skip_decision(*main, h, h, False, False)["skip"])
-    check("skip: a superseded release commit builds", not skip_decision(*main, h, tip, True, True)["skip"])
-    check("skip: workflow_dispatch never skips",
-          not skip_decision("workflow_dispatch", "refs/heads/main", h, tip, True, False)["skip"])
-    check("skip: a tag push never skips",
-          not skip_decision("push", "refs/tags/v1.9.0", h, tip, True, False)["skip"])
+    check(
+        "skip: a superseded release commit builds",
+        not skip_decision(*main, h, tip, True, True)["skip"],
+    )
+    check(
+        "skip: workflow_dispatch never skips",
+        not skip_decision("workflow_dispatch", "refs/heads/main", h, tip, True, False)["skip"],
+    )
+    check(
+        "skip: a tag push never skips",
+        not skip_decision("push", "refs/tags/v1.9.0", h, tip, True, False)["skip"],
+    )
     check("skip: an unreadable tip builds", not skip_decision(*main, h, "", True, False)["skip"])
-    check("skip: a commit that is not behind the tip (force push) builds",
-          not skip_decision(*main, h, tip, False, False)["skip"])
+    check(
+        "skip: a commit that is not behind the tip (force push) builds",
+        not skip_decision(*main, h, tip, False, False)["skip"],
+    )
 
     chain = [c * 40 for c in "abcdef"]
-    check("base: candidates are the before chain, newest first", base_candidates(chain, True, 20) == chain)
+    check(
+        "base: candidates are the before chain, newest first",
+        base_candidates(chain, True, 20) == chain,
+    )
     check("base: the search is bounded", base_candidates(chain, True, 3) == chain[:3])
-    check("base: a before that is not an ancestor offers nothing", base_candidates(chain, False, 20) == [])
+    check(
+        "base: a before that is not an ancestor offers nothing",
+        base_candidates(chain, False, 20) == [],
+    )
     check("base: an empty chain offers nothing", base_candidates([], True, 20) == [])
-    check("base: a non-sha line is dropped", base_candidates(["x", chain[0]], True, 20) == [chain[0]])
+    check(
+        "base: a non-sha line is dropped", base_candidates(["x", chain[0]], True, 20) == [chain[0]]
+    )
 
     real = (REPO / APP_DOCKERFILE).read_text(encoding="utf-8")
     real_own, real_shared = input_sets(real)
     for m in MODULES:
-        check(f"the real Dockerfile yields {m}/src/main as {m}'s own input", f"{m}/src/main" in real_own[m])
-    for must in ("gradle", "build-logic", "logging-support/src/main", "technical-support/src/main", "build.gradle.kts",
-                 "backend/build.gradle.kts", "lombok.config"):
+        check(
+            f"the real Dockerfile yields {m}/src/main as {m}'s own input",
+            f"{m}/src/main" in real_own[m],
+        )
+    for must in (
+        "gradle",
+        "build-logic",
+        "logging-support/src/main",
+        "technical-support/src/main",
+        "build.gradle.kts",
+        "backend/build.gradle.kts",
+        "lombok.config",
+    ):
         check(f"the real Dockerfile yields shared input {must}", must in real_shared)
     real_sources = copy_sources(real)
-    check("the real Dockerfile copies the shared Lombok configuration", "lombok.config" in real_sources)
+    check(
+        "the real Dockerfile copies the shared Lombok configuration",
+        "lombok.config" in real_sources,
+    )
     configuration_change = decide(base, head, real, ["lombok.config"], old, old, True)
-    check("a Lombok configuration change rebuilds every application image",
-          configuration_change["rebuild"] == list(MODULES) and configuration_change["reuse"] == [])
-    generated_change = decide(base, head, real, ["backend/src/main/resources/api/openapi.json"], old, old, True)
-    check("the wire record OpenAPI input rebuilds the frontend", "frontend" in generated_change["rebuild"])
-    generator_change = decide(base, head, real,
-                              ["build-logic/src/main/kotlin/de/greluc/krt/profit/basetool/conventions/GenerateWireRecords.kt"],
-                              old, old, True)
-    check("the wire record JVM task rebuilds application images through shared build-logic",
-          generator_change["rebuild"] == list(MODULES) and generator_change["reuse"] == [])
+    check(
+        "a Lombok configuration change rebuilds every application image",
+        configuration_change["rebuild"] == list(MODULES) and configuration_change["reuse"] == [],
+    )
+    generated_change = decide(
+        base, head, real, ["backend/src/main/resources/api/openapi.json"], old, old, True
+    )
+    check(
+        "the wire record OpenAPI input rebuilds the frontend",
+        "frontend" in generated_change["rebuild"],
+    )
+    generator_change = decide(
+        base,
+        head,
+        real,
+        [
+            "build-logic/src/main/kotlin/de/greluc/krt/profit/basetool/conventions/GenerateWireRecords.kt"
+        ],
+        old,
+        old,
+        True,
+    )
+    check(
+        "the wire record JVM task rebuilds application images through shared build-logic",
+        generator_change["rebuild"] == list(MODULES) and generator_change["reuse"] == [],
+    )
     for path in MODULE_OWN:
         check(f"MODULE_OWN entry {path} is still a COPY source", path in real_sources)
 
@@ -563,15 +730,21 @@ def main() -> int:
     parser.add_argument("--dry-run", type=int, metavar="N")
     parser.add_argument("--ref", default="origin/main")
     parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--skip-check", action="store_true",
-                        help="decide whether a superseded main-push run skips (needs --event, --pushed-ref, "
-                             "--head, --before, --tip)")
+    parser.add_argument(
+        "--skip-check",
+        action="store_true",
+        help="decide whether a superseded main-push run skips (needs --event, --pushed-ref, "
+        "--head, --before, --tip)",
+    )
     parser.add_argument("--event", default="")
     parser.add_argument("--pushed-ref", default="")
     parser.add_argument("--before", default="")
     parser.add_argument("--tip", default="")
-    parser.add_argument("--candidates", action="store_true",
-                        help="print the reuse-base candidates for --before/--head, newest first")
+    parser.add_argument(
+        "--candidates",
+        action="store_true",
+        help="print the reuse-base candidates for --before/--head, newest first",
+    )
     parser.add_argument("--limit", type=int, default=BASE_SEARCH_LIMIT)
     args = parser.parse_args()
     if args.selftest:
@@ -581,7 +754,9 @@ def main() -> int:
     if not args.head:
         parser.error("--head is required")
     if args.skip_check:
-        print(json.dumps(skip_from_git(args.event, args.pushed_ref, args.head, args.before, args.tip)))
+        print(
+            json.dumps(skip_from_git(args.event, args.pushed_ref, args.head, args.before, args.tip))
+        )
         return 0
     if args.candidates:
         print("\n".join(candidates_from_git(args.before, args.head, args.limit)))

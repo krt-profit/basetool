@@ -35,15 +35,30 @@ MIN_JAVA_FILES = 3800
 
 FLAGS = re.compile(r"--enable-preview|jdk\.incubator")
 MODULE_IMPORT = re.compile(r"^[ \t]*import[ \t]+module[ \t]+[\w.]+[ \t]*;", re.M)
-SKIPPED_SUFFIXES = (".md", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".woff", ".woff2",
-                    ".ttf", ".jar", ".p12", ".pdf", ".zip")
+SKIPPED_SUFFIXES = (
+    ".md",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".svg",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".jar",
+    ".p12",
+    ".pdf",
+    ".zip",
+)
 SKIPPED_PREFIXES = ("docs/archive/",)
 
 
 def tracked_files(root: Path) -> list[str]:
     """Lists the files git tracks under a root."""
-    out = subprocess.run(["git", "-C", str(root), "ls-files"], capture_output=True, text=True,
-                         check=True).stdout
+    out = subprocess.run(
+        ["git", "-C", str(root), "ls-files"], capture_output=True, text=True, check=True
+    ).stdout
     return [line for line in out.splitlines() if line]
 
 
@@ -78,8 +93,10 @@ def check() -> int:
     """Checks the repository."""
     found, scanned, java = violations(REPO, tracked_files(REPO))
     if scanned < MIN_FILES or java < MIN_JAVA_FILES:
-        print(f"check-final-java-only: scanned {scanned} files and {java} Java files, fewer than"
-              f" the floors {MIN_FILES} and {MIN_JAVA_FILES}; the scan lost its selection")
+        print(
+            f"check-final-java-only: scanned {scanned} files and {java} Java files, fewer than"
+            f" the floors {MIN_FILES} and {MIN_JAVA_FILES}; the scan lost its selection"
+        )
         return 1
     if found:
         print("check-final-java-only: a non-final Java feature is opted into (ADR-0223):")

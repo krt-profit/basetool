@@ -43,14 +43,31 @@ SELF = "scripts/check-ingest-audience.py"
 KEY_LINE = re.compile(r"^(\s*)expected-audiences\s*:(.*)$")
 COMMENT_LINE = re.compile(r"^\s*#")
 ENV_ASSIGNMENT = re.compile(
-    r"BASETOOL_INGEST_EXPECTED_AUDIENCES\s*(?:=|:-|:)\s*[\"'`]?\s*[\w.,-]*" + re.escape(BACKEND_AUDIENCE)
+    r"BASETOOL_INGEST_EXPECTED_AUDIENCES\s*(?:=|:-|:)\s*[\"'`]?\s*[\w.,-]*"
+    + re.escape(BACKEND_AUDIENCE)
 )
 TEMPLATE_ASSIGNMENT = re.compile(
     r"APP_SECURITY_JWT_EXPECTED_AUDIENCES\s*=.*" + re.escape(BACKEND_AUDIENCE)
 )
 TEXT_SUFFIXES = {
-    ".md", ".yml", ".yaml", ".env", ".example", ".tmpl", ".properties", ".txt", ".sh", ".py",
-    ".java", ".kts", ".json", ".conf", ".container", ".service", ".j2", "",
+    ".md",
+    ".yml",
+    ".yaml",
+    ".env",
+    ".example",
+    ".tmpl",
+    ".properties",
+    ".txt",
+    ".sh",
+    ".py",
+    ".java",
+    ".kts",
+    ".json",
+    ".conf",
+    ".container",
+    ".service",
+    ".j2",
+    "",
 }
 
 
@@ -129,7 +146,9 @@ def check(root: pathlib.Path, files: list[str]) -> list[str]:
 
     template = root / INGEST_ENV_TEMPLATE
     if template.is_file():
-        problems.extend(check_env_template(INGEST_ENV_TEMPLATE, template.read_text(encoding="utf-8")))
+        problems.extend(
+            check_env_template(INGEST_ENV_TEMPLATE, template.read_text(encoding="utf-8"))
+        )
 
     for name in files:
         if is_exempt(name) or not is_text_candidate(name):
@@ -164,15 +183,21 @@ def selftest() -> int:
     cases = {
         "clean": ({}, 0),
         "A: value is the backend audience": (
-            {INGEST_MAIN_CONFIG: clean_yaml.replace("${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}",
-                                                    "basetool-backend")},
+            {
+                INGEST_MAIN_CONFIG: clean_yaml.replace(
+                    "${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}", "basetool-backend"
+                )
+            },
             1,
         ),
         "A: comment prescribes the backend audience (the 2026-09 defect)": (
-            {INGEST_MAIN_CONFIG: clean_yaml.replace(
-                "      # The gateway's",
-                "      # Opt-in. Set to `basetool-backend` ONLY after both tokens carry it.\n"
-                "      # The gateway's")},
+            {
+                INGEST_MAIN_CONFIG: clean_yaml.replace(
+                    "      # The gateway's",
+                    "      # Opt-in. Set to `basetool-backend` ONLY after both tokens carry it.\n"
+                    "      # The gateway's",
+                )
+            },
             1,
         ),
         "A: vacuity -- the key vanished": (
@@ -184,12 +209,15 @@ def selftest() -> int:
             1,
         ),
         "B: compose default": (
-            {"docker-compose.yml":
-                "      APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${BASETOOL_INGEST_EXPECTED_AUDIENCES:-basetool-backend}\n"},
+            {
+                "docker-compose.yml": "      APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${BASETOOL_INGEST_EXPECTED_AUDIENCES:-basetool-backend}\n"
+            },
             1,
         ),
         "B: runbook with a list value": (
-            {"docs/RUNBOOK.md": "    BASETOOL_INGEST_EXPECTED_AUDIENCES=basetool-ingest,basetool-backend\n"},
+            {
+                "docs/RUNBOOK.md": "    BASETOOL_INGEST_EXPECTED_AUDIENCES=basetool-ingest,basetool-backend\n"
+            },
             1,
         ),
         "B: history is exempt": (
@@ -197,7 +225,9 @@ def selftest() -> int:
             0,
         ),
         "B: prose that warns against it passes": (
-            {"docs/SETUP.md": "Never set `BASETOOL_INGEST_EXPECTED_AUDIENCES` to the backend value.\n"},
+            {
+                "docs/SETUP.md": "Never set `BASETOOL_INGEST_EXPECTED_AUDIENCES` to the backend value.\n"
+            },
             0,
         ),
         "C: env template literal": (

@@ -17,8 +17,8 @@ wrapper_jar='gradle/wrapper/gradle-wrapper.jar'
 stamp='frontend/build/bootBuildInfo/META-INF/build-info.properties'
 
 [[ -f ${wrapper_jar} ]] || fail "${wrapper_jar} is missing"
-[[ -e .git ]] ||
-  fail ".git is missing, so the probe short-circuits on its first condition and the PATH half of \
+[[ -e .git ]] \
+  || fail ".git is missing, so the probe short-circuits on its first condition and the PATH half of \
 the guard would never be exercised; run this in a git checkout"
 
 java_bin=''
@@ -54,10 +54,10 @@ fi
 [[ -n ${project_version} ]] || fail 'could not read the project version from build.gradle.kts'
 
 git_version="$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || true)"
-[[ -n ${git_version} ]] ||
-  fail 'git describe produced nothing; the git-present half cannot be checked'
-[[ ${git_version} != "${project_version}" ]] ||
-  fail "git describe answers ${git_version}, which is the project version, so a fallback and a \
+[[ -n ${git_version} ]] \
+  || fail 'git describe produced nothing; the git-present half cannot be checked'
+[[ ${git_version} != "${project_version}" ]] \
+  || fail "git describe answers ${git_version}, which is the project version, so a fallback and a \
 git-derived stamp are indistinguishable"
 
 gradle_run() {
@@ -81,8 +81,8 @@ expect_stamp() {
   local expected="$1" what="$2" actual
   [[ -f ${stamp} ]] || fail "${what}: ${stamp} was not written"
   actual="$(sed -n 's/^build\.version=//p' "${stamp}")"
-  [[ ${actual} == "${expected}" ]] ||
-    fail "${what}: build.version is '${actual}', expected '${expected}'"
+  [[ ${actual} == "${expected}" ]] \
+    || fail "${what}: build.version is '${actual}', expected '${expected}'"
 }
 
 note "project version: ${project_version}"
