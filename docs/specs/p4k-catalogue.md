@@ -224,16 +224,18 @@ The clean-up of diverging canonical UUIDs happens at the first `schemaVersion` 2
 separate migration. That run sets the P4K GUID (`p4k_uuid`) as the identity of each matched row,
 keeps the Wiki UUID in `external_uuid` (`game_item`, `ship_type`) or `scwiki_uuid` (the other
 kinds) and records each mismatch in the change report (`IDENTITY_MISMATCH`). Matching runs per
-kind: the P4K GUID, then the Wiki UUID, then a class name and a name that each identify exactly
-one row and one record of the catalogue. A run loads each kind's rows once and matches them in
+kind: the P4K GUID, then the Wiki UUID (a commodity's Wiki key, REQ-P4K-070), then a class name
+and a name that each identify exactly one row and one record of the catalogue. A run loads each kind's rows once and matches them in
 memory (`P4kRowIndex`), answering every step as its query on the rows' current values would, so an
 APPLY's length does not grow with one round trip per record. A row that two P4K GUIDs would claim, or a P4K GUID that
-two rows would claim (also two catalogue records sharing a name, as three commodities named
-"SLAM" do), is not resolved by the import: the conflict goes to the review list (REQ-P4K-016) and
-the admin merges or splits; the import never merges. A ship record a stored ship type already
-stands for is covered instead and opens no case (REQ-P4K-050); an item row that belongs to another
-listed item is no candidate (REQ-P4K-054), and an item row whose own SC Wiki UUID or class name
-names a free record moves to it (REQ-P4K-055). The Wiki/UEX duplicate merge
+two rows would claim (also two catalogue records sharing a name), is not resolved by the import:
+the conflict goes to the review list (REQ-P4K-016) and the admin merges or splits; the import never
+merges. A ship record a stored ship type already stands for is covered instead and opens no case
+(REQ-P4K-050); an item row that belongs to another listed item is no candidate (REQ-P4K-054), and an
+item row whose own SC Wiki UUID or class name names a free record moves to it (REQ-P4K-055). The
+packagings of one commodity, as the three "SLAM" records, are one commodity (REQ-P4K-071), and a
+commodity or resource-group row holding another listed record's GUID is no candidate
+(REQ-P4K-072). The Wiki/UEX duplicate merge
 (`ItemReconciliationService.mergeExisting`, ADR-0349) keeps the same rule: it never joins two items
 with different P4K GUIDs but opens a `GUID_CONFLICT` case for each GUID and leaves both rows as they
 are; a GUID only the retired row holds moves with all its P4K columns (`P4kItemParticipation`, the
@@ -553,13 +555,16 @@ assign) is neither counted nor logged again, so the report and the open list agr
 - a manufacturer name conflict (REQ-P4K-020, REQ-P4K-021) and a GUID conflict (REQ-P4K-007); an
   APPLY settles the ship cases (REQ-P4K-050) and the item cases itself: an open case of a GUID,
   conflict, seeded row or unclear playability that the run no longer raises closes as `RESOLVED`,
-  one it raises again reopens, and a partial kind settles only the GUIDs it lists (ADR-0393);
+  one it raises again reopens, and a partial kind settles only the GUIDs it lists (ADR-0393); the
+  commodity cases `GUID_CONFLICT`, `SEEDED_NOT_CREATABLE`, `RESOURCE_JOIN_NONE` and
+  `RESOURCE_JOIN_SEVERAL` and the resource-group `GUID_CONFLICT` settle the same way after their
+  pass (ADR-0396);
 - a starmap link and a shop link that is ambiguous or not found (REQ-P4K-035, REQ-P4K-043); a shop
   whose record names no place opens none;
 - a blueprint ingredient's `resourceGuid` or a `refinedSubtypeGuid` that joins no commodity or
   several (REQ-P4K-024);
-- a material without a resource group after an APPLY, resolved by assigning a group
-  (REQ-P4K-025);
+- a material the game files know without a resource group after an APPLY, resolved by assigning
+  a group (REQ-P4K-025, REQ-P4K-074);
 - a personal-blueprint row that resolves to no produced-item GUID or to several (REQ-P4K-029).
 
 An admin resolves a case as **keep** or **hide**. Hide works like the P4K stamp (REQ-P4K-013): the
@@ -575,6 +580,7 @@ lifts. The row records who resolved the case and when, and each resolution is an
 - [x] The resolution stores the admin and the time and writes one audit event.
 - [x] An APPLY closes the item cases it no longer raises and leaves an admin's decision; a refused
   duplicate merge opens its closed case again.
+- [x] An APPLY closes a commodity `GUID_CONFLICT` it no longer raises.
 
 `p4k_review_case` holds `status` (`OPEN`, `REVIEWED`), `resolution` (`KEEP`, `HIDE`),
 `resolved_by` and `resolved_at`; a resolution echoes the case version (`409` when stale), and a
@@ -596,7 +602,8 @@ sections, so a peer admin's open import page reloads its cases, its run history 
 banner in place (`CatalogueAdminLiveSync`, REQ-FE-015); a finished PREVIEW reloads none of them. A
 list that shrank below the page it shows reloads its last page.
 
-**Enforced by:** `P4kReviewServiceTest`, `P4kItemCaseRulesImportTest`, `P4kMergeConflictRecorderTest`,
+**Enforced by:** `P4kReviewServiceTest`, `P4kItemCaseRulesImportTest`, `P4kCommodityRulesImportTest`,
+`P4kMergeConflictRecorderTest`,
 `P4kCatalogueChangeTest`, `CatalogueAdminLiveSyncTest`,
 `frontend/scripts/catalogue-admin.test.mjs`, `AdminP4kImportPageControllerMvcTest`,
 `P4kImportReportControllerMvcTest`, `P4kImportReportE2eTest` · **Code:** `P4kReviewService` · **ADR:**
@@ -1032,7 +1039,8 @@ name, and the file exports (the handover report PDF, the purchasing CSV), show `
 ### REQ-P4K-024 — the P4K leads a commodity's identity, name, group, density and refined-from link
 
 - **Identity:** the commodity's own `guid` in a unique `material.p4k_uuid`; match order P4K GUID,
-  then the UEX id, then the name. `subtypeGuid` is an n:1, nullable link to the `ResourceType` of
+  then the Wiki key (REQ-P4K-070), then the name. `subtypeGuid` is an n:1, nullable link to the
+  `ResourceType` of
   the commodity's first composition entry, not a key (p4kx #1044: on LIVE 4.10.2, 170 commodities
   hold 167 distinct values; the three SLAM packagings share one, MedPens and the counterfeit Redfin
   Energy Modulators share one, and `Special_HolidayLetter` has none). It is stored in a non-unique
@@ -1054,7 +1062,8 @@ name, and the file exports (the handover report PDF, the purchasing CSV), show `
 
 **Acceptance**
 
-- [x] Three commodities sharing one `subtypeGuid` import as three rows keyed by their `guid`.
+- [x] Three commodities of different names sharing one `subtypeGuid` import as three rows keyed by
+  their `guid`.
 - [x] An ingredient whose `resourceGuid` matches two commodities, or none, opens a review case.
 - [x] The admin's assignment of such an ingredient survives the next APPLY.
 - [x] A UEX commodity sync leaves the P4K name and density of a P4K-known material and reports a
@@ -1072,8 +1081,9 @@ An admin resolves such a case as `ASSIGN` with a live material from
 it; the case holds the material as its row, and every later APPLY links that resource's recipe
 lines to it and makes it the refined material of every commodity whose `refinedSubtypeGuid` is
 that resource (`P4kResourceAssignments`).
-Several catalogue records sharing a name (three "SLAM") match no row by name; each opens a
-`GUID_CONFLICT` case. A name the P4K leads that another material already holds is not written and
+Several catalogue records sharing a name match no row by name; each opens a `GUID_CONFLICT` case,
+unless they are packagings of one commodity (REQ-P4K-071) or the row belongs to another listed
+record (REQ-P4K-072). A name the P4K leads that another material already holds is not written and
 opens a `GUID_CONFLICT` case on the row. `material.type` is never `null`: "stays `null`" means
 it keeps its value, and a created row starts as `NO_REFINE`. A UEX name or SC Wiki density that
 differs on a row with a `p4k_uuid` is reported as `P4K_DISAGREEMENT`. The P4K also leads
@@ -1094,8 +1104,9 @@ zurückgeben", which calls `DELETE /api/v1/materials/{id}/p4k-overrides/{field}?
 release only clears the flag and keeps the stored value: the Basetool keeps no P4K value per row,
 so the next APPLY writes it. Both writes check the material's `@Version`.
 
-**Enforced by:** `P4kCommodityPrecedenceTest`, `UexCommodityServiceTest`,
-`P4kMaterialOverrideTest`, `MaterialP4kOverrideServiceTest`, `AdminMaterialsPageControllerMvcTest`
+**Enforced by:** `P4kCommodityPrecedenceTest`, `P4kCommodityRulesImportTest`,
+`UexCommodityServiceTest`, `P4kMaterialOverrideTest`, `MaterialP4kOverrideServiceTest`,
+`AdminMaterialsPageControllerMvcTest`
 · **Code:** `P4kCommodityReconciler`, `P4kCommodityJoin`, `MaterialP4kOverride` · **ADR:**
 [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891
 
@@ -1106,10 +1117,11 @@ The `resourceGroups` kind becomes the commodity categories: P4K GUID as identity
 `parentGuid` as the parent with a cycle guard (a group never becomes its own ancestor). The
 admin-maintained categories are not mapped onto groups: each P4K-matched material takes its group
 from its catalogue record on APPLY (`typeGuid`, REQ-P4K-024), unless an admin overrides it (the
-admin override of REQ-P4K-024). A material that has no group after an
-APPLY (the P4K matched no record, or its record names no group) opens a review case "no resource
-group", which an admin resolves by assigning an existing group; admins never create or rename a
-group or a category. An admin category is retired once no material references it; until then it
+admin override of REQ-P4K-024). A material no record matches takes the group of the
+`ResourceType` it stands for (REQ-P4K-073). A material the game files know that has no group after
+an APPLY (its record names no group, or its type no single group) opens a review case "no resource
+group", which an admin resolves by assigning an existing group; one the game files lack opens none
+(REQ-P4K-074). Admins never create or rename a group or a category. An admin category is retired once no material references it; until then it
 stays readable, so no material shows without a category. A group that vanishes from a complete
 kind is stamped like any other P4K row (REQ-P4K-011). (Owner decision on #3037: production's two
 admin categories "Erz" and "Raffiniertes Erz" each spread over three resource groups, so no
@@ -1124,23 +1136,34 @@ category-to-group mapping holds.)
 - [x] A material without a group after an APPLY opens one case, the admin's assignment of an
   existing group resolves it with an audit event, and an admin category or a keep is refused.
 - [x] No admin endpoint creates or renames a category.
+- [x] Of two groups sharing a name, the one of the higher GUID shows its class name in parentheses,
+  in English and German, whatever the catalogue's order.
 - [x] An APPLY keeps a group an admin overrides, reports the P4K group, and opens no "no resource
   group" case while the overriding group is a resource group; the case's `ASSIGN` sets the same
   override.
 
 The groups are the rows of `material_category` (V348: `p4k_uuid`, `class_name`, `name_de`,
-`parent_id` and the P4K stamps; the name is no longer unique, as two groups are "Man-made"). They
+`parent_id` and the P4K stamps; the name is not unique). Groups of one catalogue sharing an English
+or a German name, ignoring case, stay distinguishable wherever the category shows: of each set of
+namesakes the group of the lowest GUID keeps the plain name, and every other takes its class name
+in readable form in parentheses (underscores as blanks, words split at a lower-case letter or digit
+before an upper-case one), so LIVE 4.10.200's two "Man-made" / "Hergestellte Produkte" groups write
+"Hergestellte Produkte" (`SyntheticMaterials`) and "Hergestellte Produkte (Bulk Supplies)"
+(`Bulk_Supplies`); `P4kResourceGroupNames` decides it for the name and the German name alike. They
 match like every kind (REQ-P4K-007): the GUID, then a class name and a name that each identify one
 row and one record, so an admin category named like a group becomes that group and keeps its
-materials. A group is created when a commodity record of the run names it as `typeGuid`, or when
-it is an ancestor of such a group; every other unmatched group is listed `UNMATCHED`. A commodity's
+materials; a group holding another listed group's GUID is no candidate (REQ-P4K-072). A group is
+created when a commodity record of the run names it as `typeGuid`, when the `ResourceType` of a
+material without a group names it (REQ-P4K-073), or when it is an ancestor of such a group; every
+other unmatched group is listed `UNMATCHED`. A commodity's
 category is its group. A parent link that would make a group its own ancestor is left out, so of
 two groups listing each other the first in record order keeps the link. The pickers offer no
 stamped or hidden group. `MaterialCategoryController` is read-only, and the admin page has no
 category editor.
 
-The case is `NO_RESOURCE_GROUP` (kind `COMMODITY`, one per live material, its GUID a name-based
-UUID of the material's name); a later run closes it as `RESOLVED` once the material has a group.
+The case is `NO_RESOURCE_GROUP` (kind `COMMODITY`, one per live material the game files know, its
+GUID a name-based UUID of the material's name); a later run closes it as `RESOLVED` once the
+material has a group or the game files no longer know it.
 It is resolved only as `ASSIGN` with a live resource group from
 `GET /api/v1/catalog/admin/import/p4k/resource-groups` (`CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED`),
 which sets `resource_group_manual`, so a later record naming a group does not replace the admin's;
@@ -1150,7 +1173,9 @@ APPLY deletes the unreferenced ones (it is no P4K row, so REQ-P4K-013's stamp do
 records the number as `adminCategoriesRetired` on `CATALOGUE_P4K_APPLIED`.
 
 **Enforced by:** `P4kResourceGroupImportTest`, `P4kMaterialGroupReviewTest`,
-`MaterialCategoryControllerTest`, `P4kMaterialOverrideTest` · **Code:** `P4kResourceGroupReconciler`, `P4kMaterialGroupReview`
+`P4kCommodityRulesImportTest`, `P4kResourceGroupNamesTest`, `MaterialCategoryControllerTest`,
+`P4kMaterialOverrideTest` · **Code:** `P4kResourceGroupReconciler`, `P4kResourceGroupNames`,
+`P4kMaterialGroupReview`, `P4kMaterialTypeGroups`
 · **ADR:**
 [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891, #2825
 
@@ -1158,8 +1183,9 @@ records the number as `adminCategoriesRetired` on `CATALOGUE_P4K_APPLIED`.
 
 The import creates a commodity only when a record imported in the same run references it: a
 blueprint ingredient (`resourceGuid`) or a `refinedSubtypeGuid`, both joined by `subtypeGuid`
-(REQ-P4K-024). Such a row is visible at once. A reference that joins several commodity records
-creates none of them and opens the review case of REQ-P4K-024 instead.
+(REQ-P4K-024). Such a row is visible at once. A reference that joins several commodities creates
+none of them and opens the review case of REQ-P4K-024 instead; the packagings of one commodity join
+as that commodity's leading record (REQ-P4K-071).
 Every other unmatched commodity stays match-only and appears in the report's unmatched list.
 
 **Acceptance**
@@ -1171,6 +1197,158 @@ A created material has `source_systems = P4K` and `is_visible = true`; a materia
 seeding created invisible turns visible when the run would create it.
 
 **Enforced by:** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891
+
+### REQ-P4K-070 — the SC Wiki keys a commodity by its `ResourceType`
+
+The SC Wiki keys every commodity by the GUID of its `ResourceType`, the record's `subtypeGuid`,
+not by the commodity's own GUID. A commodity record's **Wiki key** is therefore its `subtypeGuid`
+when that type joins this commodity alone (`P4kCommodityJoin`, REQ-P4K-024), else its GUID. The
+match's Wiki step (REQ-P4K-007) looks the key up in `material.scwiki_uuid`, and a matched row
+reports `IDENTITY_MISMATCH` only when its Wiki UUID is neither the GUID nor the key. Every other
+kind keeps its GUID as its Wiki key (`P4kMatchRules.wikiKey`).
+
+On the LIVE 4.10.197 rows the key agrees with every match by GUID, settles the two Redfin Energy
+Modulator conflicts and the unmatched `raw_hephaestanite`, and ends the 123 `IDENTITY_MISMATCH`
+rows every APPLY reported for commodities matched by name.
+
+**Acceptance**
+
+- [x] A material whose Wiki UUID is a record's `subtypeGuid` is matched by it and reports no
+  mismatch.
+- [x] A material matched by GUID whose Wiki UUID is its record's `ResourceType` reports no
+  mismatch; one whose Wiki UUID names neither does.
+
+**Enforced by:** `P4kCommodityRulesImportTest` · **Code:** `P4kCommodityRules`, `P4kRowMatcher`,
+`P4kMatchRules` · **ADR:** [ADR-0396](../adr/0396-the-p4k-import-keys-commodities-by-their-resource-type.md)
+
+### REQ-P4K-071 — the packagings of one commodity are one commodity
+
+Commodity records sharing the `subtypeGuid`, the English name (ignoring case) and the `typeGuid`
+are packagings of one commodity, as the three "SLAM" records of LIVE 4.10.200 are. The record whose
+class name is the `ResourceType`'s class name, ignoring case, leads the commodity, else the record
+of the lowest class name: it alone matches, is created and joins (REQ-P4K-024, REQ-P4K-026). The
+others are covered: no row, no case, `COVERED` in the report (REQ-P4K-050). Their shared name
+counts once in the name step. A material holding the GUID of a packaging moves to the leading
+record while no material holds that one, reported `CHANGED p4k_uuid`.
+
+**Acceptance**
+
+- [x] Three records of one type, name and group match one row through the record of the type's
+  class name; the others are covered and open no case.
+- [x] Without the type's class name the lowest class name leads.
+
+**Enforced by:** `P4kCommodityRulesImportTest`, `P4kCommodityPrecedenceTest` · **Code:**
+`P4kCommodityJoin`, `P4kCommodityRules`, `P4kCommodityReconciler` · **ADR:**
+[ADR-0396](../adr/0396-the-p4k-import-keys-commodities-by-their-resource-type.md)
+
+### REQ-P4K-072 — a commodity or group row of another listed record is no name candidate
+
+The name step of the commodity match skips a material that belongs to another listed commodity
+record: the one whose GUID it holds, or the one whose Wiki key (REQ-P4K-070) its Wiki UUID is. The
+class-name and name steps of the resource-group match skip a group holding another listed group's
+GUID (`P4kListedGuidRules`). Such a record is unmatched and follows its seeding rule instead of
+opening a `GUID_CONFLICT` case. This ends the counterfeit "Redfin Energy Modulators" record's
+conflict with the real one's row and the second "Man-made" group's (`Bulk_Supplies`) conflict with
+`SyntheticMaterials`.
+
+**Acceptance**
+
+- [x] A record whose name a material of another listed commodity holds opens no conflict, and the
+  material keeps its GUID.
+- [x] A group named like a stored group of another listed GUID opens no conflict and is created as
+  its own group when a record needs it.
+
+**Enforced by:** `P4kCommodityRulesImportTest` · **Code:** `P4kCommodityRules`,
+`P4kListedGuidRules` · **ADR:**
+[ADR-0396](../adr/0396-the-p4k-import-keys-commodities-by-their-resource-type.md)
+
+### REQ-P4K-073 — a material without a group takes the group of its `ResourceType`
+
+The import reads the catalogue's `resourceTypes` when it lists them (`P4kResourceTypeDto`: GUID,
+class name, name and the `groupGuids` that list the type; every type of LIVE 4.10.200 has exactly
+one); a catalogue without the kind is read as before, and a type a commodity names is then known
+by that record's `typeGuid`. A live material no commodity record of the run reconciles, whose
+group is none or an admin category and that no admin override holds, takes the group of the type
+it stands for:
+
+- **G1:** the type of its SC Wiki UUID, else of its stored `p4k_subtype_uuid`;
+- **G2:** else the only type whose English name, reduced to `[a-z0-9]`, equals the material's
+  reduced name ("Ship Ammunition – Size 1" → `ShipAmmoSize1` → `Bulk_Supplies`).
+
+The group reconciler creates the groups those types name (REQ-P4K-025). The write is reported
+`CHANGED category_id` on the material; a preview writes nothing. An admin's override
+(`resource_group_manual`) keeps its group. A **placeholder group** is a resource group whose
+English name is the placeholder (`name.en` absent) and that no commodity record of the catalogue
+names as its `typeGuid` (LIVE 4.10.200: `HeatPlaceholder`, `CleanAir`, `LifeSupportPlaceholder`,
+`PowerPlaceholder`; the named-by-commodities `UnrefinedOres`, `Raw_Minerals` and `Halogen` are
+none). A material is never given a placeholder group, and the run never creates one for it: a
+material whose type only a placeholder group lists, such as the Wiki row "Molina Mold"
+(`CleanAir`), stays without a group.
+
+**Acceptance**
+
+- [x] A Wiki-only material takes the group of the type its Wiki UUID names, created by the run.
+- [x] A UEX material takes the group of the only type of its reduced name.
+- [x] A group an admin overrides stays.
+- [x] A material whose type only a placeholder group lists takes no group, the placeholder group is
+  not created, and no case opens.
+- [x] The reader reads the resource types with their groups, and none from a file without them.
+
+**Enforced by:** `P4kCommodityRulesImportTest`, `P4kCatalogueStreamTest` · **Code:**
+`P4kResourceTypes`, `P4kMaterialTypeGroups`, `P4kResourceGroupReconciler`, `P4kCatalogueReader` ·
+**ADR:** [ADR-0396](../adr/0396-the-p4k-import-keys-commodities-by-their-resource-type.md)
+
+### REQ-P4K-074 — a material the game files lack opens no group case
+
+A material without a resource group opens the `NO_RESOURCE_GROUP` case of REQ-P4K-025 only when
+the game files know it: a record of the run matched or created it, it holds a listed commodity's
+GUID, or it stands for a `ResourceType` of the catalogue that no placeholder group lists
+(REQ-P4K-073). A material none of them knows, such as an element UEX lists that the game never had,
+opens none, and neither does one whose type only a placeholder group lists, since it has no
+meaningful group; an APPLY closes such an open case as `RESOLVED` (owner decision N1, 2026-11-17).
+
+**Acceptance**
+
+- [x] A material without any game identity opens no case, nor does one whose type only a
+  placeholder group lists.
+- [x] A material the game files know whose record names no listed group opens one.
+
+**Enforced by:** `P4kMaterialGroupReviewTest`, `P4kCommodityRulesImportTest` · **Code:**
+`P4kMaterialGroupReview`, `P4kCommodityReconciler`, `P4kMaterialTypeGroups` · **ADR:**
+[ADR-0396](../adr/0396-the-p4k-import-keys-commodities-by-their-resource-type.md)
+
+### REQ-P4K-075 — a UEX commodity no game source knows, without price or reference, is hidden
+
+A material only UEX lists (`source_systems = UEX_ONLY`) without a P4K GUID, a SC Wiki UUID and a
+`p4k_subtype_uuid`, that the game files do not know by name either (REQ-P4K-074), with neither a
+positive buy nor a positive sell price, is marked `material.sourceless_hidden_at` (V436) by an
+APPLY unless something references it. The references are asked through the observer SPI
+`MaterialReferenceParticipant`: stock entries and stock floors, job-order material lines,
+item-order material lines, handovers, claims and provision credits, supply needs and donations,
+purchasing deals, Materialbörse requests, refinery goods, and the catalogue's own recipe
+ingredients, dismantle returns, refinery yields, terminal prices, external aliases and refined-from
+links.
+
+A marked material leaves every list and picker (`SelectableMaterialJpql.SELECTABLE_MATERIAL`,
+`Material#isSourcelessHidden()`) only while it stays without a game source and without a price, so
+a Wiki UUID, a P4K match or a UEX price brings it back at once; the next APPLY lifts the mark of a
+material that no longer qualifies. Its references stay readable. The report logs `CHANGED
+sourceless_hidden_at`; a preview reports what the APPLY would do. Every mark and every lift is an
+audit event `CATALOGUE_MATERIAL_SOURCELESS_VISIBILITY_CHANGED` (`hidden`, `run`; REQ-AUDIT-001).
+On the LIVE 4.10.197 rows this hides 26 materials (Boron, Xenon, Coal, …); the priced "Ship
+Ammunition – Size N" and the three "Construction Material …" rows a refinery alias names stay.
+
+**Acceptance**
+
+- [x] An unpriced, unreferenced UEX commodity no game source knows is hidden and audited.
+- [x] It is offered again once it gets a price or a Wiki UUID, and the next APPLY lifts the mark.
+- [x] A referenced, a priced or a game-known material stays.
+- [x] A preview reports the hide and writes nothing.
+
+**Enforced by:** `P4kSourcelessMaterialsImportTest` · **Code:** `P4kSourcelessMaterials`,
+`MaterialReferenceParticipant`, `SelectableMaterialJpql` · **ADR:**
+[ADR-0396](../adr/0396-the-p4k-import-keys-commodities-by-their-resource-type.md)
+
 
 ## Blueprints
 

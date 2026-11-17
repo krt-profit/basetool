@@ -73,6 +73,7 @@ public class P4kCatalogueReader {
       Set.of(
           SHIP_STORE_SLUGS,
           P4kCatalogue.PAINTS,
+          P4kCatalogue.RESOURCE_TYPES,
           GAMEPLAY_PROPERTIES,
           DISMANTLE_PROCESSES,
           CRAFTING_GLOBAL);
@@ -104,10 +105,10 @@ public class P4kCatalogueReader {
 
   /**
    * Reads the head, the five base kinds, the starmap objects, the shops, the ship store slugs, the
-   * paints, the resource groups, the blueprint categories and the crafting records the blueprints
-   * refer to, skipping everything else, the loadouts included. The held fields are counted against
-   * {@code heldLimitBytes} after every record, so the memory they take stays bounded by that limit
-   * plus one record.
+   * paints, the resource groups, the resource types, the blueprint categories and the crafting
+   * records the blueprints refer to, skipping everything else, the loadouts included. The held
+   * fields are counted against {@code heldLimitBytes} after every record, so the memory they take
+   * stays bounded by that limit plus one record.
    *
    * @param in the decompressed catalogue
    * @param heldLimitBytes the most bytes of catalogue JSON the held fields may span together
@@ -124,6 +125,7 @@ public class P4kCatalogueReader {
       Map<P4kKind, List<? extends P4kRecord>> kinds = new EnumMap<>(P4kKind.class);
       List<P4kShipStoreSlug> storeSlugs = List.of();
       List<P4kPaintDto> paints = List.of();
+      List<P4kResourceTypeDto> resourceTypes = List.of();
       List<P4kGameplayPropertyDto> properties = List.of();
       List<P4kDismantleProcessDto> processes = List.of();
       P4kCraftingGlobalDto craftingGlobal = null;
@@ -140,6 +142,8 @@ public class P4kCatalogueReader {
           storeSlugs = readArray(parser, P4kShipStoreSlug.class, budget);
         } else if (P4kCatalogue.PAINTS.equals(field)) {
           paints = readArray(parser, P4kPaintDto.class, budget);
+        } else if (P4kCatalogue.RESOURCE_TYPES.equals(field)) {
+          resourceTypes = readArray(parser, P4kResourceTypeDto.class, budget);
         } else if (GAMEPLAY_PROPERTIES.equals(field)) {
           properties = readArray(parser, P4kGameplayPropertyDto.class, budget);
         } else if (DISMANTLE_PROCESSES.equals(field)) {
@@ -164,6 +168,7 @@ public class P4kCatalogueReader {
           storeSlugs,
           paints,
           listOf(kinds, P4kKind.RESOURCE_GROUP, P4kResourceGroupDto.class),
+          resourceTypes,
           listOf(kinds, P4kKind.BLUEPRINT_CATEGORY, P4kBlueprintCategoryDto.class),
           P4kCraftingReferences.of(properties, processes, craftingGlobal));
     } catch (JacksonException e) {

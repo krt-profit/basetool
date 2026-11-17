@@ -597,7 +597,9 @@ The coverage list holds the **Katalog** area
     entries of the retired admin editor); the P4K overrides of a material's resource group and
     refined material (`CATALOGUE_MATERIAL_P4K_OVERRIDE_SET` with `field` and `valueId` when an
     edit makes one, `CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED` with `field` when the admin hands it
-    back, REQ-P4K-024/025); manufacturer, ship-type and terminal visibility
+    back, REQ-P4K-024/025); a P4K APPLY's hide of a UEX commodity no game source knows, and its
+    lift (`CATALOGUE_MATERIAL_SOURCELESS_VISIBILITY_CHANGED`, subject the material, `hidden=`,
+    `run=`, REQ-P4K-075); manufacturer, ship-type and terminal visibility
     (`*_VISIBILITY_CHANGED`, `hidden=`); the admin choice of a manufacturer's primary SC Wiki entry
     among its Wiki duplicates (`CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED` with `from=` and `to=`
     the Wiki UUIDs, ADR-0361); locations (`CATALOGUE_LOCATION_*`); the loading-dock

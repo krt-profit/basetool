@@ -270,17 +270,14 @@ class MaterialServiceTest {
             true,
             0L);
     Page<Material> expected = new PageImpl<>(List.of(visible));
-    when(materialRepository.findByIsVisibleTrueAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
-            pageRequest))
-        .thenReturn(expected);
+    when(materialRepository.findSelectable(pageRequest)).thenReturn(expected);
     when(materialMapper.toDto(visible)).thenReturn(read);
 
     Page<MaterialDto> result = materialService.getVisibleMaterials(pageRequest);
 
     assertEquals(1, result.getTotalElements());
     assertEquals(read, result.getContent().get(0));
-    verify(materialRepository)
-        .findByIsVisibleTrueAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(pageRequest);
+    verify(materialRepository).findSelectable(pageRequest);
     verify(materialRepository, never()).findAll(any(PageRequest.class));
   }
 

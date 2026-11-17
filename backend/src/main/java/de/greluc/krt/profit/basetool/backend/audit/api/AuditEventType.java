@@ -807,6 +807,11 @@ public enum AuditEventType {
   CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED(AuditDomain.CATALOGUE),
   /** An admin deleted a material. */
   CATALOGUE_MATERIAL_DELETED(AuditDomain.CATALOGUE),
+  /**
+   * A P4K APPLY hid a UEX commodity no game source knows, or lifted that hide (REQ-P4K-075); the
+   * details say which.
+   */
+  CATALOGUE_MATERIAL_SOURCELESS_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
   /** An admin created a material category. */
   CATALOGUE_MATERIAL_CATEGORY_CREATED(AuditDomain.CATALOGUE),
   /** An admin renamed a material category. */

@@ -118,7 +118,7 @@ class P4kCommodityPrecedenceTest {
   }
 
   @Test
-  void threeRecordsOfOneName_goToReview_andMatchNoRow() {
+  void threeRecordsOfOneNameTypeAndGroup_areOneCommodity_ledByTheLowestClassName() {
     ObjectNode root = P4kTestCatalogues.tree();
     Material slam = material("SLAM", null, null);
     UUID[] guids = new UUID[3];
@@ -128,9 +128,9 @@ class P4kCommodityPrecedenceTest {
 
     runs.apply(P4kTestCatalogues.bytes(root), false);
 
-    assertThat(slam.getP4kUuid()).isNull();
+    assertThat(slam.getP4kUuid()).isEqualTo(guids[0]);
     for (UUID guid : guids) {
-      assertThat(hasCase(guid, P4kReviewReason.GUID_CONFLICT)).isTrue();
+      assertThat(hasCase(guid, P4kReviewReason.GUID_CONFLICT)).isFalse();
     }
   }
 

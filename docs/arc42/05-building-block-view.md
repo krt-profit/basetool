@@ -555,7 +555,10 @@ events. The catalogue archives both original item/price/stat sets in `game_item_
 retiring the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical
 ids have a separate reference seam for bulk reads. The same six modules answer
 `catalogue.api.GameItemReferenceParticipant`, so the P4K import hides a seeded item only when no
-member row references it (REQ-P4K-056).
+member row references it (REQ-P4K-056). Inventory, job orders, supply, purchasing, the
+Materialbörse, the refinery and the catalogue itself answer `catalogue.api.MaterialReferenceParticipant`,
+so the P4K import hides a UEX commodity no game source knows only when nothing references it
+(REQ-P4K-075).
 
 `ScWikiRequestExecutor` owns pacing/retry transport, `ScWikiClient` owns the scoped game build,
 and `SyncChunkWriter` owns isolated application transactions. `SyncRunService` persists attempt

@@ -1,0 +1,1 @@
+ALTER TABLE material ADD COLUMN sourceless_hidden_at TIMESTAMP WITH TIME ZONE;
