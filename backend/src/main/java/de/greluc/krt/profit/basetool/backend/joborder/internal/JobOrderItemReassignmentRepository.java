@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -62,4 +63,16 @@ interface JobOrderItemReassignmentRepository extends Repository<JobOrderItem, UU
   @NotNull
   List<UUID> orderItems(
       @Param("retiredId") @NotNull UUID retiredId, @Param("survivorId") @NotNull UUID survivorId);
+
+  /**
+   * Lists which of the given items a job-order line references.
+   *
+   * @param ids the items asked about
+   * @return the referenced ones
+   */
+  @Query(
+      value = "SELECT DISTINCT game_item_id FROM job_order_item WHERE game_item_id IN (:ids)",
+      nativeQuery = true)
+  @NotNull
+  List<UUID> referenced(@Param("ids") @NotNull Collection<UUID> ids);
 }

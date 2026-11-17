@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.Query;
@@ -157,6 +158,21 @@ interface InventoryItemReassignmentRepository extends Repository<InventoryItem, 
           """,
       nativeQuery = true)
   List<UUID> floors(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
+
+  /**
+   * Lists which of the given items a stock entry or a stock floor references.
+   *
+   * @param ids the items asked about
+   * @return the referenced ones
+   */
+  @Query(
+      value =
+          """
+          SELECT game_item_id FROM inventory_item WHERE game_item_id IN (:ids)
+          UNION SELECT game_item_id FROM inventory_stock_level WHERE game_item_id IN (:ids)
+          """,
+      nativeQuery = true)
+  List<UUID> referenced(@Param("ids") Collection<UUID> ids);
 
   /**
    * Lists affected member lots for deterministic advisory locking of both identities.

@@ -811,6 +811,29 @@ name both records leave the row as it is.
 **Enforced by:** `P4kItemCaseRulesImportTest` · **Code:** `P4kItemCoverage`, `P4kRowMatcher` ·
 **ADR:** [ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
 
+### REQ-P4K-056 — a seeded item no rule would create and no member references hides itself
+
+An item an earlier seeding created (`source_systems = P4K`) whose record the seeding rule would
+now only count — not `player`, and neither sold in a shop nor produced by a blueprint
+(REQ-P4K-009) — is hidden by the next run (`p4k_hidden_at`, as an admin's hide would) instead of
+opening a `SEEDED_NOT_CREATABLE` case, unless a member row references it. The member references
+are asked through `GameItemReferenceParticipant`: stock entries and stock floors, job-order lines,
+supply needs and donations, purchasing deals, Materialbörse offers and requests, and personal and
+default blueprints and blueprint aliases. Catalogue references (loadout ports, stats, shop lists)
+do not block it; a hidden item keeps them (REQ-P4K-013). The report logs `CHANGED p4k_hidden_at`;
+a preview reports what the APPLY would hide. A referenced item stays a case.
+
+**Acceptance**
+
+- [x] An unreferenced seeded item of a record with `playability` `null` is hidden and opens no
+  case.
+- [x] A seeded item a default blueprint produces, or one a catalogue blueprint makes obtainable,
+  stays a case.
+
+**Enforced by:** `P4kSeededItemRetirementImportTest` · **Code:** `P4kSeededItemRetirement`,
+`GameItemReferenceParticipant` · **ADR:**
+[ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
+
 ## Manufacturers
 
 ### REQ-P4K-020 — the P4K leads a manufacturer's identity, name, abbreviation and description
