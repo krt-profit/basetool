@@ -1,4 +1,4 @@
 ### Changed
 
-- Sync report: UEX and SC Wiki no longer report a manufacturer abbreviation "disagreement" with the game files. The UEX
-  nickname and the Wiki code are no game codes, so about 117 such entries a day were noise; name differences stay.
+- **Abgleichbericht, Hersteller.** UEX und SC Wiki melden keine Kürzel-Abweichung zu den Spieldateien mehr, denn
+  UEX-Spitzname und Wiki-Code sind keine Spielcodes; rund 117 Meldungen am Tag entfallen, Namensabweichungen bleiben.
