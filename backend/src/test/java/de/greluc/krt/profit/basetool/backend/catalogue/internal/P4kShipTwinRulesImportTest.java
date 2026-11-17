@@ -77,6 +77,29 @@ class P4kShipTwinRulesImportTest {
   }
 
   @Test
+  void aWikiRowNamedLikeARowMovingToItsSuccessorMergesInTheSameRun() {
+    ShipType moving = new ShipType();
+    moving.setName(NAME);
+    moving.setP4kUuid(DEPARTED);
+    moving.setClassName("TEST_Rules_Old");
+    moving.setSourceSystems(GameItemSourceSystem.BOTH);
+    UUID movingId = ships.saveAndFlush(moving).getId();
+    ShipType twin = new ShipType();
+    twin.setName("Rules Test Twin");
+    twin.setGameName(NAME);
+    twin.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    UUID twinId = ships.saveAndFlush(twin).getId();
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    runs.apply(catalogue(), false);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(count(twinId)).isZero();
+    assertThat(ships.findById(movingId).orElseThrow().getP4kUuid()).isEqualTo(BASE);
+  }
+
+  @Test
   void aRowWhoseRecordLeftMergesIntoTheRowOfItsSuccessor() {
     ShipType survivor = ships.saveAndFlush(base());
     ShipType departed = new ShipType();

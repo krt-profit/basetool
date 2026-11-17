@@ -1376,7 +1376,8 @@ is neither retired nor retiring. A row without a P4K GUID is a twin of, in this 
    record;
 2. else the single row holding a record of the same variant group and in-game name as its own
    record, which its Wiki UUID or its class name names;
-3. else the single row whose name is its Wiki in-game name.
+3. else the single row whose name is its Wiki in-game name, also when that row's GUID left the
+   catalogue and it moves to a successor no other row holds.
 
 A row whose GUID left a complete catalogue is a twin of the row holding the record that succeeds it:
 the single player base carrying one of its names (REQ-P4K-051). Only this rule merges away a row

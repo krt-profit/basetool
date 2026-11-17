@@ -145,10 +145,32 @@ class P4kShipTwins {
     }
     List<ShipType> named = holders.named(row.getGameName());
     ShipType survivor = named.size() == 1 ? named.getFirst() : null;
-    P4kShipDto record = survivor == null ? null : catalogue.record(survivor.getP4kUuid());
+    P4kShipDto record = survivor == null ? null : settledRecord(survivor, catalogue, holders);
     return survivor == null || record == null
         ? null
         : new Twin(row, survivor, record, ShipTypeMergeReason.WIKI_GAME_NAME_IS_P4K_NAME);
+  }
+
+  /**
+   * Returns the record a row holds once the run is through: the record of its GUID, or, for a GUID
+   * that left a complete catalogue, the successor no other row holds, which the row moves to
+   * (REQ-P4K-051).
+   *
+   * @param row the row
+   * @param catalogue the catalogue's ships
+   * @param holders the rows holding a GUID
+   * @return the record, or {@code null} when the row's GUID left and no free successor exists
+   */
+  @Nullable
+  private static P4kShipDto settledRecord(
+      @NotNull ShipType row, @NotNull Catalogue catalogue, @NotNull Holders holders) {
+    P4kShipDto record = catalogue.record(row.getP4kUuid());
+    if (record != null || !catalogue.complete()) {
+      return record;
+    }
+    P4kShipDto successor = P4kShipIdentityMoves.successorRecord(row, catalogue.players());
+    UUID successorGuid = successor == null ? null : successor.parsedGuid();
+    return successorGuid == null || holders.byGuid().containsKey(successorGuid) ? null : successor;
   }
 
   /**
