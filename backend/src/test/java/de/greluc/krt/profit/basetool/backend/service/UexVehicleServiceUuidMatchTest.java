@@ -210,6 +210,7 @@ class UexVehicleServiceUuidMatchTest {
     when(shipTypeRepository.findByUexVehicleId(174)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByUexAliasOfVehicleId(174)).thenReturn(List.of(first, second));
     when(shipTypeRepository.findByNameIgnoreCase("Twin")).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Twin Full")).thenReturn(Optional.empty());
     when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
     when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
 
@@ -307,6 +308,8 @@ class UexVehicleServiceUuidMatchTest {
     when(shipTypeRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByUexVehicleId(12)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase("Hercules A2")).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Crusader A2 Hercules Starlifter"))
+        .thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Crusader Industries"))
         .thenReturn(Optional.empty());
     when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -345,6 +348,7 @@ class UexVehicleServiceUuidMatchTest {
     when(shipTypeRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByUexVehicleId(21)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase("Freelancer")).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Freelancer Full")).thenReturn(Optional.empty());
     when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
     when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
 
@@ -412,6 +416,138 @@ class UexVehicleServiceUuidMatchTest {
     assertEquals("Prowler Utility", sibling.getName());
     assertNull(sibling.getExternalUuid());
     verify(shipTypeRepository, never()).findByExternalUuid(any());
+  }
+
+  @Test
+  void aShipTypeTheP4kRenamedToTheInGameNameIsFoundByTheFullName() {
+    UexVehicleDto dto = vehicleDto(239, "", "Guardian QI", "Mirai Guardian QI", "1");
+    ShipType renamed = new ShipType();
+    renamed.setId(UUID.randomUUID());
+    renamed.setName("Mirai Guardian QI");
+    renamed.setP4kUuid(UUID.randomUUID());
+    renamed.setSourceSystems(GameItemSourceSystem.BOTH);
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
+    when(shipTypeRepository.findByUexVehicleId(239)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Guardian QI")).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Mirai Guardian QI"))
+        .thenReturn(Optional.of(renamed));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncVehicles();
+
+    ArgumentCaptor<ShipType> saved = ArgumentCaptor.forClass(ShipType.class);
+    verify(shipTypeRepository).save(saved.capture());
+    assertSame(renamed, saved.getValue());
+    assertEquals(239, renamed.getUexVehicleId());
+    assertEquals("Mirai Guardian QI", renamed.getName());
+  }
+
+  @Test
+  void aFullNameAnotherUexVehicleAlsoCarriesMatchesNothing() {
+    UexVehicleDto first = vehicleDto(290, "", "Sabre Raven EX", "Aegis Sabre Raven EX", "1");
+    UexVehicleDto second = vehicleDto(291, "", "Sabre Raven EX", "Aegis Sabre Raven EX", "1");
+    ShipType linked = new ShipType();
+    linked.setId(UUID.randomUUID());
+    linked.setName("Aegis Sabre Raven EX");
+    linked.setUexVehicleId(291);
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(first, second)));
+    when(shipTypeRepository.findByUexVehicleId(290)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByUexVehicleId(291)).thenReturn(Optional.of(linked));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncVehicles();
+
+    verify(shipTypeRepository, never()).findByNameIgnoreCase(any());
+    assertEquals(291, linked.getUexVehicleId());
+  }
+
+  @Test
+  void aGameUuidSeveralUexVehiclesCarryIsNoConflictForTheRowOfEitherId() {
+    UUID shared = UUID.fromString("087b2253-2fc7-4fae-9f9d-97f64b7c43db");
+    ShipType prowler = new ShipType();
+    prowler.setId(UUID.randomUUID());
+    prowler.setName("Esperia Prowler");
+    prowler.setUexVehicleId(149);
+    prowler.setExternalUuid(shared);
+    ShipType utility = new ShipType();
+    utility.setId(UUID.randomUUID());
+    utility.setName("Esperia Prowler Utility");
+    utility.setUexVehicleId(262);
+    utility.setExternalUuid(UUID.fromString("528fdddc-0000-0000-0000-000000000001"));
+    when(uexClient.getVehicles())
+        .thenReturn(
+            fetched(
+                List.of(
+                    vehicleDto(149, shared.toString(), "Prowler"),
+                    vehicleDto(262, shared.toString(), "Prowler Utility"))));
+    when(shipTypeRepository.findByUexVehicleId(149)).thenReturn(Optional.of(prowler));
+    when(shipTypeRepository.findByUexVehicleId(262)).thenReturn(Optional.of(utility));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    verify(shipTypeRepository).save(prowler);
+    verify(shipTypeRepository).save(utility);
+    verify(syncReportService, never())
+        .logUexEvent(any(), eq(SyncEventType.SOURCE_IDENTITY_CONFLICT), any(), any(), any(), any());
+    verify(shipTypeRepository).markUexDeletedExcept(any(), any());
+  }
+
+  @Test
+  void aStaleUexGameUuidNeverReplacesTheOneTheP4kGuidConfirmsAndIsReported() {
+    UUID confirmed = UUID.fromString("c984fac2-06c0-4776-8f93-07ebd2c26ad3");
+    UUID stale = UUID.fromString("7cab9bbc-3d67-4ee7-99ef-fe41991f8a3b");
+    ShipType aurora = new ShipType();
+    aurora.setId(UUID.randomUUID());
+    aurora.setName("RSI Aurora Mk I CL");
+    aurora.setUexVehicleId(21);
+    aurora.setP4kUuid(confirmed);
+    aurora.setExternalUuid(confirmed);
+    when(uexClient.getVehicles())
+        .thenReturn(fetched(List.of(vehicleDto(21, stale.toString(), "Aurora Mk I CL"))));
+    when(shipTypeRepository.findByUexVehicleId(21)).thenReturn(Optional.of(aurora));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    verify(shipTypeRepository).save(aurora);
+    assertEquals(confirmed, aurora.getExternalUuid());
+    ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+    verify(syncReportService)
+        .logUexEvent(
+            any(),
+            eq(SyncEventType.P4K_DISAGREEMENT),
+            eq("ship_type"),
+            eq(confirmed),
+            eq("Aurora Mk I CL"),
+            detail.capture());
+    assertTrue(
+        detail
+            .getValue()
+            .contains("column=external_uuid;stored=" + confirmed + ";source=" + stale));
+    verify(syncReportService, never())
+        .logUexEvent(any(), eq(SyncEventType.SOURCE_IDENTITY_CONFLICT), any(), any(), any(), any());
+    verify(shipTypeRepository).markUexDeletedExcept(any(), any());
+  }
+
+  @Test
+  void aGameUuidTheP4kDoesNotConfirmStillBlocksTheRowItsUexIdFinds() {
+    ShipType row = new ShipType();
+    row.setId(UUID.randomUUID());
+    row.setName("Aurora Mk I CL");
+    row.setUexVehicleId(21);
+    row.setExternalUuid(UUID.randomUUID());
+    when(uexClient.getVehicles())
+        .thenReturn(fetched(List.of(vehicleDto(21, externalUuid.toString(), "Aurora Mk I CL"))));
+    when(shipTypeRepository.findByUexVehicleId(21)).thenReturn(Optional.of(row));
+
+    service.syncVehicles();
+
+    verify(shipTypeRepository, never()).save(any());
+    verify(syncReportService)
+        .logUexEvent(any(), eq(SyncEventType.SOURCE_IDENTITY_CONFLICT), any(), any(), any(), any());
   }
 
   @Test
@@ -520,11 +656,15 @@ class UexVehicleServiceUuidMatchTest {
   }
 
   private UexVehicleDto vehicleDto(int id, String uuid, String name, String crew) {
+    return vehicleDto(id, uuid, name, name + " Full", crew);
+  }
+
+  private UexVehicleDto vehicleDto(int id, String uuid, String name, String nameFull, String crew) {
     return new UexVehicleDto(
         id,
         uuid,
         name,
-        name + " Full",
+        nameFull,
         name.toLowerCase().replace(' ', '-'),
         "Origin Jumpworks",
         new BigDecimal("50"),

@@ -189,6 +189,8 @@ backend down. `basetool_redis_fanout_subscribed{fanout}` and the `RedisFanoutUns
 (0 for 10m, warning) are what replace that announcement, bound to `isListening()` rather than
 `isRunning()` for the reason above.
 
+*Amended by ADR-0388:* the frontend's live-sync subscription now runs on the shared Redis, which the frontend does not need to start, so it uses the same container, moved to `technical-support` (ADR-0366 amendment 1). The paragraph below holds for the session store.
+
 Deliberately **not** extended to the frontend: Redis is genuinely mandatory there
 (`@EnableRedisIndexedHttpSession` — no session store, no login), and its context dies one bean
 earlier in the keyspace-notification initializer, before any `SmartLifecycle` runs. And deliberately

@@ -188,6 +188,16 @@ public final class MetricNames {
       "basetool.ingest.exchange.budget.used.ratio";
 
   /**
+   * Counter {@code basetool_ingest_exchange_store_conflicts_total{step,outcome}}: exchange store
+   * steps whose optimistic Redis transaction met a changed key — {@code aborted} for each discarded
+   * attempt, {@code exhausted} for a step that gave up and answered {@code 503} (ADR-0389).
+   */
+  public static final String EXCHANGE_STORE_CONFLICTS = "basetool.ingest.exchange.store.conflicts";
+
+  /** The exchange store step a {@link #EXCHANGE_STORE_CONFLICTS} count belongs to. */
+  public static final String TAG_STEP = "step";
+
+  /**
    * Gauge {@code basetool_ingest_exchange_client_budget_used_ratio{client_id}}: the share of one
    * client's Redis byte budget in use when the gateway last measured it, labelled with the registry
    * client id of an admitted request (REQ-XCH-023, REQ-OBS-011).
