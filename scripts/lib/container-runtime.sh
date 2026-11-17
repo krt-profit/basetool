@@ -28,6 +28,12 @@ RT_CHANGED_SERVICES="${RT_CHANGED_SERVICES:-}"
 
 RT_FAILED_SERVICES=""
 
+RT_STACK_ORDER="${RT_STACK_ORDER:-db-backend db-keycloak redis keycloak edge backend ingest frontend acme}"
+
+RT_RETIRED_SERVICES="${RT_RETIRED_SERVICES:-}"
+
+RT_RETIRE_FAILED=""
+
 rt_die() {
   if declare -F fail >/dev/null 2>&1; then
     fail "$*"
@@ -204,7 +210,78 @@ rt_pull() {
   return "${rc}"
 }
 
+rt_unit_requires() {
+  local line word
+  local -a words=()
+  while IFS= read -r line; do
+    read -ra words <<< "${line}"
+    for word in "${words[@]}"; do
+      if [[ "${word}" == *.service ]]; then
+        printf '%s\n' "${word%.service}"
+      fi
+    done
+  done < <(sed -n 's/^Requires=//p' "${RT_UNIT_DIR}/$1.container" 2>/dev/null)
+}
+
+# Appends to the caller's `seen` and `found` (bash dynamic scope): a unit's Requires= first, then the unit.
+rt_stack_visit() {
+  local svc="$1" dep
+  local -a deps=()
+  case "${seen}" in *" ${svc} "*) return 0 ;; esac
+  case " ${RT_RETIRED_SERVICES} " in *" ${svc} "*) return 0 ;; esac
+  [[ -f "${RT_UNIT_DIR}/${svc}.container" ]] || return 0
+  seen="${seen}${svc} "
+  mapfile -t deps < <(rt_unit_requires "${svc}")
+  for dep in "${deps[@]}"; do
+    rt_stack_visit "${dep}"
+  done
+  found="${found}${found:+ }${svc}"
+}
+
+rt_installed_stack_services() {
+  local seen=" " found="" svc
+  local -a known=()
+  read -ra known <<< "${RT_STACK_ORDER}"
+  for svc in "${known[@]}"; do
+    rt_stack_visit "${svc}"
+  done
+  printf '%s\n' "${found}"
+}
+
+rt_use_installed_stack() {
+  RT_STACK_SERVICES="$(rt_installed_stack_services)"
+  export RT_STACK_SERVICES
+}
+
+rt_unit_down() {
+  case "$(${RT_SYSTEMCTL} is-active "$1.service" 2>/dev/null)" in
+    inactive | failed | unknown) return 0 ;;
+  esac
+  return 1
+}
+
+# A retired unit is stopped while systemd still holds its definition, and its file is removed only
+# once it is down, so no container keeps running without the unit that manages it.
+rt_retire_services() {
+  local svc kept="" rc=0
+  for svc in ${RT_RETIRED_SERVICES}; do
+    if rt_unit_down "${svc}" || ${RT_SYSTEMCTL} stop "${svc}.service" || rt_unit_down "${svc}"; then
+      if rm -f "${RT_UNIT_DIR:?RT_UNIT_DIR is unset}/${svc}.container"; then
+        continue
+      fi
+    fi
+    rc=1
+    kept="${kept}${kept:+ }${svc}"
+  done
+  RT_RETIRED_SERVICES="${kept}"
+  # shellcheck disable=SC2034
+  RT_RETIRE_FAILED="${kept}"
+  return "${rc}"
+}
+
 rt_apply_stack() {
+  RT_FAILED_SERVICES=""
+  rt_retire_services || return 1
   ${RT_SYSTEMCTL} daemon-reload || return 1
   local svc rc=0
   if [[ $# -eq 0 ]]; then
@@ -368,7 +445,7 @@ rt_monitoring_services() {
   for f in "${RT_UNIT_DIR:-}"/*.container; do
     [[ -f "${f}" ]] || continue
     name="$(basename "${f}" .container)"
-    case " ${RT_STACK_SERVICES:-} " in
+    case " ${RT_STACK_SERVICES:-} ${RT_RETIRED_SERVICES} " in
       *" ${name} "*) continue ;;
     esac
     printf '%s\n' "${name}"
