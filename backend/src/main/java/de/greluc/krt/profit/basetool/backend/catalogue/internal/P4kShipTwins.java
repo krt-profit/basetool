@@ -42,10 +42,10 @@ import org.springframework.stereotype.Component;
  * without a P4K GUID is merged into the unretired row whose GUID is its Wiki UUID; else into the
  * single row holding a same-name record of its own record's variant group; else into the single row
  * whose name is its Wiki in-game name or, for a row only UEX wrote, its UEX full name. A row whose
- * GUID left a complete catalogue is merged into
- * the row holding the record that succeeds it. The twins are found before the run decides which
- * rows move to their base or successor (REQ-P4K-051), since a twin's identity would block such a
- * move, and are merged once it has: a row that moves keeps its own Wiki identity.
+ * GUID left a complete catalogue is merged into the row holding the record that succeeds it. The
+ * twins are found before the run decides which rows move to their base or successor (REQ-P4K-051),
+ * since a twin's identity would block such a move, and are merged once it has: a row that moves
+ * keeps its own Wiki identity.
  */
 @Component
 @RequiredArgsConstructor
@@ -147,7 +147,11 @@ class P4kShipTwins {
     }
     Twin byGameName =
         named(
-            row, row.getGameName(), catalogue, holders, ShipTypeMergeReason.WIKI_GAME_NAME_IS_P4K_NAME);
+            row,
+            row.getGameName(),
+            catalogue,
+            holders,
+            ShipTypeMergeReason.WIKI_GAME_NAME_IS_P4K_NAME);
     if (byGameName != null || row.getSourceSystems() != GameItemSourceSystem.UEX_ONLY) {
       return byGameName;
     }
