@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.store;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeStoreProperties;
@@ -27,10 +28,13 @@ import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
 import de.greluc.krt.profit.basetool.ingest.idempotency.ExchangeIdempotencyFilter;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRefusals;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistry;
+import de.greluc.krt.profit.basetool.ingest.registry.ExchangeUnavailableException;
 import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import de.greluc.krt.profit.basetool.testsupport.redis.RedisAclTemplate;
+import io.lettuce.core.resource.ClientResources;
+import io.lettuce.core.resource.DefaultClientResources;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.nio.charset.StandardCharsets;
@@ -57,6 +61,7 @@ import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -72,10 +77,10 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The byte budget and the idempotency cache against a real Redis under the ingest ACL user
- * (REQ-XCH-020, REQ-XCH-023): filling one member's budget and then one client's leaves every other
- * member and client working, parallel writes never overshoot a budget, a day of periodic syncs fits
- * one member's budget, a duplicate that raced the first request replays its answer, and a lock is
- * released only by the request holding it.
+ * (REQ-XCH-020, REQ-XCH-023, ADR-0389): filling one member's budget and then one client's leaves
+ * every other member and client working, parallel writes never overshoot a budget, a day of
+ * periodic syncs fits one member's budget, a duplicate that raced the first request replays its
+ * answer, and a lock is released only by the request holding it.
  */
 @Testcontainers
 class ExchangeStoreRedisIntegrationTest {
@@ -115,9 +120,11 @@ class ExchangeStoreRedisIntegrationTest {
 
   private final AtomicReference<Instant> now =
       new AtomicReference<>(Instant.parse("2026-09-27T12:00:00Z"));
+  private ClientResources clientResources;
   private LettuceConnectionFactory ingest;
   private LettuceConnectionFactory admin;
   private StringRedisTemplate template;
+  private OptimisticTransactions transactions;
   private StringRedisTemplate observer;
   private Clock clock;
   private ExchangeBudget budget;
@@ -131,9 +138,11 @@ class ExchangeStoreRedisIntegrationTest {
     }
     observer = new StringRedisTemplate(admin);
     observer.afterPropertiesSet();
-    ingest = connect(RedisAclTemplate.INGEST_USER, "REDIS_INGEST_PASSWORD");
+    clientResources = DefaultClientResources.create();
+    ingest = gatewayConnection(clientResources);
     template = new StringRedisTemplate(ingest);
     template.afterPropertiesSet();
+    transactions = new OptimisticTransactions(template, new SimpleMeterRegistry());
     clock =
         new Clock() {
           @Override
@@ -151,14 +160,16 @@ class ExchangeStoreRedisIntegrationTest {
             return now.get();
           }
         };
-    budget = new ExchangeBudget(template, SMALL, new SimpleMeterRegistry(), clock);
-    idempotency = new ExchangeIdempotency(template, JsonMapper.builder().build(), SMALL);
+    budget = new ExchangeBudget(template, transactions, SMALL, new SimpleMeterRegistry(), clock);
+    idempotency =
+        new ExchangeIdempotency(template, transactions, JsonMapper.builder().build(), SMALL);
   }
 
   @AfterEach
   void tearDown() {
     ingest.destroy();
     admin.destroy();
+    clientResources.shutdown();
   }
 
   @Test
@@ -250,7 +261,7 @@ class ExchangeStoreRedisIntegrationTest {
 
   @Test
   void aQuotaCounterIsBornWithItsExpiryAndCountedOnceInTheBudget() {
-    ExchangeQuotas quotas = new ExchangeQuotas(template, budget, clock);
+    ExchangeQuotas quotas = new ExchangeQuotas(template, transactions, budget, clock);
     String key = ExchangeQuotas.PREFIX + "a:m1:2026-09-27";
 
     assertThat(quotas.countWrite("a", "m1").count()).isEqualTo(1L);
@@ -285,8 +296,40 @@ class ExchangeStoreRedisIntegrationTest {
     Long totalExpiry =
         observer.getExpire(
             ExchangeBudget.sum(ExchangeBudget.memberScope("a", "m1")), TimeUnit.SECONDS);
-    assertThat(expiry).isGreaterThan(Duration.ofDays(4).toSeconds());
-    assertThat(totalExpiry).isGreaterThan(Duration.ofDays(4).toSeconds());
+    assertThat(expiry).isBetween(Duration.ofDays(4).toSeconds(), Duration.ofDays(5).toSeconds());
+    assertThat(totalExpiry)
+        .as("raised to the longest entry, in milliseconds and not read as seconds")
+        .isBetween(Duration.ofDays(4).toSeconds(), Duration.ofDays(5).toSeconds());
+  }
+
+  @Test
+  void aGarbledRunningTotalIsRebuiltFromItsSet() {
+    budget.record("a", "m1", "ingest:xch:idem:a:m1:1", 3000L, Duration.ofHours(1));
+    observer.opsForValue().set(ExchangeBudget.sum(ExchangeBudget.memberScope("a", "m1")), "x");
+
+    assertThat(budget.reserve("a", "m1", "ingest:xch:idem:a:m1:2", 100L, Duration.ofHours(1)))
+        .isFalse();
+    assertThat(total(ExchangeBudget.memberScope("a", "m1"))).isEqualTo(3512L);
+  }
+
+  @Test
+  void aChargeThatOverflowsAnEmptyScopeWaitsTheFallback() {
+    assertThat(budget.retryAfterSeconds("z", "m9", SMALL.memberBytes()))
+        .as("no entry of the scope ever expires to make room")
+        .isEqualTo(ExchangeBudget.FALLBACK_RETRY_AFTER_SECONDS);
+  }
+
+  @Test
+  void furtherOpsOnACounterThatIsGoneFailClosed() {
+    ExchangeQuotas quotas = new ExchangeQuotas(template, transactions, budget, clock);
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setAttribute(ExchangeQuotas.COUNTED, ExchangeQuotas.PREFIX + "a:m1:2026-09-27");
+
+    assertThatThrownBy(() -> quotas.countFurtherOps(request, 2))
+        .isInstanceOf(ExchangeUnavailableException.class);
+    assertThat(observer.hasKey(ExchangeQuotas.PREFIX + "a:m1:2026-09-27"))
+        .as("adding to a missing counter creates none")
+        .isFalse();
   }
 
   @Test
@@ -373,7 +416,7 @@ class ExchangeStoreRedisIntegrationTest {
     CountDownLatch firstDone = new CountDownLatch(1);
     AtomicBoolean pauseNextLookup = new AtomicBoolean(true);
     ExchangeIdempotency cache =
-        new ExchangeIdempotency(template, JsonMapper.builder().build(), DEFAULTS) {
+        new ExchangeIdempotency(template, transactions, JsonMapper.builder().build(), DEFAULTS) {
           @Override
           public @NotNull Optional<Stored> find(@NotNull String namespace) {
             Optional<Stored> found = super.find(namespace);
@@ -413,7 +456,9 @@ class ExchangeStoreRedisIntegrationTest {
   @Test
   void parallelDuplicatesOfOneKeyRunTheWriteOnceAndReplayIt() throws Exception {
     ExchangeIdempotencyFilter filter =
-        filter(new ExchangeIdempotency(template, JsonMapper.builder().build(), DEFAULTS));
+        filter(
+            new ExchangeIdempotency(
+                template, transactions, JsonMapper.builder().build(), DEFAULTS));
 
     for (int round = 0; round < 20; round++) {
       String key = "race-key-" + round;
@@ -447,7 +492,7 @@ class ExchangeStoreRedisIntegrationTest {
 
   @Test
   void aRefundTakesOneWriteBackAndKeepsTheCountersExpiry() {
-    ExchangeQuotas quotas = new ExchangeQuotas(template, budget, clock);
+    ExchangeQuotas quotas = new ExchangeQuotas(template, transactions, budget, clock);
     String key = quotas.countWrite("a", "m1").key();
     quotas.countWrite("a", "m1");
     long ttl = observer.getExpire(key, TimeUnit.SECONDS);
@@ -467,7 +512,7 @@ class ExchangeStoreRedisIntegrationTest {
 
   @Test
   void furtherOpsCountOnTheWritesCounterAndARefundGivesThemAllBack() {
-    ExchangeQuotas quotas = new ExchangeQuotas(template, budget, clock);
+    ExchangeQuotas quotas = new ExchangeQuotas(template, transactions, budget, clock);
     MockHttpServletRequest request = new MockHttpServletRequest();
     String key = quotas.countWrite("a", "m1").key();
     request.setAttribute(ExchangeQuotas.COUNTED, key);
@@ -489,8 +534,8 @@ class ExchangeStoreRedisIntegrationTest {
   @Test
   void aBudgetRefusalGivesTheQuotaCountBackAndWaitsUntilEnoughExpires() throws Exception {
     ExchangeBudget defaults =
-        new ExchangeBudget(template, DEFAULTS, new SimpleMeterRegistry(), clock);
-    ExchangeQuotas quotas = new ExchangeQuotas(template, defaults, clock);
+        new ExchangeBudget(template, transactions, DEFAULTS, new SimpleMeterRegistry(), clock);
+    ExchangeQuotas quotas = new ExchangeQuotas(template, transactions, defaults, clock);
     String counter = quotas.countWrite("a", "m1").key();
     defaults.record(
         "a",
@@ -502,7 +547,9 @@ class ExchangeStoreRedisIntegrationTest {
 
     MockHttpServletResponse response =
         send(
-            filter(new ExchangeIdempotency(template, JsonMapper.builder().build(), DEFAULTS)),
+            filter(
+                new ExchangeIdempotency(
+                    template, transactions, JsonMapper.builder().build(), DEFAULTS)),
             "budget-key-1",
             writes,
             counter);
@@ -549,11 +596,14 @@ class ExchangeStoreRedisIntegrationTest {
   @Test
   void aDayOfPeriodicStockAndShipSyncsNeverExhaustsTheMembersBudget() throws Exception {
     ExchangeIdempotencyFilter filter =
-        filter(new ExchangeIdempotency(template, JsonMapper.builder().build(), DEFAULTS));
+        filter(
+            new ExchangeIdempotency(
+                template, transactions, JsonMapper.builder().build(), DEFAULTS));
     ExchangeQuotas quotas =
         new ExchangeQuotas(
             template,
-            new ExchangeBudget(template, DEFAULTS, new SimpleMeterRegistry(), clock),
+            transactions,
+            new ExchangeBudget(template, transactions, DEFAULTS, new SimpleMeterRegistry(), clock),
             clock);
     byte[] answer = largeAnswer();
     AtomicInteger writes = new AtomicInteger();
@@ -592,7 +642,7 @@ class ExchangeStoreRedisIntegrationTest {
   @Test
   void eachClientsUseIsPublishedAgainstTheClientBudget() {
     SimpleMeterRegistry meters = new SimpleMeterRegistry();
-    ExchangeBudget measured = new ExchangeBudget(template, SMALL, meters, clock);
+    ExchangeBudget measured = new ExchangeBudget(template, transactions, SMALL, meters, clock);
 
     measured.record("a", "m1", "ingest:xch:idem:a:m1:1", 1536L, Duration.ofHours(1));
     measured.record("b", "m1", "ingest:xch:idem:b:m1:1", 512L, Duration.ofHours(1));
@@ -621,11 +671,11 @@ class ExchangeStoreRedisIntegrationTest {
    */
   private @NotNull ExchangeIdempotencyFilter filter(@NotNull ExchangeIdempotency cache) {
     ExchangeBudget defaults =
-        new ExchangeBudget(template, DEFAULTS, new SimpleMeterRegistry(), clock);
+        new ExchangeBudget(template, transactions, DEFAULTS, new SimpleMeterRegistry(), clock);
     return new ExchangeIdempotencyFilter(
         cache,
         defaults,
-        new ExchangeQuotas(template, defaults, clock),
+        new ExchangeQuotas(template, transactions, defaults, clock),
         DEFAULTS,
         mock(ExchangeRefusals.class),
         JsonMapper.builder().build(),
@@ -772,6 +822,26 @@ class ExchangeStoreRedisIntegrationTest {
      * @throws Exception if the task fails
      */
     T run(int index) throws Exception;
+  }
+
+  /**
+   * Connects as the gateway does in production, through {@link RedisClientConfig}: its ACL user, a
+   * pool of connections tested on borrow, none shared, no reconnect.
+   *
+   * @param resources the Lettuce client resources
+   * @return the started factory
+   */
+  private static LettuceConnectionFactory gatewayConnection(ClientResources resources) {
+    DataRedisProperties redis = new DataRedisProperties();
+    redis.setHost(REDIS.getHost());
+    redis.setPort(REDIS.getMappedPort(6379));
+    redis.setUsername(RedisAclTemplate.INGEST_USER);
+    redis.setPassword(RedisAclTemplate.E2E_PASSWORDS.get("REDIS_INGEST_PASSWORD"));
+    redis.getLettuce().getPool().setMaxActive(THREADS);
+    LettuceConnectionFactory factory = RedisClientConfig.connectionFactory(redis, resources);
+    factory.afterPropertiesSet();
+    factory.start();
+    return factory;
   }
 
   /**

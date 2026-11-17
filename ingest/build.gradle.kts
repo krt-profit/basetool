@@ -21,6 +21,7 @@ dependencies {
     exclude(group = "io.micrometer", module = "micrometer-registry-otlp")
   }
   implementation("org.springframework.boot:spring-boot-starter-data-redis")
+  implementation("org.apache.commons:commons-pool2")
   implementation(libs.resilience4j.spring.boot3)
   implementation(libs.bucket4j.core)
   implementation(libs.json.schema.validator) {

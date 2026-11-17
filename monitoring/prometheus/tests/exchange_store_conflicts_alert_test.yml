@@ -1,0 +1,48 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - budget steps keep giving up for five minutes
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_exchange_store_conflicts_total{application="basetool-ingest", step="budget", outcome="exhausted"}'
+        values: "0+2x30"
+      - series: 'basetool_ingest_exchange_store_conflicts_total{application="basetool-ingest", step="budget", outcome="aborted"}'
+        values: "0+64x30"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ExchangeStoreStepsExhausted
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              step: budget
+            exp_annotations:
+              summary: "Exchange store step budget gives up on Redis conflicts"
+              description: "The ingest gateway's budget step met a changed key on every attempt of its optimistic Redis transaction for 2 s and answered 503 (ADR-0389). Sustained, it means more concurrent exchange writes than one transaction at a time can carry — every budget step writes the whole exchange's running total — or a client that retries its writes in a tight loop. Check basetool_ingest_exchange_store_conflicts_total{outcome=\"aborted\"} by step and the Exchange dashboard's write rate per client; members see 503 SERVICE_UNAVAILABLE with Retry-After, never an overshot budget (REQ-XCH-023)."
+
+  - name: silent - aborted attempts that retried and committed
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_exchange_store_conflicts_total{application="basetool-ingest", step="budget", outcome="aborted"}'
+        values: "0+50x30"
+      - series: 'basetool_ingest_exchange_store_conflicts_total{application="basetool-ingest", step="budget", outcome="exhausted"}'
+        values: "0x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ExchangeStoreStepsExhausted
+        exp_alerts: []
+
+  - name: silent - a step that gave up a few times
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_exchange_store_conflicts_total{application="basetool-ingest", step="quota-add", outcome="exhausted"}'
+        values: "0 1 2 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: ExchangeStoreStepsExhausted
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ExchangeStoreStepsExhausted
+        exp_alerts: []

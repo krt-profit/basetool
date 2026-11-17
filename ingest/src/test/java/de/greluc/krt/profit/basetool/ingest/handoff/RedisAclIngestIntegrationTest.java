@@ -36,6 +36,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -176,7 +178,7 @@ class RedisAclIngestIntegrationTest {
     assertThat(template.opsForZSet().add(budget, "ingest:xch:idem:k|512", 1_000.0)).isTrue();
 
     assertThatThrownBy(() -> template.opsForZSet().removeRangeByScore(budget, 0, 1_500.0))
-        .as("the budget prunes with ZRANGEBYSCORE and ZREM inside its script")
+        .as("the budget prunes with ZRANGEBYSCORE and ZREM inside its transaction")
         .isInstanceOf(DataAccessException.class);
     assertThatThrownBy(() -> template.unlink(budget))
         .as("keys are deleted with DEL")
@@ -202,6 +204,49 @@ class RedisAclIngestIntegrationTest {
           .isInstanceOf(DataAccessException.class);
       assertThat(connection.serverCommands().info("server")).isNotEmpty();
     }
+  }
+
+  @Test
+  void anOptimisticTransactionRunsUnderTheIngestUserOnItsOwnKeysOnly() {
+    StringRedisTemplate template = template(ingest);
+    String counter = "ingest:xch:quota:versekit:m-3:2026-11-16";
+    String budget = "ingest:xch:budget:m:versekit:m-3";
+    template.opsForValue().set(counter, "4");
+    template.opsForZSet().add(budget, "ingest:xch:idem:k|512", 1_000.0);
+
+    List<Object> replies =
+        template.execute(
+            new SessionCallback<>() {
+              @Override
+              public <K, V> List<Object> execute(RedisOperations<K, V> operations) {
+                template.watch(List.of(counter, budget));
+                assertThat(template.opsForZSet().zCard(budget)).isEqualTo(1L);
+                template.multi();
+                template.opsForValue().increment(counter, 3);
+                template.opsForValue().decrement(counter, 2);
+                return template.exec();
+              }
+            });
+    template.execute(
+        new SessionCallback<>() {
+          @Override
+          public <K, V> Object execute(RedisOperations<K, V> operations) {
+            template.watch(counter);
+            template.unwatch();
+            template.multi();
+            template.opsForValue().increment(counter, 10);
+            template.discard();
+            return null;
+          }
+        });
+
+    assertThat(replies).as("WATCH, ZCARD, MULTI, INCRBY, DECRBY and EXEC").containsExactly(7L, 5L);
+    assertThat(template.opsForValue().get(counter))
+        .as("UNWATCH and DISCARD dropped the queued increment")
+        .isEqualTo("5");
+    assertThatThrownBy(() -> template.watch("basetool:session:sessions:x"))
+        .as("WATCH is key-checked like every other command")
+        .isInstanceOf(DataAccessException.class);
   }
 
   @Test

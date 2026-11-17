@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.platform.api;
+package de.greluc.krt.profit.basetool.technical.redis;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
