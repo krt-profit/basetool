@@ -33,7 +33,7 @@ if [ "$build" = true ]; then
   files+=(-f docker-compose.sandbox-build.yml)
 fi
 compose=(docker compose --env-file docker/sandbox/sandbox.env "${files[@]}" --profile sandbox)
-services=(redis-dev db-backend-dev db-keycloak-dev keycloak-dev backend-dev frontend-dev ingest-dev)
+services=(redis-session-dev redis-shared-dev db-backend-dev db-keycloak-dev keycloak-dev backend-dev frontend-dev ingest-dev)
 
 check_issuer_host() {
   local resolved

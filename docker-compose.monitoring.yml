@@ -271,21 +271,36 @@ services:
       - net-monitoring-scrape
       - net-db-keycloak
 
-  redis-exporter:
+  redis-session-exporter:
     <<: *mon-base
-    container_name: redis-exporter
+    container_name: redis-session-exporter
     image: oliver006/redis_exporter:v1.97.0@sha256:f5f903fbe77571d455ede0453b084d6840bc62fc105efac001034421cab83b99
     cap_drop: [ALL]
     environment:
       GOMEMLIMIT: "24MiB"
-      REDIS_ADDR: redis://redis:6379
+      REDIS_ADDR: redis://redis-session:6379
       REDIS_USER: ${REDIS_EXPORTER_USER:-monitoring}
-      REDIS_PASSWORD: ${REDIS_EXPORTER_PASSWORD:?REDIS_EXPORTER_PASSWORD must be set}
-    deploy:
+      REDIS_PASSWORD: ${REDIS_SESSION_EXPORTER_PASSWORD:?REDIS_SESSION_EXPORTER_PASSWORD must be set}
+    deploy: &redis-exporter-deploy
       resources:
         limits:
           memory: 32M
           pids: 512
+    networks:
+      - net-monitoring-scrape
+      - net-redis-session
+
+  redis-shared-exporter:
+    <<: *mon-base
+    container_name: redis-shared-exporter
+    image: oliver006/redis_exporter:v1.97.0@sha256:f5f903fbe77571d455ede0453b084d6840bc62fc105efac001034421cab83b99
+    cap_drop: [ALL]
+    environment:
+      GOMEMLIMIT: "24MiB"
+      REDIS_ADDR: redis://redis-shared:6379
+      REDIS_USER: ${REDIS_EXPORTER_USER:-monitoring}
+      REDIS_PASSWORD: ${REDIS_EXPORTER_PASSWORD:?REDIS_EXPORTER_PASSWORD must be set}
+    deploy: *redis-exporter-deploy
     networks:
       - net-monitoring-scrape
       - net-redis-frontend
@@ -338,3 +353,6 @@ networks:
   net-redis-frontend:
     external: true
     name: net-redis-frontend
+  net-redis-session:
+    external: true
+    name: net-redis-session

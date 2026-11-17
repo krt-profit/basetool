@@ -4,14 +4,14 @@ StartLimitIntervalSec=0
 
 [Container]
 Image=docker.io/oliver006/redis_exporter:v1.97.0@sha256:f5f903fbe77571d455ede0453b084d6840bc62fc105efac001034421cab83b99
-ContainerName=redis-exporter
+ContainerName=redis-shared-exporter
 LogDriver=journald
 ReadOnly=true
 DropCapability=ALL
 NoNewPrivileges=true
 Network=net-monitoring-scrape.network
 Network=net-redis-frontend.network
-EnvironmentFile=/etc/basetool/env.d/redis-exporter.env
+EnvironmentFile=/etc/basetool/env.d/redis-shared-exporter.env
 Memory=32M
 PidsLimit=512
 RunInit=true

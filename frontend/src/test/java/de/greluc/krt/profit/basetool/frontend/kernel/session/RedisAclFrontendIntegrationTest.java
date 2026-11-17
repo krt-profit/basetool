@@ -73,30 +73,52 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * Runs the frontend's Redis work under its own ACL user against the committed ACL template with
- * {@code default} disabled (REQ-SEC-068, ADR-0207), checking both what it may and may not do.
+ * Runs the frontend's Redis work under its own ACL users against the committed ACL templates with
+ * {@code default} disabled (REQ-SEC-068, ADR-0207): Spring Session on the session store, live sync
+ * and the handoff pickup on the shared Redis (REQ-SEC-089, ADR-0388), checking both what each user
+ * may and may not do.
  *
- * <p>{@link #theCommittedE2eAclIsTheTemplate} keeps {@code docker/test-redis/users.acl} equal to
- * the template.
+ * <p>{@link #theCommittedE2eAclsAreTheTemplates} keeps {@code docker/test-redis/session-users.acl}
+ * and {@code shared-users.acl} equal to the templates.
  */
 @Testcontainers
 class RedisAclFrontendIntegrationTest {
 
-  /** The template's variables for this suite: the E2E throwaway passwords, {@code default} off. */
+  /** The templates' variables for this suite: the E2E throwaway passwords, {@code default} off. */
   private static final Map<String, String> VALUES = values();
 
   @Container
-  static final GenericContainer<?> REDIS =
+  static final GenericContainer<?> SESSION_STORE =
       new GenericContainer<>(DockerImageName.parse(TestImages.REDIS))
           .withExposedPorts(6379)
           .withCopyToContainer(
-              Transferable.of(RedisAclTemplate.render(VALUES)), "/etc/redis/users.acl")
+              Transferable.of(RedisAclTemplate.renderSession(VALUES)), "/etc/redis/users.acl")
           .withCommand(
               "redis-server",
               "--aclfile",
               "/etc/redis/users.acl",
               "--notify-keyspace-events",
               "Egx");
+
+  @Container
+  static final GenericContainer<?> SHARED =
+      new GenericContainer<>(DockerImageName.parse(TestImages.REDIS))
+          .withExposedPorts(6379)
+          .withCopyToContainer(
+              Transferable.of(RedisAclTemplate.renderShared(VALUES)), "/etc/redis/users.acl")
+          .withCommand("redis-server", "--aclfile", "/etc/redis/users.acl");
+
+  /** The session store's frontend password variable. */
+  private static final String SESSION_FRONTEND = "REDIS_SESSION_FRONTEND_PASSWORD";
+
+  /** The session store's admin password variable. */
+  private static final String SESSION_ADMIN = "REDIS_SESSION_PASSWORD";
+
+  /** The shared Redis's frontend password variable. */
+  private static final String SHARED_FRONTEND = "REDIS_FRONTEND_PASSWORD";
+
+  /** The shared Redis's admin password variable. */
+  private static final String SHARED_ADMIN = "REDIS_PASSWORD";
 
   private final List<LettuceConnectionFactory> factories = new ArrayList<>();
   private final List<RedisMessageListenerContainer> containers = new ArrayList<>();
@@ -108,20 +130,47 @@ class RedisAclFrontendIntegrationTest {
   }
 
   @Test
-  void theCommittedE2eAclIsTheTemplate() throws IOException {
-    String committed =
-        Files.readString(
-            RedisAclTemplate.repositoryPath("docker/test-redis/users.acl"), StandardCharsets.UTF_8);
+  void theCommittedE2eAclsAreTheTemplates() throws IOException {
+    assertThat(committed("docker/test-redis/session-users.acl"))
+        .as("docker/test-redis/session-users.acl must be re-rendered whenever its template changes")
+        .isEqualTo(RedisAclTemplate.renderSession(VALUES));
+    assertThat(committed("docker/test-redis/shared-users.acl"))
+        .as("docker/test-redis/shared-users.acl must be re-rendered whenever its template changes")
+        .isEqualTo(RedisAclTemplate.renderShared(VALUES));
+  }
 
-    assertThat(committed.replace("\r\n", "\n"))
-        .as("docker/test-redis/users.acl must be re-rendered whenever the template changes")
-        .isEqualTo(RedisAclTemplate.render(VALUES));
+  @Test
+  void theSessionStoreKnowsNoUserOfTheBackendOrTheGateway() {
+    StringRedisTemplate admin =
+        template(connect(SESSION_STORE, RedisAclTemplate.ADMIN_USER, SESSION_ADMIN));
+
+    assertThat(aclUser(admin, RedisAclTemplate.FRONTEND_USER))
+        .as("the frontend's user exists on the session store")
+        .isNotNull();
+    assertThat(aclUser(admin, RedisAclTemplate.BACKEND_USER))
+        .as("ACL GETUSER answers nil for a user the session store does not know")
+        .isNull();
+    assertThat(aclUser(admin, RedisAclTemplate.INGEST_USER)).isNull();
+  }
+
+  /**
+   * Asks an instance for one ACL user's rules.
+   *
+   * @param admin a template authenticated as {@code admin}
+   * @param user the ACL user
+   * @return the last element of {@code ACL GETUSER}'s reply, or {@code null} when the user does not
+   *     exist
+   */
+  private static Object aclUser(StringRedisTemplate admin, String user) {
+    return admin.execute(
+        (org.springframework.data.redis.core.RedisCallback<Object>)
+            connection -> connection.execute("ACL", bytes("GETUSER"), bytes(user)));
   }
 
   @Test
   void springSessionStoresFindsRenamesAndDeletesUnderTheFrontendUser() throws Exception {
     LettuceConnectionFactory factory =
-        connect(RedisAclTemplate.FRONTEND_USER, "REDIS_FRONTEND_PASSWORD");
+        connect(SESSION_STORE, RedisAclTemplate.FRONTEND_USER, SESSION_FRONTEND);
     RedisIndexedSessionRepository repository = sessionRepository(factory);
     List<ApplicationEvent> events = new CopyOnWriteArrayList<>();
     CountDownLatch created = new CountDownLatch(1);
@@ -173,11 +222,12 @@ class RedisAclFrontendIntegrationTest {
   @Test
   void theKeyspaceStartupStepSurvivesAUserThatMayNotRunConfig() {
     LettuceConnectionFactory factory =
-        connect(RedisAclTemplate.FRONTEND_USER, "REDIS_FRONTEND_PASSWORD");
+        connect(SESSION_STORE, RedisAclTemplate.FRONTEND_USER, SESSION_FRONTEND);
     try (RedisConnection connection = factory.getConnection()) {
       new TolerantKeyspaceNotificationsAction().configure(connection);
     }
-    LettuceConnectionFactory admin = connect(RedisAclTemplate.ADMIN_USER, "REDIS_PASSWORD");
+    LettuceConnectionFactory admin =
+        connect(SESSION_STORE, RedisAclTemplate.ADMIN_USER, SESSION_ADMIN);
     try (RedisConnection connection = admin.getConnection()) {
       Properties config = connection.serverCommands().getConfig("notify-keyspace-events");
       assertThat(config.getProperty("notify-keyspace-events"))
@@ -194,8 +244,9 @@ class RedisAclFrontendIntegrationTest {
   @Test
   void theStartupStepPickedForTheFrontendUserIsNeverRefused() {
     LettuceConnectionFactory factory =
-        connect(RedisAclTemplate.FRONTEND_USER, "REDIS_FRONTEND_PASSWORD");
-    StringRedisTemplate admin = template(connect(RedisAclTemplate.ADMIN_USER, "REDIS_PASSWORD"));
+        connect(SESSION_STORE, RedisAclTemplate.FRONTEND_USER, SESSION_FRONTEND);
+    StringRedisTemplate admin =
+        template(connect(SESSION_STORE, RedisAclTemplate.ADMIN_USER, SESSION_ADMIN));
 
     long before = deniedCommands(admin);
     try (RedisConnection connection = factory.getConnection()) {
@@ -221,7 +272,8 @@ class RedisAclFrontendIntegrationTest {
   @Test
   void theStartupStepForTheFrontendUserStillFailsOnWrongCredentials() {
     LettuceConnectionFactory factory =
-        connectWithUsername(RedisAclTemplate.FRONTEND_USER, "not-the-frontend-password");
+        connectWithUsername(
+            SESSION_STORE, RedisAclTemplate.FRONTEND_USER, "not-the-frontend-password");
     ConfigureRedisAction action =
         RedisSessionConfig.selectConfigureRedisAction(true, RedisAclTemplate.FRONTEND_USER);
 
@@ -254,9 +306,9 @@ class RedisAclFrontendIntegrationTest {
   }
 
   @Test
-  void liveSyncPublishesAndReceivesOnBothChannels() throws Exception {
+  void liveSyncPublishesAndReceivesOnBothChannelsOfTheSharedRedis() throws Exception {
     LettuceConnectionFactory factory =
-        connect(RedisAclTemplate.FRONTEND_USER, "REDIS_FRONTEND_PASSWORD");
+        connect(SHARED, RedisAclTemplate.FRONTEND_USER, SHARED_FRONTEND);
     StringRedisTemplate template = template(factory);
     RedisMessageListenerContainer listener = listenerContainer(factory);
     CountDownLatch received = new CountDownLatch(2);
@@ -274,15 +326,21 @@ class RedisAclFrontendIntegrationTest {
     assertThatThrownBy(() -> template.convertAndSend("basetool:notify:published", "{}"))
         .as("the backend's notification channel is not the frontend's")
         .isInstanceOf(DataAccessException.class);
+    StringRedisTemplate sessionStore =
+        template(connect(SESSION_STORE, RedisAclTemplate.FRONTEND_USER, SESSION_FRONTEND));
+    assertThatThrownBy(() -> sessionStore.convertAndSend("basetool:livesync:changed", "{}"))
+        .as("live sync does not run on the session store")
+        .isInstanceOf(DataAccessException.class);
   }
 
   @Test
   void aStagedHandoffIsConsumedAndTheGatewayIndexStaysOutOfReach() {
-    StringRedisTemplate admin = template(connect(RedisAclTemplate.ADMIN_USER, "REDIS_PASSWORD"));
+    StringRedisTemplate admin =
+        template(connect(SHARED, RedisAclTemplate.ADMIN_USER, SHARED_ADMIN));
     admin.opsForValue().set("ingest:handoff:sub-1:hid-1", "{\"kind\":\"REFINERY\"}");
     admin.opsForList().rightPush("ingest:handoff-index:sub-1", "hid-1");
     StringRedisTemplate frontend =
-        template(connect(RedisAclTemplate.FRONTEND_USER, "REDIS_FRONTEND_PASSWORD"));
+        template(connect(SHARED, RedisAclTemplate.FRONTEND_USER, SHARED_FRONTEND));
 
     assertThat(frontend.opsForValue().getAndDelete("ingest:handoff:sub-1:hid-1"))
         .isEqualTo("{\"kind\":\"REFINERY\"}");
@@ -290,12 +348,15 @@ class RedisAclFrontendIntegrationTest {
         .isInstanceOf(DataAccessException.class);
     assertThatThrownBy(() -> frontend.opsForValue().set("other:key", "v"))
         .isInstanceOf(DataAccessException.class);
+    assertThatThrownBy(() -> frontend.opsForHash().entries("basetool:session:sessions:x"))
+        .as("the shared Redis's frontend user reaches no session key")
+        .isInstanceOf(DataAccessException.class);
   }
 
   @Test
   void theSessionCountIsScannedAndTheHealthIndicatorsInfoAnswers() {
     LettuceConnectionFactory factory =
-        connect(RedisAclTemplate.FRONTEND_USER, "REDIS_FRONTEND_PASSWORD");
+        connect(SESSION_STORE, RedisAclTemplate.FRONTEND_USER, SESSION_FRONTEND);
     StringRedisTemplate template = template(factory);
     template.opsForHash().put("basetool:session:sessions:scan-probe", "lastAccessedTime", "1");
 
@@ -321,22 +382,29 @@ class RedisAclFrontendIntegrationTest {
 
   @Test
   void theDefaultUserIsOffAndAPasswordOnlyAuthNoLongerWorks() {
-    LettuceConnectionFactory legacy = connectWithoutUsername(VALUES.get("REDIS_PASSWORD"));
+    LettuceConnectionFactory session =
+        connectWithoutUsername(SESSION_STORE, VALUES.get(SESSION_ADMIN));
+    LettuceConnectionFactory shared = connectWithoutUsername(SHARED, VALUES.get(SHARED_ADMIN));
 
-    assertThatThrownBy(() -> template(legacy).opsForValue().get("basetool:session:x"))
-        .as("password-only AUTH lands on `default`, which is off")
+    assertThatThrownBy(() -> template(session).opsForValue().get("basetool:session:x"))
+        .as("password-only AUTH lands on the session store's `default`, which is off")
+        .isInstanceOf(DataAccessException.class);
+    assertThatThrownBy(() -> template(shared).opsForValue().get("ingest:handoff:x"))
+        .as("password-only AUTH lands on the shared Redis's `default`, which is off")
         .isInstanceOf(DataAccessException.class);
   }
 
   @Test
   void beforeTheRolloutAPasswordOnlyAuthIsExactlyTodaysDefaultUser() {
-    StringRedisTemplate admin = template(connect(RedisAclTemplate.ADMIN_USER, "REDIS_PASSWORD"));
+    StringRedisTemplate admin =
+        template(connect(SESSION_STORE, RedisAclTemplate.ADMIN_USER, SESSION_ADMIN));
     admin.execute(
         (org.springframework.data.redis.core.RedisCallback<Object>)
             connection ->
                 connection.execute("ACL", bytes("SETUSER"), bytes("default"), bytes("on")));
     try {
-      StringRedisTemplate legacy = template(connectWithUsername("", VALUES.get("REDIS_PASSWORD")));
+      StringRedisTemplate legacy =
+          template(connectWithUsername(SESSION_STORE, "", VALUES.get(SESSION_ADMIN)));
       legacy.opsForValue().set("basetool:session:legacy-probe", "v");
       assertThat(legacy.opsForValue().getAndDelete("basetool:session:legacy-probe")).isEqualTo("v");
     } finally {
@@ -348,14 +416,14 @@ class RedisAclFrontendIntegrationTest {
   }
 
   /**
-   * The {@code ACL DRYRUN} table: for each user, a command it needs and must be allowed, or one it
-   * must never run.
+   * The session store's {@code ACL DRYRUN} table: for each user, a command it needs and must be
+   * allowed, or one it must never run.
    *
    * @param user the ACL user.
    * @param command the command line, space-separated.
    * @param allowed whether the ACL must allow it.
    */
-  @ParameterizedTest(name = "{0}: {1} -> {2}")
+  @ParameterizedTest(name = "session store, {0}: {1} -> {2}")
   @CsvSource({
     "basetool-frontend, HGETALL basetool:session:sessions:x, true",
     "basetool-frontend, HSET basetool:session:sessions:x f v, true",
@@ -363,19 +431,64 @@ class RedisAclFrontendIntegrationTest {
     "basetool-frontend, SADD basetool:session:index:x id, true",
     "basetool-frontend, APPEND basetool:session:sessions:expires:x v, true",
     "basetool-frontend, SCAN 0, true",
-    "basetool-frontend, GETDEL ingest:handoff:sub:id, true",
     "basetool-frontend, PUBLISH basetool:session:event:0:created:x m, true",
     "basetool-frontend, PSUBSCRIBE basetool:session:event:0:created:*, true",
     "basetool-frontend, SUBSCRIBE __keyevent@0__:expired, true",
-    "basetool-frontend, PUBLISH basetool:livesync:changed m, true",
     "basetool-frontend, INFO server, true",
     "basetool-frontend, PING, true",
-    "basetool-frontend, GET ingest:handoff-index:sub, false",
+    "basetool-frontend, GETDEL ingest:handoff:sub:id, false",
+    "basetool-frontend, GET exchange:registry, false",
+    "basetool-frontend, PUBLISH basetool:livesync:changed m, false",
+    "basetool-frontend, SUBSCRIBE basetool:livesync:presence, false",
     "basetool-frontend, SET other:key v, false",
     "basetool-frontend, PUBLISH basetool:notify:published m, false",
     "basetool-frontend, PSUBSCRIBE *, false",
     "basetool-frontend, CONFIG SET dir /tmp, false",
     "basetool-frontend, CONFIG GET notify-keyspace-events, false",
+    "basetool-frontend, KEYS *, false",
+    "basetool-frontend, FLUSHALL, false",
+    "basetool-frontend, ACL LIST, false",
+    "monitoring, INFO, true",
+    "monitoring, CONFIG GET maxmemory, true",
+    "monitoring, SCAN 0, false",
+    "monitoring, RANDOMKEY, false",
+    "monitoring, GET basetool:session:sessions:x, false",
+    "monitoring, KEYS *, false",
+    "monitoring, FLUSHALL, false",
+    "monitoring, ACL LIST, false",
+    "admin, ACL LOAD, true"
+  })
+  void theSessionStoreAclMatrixHoldsForEveryUser(String user, String command, boolean allowed) {
+    assertDryRun(SESSION_STORE, SESSION_ADMIN, user, command, allowed);
+  }
+
+  /**
+   * The shared Redis's {@code ACL DRYRUN} table: for each user, a command it needs and must be
+   * allowed, or one it must never run.
+   *
+   * @param user the ACL user.
+   * @param command the command line, space-separated.
+   * @param allowed whether the ACL must allow it.
+   */
+  @ParameterizedTest(name = "shared, {0}: {1} -> {2}")
+  @CsvSource({
+    "basetool-frontend, GETDEL ingest:handoff:sub:id, true",
+    "basetool-frontend, PUBLISH basetool:livesync:changed m, true",
+    "basetool-frontend, PUBLISH basetool:livesync:presence m, true",
+    "basetool-frontend, SUBSCRIBE basetool:livesync:changed, true",
+    "basetool-frontend, INFO server, true",
+    "basetool-frontend, PING, true",
+    "basetool-frontend, HGETALL basetool:session:sessions:x, false",
+    "basetool-frontend, SCAN 0, false",
+    "basetool-frontend, PSUBSCRIBE basetool:session:event:0:created:*, false",
+    "basetool-frontend, SUBSCRIBE __keyevent@0__:expired, false",
+    "basetool-frontend, GET ingest:handoff:sub:id, false",
+    "basetool-frontend, GET ingest:handoff-index:sub, false",
+    "basetool-frontend, GET exchange:registry, false",
+    "basetool-frontend, SET other:key v, false",
+    "basetool-frontend, PUBLISH basetool:notify:published m, false",
+    "basetool-frontend, PSUBSCRIBE *, false",
+    "basetool-frontend, CONFIG SET dir /tmp, false",
     "basetool-frontend, KEYS *, false",
     "basetool-frontend, FLUSHALL, false",
     "basetool-frontend, ACL LIST, false",
@@ -422,8 +535,27 @@ class RedisAclFrontendIntegrationTest {
     "monitoring, SUBSCRIBE basetool:livesync:changed, false",
     "admin, ACL LOAD, true"
   })
-  void theAclMatrixHoldsForEveryUser(String user, String command, boolean allowed) {
-    StringRedisTemplate admin = template(connect(RedisAclTemplate.ADMIN_USER, "REDIS_PASSWORD"));
+  void theSharedAclMatrixHoldsForEveryUser(String user, String command, boolean allowed) {
+    assertDryRun(SHARED, SHARED_ADMIN, user, command, allowed);
+  }
+
+  /**
+   * Asks one instance whether its ACL lets a user run a command, and asserts the answer.
+   *
+   * @param redis the instance
+   * @param adminPassword the variable holding that instance's admin password
+   * @param user the ACL user
+   * @param command the command line, space-separated
+   * @param allowed whether the ACL must allow it
+   */
+  private void assertDryRun(
+      GenericContainer<?> redis,
+      String adminPassword,
+      String user,
+      String command,
+      boolean allowed) {
+    StringRedisTemplate admin =
+        template(connect(redis, RedisAclTemplate.ADMIN_USER, adminPassword));
     List<byte[]> args = new ArrayList<>();
     args.add(bytes("DRYRUN"));
     args.add(bytes(user));
@@ -470,38 +602,56 @@ class RedisAclFrontendIntegrationTest {
   }
 
   /**
-   * Connects as an ACL user.
+   * Reads a committed file with Unix line ends.
    *
+   * @param relative the path relative to the repository root
+   * @return its text
+   * @throws IOException when it cannot be read
+   */
+  private static String committed(String relative) throws IOException {
+    return Files.readString(RedisAclTemplate.repositoryPath(relative), StandardCharsets.UTF_8)
+        .replace("\r\n", "\n");
+  }
+
+  /**
+   * Connects to an instance as an ACL user.
+   *
+   * @param redis the instance
    * @param user the ACL user.
    * @param passwordVariable the template variable holding its password.
    * @return a started connection factory, destroyed after the test.
    */
-  private LettuceConnectionFactory connect(String user, String passwordVariable) {
-    return connectWithUsername(user, VALUES.get(passwordVariable));
+  private LettuceConnectionFactory connect(
+      GenericContainer<?> redis, String user, String passwordVariable) {
+    return connectWithUsername(redis, user, VALUES.get(passwordVariable));
   }
 
   /**
    * Connects with a password-only {@code AUTH}, as an application with an empty {@code
    * REDIS_USERNAME} does.
    *
+   * @param redis the instance
    * @param password the password
    * @return a started connection factory, destroyed after the test
    */
-  private LettuceConnectionFactory connectWithoutUsername(String password) {
-    return connectWithUsername(null, password);
+  private LettuceConnectionFactory connectWithoutUsername(
+      GenericContainer<?> redis, String password) {
+    return connectWithUsername(redis, null, password);
   }
 
   /**
    * Connects with the given credentials, the way Spring Boot builds the factory from {@code
    * spring.data.redis.username} / {@code password}.
    *
+   * @param redis the instance
    * @param username the username; {@code null} or empty means a password-only {@code AUTH}.
    * @param password the password.
    * @return a started connection factory, destroyed after the test.
    */
-  private LettuceConnectionFactory connectWithUsername(String username, String password) {
+  private LettuceConnectionFactory connectWithUsername(
+      GenericContainer<?> redis, String username, String password) {
     RedisStandaloneConfiguration configuration =
-        new RedisStandaloneConfiguration(REDIS.getHost(), REDIS.getMappedPort(6379));
+        new RedisStandaloneConfiguration(redis.getHost(), redis.getMappedPort(6379));
     configuration.setUsername(username);
     configuration.setPassword(password);
     LettuceConnectionFactory factory = new LettuceConnectionFactory(configuration);

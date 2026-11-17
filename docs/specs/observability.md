@@ -1690,8 +1690,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   empties them while the import or sync keeps succeeding; the gauge is what makes that visible.
   Backs `ScWikiItemStatsMissing` (the maximum over both sources == 0 for 48h, warning).
 - `basetool_redis_fanout_subscribed{fanout}` gauge (`LiveSyncRedisConfig`,
-  `NotificationRedisConfig`), 1 while the cross-instance pub/sub container is listening and 0 while
-  it is not; `fanout` is the two-valued literal `livesync` / `notifications`. Exists because the
+  `NotificationRedisConfig`), 1 while the cross-instance pub/sub container is listening on
+  `redis-shared` and 0 while it is not; `fanout` is the two-valued literal `livesync` / `notifications`. Exists because the
   failure it watches used to be loud and is now quiet: until 2026-09-02 a Redis unreachable during
   context refresh threw out of `SmartLifecycle#start()` and aborted the refresh, so the backend
   crash-looped and needed no metric to be noticed. `ResilientRedisMessageListenerContainer` makes
@@ -2553,9 +2553,9 @@ idle timeout is two-tier (REQ-SEC-025 / ADR-0088) — un-authenticated sessions 
 (`app.session.anonymous-timeout`) so the throwaway CSRF-token / pre-login-OAuth2 sessions minted for
 anonymous traffic cannot accrete, and only a successful login promotes the session to the 30-day
 `app.session.authenticated-timeout`. A sustained climb past a few hundred means that split regressed
-(orphan sessions accreting again, as they did to >16000 against ~30 real principals) and the Redis
-session store is heading for its `maxmemory noeviction` ceiling where login/token-refresh writes
-fail.
+(orphan sessions accreting again, as they did to >16000 against ~30 real principals) and the session
+store `redis-session` is heading for its `maxmemory noeviction` ceiling where login/token-refresh
+writes fail.
 
 A third frontend meter was added by the 2026-09-02 production log triage:
 
@@ -2786,7 +2786,7 @@ the same `basetool_bot_blocked_total{rule}` series, distinguished by the `applic
 **Ingest.** `basetool_ingest_handoff_total{kind}` (staged handoffs per `HandoffKind`: an exchange
 client's draft or a held-back change set), `basetool_ingest_handoff_errors_total{reason}`
 (`staging_unavailable` / `internal`; `staging_unavailable` is kept apart from `internal` because at
-that point the backend relay already **succeeded** and only Redis is at fault, a different operator
+that point the backend relay already **succeeded** and only `redis-shared` is at fault, a different operator
 action, which is why it also has its own `IngestStagingUnavailable` alert — REQ-INGEST-003; the
 exchange's draft and mass-change routes count it since 2026-09-28), and
 `basetool_ratelimit_rejections_total{bucket}` (`bucket` = `ip`; shares the metric name with the
@@ -3336,6 +3336,23 @@ therefore alerts on:
   container failing its own health check — the podman exporter's `podman_container_health == 1`
   joined to `podman_container_info` for the name — which deploy.sh's targeted restart covers for the
   three application modules only.
+- **Two Redis instances, one exporter each** (ADR-0388). `redis-session` holds Spring Session and is
+  reached by the frontend alone; `redis-shared` holds the exchange registry mirror and gateway state,
+  the ingest handoffs and the three pub/sub channels. `redis-session-exporter` and
+  `redis-shared-exporter` are the two targets of the `redis` scrape job, and each target carries the
+  static label `redis="session"` or `redis="shared"`, so every `redis_*` series names its instance.
+  Every Redis alert — `RedisDown`, `RedisRdbStale`, `RedisRdbSaveFailing`, `RedisAofWriteFailing`,
+  `RedisAclDenials` (summed `by (redis)`), `RedisEvictions`, `RedisMemoryHigh`,
+  `RedisConnectionsRejected` — fires per instance and names it, its unit, data directory and ACL
+  file, and the consequence of that instance: a `redis-session` outage or full memory stops sign-in,
+  a `redis-shared` one leaves sign-in working and stops the exchange (`503 REGISTRY_UNAVAILABLE`),
+  the handoff and the cross-replica fan-out. `RedisMemoryHigh` reads the instance's own maxmemory
+  and states no fixed size. `CoreContainerMetricsMissing` counts both containers among its eight
+  core containers. The Redis dashboard (`05-redis.json`) selects the instance with its `redis`
+  variable; the exchange, handoff and fan-out alerts and panels name `redis-shared`, the session
+  alerts `redis-session`. Locked by `ops_audit_2026_09_alerts_06_redisdown_redis_up_0_pages_after_two_test.yml`,
+  `redis_acl_denials_test.yml`, `redisrdbstale_idle_guard_test.yml`,
+  `redis_instance_capacity_alerts_test.yml` and `container_presence_test.yml`.
 - **Rule-evaluation & notification failures.** The two independent alert evaluators (Prometheus and
   the Loki ruler) must keep evaluating and delivering. `PrometheusRuleEvaluationFailures`,
   `PrometheusNotificationsDropped`, `LokiRuleEvaluationFailures`, `LokiRulerNotificationsFailing`
@@ -3407,7 +3424,7 @@ therefore alerts on:
   name-labelled series — cAdvisor did (a real incident, CHANGELOG v1.1.1), and the cgroup collector
   can write a fresh file matching no cgroup — silently blinding the container alerts.
   `ContainerMetricsMissing` (critical, fewer than 10 containers) and `CoreContainerMetricsMissing`
-  (warning, fewer than the 7 core app containers) count `basetool:container:present`, which either
+  (warning, fewer than the 8 core app containers) count `basetool:container:present`, which either
   source feeds (they counted cAdvisor's `container_last_seen` until 2026-09-20 and fired permanently
   on the Podman host). `ContainerOomKilled` and `ContainerCpuThrottledHigh` (warning) surface a single
   OOM kill and sustained CFS throttling that the coarse `ContainerRestartLoop` / `ContainerMemoryHigh`

@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """Profit Basetool - render the Redis ACL file from its committed template and the host .env.
 
-One ACL user per service (REQ-SEC-068, ADR-0207), rendered into the file the ``redis`` unit loads
-with ``--aclfile``. Every ``{{hash:NAME}}`` becomes ``#`` + the SHA-256 of NAME's value; a missing
-or empty variable, or a result without exactly one ``default`` user, refuses the whole render. The
-file is written atomically with mode ``0644``.
+One ACL user per service (REQ-SEC-068, ADR-0207), rendered into the file a Redis unit loads with
+``--aclfile``; each instance has its own template and file (ADR-0388). Every ``{{hash:NAME}}``
+becomes ``#`` + the SHA-256 of NAME's value; a missing or empty variable, or a result without
+exactly one ``default`` user, refuses the whole render. The file is written atomically with mode
+``0644``.
 
 Usage
 -----
 ::
 
     render-redis-acl.py --env /etc/basetool/basetool.env \\
-        --template /opt/basetool/scripts/redis-users.acl.tmpl --out /var/lib/basetool/redis/users.acl
+        --template /opt/basetool/scripts/redis-session-users.acl.tmpl \\
+        --out /var/lib/basetool/redis/session-users.acl
+    render-redis-acl.py --env /etc/basetool/basetool.env \\
+        --template /opt/basetool/scripts/redis-shared-users.acl.tmpl \\
+        --out /var/lib/basetool/redis-shared/users.acl
     render-redis-acl.py ... --check       # report drift, write nothing
     render-redis-acl.py --selftest        # the regression tests, no files touched
 
@@ -35,6 +40,13 @@ from typing import Sequence
 from env_file import EnvFileError, parse_env_file
 
 PLACEHOLDER = re.compile(r"\{\{(hash|state):([A-Za-z_][A-Za-z0-9_]*)\}\}")
+
+# The committed templates, each with the key and channel prefixes its instance must never grant
+# (ADR-0388): the session store holds only Spring Session, the shared Redis everything else.
+COMMITTED_TEMPLATES: dict[str, tuple[str, ...]] = {
+    "redis-session-users.acl.tmpl": ("ingest:", "exchange:", "livesync", "notify"),
+    "redis-shared-users.acl.tmpl": ("basetool:session", "__keyevent"),
+}
 
 
 class Refusal(Exception):
@@ -188,15 +200,20 @@ def selftest() -> int:
         with open(target, encoding="utf-8") as handle:
             check("atomic write round-trips", handle.read() == out)
         check("no temporary file left behind", os.listdir(scratch) == ["users.acl"])
-    repo_template = os.path.join(os.path.dirname(os.path.abspath(__file__)), "redis-users.acl.tmpl")
-    if os.path.exists(repo_template):
+    here = os.path.dirname(os.path.abspath(__file__))
+    for template_name, foreign in COMMITTED_TEMPLATES.items():
+        repo_template = os.path.join(here, template_name)
+        if not os.path.exists(repo_template):
+            continue
         with open(repo_template, encoding="utf-8") as handle:
             text = handle.read()
         names = sorted({m.group(2) for m in PLACEHOLDER.finditer(text) if m.group(1) == "hash"})
         real = render(text, {name: f"selftest-{name}" for name in names})
-        check("the committed template renders", real.count("\nuser ") + 1 == real.count("user "))
-        check("the committed template keeps default", real.startswith("user default on "))
-        check("the committed template has no clear-text password", ">" not in real)
+        check(f"{template_name} renders", real.count("\nuser ") + 1 == real.count("user "))
+        check(f"{template_name} keeps default", real.startswith("user default on "))
+        check(f"{template_name} has no clear-text password", ">" not in real)
+        for pattern in foreign:
+            check(f"{template_name} grants nothing on {pattern}", pattern not in real)
     for failure in failures:
         print(f"render-redis-acl selftest FAILED: {failure}", file=sys.stderr)
     if not failures:
@@ -215,8 +232,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(prog="render-redis-acl.py")
     parser.add_argument("--env", help="the host .env")
-    parser.add_argument("--template", help="scripts/redis-users.acl.tmpl")
-    parser.add_argument("--out", help="the ACL file to write, normally /var/lib/basetool/redis/users.acl")
+    parser.add_argument("--template", help="scripts/redis-session-users.acl.tmpl or "
+                                           "scripts/redis-shared-users.acl.tmpl")
+    parser.add_argument("--out", help="the ACL file to write: /var/lib/basetool/redis/session-users.acl "
+                                      "or /var/lib/basetool/redis-shared/users.acl")
     parser.add_argument("--check", action="store_true", help="report drift and write nothing")
     parser.add_argument("--selftest", action="store_true", help="run the regression tests")
     args = parser.parse_args(argv)

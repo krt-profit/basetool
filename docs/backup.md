@@ -38,7 +38,7 @@ staging directory `…/staging/<UTC timestamp>/`:
 | Backend DB `krt_basetool`      | `krt_basetool.dump`                       | `pg_dump -Fc` inside the `db-backend` container                                                                            |
 | Keycloak DB `keycloak`         | `keycloak.dump`                           | `pg_dump -Fc` inside the `db-keycloak` container — **the live source of truth** for realm/users/clients, not `realm-export.json` |
 | Edge TLS material + ACME state | `edge-certs.tar.gz`, `edge-acme-state.tar.gz`, `edge-acme-webroot.tar.gz` | `tar` of the three named volumes through a helper container; a volume that does not exist is logged as skipped |
-| Host secrets/config            | `config/dotenv`, `config/keystore.p12`, `config/internal-tls.tar`, `config/realm-export.json`, `config/providers.tar.gz`, `config/users.acl` | `basetool.env`, the keystore, the **per-service internal TLS material** (`/etc/basetool/secrets/tls`, only once rolled out — REQ-SEC-070), the realm export, `keycloak/providers`, and the **redis ACL** (access control, not session data — redis refuses to start without it) |
+| Host secrets/config            | `config/dotenv`, `config/keystore.p12`, `config/internal-tls.tar`, `config/realm-export.json`, `config/providers.tar.gz`, `config/session-users.acl`, `config/shared-users.acl` | `basetool.env`, the keystore, the **per-service internal TLS material** (`/etc/basetool/secrets/tls`, only once rolled out — REQ-SEC-070), the realm export, `keycloak/providers`, and the **two Redis ACLs** (access control, not session data — neither instance starts without its file; ADR-0388) |
 | Monitoring plane (ADR-0072)    | `monitoring/grafana.db`, `monitoring/secrets.tar.gz`, `monitoring/alertmanager.tar.gz` | Grafana SQLite (brief `grafana` stop for a consistent copy), `/etc/basetool/monitoring/{secrets,certs}`, Alertmanager silences + notification log |
 | Prometheus TSDB (Sundays only) | `monitoring/prometheus-tsdb-snapshot.tar.gz` | admin-API snapshot via a throwaway curl container on `net-monitoring-core` |
 
@@ -60,8 +60,10 @@ success over a snapshot missing the certificates, the ACL and the keystore.
 
 **Excluded by design:**
 
-- **Redis session data** (`appendonlydir`, `dump.rdb`) — only Spring sessions; users transparently
-  re-login after a restore. The `users.acl` beside them *is* captured.
+- **Redis data** (`appendonlydir`, `dump.rdb`) of both instances — `redis-session` holds only Spring
+  sessions, so users transparently re-login after a restore; `redis-shared` holds the exchange and
+  ingest state, which the backend rewrites from Postgres or which expires within the hour. The ACL file
+  beside each *is* captured.
 - **Logs** — `/var/log/basetool/{backend,frontend,keycloak}`.
 - **The Loki log store** — a deliberate data-protection decision (ADR-0072): its GFS retention
   would silently extend the approved 31-day IP retention. Tempo traces and exporter/textfile data
@@ -76,7 +78,7 @@ For a *globally* quiescent instant, the job:
    cannot recreate containers mid-backup;
 2. stops the writers (`frontend`, `backend`, `ingest` — `systemctl --user stop <svc>.service` as
    the service user) — the edge keeps serving the maintenance page;
-3. dumps both databases and captures the edge volumes, the redis ACL and the host config to local
+3. dumps both databases and captures the edge volumes, the two Redis ACLs and the host config to local
    staging (**seconds**);
 4. **restarts the writers**. A writer that is slow to report healthy (`Notify=healthy`) is logged
    as a `WARN` and the run continues, so the dumps still reach the repository;
@@ -229,7 +231,8 @@ easy to miss:
 ```
   edge-certs: captured
   edge-acme-state: captured
-  capturing the redis ACL (/var/lib/basetool/redis/users.acl)
+  capturing the redis-session ACL (/var/lib/basetool/redis/session-users.acl)
+  capturing the redis-shared ACL (/var/lib/basetool/redis-shared/users.acl)
   capturing host config (basetool.env, keystore, realm-export, providers)
 ```
 
@@ -300,15 +303,17 @@ flock /run/lock/basetool-deploy.lock true      # returns once no deploy is runni
      setfacl -m u:100999:r /etc/basetool/secrets/tls/keycloak.p12
      restorecon -RF /etc/basetool/secrets/tls
    fi
-   # redis ACL: a plain root-owned file, nothing namespaced about it
-   install -o root -g root -m 0644 "${R}/config/users.acl" /var/lib/basetool/redis/users.acl
-   restorecon -F /etc/basetool/basetool.env /etc/basetool/realm-export.json /etc/basetool/secrets/keystore.p12 /var/lib/basetool/redis/users.acl
-   grep -c '^user default ' /var/lib/basetool/redis/users.acl      # MUST print 1
+   # the two Redis ACLs: plain root-owned files, nothing namespaced about them
+   install -o root -g root -m 0644 "${R}/config/session-users.acl" /var/lib/basetool/redis/session-users.acl
+   install -o root -g root -m 0644 "${R}/config/shared-users.acl" /var/lib/basetool/redis-shared/users.acl
+   restorecon -F /etc/basetool/basetool.env /etc/basetool/realm-export.json /etc/basetool/secrets/keystore.p12 \
+     /var/lib/basetool/redis/session-users.acl /var/lib/basetool/redis-shared/users.acl
+   grep -c '^user default ' /var/lib/basetool/redis/session-users.acl /var/lib/basetool/redis-shared/users.acl   # MUST print 1 each
    ```
 
    The keystore ACL is re-applied by hand because restic does not carry POSIX ACLs; verify with
-   `getfacl -p` (`group::r--`, `user:100999:r--`, a `mask::r--` that does not mask them away). A
-   `users.acl` without a `default` line makes redis come up with **no authentication** (the
+   `getfacl -p` (`group::r--`, `user:100999:r--`, a `mask::r--` that does not mask them away). An
+   ACL file without a `default` line makes its instance come up with **no authentication** (the
    2026-07-10 defect) — the `grep` must answer `1`.
 
 3. **Restore the edge volumes** — as the service user, *inside* its user namespace, so the
@@ -372,10 +377,11 @@ secrets must be assumed exposed: **rotate them once the stack is back up** (REQ-
 minimum —
 
 - the backend/Keycloak **database passwords** (`POSTGRES_PASSWORD`, `KC_POSTGRES_PASSWORD`) and the
-  **Redis passwords** (`REDIS_PASSWORD`, `REDIS_EXPORTER_PASSWORD` and, once the per-service users
-  are rolled out, `REDIS_FRONTEND_PASSWORD` / `_BACKEND_` / `_INGEST_`) in `/etc/basetool/basetool.env`,
-  applied to the DBs — and to `/var/lib/basetool/redis/users.acl`, which is where redis actually reads them:
-  re-render it with `render-redis-acl.py` and `ACL LOAD` ([`deployment.md` → *The Redis
+  **Redis passwords** (`REDIS_SESSION_PASSWORD`, `REDIS_SESSION_EXPORTER_PASSWORD`,
+  `REDIS_SESSION_FRONTEND_PASSWORD`, `REDIS_PASSWORD`, `REDIS_EXPORTER_PASSWORD` and, once the per-service
+  users are rolled out, `REDIS_FRONTEND_PASSWORD` / `_BACKEND_` / `_INGEST_`) in `/etc/basetool/basetool.env`,
+  applied to the DBs — and to the two ACL files, which is where Redis actually reads them:
+  re-render both with `render-redis-acl.py` and `ACL LOAD` ([`deployment.md` → *The Redis
   ACL*](deployment.md#the-redis-acl)). The captured ACL itself holds SHA-256 hashes, not passwords,
   since REQ-SEC-068;
 - the **Keycloak admin** bootstrap password and the **OIDC client secrets**

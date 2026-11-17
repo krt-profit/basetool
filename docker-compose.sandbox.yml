@@ -1,11 +1,17 @@
 name: basetool-sandbox
 
 services:
-  redis-dev:
+  redis-session-dev:
     profiles: ["dev", "sandbox"]
-    command: redis-server --save "" --appendonly no --maxmemory 768mb --maxmemory-policy noeviction --notify-keyspace-events Egx --aclfile /etc/redis/users.acl
+    command: redis-server --save "" --appendonly no --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --aclfile /etc/redis/users.acl
     volumes: !override
-      - ./docker/test-redis/users.acl:/etc/redis/users.acl:ro
+      - ./docker/test-redis/session-users.acl:/etc/redis/users.acl:ro
+
+  redis-shared-dev:
+    profiles: ["dev", "sandbox"]
+    command: redis-server --save "" --appendonly no --maxmemory 768mb --maxmemory-policy noeviction --aclfile /etc/redis/users.acl
+    volumes: !override
+      - ./docker/test-redis/shared-users.acl:/etc/redis/users.acl:ro
 
   db-backend-dev:
     profiles: ["dev", "sandbox"]
@@ -95,3 +101,5 @@ networks:
     name: basetool-sandbox_net-redis-backend
   net-redis-frontend:
     name: basetool-sandbox_net-redis-frontend
+  net-redis-session:
+    name: basetool-sandbox_net-redis-session

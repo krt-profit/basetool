@@ -38,8 +38,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Renders the committed Redis ACL template ({@code scripts/redis-users.acl.tmpl}) like {@code
- * scripts/render-redis-acl.py}, so tests run against the production rules (REQ-SEC-068).
+ * Renders the committed Redis ACL templates — {@code scripts/redis-session-users.acl.tmpl} for the
+ * session store and {@code scripts/redis-shared-users.acl.tmpl} for the shared Redis (ADR-0388) —
+ * like {@code scripts/render-redis-acl.py}, so tests run against the production rules
+ * (REQ-SEC-068).
  *
  * <p>{@code {{hash:NAME}}} becomes {@code #} plus the SHA-256 of NAME's value, {@code
  * {{state:NAME}}} becomes {@code on} or {@code off}; comment lines are dropped.
@@ -62,20 +64,27 @@ public final class RedisAclTemplate {
   public static final String MONITORING_USER = "monitoring";
 
   /**
-   * The throwaway passwords of the E2E stack, by the {@code .env} variable the template names.
-   * Obviously synthetic and published on purpose: the E2E Redis is created and destroyed per run,
-   * and {@code docker/test-redis/users.acl} carries their hashes. Never a production value.
+   * The throwaway passwords of the E2E stack, by the {@code .env} variable the templates name.
+   * Obviously synthetic and published on purpose: the E2E Redis instances are created and destroyed
+   * per run, and {@code docker/test-redis/session-users.acl} and {@code shared-users.acl} carry
+   * their hashes. Never a production value.
    */
   public static final @Unmodifiable Map<String, String> E2E_PASSWORDS =
       Map.of(
+          "REDIS_SESSION_PASSWORD", "redis-e2e-session-pw-do-not-use-in-prod",
+          "REDIS_SESSION_EXPORTER_PASSWORD", "redis-e2e-session-monitoring-pw-do-not-use-in-prod",
+          "REDIS_SESSION_FRONTEND_PASSWORD", "redis-e2e-session-frontend-pw-do-not-use-in-prod",
           "REDIS_PASSWORD", "redis-e2e-pw-do-not-use-in-prod",
           "REDIS_EXPORTER_PASSWORD", "redis-e2e-monitoring-pw-do-not-use-in-prod",
           "REDIS_FRONTEND_PASSWORD", "redis-e2e-frontend-pw-do-not-use-in-prod",
           "REDIS_BACKEND_PASSWORD", "redis-e2e-backend-pw-do-not-use-in-prod",
           "REDIS_INGEST_PASSWORD", "redis-e2e-ingest-pw-do-not-use-in-prod");
 
-  /** The template's path, relative to the repository root. */
-  private static final String TEMPLATE = "scripts/redis-users.acl.tmpl";
+  /** The session store's template, relative to the repository root. */
+  public static final String SESSION_TEMPLATE = "scripts/redis-session-users.acl.tmpl";
+
+  /** The shared Redis's template, relative to the repository root. */
+  public static final String SHARED_TEMPLATE = "scripts/redis-shared-users.acl.tmpl";
 
   /** The two placeholder forms the renderer knows. */
   private static final Pattern PLACEHOLDER =
@@ -85,15 +94,27 @@ public final class RedisAclTemplate {
   private RedisAclTemplate() {}
 
   /**
-   * Renders the repository's template.
+   * Renders the session store's template.
    *
    * @param values the template variables; every {@code hash} variable must be non-empty, a missing
    *     {@code state} variable means {@code on}
    * @return the ACL file content, one {@code user} line per rule, ending in a newline
    * @throws IllegalArgumentException when a required value is missing or a state is invalid
    */
-  public static @NotNull String render(@NotNull Map<String, String> values) {
-    return render(readTemplate(), values);
+  public static @NotNull String renderSession(@NotNull Map<String, String> values) {
+    return render(readTemplate(SESSION_TEMPLATE), values);
+  }
+
+  /**
+   * Renders the shared Redis's template.
+   *
+   * @param values the template variables; every {@code hash} variable must be non-empty, a missing
+   *     {@code state} variable means {@code on}
+   * @return the ACL file content, one {@code user} line per rule, ending in a newline
+   * @throws IllegalArgumentException when a required value is missing or a state is invalid
+   */
+  public static @NotNull String renderShared(@NotNull Map<String, String> values) {
+    return render(readTemplate(SHARED_TEMPLATE), values);
   }
 
   /**
@@ -154,7 +175,7 @@ public final class RedisAclTemplate {
 
   /**
    * Resolves a path under the repository root, found by walking up from the working directory to
-   * the directory holding the template.
+   * the directory holding the shared Redis's template.
    *
    * @param relative the path relative to the repository root
    * @return the absolute path
@@ -162,22 +183,23 @@ public final class RedisAclTemplate {
    */
   public static @NotNull Path repositoryPath(@NotNull String relative) {
     for (Path dir = Paths.get("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
-      if (Files.exists(dir.resolve(TEMPLATE))) {
+      if (Files.exists(dir.resolve(SHARED_TEMPLATE))) {
         return dir.resolve(relative);
       }
     }
     throw new IllegalStateException(
-        TEMPLATE + " not found above " + Paths.get("").toAbsolutePath());
+        SHARED_TEMPLATE + " not found above " + Paths.get("").toAbsolutePath());
   }
 
   /**
-   * Reads the committed template.
+   * Reads a committed template.
    *
+   * @param template the template's path relative to the repository root
    * @return its text.
    */
-  private static @NotNull String readTemplate() {
+  private static @NotNull String readTemplate(@NotNull String template) {
     try {
-      return Files.readString(repositoryPath(TEMPLATE), StandardCharsets.UTF_8);
+      return Files.readString(repositoryPath(template), StandardCharsets.UTF_8);
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }

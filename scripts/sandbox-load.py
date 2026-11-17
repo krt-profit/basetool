@@ -671,7 +671,7 @@ def main() -> int:
     parser.add_argument("--out", type=pathlib.Path, help="write the JSON report here")
     parser.add_argument("--ingest-container", default="basetool-sandbox-ingest-dev-1")
     parser.add_argument("--backend-container", default="basetool-sandbox-backend-dev-1")
-    parser.add_argument("--redis-container", default="basetool-sandbox-redis-dev-1")
+    parser.add_argument("--redis-container", default="basetool-sandbox-redis-shared-dev-1")
     parser.add_argument("--keycloak-container", default="basetool-sandbox-keycloak-dev-1")
     parser.add_argument("--db-container", default="basetool-sandbox-db-backend-dev-1")
     args = parser.parse_args()

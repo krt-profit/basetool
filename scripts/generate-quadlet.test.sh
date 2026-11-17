@@ -312,7 +312,7 @@ expect "its password is the one the three apps read for the same store" \
   'KRT_BACKEND_TRUSTSTORE_PASSWORD=${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?'
 
 echo "== the data networks are internal under Quadlet (OPS-SEC-05, ADR-0162) =="
-for net in net-db-backend net-db-keycloak net-redis-backend net-redis-frontend net-redis-ingest; do
+for net in net-db-backend net-db-keycloak net-redis-backend net-redis-frontend net-redis-ingest net-redis-session; do
   expect "${net} is Internal=true" \
     "files, _ = g.generate(); print(files['quadlet/systemd/${net}.network'])" \
     'Internal=true'
@@ -323,8 +323,8 @@ for net in net-edge-ingress net-acme-egress net-monitoring-scrape net-backend-ke
     'False'
 done
 expect "a container whose every network is internal may not publish a port" \
-  'g.PODMAN_LOOPBACK_PUBLISH["redis"] = ("127.0.0.1:6379:6379",); g.generate()' \
-  'REFUSAL: redis: every network it joins is internal'
+  'g.PODMAN_LOOPBACK_PUBLISH["redis-session"] = ("127.0.0.1:6379:6379",); g.generate()' \
+  'REFUSAL: redis-session: every network it joins is internal'
 expect "...nor dial the host gateway" \
   'g.PODMAN_HOST_ALIASES["db-backend"] = ("alloy",); g.generate()' \
   'REFUSAL: db-backend: every network it joins is internal'

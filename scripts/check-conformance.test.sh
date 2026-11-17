@@ -247,7 +247,11 @@ case "$cmd" in
         *)             echo "7" ;;
       esac
       ;;
-  *"exec redis"*)
+  *"exec redis-session"*|*"exec redis-shared"*)
+    if [ "${cmd#*exec redis-shared}" = "$cmd" ]; then
+      echo "-NOAUTH Authentication required."
+      exit 0
+    fi
     case "$scenario" in
       redis-open)     echo "+PONG" ;;
       redis-absent)   echo "ABSENT" ;;
@@ -306,32 +310,36 @@ case "$cmd" in
     fi
     ;;&
   *"ReadonlyRootfs"*)
-    for n in edge acme keycloak backend frontend ingest db-backend db-keycloak redis; do
+    for n in edge acme keycloak backend frontend ingest db-backend db-keycloak redis-session redis-shared; do
       ro=true
       case "$scenario" in
         writable-edge)     [ "$n" = edge ] && ro=false ;;
         writable-keycloak) [ "$n" = keycloak ] && ro=false ;;
-        ro-container-gone) [ "$n" = redis ] && continue ;;
+        ro-container-gone) [ "$n" = redis-shared ] && continue ;;
       esac
       printf '/%s|%s\n' "$n" "$ro"
     done
     ;;
   *"uid_map"*)
     name=db-backend
-    case "$cmd" in *db-keycloak*) name=db-keycloak ;; *redis*) name=redis ;; esac
+    case "$cmd" in
+      *db-keycloak*) name=db-keycloak ;;
+      *redis-session*) name=redis-session ;;
+      *redis-shared*) name=redis-shared ;;
+    esac
     case "$scenario" in
-      container-gone)  [ "$name" = redis ] && { echo ABSENT; exit 0; } ;;
-      uid-unreadable)  [ "$name" = redis ] && { echo "Uid:"; exit 0; } ;;
+      container-gone)  [ "$name" = redis-shared ] && { echo ABSENT; exit 0; } ;;
+      uid-unreadable)  [ "$name" = redis-shared ] && { echo "Uid:"; exit 0; } ;;
     esac
     case "$scenario" in
       rootless-podman)
-        case "$name" in redis) host_uid=100998 ;; *) host_uid=100069 ;; esac
+        case "$name" in redis-*) host_uid=100998 ;; *) host_uid=100069 ;; esac
         printf 'Uid:\t%s\t%s\t%s\t%s\n' "$host_uid" "$host_uid" "$host_uid" "$host_uid"
         printf 'MAP 0 1000 1\nMAP 1 100000 65536\n'
         ;;
       *)
-        case "$name" in redis) host_uid=999 ;; *) host_uid=70 ;; esac
-        [ "$scenario" = redis-root ] && [ "$name" = redis ] && host_uid=0
+        case "$name" in redis-*) host_uid=999 ;; *) host_uid=70 ;; esac
+        [ "$scenario" = redis-root ] && [ "$name" = redis-shared ] && host_uid=0
         [ "$scenario" = db-wrong-uid ] && [ "$name" = db-backend ] && host_uid=26
         printf 'Uid:\t%s\t%s\t%s\t%s\n' "$host_uid" "$host_uid" "$host_uid" "$host_uid"
         printf 'MAP 0 0 4294967295\n'
@@ -341,7 +349,8 @@ case "$cmd" in
   *"podman ps -a"*)
     printf 'edge|Up 15 hours (healthy)\nacme|Up 2 days\nkeycloak|Up 15 hours (healthy)\n'
     printf 'backend|Up 9 hours (healthy)\nfrontend|Up 9 hours (healthy)\ningest|Up 9 hours (healthy)\n'
-    printf 'db-keycloak|Up 3 days (healthy)\nredis|Up 2 days (healthy)\n'
+    printf 'db-keycloak|Up 3 days (healthy)\nredis-session|Up 2 days (healthy)\n'
+    printf 'redis-shared|Up 2 days (healthy)\n'
     case "$scenario" in
       container-down)      printf 'db-backend|Exited (0) 3 days ago\n' ;;
       container-unhealthy) printf 'db-backend|Up 2 days (unhealthy)\n' ;;
@@ -603,8 +612,8 @@ export STUB_SCENARIO=healthy
 assert_status "client-address-visible passes" client-address-visible pass "203.0.113.42" \
   -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
 assert_status "containers-running passes" containers-running pass "up and healthy" -- "${STUB_ARGS[@]}"
-assert_status "containers-unprivileged passes" containers-unprivileged pass "redis=999" -- "${STUB_ARGS[@]}"
-assert_status "containers-read-only passes" containers-read-only pass "all 9 app containers" -- "${STUB_ARGS[@]}"
+assert_status "containers-unprivileged passes" containers-unprivileged pass "redis-shared=999" -- "${STUB_ARGS[@]}"
+assert_status "containers-read-only passes" containers-read-only pass "all 10 app containers" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=rootless-podman assert_status "containers-unprivileged passes through a rootless uid_map" containers-unprivileged pass "db-backend=70" -- "${STUB_ARGS[@]}"
 assert_status "redis-requires-auth passes" redis-requires-auth pass "NOAUTH" -- "${STUB_ARGS[@]}"
 assert_status "scrape-targets-up passes"  scrape-targets-up  pass "targets up"     -- "${STUB_ARGS[@]}"

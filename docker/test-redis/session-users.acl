@@ -1,0 +1,4 @@
+user default off #dbf222dbbff4cf02b00304c2b8258ffa63ddf9096b84fa465fc4810639c751ba ~* &* +@all sanitize-payload
+user admin on #dbf222dbbff4cf02b00304c2b8258ffa63ddf9096b84fa465fc4810639c751ba ~* &* +@all sanitize-payload
+user monitoring on #f64957bfa8baf2bec7f3466904a4e04c30feab3acdaaafa3f146f4c81ea6ed8c resetkeys resetchannels -@all +@connection +@read +client +config|get +info +latency +slowlog +memory +cluster|info +cluster|slots +cluster|nodes +xinfo +pfcount -keys -scan -randomkey sanitize-payload
+user basetool-frontend on #95e0f10e4261ed94b8cd6ff87b61755bc4220a4a154af7f2e6305fe15002bdcd resetkeys ~basetool:session:* resetchannels &basetool:session:* &basetool:session:event:0:created:* &__keyevent@0__:del &__keyevent@0__:expired -@all +@connection +@read +@write +@keyspace +@hash +@set +@sortedset +@string +@pubsub +@transaction -@dangerous +info sanitize-payload

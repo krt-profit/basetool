@@ -56,7 +56,14 @@ CERT_MIN_DAYS = 21
 UNPRIVILEGED_CONTAINERS = {
     "db-backend": 70,
     "db-keycloak": 70,
-    "redis": 999,
+    "redis-session": 999,
+    "redis-shared": 999,
+}
+
+# Each Redis instance and the host ACL file it loads (ADR-0388).
+REDIS_ACL_FILES = {
+    "redis-session": "/var/lib/basetool/redis/session-users.acl",
+    "redis-shared": "/var/lib/basetool/redis-shared/users.acl",
 }
 
 EXPECTED_APP_CONTAINERS = (
@@ -68,7 +75,8 @@ EXPECTED_APP_CONTAINERS = (
     "ingest",
     "db-backend",
     "db-keycloak",
-    "redis",
+    "redis-session",
+    "redis-shared",
 )
 
 REQUIRED_CONTAINER_SERIES = (
@@ -775,46 +783,50 @@ def check_client_address_visible(ctx: Context) -> str:
 
 
 def check_redis_requires_auth(ctx: Context) -> str:
-    """An unauthenticated client must not be able to talk to Redis.
+    """An unauthenticated client must not be able to talk to either Redis instance.
 
-    Sends an unauthenticated ``PING``; ``-NOAUTH`` passes, ``+PONG`` fails. No credential is used.
+    Sends an unauthenticated ``PING`` to each instance of :data:`REDIS_ACL_FILES`; ``-NOAUTH``
+    passes, ``+PONG`` fails. No credential is used.
 
     Args:
         ctx: the run context.
 
     Returns:
-        A summary naming what Redis answered.
+        A summary naming the instances that refused.
 
     Raises:
         Skip: when no host access is configured.
-        CheckFailed: when Redis answers an unauthenticated PING, or cannot be found.
+        CheckFailed: when an instance answers an unauthenticated PING, or cannot be found.
     """
-    cmd = (
-        f"{ctx.runner.container_cli} exec redis sh -c "
-        "'env -u REDISCLI_AUTH redis-cli --no-auth-warning ping 2>&1 | head -n 1' "
-        "|| echo ABSENT"
-    )
-    reply = ctx.runner.run(cmd).strip()
+    for name, acl_file in REDIS_ACL_FILES.items():
+        cmd = (
+            f"{ctx.runner.container_cli} exec {name} sh -c "
+            "'env -u REDISCLI_AUTH redis-cli --no-auth-warning ping 2>&1 | head -n 1' "
+            "|| echo ABSENT"
+        )
+        reply = ctx.runner.run(cmd).strip()
 
-    if reply == "ABSENT":
-        raise CheckFailed("no running redis container on this host")
-    if reply in ("UNREACHABLE", "NO_REPLY", ""):
-        raise CheckFailed(
-            f"could not complete an unauthenticated probe against redis ({reply or 'no output'}). "
-            "That is not a pass: it says nothing about whether Redis requires authentication.")
-    if reply.upper().startswith("+PONG"):
-        raise CheckFailed(
-            "Redis answered +PONG to an UNAUTHENTICATED ping. The session store -- OAuth2 refresh "
-            "tokens included -- is readable and writable by anything that can reach it on the "
-            "internal network. The cause is almost certainly a users.acl with no `user default` "
-            "line, which makes Redis reset default to nopass at load: check with "
-            "`grep -c '^user default ' /var/lib/basetool/redis/users.acl`, which must answer 1.")
-    if "NOAUTH" not in reply.upper():
-        raise CheckFailed(
-            f"Redis answered {reply!r} to an unauthenticated ping - expected -NOAUTH. That is "
-            "neither the healthy answer nor the known failure, so it is worth reading before "
-            "assuming either.")
-    return "an unauthenticated ping is refused with -NOAUTH"
+        if reply == "ABSENT":
+            raise CheckFailed(f"no running {name} container on this host")
+        if reply in ("UNREACHABLE", "NO_REPLY", ""):
+            raise CheckFailed(
+                f"could not complete an unauthenticated probe against {name} "
+                f"({reply or 'no output'}). That is not a pass: it says nothing about whether "
+                "Redis requires authentication.")
+        if reply.upper().startswith("+PONG"):
+            raise CheckFailed(
+                f"{name} answered +PONG to an UNAUTHENTICATED ping. Its keys -- the sessions with "
+                "their OAuth2 refresh tokens, or the exchange's revocations -- are readable and "
+                "writable by anything that can reach it on the internal network. The cause is "
+                "almost certainly an ACL file with no `user default` line, which makes Redis reset "
+                f"default to nopass at load: check with `grep -c '^user default ' {acl_file}`, "
+                "which must answer 1.")
+        if "NOAUTH" not in reply.upper():
+            raise CheckFailed(
+                f"{name} answered {reply!r} to an unauthenticated ping - expected -NOAUTH. That is "
+                "neither the healthy answer nor the known failure, so it is worth reading before "
+                "assuming either.")
+    return f"an unauthenticated ping is refused with -NOAUTH by {' and '.join(REDIS_ACL_FILES)}"
 
 
 def check_containers_running(ctx: Context) -> str:
@@ -1192,7 +1204,8 @@ BAKED_INTO_UNITS = {
     "BASETOOL_KEYCLOAK_KEYSTORE_HOST_PATH": "Volume=",
     "BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH": "Volume=",
     "BASETOOL_TRUSTSTORE_HOST_PATH": "Volume=",
-    "BASETOOL_REDIS_ACL_HOST_PATH": "Volume=",
+    "BASETOOL_REDIS_SESSION_ACL_HOST_PATH": "Volume=",
+    "BASETOOL_REDIS_SHARED_ACL_HOST_PATH": "Volume=",
     "BASETOOL_UPSTREAM_CA_HOST_PATH": "Volume=",
     "BASETOOL_GRAFANA_UPSTREAM_CERT_HOST_PATH": "Volume=",
 }

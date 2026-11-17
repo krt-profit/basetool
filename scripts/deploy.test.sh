@@ -223,7 +223,7 @@ case "$*" in
       is_stuck() {
         is_stuck_itself "$1" && return 0
         local req req_var
-        for req in db-keycloak db-backend redis keycloak backend; do
+        for req in db-keycloak db-backend redis-session redis-shared keycloak backend; do
           req_var="FAKE_REQUIRED_BY_${req//-/_}"
           if [[ " ${!req_var:-} " == *" $1 "* ]] && is_stuck_itself "${req}"; then
             return 0
@@ -2500,7 +2500,8 @@ spi_env() {
     "FAKE_REQUIRED_BY_backend=ingest frontend" \
     "FAKE_REQUIRED_BY_db_keycloak=keycloak backend ingest frontend" \
     "FAKE_REQUIRED_BY_db_backend=backend ingest frontend" \
-    "FAKE_REQUIRED_BY_redis=ingest frontend"
+    "FAKE_REQUIRED_BY_redis_session=frontend" \
+    "FAKE_REQUIRED_BY_redis_shared=ingest"
 }
 
 assert_nothing_down() {
@@ -2808,7 +2809,7 @@ scenario_heal_unhealthy_backend_and_frontend_starts_frontend_once() {
 }
 
 scenario_heal_unhealthy_frontend_touches_nothing_it_requires() {
-  echo "Scenario: an unhealthy frontend is healed alone -- backend, keycloak and redis are not restarted"
+  echo "Scenario: an unhealthy frontend is healed alone -- backend, keycloak and the Redis instances are not restarted"
   local tmp rc=0
   tmp="$(mktmp)"
   heal_host "${tmp}"
@@ -2819,7 +2820,8 @@ scenario_heal_unhealthy_frontend_touches_nothing_it_requires() {
   assert_starts backend 0 "heal frontend: backend is not touched"
   assert_starts keycloak 0 "heal frontend: keycloak is not touched"
   assert_starts ingest 0 "heal frontend: ingest is not touched"
-  assert_starts redis 0 "heal frontend: redis is not touched"
+  assert_starts redis-session 0 "heal frontend: redis-session is not touched"
+  assert_starts redis-shared 0 "heal frontend: redis-shared is not touched"
   assert_no_docker "stop backend.service" "heal frontend: backend is not stopped"
   assert_no_docker "stop keycloak.service" "heal frontend: keycloak is not stopped"
   assert_count '^systemctl --user restart ' 0 "heal frontend: nothing is restarted"
@@ -3190,7 +3192,7 @@ scenario_reapply_flag_reapplies_the_deployed_release_and_rotates_nothing() {
   assert_contains "--reapply: the live provider JAR is the deployed release's — not swapped" \
     "--reapply: an identical live JAR is not swapped"
   assert_starts keycloak 0 "--reapply: ...and keycloak is not restarted for it"
-  assert_count '^systemctl --user (stop|restart) (db-backend|db-keycloak|redis|keycloak|backend|ingest|frontend)\.service' 0 \
+  assert_count '^systemctl --user (stop|restart) (db-backend|db-keycloak|redis-session|redis-shared|keycloak|backend|ingest|frontend)\.service' 0 \
     "--reapply: no stack unit that already matches is stopped or restarted"
   assert_anchors_keep_previous "--reapply"
   assert_pin_binds backend "${DIG_BACKEND}" "--reapply: backend stays bound to N, not to the tag's N+1"

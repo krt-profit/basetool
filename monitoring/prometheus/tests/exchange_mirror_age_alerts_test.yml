@@ -27,7 +27,7 @@ tests:
               application: basetool-ingest
             exp_annotations:
               summary: "The ingest gateway has not read the exchange registry for over 5 minutes"
-              description: "The ingest gateway reads the exchange registry mirror every 30 seconds, and its last successful read is more than 5 minutes old - or it has not read it once since it started - while the backend's mirror is enabled. Exchange requests are refused 503 REGISTRY_UNAVAILABLE meanwhile, even when no client happens to call. Check that exchange:registry exists in Redis (ExchangeMirrorWriteFailed, ExchangeRegistryReconcileStale), that Redis is up, and that the ingest ACL user still reads ~exchange:* (REQ-XCH-003, REQ-XCH-028)."
+              description: "The ingest gateway reads the exchange registry mirror every 30 seconds, and its last successful read is more than 5 minutes old - or it has not read it once since it started - while the backend's mirror is enabled. Exchange requests are refused 503 REGISTRY_UNAVAILABLE meanwhile, even when no client happens to call. Check that exchange:registry exists in redis-shared (ExchangeMirrorWriteFailed, ExchangeRegistryReconcileStale), that redis-shared is up (RedisDown), and that the ingest ACL user still reads ~exchange:* (REQ-XCH-003, REQ-XCH-028)."
 
   - name: fires - the gateway never read the mirror since it started
     interval: 1m
@@ -49,7 +49,7 @@ tests:
               application: basetool-ingest
             exp_annotations:
               summary: "The ingest gateway has not read the exchange registry for over 5 minutes"
-              description: "The ingest gateway reads the exchange registry mirror every 30 seconds, and its last successful read is more than 5 minutes old - or it has not read it once since it started - while the backend's mirror is enabled. Exchange requests are refused 503 REGISTRY_UNAVAILABLE meanwhile, even when no client happens to call. Check that exchange:registry exists in Redis (ExchangeMirrorWriteFailed, ExchangeRegistryReconcileStale), that Redis is up, and that the ingest ACL user still reads ~exchange:* (REQ-XCH-003, REQ-XCH-028)."
+              description: "The ingest gateway reads the exchange registry mirror every 30 seconds, and its last successful read is more than 5 minutes old - or it has not read it once since it started - while the backend's mirror is enabled. Exchange requests are refused 503 REGISTRY_UNAVAILABLE meanwhile, even when no client happens to call. Check that exchange:registry exists in redis-shared (ExchangeMirrorWriteFailed, ExchangeRegistryReconcileStale), that redis-shared is up (RedisDown), and that the ingest ACL user still reads ~exchange:* (REQ-XCH-003, REQ-XCH-028)."
 
   - name: silent - a gateway that reads every 30 seconds
     interval: 1m

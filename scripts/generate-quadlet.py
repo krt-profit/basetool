@@ -58,7 +58,8 @@ FRONT_END = {
 RUN_AS = {
     "db-backend":  {"uid": 70,  "role_path": "{{ basetool_host_data_dir }}/db-backend"},
     "db-keycloak": {"uid": 70,  "role_path": "{{ basetool_host_data_dir }}/db-keycloak"},
-    "redis":       {"uid": 999, "role_path": "{{ basetool_host_data_dir }}/redis"},
+    "redis-session": {"uid": 999, "role_path": "{{ basetool_host_data_dir }}/redis"},
+    "redis-shared":  {"uid": 999, "role_path": "{{ basetool_host_data_dir }}/redis-shared"},
 }
 
 ROLE_DEFAULTS = os.path.join(REPO, "ansible", "roles", "basetool_host", "defaults", "main.yml")
@@ -72,7 +73,8 @@ READ_ONLY: dict[str, dict[str, Any]] = {
     "blackbox-exporter": {},
     "postgres-exporter-backend": {},
     "postgres-exporter-keycloak": {},
-    "redis-exporter": {},
+    "redis-session-exporter": {},
+    "redis-shared-exporter": {},
     "acme": {},
     "keycloak": {"tmpfs": ["/opt/keycloak/lib/quarkus:rw,tmpcopyup",
                            "/opt/keycloak/data/transaction-logs:rw",
@@ -90,7 +92,8 @@ PATH_VARS = {
     "BASETOOL_KEYCLOAK_KEYSTORE_HOST_PATH": "/etc/basetool/secrets/tls/keycloak.p12",
     "BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH": "/etc/basetool/secrets/tls/truststore.p12",
     "BASETOOL_TRUSTSTORE_HOST_PATH": "/etc/basetool/secrets/tls/truststore.p12",
-    "BASETOOL_REDIS_ACL_HOST_PATH": "/var/lib/basetool/redis/users.acl",
+    "BASETOOL_REDIS_SESSION_ACL_HOST_PATH": "/var/lib/basetool/redis/session-users.acl",
+    "BASETOOL_REDIS_SHARED_ACL_HOST_PATH": "/var/lib/basetool/redis-shared/users.acl",
     "BASETOOL_UPSTREAM_CA_HOST_PATH": "/etc/basetool/monitoring/certs/basetool-ca.crt",
     "BASETOOL_GRAFANA_UPSTREAM_CERT_HOST_PATH": "/etc/basetool/monitoring/certs/grafana.crt",
 }
@@ -110,7 +113,8 @@ DISPOSITION: dict[str, tuple[str, str]] = {
     "ingest": ("container", ""),
     "db-backend": ("container", ""),
     "db-keycloak": ("container", ""),
-    "redis": ("container", ""),
+    "redis-session": ("container", ""),
+    "redis-shared": ("container", ""),
     "prometheus": ("container", ""),
     "grafana": ("container", ""),
     "loki": ("container", ""),
@@ -119,7 +123,8 @@ DISPOSITION: dict[str, tuple[str, str]] = {
     "blackbox-exporter": ("container", ""),
     "postgres-exporter-backend": ("container", ""),
     "postgres-exporter-keycloak": ("container", ""),
-    "redis-exporter": ("container", ""),
+    "redis-session-exporter": ("container", ""),
+    "redis-shared-exporter": ("container", ""),
     "node-exporter": (
         "host-service",
         "mounts /run/systemd/private for its systemd collector, which a rootless container cannot "
@@ -163,7 +168,9 @@ VAR_REF_RE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*(?:[:-][^{}]*)?\}")
 
 
 QUADLET_ONLY_ENV: dict[str, dict[str, str]] = {
-    "redis": {"REDIS_PASSWORD": "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}"},
+    "redis-session": {
+        "REDIS_PASSWORD": "${REDIS_SESSION_PASSWORD:?REDIS_SESSION_PASSWORD must be set in .env}"},
+    "redis-shared": {"REDIS_PASSWORD": "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}"},
 }
 
 
@@ -179,6 +186,7 @@ QUADLET_INTERNAL_NETWORKS = frozenset({
     "net-redis-backend",
     "net-redis-frontend",
     "net-redis-ingest",
+    "net-redis-session",
 })
 
 

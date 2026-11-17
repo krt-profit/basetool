@@ -61,10 +61,11 @@ class IngestHandoffE2eTest {
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
   /**
-   * The ephemeral e2e Redis, published to the host by {@code docker-compose.e2e.yml} ({@code
-   * redis-dev} → {@code 127.0.0.1:6379}), as the gateway's own ACL user (REQ-SEC-068): staging a
-   * handoff here goes through exactly the permissions the real gateway has. Throwaway password from
-   * {@code RedisAclTemplate.E2E_PASSWORDS}; never a production endpoint or credential.
+   * The ephemeral e2e shared Redis, published to the host by {@code docker-compose.yml} ({@code
+   * redis-shared-dev} → {@code 127.0.0.1:6379}), as the gateway's own ACL user (REQ-SEC-068):
+   * staging a handoff here goes through exactly the permissions the real gateway has. Throwaway
+   * password from {@code RedisAclTemplate.E2E_PASSWORDS}; never a production endpoint or
+   * credential.
    */
   private static final String INGEST_REDIS_URI =
       "redis://"

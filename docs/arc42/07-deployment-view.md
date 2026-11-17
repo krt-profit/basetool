@@ -84,20 +84,26 @@ Consequences worth stating:
 - **The config tree is mounted read-only.** Every bind mount from `/opt/basetool` — what the deployer
   rewrites on each release — carries `:ro`, and the generator refuses one that does not (`REQ-OPS-014`).
 - **The data networks have no egress.** `net-db-*` and `net-redis-*` are `Internal=true` in the
-  units, so the two databases and Redis, which sit on nothing else, cannot reach the internet
+  units, so the two databases and the two Redis instances, which sit on nothing else, cannot reach the internet
   (ADR-0162, extended 2026-09-22). Compose keeps them non-internal for the local `-dev` twins, which
   publish their ports there. *Applied on production on 2026-09-25 (the networks recreated, a
   ~2.5-minute maintenance); the testing host still runs the old, non-internal networks.*
-- **Redis's ACL is rendered, not written.** `/var/lib/basetool/redis/users.acl` comes from
-  `scripts/redis-users.acl.tmpl` through `render-redis-acl.py` (installed by the role), one user per
-  service and SHA-256 hashes only, and is applied live with `ACL LOAD` (REQ-SEC-068, ADR-0207).
+- **The session store is a Redis of its own.** `redis-session` holds only Spring Session and sits on
+  `net-redis-session`, which only the frontend and its exporter join; `redis-shared` holds the
+  exchange and ingest keys and the pub/sub channels on the three other `net-redis-*` networks, so the
+  internet-facing gateway has no route to a session (REQ-SEC-089, ADR-0388).
+- **Each Redis ACL is rendered, not written.** `/var/lib/basetool/redis/session-users.acl` and
+  `/var/lib/basetool/redis-shared/users.acl` come from `scripts/redis-session-users.acl.tmpl` and
+  `scripts/redis-shared-users.acl.tmpl` through `render-redis-acl.py` (installed by the role), one
+  user per service and SHA-256 hashes only, and are applied live with `ACL LOAD` (REQ-SEC-068,
+  ADR-0207).
   The backend writes the `exchange:*` family (the client registry mirror) and ingest may only read
   it (ADR-0221); the mirror is written only once `APP_EXCHANGE_MIRROR_ENABLED=true`, which must
   wait until the rendered ACL carries that grant. *On production both since the go-live of
   2026-09-28: the ACL rendered with the `exchange:*` grants, the mirror on, and ingest serving
   `/exchange/v1/**` as the internet-facing exchange endpoint.*
-  The unit carries `--notify-keyspace-events Egx` and an unauthenticated `PING` health probe, so
-  neither depends on which ACL users exist.
+  `redis-session`'s unit carries `--notify-keyspace-events Egx`, and both units an unauthenticated
+  `PING` health probe, so neither depends on which ACL users exist.
 - **Each service mounts its own keystore and an internal truststore** — `/run/secrets/keystore.p12`
   from `BASETOOL_<SERVICE>_KEYSTORE_HOST_PATH`, `/run/secrets/internal-truststore.p12` from
   `BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH` (REQ-SEC-070, ADR-0211); keycloak's is read by its
@@ -118,9 +124,10 @@ Consequences worth stating:
   (REQ-SEC-022, ADR-0051 amendment), not through a drop-in, because a lost drop-in fails that guard
   open with no outage to notice it by.
 - **A restart travels along `Requires=`.** `backend` requires `db-backend` and `keycloak`,
-  `frontend` requires `backend`, `keycloak` and `redis`, `ingest` requires `backend` and `redis` — so
-  restarting keycloak restarts the whole app (about two minutes, measured 2026-09-25), and
-  restarting redis restarts frontend and ingest.
+  `frontend` requires `backend`, `keycloak` and `redis-session`, `ingest` requires `backend` and
+  `redis-shared` — so restarting keycloak restarts the whole app (about two minutes, measured
+  2026-09-25), restarting `redis-session` restarts the frontend and restarting `redis-shared` the
+  gateway, while login keeps working.
 - **Podman features go through Quadlet keys, not raw arguments** — `RunInit=`, `Ulimit=` and the
   network's `Options=` since 2026-09-22. Only `--cpus` and `--oom-score-adj`, which have no key in
   podman 5.8, remain `PodmanArgs=`.
