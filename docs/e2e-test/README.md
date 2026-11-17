@@ -69,6 +69,7 @@ Die Suite liegt im Source-Set `e2e` des Moduls `frontend` (`frontend/src/e2e/jav
 | [UC-45](UC-45-ui-regressionen-formular-navigation.md) | UI-Regressionen: Zurück-Cache, Combobox, Datum/Zeit-Layout          | `e2e`         | `BfcacheRefreshE2eTest` · `ComboboxBlurRestoresValueE2eTest` · `MissionDatetimeSplitLayoutE2eTest`                                                                                          |
 | [UC-46](UC-46-austausch-rundlauf.md) | Austausch: Device-Login, Sync über das Gateway, Rücknahme & Trennen | `e2e` | `ExchangeRoundTripE2eTest` · `AdminExchangeClientsE2eTest` |
 | [UC-47](UC-47-austausch-verbindungen-sync-austritt.md) | Austausch: Installation trennen, neu verbinden, Kontoabgleich, Sperre, Korpus, Bestätigung & Austritt | `e2e` | `ExchangeConnectionsE2eTest` · `ExchangeSyncE2eTest` · `ExchangeDepartureE2eTest` |
+| [UC-48](UC-48-hangar-import-auswahl.md) | Schiffsliste importieren: mehrdeutigen Namen im Ergebnis wählen | `e2e` | `HangarImportChoiceE2eTest` |
 
 ### Ad-hoc-Prüfharnische (kein Use Case)
 

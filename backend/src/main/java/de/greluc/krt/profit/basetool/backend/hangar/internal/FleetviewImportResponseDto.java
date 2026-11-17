@@ -33,6 +33,8 @@ import java.util.List;
  * @param skippedShips the unmatched ship names
  * @param duplicateShips reserved, always empty
  * @param updatedCount matched ships whose production status or pledge data changed
+ * @param ambiguousShips the distinct ship names that may mean several ships and carried no choice,
+ *     with the ships to choose from (REQ-HANGAR-019)
  */
 public record FleetviewImportResponseDto(
     int importedCount,
@@ -40,4 +42,5 @@ public record FleetviewImportResponseDto(
     int duplicateCount,
     List<String> skippedShips,
     List<String> duplicateShips,
-    int updatedCount) {}
+    int updatedCount,
+    List<AmbiguousShipDto> ambiguousShips) {}

@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.HangarImportChoicesDto;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedHashMap;
@@ -30,6 +31,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.AbstractResource;
@@ -40,6 +42,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -79,12 +82,16 @@ public class HangarImportProxyController {
    *
    * @param file the uploaded JSON or CSV file (Fleetview, HangarXPLOR Shiplist, Fleetyards,
    *     StarJump FleetViewer or Hangar Extension)
+   * @param choices the member's choices for ambiguous names, sent with a repeated import of the
+   *     same file, or {@code null} on a first import (REQ-HANGAR-019)
    * @return the backend's {@link FleetviewImportResponseDto}, or a {@code 413} JSON body when the
    *     upload exceeds {@link #MAX_IMPORT_BYTES}
    */
   @PostMapping(value = "/ships", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<Object> importShips(@RequestParam("file") @NotNull MultipartFile file) {
+  public ResponseEntity<Object> importShips(
+      @RequestParam("file") @NotNull MultipartFile file,
+      @RequestPart(value = "choices", required = false) @Nullable HangarImportChoicesDto choices) {
     if (file.getSize() > MAX_IMPORT_BYTES) {
       log.warn(
           "Hangar import proxy: upload of {} bytes refused, the cap is {} bytes",
@@ -103,7 +110,8 @@ public class HangarImportProxyController {
         file.getOriginalFilename() != null ? file.getOriginalFilename() : FALLBACK_FILENAME;
 
     StreamedUpload upload = new StreamedUpload(file, originalFilename);
-    FleetviewImportResponseDto result = withBackendStatus(() -> hangarClient.importShips(upload));
+    FleetviewImportResponseDto result =
+        withBackendStatus(() -> hangarClient.importShips(upload, choices));
 
     return ResponseEntity.ok(result);
   }

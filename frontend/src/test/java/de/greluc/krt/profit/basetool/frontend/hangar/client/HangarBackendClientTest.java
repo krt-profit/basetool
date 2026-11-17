@@ -21,7 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.hangar.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.hangar.model.AmbiguousShipDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportResponseDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.HangarImportChoiceDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.HangarImportChoicesDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
@@ -29,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginRequest
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrigin;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipTypeOptionDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -55,7 +59,10 @@ class HangarBackendClientTest {
       "{\"content\":[],\"page\":0,\"size\":50,\"totalElements\":0,\"totalPages\":0}";
   private static final String IMPORT_RESULT =
       "{\"importedCount\":2,\"skippedCount\":1,\"duplicateCount\":0,"
-          + "\"skippedShips\":[\"Odd\"],\"duplicateShips\":[],\"updatedCount\":3}";
+          + "\"skippedShips\":[\"Odd\"],\"duplicateShips\":[],\"updatedCount\":3,"
+          + "\"ambiguousShips\":[{\"name\":\"Talon\",\"count\":2,\"options\":[{\"id\":\""
+          + SHIP
+          + "\",\"name\":\"Esperia Talon\"}]}]}";
 
   private BackendClientHarness backend;
   private HangarBackendClient client;
@@ -263,16 +270,43 @@ class HangarBackendClientTest {
   void importsStreamTheUploadAsTheFilePart() {
     backend.answerJson(IMPORT_RESULT);
 
-    FleetviewImportResponseDto ships = client.importShips(upload("shiplist.json"));
+    FleetviewImportResponseDto ships = client.importShips(upload("shiplist.json"), null);
 
     assertThat(ships)
-        .isEqualTo(new FleetviewImportResponseDto(2, 1, 0, List.of("Odd"), List.of(), 3));
+        .isEqualTo(
+            new FleetviewImportResponseDto(
+                2,
+                1,
+                0,
+                List.of("Odd"),
+                List.of(),
+                3,
+                List.of(
+                    new AmbiguousShipDto(
+                        "Talon", 2, List.of(new ShipTypeOptionDto(SHIP, "Esperia Talon"))))));
     RecordedRequest request = backend.expect("POST", "/api/v1/hangar/import/ships");
     assertThat(request.getHeader("Content-Type")).startsWith("multipart/form-data");
     assertThat(request.getBody().readString(StandardCharsets.UTF_8))
         .contains("name=\"file\"")
         .contains("filename=\"shiplist.json\"")
-        .contains("{\"ships\":[]}");
+        .contains("{\"ships\":[]}")
+        .doesNotContain("name=\"choices\"");
+  }
+
+  @Test
+  void importsSendTheChoicesAsAJsonPart() {
+    backend.answerJson(IMPORT_RESULT);
+
+    client.importShips(
+        upload("shiplist.json"),
+        new HangarImportChoicesDto(List.of(new HangarImportChoiceDto("Talon", SHIP))));
+
+    RecordedRequest request = backend.expect("POST", "/api/v1/hangar/import/ships");
+    assertThat(request.getBody().readString(StandardCharsets.UTF_8))
+        .contains("name=\"file\"")
+        .contains("name=\"choices\"")
+        .contains("Content-Type: application/json")
+        .contains("{\"choices\":[{\"name\":\"Talon\",\"shipTypeId\":\"" + SHIP + "\"}]}");
   }
 
   /**
