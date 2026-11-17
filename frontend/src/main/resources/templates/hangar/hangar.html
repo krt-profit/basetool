@@ -398,8 +398,19 @@
                 <span id="import-res-skipped">0</span>
             </div>
             <div class="stat-row">
+                <span th:text="#{hangar.import.result.ambiguous}">Nicht eindeutig</span>
+                <span id="import-res-ambiguous">0</span>
+            </div>
+            <div class="stat-row">
                 <span th:text="#{hangar.import.result.duplicates}">Duplikate übersprungen</span>
                 <span id="import-res-duplicates">0</span>
+            </div>
+            <div id="import-ambiguous-section" data-testid="hangar-import-ambiguous" hidden>
+                <p class="import-list-title" th:text="#{hangar.import.result.ambiguous_list}">Nicht eindeutige Schiffe</p>
+                <p class="form-hint" th:text="#{hangar.import.result.ambiguous_hint}">W&auml;hle f&uuml;r jeden Namen das passende Schiff.</p>
+                <div id="import-ambiguous-list" class="import-choice-list"
+                     th:data-choice-none="#{hangar.import.result.ambiguous_none}"
+                     th:data-count="#{hangar.import.result.ambiguous_count}"></div>
             </div>
             <div id="import-skip-section" hidden>
                 <p class="import-list-title" th:text="#{hangar.import.result.skipped_list}">Nicht erkannte Schiffe</p>
@@ -412,6 +423,8 @@
             </div>
             <div class="krt-modal-foot">
                 <button id="import-result-close" class="btn btn-ghost" type="button" th:text="#{hangar.import.result.close}">Schließen</button>
+                <button id="import-apply-choices" class="btn btn--cta" type="button" data-testid="hangar-import-apply" hidden disabled
+                        th:text="#{hangar.import.result.apply}">Auswahl importieren</button>
             </div>
         </th:block>
     </th:block>
