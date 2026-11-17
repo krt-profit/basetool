@@ -196,9 +196,46 @@ FAKE
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'systemctl %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+listed() { [[ " ${1} " == *" ${2} "* ]]; }
 case "$*" in
   *daemon-reload*) exit 0 ;;
+  *is-active*)
+    for a in "$@"; do
+      case "$a" in
+        *.service)
+          if listed "${FAKE_STOP_FAIL_UNITS:-}" "${a%.service}"; then echo active; exit 0; fi
+          if listed "${FAKE_NOT_LOADED_UNITS:-}" "${a%.service}"; then echo inactive; exit 3; fi
+          ;;
+      esac
+    done
+    exit 0
+    ;;
   *start*|*restart*|*stop*)
+    fake_verb=""
+    for a in "$@"; do
+      case "$a" in
+        start | restart | stop) fake_verb="$a" ;;
+        *.service)
+          u="${a%.service}"
+          if [[ "${fake_verb}" == "stop" ]] && listed "${FAKE_STOP_FAIL_UNITS:-}" "${u}"; then
+            echo "Job for ${u}.service canceled." >&2
+            exit 1
+          fi
+          if [[ "${fake_verb}" == "stop" ]] && listed "${FAKE_NOT_LOADED_UNITS:-}" "${u}"; then
+            echo "Failed to stop ${u}.service: Unit ${u}.service not loaded." >&2
+            exit 5
+          fi
+          if [[ "${fake_verb}" != "stop" && "${FAKE_REQUIRE_UNIT_FILES:-}" == "true" && ! -f "${RT_UNIT_DIR:-}/${u}.container" ]]; then
+            echo "Failed to start ${u}.service: Unit ${u}.service not found." >&2
+            exit 5
+          fi
+          if [[ "${fake_verb}" != "stop" ]] && listed "${FAKE_START_FAIL_UNITS:-}" "${u}"; then
+            echo "Job for ${u}.service failed because the control process exited with error code." >&2
+            exit 1
+          fi
+          ;;
+      esac
+    done
     if [[ -n "${FAKE_UNIT_DOWN_FILE:-}" ]]; then
       down="${FAKE_UNIT_DOWN_FILE}" pending="${FAKE_UNIT_DOWN_FILE}.pending" starts="${FAKE_UNIT_DOWN_FILE}.starts"
       live_jar="${BASETOOL_COMPOSE_DIR:-}/keycloak/providers/keycloak-spi.jar"
@@ -358,14 +395,22 @@ SHIM
   rm -rf "${tmp}/.permprobe"
 }
 
+STACK_UNITS=(db-backend db-keycloak redis keycloak edge backend ingest frontend acme)
+
+write_stack_units() {
+  local dir="$1" keystore_dir="${2:-}" svc
+  for svc in "${STACK_UNITS[@]}"; do
+    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" >"${dir}/${svc}.container"
+  done
+  if [[ -n "${keystore_dir}" ]]; then
+    printf 'Volume=%s/keystore.p12:/run/secrets/keystore.p12:ro\n' "${keystore_dir}" >>"${dir}/backend.container"
+  fi
+}
+
 seed_units() {
   T_UNIT_DIR="${1}/units"
   mkdir -p "${T_UNIT_DIR}"
-  local svc
-  for svc in backend frontend ingest; do
-    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" >"${T_UNIT_DIR}/${svc}.container"
-  done
-  printf 'Volume=%s/keystore.p12:/run/secrets/keystore.p12:ro\n' "$1" >>"${T_UNIT_DIR}/backend.container"
+  write_stack_units "${T_UNIT_DIR}" "$1"
 }
 
 seed_monitoring_units() {
@@ -1621,14 +1666,7 @@ podman_units_empty() {
 
 podman_units() {
   podman_units_empty "$1"
-  local svc
-  for svc in backend frontend ingest; do
-    printf '[Container]
-ContainerName=%s
-Image=placeholder
-' "${svc}" >"${T_UNIT_DIR}/${svc}.container"
-  done
-  printf 'Volume=%s/keystore.p12:/run/secrets/keystore.p12:ro\n' "$1" >>"${T_UNIT_DIR}/backend.container"
+  write_stack_units "${T_UNIT_DIR}" "$1"
 }
 
 scenario_podman_resolves_without_pulling() {
@@ -1783,8 +1821,7 @@ write_bundle() {
   local b="$1"
   mkdir -p "${b}/quadlet/systemd" "${b}/quadlet/env.d"
   echo "# promoted compose" >"${b}/docker-compose.yml"
-  printf '[Container]\nContainerName=backend\nImage=placeholder\n' >"${b}/quadlet/systemd/backend.container"
-  printf '[Container]\nContainerName=frontend\nImage=placeholder\n' >"${b}/quadlet/systemd/frontend.container"
+  write_stack_units "${b}/quadlet/systemd"
   printf '[Network]\nNetworkName=net-app\n' >"${b}/quadlet/systemd/net-app.network"
   # shellcheck disable=SC2016
   printf 'BACKEND_TOKEN=${BASETOOL_KEYSTORE_HOST_PATH:?}\n' >"${b}/quadlet/env.d/backend.env.tmpl"
@@ -1987,7 +2024,7 @@ REND
   chmod +x "${T_FAKE_BIN}/render-env-d.py"
 }
 
-ENV_D_BUNDLE_UNITS=(backend frontend ingest grafana loki)
+ENV_D_BUNDLE_UNITS=("${STACK_UNITS[@]}" grafana loki)
 
 # The mirror's rsync quick check compares size and mtime, so a changed value must change the
 # template's length when the bundle is rewritten within the same second.
@@ -3758,6 +3795,212 @@ scenario_first_deploy_after_the_layout_migration_has_no_old_release_to_roll_back
 
 scenario_before_the_layout_migration_a_failed_release_restores_the_old_tree
 scenario_first_deploy_after_the_layout_migration_has_no_old_release_to_roll_back_to
+
+assert_before() {
+  local first="$1" second="$2" desc="$3" a b
+  a="$(grep -nF -- "${first}" "${T_DOCKER_LOG}" | tail -n 1 | cut -d: -f1 || true)"
+  b="$(grep -nF -- "${second}" "${T_DOCKER_LOG}" | head -n 1 | cut -d: -f1 || true)"
+  if [[ -n "${a}" && -n "${b}" ]] && ((a < b)); then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} (last '${first}' at line ${a:-none}, first '${second}' at line ${b:-none})"
+  fi
+}
+
+assert_unit_installed() {
+  if [[ -f "${T_UNIT_DIR}/$1.container" ]]; then
+    record 1 "$2"
+  else
+    record 0 "$2 ($1.container is not installed)"
+  fi
+}
+
+assert_unit_gone() {
+  if [[ ! -e "${T_UNIT_DIR}/$1.container" ]]; then
+    record 1 "$2"
+  else
+    record 0 "$2 ($1.container is still installed)"
+  fi
+}
+
+write_app_unit() {
+  local file="$1" svc="$2" requires="$3"
+  printf '[Unit]\nRequires=%s\n[Container]\nContainerName=%s\nImage=placeholder\n' "${requires}" "${svc}" >"${file}"
+}
+
+# The release renames redis to redis-session (frontend and ingest Requires= it) and its exporter
+# with it; the host runs the previous release, whose tree is also the rollback anchor.
+rename_host() {
+  local tmp="$1" units
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_app_unit "${T_UNIT_DIR}/ingest.container" ingest "backend.service redis.service"
+  write_app_unit "${T_UNIT_DIR}/frontend.container" frontend "backend.service keycloak.service redis.service"
+  printf '[Container]\nContainerName=redis-exporter\nImage=placeholder\n' >"${T_UNIT_DIR}/redis-exporter.container"
+  mkdir -p "${T_COMPOSE_DIR}/quadlet/systemd"
+  cp "${T_UNIT_DIR}"/*.container "${T_COMPOSE_DIR}/quadlet/systemd/"
+
+  RENAME_BUNDLE="${tmp}/bundle"
+  units="${RENAME_BUNDLE}/quadlet/systemd"
+  mkdir -p "${units}" "${tmp}/redis-session"
+  echo "# promoted compose" >"${RENAME_BUNDLE}/docker-compose.yml"
+  cp "${T_UNIT_DIR}"/*.container "${units}/"
+  rm -f "${units}/redis.container" "${units}/redis-exporter.container"
+  printf '[Container]\nContainerName=redis-session\nImage=placeholder\nVolume=%s/redis-session:/data\n' "${tmp}" \
+    >"${units}/redis-session.container"
+  printf '[Container]\nContainerName=redis-session-exporter\nImage=placeholder\n' >"${units}/redis-session-exporter.container"
+  write_app_unit "${units}/ingest.container" ingest "backend.service redis-session.service"
+  write_app_unit "${units}/frontend.container" frontend "backend.service keycloak.service redis-session.service"
+
+  printf 'services:\n  backend:\n    image: ghcr.io/krt-profit/basetool-backend@%s\n  frontend:\n    image: ghcr.io/krt-profit/basetool-frontend@%s\n  ingest:\n    image: ghcr.io/krt-profit/basetool-ingest@%s\n' \
+    "${PDIG_BACKEND}" "${PDIG_FRONTEND}" "${PDIG_INGEST}" >"${T_STATE_DIR}/current-digest-pin.yml"
+  write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
+  mapfile -t RENAME_RUN < <(
+    podman_env
+    podman_converged_env
+    printf '%s\n' \
+      "BASETOOL_MONITORING_ENABLED=true" \
+      "FAKE_CONFIG_BUNDLE=${RENAME_BUNDLE}" \
+      "FAKE_REQUIRE_UNIT_FILES=true"
+  )
+}
+
+scenario_rename_retires_the_old_unit_inside_the_restart_window() {
+  echo "Scenario: a release that renames a unit others Requires= retires the old one after the pull, in the restart window"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  rename_host "${tmp}"
+  run_deploy -- "${RENAME_RUN[@]}" "FAKE_NOT_LOADED_UNITS=redis-exporter" || rc=$?
+  assert_exit 0 "$rc" "rename: the release deploys"
+  assert_contains "deploy successful" "rename: ...and reports success"
+  assert_before "podman pull" "systemctl --user stop redis.service" \
+    "rename: the retired unit is stopped only after the pull, so frontend and ingest stay up while it runs"
+  assert_before "systemctl --user stop redis.service" "systemctl --user daemon-reload" \
+    "rename: ...while its own definition is still loaded"
+  assert_unit_gone redis "rename: the retired unit's file is removed once it is down"
+  assert_unit_gone redis-exporter "rename: a retired unit that is not loaded is removed without a stop"
+  assert_no_docker "stop redis-exporter.service" "rename: ...which is not attempted"
+  assert_unit_installed redis-session "rename: the new unit is installed"
+  assert_contains "stack units, from the installed units: [db-backend db-keycloak keycloak edge backend redis-session ingest frontend acme]" \
+    "rename: the stack is the installed units, the new one before the first unit that requires it"
+  assert_before "systemctl --user start redis-session.service" "systemctl --user start ingest.service" \
+    "rename: the new unit starts before what requires it"
+  assert_no_docker "start redis.service" "rename: the retired unit is not started again"
+  if grep -qE 'retired units \[(redis-exporter redis|redis redis-exporter)\]' <<<"${LAST_OUTPUT}"; then
+    record 1 "rename: the release parts name the retired units"
+  else
+    record 0 "rename: the release parts name the retired units"
+  fi
+  assert_docker "systemctl --user restart redis-session-exporter.service" "rename: the new monitoring unit is started by the monitoring apply"
+  rm -rf "${tmp}"
+}
+
+scenario_rename_with_a_failed_pull_leaves_the_previous_stack_running() {
+  echo "Scenario: a release that renames a unit and then fails its pull has stopped nothing and puts the previous units back"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  rename_host "${tmp}"
+  run_deploy -- "${RENAME_RUN[@]}" "FAKE_PULL_RC=1" \
+    "FAKE_NOT_LOADED_UNITS=redis-session redis-session-exporter" || rc=$?
+  assert_exit 1 "$rc" "failed pull: the run exits non-zero"
+  assert_contains "step 'pull the release images' failed (exit 1)" "failed pull: the FATAL line names the pull"
+  assert_failure_metric "failed pull: the failure metric is written"
+  assert_no_docker "systemctl --user stop" "failed pull: no unit was stopped, so the previous stack kept running"
+  assert_no_apply "failed pull: nothing is started or restarted"
+  assert_unit_installed redis "failed pull: the unit the release would retire is still installed"
+  assert_unit_installed redis-exporter "failed pull: ...and so is the retired monitoring unit"
+  assert_unit_gone redis-session "failed pull: the release's new unit, never loaded, is removed again"
+  assert_unit_gone redis-session-exporter "failed pull: ...and its new monitoring unit"
+  if grep -q '^Requires=backend.service redis.service$' "${T_UNIT_DIR}/ingest.container"; then
+    record 1 "failed pull: the previous definition of a unit that requires the retired one is back"
+  else
+    record 0 "failed pull: the previous definition of a unit that requires the retired one is back"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_retired_unit_that_cannot_be_stopped_fails_the_release() {
+  echo "Scenario: a retired unit whose stop fails fails the release, keeps its unit and starts nothing of the release"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  rename_host "${tmp}"
+  run_deploy -- "${RENAME_RUN[@]}" "FAKE_STOP_FAIL_UNITS=redis" || rc=$?
+  assert_exit 1 "$rc" "stop fails: the release does not complete"
+  assert_contains "health gate: the retired unit(s) [redis] could not be stopped — their unit files are kept" \
+    "stop fails: the log names the unit and says its file is kept"
+  assert_contains "rolling back" "stop fails: the release is rolled back"
+  assert_count '^systemctl --user daemon-reload$' 1 "stop fails: the release's units are never loaded (only the rollback reloads)"
+  assert_no_docker "start redis-session.service" "stop fails: nothing of the release is started"
+  assert_unit_installed redis "stop fails: the unit that is still running keeps its file"
+  assert_contains "rolled back to previous digest pin successfully" "stop fails: the previous stack comes back"
+  assert_excludes "deploy successful" "stop fails: it is never reported as a success"
+  rm -rf "${tmp}"
+}
+
+scenario_rollback_after_a_rename_starts_the_restored_units() {
+  echo "Scenario: the rollback of a release that renamed units applies the units the restored tree has, monitoring included"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  rename_host "${tmp}"
+  run_deploy -- "${RENAME_RUN[@]}" "FAKE_START_FAIL_UNITS=redis-session" || rc=$?
+  assert_exit 1 "$rc" "rollback: the failed release exits non-zero"
+  assert_contains "the first unit that did not come up is redis-session" "rollback: the gate names the new unit"
+  assert_contains "rollback: stack units, from the installed units: [db-backend db-keycloak redis keycloak edge backend ingest frontend acme]" \
+    "rollback: the stack is derived from the restored units"
+  assert_contains "rolled back to previous digest pin successfully" "rollback: the rollback reaches health (no 'Unit not found')"
+  assert_excludes "rollback ALSO failed" "rollback: ...and does not report failure"
+  assert_docker "systemctl --user stop redis-session.service" "rollback: the release's new unit is stopped"
+  assert_unit_gone redis-session "rollback: ...and its file removed"
+  assert_unit_gone redis-session-exporter "rollback: ...and its new monitoring unit's"
+  assert_unit_installed redis "rollback: the renamed unit is installed again"
+  assert_before "systemctl --user start redis-session.service" "systemctl --user start redis.service" \
+    "rollback: ...and started by the rollback"
+  assert_unit_installed redis-exporter "rollback: the retired monitoring unit is installed again"
+  assert_docker "systemctl --user start redis-exporter.service" "rollback: ...and started"
+  assert_no_docker "restart redis-exporter.service" "rollback: ...not restarted"
+  rm -rf "${tmp}"
+}
+
+scenario_missing_mount_source_of_a_new_unit_refuses_before_anything_changes() {
+  echo "Scenario: a new unit that mounts a host path the host lacks is refused before anything changes"
+  local tmp rc=0 units
+  tmp="$(mktmp)"
+  rename_host "${tmp}"
+  units="${RENAME_BUNDLE}/quadlet/systemd"
+  rmdir "${tmp}/redis-session"
+  printf 'Volume=redis-data.volume:/cache\nVolume=%s/docker/redis:/etc/redis:ro\n' "${T_COMPOSE_DIR}" \
+    >>"${units}/redis-session.container"
+  run_deploy -- "${RENAME_RUN[@]}" || rc=$?
+  assert_exit 1 "$rc" "missing source: the release is refused"
+  assert_contains "PRE-FLIGHT: required mount source missing: ${tmp}/redis-session (redis-session)" \
+    "missing source: the refusal names the path and the unit"
+  assert_excludes "mounts redis-data.volume" "missing source: a named volume is not a host path"
+  assert_excludes "mounts ${T_COMPOSE_DIR}/docker/redis" "missing source: a path the release tree delivers is not checked"
+  assert_failure_metric "missing source: the refusal is a recorded failure"
+  assert_no_docker "systemctl --user stop" "missing source: nothing is stopped"
+  assert_no_apply "missing source: nothing is started"
+  assert_unit_installed redis "missing source: the units are untouched"
+  assert_unit_gone redis-session "missing source: ...and the new one is not installed"
+  if [[ ! -d "${T_STATE_DIR}/config-previous" ]]; then
+    record 1 "missing source: not even the snapshot was taken"
+  else
+    record 0 "missing source: not even the snapshot was taken"
+  fi
+
+  mkdir -p "${tmp}/redis-session"
+  : >"${T_DOCKER_LOG}"
+  rc=0
+  run_deploy --force -- "${RENAME_RUN[@]}" || rc=$?
+  assert_exit 0 "$rc" "missing source: once the path exists, --force applies the release"
+  assert_unit_installed redis-session "missing source: ...and installs the new unit"
+  rm -rf "${tmp}"
+}
+
+scenario_rename_retires_the_old_unit_inside_the_restart_window
+scenario_rename_with_a_failed_pull_leaves_the_previous_stack_running
+scenario_retired_unit_that_cannot_be_stopped_fails_the_release
+scenario_rollback_after_a_rename_starts_the_restored_units
+scenario_missing_mount_source_of_a_new_unit_refuses_before_anything_changes
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then
