@@ -343,7 +343,7 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 ### Tech stack
 
 - **Language / framework** — Java 25, Spring Boot 4.1
-- **Build** — Gradle 9 (Kotlin DSL), versions in the `gradle/libs.versions.toml` catalog, updates surfaced by refreshVersions
+- **Build** — Gradle 9 (Kotlin DSL), versions in the `gradle/libs.versions.toml` catalog, updates surfaced by refreshVersions and, for Ruff, shfmt and Node.js, proposed weekly by `native-tool-updates.yml`
 - **Database** — PostgreSQL 18, schema owned by Flyway (Hibernate `ddl-auto=validate`)
 - **Session store** — Redis 8 (`spring-session-data-redis`)
 - **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.8)

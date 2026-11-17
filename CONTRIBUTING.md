@@ -338,7 +338,10 @@ module's `build.gradle.kts`.
 refreshVersions plugin; without it the task does not exist, because the plugin
 is not configuration-cache compatible and is kept off every other build. The
 run annotates `gradle/libs.versions.toml` and recreates an empty, gitignored
-`versions.properties` — do not commit that file. Why an entry is held, pinned
+`versions.properties` — do not commit that file. Ruff, shfmt and Node.js, which
+Gradle takes from their publishers, get their proposals from
+[native-tool-updates](.github/workflows/native-tool-updates.yml) instead
+(see [Dependency verification](#dependency-verification)). Why an entry is held, pinned
 or floored is recorded in [`docs/dependency-pins.md`](docs/dependency-pins.md),
 not in a comment beside the entry (ADR-0214); update its row in the PR that changes the entry.
 
@@ -371,13 +374,22 @@ entry does no harm).
   catalog's `[plugins]` section changes it.
 - **The Node.js archive is per operating system.** The file carries the
   `win-x64` and `linux-x64` entries. On another platform add yours once with
-  `./gradlew --write-verification-metadata sha256 :frontend:nodeSetup`; after a
-  Node bump regenerate both (the Linux entry from a Linux shell or container).
+  `./gradlew --write-verification-metadata sha256 :frontend:nodeSetup`.
 - **Ruff and shfmt are per operating system too** (REQ-OPS-058). The file carries
   their Windows and Linux x86-64 release binaries, resolved from the vendors'
-  GitHub releases; Dependabot does not see them. After a bump in the catalog run
-  `./gradlew --write-verification-metadata sha256 installRuff installShfmt` and
-  add the other platform's entry from the release's published SHA-256 digest.
+  GitHub releases.
+- **Ruff, shfmt and Node.js are bumped by
+  [`native-tool-updates.yml`](.github/workflows/native-tool-updates.yml)**
+  (REQ-OPS-059), because neither Dependabot nor refreshVersions sees an Ivy
+  module. Every Monday it opens one pull request that moves each of them to its
+  newest stable release at least a week old (a Node.js security release at once,
+  Node.js within the major line the catalog pins). It writes both platforms'
+  entries from the SHA-256 the publisher states — the GitHub release asset
+  `digest`, nodejs.org `SHASUMS256.txt` — and puts a reformat by a new formatter
+  into a commit of its own, listed in `.git-blame-ignore-revs`. Closing that pull
+  request unmerged refuses its versions. A bump by hand, such as a new Node.js
+  major line, takes both platforms' entries from those published digests too,
+  never from what `--write-verification-metadata` downloads.
 - **If CI still fails verification on a coordinate your machine never
   complained about**, the command ran on a warm cache somewhere; run it again as
   written, or in a Linux container, and commit what it adds.
@@ -396,7 +408,8 @@ entry does no harm).
   update* for a Gradle dependency, should one ever be opened, fails verification
   until a maintainer pushes the regenerated file to its branch.
 - `refresh-versions.yml` changes no version and needs nothing; the PR that
-  takes one of its proposals regenerates the file.
+  takes one of its proposals regenerates the file. `native-tool-updates.yml`
+  writes the entries of the versions it proposes itself.
 
 The `main` ruleset makes eight checks **required**: *Build, Test & Lint*
 ([`ci.yml`](.github/workflows/ci.yml)), the two CodeQL jobs *Analyze
