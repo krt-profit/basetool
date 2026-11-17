@@ -45,6 +45,7 @@
     }
     .material-grid {
         display: grid;
+        min-width: 0;
         --remove-col: var(--touch-target-dense);
         grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) var(--remove-col);
         gap: var(--space-3);
