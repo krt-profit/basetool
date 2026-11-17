@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportChoicesDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarShipOriginService;
@@ -47,10 +48,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -67,6 +70,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -507,19 +511,26 @@ public class HangarController {
   }
 
   /**
-   * Imports a ship-export JSON file (CCU Game Fleetview, HangarXPLOR, Fleetyards or StarJump
-   * FleetViewer; format auto-detected), creating only missing rows owned by the caller.
+   * Imports a ship export (CCU Game Fleetview, HangarXPLOR, Fleetyards, StarJump FleetViewer or
+   * Hangar Extension JSON or CSV; format auto-detected), creating only missing rows owned by the
+   * caller.
    *
    * @param jwt caller's JWT — its {@code sub} claim becomes the new rows' owner id
-   * @param file uploaded JSON file
-   * @return import summary (created / skipped / duplicate counts plus the unmatched-ship list)
+   * @param file uploaded export file
+   * @param choices the member's choices for ambiguous names, sent with a repeated import of the
+   *     same file, or {@code null} on a first import (REQ-HANGAR-019)
+   * @return import summary: the counts, the unmatched names and the ambiguous names with options
    */
   @PostMapping("/import/ships")
   @PreAuthorize("isAuthenticated()")
   @Transactional
   public FleetviewImportResponseDto importShips(
-      @AuthenticationPrincipal Jwt jwt, @RequestParam("file") @NotNull MultipartFile file) {
-    return hangarImportService.importShips(userService.getUserIdFromJwt(jwt), file);
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestParam("file") @NotNull MultipartFile file,
+      @RequestPart(value = "choices", required = false) @Valid @Nullable
+          HangarImportChoicesDto choices) {
+    return hangarImportService.importShips(
+        userService.getUserIdFromJwt(jwt), file, choices == null ? List.of() : choices.choices());
   }
 
   /**

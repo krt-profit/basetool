@@ -31,6 +31,8 @@ import java.util.List;
  * @param skippedShips the names of the skipped entries
  * @param duplicateShips the names of the duplicate entries
  * @param updatedCount how many matched ships took a new production status or pledge data
+ * @param ambiguousShips the names that may mean several ships, with the ships to choose from
+ *     (REQ-HANGAR-019)
  */
 @DtoMirror
 public record FleetviewImportResponseDto(
@@ -39,4 +41,5 @@ public record FleetviewImportResponseDto(
     int duplicateCount,
     List<String> skippedShips,
     List<String> duplicateShips,
-    int updatedCount) {}
+    int updatedCount,
+    List<AmbiguousShipDto> ambiguousShips) {}
