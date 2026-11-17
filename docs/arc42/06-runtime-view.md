@@ -127,7 +127,9 @@ itself changes only through the Ansible role, which never delivers):
    with the app images. The apply takes every re-defined unit down in **one** `systemctl stop` —
    `Requires=` takes what depends on them along — and then starts the stack in dependency order, so
    a release is one restart window in which each unit restarts once, and one gate covers images,
-   units and JAR. A failed gate rolls all of them back together; the log names what the release
+   units and JAR. A unit the release retires is stopped inside that window, never before the pull,
+   and the stack it starts is the units the host has, so a renamed unit rolls forward and back by
+   name (`REQ-OPS-004`). A failed gate rolls all of them back together; the log names what the release
    changed and what did not come up, because a single gate cannot tell a bad JAR from a bad image.
    (Until 2026-09-25 the JAR was swapped only *after* the gate, and its keycloak restart took the
    app down a second time.)

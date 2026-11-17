@@ -50,7 +50,14 @@ make_stub podman 'case "$*" in
   *create*) echo "created-cid" ;;
 esac'
 make_stub skopeo 'echo "{\"Digest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}"'
-make_stub systemctl
+# shellcheck disable=SC2016
+make_stub systemctl 'case "$*" in
+  *is-active*)
+    for u in ${STUB_ACTIVE:-}; do
+      case "$*" in *" ${u}.service"*) echo active; exit 0 ;; esac
+    done
+    echo inactive; exit 3 ;;
+esac'
 export PATH="${BIN}:${PATH}"
 
 run_rt() {
@@ -727,6 +734,64 @@ expect_no_call "...never an application unit" podman \
   'start backend.service'
 expect_out "an empty unit directory is 'not configured', not an error" podman \
   "RT_MONITORING_SERVICES=''; RT_UNIT_DIR='${WORK}/nothing-here'; rt_monitoring_configured; echo \"rc=\$?\"" 'rc=1'
+
+say ""
+say "== the stack is the installed units, in the known order =="
+# shellcheck disable=SC2016
+expect_out "the known order starts the edge right after keycloak, before the applications" podman \
+  'echo "[${RT_STACK_ORDER}]"' '[db-backend db-keycloak redis keycloak edge backend ingest frontend acme]'
+STACKDIR="${WORK}/stack-units"
+mkdir -p "$STACKDIR"
+for u in db-backend keycloak backend legacy prometheus; do printf '[Container]\n' >"${STACKDIR}/${u}.container"; done
+printf '[Unit]\nRequires=backend.service keycloak.service cache.service\n[Container]\n' >"${STACKDIR}/frontend.container"
+printf '[Unit]\nRequires=db-backend.service\n[Container]\n' >"${STACKDIR}/cache.container"
+stack_in="RT_UNIT_DIR='${STACKDIR}'; RT_STACK_ORDER='db-backend redis keycloak backend frontend';"
+expect_out "a known unit that is not installed is left out, an unknown one a stack unit Requires= comes before it" podman \
+  "${stack_in} echo \"[\$(rt_installed_stack_services)]\"" '[db-backend keycloak backend cache frontend]'
+expect_out "a unit being retired is not part of the stack" podman \
+  "${stack_in} RT_RETIRED_SERVICES='cache'; echo \"[\$(rt_installed_stack_services)]\"" '[db-backend keycloak backend frontend]'
+got="$(run_rt podman "RT_MONITORING_SERVICES=''; ${stack_in} rt_use_installed_stack; rt_monitoring_services" 2>/dev/null | sort | tr '\n' ' ')"
+if [[ "$got" == "legacy prometheus " ]]; then
+  ok "a unit outside the stack that no stack unit requires is a monitoring unit"
+else
+  bad "derived monitoring set was '${got}', wanted 'legacy prometheus'"
+fi
+got="$(run_rt podman "RT_MONITORING_SERVICES=''; ${stack_in} RT_RETIRED_SERVICES='legacy'; rt_use_installed_stack; rt_monitoring_services" 2>/dev/null | sort | tr '\n' ' ')"
+if [[ "$got" == "prometheus " ]]; then
+  ok "...and a retired one is not"
+else
+  bad "derived monitoring set with legacy retired was '${got}', wanted 'prometheus'"
+fi
+
+say ""
+say "== a retired unit is stopped before its unit file goes =="
+RETIRE_DIR="${WORK}/retire-units"
+retire() {
+  printf 'mkdir -p %q && rm -f %q/.stopped && printf "[Container]\\n" > %q/legacy.container; RT_UNIT_DIR=%q; RT_RETIRED_SERVICES=legacy; %s' \
+    "${RETIRE_DIR}" "${RETIRE_DIR}" "${RETIRE_DIR}" "${RETIRE_DIR}" "$1"
+}
+# shellcheck disable=SC2016
+retire_state='echo "rc=$?; file=$([[ -f "${RT_UNIT_DIR}/legacy.container" ]] && echo kept || echo gone); failed=[${RT_RETIRE_FAILED}]; pending=[${RT_RETIRED_SERVICES}]"'
+expect_out "a retired unit that is not running loses its file" podman \
+  "$(retire "rt_retire_services; ${retire_state}")" 'rc=0; file=gone; failed=[]; pending=[]'
+expect_no_call "...without a stop" podman "$(retire 'rt_retire_services')" 'stop legacy.service'
+expect_call "a running retired unit is stopped" podman \
+  "$(retire 'STUB_ACTIVE=legacy rt_retire_services')" 'systemctl --user stop legacy.service'
+expect_out "...and then loses its file" podman \
+  "$(retire "STUB_ACTIVE=legacy rt_retire_services; ${retire_state}")" 'rc=0; file=gone'
+expect_out "a running retired unit whose stop fails keeps its file and is named" podman \
+  "$(retire "STUB_ACTIVE=legacy STUB_FAIL='stop_legacy.service' rt_retire_services; ${retire_state}")" \
+  'rc=1; file=kept; failed=[legacy]; pending=[legacy]'
+expect_out "...which fails the apply" podman \
+  "$(retire "STUB_ACTIVE=legacy STUB_FAIL='stop_legacy.service' RT_STACK_SERVICES='backend' rt_apply_stack; echo \"rc=\$?\"")" 'rc=1'
+expect_no_call "...before anything is reloaded" podman \
+  "$(retire "STUB_ACTIVE=legacy STUB_FAIL='stop_legacy.service' RT_STACK_SERVICES='backend' rt_apply_stack")" 'daemon-reload'
+expect_no_call "...or started" podman \
+  "$(retire "STUB_ACTIVE=legacy STUB_FAIL='stop_legacy.service' RT_STACK_SERVICES='backend' rt_apply_stack")" 'start backend.service'
+# shellcheck disable=SC2016
+flaky='flaky() { case "$1" in is-active) if [[ -f "${RT_UNIT_DIR}/.stopped" ]]; then echo inactive; else echo active; fi ;; stop) : > "${RT_UNIT_DIR}/.stopped"; return 1 ;; esac; }; RT_SYSTEMCTL=flaky;'
+expect_out "a stop job that fails while the unit still goes down is no error" podman \
+  "$(retire "${flaky} rt_retire_services; ${retire_state}")" 'rc=0; file=gone; failed=[]'
 
 say ""
 say "== reading state out for the backup =="
