@@ -7,9 +7,9 @@ tests:
   - name: fires - a service failing AUTH continuously
     interval: 1m
     input_series:
-      - series: 'redis_acl_access_denied_auth_total{job="redis",instance="redis-exporter:9121"}'
+      - series: 'redis_acl_access_denied_auth_total{job="redis",instance="redis-shared-exporter:9121",redis="shared"}'
         values: "0+4x30"
-      - series: 'redis_acl_access_denied_cmd_total{job="redis",instance="redis-exporter:9121"}'
+      - series: 'redis_acl_access_denied_cmd_total{job="redis",instance="redis-shared-exporter:9121",redis="shared"}'
         values: "0x30"
     alert_rule_test:
       - eval_time: 20m
@@ -17,14 +17,15 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: warning
+              redis: shared
             exp_annotations:
-              summary: "Redis is refusing authentication or commands under its ACL (20 in 5m)"
-              description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
+              summary: "Redis is refusing authentication or commands under its ACL on redis-shared (20 in 5m)"
+              description: "redis-shared counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis-shared/users.acl, a rule in scripts/redis-shared-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis-shared container as the admin user and read the username, reason and context fields only — the object field can carry a key name, i.e. a session id or a handoff id. See docs/deployment.md, The Redis ACL."
 
   - name: fires - a service refused a channel on every publish
     interval: 1m
     input_series:
-      - series: 'redis_acl_access_denied_channel_total{job="redis",instance="redis-exporter:9121"}'
+      - series: 'redis_acl_access_denied_channel_total{job="redis",instance="redis-shared-exporter:9121",redis="shared"}'
         values: "0+1x30"
     alert_rule_test:
       - eval_time: 20m
@@ -32,14 +33,43 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: warning
+              redis: shared
             exp_annotations:
-              summary: "Redis is refusing authentication or commands under its ACL (5 in 5m)"
-              description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
+              summary: "Redis is refusing authentication or commands under its ACL on redis-shared (5 in 5m)"
+              description: "redis-shared counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis-shared/users.acl, a rule in scripts/redis-shared-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis-shared container as the admin user and read the username, reason and context fields only — the object field can carry a key name, i.e. a session id or a handoff id. See docs/deployment.md, The Redis ACL."
+
+  - name: fires - each instance is counted and named on its own
+    interval: 1m
+    input_series:
+      - series: 'redis_acl_access_denied_auth_total{job="redis",instance="redis-session-exporter:9121",redis="session"}'
+        values: "0+4x30"
+      - series: 'redis_acl_access_denied_cmd_total{job="redis",instance="redis-session-exporter:9121",redis="session"}'
+        values: "0+1x30"
+      - series: 'redis_acl_access_denied_auth_total{job="redis",instance="redis-shared-exporter:9121",redis="shared"}'
+        values: "0x30"
+      - series: 'redis_acl_access_denied_key_total{job="redis",instance="redis-shared-exporter:9121",redis="shared"}'
+        values: "0+1x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: RedisAclDenials
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              redis: session
+            exp_annotations:
+              summary: "Redis is refusing authentication or commands under its ACL on redis-session (25 in 5m)"
+              description: "redis-session counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_SESSION_FRONTEND_PASSWORD does not match the rendered /var/lib/basetool/redis/session-users.acl, a rule in scripts/redis-session-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis-session container as the admin user and read the username, reason and context fields only — the object field can carry a key name, i.e. a session id or a handoff id. See docs/deployment.md, The Redis ACL."
+          - exp_labels:
+              severity: warning
+              redis: shared
+            exp_annotations:
+              summary: "Redis is refusing authentication or commands under its ACL on redis-shared (5 in 5m)"
+              description: "redis-shared counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/lib/basetool/redis-shared/users.acl, a rule in scripts/redis-shared-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis-shared container as the admin user and read the username, reason and context fields only — the object field can carry a key name, i.e. a session id or a handoff id. See docs/deployment.md, The Redis ACL."
 
   - name: silent - a single refusal
     interval: 1m
     input_series:
-      - series: 'redis_acl_access_denied_auth_total{job="redis",instance="redis-exporter:9121"}'
+      - series: 'redis_acl_access_denied_auth_total{job="redis",instance="redis-session-exporter:9121",redis="session"}'
         values: "0x10 1x30"
     alert_rule_test:
       - eval_time: 15m
@@ -55,7 +85,9 @@ tests:
   - name: silent - no refusals
     interval: 1m
     input_series:
-      - series: 'redis_acl_access_denied_auth_total{job="redis",instance="redis-exporter:9121"}'
+      - series: 'redis_acl_access_denied_auth_total{job="redis",instance="redis-session-exporter:9121",redis="session"}'
+        values: "0x30"
+      - series: 'redis_acl_access_denied_auth_total{job="redis",instance="redis-shared-exporter:9121",redis="shared"}'
         values: "0x30"
     alert_rule_test:
       - eval_time: 25m

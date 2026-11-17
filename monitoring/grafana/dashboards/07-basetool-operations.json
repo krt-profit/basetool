@@ -920,7 +920,7 @@
       },
       "type": "timeseries",
       "title": "Ingest gateway errors by reason",
-      "description": "Ingest gateway failures/s by reason (basetool_ingest_handoff_errors_total): staging_unavailable = Redis refused a staged draft or change set, internal = an unexpected 500. Relay failures to the backend are counted as basetool_ingest_exchange_relay_total{outcome=\"failed\"}. Backs IngestHandoffErrors / IngestStagingUnavailable.",
+      "description": "Ingest gateway failures/s by reason (basetool_ingest_handoff_errors_total): staging_unavailable = redis-shared refused a staged draft or change set, internal = an unexpected 500. Relay failures to the backend are counted as basetool_ingest_exchange_relay_total{outcome=\"failed\"}. Backs IngestHandoffErrors / IngestStagingUnavailable.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2158,7 +2158,7 @@
       },
       "type": "timeseries",
       "title": "Redis fan-out pub/sub & errors/hour",
-      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094/ADR-0126): the live-sync changed-relay (basetool_livesync_redis_*), the editor-presence gossip (basetool_livesync_presence_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay/broadcast, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert, which covers the changed relay and the SSE fan-out only (a lost changed frame costs correctness; a lost presence gossip costs a cosmetic dot, so it is a panel row, not a page). Note the presence rows are a PERIODIC gossip — one message per actively-edited topic per 10 s per replica — so a steady non-zero floor is normal there and a flat zero simply means nobody has a mission panel focused. Which rows CAN populate depends on how many processes sit on the channel, and the difference is invisible in the panel: basetool_sse_redis_consumed_total counts peer-origin messages only (own-origin excluded), and production runs a single backend replica -- so that row, and its errors row, are permanently absent here and their absence is correct. The live-sync `published` row populates from both processes on the same single-replica host, because backend and frontend are two DIFFERENT processes on one channel; `consumed` is the frontend's alone, since the backend publishes without subscribing (ADR-0274). Read side by side, one bridge looks alive and the other looks dead while both are healthy; a genuinely broken SSE fan-out shows up as `published` continuing while notifications stop arriving, not as this row going flat (the #1488 lesson, on a second metric).",
+      "description": "Cross-replica Redis fan-out for live delivery over redis-shared (ADR-0094/ADR-0126): the live-sync changed-relay (basetool_livesync_redis_*), the editor-presence gossip (basetool_livesync_presence_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay/broadcast, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert, which covers the changed relay and the SSE fan-out only (a lost changed frame costs correctness; a lost presence gossip costs a cosmetic dot, so it is a panel row, not a page). Note the presence rows are a PERIODIC gossip — one message per actively-edited topic per 10 s per replica — so a steady non-zero floor is normal there and a flat zero simply means nobody has a mission panel focused. Which rows CAN populate depends on how many processes sit on the channel, and the difference is invisible in the panel: basetool_sse_redis_consumed_total counts peer-origin messages only (own-origin excluded), and production runs a single backend replica -- so that row, and its errors row, are permanently absent here and their absence is correct. The live-sync `published` row populates from both processes on the same single-replica host, because backend and frontend are two DIFFERENT processes on one channel; `consumed` is the frontend's alone, since the backend publishes without subscribing (ADR-0274). Read side by side, one bridge looks alive and the other looks dead while both are healthy; a genuinely broken SSE fan-out shows up as `published` continuing while notifications stop arriving, not as this row going flat (the #1488 lesson, on a second metric).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2288,7 +2288,7 @@
       },
       "type": "timeseries",
       "title": "Session evictions/hour",
-      "description": "Concurrent-session evictions (basetool_session_evicted_total): Spring Security expired a principal's oldest session because the per-user cap of 10 was full. The panel sits beside 'Active sessions' on purpose - the gauge cannot show this, because expireNow() only marks the session and leaves the registry entry and the Redis key in place. Rare by construction; a floor that never returns to zero means the registry is holding dead sessions against the cap and evicting live ones (watched by SessionEvictionSpike).",
+      "description": "Concurrent-session evictions (basetool_session_evicted_total): Spring Security expired a principal's oldest session because the per-user cap of 10 was full. The panel sits beside 'Active sessions' on purpose - the gauge cannot show this, because expireNow() only marks the session and leaves the registry entry and its key in redis-session in place. Rare by construction; a floor that never returns to zero means the registry is holding dead sessions against the cap and evicting live ones (watched by SessionEvictionSpike).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -3853,7 +3853,7 @@
       },
       "type": "timeseries",
       "title": "Exchange Redis byte budget in use",
-      "description": "The share of the exchange's total Redis byte budget (128 MiB) the gateway's cached answers, quota counters and locks hold (REQ-XCH-023). Above 0.8 ExchangeBudgetHigh fires; at 1.0 writes are refused EXCHANGE_BUDGET_EXHAUSTED before they reach the backend.",
+      "description": "The share of the exchange's total byte budget in redis-shared (128 MiB) the gateway's cached answers, quota counters and locks hold (REQ-XCH-023). Above 0.8 ExchangeBudgetHigh fires; at 1.0 writes are refused EXCHANGE_BUDGET_EXHAUSTED before they reach the backend.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

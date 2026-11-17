@@ -503,6 +503,7 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_MANUFACTURER_MERGED",
                   "CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED",
                   "CATALOGUE_SHIP_TYPE_MERGED",
+                  "CATALOGUE_ITEM_MERGED",
                   "CATALOGUE_LOCATION_CREATED",
                   "CATALOGUE_LOCATION_UPDATED",
                   "CATALOGUE_LOCATION_DELETED",

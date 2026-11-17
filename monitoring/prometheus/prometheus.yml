@@ -91,7 +91,12 @@ scrape_configs:
 
   - job_name: redis
     static_configs:
-      - targets: ["redis-exporter:9121"]
+      - targets: ["redis-session-exporter:9121"]
+        labels:
+          redis: session
+      - targets: ["redis-shared-exporter:9121"]
+        labels:
+          redis: shared
 
   - job_name: alertmanager
     static_configs:

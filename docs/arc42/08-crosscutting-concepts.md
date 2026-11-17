@@ -53,6 +53,8 @@ Beyond roles there are three mechanisms that are easy to miss:
   each confined to its own keys and channels, with `default` switched off at the end of the rollout
   (REQ-SEC-068, ADR-0207). The ACL is rendered from a committed template with hashes, never
   passwords, and the E2E stack runs against it. Production completed the rollout on 2026-09-25.
+  The sessions have a Redis of their own that only the frontend reaches, so the internet-facing
+  gateway shares no process with a session token (REQ-SEC-089, ADR-0388).
 - **Internal TLS: one leaf per service, one CA, the name checked** — a private CA whose key is
   destroyed at mint time signs a leaf for backend, frontend, ingest and Keycloak; clients pin the
   CA and verify the hostname (REQ-SEC-070, ADR-0211). Shipped inert behind

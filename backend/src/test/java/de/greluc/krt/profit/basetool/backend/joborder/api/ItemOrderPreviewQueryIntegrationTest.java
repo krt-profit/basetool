@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -33,11 +34,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
-import jakarta.persistence.EntityManagerFactory;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -52,7 +51,6 @@ class ItemOrderPreviewQueryIntegrationTest {
   @Autowired private GameItemRepository gameItems;
   @Autowired private MaterialRepository materials;
   @Autowired private TransactionTemplate transactions;
-  @Autowired private EntityManagerFactory entityManagerFactory;
 
   /** The explicitly selected recipe and the independent material identities its costs require. */
   private record Fixture(UUID blueprintId, Set<UUID> materialIds) {}
@@ -61,33 +59,23 @@ class ItemOrderPreviewQueryIntegrationTest {
   void previewReadsRemainBoundedWhenRequiredItemBridgesGrowFromThreeToThirty() throws Exception {
     Fixture few = recipe(3);
     Fixture many = recipe(30);
-    var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    boolean enabled = statistics.isStatisticsEnabled();
-    statistics.setStatisticsEnabled(true);
-    try {
-      statistics.clear();
-      ItemDerivationDto small = preview(few.blueprintId());
-      long fewQueries = statistics.getPrepareStatementCount();
-      statistics.clear();
-      ItemDerivationDto large = preview(many.blueprintId());
-      long manyQueries = statistics.getPrepareStatementCount();
-      assertThat(small.materials())
-          .extracting(row -> row.material().id())
-          .containsExactlyInAnyOrderElementsOf(few.materialIds());
-      assertThat(large.materials())
-          .extracting(row -> row.material().id())
-          .containsExactlyInAnyOrderElementsOf(many.materialIds());
-      assertThat(large.materials())
-          .extracting(DerivedMaterialDto::requiredQuantity)
-          .containsOnly(2.0);
-      assertThat(large.subAssemblies()).isEmpty();
-      assertThat(large.unresolvedIngredients()).isEmpty();
-      assertThat(manyQueries)
-          .as("preview query count for thirty versus three required ITEM bridges")
-          .isEqualTo(fewQueries);
-    } finally {
-      statistics.setStatisticsEnabled(enabled);
-    }
+    var small = measured(() -> preview(few.blueprintId()));
+    var large = measured(() -> preview(many.blueprintId()));
+    assertThat(small.result().materials())
+        .extracting(row -> row.material().id())
+        .containsExactlyInAnyOrderElementsOf(few.materialIds());
+    assertThat(large.result().materials())
+        .extracting(row -> row.material().id())
+        .containsExactlyInAnyOrderElementsOf(many.materialIds());
+    assertThat(large.result().materials())
+        .extracting(DerivedMaterialDto::requiredQuantity)
+        .containsOnly(2.0);
+    assertThat(large.result().subAssemblies()).isEmpty();
+    assertThat(large.result().unresolvedIngredients()).isEmpty();
+    assertThat(large.statements())
+        .as("preview query count for thirty versus three required ITEM bridges")
+        .isPositive()
+        .isEqualTo(small.statements());
   }
 
   private ItemDerivationDto preview(UUID id) throws Exception {

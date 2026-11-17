@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
-import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -54,19 +53,7 @@ class ShopTerminalNamesTest {
    * @return the row
    */
   private static @NotNull StarmapPlaceRow terminal(@NotNull String name) {
-    return new StarmapPlaceRow(
-        StarmapPlaceKind.TERMINAL,
-        UUID.randomUUID(),
-        name,
-        "Stanton",
-        null,
-        null,
-        null,
-        "New Babbage",
-        null,
-        null,
-        null,
-        false);
+    return StarmapPlaceRowBuilder.terminal(name, "New Babbage", "item").build();
   }
 
   @Test

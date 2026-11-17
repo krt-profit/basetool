@@ -12,7 +12,23 @@
   },
   "refresh": "30s",
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "redis",
+        "label": "Instance",
+        "description": "session is redis-session (Spring Session, reached by the frontend only); shared is redis-shared (the exchange, the ingest handoffs and the live-sync and notification channels).",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(redis_up, redis)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "current": {}
+      }
+    ]
   },
   "panels": [
     {
@@ -31,7 +47,8 @@
       },
       "targets": [
         {
-          "expr": "redis_up",
+          "expr": "redis_up{redis=~\"$redis\"}",
+          "legendFormat": "{{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -65,6 +82,7 @@
       "id": 2,
       "type": "timeseries",
       "title": "Memory Used vs Limit",
+      "description": "Per instance: the memory Redis uses, its maxmemory (where noeviction starts refusing writes and RedisMemoryHigh reads its ratio) and the container's memory limit.",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -77,8 +95,8 @@
       },
       "targets": [
         {
-          "expr": "redis_memory_used_bytes",
-          "legendFormat": "used",
+          "expr": "redis_memory_used_bytes{redis=~\"$redis\"}",
+          "legendFormat": "used {{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -86,9 +104,18 @@
           }
         },
         {
-          "expr": "max(basetool:container:memory_limit_bytes{name=\"redis\"})",
-          "legendFormat": "limit",
+          "expr": "label_replace(max by (name) (basetool:container:memory_limit_bytes{name=~\"redis-$redis\"}), \"redis\", \"$1\", \"name\", \"redis-(.+)\")",
+          "legendFormat": "limit {{redis}}",
           "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "redis_memory_max_bytes{redis=~\"$redis\"}",
+          "legendFormat": "maxmemory {{redis}}",
+          "refId": "C",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -119,7 +146,8 @@
       },
       "targets": [
         {
-          "expr": "100 * redis_memory_used_bytes / scalar(max(basetool:container:memory_limit_bytes{name=\"redis\"}))",
+          "expr": "100 * redis_memory_used_bytes{redis=~\"$redis\"} / on (redis) label_replace(max by (name) (basetool:container:memory_limit_bytes{name=~\"redis-$redis\"}), \"redis\", \"$1\", \"name\", \"redis-(.+)\")",
+          "legendFormat": "{{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -154,7 +182,8 @@
       },
       "targets": [
         {
-          "expr": "time()-redis_rdb_last_save_timestamp_seconds",
+          "expr": "time()-redis_rdb_last_save_timestamp_seconds{redis=~\"$redis\"}",
+          "legendFormat": "{{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -199,7 +228,8 @@
       },
       "targets": [
         {
-          "expr": "rate(redis_evicted_keys_total[5m])",
+          "expr": "rate(redis_evicted_keys_total{redis=~\"$redis\"}[5m])",
+          "legendFormat": "{{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -231,7 +261,8 @@
       },
       "targets": [
         {
-          "expr": "redis_connected_clients",
+          "expr": "redis_connected_clients{redis=~\"$redis\"}",
+          "legendFormat": "{{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -263,7 +294,8 @@
       },
       "targets": [
         {
-          "expr": "rate(redis_commands_processed_total[5m])",
+          "expr": "rate(redis_commands_processed_total{redis=~\"$redis\"}[5m])",
+          "legendFormat": "{{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -295,7 +327,8 @@
       },
       "targets": [
         {
-          "expr": "rate(redis_keyspace_hits_total[5m])/(rate(redis_keyspace_hits_total[5m])+rate(redis_keyspace_misses_total[5m]))",
+          "expr": "rate(redis_keyspace_hits_total{redis=~\"$redis\"}[5m])/(rate(redis_keyspace_hits_total{redis=~\"$redis\"}[5m])+rate(redis_keyspace_misses_total{redis=~\"$redis\"}[5m]))",
+          "legendFormat": "{{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -330,7 +363,8 @@
       },
       "targets": [
         {
-          "expr": "redis_rdb_changes_since_last_save",
+          "expr": "redis_rdb_changes_since_last_save{redis=~\"$redis\"}",
+          "legendFormat": "{{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -363,8 +397,8 @@
       },
       "targets": [
         {
-          "expr": "redis_rdb_last_bgsave_status",
-          "legendFormat": "RDB bgsave",
+          "expr": "redis_rdb_last_bgsave_status{redis=~\"$redis\"}",
+          "legendFormat": "RDB bgsave {{redis}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -372,8 +406,8 @@
           }
         },
         {
-          "expr": "redis_aof_last_write_status",
-          "legendFormat": "AOF write",
+          "expr": "redis_aof_last_write_status{redis=~\"$redis\"}",
+          "legendFormat": "AOF write {{redis}}",
           "refId": "B",
           "datasource": {
             "type": "prometheus",

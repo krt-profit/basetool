@@ -1043,6 +1043,11 @@ surviving ship-type ids and a fixed subject token; the catalogue records the mer
 `CATALOGUE_SHIP_TYPE_MERGED`, with the retired id, the evidence token and the number of moved
 references.
 
+The merge of an item UEX lists twice (REQ-DATA-044) moves the twin's references through the same
+owner-domain events and records the merge itself as `CATALOGUE_ITEM_MERGED`, actor `system`,
+subject the surviving item, with `retiredItem`, the rule token (`GAME_UUID`, `UNIQUE_NAME`,
+`GS_RECORD`), the merged `uexItemId` and the number of moved `references`.
+
 The hierarchy foundation records every automatic ending of an ineligible legacy material promise
 as `JOB_ORDER_CLAIM_WITHDRAWN` with safe claim/unit identities and bounded reason `UNIT_INELIGIBLE`.
 An actual active-to-ended Staffel participation is recorded once as

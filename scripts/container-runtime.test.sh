@@ -739,7 +739,7 @@ say ""
 say "== the stack is the installed units, in the known order =="
 # shellcheck disable=SC2016
 expect_out "the known order starts the edge right after keycloak, before the applications" podman \
-  'echo "[${RT_STACK_ORDER}]"' '[db-backend db-keycloak redis keycloak edge backend ingest frontend acme]'
+  'echo "[${RT_STACK_ORDER}]"' '[db-backend db-keycloak redis redis-session redis-shared keycloak edge backend ingest frontend acme]'
 STACKDIR="${WORK}/stack-units"
 mkdir -p "$STACKDIR"
 for u in db-backend keycloak backend legacy prometheus; do printf '[Container]\n' >"${STACKDIR}/${u}.container"; done

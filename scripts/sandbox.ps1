@@ -41,7 +41,7 @@ if ($Build) {
     $files += @('-f', 'docker-compose.sandbox-build.yml')
 }
 $compose = @('compose', '--env-file', 'docker/sandbox/sandbox.env') + $files + @('--profile', 'sandbox')
-$services = @('redis-dev', 'db-backend-dev', 'db-keycloak-dev', 'keycloak-dev', 'backend-dev', 'frontend-dev', 'ingest-dev')
+$services = @('redis-session-dev', 'redis-shared-dev', 'db-backend-dev', 'db-keycloak-dev', 'keycloak-dev', 'backend-dev', 'frontend-dev', 'ingest-dev')
 
 function Invoke-Compose {
     <#

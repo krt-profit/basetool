@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.leadership.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
@@ -27,8 +28,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,43 +45,31 @@ class LeitungViewQueryCountIntegrationTest {
   @Autowired private EntityManager entityManager;
 
   @Test
-  void oneAndOneHundredTwentyFiveInactiveParentsUseTheSameStatementCount() {
+  void oneAndOneHundredTwentyFiveInactiveParentsUseTheSameStatementCount() throws Exception {
     Pair first = createPair();
-    Statistics statistics =
-        entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
-    boolean enabled = statistics.isStatisticsEnabled();
-    statistics.setStatisticsEnabled(true);
-    try {
-      entityManager.flush();
-      entityManager.clear();
-      statistics.clear();
-      LeitungViewDto small =
-          service.buildView(SecurityContextHolder.getContext().getAuthentication());
-      long smallStatements = statistics.getPrepareStatementCount();
-      assertThat(small.squadrons())
-          .anySatisfy(unit -> {
-            assertThat(unit.id()).isEqualTo(first.child());
-            assertThat(unit.bereichName()).isEqualTo(first.parentName());
-            assertThat(unit.department()).isEqualTo(Department.FORSCHUNG);
-          });
-      for (int i = 1; i < 125; i++) {
-        createPair();
-      }
-      entityManager.flush();
-      entityManager.clear();
-      statistics.clear();
-      LeitungViewDto large =
-          service.buildView(SecurityContextHolder.getContext().getAuthentication());
-      long largeStatements = statistics.getPrepareStatementCount();
-      assertThat(large.squadrons()).hasSize(small.squadrons().size() + 124);
-      assertThat(largeStatements).isEqualTo(smallStatements);
-      System.out.printf(
-          "LEITUNG_QUERY_PROFILE inactive_parents=1 statements=%d inactive_parents=125"
-              + " statements=%d%n",
-          smallStatements, largeStatements);
-    } finally {
-      statistics.setStatisticsEnabled(enabled);
+    entityManager.flush();
+    entityManager.clear();
+    var small =
+        measured(() -> service.buildView(SecurityContextHolder.getContext().getAuthentication()));
+    assertThat(small.result().squadrons())
+        .anySatisfy(unit -> {
+          assertThat(unit.id()).isEqualTo(first.child());
+          assertThat(unit.bereichName()).isEqualTo(first.parentName());
+          assertThat(unit.department()).isEqualTo(Department.FORSCHUNG);
+        });
+    for (int i = 1; i < 125; i++) {
+      createPair();
     }
+    entityManager.flush();
+    entityManager.clear();
+    var large =
+        measured(() -> service.buildView(SecurityContextHolder.getContext().getAuthentication()));
+    assertThat(large.result().squadrons()).hasSize(small.result().squadrons().size() + 124);
+    assertThat(large.statements()).isPositive().isEqualTo(small.statements());
+    System.out.printf(
+        "LEITUNG_QUERY_PROFILE inactive_parents=1 statements=%d inactive_parents=125"
+            + " statements=%d%n",
+        small.statements(), large.statements());
   }
 
   private Pair createPair() {

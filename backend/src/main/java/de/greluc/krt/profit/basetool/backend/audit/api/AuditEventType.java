@@ -832,6 +832,8 @@ public enum AuditEventType {
   CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
   /** A ship type created a second time was merged into the ship type of the same game ship. */
   CATALOGUE_SHIP_TYPE_MERGED(AuditDomain.CATALOGUE),
+  /** A row a second UEX listing created was merged into the game row of the same item. */
+  CATALOGUE_ITEM_MERGED(AuditDomain.CATALOGUE),
   /** An admin created a location. */
   CATALOGUE_LOCATION_CREATED(AuditDomain.CATALOGUE),
   /** An admin edited a location. */

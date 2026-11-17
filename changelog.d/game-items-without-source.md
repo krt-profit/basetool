@@ -1,4 +1,5 @@
 ### Fixed
 
-- Item pickers no longer offer items that no source lists any more (no P4K match, deleted on the SC Wiki, no live UEX
-  listing), mostly old ship records the Wiki once served as items. Existing entries still show them.
+- **Gegenstände.** Auswahllisten bieten keine Gegenstände mehr an, die keine Quelle mehr führt (kein P4K-Treffer, im SC
+  Wiki gelöscht, kein aktiver UEX-Eintrag), meist alte Schiffseinträge, die das Wiki früher als Gegenstände lieferte.
+  Bestehende Einträge zeigen sie weiter.

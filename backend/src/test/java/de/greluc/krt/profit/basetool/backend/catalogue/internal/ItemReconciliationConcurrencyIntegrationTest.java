@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReassignmentParticipant;
@@ -66,6 +67,7 @@ class ItemReconciliationConcurrencyIntegrationTest {
   @Autowired private SyncReportService reports;
   @Autowired private P4kMergeConflictRecorder p4kConflicts;
   @Autowired private StockCommands stock;
+  @Autowired private AuditRecorder auditRecorder;
 
   @Test
   void busyStockInsertCanCommitBeforeAFreshMergeRescansAllReferences() throws Exception {
@@ -86,7 +88,15 @@ class ItemReconciliationConcurrencyIntegrationTest {
     observed.addAll(participants);
     ItemReconciliationService merger =
         new ItemReconciliationService(
-            items, redirects, recipes, prices, stats, observed, reports, p4kConflicts);
+            items,
+            redirects,
+            recipes,
+            prices,
+            stats,
+            observed,
+            reports,
+            p4kConflicts,
+            auditRecorder);
 
     try (var pool = Executors.newFixedThreadPool(2)) {
       var booking =

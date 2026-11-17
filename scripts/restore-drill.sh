@@ -28,7 +28,8 @@ OK_GRAFANA_SQLITE=0
 OK_MONITORING_SECRETS=0
 OK_EDGE_CERTS=0
 OK_ACME_STATE=0
-OK_REDIS_ACL=0
+OK_REDIS_SESSION_ACL=0
+OK_REDIS_SHARED_ACL=0
 
 KEEP=false
 [[ "${1:-}" == "--keep" ]] && KEEP=true
@@ -61,7 +62,8 @@ write_drill_metrics() {
     echo "basetool_restore_drill_artifact_ok{artifact=\"monitoring_secrets\"} ${OK_MONITORING_SECRETS}"
     echo "basetool_restore_drill_artifact_ok{artifact=\"edge_certs\"} ${OK_EDGE_CERTS}"
     echo "basetool_restore_drill_artifact_ok{artifact=\"acme_state\"} ${OK_ACME_STATE}"
-    echo "basetool_restore_drill_artifact_ok{artifact=\"redis_acl\"} ${OK_REDIS_ACL}"
+    echo "basetool_restore_drill_artifact_ok{artifact=\"redis_session_acl\"} ${OK_REDIS_SESSION_ACL}"
+    echo "basetool_restore_drill_artifact_ok{artifact=\"redis_shared_acl\"} ${OK_REDIS_SHARED_ACL}"
   } | write_textfile restore_drill.prom || true
 }
 
@@ -108,7 +110,7 @@ restic restore latest --tag basetool \
   --include '*/krt_basetool.dump' --include '*/keycloak.dump' \
   --include '*/monitoring/grafana.db' --include '*/monitoring/secrets.tar.gz' \
   --include '*/edge-certs.tar.gz' --include '*/edge-acme-state.tar.gz' \
-  --include '*/config/users.acl' \
+  --include '*/config/session-users.acl' --include '*/config/shared-users.acl' \
   --target "${WORK}" \
   || fail "restic restore failed"
 
@@ -127,8 +129,10 @@ check_artifact 'edge-certs.tar.gz' OK_EDGE_CERTS 'the edge TLS material' \
   'a restored host cannot serve HTTPS, and re-issuing hits the Let'"'"'s Encrypt duplicate limit'
 check_artifact 'edge-acme-state.tar.gz' OK_ACME_STATE 'the ACME account state' \
   'renewal starts from a new account and the issuance history is lost'
-check_artifact 'users.acl' OK_REDIS_ACL 'the redis ACL' \
-  'redis refuses to start, and a hand-written replacement can leave it open'
+check_artifact 'session-users.acl' OK_REDIS_SESSION_ACL 'the redis-session ACL' \
+  'redis-session refuses to start, and a hand-written replacement can leave the sessions open'
+check_artifact 'shared-users.acl' OK_REDIS_SHARED_ACL 'the redis-shared ACL' \
+  'redis-shared refuses to start, and a hand-written replacement can leave it open'
 
 BACKEND_DUMP="$(find "${WORK}" -name krt_basetool.dump -print -quit)"
 KEYCLOAK_DUMP="$(find "${WORK}" -name keycloak.dump -print -quit)"

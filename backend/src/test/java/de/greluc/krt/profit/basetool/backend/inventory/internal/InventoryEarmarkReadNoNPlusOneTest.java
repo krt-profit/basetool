@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
@@ -42,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
-import jakarta.persistence.EntityManagerFactory;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,8 +50,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -97,7 +95,6 @@ class InventoryEarmarkReadNoNPlusOneTest {
   @Autowired private MissionRepository missionRepository;
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private SquadronRepository squadronRepository;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private JdbcTemplate jdbc;
 
   private Squadron unit;
@@ -153,7 +150,7 @@ class InventoryEarmarkReadNoNPlusOneTest {
   }
 
   @Test
-  void theLagerReadsStayStatementBoundedWhateverTheEarmarks() {
+  void theLagerReadsStayStatementBoundedWhateverTheEarmarks() throws Exception {
     Seed few = seed(FEW);
     Seed many = seed(MANY);
     PageRequest page = PageRequest.of(0, 50);
@@ -206,17 +203,12 @@ class InventoryEarmarkReadNoNPlusOneTest {
     reads.put(
         "mission inventory", s -> inventoryItemService.getMissionInventory(s.shared().getId()));
 
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
     for (Map.Entry<String, Function<Seed, List<InventoryItemDto>>> read : reads.entrySet()) {
-      stats.clear();
-      List<InventoryItemDto> fewRows = inOwnRequest(() -> read.getValue().apply(few));
-      long fewStatements = stats.getPrepareStatementCount();
-      stats.clear();
-      List<InventoryItemDto> manyRows = inOwnRequest(() -> read.getValue().apply(many));
-      long manyStatements = stats.getPrepareStatementCount();
+      var fewRead = measured(() -> inOwnRequest(() -> read.getValue().apply(few)));
+      var manyRead = measured(() -> inOwnRequest(() -> read.getValue().apply(many)));
+      List<InventoryItemDto> manyRows = manyRead.result();
 
-      assertThat(fewRows).as(read.getKey() + " rows for the small Lager").hasSize(FEW);
+      assertThat(fewRead.result()).as(read.getKey() + " rows for the small Lager").hasSize(FEW);
       assertThat(manyRows).as(read.getKey() + " rows for the large Lager").hasSize(MANY);
       assertThat(manyRows)
           .as(read.getKey() + " carries every earmark's name and number")
@@ -231,9 +223,10 @@ class InventoryEarmarkReadNoNPlusOneTest {
                 .satisfies(
                     pledge -> assertThat(pledge.receivingUnitName()).isEqualTo(unit.getName()));
           });
-      assertThat(manyStatements)
+      assertThat(manyRead.statements())
           .as(read.getKey() + " statements for " + MANY + " rows against " + FEW + " (N+1)")
-          .isEqualTo(fewStatements)
+          .isPositive()
+          .isEqualTo(fewRead.statements())
           .isLessThanOrEqualTo(STATEMENT_BOUND);
     }
   }
