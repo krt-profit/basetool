@@ -265,7 +265,8 @@ class P4kLocationReviewActionsTest {
   private static StarmapPlaceRow place(
       StarmapPlaceKind kind, UUID id, String name, String planet, UUID linked) {
     return new StarmapPlaceRow(
-        kind, id, name, "Stanton", planet, null, null, null, null, null, linked, false);
+        kind, id, null, name, null, "Stanton", planet, null, null, null, null, null, true, null,
+        linked, false);
   }
 
   private static StarmapObject object(String name, String type, UUID parentId) {

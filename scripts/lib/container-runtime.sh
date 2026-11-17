@@ -28,7 +28,7 @@ RT_CHANGED_SERVICES="${RT_CHANGED_SERVICES:-}"
 
 RT_FAILED_SERVICES=""
 
-RT_STACK_ORDER="${RT_STACK_ORDER:-db-backend db-keycloak redis keycloak edge backend ingest frontend acme}"
+RT_STACK_ORDER="${RT_STACK_ORDER:-db-backend db-keycloak redis redis-session redis-shared keycloak edge backend ingest frontend acme}"
 
 RT_RETIRED_SERVICES="${RT_RETIRED_SERVICES:-}"
 

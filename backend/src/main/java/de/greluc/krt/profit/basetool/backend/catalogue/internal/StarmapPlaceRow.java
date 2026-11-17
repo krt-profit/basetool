@@ -19,19 +19,24 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * One row of a UEX location table as the starmap linking reads it (REQ-P4K-035).
  *
  * @param kind the table
  * @param id the row
+ * @param uexId the row's UEX id, or {@code null}
  * @param name the UEX name
+ * @param nickname the UEX nickname, {@code null} when UEX gives none or the table keeps none
  * @param starSystem the star system's name
  * @param planet the planet's name, or {@code null}
  * @param orbit the orbit's name, or {@code null}
@@ -39,13 +44,17 @@ import org.jetbrains.annotations.Nullable;
  * @param city the city's name, or {@code null}
  * @param spaceStation the space station's name, or {@code null}
  * @param outpost the outpost's name, or {@code null}
+ * @param live UEX's {@code is_available_live}, or {@code null} when UEX stated none
+ * @param terminalType the UEX type of a terminal, e.g. {@code item}, {@code null} for other tables
  * @param starmapObjectId the linked starmap object, or {@code null}
  * @param manual whether an admin set or cleared the link
  */
 public record StarmapPlaceRow(
     @NotNull StarmapPlaceKind kind,
     @NotNull UUID id,
+    @Nullable Integer uexId,
     @Nullable String name,
+    @Nullable String nickname,
     @Nullable String starSystem,
     @Nullable String planet,
     @Nullable String orbit,
@@ -53,6 +62,8 @@ public record StarmapPlaceRow(
     @Nullable String city,
     @Nullable String spaceStation,
     @Nullable String outpost,
+    @Nullable Boolean live,
+    @Nullable String terminalType,
     @Nullable UUID starmapObjectId,
     boolean manual) {
 
@@ -98,21 +109,53 @@ public record StarmapPlaceRow(
    */
   @Nullable
   public <V> V nearestLinkedParent(@NotNull Map<StarmapPlaceKind, Map<String, V>> linked) {
+    List<V> parents = linkedParents(linked);
+    return parents.isEmpty() ? null : parents.getFirst();
+  }
+
+  /**
+   * Returns the links of the row's linked parents: the parents the row names, nearest first, then
+   * its star system, each link once.
+   *
+   * @param linked the links of the rows of each kind, keyed by star system and name
+   * @param <V> the link value, a starmap object's GUID or id
+   * @return the links, empty for a star system or a row without a linked parent
+   */
+  @NotNull
+  @Unmodifiable
+  public <V> List<V> linkedParents(@NotNull Map<StarmapPlaceKind, Map<String, V>> linked) {
     if (kind == StarmapPlaceKind.STAR_SYSTEM) {
-      return null;
+      return List.of();
     }
+    List<V> links = new ArrayList<>();
     for (StarmapPlaceKind.Parent parent : kind.getParents()) {
       String parentName = parentName(parent);
-      if (parentName != null) {
-        V link =
-            linked
-                .getOrDefault(parent.kind(), Map.of())
-                .get(StarmapNames.key(starSystem, parentName));
-        if (link != null) {
-          return link;
-        }
+      V link =
+          parentName == null
+              ? null
+              : linked
+                  .getOrDefault(parent.kind(), Map.of())
+                  .get(StarmapNames.key(starSystem, parentName));
+      if (link != null && !links.contains(link)) {
+        links.add(link);
       }
     }
+    V system = starSystemLink(linked);
+    if (system != null && !links.contains(system)) {
+      links.add(system);
+    }
+    return List.copyOf(links);
+  }
+
+  /**
+   * Returns the link of the row's star system.
+   *
+   * @param linked the links of the rows of each kind, keyed by star system and name
+   * @param <V> the link value, a starmap object's GUID or id
+   * @return the link of the star system row of the row's system, or {@code null}
+   */
+  @Nullable
+  public <V> V starSystemLink(@NotNull Map<StarmapPlaceKind, Map<String, V>> linked) {
     return starSystem == null
         ? null
         : linked
@@ -133,7 +176,7 @@ public record StarmapPlaceRow(
     return new StarmapPlaceRow(
         kind,
         (UUID) tuple[0],
-        (String) tuple[1],
+        (Integer) tuple[1],
         (String) tuple[2],
         (String) tuple[3],
         (String) tuple[4],
@@ -141,7 +184,11 @@ public record StarmapPlaceRow(
         (String) tuple[6],
         (String) tuple[7],
         (String) tuple[8],
-        (UUID) tuple[9],
-        Boolean.TRUE.equals(tuple[10]));
+        (String) tuple[9],
+        (String) tuple[10],
+        (Boolean) tuple[11],
+        (String) tuple[12],
+        (UUID) tuple[13],
+        Boolean.TRUE.equals(tuple[14]));
   }
 }

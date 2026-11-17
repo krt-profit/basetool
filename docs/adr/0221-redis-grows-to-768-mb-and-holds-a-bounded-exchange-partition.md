@@ -6,7 +6,9 @@
   arrives with it ([#2092](https://github.com/krt-profit/basetool/issues/2092), amendment 2). Amends [ADR-0085](0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md) (the
   Redis ceiling) and [ADR-0207](0207-each-service-reaches-redis-as-its-own-acl-user.md) (two new key
   families in the ACL). Amendment 1's scripts are replaced by optimistic transactions in
-  [ADR-0389](0389-the-ingest-gateway-runs-no-lua-in-redis.md).
+  [ADR-0389](0389-the-ingest-gateway-runs-no-lua-in-redis.md). The instance is split by
+  [ADR-0388](0388-the-session-store-gets-a-redis-the-ingest-gateway-cannot-reach.md): the 768 MB
+  ceiling stays with `redis-shared`, which holds the exchange partition.
 - **Date:** 2026-09-26
 - **Deciders:** @greluc
 - **Related:** `REQ-OPS-018`, `REQ-SEC-068` · [ADR-0079](0079-redis-session-store-aof-and-maxmemory-noeviction.md) ·

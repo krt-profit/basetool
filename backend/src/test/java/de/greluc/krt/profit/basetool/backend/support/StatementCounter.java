@@ -37,6 +37,27 @@ public final class StatementCounter implements SessionEventListener {
 
   private static final ThreadLocal<AtomicLong> RUNNING = new ThreadLocal<>();
 
+  /** Work whose statements {@link #preparedBy} counts; its result, if any, is discarded. */
+  @FunctionalInterface
+  public interface Work {
+
+    /**
+     * Runs the work on the calling thread.
+     *
+     * @throws Exception whatever the work throws
+     */
+    void run() throws Exception;
+  }
+
+  /**
+   * What a measured piece of work returned and the statements it prepared.
+   *
+   * @param result what the work returned
+   * @param statements the number of statements prepared on the calling thread while it ran
+   * @param <T> the type of the work's result
+   */
+  public record Measured<T>(T result, long statements) {}
+
   /**
    * Runs the work on the calling thread and counts the statements Hibernate prepares for it there.
    *
@@ -46,18 +67,38 @@ public final class StatementCounter implements SessionEventListener {
    * @return the number of statements prepared on this thread while the work ran
    * @throws Exception whatever the work throws
    */
-  public static long preparedBy(@NotNull ThrowingSupplier<?> work) throws Exception {
+  public static long preparedBy(@NotNull Work work) throws Exception {
+    return measured(
+            () -> {
+              work.run();
+              return null;
+            })
+        .statements();
+  }
+
+  /**
+   * Runs the work on the calling thread and keeps its result beside the statements Hibernate
+   * prepares for it there.
+   *
+   * @param work the work to measure
+   * @param <T> the type of the work's result
+   * @return the work's result and the number of statements prepared on this thread while it ran
+   * @throws Exception whatever the work throws
+   */
+  public static <T> @NotNull Measured<T> measured(@NotNull ThrowingSupplier<T> work)
+      throws Exception {
     AtomicLong statements = new AtomicLong();
     RUNNING.set(statements);
+    T result;
     try {
-      work.getWithException();
+      result = work.getWithException();
     } finally {
       RUNNING.remove();
     }
-    return statements.get();
+    return new Measured<>(result, statements.get());
   }
 
-  /** Counts one statement when a {@link #preparedBy} measurement runs on this thread. */
+  /** Counts one statement when a {@link #measured} measurement runs on this thread. */
   @Override
   public void jdbcPrepareStatementStart() {
     AtomicLong statements = RUNNING.get();
