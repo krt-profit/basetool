@@ -1747,7 +1747,8 @@ locks without waiting while holding that fence; a busy lot rolls back and retrie
 times in fresh transactions. Exhaustion records a deferred failure and suppresses cleanup.
 Stock, order, allocation, ownership and location records retain their ids and quantities.
 Both original item rows and their complete price/statistic sets are archived before active
-duplicates are removed. A colliding price keeps the newer source timestamp; a colliding statistic
+duplicates are removed. A colliding price keeps the newer source timestamp (the merge of a second
+UEX listing keeps the game row's own, REQ-DATA-044); a colliding statistic
 keeps the Wiki survivor value, with both originals retained in the archive.
 Every changed user row keeps optimistic-lock and audit semantics. Duplicate minimum-stock
 settings of one unit retain the greater minimum and target; the notification is re-armed.
@@ -1930,3 +1931,64 @@ partial fetch did not list is still not written.
 - [x] A second listing of a shared name creates no row (`UexVehicleServiceUuidMatchTest`).
 
 **Code:** `UexVehicleService`, `UexVehicleListings` · **ADR:** ADR-0392
+
+### REQ-DATA-044 — an item UEX lists twice keeps one row
+
+UEX lists some items twice. One listing sits on the item's **game row**, a row holding a P4K GUID,
+or an external UUID on a row the SC Wiki or the P4K wrote; the other created a **twin**: a
+`UEX_ONLY` row holding a UEX item id but neither a P4K GUID nor an external UUID. Members saw both,
+and the SC Wiki item sync reported the pair as `MULTI_MATCH_AMBIGUOUS` every day. After every
+complete UEX item fetch (REQ-DATA-014) the UEX item sync merges each twin whose listing the fetch
+holds into the game row the first matching rule names, each only on a single candidate:
+
+1. **Game UUID** (`GAME_UUID`): the twin's listing carries a game UUID that exactly one row holds as
+   `p4k_uuid` or `external_uuid`, and that row is a game row carrying the listing's name as its
+   `name` or `uex_name` (compared by `UexIdentityCensus.nameKey`). A game UUID held by a row of
+   another name, by several rows or by no game row merges nothing, by no rule: UEX copies a UUID
+   onto the wrong listing.
+2. **Unique name** (`UNIQUE_NAME`): no row holds the listing's game UUID, or it carries none, and
+   exactly one visible game row (`GameItem#isSelectable`, REQ-P4K-057) carries its name.
+3. **`_GS` record** (`GS_RECORD`): two visible game rows carry its name, and one's class name is the
+   other's plus `_GS`; the twin goes into the `_GS` row, as ADR-0392 does for ships.
+
+The game row must hold a UEX item id of its own that the same fetch lists; a name rule also needs
+the twin's kind and manufacturer to agree with the game row's (`ItemIdentityCompatibility`). A
+referenced twin is merged too.
+
+The merge runs per pair in a transaction of its own, under the row locks of REQ-DATA-034, and
+reuses its steps: both rows are archived in `game_item_redirect`, every module moves its
+references through `GameItemReassignmentParticipant` and audits them in its own area, recipes,
+loadout ports, paints, shop rows and stats move, and the twin is deleted. The game row keeps its
+own UEX listing and, at a terminal both rows list, its own price; the twin's other prices move to
+it. The redirect keeps the twin's UEX item id (`game_item_redirect.uex_item_id`), so the merged id
+still resolves through `GameItemRepository#findById` and the twin is never created again. Each
+merge is reported as `SOURCE_RECORDS_MERGED` and audited as `CATALOGUE_ITEM_MERGED` with the merged
+id, the rule, the merged UEX item id and the number of moved references.
+
+A fetched listing no resolution step places whose id is such a merged id (`isMergedUexItemId`)
+writes nothing and creates no row; it is no rejected write, so it neither marks the census
+incomplete nor suppresses the orphan sweep (REQ-DATA-035). A merged listing whose game UUID finds
+the game row while the row's own listing left a complete fetch takes the row over.
+The UEX item-price sync resolves a merged listing to its game row: its price at a terminal the
+game row's own listing also lists in the fetch is dropped, its other prices are written there, and
+it counts as a known item for the stale-price sweep (REQ-DATA-005).
+
+**Acceptance**
+
+- [x] Each rule merges its twin into the game row and moves a reference; a game UUID on a row of
+  another name merges nothing (`UexItemTwinsTest`, `UexItemTwinMergeIntegrationTest`).
+- [x] The game row keeps its UEX listing and its price at a shared terminal and takes the twin's
+  other prices; the merge keeps the twin's UEX item id and is audited
+  (`ItemReconciliationServiceTest`, `UexItemTwinMergeIntegrationTest`).
+- [x] A name rule refuses a twin whose kind contradicts the game row, and no twin merges into a row
+  without a UEX listing of its own (`ItemReconciliationServiceTest`).
+- [x] A merged listing writes nothing, creates no row and leaves the sweep running; a complete fetch
+  hands its listings to the twin merge (`UexItemSyncServiceTest`).
+- [x] A merged listing's price yields to the game row's own at a terminal both list and keeps the
+  stale-price sweep running (`UexItemPriceSyncServiceTest`).
+
+**Enforced by:** `UexItemTwinsTest`, `UexItemTwinMergeIntegrationTest`,
+`ItemReconciliationServiceTest`, `UexItemSyncServiceTest`, `UexItemPriceSyncServiceTest` ·
+**Code:** `UexItemTwins`, `UexItemTwinMerger`, `ItemReconciliationService#mergeUexTwin`,
+`UexItemSyncService`, `UexItemPriceSyncService`, `V435__game_item_redirect_uex_item_id.sql` ·
+**ADR:** [ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
