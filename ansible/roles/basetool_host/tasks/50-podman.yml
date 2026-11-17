@@ -1,27 +1,28 @@
 ---
-- name: Create the service user's containers configuration directory
+- name: Create the service user's containers configuration, Quadlet and drop-in directories
   ansible.builtin.file:
-    path: "~{{ basetool_host_service_user }}/.config/containers"
+    path: "{{ item }}"
     state: directory
     owner: "{{ basetool_host_service_user }}"
     group: "{{ basetool_host_service_group }}"
     mode: "0755"
+  loop:
+    - "~{{ basetool_host_service_user }}/.config/containers"
+    - "~{{ basetool_host_service_user }}/.config/containers/systemd"
+    - "~{{ basetool_host_service_user }}/.config/containers/containers.conf.d"
 
-- name: Create the Quadlet unit directory
-  ansible.builtin.file:
-    path: "~{{ basetool_host_service_user }}/.config/containers/systemd"
-    state: directory
-    owner: "{{ basetool_host_service_user }}"
-    group: "{{ basetool_host_service_group }}"
-    mode: "0755"
-
-- name: Configure rootless port forwarding
+- name: Map the host into the rootless network namespace through pasta
   ansible.builtin.template:
-    src: containers.conf.j2
-    dest: "~{{ basetool_host_service_user }}/.config/containers/containers.conf"
+    src: pasta-host-mapping.conf.j2
+    dest: "~{{ basetool_host_service_user }}/.config/containers/containers.conf.d/50-basetool.conf"
     owner: "{{ basetool_host_service_user }}"
     group: "{{ basetool_host_service_group }}"
     mode: "0644"
+
+- name: Remove the user's main containers.conf, which would hide the vendor one from Podman 6
+  ansible.builtin.file:
+    path: "~{{ basetool_host_service_user }}/.config/containers/containers.conf"
+    state: absent
 
 - name: Read back what podman actually resolved the setting to
   when: not ansible_check_mode

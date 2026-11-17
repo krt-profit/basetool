@@ -1804,6 +1804,11 @@ for why the missing-probe half is not redundant.
   `basetool_host_public_name_aliases`; the role writes the drop-ins and removes them when the list
   is empty, and `env-reaches-the-units` fails when its first entry and `BASETOOL_KEYCLOAK_HOST_ALIAS`
   disagree.
+- [ ] The running pasta maps every address an alias points at: `host-gateway` and each link-local or
+  unique-local target outside the container subnets. The role writes the mapping as the service
+  user's drop-in `containers.conf.d/50-basetool.conf` and keeps no main user `containers.conf`, so the
+  vendor `containers.conf` stays in force under Podman 6; `pasta-maps-host-aliases` fails on an
+  unmapped address.
 - [ ] `BASETOOL_EXTRA_JAVA_OPTS` unset ⇒ `JAVA_TOOL_OPTIONS` is character-identical to before, and the
   truststore mount points at the same file as the keystore mount (read, but never consulted).
 - [ ] The documented trust store recipe starts from `$JAVA_HOME/lib/security/cacerts`, so selecting
@@ -1813,7 +1818,8 @@ for why the missing-probe half is not redundant.
 
 **Enforced by:** `.github/workflows/promote-testing.yml` · `docker-compose.yml`
 (`KC_HOSTNAME`, `KEYCLOAK_ISSUER_URI`) · `.env.example` · `ansible/roles/basetool_host/tasks/50-podman.yml`
-(alias and truststore drop-ins) · `scripts/check-conformance.py` (`env-reaches-the-units`) ·
+(alias and truststore drop-ins, the pasta mapping drop-in) · `scripts/check-conformance.py`
+(`env-reaches-the-units`, `pasta-maps-host-aliases`) ·
 **Runbook:** `docs/deployment.md` → *Promoting to testing* · **Decision:** ADR-0196
 
 ### REQ-OPS-023 — Build provenance is anchored outside the registry
