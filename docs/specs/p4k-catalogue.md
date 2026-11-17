@@ -1372,7 +1372,10 @@ the GUID another row holds stands for that row's ship: the Wiki files the vehicl
 UUID the game gives the record. After retiring the seeded NPC ship types (REQ-P4K-052) and before
 it matches, an APPLY merges each such row into the row of the GUID through the ship-type merge
 (REQ-DATA-042), when the catalogue lists the record and the row of the GUID is neither retired nor
-retiring. The report lists each merge as `MERGED`, with both names; a preview reports the merges,
+retiring. The twins are set aside while the run decides which rows move to their base or successor
+(REQ-P4K-051), since a twin's Wiki UUID would block such a move. When the row of the GUID moves, the
+twin is the Wiki entry of the record it leaves: it is merged all the same, and the row keeps its own
+Wiki UUID. The report lists each merge as `MERGED`, with both names; a preview reports the merges,
 writes nothing, and matches without the merged rows as the APPLY does. A row holding a P4K GUID is
 never merged away (REQ-P4K-007).
 
@@ -1381,6 +1384,8 @@ never merged away (REQ-P4K-007).
 - [x] A Wiki row whose UUID is a stored row's GUID is merged into that row in an APPLY: its hangar
   ships, mission units and linked items move, its id resolves to the survivor, and the survivor takes
   the Wiki UUID.
+- [x] A Wiki row of the edition a row leaves for its base is merged, and the row keeps its own Wiki
+  UUID.
 - [x] A preview reports the merge as `MERGED` and changes no row.
 - [x] A second APPLY finds nothing to merge.
 

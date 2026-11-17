@@ -1848,7 +1848,8 @@ as `CATALOGUE_SHIP_TYPE_MERGED` with the merged id, the evidence and the number 
 references. The open hangar and template views hear of the change through live sync.
 
 The survivor takes the Wiki identity of the merged row when it has none, or when the merged row's
-Wiki UUID is the survivor's P4K GUID, and the UEX identity when it has none. Both
+Wiki UUID is the P4K GUID the survivor holds once the caller's run is through, and the UEX identity
+when it has none. Both
 rows are kept as JSON in `ship_type_redirect`. The merged id stays resolvable through
 `findById`, `existsById`, `findAllById` and `getReferenceById` of `ShipTypeRepository`. The
 exchange resolves it as a `bt` reference and names journal entries by it; the append-only journal

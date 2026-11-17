@@ -42,6 +42,9 @@ class P4kShipTwinsImportTest {
 
   private static final String SURVIVOR_NAME = "Aegis Avenger Titan";
   private static final String TWIN_NAME = "Avenger Titan";
+  private static final UUID BASE = UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1e001");
+  private static final UUID EDITION = UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1e002");
+  private static final String EDITION_NAME = "Twin Test Ship";
 
   @Autowired private P4kImportService imports;
   @Autowired private P4kImportJobRepository jobs;
@@ -73,6 +76,36 @@ class P4kShipTwinsImportTest {
           assertThat(change.getOldValue()).isEqualTo(TWIN_NAME);
           assertThat(change.getGuid()).isEqualTo(P4kTestCatalogues.PLAYER_SHIP);
         });
+  }
+
+  @Test
+  void aTwinOfTheEditionARowLeavesForItsBaseMergesAndTheRowKeepsItsWikiUuid() {
+    ShipType stamped = new ShipType();
+    stamped.setName(EDITION_NAME);
+    stamped.setP4kUuid(EDITION);
+    stamped.setClassName("TEST_Twin_Edition");
+    stamped.setExternalUuid(BASE);
+    stamped.setSourceSystems(GameItemSourceSystem.BOTH);
+    ShipType survivor = ships.saveAndFlush(stamped);
+    ShipType editionTwin = new ShipType();
+    editionTwin.setName("Twin Test Edition");
+    editionTwin.setExternalUuid(EDITION);
+    editionTwin.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    UUID twinId = ships.saveAndFlush(editionTwin).getId();
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    runs.apply(
+        P4kTestCatalogues.bytes(
+            P4kTestCatalogues.withEdition(
+                BASE, "TEST_Twin_Base", EDITION, "TEST_Twin_Edition", EDITION_NAME)),
+        false);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(count(twinId)).isZero();
+    ShipType kept = ships.findById(survivor.getId()).orElseThrow();
+    assertThat(kept.getP4kUuid()).isEqualTo(BASE);
+    assertThat(kept.getExternalUuid()).isEqualTo(BASE);
   }
 
   @Test

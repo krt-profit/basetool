@@ -58,7 +58,8 @@ class ShipTypeMergeServiceTest {
     UUID template = insertTemplate(twinId);
     UUID item = insertLinkedItem(twinId);
 
-    assertThat(merges.merge(twinId, survivor.getId(), ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID))
+    assertThat(
+            merges.merge(twinId, survivor.getId(), guid, ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID))
         .isTrue();
     entityManager.flush();
     entityManager.clear();
@@ -99,7 +100,10 @@ class ShipTypeMergeServiceTest {
 
     assertThat(
             merges.merge(
-                stamped.getId(), survivor.getId(), ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID))
+                stamped.getId(),
+                survivor.getId(),
+                survivor.getP4kUuid(),
+                ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID))
         .isFalse();
     assertThat(count("SELECT count(*) FROM ship_type WHERE id = ?", stamped.getId())).isOne();
   }
@@ -110,8 +114,9 @@ class ShipTypeMergeServiceTest {
     ShipType second = ships.saveAndFlush(shipType("Idris-M B", null, null));
     ShipType last = ships.saveAndFlush(shipType("Aegis Idris-M", UUID.randomUUID(), null));
 
-    merges.merge(first.getId(), second.getId(), ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID);
-    merges.merge(second.getId(), last.getId(), ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID);
+    merges.merge(first.getId(), second.getId(), null, ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID);
+    merges.merge(
+        second.getId(), last.getId(), last.getP4kUuid(), ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID);
     entityManager.flush();
     entityManager.clear();
 
@@ -119,12 +124,13 @@ class ShipTypeMergeServiceTest {
   }
 
   @Test
-  void aSurvivorKeepsItsOwnWikiUuidWhenTheTwinsIsNotItsGuid() {
+  void aSurvivorMovingToAnotherGuidKeepsItsOwnWikiUuid() {
     UUID own = UUID.randomUUID();
-    ShipType survivor = ships.saveAndFlush(shipType("Aegis Idris-M", UUID.randomUUID(), own));
-    ShipType twin = ships.saveAndFlush(wikiTwin("Idris-M", UUID.randomUUID()));
+    UUID edition = UUID.randomUUID();
+    ShipType survivor = ships.saveAndFlush(shipType("Anvil Carrack", edition, own));
+    ShipType twin = ships.saveAndFlush(wikiTwin("Carrack", edition));
 
-    merges.merge(twin.getId(), survivor.getId(), ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID);
+    merges.merge(twin.getId(), survivor.getId(), own, ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID);
     entityManager.flush();
     entityManager.clear();
 

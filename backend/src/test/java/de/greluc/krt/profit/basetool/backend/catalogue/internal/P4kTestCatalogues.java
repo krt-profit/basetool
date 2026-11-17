@@ -170,6 +170,43 @@ public final class P4kTestCatalogues {
   }
 
   /**
+   * Builds the fixture with a player base ship and a same-name player edition of it, made from the
+   * player and the AI ship; the base takes over the player ship's loadout.
+   *
+   * @param base the base's GUID
+   * @param baseClass the base's class name
+   * @param edition the edition's GUID
+   * @param editionClass the edition's class name
+   * @param name the in-game name both carry
+   * @return the tree
+   */
+  @NotNull
+  public static ObjectNode withEdition(
+      @NotNull UUID base,
+      @NotNull String baseClass,
+      @NotNull UUID edition,
+      @NotNull String editionClass,
+      @NotNull String name) {
+    ObjectNode root = tree();
+    ObjectNode baseRecord = record(root, "ships", PLAYER_SHIP);
+    baseRecord.put("guid", base.toString()).put("className", baseClass).putNull("variantOf");
+    ((ObjectNode) baseRecord.get("name")).put("en", name);
+    ObjectNode editionRecord = record(root, "ships", AI_SHIP);
+    editionRecord
+        .put("guid", edition.toString())
+        .put("className", editionClass)
+        .put("playability", "player")
+        .put("variantOf", base.toString());
+    ((ObjectNode) editionRecord.get("name")).put("en", name);
+    for (JsonNode node : (ArrayNode) root.get("loadouts")) {
+      if (PLAYER_SHIP.toString().equals(node.get("entityGuid").asString())) {
+        ((ObjectNode) node).put("entityGuid", base.toString());
+      }
+    }
+    return root;
+  }
+
+  /**
    * Compresses with gzip.
    *
    * @param plain the plain bytes

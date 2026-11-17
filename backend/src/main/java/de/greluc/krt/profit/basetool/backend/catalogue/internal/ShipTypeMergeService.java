@@ -58,13 +58,18 @@ class ShipTypeMergeService {
    *
    * @param retiredId the ship type to merge away
    * @param survivorId the ship type that stays
+   * @param survivorGuid the P4K GUID the survivor holds once the caller's run is through, or {@code
+   *     null} when it holds none; a Wiki UUID equal to it outranks the survivor's own
    * @param reason the evidence that both stand for the same game ship
    * @return whether the merge happened; {@code false} when a row is gone or the retired row holds a
    *     P4K GUID
    */
   @Transactional(propagation = Propagation.MANDATORY)
   boolean merge(
-      @NotNull UUID retiredId, @NotNull UUID survivorId, @NotNull ShipTypeMergeReason reason) {
+      @NotNull UUID retiredId,
+      @NotNull UUID survivorId,
+      @Nullable UUID survivorGuid,
+      @NotNull ShipTypeMergeReason reason) {
     if (retiredId.equals(survivorId)) {
       return false;
     }
@@ -83,7 +88,7 @@ class ShipTypeMergeService {
     Identity identity = Identity.of(retired);
     shipTypes.delete(retired);
     shipTypes.flush();
-    identity.giveTo(survivor);
+    identity.giveTo(survivor, survivorGuid);
     shipTypes.saveAndFlush(survivor);
     redirects.alias(retiredId, survivorId, snapshot);
     auditRecorder.record(
@@ -159,15 +164,16 @@ class ShipTypeMergeService {
 
     /**
      * Hands the identities to the survivor: the Wiki identity when the survivor has none or when
-     * the Wiki UUID is the survivor's P4K GUID, the UEX identity when the survivor has none. A
-     * value the merged row lacks leaves the survivor's own in place.
+     * the Wiki UUID is the survivor's settled P4K GUID, the UEX identity when the survivor has
+     * none. A value the merged row lacks leaves the survivor's own in place.
      *
      * @param survivor the ship type that stays
+     * @param survivorGuid the P4K GUID the survivor holds once the run is through, or {@code null}
      */
-    void giveTo(@NotNull ShipType survivor) {
+    void giveTo(@NotNull ShipType survivor, @Nullable UUID survivorGuid) {
       boolean wiki = false;
       if (externalUuid != null
-          && (survivor.getExternalUuid() == null || externalUuid.equals(survivor.getP4kUuid()))) {
+          && (survivor.getExternalUuid() == null || externalUuid.equals(survivorGuid))) {
         survivor.setExternalUuid(externalUuid);
         fill(scwikiSlug, survivor::setScwikiSlug);
         fill(gameName, survivor::setGameName);
