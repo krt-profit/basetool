@@ -231,7 +231,9 @@ APPLY's length does not grow with one round trip per record. A row that two P4K 
 two rows would claim (also two catalogue records sharing a name, as three commodities named
 "SLAM" do), is not resolved by the import: the conflict goes to the review list (REQ-P4K-016) and
 the admin merges or splits; the import never merges. A ship record a stored ship type already
-stands for is covered instead and opens no case (REQ-P4K-050). The Wiki/UEX duplicate merge
+stands for is covered instead and opens no case (REQ-P4K-050); an item row that belongs to another
+listed item is no candidate (REQ-P4K-054), and an item row whose own SC Wiki UUID or class name
+names a free record moves to it (REQ-P4K-055). The Wiki/UEX duplicate merge
 (`ItemReconciliationService.mergeExisting`, ADR-0349) keeps the same rule: it never joins two items
 with different P4K GUIDs but opens a `GUID_CONFLICT` case for each GUID and leaves both rows as they
 are; a GUID only the retired row holds moves with all its P4K columns (`P4kItemParticipation`, the
@@ -250,6 +252,8 @@ P4K-seeded item gains its Wiki UUID instead of a second row.
   as `p4k_uuid`, the Wiki UUID in `external_uuid` / `scwiki_uuid` and a report row of the
   mismatch.
 - [x] Two rows claiming one P4K GUID produce a review case and keep their values.
+- [x] An item row holding a departed GUID moves to the free record its class name names; one whose
+  class names a record another row holds keeps its GUID.
 - [x] The unique-constraint migration clears every duplicate group's `p4k_uuid`, then enforces
   uniqueness.
 - [x] The Wiki/UEX duplicate merge refuses two different P4K GUIDs with a review case per GUID,
@@ -780,6 +784,31 @@ longer turns every other record of that name into a `GUID_CONFLICT` case.
 - [x] A copy of a stored item with the same name, type, sub-type and size is covered: no row, no
   case, `COVERED` in the report.
 - [x] A namesake of another size opens no case; with the box ticked it is created as its own row.
+
+**Enforced by:** `P4kItemCaseRulesImportTest` · **Code:** `P4kItemCoverage`, `P4kRowMatcher` ·
+**ADR:** [ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
+
+### REQ-P4K-055 — a stored item's P4K identity follows the record its own SC Wiki UUID or class name names
+
+A stored item can hold the GUID of a record its own facts do not describe: a same-name copy
+(`KLWE_LaserRepeater_S5` stamped with `…_S5_Turret`, a glowstick with its `_Active` variant) or a
+GUID the catalogue no longer lists while its SC Wiki UUID names a listed record. The import then
+moves the row to the record its facts name — the record of its SC Wiki UUID, else the only record
+of its class name — when:
+
+- no stored item holds that record's GUID, and
+- the row's SC Wiki UUID and class name do not also name the listed record of the GUID it holds.
+
+The move is reported `CHANGED p4k_uuid`; a row the sweep had retired reappears. The GUID the row
+held no longer finds it: that record matches its own row, is covered by the moved row when it is a
+copy (REQ-P4K-054), or stays unmatched. Neither record opens a `GUID_CONFLICT` case. Facts that
+name both records leave the row as it is.
+
+**Acceptance**
+
+- [x] A row stamped with a copy moves to the item its SC Wiki UUID names; the copy is covered and no
+  case opens.
+- [x] A swept row holding a departed GUID moves to the item its SC Wiki UUID names and reappears.
 
 **Enforced by:** `P4kItemCaseRulesImportTest` · **Code:** `P4kItemCoverage`, `P4kRowMatcher` ·
 **ADR:** [ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)

@@ -52,3 +52,16 @@ decide: a record without a name, or one no player can obtain.
 - Covered copies show in the change report as `COVERED`; they no longer reach the review list.
 - A Wiki-raised conflict can close at an APPLY and reopen at the next Wiki sync, so it is visible
   again within a day.
+
+## Amendment — an item's identity follows its own facts (REQ-P4K-055)
+
+35 further conflicts came from rows stamped with a GUID their own facts do not describe: 14 rows
+whose SC Wiki UUID and class name name the base record while the row holds a same-name copy's GUID
+(the run's 14 `IDENTITY_MISMATCH` rows), 7 rows holding a GUID the catalogue no longer lists while
+their SC Wiki UUID names a listed record, and 14 seeded rows whose class name names another record.
+
+A stored item now belongs to the record its SC Wiki UUID, else its unique class name, names — when
+no stored item holds that GUID and the facts do not also name the GUID the row holds. The matcher
+asks the kind's rules for that GUID (`P4kMatchRules.followedGuid`): the held GUID no longer finds
+the row, and the named record takes it, reported as `CHANGED p4k_uuid`. This is the item form of
+ADR-0379's "identity follows the GUID the Wiki names"; ships keep their own moves (REQ-P4K-051).

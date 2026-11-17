@@ -38,8 +38,9 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Item cases open only where an admin can decide something, and an APPLY settles the ones it no
- * longer raises (REQ-P4K-009, REQ-P4K-016, REQ-P4K-054).
+ * Item cases open only where an admin can decide something, an item's identity follows the record
+ * its own facts name, and an APPLY settles the cases it no longer raises (REQ-P4K-009, REQ-P4K-016,
+ * REQ-P4K-054, REQ-P4K-055).
  */
 @SpringBootTest
 @Transactional
@@ -126,6 +127,44 @@ class P4kItemCaseRulesImportTest {
         .hasValueSatisfying(row -> assertThat(row.getId()).isNotEqualTo(custodian.getId()));
     assertThat(P4kImportRuns.report(changes, runId))
         .anyMatch(change -> is(change, P4kChangeType.COVERED, CUSTODIAN_COPY));
+  }
+
+  @Test
+  void aRowStampedWithACopyFollowsTheItemItsWikiUuidNames_andTheCopyIsCovered() {
+    GameItem custodian = item("Custodian SMG", CUSTODIAN_COPY);
+    custodian.setExternalUuid(CUSTODIAN);
+    custodian.setClassName("ksar_smg_energy_01_contestedzonereward");
+    items.saveAndFlush(custodian);
+    ObjectNode root = P4kTestCatalogues.tree();
+    ObjectNode copy = P4kTestCatalogues.record(root, "items", CUSTODIAN).deepCopy();
+    copy.put("guid", CUSTODIAN_COPY.toString());
+    copy.put("className", "ksar_smg_energy_01_contestedzonereward_tow");
+    ((ArrayNode) root.get("items")).add(copy);
+
+    UUID runId = runs.apply(P4kTestCatalogues.bytes(root), false).runId();
+
+    assertThat(custodian.getP4kUuid()).isEqualTo(CUSTODIAN);
+    assertThat(hasCase(CUSTODIAN, P4kReviewReason.GUID_CONFLICT)).isFalse();
+    assertThat(hasCase(CUSTODIAN_COPY, P4kReviewReason.GUID_CONFLICT)).isFalse();
+    assertThat(P4kImportRuns.report(changes, runId))
+        .anyMatch(change -> is(change, P4kChangeType.COVERED, CUSTODIAN_COPY))
+        .anyMatch(change ->
+            is(change, P4kChangeType.CHANGED, CUSTODIAN)
+                && "p4k_uuid".equals(change.getFieldName()));
+  }
+
+  @Test
+  void aSweptRowHoldingADepartedGuidFollowsTheItemItsWikiUuidNames_andReappears() {
+    GameItem custodian = item("Custodian SMG", UUID.randomUUID());
+    custodian.setExternalUuid(CUSTODIAN);
+    custodian.setP4kDeletedAt(Instant.now());
+    items.saveAndFlush(custodian);
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    assertThat(custodian.getP4kUuid()).isEqualTo(CUSTODIAN);
+    assertThat(custodian.getP4kDeletedAt()).isNull();
+    assertThat(hasCase(CUSTODIAN, P4kReviewReason.GUID_CONFLICT)).isFalse();
   }
 
   @Test

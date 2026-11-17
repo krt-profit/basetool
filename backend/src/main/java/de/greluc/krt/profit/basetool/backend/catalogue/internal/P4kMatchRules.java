@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A kind's rules for a stored row that a class-name or name step of {@link P4kRowMatcher} found for
@@ -63,5 +64,17 @@ public interface P4kMatchRules<T> {
    */
   default boolean isCandidate(@NotNull UUID guid, @NotNull T row) {
     return true;
+  }
+
+  /**
+   * Returns the GUID of another record that a row's own facts name in place of the GUID it holds;
+   * the row then takes that GUID, and the GUID it holds no longer finds it (REQ-P4K-055).
+   *
+   * @param row a stored row
+   * @return the GUID the row follows, or {@code null} when it keeps the one it holds
+   */
+  @Nullable
+  default UUID followedGuid(@NotNull T row) {
+    return null;
   }
 }
