@@ -442,13 +442,25 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
   }
 
   /**
-   * Whether a new reference may take the item: the P4K lists it and no admin hid it as not
-   * obtainable (REQ-P4K-013, REQ-P4K-048); {@link SelectableGameItemJpql#SELECTABLE_ITEM} is its
-   * query form.
+   * Whether no source lists the item any more: the P4K never matched it, the SC Wiki deleted it,
+   * and UEX lists it under no live id (REQ-P4K-057).
    *
-   * @return {@code false} for a retired or an unobtainable item
+   * @return {@code true} for an item every source has dropped
+   */
+  public boolean isWithoutSource() {
+    return p4kUuid == null
+        && scwikiDeletedAt != null
+        && (uexItemId == null || uexDeletedAt != null);
+  }
+
+  /**
+   * Whether a new reference may take the item: the P4K lists it, no admin hid it as not obtainable,
+   * and some source still lists it (REQ-P4K-013, REQ-P4K-048, REQ-P4K-057); {@link
+   * SelectableGameItemJpql#SELECTABLE_ITEM} is its query form.
+   *
+   * @return {@code false} for a retired, an unobtainable or a sourceless item
    */
   public boolean isSelectable() {
-    return !isP4kRetired() && !isUnobtainable();
+    return !isP4kRetired() && !isUnobtainable() && !isWithoutSource();
   }
 }

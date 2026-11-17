@@ -21,14 +21,20 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 /**
  * The JPQL form of {@link GameItem#isSelectable()}, for the item pickers that offer only what a new
- * reference may take (REQ-P4K-013, REQ-P4K-048). The fragment is a compile-time constant, so a
- * {@code @Query} concatenates it; its query must alias the game item {@code gi}.
+ * reference may take (REQ-P4K-013, REQ-P4K-048, REQ-P4K-057). The fragment is a compile-time
+ * constant, so a {@code @Query} concatenates it; its query must alias the game item {@code gi}.
  */
 public final class SelectableGameItemJpql {
 
-  /** The game item aliased {@code gi} is listed by the P4K and not hidden as unobtainable. */
+  /**
+   * The game item aliased {@code gi} is listed by the P4K, not hidden as unobtainable, and still
+   * listed by some source.
+   */
   public static final String SELECTABLE_ITEM =
-      P4kRetirementJpql.LISTED_ITEM + "AND gi.unobtainableSince IS NULL ";
+      P4kRetirementJpql.LISTED_ITEM
+          + "AND gi.unobtainableSince IS NULL "
+          + "AND (gi.p4kUuid IS NOT NULL OR gi.scwikiDeletedAt IS NULL"
+          + " OR (gi.uexItemId IS NOT NULL AND gi.uexDeletedAt IS NULL)) ";
 
   /** Non-instantiable constant holder. */
   private SelectableGameItemJpql() {}

@@ -834,6 +834,24 @@ a preview reports what the APPLY would hide. A referenced item stays a case.
 `GameItemReferenceParticipant` · **ADR:**
 [ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
 
+### REQ-P4K-057 — an item every source dropped leaves the pickers
+
+An item the P4K never matched (`p4k_uuid` null), that the SC Wiki deleted (`scwiki_deleted_at`
+set) and that UEX lists under no live id (`uex_item_id` null or `uex_deleted_at` set) is no
+longer selectable: `GameItem#isWithoutSource()` makes `isSelectable()` false, and
+`SelectableGameItemJpql.SELECTABLE_ITEM` leaves it out of every item picker, as for a retired item
+(REQ-P4K-013). Its references stay readable. Such rows are mostly ship records an older Wiki served
+as items ("Aegis Avenger Stalker") and debris templates. A source listing the item again makes it
+selectable again.
+
+**Acceptance**
+
+- [x] An item every source dropped is refused like a retired one.
+- [x] An item the Wiki dropped stays selectable while the P4K or a live UEX id lists it.
+
+**Enforced by:** `SelectableGameItemsTest` · **Code:** `GameItem`, `SelectableGameItemJpql` ·
+**ADR:** [ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
+
 ## Manufacturers
 
 ### REQ-P4K-020 — the P4K leads a manufacturer's identity, name, abbreviation and description
