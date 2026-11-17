@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeUnavailableException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -61,7 +62,12 @@ class ExchangeQuotasTest {
 
   @BeforeEach
   void setUp() {
-    quotas = new ExchangeQuotas(template, budget, Clock.fixed(NOW, ZoneOffset.UTC));
+    quotas =
+        new ExchangeQuotas(
+            template,
+            new OptimisticTransactions(template, new SimpleMeterRegistry()),
+            budget,
+            Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   @Test

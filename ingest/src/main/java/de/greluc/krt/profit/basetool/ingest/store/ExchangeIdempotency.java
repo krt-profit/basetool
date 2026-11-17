@@ -67,7 +67,11 @@ public class ExchangeIdempotency {
   private static final SecureRandom RANDOM = new SecureRandom();
   private static final Base64.Encoder TOKEN_ENCODER = Base64.getUrlEncoder().withoutPadding();
 
+  /** The step name of a claim release on the conflict counter. */
+  static final String STEP_RELEASE = "claim-release";
+
   private final StringRedisTemplate redisTemplate;
+  private final OptimisticTransactions transactions;
   private final ObjectMapper objectMapper;
   private final ExchangeStoreProperties properties;
 
@@ -180,13 +184,13 @@ public class ExchangeIdempotency {
   public boolean releaseClaim(@NotNull String namespace, @NotNull String token) {
     String key = CLAIM_PREFIX + namespace;
     try {
-      return OptimisticTransaction.run(
-          redisTemplate,
+      return transactions.run(
+          STEP_RELEASE,
           List.of(key),
           () ->
               token.equals(redisTemplate.opsForValue().get(key))
-                  ? OptimisticTransaction.Plan.write(true, () -> redisTemplate.delete(key))
-                  : OptimisticTransaction.Plan.read(false));
+                  ? OptimisticTransactions.Plan.write(true, () -> redisTemplate.delete(key))
+                  : OptimisticTransactions.Plan.read(false));
     } catch (RuntimeException e) {
       log.warn("An idempotency claim could not be released: {}", e.getClass().getSimpleName());
       return false;

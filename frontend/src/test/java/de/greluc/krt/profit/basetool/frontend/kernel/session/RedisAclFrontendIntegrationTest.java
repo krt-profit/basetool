@@ -420,6 +420,14 @@ class RedisAclFrontendIntegrationTest {
     "monitoring, FLUSHDB, false",
     "monitoring, ACL LIST, false",
     "monitoring, SUBSCRIBE basetool:livesync:changed, false",
+    "monitoring, CLIENT TRACKING ON BCAST PREFIX basetool:session:, false",
+    "monitoring, CLIENT KILL USER basetool-frontend, false",
+    "monitoring, CLIENT PAUSE 1000 ALL, false",
+    "monitoring, CLIENT LIST, false",
+    "monitoring, SLOWLOG GET 10, false",
+    "basetool-frontend, CLIENT TRACKING ON BCAST PREFIX basetool:session:, false",
+    "basetool-backend, CLIENT TRACKING ON BCAST PREFIX exchange:, false",
+    "basetool-ingest, CLIENT TRACKING ON BCAST PREFIX ingest:, false",
     "admin, ACL LOAD, true"
   })
   void theAclMatrixHoldsForEveryUser(String user, String command, boolean allowed) {

@@ -5967,7 +5967,7 @@ its service does:
 | `basetool-frontend` | `basetool:session:*`, `ingest:handoff:*` | `basetool:session:*`, the created-event pattern, `__keyevent@0__:del` / `:expired`, `basetool:livesync:changed` / `:presence` | read, write, keyspace, hash, set, sorted set, string, pub/sub, transaction, `INFO`; no dangerous command, no `CONFIG` |
 | `basetool-backend` | `exchange:*` | `basetool:livesync:changed`, `basetool:notify:published` | `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `GET`, `SET`, `INFO` |
 | `basetool-ingest` | `ingest:*`, read-only `exchange:*` | none | `GET`, `SET`/`SETEX`/`PSETEX`, `INCR`/`INCRBY`/`DECRBY`, `ZADD`, `ZRANGE`/`ZRANGEBYSCORE`, `ZREM`, `ZSCORE`, `ZCARD`, `RPUSH`, `LPOP`, `EXPIRE`/`PEXPIRE`, `DEL`, `WATCH`/`UNWATCH`/`MULTI`/`EXEC`/`DISCARD`, `INFO`; `EVAL`/`EVALSHA` until the follow-up of ADR-0389 |
-| `monitoring` | none | none | introspection; **not** `SCAN` or `RANDOMKEY`, which are not key-checked and would list every session id |
+| `monitoring` | none | none | only what `redis_exporter` sends: `PING`, `CLIENT SETNAME`/`SETINFO`, `COMMAND INFO`, `INFO`, `CONFIG GET`, `LATENCY LATEST`/`HISTOGRAM`; **not** `SCAN`, `RANDOMKEY`, `CLIENT TRACKING`, `CLIENT LIST`/`KILL`/`PAUSE` or `SLOWLOG`, which are not key-checked and would list session ids, show command arguments or stop the frontend |
 | `admin` | all | all | all — the operator's, never in an application's environment |
 | `default` | — | — | switched **off** at the end of the rollout |
 
@@ -5981,6 +5981,12 @@ its service does:
   optimistic transactions that check and record the budget, add to and refund a quota and release
   an idempotency claim atomically (`OptimisticTransaction`, ADR-0389). `WATCH` is key-checked like
   every other command.
+- **No user but `admin` may track keys.** `CLIENT TRACKING` in broadcast mode is not key-checked:
+  a user holding it would be sent the name — for a session, the id — of every key written under a
+  prefix. Every application user drops `client|tracking` and `client|caching` after its
+  `@connection` grant, and `monitoring` is an allow-list of the exporter's own commands; the exporter
+  runs with `REDIS_EXPORTER_EXCLUDE_SLOWLOG_METRICS`, because `SLOWLOG GET` returns command
+  arguments.
 - **The gateway's user runs no script** (ADR-0389). The Lua interpreter runs inside the server,
   where a fault in it reaches past the ACL, and the gateway is the internet-facing service. Its user
   keeps `EVAL`/`EVALSHA` only until production runs the release that sends transactions instead;
@@ -6040,6 +6046,11 @@ its service does:
   `FLUSHALL`/`FLUSHDB`, `SCAN` for backend, ingest and monitoring, and `ACL` for every non-admin user.
   *`RedisAclFrontendIntegrationTest#theAclMatrixHoldsForEveryUser`; `monitoring` keeps `CONFIG GET`
   by design and is refused `CONFIG SET`.*
+- [x] `monitoring` is refused `CLIENT TRACKING`, `CLIENT LIST`, `CLIENT KILL`, `CLIENT PAUSE` and
+  `SLOWLOG GET`, every application user `CLIENT TRACKING`, and the exporter scrapes every metric
+  the alerts and dashboards read without one refusal.
+  *`RedisAclFrontendIntegrationTest#theAclMatrixHoldsForEveryUser`; measured against
+  `redis_exporter` v1.97.0 with `ACL LOG` empty.*
 - [x] A password-only `AUTH` works while `default` is on and fails once it is off.
   *`RedisAclFrontendIntegrationTest`.*
 - [x] Under `prod` the gateway refuses to start with a blank or `default` Redis username, read

@@ -235,6 +235,15 @@ groups:
           summary: "The exchange's Redis budget is more than 80 % used"
           description: "The exchange data the ingest gateway keeps in Redis (the idempotency cache) uses more than 80 % of its 128 MiB budget. Above 100 % every exchange write is refused with 503 EXCHANGE_BUDGET_EXHAUSTED, while sessions keep their room (REQ-XCH-023, ADR-0221). Check which client writes most (the per-client sets under ingest:xch:budget:c:*) and whether a client loops."
 
+      - alert: ExchangeStoreStepsExhausted
+        expr: sum by (step) (increase(basetool_ingest_exchange_store_conflicts_total{outcome="exhausted"}[10m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Exchange store step {{ $labels.step }} gives up on Redis conflicts"
+          description: "The ingest gateway's {{ $labels.step }} step met a changed key on every attempt of its optimistic Redis transaction for 2 s and answered 503 (ADR-0389). Sustained, it means more concurrent exchange writes than one transaction at a time can carry — every budget step writes the whole exchange's running total — or a client that retries its writes in a tight loop. Check basetool_ingest_exchange_store_conflicts_total{outcome=\"aborted\"} by step and the Exchange dashboard's write rate per client; members see 503 SERVICE_UNAVAILABLE with Retry-After, never an overshot budget (REQ-XCH-023)."
+
       - alert: ExchangeClientBudgetHigh
         expr: max by (client_id) (basetool_ingest_exchange_client_budget_used_ratio) > 0.8
         for: 10m

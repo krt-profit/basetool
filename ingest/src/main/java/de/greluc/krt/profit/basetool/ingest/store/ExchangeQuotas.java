@@ -67,7 +67,14 @@ public class ExchangeQuotas {
   /** The bytes a counter is budgeted with: its key plus a long's decimal digits. */
   static final int VALUE_BYTES = 20;
 
+  /** The step name of adding to a counter on the conflict counter. */
+  static final String STEP_ADD = "quota-add";
+
+  /** The step name of giving counts back on the conflict counter. */
+  static final String STEP_TAKE = "quota-take";
+
   private final StringRedisTemplate redisTemplate;
+  private final OptimisticTransactions transactions;
   private final ExchangeBudget budget;
   private final Clock clock;
 
@@ -75,26 +82,32 @@ public class ExchangeQuotas {
    * Creates the quotas on the system clock.
    *
    * @param redisTemplate the Redis access
+   * @param transactions runs the counters' read-check-write steps
    * @param budget the byte budget a new counter is registered in
    */
   @Autowired
   public ExchangeQuotas(
-      @NotNull StringRedisTemplate redisTemplate, @NotNull ExchangeBudget budget) {
-    this(redisTemplate, budget, Clock.systemUTC());
+      @NotNull StringRedisTemplate redisTemplate,
+      @NotNull OptimisticTransactions transactions,
+      @NotNull ExchangeBudget budget) {
+    this(redisTemplate, transactions, budget, Clock.systemUTC());
   }
 
   /**
    * Creates the quotas on the given clock.
    *
    * @param redisTemplate the Redis access
+   * @param transactions runs the counters' read-check-write steps
    * @param budget the byte budget a new counter is registered in
    * @param clock the time source
    */
   ExchangeQuotas(
       @NotNull StringRedisTemplate redisTemplate,
+      @NotNull OptimisticTransactions transactions,
       @NotNull ExchangeBudget budget,
       @NotNull Clock clock) {
     this.redisTemplate = redisTemplate;
+    this.transactions = transactions;
     this.budget = budget;
     this.clock = clock;
   }
@@ -217,14 +230,14 @@ public class ExchangeQuotas {
    * @return the new count, or {@link #NO_COUNTER} when there is no counter, which is not created
    */
   private long add(@NotNull String key, long counts) {
-    return OptimisticTransaction.run(
-        redisTemplate,
+    return transactions.run(
+        STEP_ADD,
         List.of(key),
         () -> {
           Long count = StoredNumbers.parse(redisTemplate.opsForValue().get(key));
           return count == null
-              ? OptimisticTransaction.Plan.read(NO_COUNTER)
-              : OptimisticTransaction.Plan.write(
+              ? OptimisticTransactions.Plan.read(NO_COUNTER)
+              : OptimisticTransactions.Plan.write(
                   count + counts, () -> redisTemplate.opsForValue().increment(key, counts));
         });
   }
@@ -237,16 +250,16 @@ public class ExchangeQuotas {
    * @param counts how many counts to take back
    */
   private void take(@NotNull String key, long counts) {
-    OptimisticTransaction.run(
-        redisTemplate,
+    transactions.run(
+        STEP_TAKE,
         List.of(key),
         () -> {
           Long count = StoredNumbers.parse(redisTemplate.opsForValue().get(key));
           if (count == null || count < 1) {
-            return OptimisticTransaction.Plan.read(Boolean.FALSE);
+            return OptimisticTransactions.Plan.read(Boolean.FALSE);
           }
           long taken = Math.min(count, counts);
-          return OptimisticTransaction.Plan.write(
+          return OptimisticTransactions.Plan.write(
               Boolean.TRUE, () -> redisTemplate.opsForValue().decrement(key, taken));
         });
   }
