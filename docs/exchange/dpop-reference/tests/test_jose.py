@@ -74,8 +74,14 @@ class ThumbprintTest(unittest.TestCase):
 
     def test_member_order_and_extra_members_do_not_matter(self) -> None:
         """Only the required members count, whatever the input order."""
-        reordered = {"y": RFC9449_JWK["y"], "crv": "P-256", "x": RFC9449_JWK["x"], "kty": "EC",
-                     "kid": "k1", "use": "sig"}
+        reordered = {
+            "y": RFC9449_JWK["y"],
+            "crv": "P-256",
+            "x": RFC9449_JWK["x"],
+            "kty": "EC",
+            "kid": "k1",
+            "use": "sig",
+        }
         self.assertEqual(jwk_thumbprint(RFC9449_JWK), jwk_thumbprint(reordered))
 
     def test_incomplete_or_unknown_keys_are_refused(self) -> None:
@@ -114,19 +120,14 @@ class HtuTest(unittest.TestCase):
     def test_normalisation(self) -> None:
         """Each URL maps to the ``htu`` the gateway compares with."""
         cases = {
-            "https://ingest.profit-base.online/exchange/v1/me/stock?limit=5#top":
-                "https://ingest.profit-base.online/exchange/v1/me/stock",
-            "HTTPS://Ingest.Profit-Base.Online:443/exchange/v1":
-                "https://ingest.profit-base.online/exchange/v1",
-            "http://localhost:18081/exchange/v1/":
-                "http://localhost:18081/exchange/v1/",
+            "https://ingest.profit-base.online/exchange/v1/me/stock?limit=5#top": "https://ingest.profit-base.online/exchange/v1/me/stock",
+            "HTTPS://Ingest.Profit-Base.Online:443/exchange/v1": "https://ingest.profit-base.online/exchange/v1",
+            "http://localhost:18081/exchange/v1/": "http://localhost:18081/exchange/v1/",
             "http://localhost:80/exchange/v1": "http://localhost/exchange/v1",
             "https://ingest.profit-base.online": "https://ingest.profit-base.online/",
             "https://[::1]:8443/exchange/v1": "https://[::1]:8443/exchange/v1",
-            "https://ingest.profit-base.online/exchange/v1/schemas/a%2Fb":
-                "https://ingest.profit-base.online/exchange/v1/schemas/a%2Fb",
-            "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token":
-                "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token",
+            "https://ingest.profit-base.online/exchange/v1/schemas/a%2Fb": "https://ingest.profit-base.online/exchange/v1/schemas/a%2Fb",
+            "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token": "https://profit-base.online/auth/realms/basetool/protocol/openid-connect/token",
         }
         for url, expected in cases.items():
             with self.subTest(url=url):
@@ -134,8 +135,13 @@ class HtuTest(unittest.TestCase):
 
     def test_unusable_urls_are_refused(self) -> None:
         """Relative URLs, other schemes, user info and invalid ports are errors."""
-        for url in ("/exchange/v1", "ftp://host/x", "https://user:secret@host/x",
-                    "https://host:99999/x", "https:///x"):
+        for url in (
+            "/exchange/v1",
+            "ftp://host/x",
+            "https://user:secret@host/x",
+            "https://host:99999/x",
+            "https:///x",
+        ):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 normalize_htu(url)
 
@@ -161,9 +167,13 @@ class SignatureFormTest(unittest.TestCase):
     def test_malformed_der_is_refused(self) -> None:
         """Truncated, trailing, negative or oversized values are errors."""
         good = raw_to_der(bytes([0x7F] * 64))
-        for bad in (good[:-1], good + b"\x00", b"\x31" + good[1:],
-                    bytes([0x30, 6, 0x02, 1, 0x80, 0x02, 1, 0x01]),
-                    bytes([0x30, 38, 0x02, 33]) + b"\x01" * 33 + bytes([0x02, 1, 0x01])):
+        for bad in (
+            good[:-1],
+            good + b"\x00",
+            b"\x31" + good[1:],
+            bytes([0x30, 6, 0x02, 1, 0x80, 0x02, 1, 0x01]),
+            bytes([0x30, 38, 0x02, 33]) + b"\x01" * 33 + bytes([0x02, 1, 0x01]),
+        ):
             with self.subTest(bad=bad.hex()), self.assertRaises(ValueError):
                 der_to_raw(bad)
 

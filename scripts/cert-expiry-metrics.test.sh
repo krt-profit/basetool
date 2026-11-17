@@ -24,8 +24,14 @@ cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 
 say() { printf '%s\n' "$*"; }
-ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
-bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
+ok() {
+  PASSED=$((PASSED + 1))
+  printf '  ok    %s\n' "$*"
+}
+bad() {
+  FAILED=$((FAILED + 1))
+  printf '  FAIL  %s\n' "$*"
+}
 
 assert_line() {
   local label=$1 pattern=$2
@@ -50,7 +56,10 @@ cd "$CERTS" || exit 1
 
 openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out basetool-ca.crt -days 60 \
   -subj "/C=DE/O=DAS KARTELL/OU=basetool/CN=DAS KARTELL basetool CA" >/dev/null 2>&1 \
-  || { echo "openssl could not mint the root" >&2; exit 1; }
+  || {
+    echo "openssl could not mint the root" >&2
+    exit 1
+  }
 
 openssl req -newkey rsa:2048 -nodes -keyout service.key -out service.csr \
   -subj "/CN=service.internal" >/dev/null 2>&1
@@ -58,7 +67,7 @@ openssl x509 -req -in service.csr -CA basetool-ca.crt -CAkey ca.key -CAcreateser
   -out service.crt -days 10 >/dev/null 2>&1
 rm -f service.csr
 
-cat > expired.crt <<'PEM'
+cat >expired.crt <<'PEM'
 -----BEGIN CERTIFICATE-----
 MIIDFTCCAf2gAwIBAgIUWTlSw2mTesxGLy9khfZY+RVW22MwDQYJKoZIhvcNAQEL
 BQAwGjEYMBYGA1UEAwwPZXhwaXJlZC5pbnZhbGlkMB4XDTIwMDEwMTAwMDAwMFoX
@@ -80,7 +89,7 @@ llhOp49ykojmDkAtXPoINEPDCyPw/oLw3w==
 -----END CERTIFICATE-----
 PEM
 
-echo "this is not a certificate" > notacert.pem
+echo "this is not a certificate" >notacert.pem
 cp ca.key looks-important.key
 
 cd "$HERE" || exit 1
@@ -102,12 +111,12 @@ else
 fi
 
 assert_line "HELP for the expiry gauge" '^# HELP basetool_certificate_expiry_timestamp_seconds '
-assert_line "TYPE is gauge"             '^# TYPE basetool_certificate_expiry_timestamp_seconds gauge$'
-assert_line "the root is reported"      '^basetool_certificate_expiry_timestamp_seconds\{path="[^"]*basetool-ca\.crt"'
-assert_line "the leaf is reported"      '^basetool_certificate_expiry_timestamp_seconds\{path="[^"]*service\.crt"'
+assert_line "TYPE is gauge" '^# TYPE basetool_certificate_expiry_timestamp_seconds gauge$'
+assert_line "the root is reported" '^basetool_certificate_expiry_timestamp_seconds\{path="[^"]*basetool-ca\.crt"'
+assert_line "the leaf is reported" '^basetool_certificate_expiry_timestamp_seconds\{path="[^"]*service\.crt"'
 assert_line "notBefore is reported too" '^basetool_certificate_not_before_timestamp_seconds\{'
 assert_line "the file count is present" '^basetool_certificate_files [0-9]+$'
-assert_line "the run is stamped"        '^basetool_certificate_metrics_timestamp_seconds [0-9]+$'
+assert_line "the run is stamped" '^basetool_certificate_metrics_timestamp_seconds [0-9]+$'
 
 say ""
 say "== self_signed is what decides between a 14-day and a 90-day alert =="
@@ -179,10 +188,10 @@ TZ_PROBE_OTHER="$(TZ='Asia/Kolkata' "$PY" -c 'import time; print(time.mktime(tim
 if [ "$TZ_PROBE" = "$TZ_PROBE_OTHER" ]; then
   say "  skip  timezone leg - TZ has no effect on this platform's mktime"
 else
-  A="$(TZ='UTC'           "$PY" "$COLLECTOR" --dir "$CERTS" --dry-run 2>/dev/null \
-        | grep -E '^basetool_certificate_(expiry|not_before)')"
-  B="$(TZ='Asia/Kolkata'  "$PY" "$COLLECTOR" --dir "$CERTS" --dry-run 2>/dev/null \
-        | grep -E '^basetool_certificate_(expiry|not_before)')"
+  A="$(TZ='UTC' "$PY" "$COLLECTOR" --dir "$CERTS" --dry-run 2>/dev/null \
+    | grep -E '^basetool_certificate_(expiry|not_before)')"
+  B="$(TZ='Asia/Kolkata' "$PY" "$COLLECTOR" --dir "$CERTS" --dry-run 2>/dev/null \
+    | grep -E '^basetool_certificate_(expiry|not_before)')"
   if [ -n "$A" ] && [ "$A" = "$B" ]; then
     ok "UTC and UTC+5:30 produce identical timestamps"
   else
@@ -194,15 +203,15 @@ fi
 say ""
 say "== what it must never read =="
 assert_absent "the private key is not reported" 'looks-important\.key'
-assert_absent "the CA's key is not reported"    'path="[^"]*ca\.key"'
+assert_absent "the CA's key is not reported" 'path="[^"]*ca\.key"'
 
 case "$RUN_OUT" in
   *notacert.pem*) ok "the unreadable file is named on stderr" ;;
-  *)              bad "the unreadable file is named on stderr - got: ${RUN_OUT}" ;;
+  *) bad "the unreadable file is named on stderr - got: ${RUN_OUT}" ;;
 esac
 case "$RUN_OUT" in
   *"1 skipped"*) ok "the run reports how many it skipped" ;;
-  *)             bad "the run reports how many it skipped - got: ${RUN_OUT}" ;;
+  *) bad "the run reports how many it skipped - got: ${RUN_OUT}" ;;
 esac
 assert_absent "the unreadable file produced no series" 'notacert\.pem'
 
@@ -260,7 +269,7 @@ fi
 
 ONLYBAD="${WORK}/onlybad"
 mkdir -p "$ONLYBAD"
-echo "not a certificate" > "${ONLYBAD}/x.pem"
+echo "not a certificate" >"${ONLYBAD}/x.pem"
 if "$PY" "$COLLECTOR" --dir "$ONLYBAD" --output "${WORK}/never.prom" >/dev/null 2>&1; then
   bad "a directory of unreadable files is an error"
 else
@@ -286,18 +295,18 @@ fi
 DRY="$("$PY" "$COLLECTOR" --dir "$CERTS" --dry-run 2>/dev/null)"
 case "$DRY" in
   *basetool_certificate_expiry_timestamp_seconds*) ok "--dry-run prints the exposition text" ;;
-  *)                                               bad "--dry-run prints the exposition text" ;;
+  *) bad "--dry-run prints the exposition text" ;;
 esac
 
 say ""
 say "== Prometheus itself accepts the output =="
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  if docker run --rm -i --entrypoint promtool prom/prometheus:v3.16.0 check metrics < "$OUT" \
-       >/dev/null 2>&1; then
+  if docker run --rm -i --entrypoint promtool prom/prometheus:v3.16.0 check metrics <"$OUT" \
+    >/dev/null 2>&1; then
     ok "promtool check metrics accepts the file"
   else
     bad "promtool check metrics accepts the file"
-    docker run --rm -i --entrypoint promtool prom/prometheus:v3.16.0 check metrics < "$OUT" 2>&1 \
+    docker run --rm -i --entrypoint promtool prom/prometheus:v3.16.0 check metrics <"$OUT" 2>&1 \
       | sed 's/^/      /' | head -10
   fi
 else

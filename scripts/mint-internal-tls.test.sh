@@ -50,8 +50,8 @@ mint_rc() {
 
 echo "Scenario: a full mint"
 if sh "${MINT}" --out "${TMP}" --days 30 \
-     --service 'backend=dns:backend,dns:localhost,ip:127.0.0.1' \
-     --service 'ingest=dns:ingest,dns:localhost,ip:127.0.0.1' >"${TMP}.log" 2>&1; then
+  --service 'backend=dns:backend,dns:localhost,ip:127.0.0.1' \
+  --service 'ingest=dns:ingest,dns:localhost,ip:127.0.0.1' >"${TMP}.log" 2>&1; then
   check "mint exits 0" true
 else
   check "mint exits 0" false

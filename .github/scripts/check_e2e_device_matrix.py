@@ -74,10 +74,14 @@ def sweep_devices(text: str) -> list[str]:
     """Return ``DEVICE_CLASSES`` as WxH strings in declaration order, read from that declaration only."""
     declaration = DEVICE_DECLARATION.search(text)
     if not declaration:
-        raise SystemExit("FAIL: no DEVICE_CLASSES List.of declaration in TouchClassLayoutE2eTest.java")
+        raise SystemExit(
+            "FAIL: no DEVICE_CLASSES List.of declaration in TouchClassLayoutE2eTest.java"
+        )
     entries = declaration.group("entries")
     if not VIEWPORT_LIST.fullmatch(entries):
-        raise SystemExit("FAIL: DEVICE_CLASSES must contain only literal Viewport(width, height) entries")
+        raise SystemExit(
+            "FAIL: DEVICE_CLASSES must contain only literal Viewport(width, height) entries"
+        )
     return [f"{width}x{height}" for width, height in re.findall(VIEWPORT, entries)]
 
 

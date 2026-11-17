@@ -157,8 +157,13 @@ class HostRunner:
             runs as root through ``sudo -k -S``, which reads it from the command's stdin.
     """
 
-    def __init__(self, ssh_target: str | None, stub: str | None, timeout: int = 45,
-                 sudo_password: str | None = None) -> None:
+    def __init__(
+        self,
+        ssh_target: str | None,
+        stub: str | None,
+        timeout: int = 45,
+        sudo_password: str | None = None,
+    ) -> None:
         self.ssh_target = ssh_target
         self.stub = stub
         self.timeout = timeout
@@ -222,19 +227,32 @@ class HostRunner:
             ssh = shutil.which("ssh")
             if not ssh:
                 raise Skip("ssh not found on PATH")
-            argv = [ssh, "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
-                    self.ssh_target or "", command]
+            argv = [
+                ssh,
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=15",
+                self.ssh_target or "",
+                command,
+            ]
 
         try:
-            proc = subprocess.run(argv, input=stdin.encode() if stdin is not None else None,
-                                  capture_output=True, timeout=self.timeout)
+            proc = subprocess.run(
+                argv,
+                input=stdin.encode() if stdin is not None else None,
+                capture_output=True,
+                timeout=self.timeout,
+            )
         except subprocess.TimeoutExpired as exc:
             raise CheckFailed(f"host command timed out after {self.timeout}s: {command}") from exc
         stdout = proc.stdout.decode("utf-8", errors="replace").replace("\r\n", "\n")
         stderr = proc.stderr.decode("utf-8", errors="replace").replace("\r\n", "\n")
         if proc.returncode != 0:
             err = (stderr or stdout).strip().splitlines()
-            raise CheckFailed(f"host command failed ({proc.returncode}): {err[-1] if err else command}")
+            raise CheckFailed(
+                f"host command failed ({proc.returncode}): {err[-1] if err else command}"
+            )
         return stdout.strip()
 
     @property
@@ -258,13 +276,13 @@ class HostRunner:
                 "  else "
                 "    found=; "
                 "    for u in $(ls -1 /var/lib/systemd/linger 2>/dev/null); do "
-                "      uid=$(id -u \"$u\" 2>/dev/null) || continue; "
-                "      if sudo -n -u \"$u\" XDG_RUNTIME_DIR=/run/user/$uid podman ps "
+                '      uid=$(id -u "$u" 2>/dev/null) || continue; '
+                '      if sudo -n -u "$u" XDG_RUNTIME_DIR=/run/user/$uid podman ps '
                 "           --format '{{.Names}}' 2>/dev/null | grep -q .; then "
-                "        found=\"sudo -n -u $u XDG_RUNTIME_DIR=/run/user/$uid podman\"; break; "
+                '        found="sudo -n -u $u XDG_RUNTIME_DIR=/run/user/$uid podman"; break; '
                 "      fi; "
                 "    done; "
-                "    echo \"${found:-podman}\"; "
+                '    echo "${found:-podman}"; '
                 "  fi; "
                 "else echo NONE; fi"
             )
@@ -317,8 +335,13 @@ class HostRunner:
         return out.split()[0] if out.split() else None
 
 
-def _https_get(host: str, path: str = "/", family: int = 0, timeout: int = 20,
-               headers: dict[str, str] | None = None) -> tuple[int, dict[str, str]]:
+def _https_get(
+    host: str,
+    path: str = "/",
+    family: int = 0,
+    timeout: int = 20,
+    headers: dict[str, str] | None = None,
+) -> tuple[int, dict[str, str]]:
     """Issue one HTTPS GET and return the status and response headers.
 
     Pins the address family and never follows redirects.
@@ -378,8 +401,7 @@ def _connect(host: str, port: int, family: int, timeout: int) -> socket.socket:
             return sock
         except OSError as exc:
             last = exc
-    raise OSError(getattr(last, "errno", None),
-                  f"{host}:{port} unreachable: {last}") from last
+    raise OSError(getattr(last, "errno", None), f"{host}:{port} unreachable: {last}") from last
 
 
 def _peer_certificate(host: str, family: int = 0, timeout: int = 20) -> dict:
@@ -405,10 +427,10 @@ def _peer_certificate(host: str, family: int = 0, timeout: int = 20) -> dict:
         cert = tls.getpeercert()
         der = tls.getpeercert(binary_form=True) or b""
     not_after = dt.datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z").replace(
-        tzinfo=dt.timezone.utc)
+        tzinfo=dt.timezone.utc
+    )
     sans = tuple(v for k, v in cert.get("subjectAltName", ()) if k == "DNS")
-    return {"not_after": not_after, "sans": sans,
-            "fingerprint": hashlib.sha256(der).hexdigest()}
+    return {"not_after": not_after, "sans": sans, "fingerprint": hashlib.sha256(der).hexdigest()}
 
 
 def _san_covers(host: str, sans: Sequence[str]) -> bool:
@@ -572,15 +594,17 @@ def check_certificate_shared(ctx: Context) -> str:
     if ctx.runner.available:
         try:
             managed = ctx.runner.run(
-                f'{ctx.runner.container_cli} inspect acme '
+                f"{ctx.runner.container_cli} inspect acme "
                 '--format "{{range .Config.Env}}{{println .}}{{end}}" '
-                '| grep "^ACME_HOSTS=" | cut -d= -f2-')
+                '| grep "^ACME_HOSTS=" | cut -d= -f2-'
+            )
         except (Skip, CheckFailed):
             managed = ""
         if not managed.strip():
             raise Skip(
                 "this host issues no certificates of its own (ACME_HOSTS is empty, so the acme "
-                "container idles) - a single shared leaf is not claimed here")
+                "container idles) - a single shared leaf is not claimed here"
+            )
     prints: dict[str, list[str]] = {}
     for role, host in sorted(ctx.hosts.items()):
         try:
@@ -656,11 +680,14 @@ def check_ipv6_reachable(ctx: Context) -> str:
             seen.append(f"{host}={status}")
         except OSError as exc:
             if getattr(exc, "errno", None) in (
-                    getattr(__import__("errno"), "ENETUNREACH", -1),
-                    getattr(__import__("errno"), "EAFNOSUPPORT", -2)):
-                raise Skip(f"no usable IPv6 route from this machine "
-                           f"({exc.strerror or exc}) - this says nothing about the "
-                           f"deployment") from exc
+                getattr(__import__("errno"), "ENETUNREACH", -1),
+                getattr(__import__("errno"), "EAFNOSUPPORT", -2),
+            ):
+                raise Skip(
+                    f"no usable IPv6 route from this machine "
+                    f"({exc.strerror or exc}) - this says nothing about the "
+                    f"deployment"
+                ) from exc
             unreachable.append(f"{host}: {exc}")
 
     problems = []
@@ -732,18 +759,21 @@ def check_client_address_visible(ctx: Context) -> str:
         raise CheckFailed(f"could not issue the marked probe to {frontend}: {exc}") from exc
 
     logs = ctx.runner.run(
-        f"{ctx.runner.container_log_cmd('edge', ctx.log_window)} | grep -F {marker} | head -5")
+        f"{ctx.runner.container_log_cmd('edge', ctx.log_window)} | grep -F {marker} | head -5"
+    )
     if not logs.strip():
         raise CheckFailed(
             f"the edge logged no line carrying our probe marker within {ctx.log_window}m - "
-            "either the request did not reach this edge, or the access log format dropped it")
+            "either the request did not reach this edge, or the access log format dropped it"
+        )
 
     first_field = logs.splitlines()[0].split()[0]
     if _is_private(first_field):
         raise CheckFailed(
             f"the edge logged our request from {first_field}, a private/bridge address - a "
             "userland forwarder is rewriting the source, so the per-IP limiter and every "
-            "$remote_addr allow-list are keyed on one bucket (see PODMAN_MIGRATION_PLAN.md §3.1)")
+            "$remote_addr allow-list are keyed on one bucket (see PODMAN_MIGRATION_PLAN.md §3.1)"
+        )
 
     ssh_addr = ctx.runner.ssh_client_address()
     matched = ""
@@ -753,7 +783,8 @@ def check_client_address_visible(ctx: Context) -> str:
         if ssh_parsed != logged:
             raise CheckFailed(
                 f"the edge logged {first_field} but this machine reaches the host from "
-                f"{ssh_addr} - the address is being rewritten in flight")
+                f"{ssh_addr} - the address is being rewritten in flight"
+            )
         matched = ", and it matches our SSH source"
 
     raw_lines = ctx.runner.run(f"{ctx.runner.container_log_cmd('edge', 60)} | head -20000")
@@ -770,7 +801,8 @@ def check_client_address_visible(ctx: Context) -> str:
         raise CheckFailed(
             f"the edge saw {count} distinct client address in the last hour - an edge behind a "
             "userland forwarder sees exactly one, and the per-IP limiter then applies to "
-            "everybody at once")
+            "everybody at once"
+        )
     return f"edge logged our probe from {first_field}{matched}; {count} distinct clients in 60m"
 
 
@@ -801,19 +833,22 @@ def check_redis_requires_auth(ctx: Context) -> str:
     if reply in ("UNREACHABLE", "NO_REPLY", ""):
         raise CheckFailed(
             f"could not complete an unauthenticated probe against redis ({reply or 'no output'}). "
-            "That is not a pass: it says nothing about whether Redis requires authentication.")
+            "That is not a pass: it says nothing about whether Redis requires authentication."
+        )
     if reply.upper().startswith("+PONG"):
         raise CheckFailed(
             "Redis answered +PONG to an UNAUTHENTICATED ping. The session store -- OAuth2 refresh "
             "tokens included -- is readable and writable by anything that can reach it on the "
             "internal network. The cause is almost certainly a users.acl with no `user default` "
             "line, which makes Redis reset default to nopass at load: check with "
-            "`grep -c '^user default ' /var/lib/basetool/redis/users.acl`, which must answer 1.")
+            "`grep -c '^user default ' /var/lib/basetool/redis/users.acl`, which must answer 1."
+        )
     if "NOAUTH" not in reply.upper():
         raise CheckFailed(
             f"Redis answered {reply!r} to an unauthenticated ping - expected -NOAUTH. That is "
             "neither the healthy answer nor the known failure, so it is worth reading before "
-            "assuming either.")
+            "assuming either."
+        )
     return "an unauthenticated ping is refused with -NOAUTH"
 
 
@@ -831,7 +866,8 @@ def check_containers_running(ctx: Context) -> str:
         CheckFailed: when a container is missing, exited, restarting or unhealthy.
     """
     out = ctx.runner.run(
-        f'{ctx.runner.container_cli} ps -a --format "{{{{.Names}}}}|{{{{.Status}}}}"')
+        f'{ctx.runner.container_cli} ps -a --format "{{{{.Names}}}}|{{{{.Status}}}}"'
+    )
     status_by_name = {}
     for line in out.splitlines():
         if "|" in line:
@@ -873,9 +909,9 @@ def _promql(ctx: Context, query: str) -> dict:
     encoded = urllib.parse.quote(query, safe="")
     inner = (
         f"p=$(cat {secret}); "
-        "a=$(printf grafana:%s \"$p\" | base64 -w0); "
-        "wget -q -O- --header=\"Authorization: Basic $a\" "
-        f"\"http://127.0.0.1:9090/api/v1/query?query={encoded}\""
+        'a=$(printf grafana:%s "$p" | base64 -w0); '
+        'wget -q -O- --header="Authorization: Basic $a" '
+        f'"http://127.0.0.1:9090/api/v1/query?query={encoded}"'
     )
     cmd = f"{ctx.runner.container_cli} exec prometheus sh -c '{inner}'"
     try:
@@ -936,7 +972,8 @@ def check_containers_unprivileged(ctx: Context) -> str:
     for name, expected in sorted(UNPRIVILEGED_CONTAINERS.items()):
         cmd = (
             f"pid=$({ctx.runner.container_cli} inspect --format '{{{{.State.Pid}}}}' "
-            + name + " 2>/dev/null); "
+            + name
+            + " 2>/dev/null); "
             'if [ -z "$pid" ] || [ "$pid" = 0 ]; then echo ABSENT; exit 0; fi; '
             "grep ^Uid: /proc/$pid/status; "
             "sed 's/^/MAP /' /proc/$pid/uid_map"
@@ -951,19 +988,23 @@ def check_containers_unprivileged(ctx: Context) -> str:
             fields = line.split()
             if fields[:1] == ["Uid:"] and len(fields) >= 2 and fields[1].isdigit():
                 host_uid = int(fields[1])
-            elif fields[:1] == ["MAP"] and len(fields) == 4 and all(f.isdigit() for f in fields[1:]):
+            elif (
+                fields[:1] == ["MAP"] and len(fields) == 4 and all(f.isdigit() for f in fields[1:])
+            ):
                 uid_map.append(tuple(int(f) for f in fields[1:]))
         if host_uid is None or not uid_map:
             problems.append(
                 f"{name}: could not read the uid of pid 1 ({out!r}). That is not a pass -- it "
-                "says nothing about whether the process dropped its privileges")
+                "says nothing about whether the process dropped its privileges"
+            )
             continue
 
         inside = _translate_uid(host_uid, uid_map)
         if inside is None:
             problems.append(
                 f"{name}: host uid {host_uid} is outside the container's own uid_map {uid_map}, "
-                "which should be impossible for its own pid 1")
+                "which should be impossible for its own pid 1"
+            )
         elif inside != expected:
             extra = " -- it is running as ROOT inside the container" if inside == 0 else ""
             problems.append(f"{name} runs as container uid {inside}, expected {expected}{extra}")
@@ -989,9 +1030,8 @@ def check_containers_read_only(ctx: Context) -> str:
         CheckFailed: when a container is not read-only, or when one cannot be read at all.
     """
     out = ctx.runner.run(
-        f'{ctx.runner.container_cli} inspect '
-        '--format "{{.Name}}|{{.HostConfig.ReadonlyRootfs}}" '
-        + " ".join(EXPECTED_APP_CONTAINERS)
+        f"{ctx.runner.container_cli} inspect "
+        '--format "{{.Name}}|{{.HostConfig.ReadonlyRootfs}}" ' + " ".join(EXPECTED_APP_CONTAINERS)
     )
     state: dict[str, str] = {}
     for line in out.splitlines():
@@ -1046,7 +1086,8 @@ def check_container_metrics(ctx: Context) -> str:
     if missing:
         raise CheckFailed(
             f"{len(missing)} of {len(REQUIRED_CONTAINER_SERIES)} required container series carry "
-            f"no samples: {', '.join(missing)} - every alert reading them is silently disarmed")
+            f"no samples: {', '.join(missing)} - every alert reading them is silently disarmed"
+        )
     return f"all {len(REQUIRED_CONTAINER_SERIES)} required container series populated"
 
 
@@ -1068,12 +1109,14 @@ def check_log_streams(ctx: Context) -> str:
     if not results:
         raise CheckFailed(
             "loki_distributor_lines_received_total has no samples - either Loki is not being "
-            "scraped or it has stopped receiving altogether")
+            "scraped or it has stopped receiving altogether"
+        )
     rate = float(results[0]["value"][1])
     if rate <= 0:
         raise CheckFailed(
             f"Loki ingested {rate} lines/s over the last 5m - the log pipeline has stopped, and "
-            "nothing downstream will say so")
+            "nothing downstream will say so"
+        )
     return f"Loki ingesting {rate:.2f} lines/s"
 
 
@@ -1094,20 +1137,29 @@ def check_trace_pipeline(ctx: Context) -> str:
         CheckFailed: when tracing is on and no span has reached the receiver.
     """
     raw = ctx.runner.run(
-        "grep -E '^MONITORING_TRACING_ENABLED=' /etc/basetool/basetool.env 2>/dev/null || true")
+        "grep -E '^MONITORING_TRACING_ENABLED=' /etc/basetool/basetool.env 2>/dev/null || true"
+    )
     if not raw.strip():
         if not ctx.runner.run("test -e /etc/basetool/basetool.env && echo yes || true").strip():
-            raise Skip("no /etc/basetool/basetool.env on this host yet -- it arrives with the restore, so "
-                       "before that there is nothing to read and nothing to conclude")
+            raise Skip(
+                "no /etc/basetool/basetool.env on this host yet -- it arrives with the restore, so "
+                "before that there is nothing to read and nothing to conclude"
+            )
         if not ctx.runner.run("test -r /etc/basetool/basetool.env && echo yes || true").strip():
-            raise Skip("/etc/basetool/basetool.env is not readable by this SSH account (0640 "
-                       "deploy:deploy) -- rerun with an account that can read it")
-        raise Skip("the .env does not set MONITORING_TRACING_ENABLED; it defaults to false "
-                   "(REQ-OBS, tracing is inert by default) so there are no spans to expect")
+            raise Skip(
+                "/etc/basetool/basetool.env is not readable by this SSH account (0640 "
+                "deploy:deploy) -- rerun with an account that can read it"
+            )
+        raise Skip(
+            "the .env does not set MONITORING_TRACING_ENABLED; it defaults to false "
+            "(REQ-OBS, tracing is inert by default) so there are no spans to expect"
+        )
     value = raw.split("=", 1)[1].strip().strip('"').strip("'").lower()
     if value != "true":
-        raise Skip(f"MONITORING_TRACING_ENABLED={value} on this host -- the apps emit no spans, "
-                   "so the pipeline has nothing to carry")
+        raise Skip(
+            f"MONITORING_TRACING_ENABLED={value} on this host -- the apps emit no spans, "
+            "so the pipeline has nothing to carry"
+        )
 
     payload = _promql(ctx, "sum(otelcol_receiver_accepted_spans_total)")
     results = payload.get("data", {}).get("result", [])
@@ -1117,12 +1169,14 @@ def check_trace_pipeline(ctx: Context) -> str:
             "no span has ever reached Alloy's OTLP receiver. The usual cause on a Podman host is "
             "that the app containers cannot resolve `alloy`: it is a HOST service there, so the "
             "name needs AddHost=alloy:host-gateway (generate-quadlet.py's PODMAN_HOST_ALIASES). "
-            "The spans are dropped in each app's own exporter, which logs nothing")
+            "The spans are dropped in each app's own exporter, which logs nothing"
+        )
     spans = float(results[0]["value"][1])
     if spans <= 0:
         raise CheckFailed(
             "Alloy's OTLP receiver has accepted 0 spans while tracing is ON - the apps are "
-            "emitting nowhere and no alert covers this path")
+            "emitting nowhere and no alert covers this path"
+        )
     return f"Alloy has accepted {spans:.0f} spans"
 
 
@@ -1148,8 +1202,9 @@ def check_rate_limit_active(ctx: Context) -> str:
 
     def one(_i: int) -> int:
         try:
-            status, _ = _https_get(host, "/healthz", timeout=10,
-                                   headers={PROBE_HEADER: "rate-limit-probe"})
+            status, _ = _https_get(
+                host, "/healthz", timeout=10, headers={PROBE_HEADER: "rate-limit-probe"}
+            )
             return status
         except OSError:
             return 0
@@ -1160,7 +1215,8 @@ def check_rate_limit_active(ctx: Context) -> str:
     if refused == 0:
         raise CheckFailed(
             f"400 requests drew no 429 (statuses seen: {sorted(set(statuses))}) - the per-IP "
-            "limiter is not in the request path, or its bucket is not keyed on this client")
+            "limiter is not in the request path, or its bucket is not keyed on this client"
+        )
     return f"{refused}/400 refused with 429"
 
 
@@ -1216,14 +1272,17 @@ def check_env_reaches_the_units(ctx: Context) -> str:
     """
     wanted = "|".join(sorted(BAKED_INTO_UNITS))
     env_raw = ctx.runner.run(
-        f"grep -E '^({wanted})=' /etc/basetool/basetool.env 2>/dev/null || true")
+        f"grep -E '^({wanted})=' /etc/basetool/basetool.env 2>/dev/null || true"
+    )
     if not env_raw.strip():
         if not ctx.runner.run("test -f /etc/basetool/basetool.env && echo yes || true").strip():
             raise Skip("no /etc/basetool/basetool.env on this host")
         if not ctx.runner.run("test -r /etc/basetool/basetool.env && echo yes || true").strip():
-            raise Skip("/etc/basetool/basetool.env is not readable by this SSH account (it is 0640 "
-                       "deploy:deploy) -- rerun with an account that can read it, or this check "
-                       "says nothing")
+            raise Skip(
+                "/etc/basetool/basetool.env is not readable by this SSH account (it is 0640 "
+                "deploy:deploy) -- rerun with an account that can read it, or this check "
+                "says nothing"
+            )
         raise Skip("the .env on this host sets none of the variables the units bake in")
 
     env = {}
@@ -1286,15 +1345,13 @@ def check_edge_not_directly_reachable(ctx: Context) -> str:
         f"{ctx.runner.container_cli} inspect edge "
         "--format '{{json .NetworkSettings.Ports}}' 2>/dev/null || echo ''"
     ).strip()
-    if not published or '127.0.0.1' not in published:
+    if not published or "127.0.0.1" not in published:
         raise Skip(
             "the edge does not publish on loopback, so there is no front end in front of it "
             "(ADR-0187 not in effect on this host)"
         )
 
-    addrs = ctx.runner.run(
-        "ip -o addr show scope global | awk '{print $4}' | cut -d/ -f1"
-    ).split()
+    addrs = ctx.runner.run("ip -o addr show scope global | awk '{print $4}' | cut -d/ -f1").split()
     if not addrs:
         raise Skip("the host reports no global address to probe from")
 
@@ -1302,10 +1359,15 @@ def check_edge_not_directly_reachable(ctx: Context) -> str:
     for addr in addrs:
         target = f"[{addr}]" if ":" in addr else addr
         for port in ("8080", "8443"):
-            code = ctx.runner.run(
-                f"curl -s -o /dev/null --connect-timeout 4 --max-time 6 "
-                f"http://{target}:{port}/ >/dev/null 2>&1; echo $?"
-            ).strip().splitlines()[-1].strip()
+            code = (
+                ctx.runner.run(
+                    f"curl -s -o /dev/null --connect-timeout 4 --max-time 6 "
+                    f"http://{target}:{port}/ >/dev/null 2>&1; echo $?"
+                )
+                .strip()
+                .splitlines()[-1]
+                .strip()
+            )
             if code not in ("7", "28"):
                 reachable.append(f"{target}:{port} -> connected (curl exit {code})")
 
@@ -1325,7 +1387,8 @@ HOST_EXPORTERS = {
 }
 
 COMPOSE_MONITORING = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docker-compose.monitoring.yml")
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docker-compose.monitoring.yml"
+)
 
 
 def _compose_pinned_version(service: str, path: str = COMPOSE_MONITORING) -> str | None:
@@ -1382,19 +1445,22 @@ def check_host_exporter_versions(ctx: Context) -> str:
             problems.append(f"{service}: no image pin found in docker-compose.monitoring.yml")
             continue
         line = ctx.runner.run(
-            f"curl -s --max-time 5 {url} 2>/dev/null | grep '^{metric}' | head -n 1 || true")
+            f"curl -s --max-time 5 {url} 2>/dev/null | grep '^{metric}' | head -n 1 || true"
+        )
         match = re.search(r'[{,]version="v?([^"]+)"', line)
         if not match:
             problems.append(
                 f"{service}: {metric} not readable from {url} -- the component is down or not "
-                "exporting its build info, so its version says nothing")
+                "exporting its build info, so its version says nothing"
+            )
             continue
         running = match.group(1)
         if running != pinned:
             problems.append(
                 f"{service} runs {running}, the compose pin is {pinned} -- update the host package "
                 "(a tested maintenance) or the pin, so the configuration the release ships matches "
-                "the process that reads it")
+                "the process that reads it"
+            )
         else:
             good.append(f"{service}={running}")
     if problems:
@@ -1423,7 +1489,8 @@ def check_security_updates_enabled(ctx: Context) -> str:
     active = ctx.runner.run("systemctl is-active dnf-automatic.timer 2>/dev/null || true").strip()
     conf = ctx.runner.run(
         "grep -E '^[[:space:]]*(upgrade_type|apply_updates|exclude)[[:space:]]*=' "
-        "/etc/dnf/automatic.conf 2>/dev/null || true")
+        "/etc/dnf/automatic.conf 2>/dev/null || true"
+    )
     settings: dict[str, str] = {}
     for line in conf.splitlines():
         if "=" in line:
@@ -1434,20 +1501,24 @@ def check_security_updates_enabled(ctx: Context) -> str:
     if enabled != "enabled" or active != "active":
         problems.append(
             f"dnf-automatic.timer is {enabled or 'absent'}/{active or 'unknown'}, expected "
-            "enabled/active -- the host receives no security updates")
+            "enabled/active -- the host receives no security updates"
+        )
     if settings.get("upgrade_type") != "security":
         problems.append(
             f"upgrade_type is {settings.get('upgrade_type') or 'unset'}, expected security -- "
-            "unattended feature updates are not what REQ-OPS-032 allows")
+            "unattended feature updates are not what REQ-OPS-032 allows"
+        )
     if settings.get("apply_updates") not in ("yes", "true", "1"):
         problems.append(
             f"apply_updates is {settings.get('apply_updates') or 'unset'} -- updates would be "
-            "downloaded and never installed")
+            "downloaded and never installed"
+        )
     excluded = settings.get("exclude", "").split()
     if "podman" not in excluded:
         problems.append(
             "the container runtime is not excluded -- podman and its companions must move on a "
-            "tested maintenance, not unattended")
+            "tested maintenance, not unattended"
+        )
     if problems:
         raise CheckFailed("; ".join(problems))
     return f"dnf-automatic.timer {enabled}/{active}, security-only, runtime excluded"
@@ -1472,7 +1543,8 @@ def check_ssh_root_login_refused(ctx: Context) -> str:
     """
     out = ctx.runner.run(
         "c='/usr/sbin/sshd -T -C user=root,host=conformance,addr=192.0.2.1'; "
-        "if [ \"$(id -u)\" -eq 0 ]; then $c; else sudo -n $c; fi")
+        'if [ "$(id -u)" -eq 0 ]; then $c; else sudo -n $c; fi'
+    )
     settings: dict[str, str] = {}
     for line in out.splitlines():
         key, _, value = line.partition(" ")
@@ -1480,15 +1552,16 @@ def check_ssh_root_login_refused(ctx: Context) -> str:
 
     problems = []
     if settings.get("permitrootlogin") != "no":
-        problems.append(f"permitrootlogin is {settings.get('permitrootlogin') or 'unset'}, expected no")
+        problems.append(
+            f"permitrootlogin is {settings.get('permitrootlogin') or 'unset'}, expected no"
+        )
     if settings.get("passwordauthentication") != "no":
         problems.append("passwordauthentication is not no")
     if not settings.get("allowusers"):
         problems.append("no AllowUsers -- every account with a shell and a key may log in")
     if problems:
         raise CheckFailed("; ".join(problems))
-    return (f"permitrootlogin no, allowusers {settings['allowusers']}, "
-            "passwordauthentication no")
+    return f"permitrootlogin no, allowusers {settings['allowusers']}, passwordauthentication no"
 
 
 NETWORK_SYSCTLS = {
@@ -1528,9 +1601,11 @@ def check_network_sysctls(ctx: Context) -> str:
         "for i in $(ls /sys/class/net | grep -E '^(eth|en)[0-9a-z]+$'); do echo \"IFACE $i\"; done; "
         f"sysctl {' '.join(NETWORK_SYSCTLS)} 2>&1; "
         "for i in $(ls /sys/class/net | grep -E '^(eth|en)[0-9a-z]+$'); do "
-        "sysctl " + " ".join(k.replace("{iface}", "$i") for k in NETWORK_INTERFACE_SYSCTLS)
+        "sysctl "
+        + " ".join(k.replace("{iface}", "$i") for k in NETWORK_INTERFACE_SYSCTLS)
         + " 2>&1; done",
-        privileged=False)
+        privileged=False,
+    )
     wanted = dict(NETWORK_SYSCTLS)
     seen: dict[str, str] = {}
     for line in out.splitlines():
@@ -1542,8 +1617,11 @@ def check_network_sysctls(ctx: Context) -> str:
             key, _, value = line.partition(" = ")
             seen[key.strip()] = value.strip()
 
-    problems = [f"{key} is {seen.get(key, 'unreadable')}, expected {value}"
-                for key, value in wanted.items() if seen.get(key) != value]
+    problems = [
+        f"{key} is {seen.get(key, 'unreadable')}, expected {value}"
+        for key, value in wanted.items()
+        if seen.get(key) != value
+    ]
     if problems:
         raise CheckFailed("; ".join(problems))
     return f"all {len(wanted)} redirect and source-filter values as required"
@@ -1563,22 +1641,19 @@ CHECKS: tuple[Check, ...] = (
     Check("log-streams", "REQ-OBS-005", True, check_log_streams),
     Check("trace-pipeline", "REQ-OBS-009 / REQ-OBS-019", True, check_trace_pipeline),
     Check("rate-limit-active", "REQ-SEC-023", False, check_rate_limit_active),
-    Check("edge-not-directly-reachable", "ADR-0187 / REQ-SEC-023", True,
-          check_edge_not_directly_reachable),
-    Check("containers-unprivileged", "REQ-OPS-014 / ADR-0189", True,
-          check_containers_unprivileged),
-    Check("env-reaches-the-units", "REQ-OPS-004 / REQ-OPS-022", True,
-          check_env_reaches_the_units),
-    Check("containers-read-only", "REQ-OPS-014 / ADR-0190", True,
-          check_containers_read_only),
-    Check("host-exporter-versions", "REQ-OBS-005 / OPS-SEC-06", True,
-          check_host_exporter_versions),
-    Check("security-updates-enabled", "REQ-OPS-032", True,
-          check_security_updates_enabled),
-    Check("ssh-root-login-refused", "REQ-OPS-052", True,
-          check_ssh_root_login_refused),
-    Check("network-sysctls", "REQ-OPS-053", True,
-          check_network_sysctls),
+    Check(
+        "edge-not-directly-reachable",
+        "ADR-0187 / REQ-SEC-023",
+        True,
+        check_edge_not_directly_reachable,
+    ),
+    Check("containers-unprivileged", "REQ-OPS-014 / ADR-0189", True, check_containers_unprivileged),
+    Check("env-reaches-the-units", "REQ-OPS-004 / REQ-OPS-022", True, check_env_reaches_the_units),
+    Check("containers-read-only", "REQ-OPS-014 / ADR-0190", True, check_containers_read_only),
+    Check("host-exporter-versions", "REQ-OBS-005 / OPS-SEC-06", True, check_host_exporter_versions),
+    Check("security-updates-enabled", "REQ-OPS-032", True, check_security_updates_enabled),
+    Check("ssh-root-login-refused", "REQ-OPS-052", True, check_ssh_root_login_refused),
+    Check("network-sysctls", "REQ-OPS-053", True, check_network_sysctls),
 )
 
 
@@ -1599,8 +1674,14 @@ def run_checks(ctx: Context, selected: Sequence[str] | None) -> list[Result]:
         if selected and check.name not in selected:
             continue
         if check.needs_host and not ctx.runner.available:
-            results.append(Result(check.name, check.requirement, "skip",
-                                  "needs host access (--ssh or --host-stub)"))
+            results.append(
+                Result(
+                    check.name,
+                    check.requirement,
+                    "skip",
+                    "needs host access (--ssh or --host-stub)",
+                )
+            )
             continue
         try:
             detail = check.fn(ctx)
@@ -1610,8 +1691,9 @@ def run_checks(ctx: Context, selected: Sequence[str] | None) -> list[Result]:
         except CheckFailed as exc:
             results.append(Result(check.name, check.requirement, "fail", str(exc)))
         except Exception as exc:  # noqa: BLE001
-            results.append(Result(check.name, check.requirement, "fail",
-                                  f"{type(exc).__name__}: {exc}"))
+            results.append(
+                Result(check.name, check.requirement, "fail", f"{type(exc).__name__}: {exc}")
+            )
     return results
 
 
@@ -1627,27 +1709,55 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog="check-conformance.py",
         description="External conformance suite for the Profit Basetool deployment.",
-        epilog="Every check is read-only except rate-limit-active, which needs --include-load.")
-    p.add_argument("--host", action="append", default=[], metavar="ROLE=NAME",
-                   help="override a vhost, e.g. --host frontend=staging.example. Repeatable.")
-    p.add_argument("--ssh", metavar="USER@HOST",
-                   help="enable the host-side checks over read-only SSH")
-    p.add_argument("--sudo", action="store_true",
-                   help="run each host command as root; asks for the login account's sudo "
-                        "password once and hands it to `sudo -S` on stdin (REQ-OPS-052)")
-    p.add_argument("--sudo-password-stdin", action="store_true",
-                   help="with --sudo, read the password from the first line of stdin instead "
-                        "of prompting")
-    p.add_argument("--host-stub", metavar="CMD",
-                   help="run host commands through this command line instead of ssh, "
-                        "e.g. \"bash tools/stub.sh\". The host command is appended as "
-                        "the last argument. Used by check-conformance.test.sh.")
-    p.add_argument("--include-load", action="store_true",
-                   help="also run the rate-limiter burst - load against the target")
-    p.add_argument("--only", action="append", default=[], metavar="CHECK",
-                   help="run only this check. Repeatable.")
-    p.add_argument("--log-window", type=int, default=10, metavar="MIN",
-                   help="minutes of host log history the probe reads back (default: 10)")
+        epilog="Every check is read-only except rate-limit-active, which needs --include-load.",
+    )
+    p.add_argument(
+        "--host",
+        action="append",
+        default=[],
+        metavar="ROLE=NAME",
+        help="override a vhost, e.g. --host frontend=staging.example. Repeatable.",
+    )
+    p.add_argument(
+        "--ssh", metavar="USER@HOST", help="enable the host-side checks over read-only SSH"
+    )
+    p.add_argument(
+        "--sudo",
+        action="store_true",
+        help="run each host command as root; asks for the login account's sudo "
+        "password once and hands it to `sudo -S` on stdin (REQ-OPS-052)",
+    )
+    p.add_argument(
+        "--sudo-password-stdin",
+        action="store_true",
+        help="with --sudo, read the password from the first line of stdin instead of prompting",
+    )
+    p.add_argument(
+        "--host-stub",
+        metavar="CMD",
+        help="run host commands through this command line instead of ssh, "
+        'e.g. "bash tools/stub.sh". The host command is appended as '
+        "the last argument. Used by check-conformance.test.sh.",
+    )
+    p.add_argument(
+        "--include-load",
+        action="store_true",
+        help="also run the rate-limiter burst - load against the target",
+    )
+    p.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        metavar="CHECK",
+        help="run only this check. Repeatable.",
+    )
+    p.add_argument(
+        "--log-window",
+        type=int,
+        default=10,
+        metavar="MIN",
+        help="minutes of host log history the probe reads back (default: 10)",
+    )
     p.add_argument("--json", action="store_true", help="emit results as JSON")
     p.add_argument("--list", action="store_true", help="list the checks and exit")
     return p.parse_args(argv)
@@ -1724,8 +1834,10 @@ def _report(results: Sequence[Result], as_json: bool) -> None:
     passed = len(results) - failed - skipped
     print()
     if HTTPS_PORT != 443 or HTTP_PORT != 80 or CA_BUNDLE:
-        print(f"NOTE: test seams active - https:{HTTPS_PORT} http:{HTTP_PORT} "
-              f"ca:{CA_BUNDLE or 'system'}. This run did NOT probe production.")
+        print(
+            f"NOTE: test seams active - https:{HTTPS_PORT} http:{HTTP_PORT} "
+            f"ca:{CA_BUNDLE or 'system'}. This run did NOT probe production."
+        )
     print(f"{passed} passed, {failed} failed, {skipped} skipped")
 
 

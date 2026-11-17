@@ -79,6 +79,7 @@ class BackendChecks:
         self.assertEqual("ES256", header["alg"])
         self.assertEqual(self.key.public_jwk(), header["jwk"])
         self.assertEqual("POST", claims["htm"])
-        self.assertEqual("https://ingest.profit-base.online/exchange/v1/me/installation",
-                         claims["htu"])
+        self.assertEqual(
+            "https://ingest.profit-base.online/exchange/v1/me/installation", claims["htu"]
+        )
         self.assertTrue(p256.verify_es256(public_point(header["jwk"]), signing_input, signature))

@@ -9,10 +9,10 @@ PRIMARY="${ACME_HOSTS%% *}"
 DOMAINS=""
 for h in ${ACME_HOSTS}; do DOMAINS="${DOMAINS} -d $h"; done
 while true; do
-  echo "Y" | /lego migrate --path /data ||
-    echo "acme: migrate failed, will retry on the next pass" >&2
+  echo "Y" | /lego migrate --path /data \
+    || echo "acme: migrate failed, will retry on the next pass" >&2
   # shellcheck disable=SC2086
-  /lego run --accept-tos --email "${ACME_EMAIL}" --path /data                --http --http.webroot /webroot --renew-days 30 ${DOMAINS} ||             echo "acme: run/renew failed, will retry on the next pass" >&2
+  /lego run --accept-tos --email "${ACME_EMAIL}" --path /data --http --http.webroot /webroot --renew-days 30 ${DOMAINS} || echo "acme: run/renew failed, will retry on the next pass" >&2
   if [ -f "/data/certificates/${PRIMARY}.crt" ]; then
     publish() {
       cp "$1" "$2.new"
@@ -25,7 +25,7 @@ while true; do
       mkdir -p "/certs/$h"
       chown 0:0 "/certs/$h"
       publish "/data/certificates/${PRIMARY}.crt" "/certs/$h/fullchain.pem" 0644
-      publish "/data/certificates/${PRIMARY}.key" "/certs/$h/privkey.pem"   0600
+      publish "/data/certificates/${PRIMARY}.key" "/certs/$h/privkey.pem" 0600
     done
   fi
   sleep 43200

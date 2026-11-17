@@ -49,7 +49,9 @@ def plan(caches: list[dict], now: datetime) -> tuple[list[dict], list[dict]]:
         if current is None or _ts(home["createdAt"]) > _ts(current["createdAt"]):
             newest[family(home["key"])] = home
     kept_homes = list(newest.values())
-    anchors = [_ts(h["createdAt"]) for h in kept_homes] + [_ts(h["lastAccessedAt"]) for h in kept_homes]
+    anchors = [_ts(h["createdAt"]) for h in kept_homes] + [
+        _ts(h["lastAccessedAt"]) for h in kept_homes
+    ]
 
     def linked(entry: dict) -> bool:
         times = (_ts(entry["createdAt"]), _ts(entry["lastAccessedAt"]))
@@ -71,7 +73,13 @@ def plan(caches: list[dict], now: datetime) -> tuple[list[dict], list[dict]]:
 
 def _entry(i: int, key: str, created: str, accessed: str) -> dict:
     """Build one synthetic cache entry for the self-test."""
-    return {"id": i, "key": key, "sizeInBytes": 1 << 20, "createdAt": created, "lastAccessedAt": accessed}
+    return {
+        "id": i,
+        "key": key,
+        "sizeInBytes": 1 << 20,
+        "createdAt": created,
+        "lastAccessedAt": accessed,
+    }
 
 
 def selftest() -> int:
@@ -85,7 +93,9 @@ def selftest() -> int:
         _entry(3, "gradle-dependencies-v2-old", "2026-10-03T09:59:58Z", "2026-10-03T11:00:01Z"),
         _entry(4, "gradle-dependencies-v2-new", "2026-10-03T11:59:58.5Z", "2026-10-03T11:59:58.5Z"),
         _entry(5, "gradle-wrapper-zips-v2-x", "2026-09-01T00:00:00Z", "2026-10-03T12:00:01Z"),
-        _entry(6, "gradle-dependencies-v2-inflight", "2026-10-03T13:30:00Z", "2026-10-03T13:30:00Z"),
+        _entry(
+            6, "gradle-dependencies-v2-inflight", "2026-10-03T13:30:00Z", "2026-10-03T13:30:00Z"
+        ),
     ]
     keep, delete = plan(caches, _ts("2026-10-03T14:00:00Z"))
     got = sorted(c["id"] for c in delete)

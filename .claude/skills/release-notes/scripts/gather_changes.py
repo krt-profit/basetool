@@ -39,7 +39,15 @@ TYPE_BUCKETS: dict[str, str] = {
     "revert": "REVERT -- check what was rolled back and whether users saw it",
 }
 INTERNAL_TYPES = {
-    "chore", "refactor", "test", "docs", "build", "ci", "style", "deps", "release",
+    "chore",
+    "refactor",
+    "test",
+    "docs",
+    "build",
+    "ci",
+    "style",
+    "deps",
+    "release",
 }
 
 DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -65,8 +73,7 @@ def run_git(repo: str, args: list[str]) -> str:
     return result.stdout
 
 
-VERSION_HEADER_RE = re.compile(
-    r"^## \[v(\d+)\.(\d+)\.(\d+)\].* - (\d{4}-\d{2}-\d{2})\s*$")
+VERSION_HEADER_RE = re.compile(r"^## \[v(\d+)\.(\d+)\.(\d+)\].* - (\d{4}-\d{2}-\d{2})\s*$")
 UNRELEASED_HEADER_RE = re.compile(r"^## .*unreleased", re.IGNORECASE)
 VERSION_REF_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
@@ -92,8 +99,9 @@ def version_ref_key(value: str) -> tuple[int, int, int] | None:
     return tuple(int(part) for part in match.groups()) if match else None  # type: ignore[return-value]
 
 
-def select_changelog(changelog_path: str, since: str, until: str,
-                     exclude_tags: set[str] | None = None) -> str:
+def select_changelog(
+    changelog_path: str, since: str, until: str, exclude_tags: set[str] | None = None
+) -> str:
     """Return ``[Unreleased]`` plus every version section inside the window.
 
     A tag ``since`` keeps strictly newer versions, a date ``since`` keeps sections
@@ -108,10 +116,16 @@ def select_changelog(changelog_path: str, since: str, until: str,
 
     since_ver = version_ref_key(since)
     until_ver = version_ref_key(until) if until and until != "HEAD" else None
-    since_date = since.replace("T", " ")[:10] if (
-        DATE_ONLY_RE.match(since) or DATE_TIME_RE.match(since)) else None
-    until_date = until.replace("T", " ")[:10] if until and (
-        DATE_ONLY_RE.match(until) or DATE_TIME_RE.match(until)) else None
+    since_date = (
+        since.replace("T", " ")[:10]
+        if (DATE_ONLY_RE.match(since) or DATE_TIME_RE.match(since))
+        else None
+    )
+    until_date = (
+        until.replace("T", " ")[:10]
+        if until and (DATE_ONLY_RE.match(until) or DATE_TIME_RE.match(until))
+        else None
+    )
 
     out: list[str] = []
     for header, body in iter_level2_blocks(lines):
@@ -129,9 +143,11 @@ def select_changelog(changelog_path: str, since: str, until: str,
         elif since_date is not None:
             keep = date >= since_date and (until_date is None or date <= until_date)
         elif exclude_tags is not None:
-            keep = (f"v{ver[0]}.{ver[1]}.{ver[2]}" not in exclude_tags
-                    and (until_ver is None or ver <= until_ver)
-                    and (until_date is None or date <= until_date))
+            keep = (
+                f"v{ver[0]}.{ver[1]}.{ver[2]}" not in exclude_tags
+                and (until_ver is None or ver <= until_ver)
+                and (until_date is None or date <= until_date)
+            )
         else:
             keep = False
         if keep:
@@ -145,8 +161,12 @@ def unreleased_fragments(repo: str, rev: str) -> str:
 
     These are entries merged but not yet folded into a release section.
     """
-    exists = subprocess.run(["git", "cat-file", "-e", f"{rev}:changelog.d"],
-                            cwd=repo, capture_output=True).returncode == 0
+    exists = (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{rev}:changelog.d"], cwd=repo, capture_output=True
+        ).returncode
+        == 0
+    )
     listing = run_git(repo, ["ls-tree", "--name-only", f"{rev}:changelog.d"]) if exists else ""
     out: list[str] = []
     for name in sorted(listing.split()):
@@ -183,8 +203,11 @@ def collect_commits(repo: str, since: str, until: str) -> str:
             if until_bound is not None:
                 args.append(f"--until={until_bound}")
             else:
-                print(f"# warning: --until={until!r} ignored "
-                      "(a date/time --since needs a date/time --until)", file=sys.stderr)
+                print(
+                    f"# warning: --until={until!r} ignored "
+                    "(a date/time --since needs a date/time --until)",
+                    file=sys.stderr,
+                )
     else:
         args = base + [f"{since}..{until or 'HEAD'}"]
     return run_git(repo, args).strip()
@@ -277,6 +300,7 @@ def load_state_module():
     """Import the sibling ``release_state`` helper, or return ``None`` if absent."""
     try:
         import release_state  # noqa: PLC0415
+
         return release_state
     except ImportError:
         return None
@@ -292,8 +316,10 @@ def resolve_since(repo: str, arg_since: str | None, state):
     if arg_since is not None:
         return arg_since, False, None
     if state is None:
-        sys.exit("error: no --since given and the release_state.py tracking helper "
-                 "is missing next to this script.")
+        sys.exit(
+            "error: no --since given and the release_state.py tracking helper "
+            "is missing next to this script."
+        )
     covered = (state.read_state(repo) or {}).get("last_covered") or {}
     sha = covered.get("sha")
     if not sha:
@@ -303,13 +329,15 @@ def resolve_since(repo: str, arg_since: str | None, state):
             f"  looked in: {state.state_path(repo)}\n"
             "  -> Ask the user once for a start point (date or tag) and re-run with "
             "--since,\n"
-            f"     then create the pointer after writing the notes:  python {TRACK_CMD} --set\n")
+            f"     then create the pointer after writing the notes:  python {TRACK_CMD} --set\n"
+        )
         sys.exit(2)
     if not state.commit_exists(repo, sha):
         sys.stderr.write(
             f"the tracking pointer ({state.STATE_FILENAME}) points at {sha[:12]}, which is "
             "not in this repository\n  (history rewrite or fresh clone?). Ask the user for "
-            f"a start point, re-run with --since,\n  then re-set the pointer:  python {TRACK_CMD} --set\n")
+            f"a start point, re-run with --since,\n  then re-set the pointer:  python {TRACK_CMD} --set\n"
+        )
         sys.exit(2)
     anchor = covered.get("tag") or sha[:12]
     return sha, True, f"{anchor} (covered through {covered.get('date', '?')})"
@@ -320,13 +348,26 @@ def selftest() -> int:
 
     :return: 0 when every check passed, 1 otherwise.
     """
-    env =dict(os.environ, GIT_AUTHOR_NAME="Selftest", GIT_AUTHOR_EMAIL="selftest@example.invalid",
-               GIT_COMMITTER_NAME="Selftest", GIT_COMMITTER_EMAIL="selftest@example.invalid",
-               GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+    env = dict(
+        os.environ,
+        GIT_AUTHOR_NAME="Selftest",
+        GIT_AUTHOR_EMAIL="selftest@example.invalid",
+        GIT_COMMITTER_NAME="Selftest",
+        GIT_COMMITTER_EMAIL="selftest@example.invalid",
+        GIT_CONFIG_NOSYSTEM="1",
+        GIT_CONFIG_GLOBAL=os.devnull,
+    )
 
     def git(repo: str, *args: str) -> str:
-        return subprocess.run(["git", "-c", "commit.gpgsign=false", *args], cwd=repo, env=env,
-                              capture_output=True, text=True, encoding="utf-8", check=True).stdout
+        return subprocess.run(
+            ["git", "-c", "commit.gpgsign=false", *args],
+            cwd=repo,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        ).stdout
 
     def write(repo: str, path: str, text: str) -> None:
         os.makedirs(os.path.dirname(os.path.join(repo, path)), exist_ok=True)
@@ -361,19 +402,26 @@ def main() -> None:
     """Parse arguments, gather both sources, and print the digest to stdout."""
     if "--selftest" in sys.argv:
         raise SystemExit(selftest())
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--since", default=None,
-                        help="Starting point: a date (YYYY-MM-DD), a date+time "
-                             "(\"YYYY-MM-DD HH:MM\" or YYYY-MM-DDTHH:MM, seconds "
-                             "optional), a git tag, or a commit SHA. If omitted, "
-                             "resume from the local tracking pointer (see "
-                             "track_release_notes.py).")
-    parser.add_argument("--until", default="HEAD",
-                        help="End point: same forms as --since (date / date+time / "
-                             "ref). Default: HEAD / now.")
-    parser.add_argument("--repo", default=os.getcwd(),
-                        help="Repository root. Default: current directory.")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--since",
+        default=None,
+        help="Starting point: a date (YYYY-MM-DD), a date+time "
+        '("YYYY-MM-DD HH:MM" or YYYY-MM-DDTHH:MM, seconds '
+        "optional), a git tag, or a commit SHA. If omitted, "
+        "resume from the local tracking pointer (see "
+        "track_release_notes.py).",
+    )
+    parser.add_argument(
+        "--until",
+        default="HEAD",
+        help="End point: same forms as --since (date / date+time / ref). Default: HEAD / now.",
+    )
+    parser.add_argument(
+        "--repo", default=os.getcwd(), help="Repository root. Default: current directory."
+    )
     args = parser.parse_args()
 
     repo = os.path.abspath(args.repo)
@@ -399,11 +447,15 @@ def main() -> None:
     if subtitle:
         print(f"SUGGESTED SUBTITLE (mandatory 2nd block, use verbatim): {subtitle}")
     elif log:
-        print("SUGGESTED SUBTITLE: no release tag reachable at the window end -- use the "
-              "planned next version, e.g. <p><em>Version vX.Y.Z · Stand DD.MM.YYYY</em></p>")
-    print("OUTPUT FORMAT: CKEditor-ready HTML fragment for the WoltLab forum post -- "
-          "h2/h3/p/ul/li/strong/em/a only, href the only attribute, no wrapper element. "
-          "See SKILL.md 'Ausgabeformat'.")
+        print(
+            "SUGGESTED SUBTITLE: no release tag reachable at the window end -- use the "
+            "planned next version, e.g. <p><em>Version vX.Y.Z · Stand DD.MM.YYYY</em></p>"
+        )
+    print(
+        "OUTPUT FORMAT: CKEditor-ready HTML fragment for the WoltLab forum post -- "
+        "h2/h3/p/ul/li/strong/em/a only, href the only attribute, no wrapper element. "
+        "See SKILL.md 'Ausgabeformat'."
+    )
     if resumed:
         print(f"RESUMED from local pointer {state.STATE_FILENAME}: {anchor_desc}")
     print("=" * 78)

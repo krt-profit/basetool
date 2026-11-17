@@ -67,7 +67,7 @@ def totp(secret: str, at: float | None = None) -> str:
     counter = int((at if at is not None else time.time()) // 30)
     digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
     offset = digest[-1] & 0x0F
-    value = (struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF) % 1_000_000
+    value = (struct.unpack(">I", digest[offset : offset + 4])[0] & 0x7FFFFFFF) % 1_000_000
     return f"{value:06d}"
 
 
@@ -93,9 +93,11 @@ class Browser:
         self.client_id = client_id
         self.redirect_uri = redirect_uri
         self.jar = http.cookiejar.CookieJar(
-            http.cookiejar.DefaultCookiePolicy(secure_protocols=("https", "http")))
+            http.cookiejar.DefaultCookiePolicy(secure_protocols=("https", "http"))
+        )
         self.opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(self.jar), _NoRedirect())
+            urllib.request.HTTPCookieProcessor(self.jar), _NoRedirect()
+        )
         self.page = ""
         self.url = ""
 
@@ -122,9 +124,16 @@ class Browser:
 
     def start(self) -> str:
         """Open the authorization endpoint; returns the login page."""
-        query = urllib.parse.urlencode({
-            "client_id": self.client_id, "response_type": "code", "scope": "openid",
-            "redirect_uri": self.redirect_uri, "state": "probe", "nonce": "probe"})
+        query = urllib.parse.urlencode(
+            {
+                "client_id": self.client_id,
+                "response_type": "code",
+                "scope": "openid",
+                "redirect_uri": self.redirect_uri,
+                "state": "probe",
+                "nonce": "probe",
+            }
+        )
         url = f"{self.base_url}/realms/{self.realm}/protocol/openid-connect/auth?{query}"
         status, page, location = self._fetch(url)
         self.url, self.page = self._follow(status, page, location, url)

@@ -28,31 +28,78 @@ SERVICES=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --out) OUT="$2"; shift 2 ;;
-    --days) DAYS="$2"; shift 2 ;;
-    --prefix) PREFIX="$2"; shift 2 ;;
-    --ca-cn) CA_CN="$2"; shift 2 ;;
-    --leaf-cn-suffix) LEAF_SUFFIX="$2"; shift 2 ;;
-    --service) SERVICES="${SERVICES}${SERVICES:+
-}$2"; shift 2 ;;
-    --force) FORCE=1; shift ;;
-    -h|--help) usage ;;
-    *) echo "mint-internal-tls: unknown argument: $1" >&2; usage ;;
+    --out)
+      OUT="$2"
+      shift 2
+      ;;
+    --days)
+      DAYS="$2"
+      shift 2
+      ;;
+    --prefix)
+      PREFIX="$2"
+      shift 2
+      ;;
+    --ca-cn)
+      CA_CN="$2"
+      shift 2
+      ;;
+    --leaf-cn-suffix)
+      LEAF_SUFFIX="$2"
+      shift 2
+      ;;
+    --service)
+      SERVICES="${SERVICES}${SERVICES:+
+}$2"
+      shift 2
+      ;;
+    --force)
+      FORCE=1
+      shift
+      ;;
+    -h | --help) usage ;;
+    *)
+      echo "mint-internal-tls: unknown argument: $1" >&2
+      usage
+      ;;
   esac
 done
 
-[ -n "$OUT" ] || { echo "mint-internal-tls: --out is required" >&2; exit 2; }
-[ -n "$SERVICES" ] || { echo "mint-internal-tls: at least one --service NAME=SANS is required" >&2; exit 2; }
-[ -n "${TLS_STORE_PASSWORD:-}" ] || { echo "mint-internal-tls: TLS_STORE_PASSWORD must be set in the environment" >&2; exit 2; }
-case "$DAYS" in ''|*[!0-9]*) echo "mint-internal-tls: --days must be a number" >&2; exit 2 ;; esac
-command -v keytool >/dev/null 2>&1 || { echo "mint-internal-tls: keytool not found (run it in the backend image)" >&2; exit 1; }
-[ -d "$OUT" ] || { echo "mint-internal-tls: --out $OUT is not a directory" >&2; exit 1; }
+[ -n "$OUT" ] || {
+  echo "mint-internal-tls: --out is required" >&2
+  exit 2
+}
+[ -n "$SERVICES" ] || {
+  echo "mint-internal-tls: at least one --service NAME=SANS is required" >&2
+  exit 2
+}
+[ -n "${TLS_STORE_PASSWORD:-}" ] || {
+  echo "mint-internal-tls: TLS_STORE_PASSWORD must be set in the environment" >&2
+  exit 2
+}
+case "$DAYS" in '' | *[!0-9]*)
+  echo "mint-internal-tls: --days must be a number" >&2
+  exit 2
+  ;;
+esac
+command -v keytool >/dev/null 2>&1 || {
+  echo "mint-internal-tls: keytool not found (run it in the backend image)" >&2
+  exit 1
+}
+[ -d "$OUT" ] || {
+  echo "mint-internal-tls: --out $OUT is not a directory" >&2
+  exit 1
+}
 
 targets="${PREFIX}ca.crt ${PREFIX}truststore.p12"
 for spec in $SERVICES; do
   name="${spec%%=*}"
   sans="${spec#*=}"
-  case "$name" in ''|*[!a-z0-9-]*) echo "mint-internal-tls: bad service name '$name'" >&2; exit 2 ;; esac
+  case "$name" in '' | *[!a-z0-9-]*)
+    echo "mint-internal-tls: bad service name '$name'" >&2
+    exit 2
+    ;;
+  esac
   if [ -z "$sans" ] || [ "$sans" = "$spec" ]; then
     echo "mint-internal-tls: --service $spec needs =SANS" >&2
     exit 2

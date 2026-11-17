@@ -113,9 +113,13 @@ def vet_commits(commits: list[tuple[str, str, int, list[str]]]) -> list[str]:
         elif author == DEPENDABOT_EMAIL:
             foreign = [p for p in paths if not COMPOSE_PATH.match(p)]
             if foreign:
-                problems.append(f"{sha} (Dependabot) touches more than compose: {', '.join(foreign)}")
+                problems.append(
+                    f"{sha} (Dependabot) touches more than compose: {', '.join(foreign)}"
+                )
         elif author != APP_EMAIL:
-            problems.append(f"{sha} is authored by {email}, neither Dependabot nor basetool-release")
+            problems.append(
+                f"{sha} is authored by {email}, neither Dependabot nor basetool-release"
+            )
     return problems
 
 
@@ -153,7 +157,7 @@ def rewrite(text: str, ref: str, digest: str) -> str:
     for line in text.splitlines(keepends=True):
         match = IMAGE_LINE.match(line.rstrip("\r\n"))
         if match and f"{match['name']}:{match['tag']}" == ref:
-            ending = line[len(line.rstrip("\r\n")):]
+            ending = line[len(line.rstrip("\r\n")) :]
             line = f"{match['lead']}{ref}@{digest}{match['tail']}{ending}"
         lines.append(line)
     return "".join(lines)
@@ -163,7 +167,11 @@ def resolve(ref: str) -> str | None:
     """Return the index digest ``ref`` names in its registry now, or ``None`` when it cannot be read."""
     result = subprocess.run(
         ["docker", "buildx", "imagetools", "inspect", ref, "--format", "{{json .Manifest}}"],
-        capture_output=True, text=True, encoding="utf-8", timeout=120, check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=120,
+        check=False,
     )
     if result.returncode != 0:
         return None
@@ -177,7 +185,9 @@ def resolve(ref: str) -> str | None:
 def refresh_digests(base: str, resolver: Callable[[str], str | None] = resolve) -> int:
     """Move every image the branch bumped to the digest its tag resolves to now."""
     merge_base = git("merge-base", base, "HEAD").strip()
-    files = [p for p in git("diff", "--name-only", merge_base, "HEAD").split() if COMPOSE_PATH.match(p)]
+    files = [
+        p for p in git("diff", "--name-only", merge_base, "HEAD").split() if COMPOSE_PATH.match(p)
+    ]
     for name in files:
         path = REPO / name
         original = path.read_bytes().decode("utf-8")
@@ -185,10 +195,14 @@ def refresh_digests(base: str, resolver: Callable[[str], str | None] = resolve) 
         for ref, pinned in changed_images(git("diff", merge_base, "HEAD", "--", name)).items():
             current = resolver(ref)
             if current is None:
-                print(f"::warning title=dependabot-compose-followup::{ref}: could not resolve the "
-                      f"tag; keeping Dependabot's {pinned[:19]}. Re-resolve it before merging.")
+                print(
+                    f"::warning title=dependabot-compose-followup::{ref}: could not resolve the "
+                    f"tag; keeping Dependabot's {pinned[:19]}. Re-resolve it before merging."
+                )
             elif current != pinned:
-                print(f"{name}: {ref} moved from {pinned[:19]} to {current[:19]} since Dependabot pinned it")
+                print(
+                    f"{name}: {ref} moved from {pinned[:19]} to {current[:19]} since Dependabot pinned it"
+                )
                 text = rewrite(text, ref, current)
             else:
                 print(f"{name}: {ref} still resolves to {pinned[:19]}")
@@ -223,14 +237,18 @@ def sync_constants(java: str, pins: dict[str, set[str]]) -> tuple[str, list[str]
         ref = f"{match['name']}:{match['tag']}"
         digests = pins.get(ref, set())
         if len(digests) > 1:
-            notes.append(f"::warning title=dependabot-compose-followup::{TEST_IMAGES_COMPOSE} pins {ref} "
-                         f"to {len(digests)} digests; leaving the TestImages constant at {match['digest'][:19]}")
+            notes.append(
+                f"::warning title=dependabot-compose-followup::{TEST_IMAGES_COMPOSE} pins {ref} "
+                f"to {len(digests)} digests; leaving the TestImages constant at {match['digest'][:19]}"
+            )
             return match.group(0)
         if len(digests) == 1:
             (digest,) = digests
             if digest != match["digest"]:
-                notes.append(f"{TEST_IMAGES.name}: {ref} moved from {match['digest'][:19]} to {digest[:19]}")
-                return f"\"{ref}@{digest}\""
+                notes.append(
+                    f"{TEST_IMAGES.name}: {ref} moved from {match['digest'][:19]} to {digest[:19]}"
+                )
+                return f'"{ref}@{digest}"'
         return match.group(0)
 
     return JAVA_IMAGE_LITERAL.sub(replace, java), notes
@@ -264,9 +282,11 @@ def sync_keycloak_from(dockerfile: str, pins: dict[str, set[str]]) -> tuple[str,
     refs = {ref: digests for ref, digests in pins.items() if ref.startswith(f"{KEYCLOAK_IMAGE}:")}
     digests = {digest for found in refs.values() for digest in found}
     if len(refs) != 1 or len(digests) != 1:
-        return dockerfile, [f"::warning title=dependabot-compose-followup::{TEST_IMAGES_COMPOSE} pins "
-                            f"{KEYCLOAK_IMAGE} {len(refs)} time(s) to {len(digests)} digest(s); "
-                            f"leaving {SANDBOX_KEYCLOAK_DOCKERFILE}"]
+        return dockerfile, [
+            f"::warning title=dependabot-compose-followup::{TEST_IMAGES_COMPOSE} pins "
+            f"{KEYCLOAK_IMAGE} {len(refs)} time(s) to {len(digests)} digest(s); "
+            f"leaving {SANDBOX_KEYCLOAK_DOCKERFILE}"
+        ]
     (ref,) = refs
     (digest,) = digests
     tag = ref.split(":", 1)[1]
@@ -276,9 +296,11 @@ def sync_keycloak_from(dockerfile: str, pins: dict[str, set[str]]) -> tuple[str,
         body = line.rstrip("\r\n")
         match = KEYCLOAK_FROM_LINE.match(body)
         if match and (match["tag"], match["digest"]) != (tag, digest):
-            notes.append(f"{SANDBOX_KEYCLOAK_DOCKERFILE.name}: {match['tag']}@{match['digest'][:19]} "
-                         f"moved to {tag}@{digest[:19]}")
-            line = f"{match['lead']}{ref}@{digest}{match['tail']}{line[len(body):]}"
+            notes.append(
+                f"{SANDBOX_KEYCLOAK_DOCKERFILE.name}: {match['tag']}@{match['digest'][:19]} "
+                f"moved to {tag}@{digest[:19]}"
+            )
+            line = f"{match['lead']}{ref}@{digest}{match['tail']}{line[len(body) :]}"
         lines.append(line)
     return "".join(lines), notes
 
@@ -305,85 +327,143 @@ def selftest() -> int:
     compose = (
         "services:\n"
         f"  redis:\n    image: redis:8-alpine@{old}\n"
-        f"  exp:\n    image: \"quay.io/x/y:v1.2@{old}\"\n"
+        f'  exp:\n    image: "quay.io/x/y:v1.2@{old}"\n'
         f"  other:\n    image: redis:7-alpine@{old}\n"
     )
     diff = (
         "--- a/docker-compose.yml\n+++ b/docker-compose.yml\n"
         f"-    image: redis:8-alpine@{new}\n+    image: redis:8-alpine@{old}\n"
-        f"+    image: \"quay.io/x/y:v1.2@{old}\"\n+    command: [\"image: nope\"]\n"
+        f'+    image: "quay.io/x/y:v1.2@{old}"\n+    command: ["image: nope"]\n'
     )
     bump = ("abc1234", DEPENDABOT_EMAIL, 1, ["docker-compose.yml", "docker-compose.monitoring.yml"])
     cases: list[tuple[str, bool]] = [
         ("a Dependabot compose bump passes", vet_commits([bump]) == []),
-        ("a follow-up commit by the App passes",
-         vet_commits([bump, ("def5678", APP_EMAIL.upper(), 1, ["quadlet/systemd/redis.container"])]) == []),
+        (
+            "a follow-up commit by the App passes",
+            vet_commits(
+                [bump, ("def5678", APP_EMAIL.upper(), 1, ["quadlet/systemd/redis.container"])]
+            )
+            == [],
+        ),
         ("an empty range is refused", len(vet_commits([])) == 1),
-        ("a Dependabot commit outside compose is refused",
-         len(vet_commits([("abc1234", DEPENDABOT_EMAIL, 1, ["scripts/deploy.sh"])])) == 1),
-        ("a nested compose path is refused",
-         len(vet_commits([("abc1234", DEPENDABOT_EMAIL, 1, ["docker/docker-compose.yml"])])) == 1),
-        ("a human commit is refused", len(vet_commits([bump, ("123abcd", "someone@example.org", 1, [])])) == 1),
+        (
+            "a Dependabot commit outside compose is refused",
+            len(vet_commits([("abc1234", DEPENDABOT_EMAIL, 1, ["scripts/deploy.sh"])])) == 1,
+        ),
+        (
+            "a nested compose path is refused",
+            len(vet_commits([("abc1234", DEPENDABOT_EMAIL, 1, ["docker/docker-compose.yml"])]))
+            == 1,
+        ),
+        (
+            "a human commit is refused",
+            len(vet_commits([bump, ("123abcd", "someone@example.org", 1, [])])) == 1,
+        ),
         ("a merge commit is refused", len(vet_commits([bump, ("fedcba9", APP_EMAIL, 2, [])])) == 1),
-        ("the diff yields both added pins and nothing else",
-         changed_images(diff) == {"redis:8-alpine": old, "quay.io/x/y:v1.2": old}),
-        ("a registry with a port is parsed",
-         changed_images(f"+  image: reg:5000/a/b:1@{old}\n") == {"reg:5000/a/b:1": old}),
-        ("the rewrite moves only the named tag",
-         rewrite(compose, "redis:8-alpine", new)
-         == compose.replace(f"redis:8-alpine@{old}", f"redis:8-alpine@{new}")),
-        ("the rewrite keeps quotes and CRLF",
-         rewrite(f"  image: \"quay.io/x/y:v1.2@{old}\"\r\n", "quay.io/x/y:v1.2", new)
-         == f"  image: \"quay.io/x/y:v1.2@{new}\"\r\n"),
-        ("an unpinned tag is not an image line", IMAGE_LINE.match("  image: redis:8-alpine") is None),
+        (
+            "the diff yields both added pins and nothing else",
+            changed_images(diff) == {"redis:8-alpine": old, "quay.io/x/y:v1.2": old},
+        ),
+        (
+            "a registry with a port is parsed",
+            changed_images(f"+  image: reg:5000/a/b:1@{old}\n") == {"reg:5000/a/b:1": old},
+        ),
+        (
+            "the rewrite moves only the named tag",
+            rewrite(compose, "redis:8-alpine", new)
+            == compose.replace(f"redis:8-alpine@{old}", f"redis:8-alpine@{new}"),
+        ),
+        (
+            "the rewrite keeps quotes and CRLF",
+            rewrite(f'  image: "quay.io/x/y:v1.2@{old}"\r\n', "quay.io/x/y:v1.2", new)
+            == f'  image: "quay.io/x/y:v1.2@{new}"\r\n',
+        ),
+        (
+            "an unpinned tag is not an image line",
+            IMAGE_LINE.match("  image: redis:8-alpine") is None,
+        ),
     ]
     java = (
         "  public static final String REDIS =\n"
-        f"      \"redis:8-alpine@{old}\";\n"
-        f"  public static final String POSTGRES =\n      \"postgres:18-alpine@{old}\";\n"
-        f"  public static final String OTHER = \"nginx:1@{old}\";\n"
+        f'      "redis:8-alpine@{old}";\n'
+        f'  public static final String POSTGRES =\n      "postgres:18-alpine@{old}";\n'
+        f'  public static final String OTHER = "nginx:1@{old}";\n'
     )
-    moved, moved_notes = sync_constants(java, compose_pins(compose.replace(f"8-alpine@{old}", f"8-alpine@{new}")))
+    moved, moved_notes = sync_constants(
+        java, compose_pins(compose.replace(f"8-alpine@{old}", f"8-alpine@{new}"))
+    )
     real_java = (REPO / TEST_IMAGES).read_bytes().decode("utf-8")
     real_refs = {f"{m['name']}:{m['tag']}" for m in JAVA_IMAGE_LITERAL.finditer(real_java)}
     real_pins = compose_pins((REPO / TEST_IMAGES_COMPOSE).read_bytes().decode("utf-8"))
     cases += [
-        ("the compose pins collect every digest per tag",
-         compose_pins(compose + f"    image: redis:8-alpine@{new}\n")["redis:8-alpine"] == {old, new}),
-        ("a moved compose digest moves only that constant",
-         moved == java.replace(f"redis:8-alpine@{old}", f"redis:8-alpine@{new}") and len(moved_notes) == 1),
-        ("an unchanged compose digest leaves the constants alone",
-         sync_constants(java, compose_pins(compose)) == (java, [])),
-        ("an ambiguous compose pin leaves the constant and warns",
-         sync_constants(java, {"redis:8-alpine": {old, new}})[0] == java
-         and "::warning" in sync_constants(java, {"redis:8-alpine": {old, new}})[1][0]),
-        ("the real TestImages still holds the Redis and PostgreSQL literals",
-         {"redis:8-alpine", "postgres:18-alpine"} <= real_refs),
-        ("the real docker-compose.yml pins every TestImages reference once",
-         all(len(real_pins.get(ref, set())) == 1 for ref in real_refs)),
+        (
+            "the compose pins collect every digest per tag",
+            compose_pins(compose + f"    image: redis:8-alpine@{new}\n")["redis:8-alpine"]
+            == {old, new},
+        ),
+        (
+            "a moved compose digest moves only that constant",
+            moved == java.replace(f"redis:8-alpine@{old}", f"redis:8-alpine@{new}")
+            and len(moved_notes) == 1,
+        ),
+        (
+            "an unchanged compose digest leaves the constants alone",
+            sync_constants(java, compose_pins(compose)) == (java, []),
+        ),
+        (
+            "an ambiguous compose pin leaves the constant and warns",
+            sync_constants(java, {"redis:8-alpine": {old, new}})[0] == java
+            and "::warning" in sync_constants(java, {"redis:8-alpine": {old, new}})[1][0],
+        ),
+        (
+            "the real TestImages still holds the Redis and PostgreSQL literals",
+            {"redis:8-alpine", "postgres:18-alpine"} <= real_refs,
+        ),
+        (
+            "the real docker-compose.yml pins every TestImages reference once",
+            all(len(real_pins.get(ref, set())) == 1 for ref in real_refs),
+        ),
     ]
     kc_old = f"{KEYCLOAK_IMAGE}:26.8@{old}"
     kc_new = f"{KEYCLOAK_IMAGE}:26.9@{new}"
     kc_pins = {f"{KEYCLOAK_IMAGE}:26.9": {new}}
-    dockerfile = f"FROM eclipse-temurin:25-jdk-alpine@{old} AS spi\nRUN true\nFROM {kc_old}\nCOPY a b\n"
+    dockerfile = (
+        f"FROM eclipse-temurin:25-jdk-alpine@{old} AS spi\nRUN true\nFROM {kc_old}\nCOPY a b\n"
+    )
     real_dockerfile = (REPO / SANDBOX_KEYCLOAK_DOCKERFILE).read_bytes().decode("utf-8")
     cases += [
-        ("a moved compose pin moves only the Keycloak FROM line",
-         sync_keycloak_from(dockerfile, kc_pins)[0] == dockerfile.replace(kc_old, kc_new)
-         and len(sync_keycloak_from(dockerfile, kc_pins)[1]) == 1),
-        ("the Keycloak FROM line keeps CRLF and a stage name",
-         sync_keycloak_from(f"FROM {kc_old} AS kc\r\n", kc_pins)[0] == f"FROM {kc_new} AS kc\r\n"),
-        ("a matching Keycloak pin is left alone",
-         sync_keycloak_from(dockerfile.replace(kc_old, kc_new), kc_pins) == (dockerfile.replace(kc_old, kc_new), [])),
-        ("a compose file without the Keycloak image leaves the Dockerfile and warns",
-         sync_keycloak_from(dockerfile, {"redis:8-alpine": {old}})[0] == dockerfile
-         and "::warning" in sync_keycloak_from(dockerfile, {"redis:8-alpine": {old}})[1][0]),
-        ("two Keycloak digests leave the Dockerfile and warn",
-         sync_keycloak_from(dockerfile, {f"{KEYCLOAK_IMAGE}:26.9": {old, new}})[0] == dockerfile),
-        ("the real sandbox Dockerfile holds one Keycloak FROM line",
-         sum(1 for line in real_dockerfile.splitlines() if KEYCLOAK_FROM_LINE.match(line)) == 1),
-        ("the real docker-compose.yml pins Keycloak once",
-         len([ref for ref in real_pins if ref.startswith(f"{KEYCLOAK_IMAGE}:")]) == 1),
+        (
+            "a moved compose pin moves only the Keycloak FROM line",
+            sync_keycloak_from(dockerfile, kc_pins)[0] == dockerfile.replace(kc_old, kc_new)
+            and len(sync_keycloak_from(dockerfile, kc_pins)[1]) == 1,
+        ),
+        (
+            "the Keycloak FROM line keeps CRLF and a stage name",
+            sync_keycloak_from(f"FROM {kc_old} AS kc\r\n", kc_pins)[0]
+            == f"FROM {kc_new} AS kc\r\n",
+        ),
+        (
+            "a matching Keycloak pin is left alone",
+            sync_keycloak_from(dockerfile.replace(kc_old, kc_new), kc_pins)
+            == (dockerfile.replace(kc_old, kc_new), []),
+        ),
+        (
+            "a compose file without the Keycloak image leaves the Dockerfile and warns",
+            sync_keycloak_from(dockerfile, {"redis:8-alpine": {old}})[0] == dockerfile
+            and "::warning" in sync_keycloak_from(dockerfile, {"redis:8-alpine": {old}})[1][0],
+        ),
+        (
+            "two Keycloak digests leave the Dockerfile and warn",
+            sync_keycloak_from(dockerfile, {f"{KEYCLOAK_IMAGE}:26.9": {old, new}})[0] == dockerfile,
+        ),
+        (
+            "the real sandbox Dockerfile holds one Keycloak FROM line",
+            sum(1 for line in real_dockerfile.splitlines() if KEYCLOAK_FROM_LINE.match(line)) == 1,
+        ),
+        (
+            "the real docker-compose.yml pins Keycloak once",
+            len([ref for ref in real_pins if ref.startswith(f"{KEYCLOAK_IMAGE}:")]) == 1,
+        ),
     ]
     failures = 0
     for name, passed in cases:
@@ -397,9 +477,15 @@ def main() -> int:
     """Dispatch to the self-test or to one of the four subcommands."""
     if sys.argv[1:] == ["--selftest"]:
         return selftest()
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=["guard", "refresh-digests", "sync-test-images", "sync-sandbox-keycloak"])
-    parser.add_argument("--base", help="The PR's base commit; required by guard and refresh-digests.")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "command", choices=["guard", "refresh-digests", "sync-test-images", "sync-sandbox-keycloak"]
+    )
+    parser.add_argument(
+        "--base", help="The PR's base commit; required by guard and refresh-digests."
+    )
     args = parser.parse_args()
     if args.command == "sync-test-images":
         return sync_test_images()

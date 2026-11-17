@@ -16,11 +16,11 @@ tests_failed=0
 LAST_OUTPUT=""
 
 complete_report() {
-  printf '<?xml version="1.0" encoding="UTF-8"?>\n<mutations partial="false">\n<mutation detected="true"/>\n<mutation detected="false"/>\n</mutations>\n' > "$1"
+  printf '<?xml version="1.0" encoding="UTF-8"?>\n<mutations partial="false">\n<mutation detected="true"/>\n<mutation detected="false"/>\n</mutations>\n' >"$1"
 }
 
 partial_report() {
-  printf '<?xml version="1.0" encoding="UTF-8"?>\n<mutations partial="true">\n<mutation detected="true"/>\n' > "$1"
+  printf '<?xml version="1.0" encoding="UTF-8"?>\n<mutations partial="true">\n<mutation detected="true"/>\n' >"$1"
 }
 
 expect() {
@@ -35,12 +35,12 @@ expect() {
   fi
 }
 
-: > "${WORK}/clean.log"
-printf 'PIT >> SEVERE : PitHelpError: tests are not green\n' > "${WORK}/help.log"
+: >"${WORK}/clean.log"
+printf 'PIT >> SEVERE : PitHelpError: tests are not green\n' >"${WORK}/help.log"
 complete_report "${WORK}/complete.xml"
 partial_report "${WORK}/partial.xml"
-: > "${WORK}/empty.xml"
-printf '<mutations partial="false">\n</mutations>\n' > "${WORK}/none.xml"
+: >"${WORK}/empty.xml"
+printf '<mutations partial="false">\n</mutations>\n' >"${WORK}/none.xml"
 
 expect "a finished run with mutations passes" 0 "2 mutations" success "${WORK}/complete.xml" "${WORK}/clean.log"
 expect "a step cancelled at the job timeout fails even with a plausible report" 1 "ended 'cancelled'" cancelled "${WORK}/partial.xml" "${WORK}/clean.log"
@@ -55,7 +55,7 @@ expect "a report with zero mutations fails" 1 "lists no mutations" success "${WO
 
 tests_run=$((tests_run + 1))
 if grep -q 'check-pit-result.sh' "${SCRIPT_DIR}/../.github/workflows/pitest.yml" \
-   && grep -q 'steps.pit.outcome' "${SCRIPT_DIR}/../.github/workflows/pitest.yml"; then
+  && grep -q 'steps.pit.outcome' "${SCRIPT_DIR}/../.github/workflows/pitest.yml"; then
   echo "  ok    pitest.yml gates on this script and on the PIT step's own outcome"
 else
   tests_failed=$((tests_failed + 1))

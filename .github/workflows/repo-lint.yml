@@ -36,7 +36,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          mapfile -t files < <(git ls-files '*.sh')
+          mapfile -t files < <(git ls-files '*.sh' '.githooks/*')
           if [ ${#files[@]} -eq 0 ]; then
             echo "No shell scripts tracked; nothing to lint."
             exit 0
@@ -166,6 +166,10 @@ jobs:
       - name: cache-janitor / Self-test the Gradle cache selection
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/prune_gradle_caches.py --selftest
+
+      - name: native-tool-updates / Self-test the proposal and the tool table against the repository
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/native_tool_updates.py --selftest
 
       - name: ingest-audience / Self-test the ingest audience checker
         if: ${{ !cancelled() }}
@@ -470,6 +474,10 @@ jobs:
       - name: ci-superseded / Self-test the superseded main-push decision
         if: ${{ !cancelled() }}
         run: bash scripts/ci-superseded.test.sh
+
+      - name: pre-push-hook / Self-test the format gate of every push
+        if: ${{ !cancelled() }}
+        run: bash scripts/pre-push-hook.test.sh
 
   container-checks:
     name: Container checks

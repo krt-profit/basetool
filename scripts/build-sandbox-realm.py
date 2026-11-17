@@ -46,8 +46,11 @@ THROWAWAY = "do-not-use-in-prod"
 GATEWAY_CLIENT = "basetool-ingest-gateway"
 LOAD_MEMBERS = 16
 
-LOCALES = {"internationalizationEnabled": True, "supportedLocales": ["de", "en"],
-           "defaultLocale": "en"}
+LOCALES = {
+    "internationalizationEnabled": True,
+    "supportedLocales": ["de", "en"],
+    "defaultLocale": "en",
+}
 
 PRODUCTION_MARKERS = ("profit-base.online", "krt-profit.de")
 
@@ -105,10 +108,20 @@ SANDBOX = Target(
         {"id": "5a4d0000-0000-4000-8000-000000000001", "username": "sandbox-member"},
         {"id": "5a4d0000-0000-4000-8000-000000000002", "username": "sandbox-member-2"},
         {"id": "5a4d0000-0000-4000-8000-000000000003", "username": "sandbox-admin"},
-        *({"id": f"5a4d0000-0000-4000-8000-0000000002{n:02d}", "username": f"sandbox-load-{n:02d}"} for n in range(1, LOAD_MEMBERS + 1)),
+        *(
+            {
+                "id": f"5a4d0000-0000-4000-8000-0000000002{n:02d}",
+                "username": f"sandbox-load-{n:02d}",
+            }
+            for n in range(1, LOAD_MEMBERS + 1)
+        ),
     ],
-    offline_users=("sandbox-member", "sandbox-member-2", "sandbox-admin",
-                   *(f"sandbox-load-{n:02d}" for n in range(1, LOAD_MEMBERS + 1))),
+    offline_users=(
+        "sandbox-member",
+        "sandbox-member-2",
+        "sandbox-admin",
+        *(f"sandbox-load-{n:02d}" for n in range(1, LOAD_MEMBERS + 1)),
+    ),
     fixed_ids=True,
     password=lambda username: f"{username}-pw-{THROWAWAY}",
 )
@@ -185,13 +198,15 @@ def client_representation(spec, secret: str | None) -> dict:
     :return: the client as Keycloak imports it
     """
     client = {"clientId": spec.client_id, **spec.create_only, **spec.fields}
-    client.update({
-        "attributes": dict(spec.attributes),
-        "redirectUris": list(spec.redirect_uris),
-        "webOrigins": list(spec.web_origins),
-        "defaultClientScopes": list(spec.default_scopes),
-        "optionalClientScopes": list(spec.optional_scopes),
-    })
+    client.update(
+        {
+            "attributes": dict(spec.attributes),
+            "redirectUris": list(spec.redirect_uris),
+            "webOrigins": list(spec.web_origins),
+            "defaultClientScopes": list(spec.default_scopes),
+            "optionalClientScopes": list(spec.optional_scopes),
+        }
+    )
     if spec.mappers:
         client["protocolMappers"] = [mapper_representation(m) for m in spec.mappers]
     if secret is not None:
@@ -214,14 +229,14 @@ def user_representation(target: Target, user: dict) -> dict:
         "enabled": True,
         "emailVerified": True,
         "email": f"{name}@example.invalid",
-        "credentials": [{"type": "password", "value": target.password(name),
-                         "temporary": False}],
+        "credentials": [{"type": "password", "value": target.password(name), "temporary": False}],
         "realmRoles": [f"default-roles-{REALM}"],
     }
 
 
-def service_account_user(target: Target, client_id: str,
-                         client_roles: dict[str, list[str]]) -> dict:
+def service_account_user(
+    target: Target, client_id: str, client_roles: dict[str, list[str]]
+) -> dict:
     """Build the service-account user of a confidential client."""
     user = {
         "id": target.service_account_ids[client_id],
@@ -235,8 +250,9 @@ def service_account_user(target: Target, client_id: str,
     return user
 
 
-def build_realm(provisioner: ModuleType, base: dict, builtin_scopes: list[dict],
-                target: Target) -> dict:
+def build_realm(
+    provisioner: ModuleType, base: dict, builtin_scopes: list[dict], target: Target
+) -> dict:
     """Assemble one target's realm from the base, the built-in scopes and the provisioner.
 
     :param provisioner: the loaded production provisioner module
@@ -290,8 +306,9 @@ def build_realm(provisioner: ModuleType, base: dict, builtin_scopes: list[dict],
         accounts = [user_representation(target, user) for user in target.users]
     backend_roles = spec_by_id(provisioner, "backend-service").service_account_roles or {}
     realm["users"] = accounts + [
-        service_account_user(target, "backend-service",
-                             {k: v for k, v in backend_roles.items() if k != "<realm>"}),
+        service_account_user(
+            target, "backend-service", {k: v for k, v in backend_roles.items() if k != "<realm>"}
+        ),
         service_account_user(target, GATEWAY_CLIENT, {}),
     ]
     return realm
@@ -310,8 +327,9 @@ def inputs() -> tuple[ModuleType, dict, list[dict]]:
     return provisioner, base, builtin
 
 
-def admin_api_problems(clients: dict[str, dict], scopes: dict[str, dict],
-                       realm: dict, scope_name: str) -> list[str]:
+def admin_api_problems(
+    clients: dict[str, dict], scopes: dict[str, dict], realm: dict, scope_name: str
+) -> list[str]:
     """Require the backend's scoped Admin API audience without granting it to other clients.
 
     :param clients: clients indexed by client ID
@@ -322,8 +340,9 @@ def admin_api_problems(clients: dict[str, dict], scopes: dict[str, dict],
     """
     found = []
     backend = clients.get("backend-service", {})
-    if (scope_name not in backend.get("defaultClientScopes", [])
-            or scope_name in backend.get("optionalClientScopes", [])):
+    if scope_name not in backend.get("defaultClientScopes", []) or scope_name in backend.get(
+        "optionalClientScopes", []
+    ):
         found.append(f"backend-service lacks the default {scope_name} scope")
     for client_id, client in clients.items():
         assigned = client.get("defaultClientScopes", []) + client.get("optionalClientScopes", [])
@@ -336,9 +355,11 @@ def admin_api_problems(clients: dict[str, dict], scopes: dict[str, dict],
     if scope.get("attributes", {}).get("include.in.token.scope") != "true":
         found.append(f"{scope_name} is missing from its access token scope claim")
     mappers = scope.get("protocolMappers", [])
-    if not any(mapper.get("protocolMapper") == "oidc-admin-api-audience-mapper"
-               and mapper.get("config", {}).get("access.token.claim") == "true"
-               for mapper in mappers):
+    if not any(
+        mapper.get("protocolMapper") == "oidc-admin-api-audience-mapper"
+        and mapper.get("config", {}).get("access.token.claim") == "true"
+        for mapper in mappers
+    ):
         found.append(f"{scope_name} lacks its Admin API access token audience mapper")
     return found
 
@@ -384,7 +405,9 @@ def problems(realm: dict, provisioner: ModuleType, target: Target) -> list[str]:
             found.append(f"{client_id} tokens must be DPoP-bound")
         if attributes.get("oauth2.device.authorization.grant.enabled") != "true":
             found.append(f"{client_id} must use the device grant")
-        missing = set(provisioner.EXCHANGE_SCOPE_NAMES) - set(client.get("optionalClientScopes", []))
+        missing = set(provisioner.EXCHANGE_SCOPE_NAMES) - set(
+            client.get("optionalClientScopes", [])
+        )
         if missing:
             found.append(f"{client_id} lacks exchange scopes {sorted(missing)}")
     for scope in provisioner.SCOPES:
@@ -393,22 +416,34 @@ def problems(realm: dict, provisioner: ModuleType, target: Target) -> list[str]:
     realm_roles = {r.get("name") for r in realm.get("roles", {}).get("realm", [])}
     for name in provisioner.RETIRED_APPLICATION_ROLES:
         if name in realm_roles:
-            found.append(f"the realm defines the application role {name}, which the Basetool "
-                         f"holds itself")
+            found.append(
+                f"the realm defines the application role {name}, which the Basetool holds itself"
+            )
     frontend = clients.get("basetool-frontend", {})
-    frontend_scopes = frontend.get("defaultClientScopes",
-                                   realm.get("defaultDefaultClientScopes", []))
+    frontend_scopes = frontend.get(
+        "defaultClientScopes", realm.get("defaultDefaultClientScopes", [])
+    )
     if provisioner.ROLES_SCOPE in frontend_scopes + frontend.get("optionalClientScopes", []):
         found.append("basetool-frontend has the roles scope, so the web login carries realm roles")
     offline = provisioner.OFFLINE_ACCESS
-    default_role = next((r for r in realm.get("roles", {}).get("realm", [])
-                         if r.get("name") == f"default-roles-{REALM}"), {})
+    default_role = next(
+        (
+            r
+            for r in realm.get("roles", {}).get("realm", [])
+            if r.get("name") == f"default-roles-{REALM}"
+        ),
+        {},
+    )
     if offline not in default_role.get("composites", {}).get("realm", []):
         found.append(f"default-roles-{REALM} lacks {offline}, so no member gets an offline token")
-    if not any(m.get("clientScope") == offline and offline in m.get("roles", [])
-               for m in realm.get("scopeMappings", [])):
-        found.append(f"the {offline} client scope maps no {offline} role, so a client without "
-                     f"full scope gets no offline token")
+    if not any(
+        m.get("clientScope") == offline and offline in m.get("roles", [])
+        for m in realm.get("scopeMappings", [])
+    ):
+        found.append(
+            f"the {offline} client scope maps no {offline} role, so a client without "
+            f"full scope gets no offline token"
+        )
     for key in ("defaultDefaultClientScopes", "defaultOptionalClientScopes"):
         if offline in realm.get(key, []):
             found.append(f"{key} lists {offline}, so every client inherits it")
@@ -457,8 +492,10 @@ def selftest() -> int:
 
         prefix = f"{target.name}:"
         expect(f"{prefix} the generated realm is sound", not caught(realm))
-        expect(f"{prefix} two builds are byte-identical",
-               render(realm) == render(build_realm(provisioner, base, builtin, target)))
+        expect(
+            f"{prefix} two builds are byte-identical",
+            render(realm) == render(build_realm(provisioner, base, builtin, target)),
+        )
 
         broken = copy.deepcopy(realm)
         backend = next(c for c in broken["clients"] if c["clientId"] == "backend-service")
@@ -499,8 +536,9 @@ def selftest() -> int:
         expect(f"{prefix} a password that is not a throwaway is caught", caught(broken))
 
         broken = copy.deepcopy(realm)
-        broken["clientScopes"] = [s for s in broken["clientScopes"]
-                                  if s["name"] != "exchange.connect"]
+        broken["clientScopes"] = [
+            s for s in broken["clientScopes"] if s["name"] != "exchange.connect"
+        ]
         expect(f"{prefix} a missing exchange scope is caught", caught(broken))
 
         broken = copy.deepcopy(realm)
@@ -514,25 +552,28 @@ def selftest() -> int:
         broken = copy.deepcopy(realm)
         offline = next(u for u in broken["users"] if u["username"] == target.offline_users[0])
         offline["realmRoles"] = []
-        expect(f"{prefix} a device-grant account without the default roles is caught",
-               problems(broken, provisioner, target)
-               == [f"user {offline['username']} lacks the default roles, so no offline token"])
+        expect(
+            f"{prefix} a device-grant account without the default roles is caught",
+            problems(broken, provisioner, target)
+            == [f"user {offline['username']} lacks the default roles, so no offline token"],
+        )
 
         broken = copy.deepcopy(realm)
-        broken["users"] = [u for u in broken["users"]
-                           if u["username"] != target.offline_users[0]]
+        broken["users"] = [u for u in broken["users"] if u["username"] != target.offline_users[0]]
         expect(f"{prefix} a missing device-grant account is caught", caught(broken))
 
         broken = copy.deepcopy(realm)
-        default_role = next(r for r in broken["roles"]["realm"]
-                            if r["name"] == f"default-roles-{REALM}")
+        default_role = next(
+            r for r in broken["roles"]["realm"] if r["name"] == f"default-roles-{REALM}"
+        )
         default_role["composites"]["realm"].remove(provisioner.OFFLINE_ACCESS)
         expect(f"{prefix} a default role without offline_access is caught", caught(broken))
 
         broken = copy.deepcopy(realm)
         broken["scopeMappings"] = []
-        expect(f"{prefix} an offline_access scope without its role mapping is caught",
-               caught(broken))
+        expect(
+            f"{prefix} an offline_access scope without its role mapping is caught", caught(broken)
+        )
 
         broken = copy.deepcopy(realm)
         broken["roles"]["realm"].append({"name": "KRT Member"})
@@ -554,17 +595,22 @@ def selftest() -> int:
 
         broken = copy.deepcopy(realm)
         broken["defaultOptionalClientScopes"].append(provisioner.OFFLINE_ACCESS)
-        expect(f"{prefix} offline_access as a realm default client scope is caught",
-               caught(broken))
+        expect(f"{prefix} offline_access as a realm default client scope is caught", caught(broken))
 
     sandbox = build_realm(provisioner, base, builtin, SANDBOX)
-    expect("sandbox: the E2E accounts are dropped",
-           not any(u["username"].startswith("test-") for u in sandbox["users"]))
+    expect(
+        "sandbox: the E2E accounts are dropped",
+        not any(u["username"].startswith("test-") for u in sandbox["users"]),
+    )
     e2e = build_realm(provisioner, base, builtin, E2E)
     kept = {u["username"]: u for u in e2e["users"]}
-    expect("e2e: every base account is kept with its roles",
-           all(b["username"] in kept and kept[b["username"]]["realmRoles"] == b["realmRoles"]
-               for b in base["users"]))
+    expect(
+        "e2e: every base account is kept with its roles",
+        all(
+            b["username"] in kept and kept[b["username"]]["realmRoles"] == b["realmRoles"]
+            for b in base["users"]
+        ),
+    )
 
     print("selftest: FAILED" if failures else "selftest: passed")
     return 1 if failures else 0
@@ -578,8 +624,11 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(prog="build-sandbox-realm.py")
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--check", action="store_true",
-                      help="fail when a committed realm differs from a fresh build")
+    mode.add_argument(
+        "--check",
+        action="store_true",
+        help="fail when a committed realm differs from a fresh build",
+    )
     mode.add_argument("--selftest", action="store_true", help="prove the realms' invariants")
     args = parser.parse_args(argv)
     if args.selftest:
@@ -598,8 +647,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.check:
             current = target.output.read_text(encoding="utf-8") if target.output.exists() else ""
             if current != text:
-                print(f"FAIL {relative} is stale; run python3 scripts/build-sandbox-realm.py "
-                      f"and commit the result")
+                print(
+                    f"FAIL {relative} is stale; run python3 scripts/build-sandbox-realm.py "
+                    f"and commit the result"
+                )
                 status = 1
             else:
                 print(f"OK: {relative} matches a fresh build")

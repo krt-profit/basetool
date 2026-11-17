@@ -42,8 +42,8 @@ commit_all() {
 run_checker() {
   local repo="$1" base_ref="$2" rc=0
   LAST_OUTPUT="$(
-    cd "$repo" &&
-      ADR_DIR="$ADR_SUBDIR" ADR_BASE_REF="$base_ref" \
+    cd "$repo" \
+      && ADR_DIR="$ADR_SUBDIR" ADR_BASE_REF="$base_ref" \
         bash "$CHECKER" 2>&1
   )" || rc=$?
   return "$rc"
@@ -243,7 +243,7 @@ scenario_renumber_into_occupied() {
   commit_all "$repo" "base also holds 0100"
 
   git -C "$repo" checkout -q -b feature
-  git -C "$repo" mv "${ADR_SUBDIR}/0100-something-old.md"     "${ADR_SUBDIR}/0165-something-old.md"
+  git -C "$repo" mv "${ADR_SUBDIR}/0100-something-old.md" "${ADR_SUBDIR}/0165-something-old.md"
   commit_all "$repo" "docs: renumber 0100 -> 0165"
 
   run_checker "$repo" "main" || rc=$?
@@ -263,7 +263,7 @@ scenario_renumber_into_free() {
   commit_all "$repo" "base also holds 0100"
 
   git -C "$repo" checkout -q -b feature
-  git -C "$repo" mv "${ADR_SUBDIR}/0100-something-old.md"     "${ADR_SUBDIR}/0170-something-old.md"
+  git -C "$repo" mv "${ADR_SUBDIR}/0100-something-old.md" "${ADR_SUBDIR}/0170-something-old.md"
   commit_all "$repo" "docs: renumber 0100 -> 0170"
 
   run_checker "$repo" "main" || rc=$?

@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Profit Basetool - squadron-management web app.
+# Copyright (C) 2026 Lucas Greuloch
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Refuses a push that carries commits while ./gradlew spotlessCheck fails on the working tree.
+set -eu
+
+pushes_commits=false
+while read -r _ local_sha _; do
+  case $local_sha in
+    *[!0]*) pushes_commits=true ;;
+  esac
+done
+if [ "$pushes_commits" = false ]; then
+  exit 0
+fi
+
+if ! ./gradlew spotlessCheck --quiet; then
+  echo "pre-push: a formatter would change files. Run ./gradlew spotlessApply, commit, push again." >&2
+  exit 1
+fi
