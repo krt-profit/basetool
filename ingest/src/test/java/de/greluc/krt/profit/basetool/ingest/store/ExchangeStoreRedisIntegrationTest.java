@@ -90,7 +90,7 @@ class ExchangeStoreRedisIntegrationTest {
       new GenericContainer<>(DockerImageName.parse(TestImages.REDIS))
           .withExposedPorts(6379)
           .withCopyToContainer(
-              Transferable.of(RedisAclTemplate.render(values())), "/etc/redis/users.acl")
+              Transferable.of(RedisAclTemplate.renderShared(values())), "/etc/redis/users.acl")
           .withCommand("redis-server", "--aclfile", "/etc/redis/users.acl");
 
   private static final ExchangeStoreProperties SMALL =

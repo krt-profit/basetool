@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
-import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -37,11 +38,11 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Links the nine UEX location tables to the starmap tree on APPLY (REQ-P4K-035, ADR-0345): a row
- * links to the one object whose normalised English name equals its own, whose type belongs to the
- * row's type families and which lies below the row's nearest linked parent. Several candidates or
- * none leave the row unlinked, count it as unmatched and open a review case; a row an admin linked
- * or unlinked by hand is left alone. A run closes the link cases it no longer finds.
+ * Links the nine UEX location tables to the starmap tree on APPLY (REQ-P4K-035, REQ-P4K-060,
+ * ADR-0345, ADR-0395): each row the import owns links as {@link StarmapLinkRun} decides, parents
+ * first. A row left unlinked counts as unmatched and opens a review case unless the case could
+ * settle nothing; a row an admin linked or unlinked by hand is left alone. A run closes the link
+ * cases it no longer finds.
  */
 @Component
 @RequiredArgsConstructor
@@ -58,6 +59,7 @@ public class P4kStarmapLinker {
   private static final String CASE_GUID_PREFIX = "starmap-link:";
 
   private final StarmapPlaceRows placeRows;
+  private final LocationRepository locationRepository;
   private final P4kRunResolvedCases runResolvedCases;
 
   /**
@@ -67,23 +69,31 @@ public class P4kStarmapLinker {
    * @param context the run
    */
   public void link(@NotNull P4kStarmapTree tree, @NotNull P4kImportContext context) {
-    Map<String, List<StarmapObject>> byName = indexByName(tree);
     Map<UUID, UUID> guidById = new HashMap<>();
     tree.all().stream()
         .filter(o -> o.getId() != null)
         .forEach(o -> guidById.put(o.getId(), o.getP4kUuid()));
-    StarmapParentLinks<UUID> linked = new StarmapParentLinks<>();
+    Map<StarmapPlaceKind, List<StarmapPlaceRow>> rows = new EnumMap<>(StarmapPlaceKind.class);
+    for (StarmapPlaceKind kind : StarmapPlaceKind.values()) {
+      rows.put(kind, placeRows.rows(kind));
+    }
+    StarmapLinkRun run =
+        new StarmapLinkRun(
+            new StarmapCandidates(tree),
+            new StarmapCaseRules(
+                tree,
+                rows.getOrDefault(StarmapPlaceKind.TERMINAL, List.of()),
+                storagePlaces(guidById)),
+            rows.getOrDefault(StarmapPlaceKind.PLANET, List.of()));
     Set<P4kRunResolvedCases.Found> found = new HashSet<>();
     for (StarmapPlaceKind kind : StarmapPlaceKind.values()) {
       Map<UUID, UUID> writes = new LinkedHashMap<>();
-      for (StarmapPlaceRow row : placeRows.rows(kind)) {
+      for (StarmapPlaceRow row : rows.getOrDefault(kind, List.of())) {
         UUID link =
             row.manual()
                 ? guidById.get(row.starmapObjectId())
-                : linkRow(row, tree, byName, linked.byKind(), guidById, found, writes, context);
-        if (link != null) {
-          linked.put(row, link);
-        }
+                : linkRow(row, run, tree, guidById, found, writes, context);
+        run.record(row, link);
       }
       if (context.isApply()) {
         placeRows.autoLink(kind, writes);
@@ -110,9 +120,8 @@ public class P4kStarmapLinker {
    * Links one row the import owns, reporting a changed link, an unmatched row and its case.
    *
    * @param row the row
+   * @param run the run's decisions
    * @param tree the starmap tree
-   * @param byName the linkable objects by normalised English name
-   * @param linked the GUIDs the rows of earlier kinds link to, by system and name
    * @param guidById the GUIDs of the stored objects by id
    * @param found the cases this run found, extended
    * @param writes the links of the row's table the APPLY writes, extended by the row's
@@ -122,24 +131,14 @@ public class P4kStarmapLinker {
   @Nullable
   private UUID linkRow(
       @NotNull StarmapPlaceRow row,
+      @NotNull StarmapLinkRun run,
       @NotNull P4kStarmapTree tree,
-      @NotNull Map<String, List<StarmapObject>> byName,
-      @NotNull Map<StarmapPlaceKind, Map<String, UUID>> linked,
       @NotNull Map<UUID, UUID> guidById,
       @NotNull Set<P4kRunResolvedCases.Found> found,
       @NotNull Map<UUID, UUID> writes,
       @NotNull P4kImportContext context) {
-    UUID ancestor = row.nearestLinkedParent(linked);
-    String name = StarmapNames.normalise(row.name());
-    List<UUID> candidates =
-        name == null
-            ? List.of()
-            : byName.getOrDefault(name, List.of()).stream()
-                .filter(o -> row.kind().accepts(o.getType()))
-                .map(StarmapObject::getP4kUuid)
-                .filter(guid -> ancestor == null || tree.isBelow(guid, ancestor))
-                .toList();
-    UUID target = candidates.size() == 1 ? candidates.getFirst() : null;
+    StarmapLinkRun.Decision decision = run.decide(row);
+    UUID target = decision.target();
     UUID current = guidById.get(row.starmapObjectId());
     PlaceRecord record = new PlaceRecord(row);
     if (!Objects.equals(current, target)) {
@@ -157,35 +156,32 @@ public class P4kStarmapLinker {
       }
     }
     if (target == null) {
-      P4kReviewReason reason =
-          candidates.isEmpty()
-              ? P4kReviewReason.STARMAP_LINK_NOT_FOUND
-              : P4kReviewReason.STARMAP_LINK_AMBIGUOUS;
-      P4kRunResolvedCases.Found finding = new P4kRunResolvedCases.Found(record.caseGuid(), reason);
-      found.add(finding);
       context.getReport().unmatched(KIND, record);
-      context.getReport().review(KIND, record, record.caseGuid(), reason, null);
+      P4kReviewReason reason = decision.caseReason();
+      if (reason != null) {
+        found.add(new P4kRunResolvedCases.Found(record.caseGuid(), reason));
+        context.getReport().review(KIND, record, record.caseGuid(), reason, null);
+      }
     }
     return target;
   }
 
   /**
-   * Indexes the objects a row can link to by normalised English name; a stamped or hidden object
-   * links nothing new.
+   * Returns the GUIDs of the starmap objects a storage place sits on.
    *
-   * @param tree the starmap tree
-   * @return the objects by name
+   * @param guidById the GUIDs of the stored objects by id
+   * @return the GUIDs of those objects the tree holds
    */
   @NotNull
-  private static Map<String, List<StarmapObject>> indexByName(@NotNull P4kStarmapTree tree) {
-    Map<String, List<StarmapObject>> byName = new HashMap<>();
-    for (StarmapObject object : tree.all()) {
-      String name = StarmapNames.normalise(object.getName());
-      if (name != null && !object.isP4kRetired()) {
-        byName.computeIfAbsent(name, _ -> new ArrayList<>()).add(object);
+  private Set<UUID> storagePlaces(@NotNull Map<UUID, UUID> guidById) {
+    Set<UUID> guids = new HashSet<>();
+    for (UUID objectId : locationRepository.findStarmapObjectIds()) {
+      UUID guid = guidById.get(objectId);
+      if (guid != null) {
+        guids.add(guid);
       }
     }
-    return byName;
+    return guids;
   }
 
   /**

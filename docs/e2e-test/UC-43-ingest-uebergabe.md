@@ -16,7 +16,7 @@
 Nur im ephemeren Modus (`assumeTrue(STACK.managesStack())`), weil der Test die Redis des Stacks und das Backend-Seeding braucht:
 
 - Der Test postet das Fixture `refinery-extract-e2e.json` an `/api/v1/refinery-orders/import-extract` und erhält damit genau die Entwurfsantwort, die der echte Backend-Matcher aus den Namen im geseedeten Katalog erzeugt.
-- Diese Antwort legt er unverändert in dieselbe Redis, die das Frontend liest, unter `ingest:handoff:<sub>:<id>` ab — die Redis der E2E-Compose-Datei (`redis-dev`), auf `127.0.0.1:6379` veröffentlicht, mit dem Wegwerf-Passwort aus `docker-compose.e2e.yml`.
+- Diese Antwort legt er unverändert in die geteilte Redis, aus der das Frontend die Übergabe liest, unter `ingest:handoff:<sub>:<id>` ab — `redis-shared-dev` der E2E-Compose-Dateien, auf `127.0.0.1:6379` veröffentlicht, mit dem Wegwerf-Passwort aus `RedisAclTemplate.E2E_PASSWORDS`.
 
 ## Auslöser
 

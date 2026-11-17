@@ -26,8 +26,8 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * One entry of {@code starmapObjects} in catalogue version 2 (contract, "Starmap objects"), bound
- * to the fields the import writes; every other field is skipped. The name is a game text, so it
- * never reaches the change report (REQ-P4K-033).
+ * to the fields the import writes or links shops by; every other field is skipped. The name is a
+ * game text, so it never reaches the change report (REQ-P4K-033).
  *
  * @param guid the Record GUID
  * @param className the Record name
@@ -38,6 +38,8 @@ import org.jetbrains.annotations.Nullable;
  * @param hideInStarmap the Record's flag, {@code null} when it states none
  * @param system the folder of the star system that places the object, or {@code null}
  * @param position {@code [x, y, z]} in metres in the system's frame, or {@code null}
+ * @param entityName the name of the entity that places the object, e.g. {@code
+ *     jumppoint_stanton_pyro}, which a shop's containers name; {@code null} when unplaced
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kStarmapObjectDto(
@@ -49,7 +51,8 @@ public record P4kStarmapObjectDto(
     @Nullable String parentGuid,
     @Nullable Boolean hideInStarmap,
     @Nullable String system,
-    @Nullable List<Double> position)
+    @Nullable List<Double> position,
+    @Nullable String entityName)
     implements P4kRecord {
 
   /** The number of coordinates of a position. */

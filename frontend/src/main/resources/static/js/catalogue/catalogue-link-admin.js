@@ -64,31 +64,58 @@ export function filterValue(id) {
 }
 
 /**
+ * A pending read of one render target and the result region it keeps busy.
+ *
+ * @typedef {{ busy: Element | null }} ReadTicket
+ */
+
+/**
  * The newest read of each render target; an answer whose read a later one replaced is dropped.
  *
- * @type {Map<string, object>}
+ * @type {Map<string, ReadTicket>}
  */
 const latestReads = new Map();
 
 /**
+ * Sets the loading state of a read's result region.
+ *
+ * @param {ReadTicket | undefined} ticket the read, absent when the target was never read
+ * @param {boolean} busy whether the region is waiting for its answer
+ */
+function markBusy(ticket, busy) {
+    ticket?.busy?.setAttribute('aria-busy', String(busy));
+}
+
+/**
  * Reads a JSON answer for one render target (REQ-FE-013): a later read of the same target aborts
  * this one through the krtFetch supersede key, and an answer that still arrives after it is
- * dropped, so a slower earlier read never overwrites a newer one.
+ * dropped, so a slower earlier read never overwrites a newer one. The result region carries
+ * `aria-busy="true"` until the current read settles (REQ-UI-009); the caller renders the answer in
+ * the same microtask checkpoint, so nothing observes the region idle before its rows.
  *
  * @param {string} url the proxy URL
  * @param {string} errorLabel the toast shown when the read fails
  * @param {string} target the render target the answer fills, unique on the page
+ * @param {Element | null} [busy] the result region the answer fills
  * @returns {Promise<any>} the parsed body; null after a toast when it is no data, and null without
  *     one when a later read of the target superseded it
  */
-export function readJson(url, errorLabel, target) {
-    const ticket = {};
+export function readJson(url, errorLabel, target, busy = null) {
+    /** @type {ReadTicket} */
+    const ticket = { busy };
     latestReads.set(target, ticket);
+    markBusy(ticket, true);
     const current = () => latestReads.get(target) === ticket;
     return krtFetch.getJson(url, { key: target }).then(
-        (body) => (current() ? body : null),
+        (body) => {
+            if (!current()) return null;
+            markBusy(ticket, false);
+            return body;
+        },
         () => {
-            if (current()) showFrontendErrorToast(errorLabel);
+            if (!current()) return null;
+            markBusy(ticket, false);
+            showFrontendErrorToast(errorLabel);
             return null;
         },
     );
@@ -98,20 +125,22 @@ export function readJson(url, errorLabel, target) {
  * Builds a page's JSON reader: {@link readJson} with the page's load-error toast.
  *
  * @param {() => string} errorLabel reads the toast shown when a read fails
- * @returns {(url: string, target: string) => Promise<any>} reads one render target's answer
+ * @returns {(url: string, target: string, busy?: Element | null) => Promise<any>} reads one
+ *     render target's answer
  */
 export function jsonReader(errorLabel) {
-    return (url, target) => readJson(url, errorLabel(), target);
+    return (url, target, busy) => readJson(url, errorLabel(), target, busy);
 }
 
 /**
  * Drops the answer of the read still pending for a render target, for a target the page empties
- * without reading.
+ * without reading, and ends its region's loading state.
  *
  * @param {string} target the render target
  */
 export function forgetRead(target) {
-    latestReads.set(target, {});
+    markBusy(latestReads.get(target), false);
+    latestReads.set(target, { busy: null });
 }
 
 /**

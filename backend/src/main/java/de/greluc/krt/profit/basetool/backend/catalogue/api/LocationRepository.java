@@ -192,6 +192,14 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   boolean existsByStarmapObjectId(UUID starmapObjectId);
 
   /**
+   * Lists the starmap objects storage places sit on (REQ-P4K-036).
+   *
+   * @return the ids of the starmap objects, each once
+   */
+  @Query("SELECT DISTINCT l.starmapObjectId FROM Location l WHERE l.starmapObjectId IS NOT NULL")
+  List<UUID> findStarmapObjectIds();
+
+  /**
    * Finds the storage places on a set of starmap objects.
    *
    * @param starmapObjectIds the starmap objects

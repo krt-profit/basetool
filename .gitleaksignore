@@ -6,3 +6,4 @@ d149011c59605cf1991b10d22cfec41ebe1c74a5:ingest/src/test/resources/exchange/gold
 8103f084fd5a32885db112c5fb723c9b920e3f65:docs/exchange/examples/v1/page--shipPage/valid/patch-removal.json:generic-api-key:5
 8a7aad9b35052a13a668f8183bbe734032f69252:backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/ScWikiVehicleSyncService.java:generic-api-key:198
 8a7aad9b35052a13a668f8183bbe734032f69252:backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/ScWikiVehicleSyncService.java:generic-api-key:222
+093448aae5eabd66ca86d982d1e3f755aff25067:backend/src/test/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/P4kShopTerminalLinkTest.java:generic-api-key:319

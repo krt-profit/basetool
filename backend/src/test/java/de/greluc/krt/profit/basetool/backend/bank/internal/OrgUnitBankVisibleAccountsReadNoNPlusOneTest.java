@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
@@ -28,11 +29,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import jakarta.persistence.EntityManagerFactory;
 import java.util.List;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,7 +59,6 @@ class OrgUnitBankVisibleAccountsReadNoNPlusOneTest {
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
-  @Autowired private EntityManagerFactory entityManagerFactory;
 
   @AfterEach
   void clearAuthentication() {
@@ -69,7 +66,7 @@ class OrgUnitBankVisibleAccountsReadNoNPlusOneTest {
   }
 
   @Test
-  void orderingByOrgUnitStaysStatementBounded_independentOfAccountCount() {
+  void orderingByOrgUnitStaysStatementBounded_independentOfAccountCount() throws Exception {
     String tag = UUID.randomUUID().toString().substring(0, 6);
     for (int i = 0; i < ACCOUNTS; i++) {
       Squadron squadron = new Squadron();
@@ -97,19 +94,16 @@ class OrgUnitBankVisibleAccountsReadNoNPlusOneTest {
                     .subject(admin.getId().toString())
                     .build(),
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
 
-    stats.clear();
-    var page = query.listVisibleAccounts(PageRequest.of(0, 1000));
-    long statements = stats.getPrepareStatementCount();
+    var page = measured(() -> query.listVisibleAccounts(PageRequest.of(0, 1000)));
 
-    assertThat(page.getContent())
+    assertThat(page.result().getContent())
         .filteredOn(row -> row.accountName().startsWith("Visible Konto " + tag))
         .hasSize(ACCOUNTS)
         .allSatisfy(row -> assertThat(row.orgUnitName()).startsWith("Visible Staffel " + tag));
-    assertThat(statements)
+    assertThat(page.statements())
         .as("statements for %d accounts", ACCOUNTS)
+        .isPositive()
         .isLessThanOrEqualTo(STATEMENT_BOUND);
   }
 }

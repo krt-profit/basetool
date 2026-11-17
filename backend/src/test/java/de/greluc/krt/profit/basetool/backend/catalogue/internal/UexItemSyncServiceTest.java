@@ -72,6 +72,8 @@ class UexItemSyncServiceTest {
   @Mock private SyncReportService syncReportService;
   @Mock private ScWikiProperties scWikiProperties;
   @Mock private ObjectProvider<UexItemSyncService> self;
+  @Mock private GameItemRedirectRepository redirects;
+  @Mock private UexItemTwinMerger twinMerger;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
   @Spy
@@ -858,6 +860,54 @@ class UexItemSyncServiceTest {
             isNull(),
             isNull(),
             contains("created=0, updated=1"));
+  }
+
+  @Test
+  void aListingAnItemMergeLeftBehindWritesNothingAndKeepsTheSweep() {
+    UexItemDto merged = helmetDto(77, "Venture Helmet", "", helmetsCategory);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(merged));
+    when(gameItemRepository.findByUexItemId(77)).thenReturn(Optional.empty());
+    when(redirects.isMergedUexItemId(77)).thenReturn(true);
+    when(gameItemRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    assertEquals(0, service.syncItems());
+
+    verify(gameItemRepository, never()).save(any());
+    verify(gameItemRepository).markUexDeletedExcept(argThat(ids -> ids.contains(77)), any());
+    verify(syncReportService).recordSweep(true);
+    verify(syncReportService, never()).recordIncomplete();
+    verify(syncReportService)
+        .logUexEvent(
+            any(),
+            eq(SyncEventType.SYNC_RUN_SUMMARY),
+            eq("game_item"),
+            isNull(),
+            isNull(),
+            contains("mergedListings=1"));
+  }
+
+  @Test
+  void aCompleteFetchHandsItsListingsToTheTwinMerge() {
+    UexItemDto helmet = helmetDto(11, "Venture Helmet", "", helmetsCategory);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(twinMerger.mergeTwins(eq(List.of(helmet)), argThat(UexIdentityCensus::complete), any()))
+        .thenReturn(1);
+
+    service.syncItems();
+
+    verify(syncReportService)
+        .logUexEvent(
+            any(),
+            eq(SyncEventType.SYNC_RUN_SUMMARY),
+            eq("game_item"),
+            isNull(),
+            isNull(),
+            contains("twinsMerged=1"));
   }
 
   private void stubMutableRepository(List<GameItem> rows) {

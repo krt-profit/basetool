@@ -20,7 +20,9 @@ tests:
         values: "100+0x20"
       - series: 'basetool_container_memory_usage_bytes{name="db-keycloak"}'
         values: "100+0x20"
-      - series: 'basetool_container_memory_usage_bytes{name="redis"}'
+      - series: 'basetool_container_memory_usage_bytes{name="redis-session"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="redis-shared"}'
         values: "100+0x20"
       - series: 'basetool_container_memory_usage_bytes{name="edge"}'
         values: "100+0x20"
@@ -51,7 +53,7 @@ tests:
               summary: "No container metrics: fewer than 10 named containers are reporting"
               description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the cgroup-fed container alerts (working-set, OOM, CPU throttle) are silently blind. The restart-loop alert reads a different source and has its own guard, ContainerStartTimeMissing. The source is scripts/cgroup-container-metrics.py and its basetool-container-metrics.timer (`systemctl status basetool-container-metrics.timer`, /var/lib/basetool/textfile/containers.prom)."
 
-  - name: fires - one of the seven core containers stops reporting
+  - name: fires - neither Redis instance reports
     interval: 1m
     input_series:
       - series: 'basetool_container_memory_usage_bytes{name="backend"}'
@@ -74,4 +76,40 @@ tests:
               severity: warning
             exp_annotations:
               summary: "A core app container stopped reporting metrics"
-              description: "Fewer than the 7 core app containers (backend/frontend/ingest/keycloak/db-backend/db-keycloak/redis) report container metrics — one is down, or the collector lost its series. Cross-check TargetDown and the container's health."
+              description: "Fewer than the 8 core app containers (backend/frontend/ingest/keycloak/db-backend/db-keycloak/redis-session/redis-shared) report container metrics — one is down, or the collector lost its series. Cross-check TargetDown and the container's health."
+
+  - name: fires - redis-shared alone stops reporting while the other seven core containers do
+    interval: 1m
+    input_series:
+      - series: 'basetool_container_memory_usage_bytes{name="backend"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="frontend"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="ingest"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="keycloak"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="db-backend"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="db-keycloak"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="redis-session"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="edge"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="prometheus"}'
+        values: "100+0x20"
+      - series: 'basetool_container_memory_usage_bytes{name="grafana"}'
+        values: "100+0x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ContainerMetricsMissing
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: CoreContainerMetricsMissing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "A core app container stopped reporting metrics"
+              description: "Fewer than the 8 core app containers (backend/frontend/ingest/keycloak/db-backend/db-keycloak/redis-session/redis-shared) report container metrics — one is down, or the collector lost its series. Cross-check TargetDown and the container's health."

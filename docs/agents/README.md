@@ -17,7 +17,7 @@ before you start it.
 | [`java-conventions.md`](java-conventions.md) | editing any `.java` file |
 | [`backend-module-map.md`](backend-module-map.md) | adding a backend class, package or module dependency |
 | [`backend-concurrency.md`](backend-concurrency.md) | any multi-step transaction, version check, bulk update or find-or-create |
-| [`backend-testing.md`](backend-testing.md) | a backend unit test with real collaborators or a `@SpringBootTest` |
+| [`backend-testing.md`](backend-testing.md) | a backend unit test with real collaborators, a `@SpringBootTest` or a statement bound |
 | [`frontend-design-system.md`](frontend-design-system.md) | any UI work |
 | [`ui-preview.md`](ui-preview.md) | claiming a UI change looks right; starting or stopping the preview stack |
 | [`frontend-templates-and-assets.md`](frontend-templates-and-assets.md) | changing a template, stylesheet, script tag, DOM write or dialog |
