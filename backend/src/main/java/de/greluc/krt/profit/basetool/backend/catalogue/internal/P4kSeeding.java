@@ -30,8 +30,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The seeding rule of items and ships (REQ-P4K-009): with "create new items and ships" ticked, an
  * unmatched record is created only when its {@code playability} is {@code player}; {@code ai} and
- * {@code mission} are only counted, {@code special}, {@code null} and an unknown value go to
- * review.
+ * {@code mission} are only counted. A ship whose playability is {@code special}, {@code null} or
+ * unknown goes to review; such an item goes to review only when a shop sells it or a blueprint
+ * produces it, and is otherwise only counted.
  */
 enum P4kSeeding {
 
@@ -48,15 +49,17 @@ enum P4kSeeding {
    * The rule for an item.
    *
    * @param playability the item's playability, {@code null} when absent or unknown
+   * @param obtainable whether a shop of the catalogue sells the item or a blueprint produces it
    * @return the decision
    */
   @NotNull
-  static P4kSeeding forItem(@Nullable P4kItemPlayability playability) {
+  static P4kSeeding forItem(@Nullable P4kItemPlayability playability, boolean obtainable) {
+    P4kSeeding unclear = obtainable ? REVIEW : COUNT_ONLY;
     return switch (playability) {
-      case null -> REVIEW;
+      case null -> unclear;
       case PLAYER -> CREATE;
       case MISSION -> COUNT_ONLY;
-      case SPECIAL -> REVIEW;
+      case SPECIAL -> unclear;
     };
   }
 

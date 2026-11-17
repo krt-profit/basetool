@@ -153,7 +153,7 @@ class P4kImportServiceSeedingTest {
   }
 
   @Test
-  void anUnknownPlayability_readsAsNull_andIsCounted() {
+  void anUnknownPlayability_readsAsNull_andAnUnnamedItemIsOnlyCounted() {
     ObjectNode root = P4kTestCatalogues.tree();
     P4kTestCatalogues.record(root, "items", P4kTestCatalogues.SPECIAL_ITEM)
         .put("playability", "crew");
@@ -171,7 +171,7 @@ class P4kImportServiceSeedingTest {
     assertThat(
             reviewCaseRepository.findByKindAndGuidAndReason(
                 P4kKind.ITEM, P4kTestCatalogues.SPECIAL_ITEM, P4kReviewReason.UNCLEAR_PLAYABILITY))
-        .isPresent();
+        .isEmpty();
   }
 
   @Test

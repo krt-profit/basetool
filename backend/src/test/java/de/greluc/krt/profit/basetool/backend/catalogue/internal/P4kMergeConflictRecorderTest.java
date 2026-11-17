@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,6 +90,22 @@ class P4kMergeConflictRecorderTest {
   }
 
   @Test
+  void aCaseAnApplyClosedOpensAgain_andAnAdminDecisionStays() {
+    P4kReviewCase closedByRun = closed(P4kReviewResolution.RESOLVED);
+    P4kReviewCase kept = closed(P4kReviewResolution.KEEP);
+    when(reviewCases.findByKindAndGuidAndReason(any(), any(), any()))
+        .thenReturn(Optional.of(closedByRun), Optional.of(kept));
+
+    record(row(UUID.randomUUID()), row(UUID.randomUUID()));
+
+    assertThat(closedByRun.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+    assertThat(closedByRun.getResolution()).isNull();
+    assertThat(closedByRun.getResolvedAt()).isNull();
+    assertThat(kept.getStatus()).isEqualTo(P4kReviewStatus.REVIEWED);
+    assertThat(kept.getResolution()).isEqualTo(P4kReviewResolution.KEEP);
+  }
+
+  @Test
   void rowsWithoutARunFallBackToTheLatestRun() {
     P4kImportRun latest = new P4kImportRun();
     latest.setId(UUID.randomUUID());
@@ -118,6 +135,17 @@ class P4kMergeConflictRecorderTest {
 
   private P4kMergeConflictRecorder recorder() {
     return new P4kMergeConflictRecorder(reviewCases, runs);
+  }
+
+  private static P4kReviewCase closed(P4kReviewResolution resolution) {
+    UUID run = UUID.randomUUID();
+    P4kReviewCase reviewCase = new P4kReviewCase();
+    reviewCase.setFirstRunId(run);
+    reviewCase.setLastRunId(run);
+    reviewCase.setStatus(P4kReviewStatus.REVIEWED);
+    reviewCase.setResolution(resolution);
+    reviewCase.setResolvedAt(Instant.now());
+    return reviewCase;
   }
 
   private static GameItem row(UUID seenRun) {

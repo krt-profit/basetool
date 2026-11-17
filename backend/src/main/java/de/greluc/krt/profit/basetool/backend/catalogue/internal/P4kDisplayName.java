@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.List;
 import java.util.Locale;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
@@ -28,9 +29,14 @@ public final class P4kDisplayName {
 
   private P4kDisplayName() {}
 
+  /** The lower-cased prefixes of the placeholder names the game files carry. */
+  private static final List<String> PLACEHOLDER_PREFIXES =
+      List.of("loc_placeholder", "loc_empty", "ph - ", "placeholder - ");
+
   /**
    * Whether the name is a real, player-facing display name: present, not an unresolved {@code @LOC}
-   * key, and not a placeholder token. This is the primary filter against seeding internal records.
+   * key, and not a placeholder token such as {@code PH - hdh_boots_01_01_13}. This is the primary
+   * filter against seeding internal records.
    *
    * @param name the candidate display name
    * @return {@code true} when the name looks like real content
@@ -47,7 +53,6 @@ public final class P4kDisplayName {
     String lower = trimmed.toLowerCase(Locale.ROOT);
     return !lower.equals("uninitialized")
         && !lower.equals("empty")
-        && !lower.startsWith("loc_placeholder")
-        && !lower.startsWith("loc_empty");
+        && PLACEHOLDER_PREFIXES.stream().noneMatch(lower::startsWith);
   }
 }

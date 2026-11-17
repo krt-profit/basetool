@@ -40,7 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * the stored ship type's GUID belongs to, or a ship no player owns. Such a ship needs neither a row
  * of its own nor a review case.
  */
-final class P4kShipCoverage {
+final class P4kShipCoverage implements P4kMatchRules<ShipType> {
 
   /** The playabilities of the ships no player can own, buy or fit. */
   private static final Set<P4kShipPlayability> NOT_OWNED =
@@ -79,7 +79,8 @@ final class P4kShipCoverage {
    * @return {@code true} when both carry the same in-game name and the ship is a variant of the
    *     row's group or a ship no player owns
    */
-  boolean covers(@NotNull UUID guid, @NotNull ShipType row) {
+  @Override
+  public boolean covers(@NotNull UUID guid, @NotNull ShipType row) {
     P4kShipDto record = records.get(guid);
     if (record == null
         || !Objects.equals(P4kMatchKeys.fold(record.nameEn()), P4kMatchKeys.fold(row.getName()))) {

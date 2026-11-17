@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -133,7 +132,7 @@ public class P4kShipReconciler {
             className -> P4kShipClassAliases.classMatches(rows, aliased, className),
             rows::byName,
             row -> row.getSourceSystems() == GameItemSourceSystem.P4K,
-            coverage::covers);
+            coverage);
     Set<UUID> bases =
         repairs.stream()
             .map(P4kShipBaseRepairs.Repair::baseGuid)
@@ -222,23 +221,12 @@ public class P4kShipReconciler {
    * @param context the run
    */
   private void settleCases(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
-    Set<P4kRunResolvedCases.Found> found =
-        context.getReport().reviews().stream()
-            .filter(finding -> finding.kind() == P4kKind.SHIP)
-            .map(finding -> new P4kRunResolvedCases.Found(finding.guid(), finding.reason()))
-            .collect(Collectors.toUnmodifiableSet());
-    Predicate<UUID> evaluated;
-    if (catalogue.head().isComplete(P4kKind.SHIP)) {
-      evaluated = _ -> true;
-    } else {
-      Set<UUID> listed =
-          catalogue.ships().stream()
-              .map(P4kShipDto::parsedGuid)
-              .filter(Objects::nonNull)
-              .collect(Collectors.toUnmodifiableSet());
-      evaluated = listed::contains;
-    }
-    resolvedCases.settleWithin(P4kKind.SHIP, SETTLED_REASONS, found, evaluated, context.getNow());
+    resolvedCases.settleRun(
+        P4kKind.SHIP,
+        SETTLED_REASONS,
+        catalogue.ships(),
+        catalogue.head().isComplete(P4kKind.SHIP),
+        context);
   }
 
   /**

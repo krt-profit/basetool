@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -37,8 +36,9 @@ import org.jetbrains.annotations.Nullable;
  * GUID first, then the SC Wiki UUID, then a class name and a name that each identify exactly one
  * row and one record. The import never merges: a key that several rows or records share, a row that
  * already holds another GUID and a row two records claim each open a {@code GUID_CONFLICT} review
- * case and leave the rows as they are, unless a row the key found already stands for the record
- * ({@code covers}, REQ-P4K-050), which then needs neither a row of its own nor a case.
+ * case and leave the rows as they are, unless the kind's {@link P4kMatchRules} say a row the key
+ * found already stands for the record (REQ-P4K-050), which then needs neither a row of its own nor
+ * a case, or leave the row out of the class-name and name steps (REQ-P4K-054).
  *
  * @param <T> the row type
  * @param kind the kind
@@ -49,7 +49,7 @@ import org.jetbrains.annotations.Nullable;
  * @param byClassName finds the rows of a class name, ignoring case
  * @param byName finds the rows of a name, ignoring case
  * @param seeded whether a row was created by an earlier seeding (REQ-P4K-010)
- * @param covers whether a found row already stands for the record of a GUID it does not hold
+ * @param rules the kind's rules for a found row of another GUID
  */
 public record P4kRowMatcher<T extends P4kKeyedRow>(
     @NotNull P4kKind kind,
@@ -60,10 +60,11 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
     @NotNull Function<String, List<T>> byClassName,
     @NotNull Function<String, List<T>> byName,
     @NotNull Predicate<T> seeded,
-    @NotNull BiPredicate<UUID, T> covers) {
+    @NotNull P4kMatchRules<T> rules) {
 
   /**
-   * Creates the matcher of a kind no stored row covers a record of another GUID for.
+   * Creates the matcher of a kind with the default rules: no stored row covers a record of another
+   * GUID, and the class-name and name steps consider every row they find.
    *
    * @param kind the kind
    * @param byP4kUuid finds the row holding a P4K GUID
@@ -92,7 +93,7 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
         byClassName,
         byName,
         seeded,
-        (_, _) -> false);
+        P4kMatchRules.none());
   }
 
   /**
@@ -232,7 +233,8 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
   }
 
   /**
-   * Tries one fallback key: it matches only when it names exactly one row and one record.
+   * Tries one fallback key: it matches only when it names exactly one candidate row and one record;
+   * when every row it finds is refused as a candidate, the next step runs.
    *
    * @param record the record
    * @param guid the record's GUID
@@ -241,7 +243,7 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
    * @param repeated whether several records of the kind share the key
    * @param creatable whether the current seeding rule of the kind would create the record
    * @param context the run
-   * @return the match, or {@code null} when the key finds no row
+   * @return the match, or {@code null} when the key finds no candidate row
    */
   @Nullable
   private Match<T> fallback(
@@ -255,13 +257,14 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
     if (key == null || key.isBlank()) {
       return null;
     }
-    List<T> candidates = finder.apply(key.strip());
-    if (candidates.isEmpty()) {
-      return null;
-    }
-    Optional<T> covering = candidates.stream().filter(row -> covers.test(guid, row)).findFirst();
+    List<T> found = finder.apply(key.strip());
+    Optional<T> covering = found.stream().filter(row -> rules.covers(guid, row)).findFirst();
     if (covering.isPresent()) {
       return new Covered<>(covering.get());
+    }
+    List<T> candidates = found.stream().filter(row -> rules.isCandidate(guid, row)).toList();
+    if (candidates.isEmpty()) {
+      return null;
     }
     if (candidates.size() > 1 || repeated) {
       context.getReport().review(kind, record, guid, P4kReviewReason.GUID_CONFLICT, null);
@@ -290,7 +293,7 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       @NotNull P4kImportContext context) {
     P4kImportReport report = context.getReport();
     UUID held = row.getP4kUuid();
-    if (held != null && !held.equals(guid) && covers.test(guid, row)) {
+    if (held != null && !held.equals(guid) && rules.covers(guid, row)) {
       return new Covered<>(row);
     }
     if ((held != null && !held.equals(guid)) || !context.claim(kind, row.getId(), guid)) {
