@@ -257,6 +257,7 @@ public class Material extends AbstractEntity<UUID> implements P4kKeyedRow {
    * Wiki UUID stays in {@code scwiki_uuid}.
    */
   @Column(name = "p4k_uuid", unique = true)
+  @Nullable
   private UUID p4kUuid;
 
   /**

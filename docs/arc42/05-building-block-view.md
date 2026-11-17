@@ -563,9 +563,10 @@ Repository identity lookups resolve retained ids, while preloaded canonical ids 
 reference seam for bulk reads. The same six modules answer
 `catalogue.api.GameItemReferenceParticipant`, so the P4K import hides a seeded item only when no
 member row references it (REQ-P4K-056). Inventory, job orders, supply, purchasing, the
-Materialbörse, the refinery and the catalogue itself answer `catalogue.api.MaterialReferenceParticipant`,
-so the P4K import hides a UEX commodity no game source knows only when nothing references it
-(REQ-P4K-075).
+Materialbörse and the refinery answer `catalogue.api.MaterialReferenceParticipant`, and the
+catalogue reads its own references beside them, so the P4K import hides a UEX commodity no game
+source knows only when nothing references it (REQ-P4K-075) and retires a leftover seeded, admin or
+Wiki-only twin only when no member uses it (REQ-P4K-076…078).
 
 `ScWikiRequestExecutor` owns pacing/retry transport, `ScWikiClient` owns the scoped game build,
 and `SyncChunkWriter` owns isolated application transactions. `SyncRunService` persists attempt

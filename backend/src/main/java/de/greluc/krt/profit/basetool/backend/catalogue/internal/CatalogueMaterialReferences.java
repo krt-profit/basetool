@@ -31,13 +31,13 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reports the catalogue's own material references (REQ-P4K-075): recipe ingredients and dismantle
- * returns, UEX refinery yields and terminal prices, external name aliases, and a material that
- * refines into it.
+ * Reports the catalogue's own material references (REQ-P4K-075, REQ-P4K-076): recipe ingredients
+ * and dismantle returns, UEX refinery yields and terminal prices, external name aliases, and a
+ * material that refines into it. Each of them would refuse the material's deletion.
  */
 @Component
 @RequiredArgsConstructor
-public class CatalogueMaterialReferences implements MaterialReferenceParticipant {
+class CatalogueMaterialReferences {
 
   /** The materials among {@code :ids} a catalogue row references. */
   private static final String REFERENCED =
@@ -52,9 +52,15 @@ public class CatalogueMaterialReferences implements MaterialReferenceParticipant
 
   private final EntityManager entityManager;
 
-  @Override
+  /**
+   * Tells which of the given materials a catalogue row references.
+   *
+   * @param materialIds the materials asked about
+   * @return the referenced ones among them, empty when none is
+   */
+  @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
-  public @NotNull Set<UUID> referencedMaterials(@NotNull Collection<UUID> materialIds) {
+  Set<UUID> referencedMaterials(@NotNull Collection<UUID> materialIds) {
     return MaterialReferenceParticipant.referenced(entityManager, REFERENCED, materialIds);
   }
 }

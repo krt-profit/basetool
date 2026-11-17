@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceParticipant;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import jakarta.persistence.EntityManager;
@@ -41,10 +40,10 @@ import org.springframework.stereotype.Component;
 /**
  * Hides the UEX commodities no game source knows (REQ-P4K-075, ADR-0396): a material only UEX
  * lists, without a P4K GUID, a SC Wiki UUID or a {@code ResourceType}, that the game files do not
- * know by name either, with no price and no reference ({@link MaterialReferenceParticipant}), is
- * marked {@code sourceless_hidden_at} by an APPLY and leaves the lists and pickers while it stays
- * so. An APPLY lifts the mark of a row that no longer qualifies; a source or a price lifts the hide
- * at once ({@link Material#isSourcelessHidden()}). Every change is reported and audited.
+ * know by name either, with no price and no reference ({@link P4kMaterialReferences}), is marked
+ * {@code sourceless_hidden_at} by an APPLY and leaves the lists and pickers while it stays so. An
+ * APPLY lifts the mark of a row that no longer qualifies; a source or a price lifts the hide at
+ * once ({@link Material#isSourcelessHidden()}). Every change is reported and audited.
  */
 @Component
 @RequiredArgsConstructor
@@ -60,7 +59,7 @@ public class P4kSourcelessMaterials {
           + " AND m.p4kSubtypeUuid IS NULL)";
 
   private final EntityManager entityManager;
-  private final List<MaterialReferenceParticipant> participants;
+  private final P4kMaterialReferences references;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -83,9 +82,7 @@ public class P4kSourcelessMaterials {
         sourceless.add(id);
       }
     }
-    Set<UUID> referenced = new HashSet<>();
-    participants.forEach(
-        participant -> referenced.addAll(participant.referencedMaterials(sourceless)));
+    Set<UUID> referenced = references.byAnyone(sourceless);
     for (Material row : rows) {
       UUID id = Objects.requireNonNull(row.getId());
       boolean hide = sourceless.contains(id) && !referenced.contains(id);
