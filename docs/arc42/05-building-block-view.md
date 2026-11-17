@@ -31,14 +31,16 @@
     acme (lego): writes edge-certs, answers HTTP-01 from edge-acme-webroot
 ```
 
-The drawing shows the request path only. Beside it: the frontend and ingest use redis too; the
+The drawing shows the request path only; `redis` stands for `redis-shared`. Beside it: the frontend and ingest use `redis-shared` too, and the frontend alone uses `redis-session` for its sessions; the
 frontend and backend reach keycloak (OIDC, the admin API) and keycloak's SPI calls the backend back;
 keycloak alone owns `db-keycloak`.
 
-The connections run over **seventeen** container networks, each named for what it joins
+The connections run over **nineteen** container networks, each named for what it joins
 (`net-proxy-*`, `net-db-*`, `net-redis-*`, `net-backend-*`, `net-edge-ingress`, `net-acme-egress`,
-`net-monitoring-core`, `net-monitoring-scrape`, `net-blackbox-v6`). Apart from the two monitoring
-networks each joins a small named set — usually one pair, plus a data store's exporter — and a
+`net-monitoring-core`, `net-monitoring-scrape`, `net-monitoring-redis`, `net-blackbox-v6`). Apart
+from `net-monitoring-core` and `net-monitoring-scrape` each joins a small named set — usually one
+pair, plus a data store's exporter; `net-monitoring-redis` holds Prometheus and the two Redis
+exporters alone — and a
 container reaches exactly the containers it shares a network with. The units are in
 [`quadlet/systemd/`](../../quadlet/systemd/).
 
@@ -52,7 +54,8 @@ container reaches exactly the containers it shares a network with. The units are
 | **ingest** | Gate, limit and relay the exchange API for approved clients, the SC Extractor included (§5.5); stage a returned draft in Redis for a one-time browser pickup | Own a database or save anything itself |
 | **keycloak** | Identity, OIDC tokens, the Discord provider and guild/role gate, the KRT theme, the device-grant consent for exchange clients and the `basetool-exchange` admin extension | Store domain data |
 | **db-backend / db-keycloak** | Two separate PostgreSQL instances | Share a cluster — a Keycloak upgrade must not be able to touch domain data |
-| **redis** | Spring Session store, the live-sync and notification pub/sub fanout, the ingest handoffs, the exchange registry mirror and the gateway's byte-bounded exchange partition (ADR-0221) — one instance on three separate networks | Be a cache of record for anything that matters |
+| **redis-session** | The Spring Session store, reached by the frontend alone on its own network (ADR-0388) | Hold anything but sessions |
+| **redis-shared** | The live-sync and notification pub/sub fanout, the ingest handoffs, the exchange registry mirror and the gateway's byte-bounded exchange partition (ADR-0221) — one instance on three separate networks | Be a cache of record for anything that matters |
 
 ## 5.2 Level 2 — inside `backend`
 
@@ -538,7 +541,7 @@ Generated from its own compose file (`docker-compose.monitoring.yml`); it reache
 through `net-monitoring-scrape` and the exporters' data-store networks, and is reached from outside
 only through the edge's `net-proxy-grafana`: **prometheus**,
 **grafana**, **loki**, **tempo**, **alertmanager**, **blackbox-exporter**, two
-**postgres-exporters** and a **redis-exporter** as containers — and **node-exporter**, **alloy** and
+**postgres-exporters** and two **redis-exporters** as containers — and **node-exporter**, **alloy** and
 **podman-exporter** as *host* services. §7.3 says why those three are not containers, and what was
 deleted instead of being carried across. Every container that shares a network with an application
 reaches its management port, so health there is open and everything else answers only to the scrape

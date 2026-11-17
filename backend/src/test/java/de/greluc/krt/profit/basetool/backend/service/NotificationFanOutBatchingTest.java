@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -54,7 +55,7 @@ class NotificationFanOutBatchingTest {
   @Autowired private EntityManagerFactory entityManagerFactory;
 
   @Test
-  void hundredRecipientFanOut_isBatched() {
+  void hundredRecipientFanOut_isBatched() throws Exception {
     List<Notification> fanOut = new ArrayList<>();
     for (int i = 0; i < RECIPIENTS; i++) {
       User recipient = new User();
@@ -76,12 +77,16 @@ class NotificationFanOutBatchingTest {
     stats.setStatisticsEnabled(true);
     stats.clear();
 
-    notificationRepository.saveAll(fanOut);
-    entityManager.flush();
+    long statements =
+        preparedBy(() -> {
+          notificationRepository.saveAll(fanOut);
+          entityManager.flush();
+        });
 
     assertThat(stats.getEntityInsertCount()).isEqualTo(RECIPIENTS);
-    assertThat(stats.getPrepareStatementCount())
+    assertThat(statements)
         .as("100 inserts should reach the database as a few JDBC batches, not 100 statements")
+        .isPositive()
         .isLessThanOrEqualTo(5);
   }
 }

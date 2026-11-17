@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
@@ -36,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -360,7 +360,7 @@ class ItemReconciliationIntegrationTest {
   }
 
   @Test
-  void aRetiredIdStillOffersItsActiveBlueprintsInOneQuery() {
+  void aRetiredIdStillOffersItsActiveBlueprintsInOneQuery() throws Exception {
     Pair pair = pair();
     UUID active =
         insert(
@@ -380,25 +380,16 @@ class ItemReconciliationIntegrationTest {
         pair.retired(),
         pair.canonical());
     entityManager.clear();
-    var statistics =
-        entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
-    boolean enabled = statistics.isStatisticsEnabled();
-    statistics.setStatisticsEnabled(true);
-    try {
-      long before = statistics.getPrepareStatementCount();
 
-      assertThat(orderItems.blueprintsForItem(pair.retired()))
-          .extracting(BlueprintReferenceDto::id)
-          .containsExactly(active);
+    var offered = measured(() -> orderItems.blueprintsForItem(pair.retired()));
 
-      assertThat(statistics.getPrepareStatementCount() - before).isOne();
-    } finally {
-      statistics.setStatisticsEnabled(enabled);
-    }
+    assertThat(offered.result()).extracting(BlueprintReferenceDto::id).containsExactly(active);
+    assertThat(offered.statements()).isOne();
   }
 
   @Test
-  void localIdNormalizationUsesBoundedBatchesAndRetainsUnknownIdsWithoutDuplicates() {
+  void localIdNormalizationUsesBoundedBatchesAndRetainsUnknownIdsWithoutDuplicates()
+      throws Exception {
     Pair pair = pair();
     jdbc.update("DELETE FROM game_item WHERE id = ?", pair.retired());
     jdbc.update(
@@ -412,27 +403,18 @@ class ItemReconciliationIntegrationTest {
     for (int index = 0; index < 499; index++) {
       input.add(UUID.randomUUID());
     }
-    var statistics =
-        entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
-    boolean enabled = statistics.isStatisticsEnabled();
-    statistics.setStatisticsEnabled(true);
-    try {
-      long before = statistics.getPrepareStatementCount();
 
-      List<UUID> resolved = items.resolveLocalIds(input);
+    var resolved = measured(() -> items.resolveLocalIds(input));
 
-      assertThat(resolved)
-          .hasSize(500)
-          .startsWith(pair.canonical())
-          .doesNotContain(pair.retired())
-          .containsAll(input.subList(2, input.size()));
-      assertThat(statistics.getPrepareStatementCount() - before).isEqualTo(2);
-      before = statistics.getPrepareStatementCount();
-      assertThat(items.resolveLocalIds(List.of())).isEmpty();
-      assertThat(statistics.getPrepareStatementCount()).isEqualTo(before);
-    } finally {
-      statistics.setStatisticsEnabled(enabled);
-    }
+    assertThat(resolved.result())
+        .hasSize(500)
+        .startsWith(pair.canonical())
+        .doesNotContain(pair.retired())
+        .containsAll(input.subList(2, input.size()));
+    assertThat(resolved.statements()).isEqualTo(2);
+    var none = measured(() -> items.resolveLocalIds(List.of()));
+    assertThat(none.result()).isEmpty();
+    assertThat(none.statements()).isZero();
   }
 
   @Test
@@ -464,7 +446,7 @@ class ItemReconciliationIntegrationTest {
   }
 
   @Test
-  void redirectBatchUsesOneStatementRegardlessOfTheNumberOfAliases() {
+  void redirectBatchUsesOneStatementRegardlessOfTheNumberOfAliases() throws Exception {
     List<UUID> aliases = new ArrayList<>();
     List<UUID> survivors = new ArrayList<>();
     for (int index = 0; index < 25; index++) {
@@ -479,28 +461,18 @@ class ItemReconciliationIntegrationTest {
       survivors.add(pair.canonical());
     }
     entityManager.clear();
-    var stats =
-        entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
-    boolean enabled = stats.isStatisticsEnabled();
-    stats.setStatisticsEnabled(true);
-    try {
-      long before = stats.getPrepareStatementCount();
 
-      assertThat(items.findLocalIdRedirects(aliases))
-          .hasSize(25)
-          .containsValues(survivors.toArray(UUID[]::new));
+    var redirected = measured(() -> items.findLocalIdRedirects(aliases));
 
-      assertThat(stats.getPrepareStatementCount() - before).isOne();
-      before = stats.getPrepareStatementCount();
+    assertThat(redirected.result()).hasSize(25).containsValues(survivors.toArray(UUID[]::new));
+    assertThat(redirected.statements()).isOne();
 
-      assertThat(items.findAllById(aliases))
-          .extracting(GameItem::getId)
-          .containsExactlyInAnyOrderElementsOf(survivors);
+    var found = measured(() -> items.findAllById(aliases));
 
-      assertThat(stats.getPrepareStatementCount() - before).isOne();
-    } finally {
-      stats.setStatisticsEnabled(enabled);
-    }
+    assertThat(found.result())
+        .extracting(GameItem::getId)
+        .containsExactlyInAnyOrderElementsOf(survivors);
+    assertThat(found.statements()).isOne();
   }
 
   @Test

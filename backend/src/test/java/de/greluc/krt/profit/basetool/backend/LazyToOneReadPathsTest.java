@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -66,7 +67,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
-import jakarta.persistence.EntityManagerFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.time.Instant;
@@ -76,8 +76,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,7 +108,6 @@ class LazyToOneReadPathsTest {
 
   @Autowired private WebApplicationContext context;
   @Autowired private TransactionTemplate transactionTemplate;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private CacheManager cacheManager;
   @Autowired private UserRepository userRepository;
   @Autowired private OrgUnitMembershipRepository membershipRepository;
@@ -174,6 +171,7 @@ class LazyToOneReadPathsTest {
     for (Map.Entry<String, Long> entry : smallCounts.entrySet()) {
       assertThat(largeCounts.get(entry.getKey()))
           .as("statements for %s must not grow with the rows (per-row lazy load?)", entry.getKey())
+          .isPositive()
           .isLessThanOrEqualTo(entry.getValue());
     }
   }
@@ -246,10 +244,7 @@ class LazyToOneReadPathsTest {
     for (Map.Entry<String, Function<Seed, String>> endpoint : endpoints.entrySet()) {
       String url = endpoint.getValue().apply(seed);
       clearCaches();
-      Statistics stats = statistics();
-      stats.clear();
-      call(url, seed);
-      counts.put(endpoint.getKey(), stats.getPrepareStatementCount());
+      counts.put(endpoint.getKey(), preparedBy(() -> call(url, seed)));
       call(url, seed);
     }
     return counts;
@@ -289,12 +284,6 @@ class LazyToOneReadPathsTest {
 
   private void clearCaches() {
     cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
-  }
-
-  private Statistics statistics() {
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
-    return stats;
   }
 
   /**
