@@ -95,6 +95,7 @@ RUN set -eu; \
             -Dspring.security.oauth2.client.provider.aot-training.user-name-attribute=preferred_username \
             -Dapp.backend-url="https://${stub}" \
             -Dspring.data.redis.host="${stub}" \
+            -Dapp.shared-redis.host="${stub}" \
             -Dapp.session.configure-keyspace-notifications=false ;; \
         ingest) set -- \
             -Dspring.security.oauth2.resourceserver.jwt.issuer-uri= \
