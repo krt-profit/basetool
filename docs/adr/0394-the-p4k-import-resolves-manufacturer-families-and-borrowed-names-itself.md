@@ -47,3 +47,13 @@ indexes them.
   `XNAA`, and ArcCorp's becomes `ARCC`.
 - Two rows of one brand (a UEX twin beside the P4K row) are not merged by this rule; that is a
   separate decision.
+
+## Amendment — the brand in a ship's name beats its manufacturer GUID (REQ-P4K-059)
+
+The game files swap Esperia and Vanduul: "Esperia Stinger" carries the Vanduul GUID, "Vanduul
+Scythe" and the NPC Blade and Glaive the Esperia GUID. Our GUID mapping is right, so a manual fix
+was overwritten by the next APPLY. The owner decided on 2026-11-17 that the brand a ship's English
+name begins with wins over a contradicting GUID, as a general rule rather than a curated list. The
+word must name exactly one matched manufacturer, by its name's first word, its code or its class
+name; a borrowed name names none. Checked against LIVE 4.10.200, the rule changes 17 records and
+two stored ship types.

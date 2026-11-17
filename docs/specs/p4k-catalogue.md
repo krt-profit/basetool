@@ -1580,6 +1580,25 @@ preview reports the merges, writes nothing, and matches without the merged rows 
 `P4kShipGoldStandard`, `ShipTypeMergeService` ·
 **ADR:** [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
 
+### REQ-P4K-059 — the brand a ship's name begins with beats a contradicting manufacturer GUID
+
+The game files give some ships another brand's manufacturer GUID: `VNCL_Stinger` ("Esperia
+Stinger") carries Vanduul's, `VNCL_Scythe` ("Vanduul Scythe") and the NPC Blade and Glaive carry
+Esperia's. The import leads, and seeds, a ship's manufacturer from the brand its English name
+begins with: the matched manufacturer whose name's first word, `code` or class name is the ship
+name's first word, when exactly one manufacturer carries that word. A borrowed name (REQ-P4K-058)
+names no brand. Otherwise the manufacturer GUID decides, as before. A change is logged as
+`CHANGED manufacturer_id`.
+
+**Acceptance**
+
+- [x] A ship named "Aegis …" whose GUID names Anvil gets Aegis as manufacturer.
+- [x] A ship whose name agrees with its GUID keeps that brand.
+
+**Enforced by:** `P4kShipBrandImportTest` · **Code:** `P4kShipBrands`,
+`P4kImportContext#shipManufacturer` · **ADR:**
+[ADR-0394](../adr/0394-the-p4k-import-resolves-manufacturer-families-and-borrowed-names-itself.md)
+
 ## Game texts
 
 ### REQ-P4K-033 — every column holding a game text is classified, and game texts and media stay with members
