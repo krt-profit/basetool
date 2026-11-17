@@ -26,7 +26,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -34,13 +33,11 @@ import org.jetbrains.annotations.NotNull;
  * holding the listed GUID of another record of the run is no class-name or name candidate
  * (REQ-P4K-072), since it already stands for that record.
  *
+ * @param listed the GUIDs the catalogue lists for the kind
  * @param <T> the row type
  */
-@RequiredArgsConstructor
-final class P4kListedGuidRules<T extends P4kKeyedRow> implements P4kMatchRules<T> {
-
-  /** The GUIDs the catalogue lists for the kind. */
-  @NotNull private final Set<UUID> listed;
+record P4kListedGuidRules<T extends P4kKeyedRow>(@NotNull Set<UUID> listed)
+    implements P4kMatchRules<T> {
 
   /**
    * Collects the GUIDs of a kind's records.
