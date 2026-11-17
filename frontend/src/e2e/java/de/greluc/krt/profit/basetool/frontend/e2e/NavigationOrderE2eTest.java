@@ -28,8 +28,11 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
+import com.microsoft.playwright.Route;
 import com.microsoft.playwright.options.BoundingBox;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -369,6 +372,91 @@ class NavigationOrderE2eTest {
           assertThat(reset).isDisabled();
           awaitKeys(page, LINK_KEYS, links);
           awaitKeys(page, GROUP_KEYS, groups);
+        });
+  }
+
+  /**
+   * A reset pressed while a move is still being saved waits for that save and is sent with the
+   * version it returned, so the default order comes back instead of a conflict.
+   */
+  @Test
+  void aResetQueuedBehindAMoveCarriesTheMovesVersion() {
+    run(
+        "nav-order-queued-reset",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          startEditing(page);
+          List<String> links = keys(page, LINK_KEYS);
+          List<String> groups = keys(page, GROUP_KEYS);
+          Locator reset =
+              page.locator("#sidebar [data-testid='nav-order-reset'][data-mode='member']");
+          page.locator(MISSIONS_ROW + " [data-reorder-move='down']").click();
+          assertThat(reset).isEnabled();
+          List<Route> held = new ArrayList<>();
+          page.route("**/navigation/order/member/groups", held::add);
+
+          page.locator(OPERATIONS_GROUP_DOWN).click();
+          page.waitForCondition(() -> !held.isEmpty());
+          reset.click();
+          Response queued =
+              page.waitForResponse(
+                  response -> response.url().endsWith("/navigation/order/member/reset"),
+                  () -> held.getFirst().resume());
+
+          assertEquals(200, queued.status(), "the reset must carry the version of the move");
+          assertThat(page.getByTestId("nav-live")).containsText("Standardreihenfolge");
+          awaitKeys(page, LINK_KEYS, links);
+          awaitKeys(page, GROUP_KEYS, groups);
+        });
+  }
+
+  /**
+   * A favourite unstarred while a favourites move is still being saved waits for that save and is
+   * sent with its version and its order, so both changes are stored.
+   */
+  @Test
+  void anUnstarQueuedBehindAFavouriteMoveCarriesTheMovesVersion() {
+    run(
+        "nav-order-queued-unstar",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+          try {
+            page.evaluate(SET_FAVOURITES, List.of("missions.list", "hangar.overview"));
+            page.reload();
+            startEditing(page);
+            List<Route> held = new ArrayList<>();
+            page.route(
+                "**/navigation/favourites",
+                route -> {
+                  if (held.isEmpty()) {
+                    held.add(route);
+                  } else {
+                    route.resume();
+                  }
+                });
+            List<Integer> statuses = new ArrayList<>();
+            page.onResponse(response -> {
+              if (response.url().endsWith("/navigation/favourites")) {
+                statuses.add(response.status());
+              }
+            });
+
+            page.locator(FAVOURITE_ROW.formatted("missions.list") + " [data-reorder-move='down']")
+                .click();
+            page.waitForCondition(() -> !held.isEmpty());
+            page.locator(FAVOURITE_ROW.formatted("hangar.overview") + " [data-favourite-toggle]")
+                .click();
+            held.getFirst().resume();
+            page.waitForCondition(() -> statuses.size() == 2);
+
+            assertEquals(List.of(200, 200), statuses, "the unstar must carry the move's version");
+            awaitKeys(page, FAVOURITE_KEYS, List.of("missions.list"));
+            page.reload();
+            assertEquals(List.of("missions.list"), keys(page, FAVOURITE_KEYS));
+          } finally {
+            E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+            page.evaluate(SET_FAVOURITES, List.of());
+          }
         });
   }
 
