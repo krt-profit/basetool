@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexVehicleDto;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -50,10 +51,16 @@ import org.springframework.util.StringUtils;
  *   <li>{@code findByExternalUuid(dto.uuid)}, only for an unambiguous UUID and an unclaimed row;
  *   <li>the class name the {@code ship_type_uex_alias} table ties {@code dto.id} to, when exactly
  *       one ship type carries it (REQ-DATA-026);
- *   <li>{@code findByNameIgnoreCase(dto.name)}, which backfills {@code external_uuid} and {@code
- *       uex_vehicle_id} on a hit;
+ *   <li>{@code findByNameIgnoreCase} of {@code dto.name}, then of {@code dto.name_full}, each only
+ *       while no other UEX vehicle carries it; a hit backfills {@code external_uuid} and {@code
+ *       uex_vehicle_id} (REQ-DATA-041);
  *   <li>a new row stamped {@link GameItemSourceSystem#UEX_ONLY}.
  * </ol>
+ *
+ * <p>A found row that holds another live UEX vehicle id or another game UUID is not written; a game
+ * UUID several UEX vehicles carry is no evidence either way. A row found by its own UEX vehicle id
+ * whose game UUID is its P4K GUID keeps that UUID, and a differing UEX one is reported as a
+ * disagreement (REQ-DATA-041).
  *
  * <p>On a row with a P4K GUID the manufacturer, cargo, maximum crew and mass are written only while
  * empty; a differing UEX value is reported as {@link SyncEventType#P4K_DISAGREEMENT} (REQ-P4K-031).
@@ -100,7 +107,7 @@ public class UexVehicleService {
             vehicles,
             UexVehicleDto::id,
             UexVehicleDto::uuid,
-            UexVehicleDto::name,
+            List.of(UexVehicleDto::name, UexVehicleDto::nameFull),
             fetched.complete());
     Set<Integer> seenUexVehicleIds = census.ids();
     SyncChunkWriter.Outcome<VehicleOutcome> outcome =
@@ -167,6 +174,7 @@ public class UexVehicleService {
     UUID externalUuid = UexValues.parseUuid(dto.uuid());
 
     Optional<ShipType> existingOpt = shipTypeRepository.findByUexVehicleId(dto.id());
+    final boolean foundById = existingOpt.isPresent();
     if (existingOpt.isEmpty() && externalUuid != null && census.uniqueUuid(externalUuid)) {
       existingOpt =
           shipTypeRepository
@@ -181,8 +189,8 @@ public class UexVehicleService {
         existingOpt = Optional.of(aliased.getFirst());
       }
     }
-    if (existingOpt.isEmpty() && census.uniqueName(dto.name())) {
-      existingOpt = shipTypeRepository.findByNameIgnoreCase(dto.name());
+    if (existingOpt.isEmpty()) {
+      existingOpt = findByUniqueName(dto, census);
     }
 
     if (existingOpt.isPresent()) {
@@ -194,7 +202,9 @@ public class UexVehicleService {
       boolean uuidConflict =
           candidate.getExternalUuid() != null
               && externalUuid != null
-              && !candidate.getExternalUuid().equals(externalUuid);
+              && !census.sharedUuid(externalUuid)
+              && !candidate.getExternalUuid().equals(externalUuid)
+              && !(foundById && isP4kConfirmed(candidate));
       if (sourceConflict || uuidConflict) {
         syncReportService.logUexEvent(
             runId,
@@ -224,6 +234,10 @@ public class UexVehicleService {
     }
 
     P4kLedColumns led = new P4kLedColumns(shipType);
+    if (isP4kConfirmed(shipType)) {
+      led.write(
+          "external_uuid", shipType.getExternalUuid(), externalUuid, shipType::setExternalUuid);
+    }
     Manufacturer manufacturer = resolveManufacturer(dto);
     if (manufacturer != null) {
       led.write(
@@ -253,6 +267,39 @@ public class UexVehicleService {
 
     shipTypeRepository.save(shipType);
     return isNew ? VehicleOutcome.CREATED : VehicleOutcome.UPDATED;
+  }
+
+  /**
+   * Tells whether the row's game UUID is its P4K GUID, which makes it outrank a UEX game UUID
+   * (REQ-DATA-041).
+   *
+   * @param shipType the stored row
+   * @return whether {@code external_uuid} is set and equals {@code p4k_uuid}
+   */
+  private static boolean isP4kConfirmed(@NotNull ShipType shipType) {
+    return shipType.getExternalUuid() != null
+        && shipType.getExternalUuid().equals(shipType.getP4kUuid());
+  }
+
+  /**
+   * Finds the ship type carrying the vehicle's name, else its full name, which matches the in-game
+   * name the P4K import leads into {@code ship_type.name} (REQ-DATA-041); a name another UEX
+   * vehicle also carries is skipped.
+   *
+   * @param dto inbound UEX row
+   * @param census validated source identities and name claims
+   * @return the ship type, or empty when no unique name of the vehicle is stored
+   */
+  private Optional<ShipType> findByUniqueName(UexVehicleDto dto, UexIdentityCensus census) {
+    for (String name : Arrays.asList(dto.name(), dto.nameFull())) {
+      if (census.uniqueName(name)) {
+        Optional<ShipType> ship = shipTypeRepository.findByNameIgnoreCase(name);
+        if (ship.isPresent()) {
+          return ship;
+        }
+      }
+    }
+    return Optional.empty();
   }
 
   /** Persistence outcome of one UEX vehicle. */

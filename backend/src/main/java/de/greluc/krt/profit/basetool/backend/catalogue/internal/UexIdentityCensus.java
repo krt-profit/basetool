@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -60,6 +61,27 @@ public final class UexIdentityCensus {
       @NotNull Function<T, String> uuid,
       @NotNull Function<T, String> name,
       boolean complete) {
+    return of(rows, sourceId, uuid, List.of(name), complete);
+  }
+
+  /**
+   * Counts distinct source identities and records every UUID claimant and every claimant of each
+   * name; a name one row carries and another row carries under a different field is shared.
+   *
+   * @param rows fetched source rows
+   * @param sourceId source-id accessor
+   * @param uuid in-game UUID accessor
+   * @param names the accessors of every source display name a row may be matched by
+   * @param complete whether every required source fetch completed
+   * @param <T> fetched source row type
+   * @return the pre-write identity census
+   */
+  static <T> @NotNull UexIdentityCensus of(
+      @NotNull Collection<T> rows,
+      @NotNull Function<T, Integer> sourceId,
+      @NotNull Function<T, String> uuid,
+      @NotNull List<Function<T, String>> names,
+      boolean complete) {
     UexIdentityCensus census = new UexIdentityCensus(complete);
     for (T row : rows) {
       Integer id = sourceId.apply(row);
@@ -73,9 +95,11 @@ public final class UexIdentityCensus {
       if (parsed != null) {
         census.uuidClaimants.computeIfAbsent(parsed, _ -> new HashSet<>()).add(id);
       }
-      String key = nameKey(name.apply(row));
-      if (key != null) {
-        census.nameClaimants.computeIfAbsent(key, _ -> new HashSet<>()).add(id);
+      for (Function<T, String> name : names) {
+        String key = nameKey(name.apply(row));
+        if (key != null) {
+          census.nameClaimants.computeIfAbsent(key, _ -> new HashSet<>()).add(id);
+        }
       }
     }
     return census;
@@ -119,6 +143,17 @@ public final class UexIdentityCensus {
    */
   boolean uniqueUuid(@Nullable UUID uuid) {
     return complete && uuid != null && uuidClaimants.getOrDefault(uuid, Set.of()).size() == 1;
+  }
+
+  /**
+   * Tells whether several source ids of this feed claim the UUID, which makes it no identity
+   * evidence for any of them.
+   *
+   * @param uuid incoming game UUID
+   * @return whether more than one source id carries it
+   */
+  boolean sharedUuid(@Nullable UUID uuid) {
+    return uuid != null && uuidClaimants.getOrDefault(uuid, Set.of()).size() > 1;
   }
 
   /**
