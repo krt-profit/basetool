@@ -1,0 +1,63 @@
+# ADR-0392 — The P4K import resolves ship identity conflicts itself
+
+- **Status:** Accepted
+- **Date:** 2026-11-17
+- **Deciders:** @greluc
+- **Related:** spec [`p4k-catalogue.md`](../specs/p4k-catalogue.md) (REQ-P4K-007, REQ-P4K-010,
+  REQ-P4K-016, REQ-P4K-032, REQ-P4K-050) · [ADR-0335](0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) ·
+  [ADR-0341](0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) ·
+  [ADR-0379](0379-a-wiki-vehicle-follows-its-p4k-guid-across-a-game-uuid-change.md)
+
+## Context
+
+ADR-0335 lets the P4K import match and stamp, but never merge: every ambiguity becomes a review
+case. For ships this did not hold up. After the 4.10.2 APPLY, 363 ship cases were open. Checked
+against the LIVE 4.10.200 catalogue:
+
+- 328 were copies of a ship that already has a ship type: NPC crews (`*_PU_AI_*`, `*_AI_Super`),
+  mission targets (`*_Unmanned_*`), wrecks, tutorial and event editions. They carry the ship's
+  in-game name and usually its variant group. No admin decision can turn them into anything but
+  "this is that ship".
+- 22 belonged to records the catalogue no longer lists. Ship cases were never closed by a run, unlike
+  those of manufacturers and of rows without a GUID.
+- Six ship types held the GUID of a same-name edition of their ship (`ANVL_Carrack_BIS2950`,
+  `RSI_Polaris_Collector_Military`, …) while the base record was unclaimed.
+- Five rows the P4K once seeded are NPC variants nobody references.
+- The 4.10.200 build drops `AEGS_Hammerhead` and the old Constellation Mk IV records in favour of
+  `_GS` records. The sweep would retire the stored ship types, 35 hangar and mission references on
+  the Andromeda alone.
+
+The catalogue carries the facts that decide all of these: `variantOf` groups structurally
+identical ships, `playability` says which ships a player can own, and the in-game name says what a
+member sees.
+
+## Decision
+
+The P4K import decides ship identity itself wherever the catalogue's facts decide it, and leaves a
+case only where they do not.
+
+1. **Covered copies (REQ-P4K-050).** A ship record is covered by the stored ship type the class or
+   name step finds when both carry the same in-game name and the record is a variant of a group
+   that ship type holds a member of, or a ship no player owns. It gets no row and no case. The base
+   of a group is never covered by a ship type holding one of its variants.
+2. **Self-settling ship cases (REQ-P4K-050).** An APPLY closes the open ship cases it no longer
+   finds and reopens closed ones it finds again, as it does for manufacturers; an admin's decision
+   is never touched.
+3. **Identity follows the base and the successor.** A ship type stamped with a same-name variant
+   whose base is unclaimed moves to the base GUID; a ship type whose GUID left a complete catalogue
+   follows the single unclaimed player record carrying its in-game name.
+4. **Seeded NPC rows retire themselves.** A row an earlier seeding created whose record no rule
+   would create any more, and which nothing references, is hidden instead of reviewed.
+5. **Twins converge.** Two ship types that the catalogue shows to be the same ship are merged by a
+   ship-type merge that moves every reference through the owning modules and keeps the retired id
+   resolvable.
+
+## Consequences
+
+- The review list holds only what the catalogue cannot decide; the next APPLY of 4.10.200 closes
+  the copies and the cases of vanished records.
+- A covered record is visible in the change report as `COVERED`, so nothing disappears silently.
+- REQ-P4K-007's "the import never merges" stays true for rows two GUIDs could claim; decisions 3–5
+  are bounded by unique candidates and fall back to a case otherwise.
+- Decisions 3–5 need the ship-type merge and the reference probe across modules; they land after
+  decisions 1 and 2.

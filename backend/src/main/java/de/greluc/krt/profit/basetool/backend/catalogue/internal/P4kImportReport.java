@@ -121,6 +121,17 @@ public final class P4kImportReport {
   }
 
   /**
+   * Records a catalogue record a stored row already stands for, which needs neither a row of its
+   * own nor a review case (REQ-P4K-050).
+   *
+   * @param kind the kind
+   * @param record the record
+   */
+  public void covered(@NotNull P4kKind kind, @NotNull P4kRecord record) {
+    add(row(kind, record, P4kChangeType.COVERED));
+  }
+
+  /**
    * Records a row the run created.
    *
    * @param kind the kind

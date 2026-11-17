@@ -28,6 +28,12 @@ public enum P4kChangeType {
   /** A catalogue record without a Basetool row, with its identifiers (REQ-P4K-008). */
   UNMATCHED,
 
+  /**
+   * A catalogue record a stored row of its variant group or name already stands for, so it needs
+   * neither a row nor a review case (REQ-P4K-050).
+   */
+  COVERED,
+
   /** A review case the run found (REQ-P4K-016); {@code field_name} holds its reason. */
   REVIEW,
 

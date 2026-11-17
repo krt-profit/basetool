@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -36,7 +37,8 @@ import org.jetbrains.annotations.Nullable;
  * GUID first, then the SC Wiki UUID, then a class name and a name that each identify exactly one
  * row and one record. The import never merges: a key that several rows or records share, a row that
  * already holds another GUID and a row two records claim each open a {@code GUID_CONFLICT} review
- * case and leave the rows as they are.
+ * case and leave the rows as they are, unless a row the key found already stands for the record
+ * ({@code covers}, REQ-P4K-050), which then needs neither a row of its own nor a case.
  *
  * @param <T> the row type
  * @param kind the kind
@@ -47,6 +49,7 @@ import org.jetbrains.annotations.Nullable;
  * @param byClassName finds the rows of a class name, ignoring case
  * @param byName finds the rows of a name, ignoring case
  * @param seeded whether a row was created by an earlier seeding (REQ-P4K-010)
+ * @param covers whether a found row already stands for the record of a GUID it does not hold
  */
 public record P4kRowMatcher<T extends P4kKeyedRow>(
     @NotNull P4kKind kind,
@@ -56,14 +59,48 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
     @NotNull String wikiColumn,
     @NotNull Function<String, List<T>> byClassName,
     @NotNull Function<String, List<T>> byName,
-    @NotNull Predicate<T> seeded) {
+    @NotNull Predicate<T> seeded,
+    @NotNull BiPredicate<UUID, T> covers) {
+
+  /**
+   * Creates the matcher of a kind no stored row covers a record of another GUID for.
+   *
+   * @param kind the kind
+   * @param byP4kUuid finds the row holding a P4K GUID
+   * @param byWikiUuid finds the row holding a SC Wiki UUID
+   * @param wikiUuid reads the row's SC Wiki UUID
+   * @param wikiColumn the column holding the SC Wiki UUID, for the report
+   * @param byClassName finds the rows of a class name, ignoring case
+   * @param byName finds the rows of a name, ignoring case
+   * @param seeded whether a row was created by an earlier seeding (REQ-P4K-010)
+   */
+  public P4kRowMatcher(
+      @NotNull P4kKind kind,
+      @NotNull Function<UUID, Optional<T>> byP4kUuid,
+      @NotNull Function<UUID, Optional<T>> byWikiUuid,
+      @NotNull Function<T, UUID> wikiUuid,
+      @NotNull String wikiColumn,
+      @NotNull Function<String, List<T>> byClassName,
+      @NotNull Function<String, List<T>> byName,
+      @NotNull Predicate<T> seeded) {
+    this(
+        kind,
+        byP4kUuid,
+        byWikiUuid,
+        wikiUuid,
+        wikiColumn,
+        byClassName,
+        byName,
+        seeded,
+        (_, _) -> false);
+  }
 
   /**
    * What matching one record found.
    *
    * @param <T> the row type
    */
-  public sealed interface Match<T> permits Matched, Unmatched, Held {}
+  public sealed interface Match<T> permits Matched, Unmatched, Held, Covered {}
 
   /**
    * One row, accepted for enrichment and stamping.
@@ -88,6 +125,14 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
    * @param <T> the row type
    */
   public record Held<T>() implements Match<T> {}
+
+  /**
+   * A stored row that already stands for the record: nothing is stamped, created or reviewed.
+   *
+   * @param row the covering row
+   * @param <T> the row type
+   */
+  public record Covered<T>(@NotNull T row) implements Match<T> {}
 
   /**
    * Writes the values a reconciler's kind leads onto a matched row.
@@ -139,6 +184,7 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       }
       case Unmatched<T>(UUID guid) -> unmatched.accept(guid);
       case Held<T> _ -> {}
+      case Covered<T> _ -> context.getReport().covered(kind, record);
     }
   }
 
@@ -213,6 +259,10 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
     if (candidates.isEmpty()) {
       return null;
     }
+    Optional<T> covering = candidates.stream().filter(row -> covers.test(guid, row)).findFirst();
+    if (covering.isPresent()) {
+      return new Covered<>(covering.get());
+    }
     if (candidates.size() > 1 || repeated) {
       context.getReport().review(kind, record, guid, P4kReviewReason.GUID_CONFLICT, null);
       return new Held<>();
@@ -240,6 +290,9 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       @NotNull P4kImportContext context) {
     P4kImportReport report = context.getReport();
     UUID held = row.getP4kUuid();
+    if (held != null && !held.equals(guid) && covers.test(guid, row)) {
+      return new Covered<>(row);
+    }
     if ((held != null && !held.equals(guid)) || !context.claim(kind, row.getId(), guid)) {
       report.review(kind, record, guid, P4kReviewReason.GUID_CONFLICT, row.getId());
       return new Held<>();
