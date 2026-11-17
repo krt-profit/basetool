@@ -42,8 +42,12 @@ ENV_DIR_ON_HOST = "/etc/basetool/env.d"
 
 FRONT_END = {
     "edge": {
-        "publish": ["127.0.0.1:8080:8080", "[::1]:8080:8080",
-                    "127.0.0.1:8443:8443", "[::1]:8443:8443"],
+        "publish": [
+            "127.0.0.1:8080:8080",
+            "[::1]:8080:8080",
+            "127.0.0.1:8443:8443",
+            "[::1]:8443:8443",
+        ],
         "role_var": "basetool_host_edge_trusted_proxies",
         "pins": {
             "net-edge-ingress": "172.28.15.10",
@@ -56,10 +60,10 @@ FRONT_END = {
 }
 
 RUN_AS = {
-    "db-backend":  {"uid": 70,  "role_path": "{{ basetool_host_data_dir }}/db-backend"},
-    "db-keycloak": {"uid": 70,  "role_path": "{{ basetool_host_data_dir }}/db-keycloak"},
+    "db-backend": {"uid": 70, "role_path": "{{ basetool_host_data_dir }}/db-backend"},
+    "db-keycloak": {"uid": 70, "role_path": "{{ basetool_host_data_dir }}/db-keycloak"},
     "redis-session": {"uid": 999, "role_path": "{{ basetool_host_data_dir }}/redis"},
-    "redis-shared":  {"uid": 999, "role_path": "{{ basetool_host_data_dir }}/redis-shared"},
+    "redis-shared": {"uid": 999, "role_path": "{{ basetool_host_data_dir }}/redis-shared"},
 }
 
 ROLE_DEFAULTS = os.path.join(REPO, "ansible", "roles", "basetool_host", "defaults", "main.yml")
@@ -76,9 +80,13 @@ READ_ONLY: dict[str, dict[str, Any]] = {
     "redis-session-exporter": {},
     "redis-shared-exporter": {},
     "acme": {},
-    "keycloak": {"tmpfs": ["/opt/keycloak/lib/quarkus:rw,tmpcopyup",
-                           "/opt/keycloak/data/transaction-logs:rw",
-                           "/opt/keycloak/data/tmp:rw"]},
+    "keycloak": {
+        "tmpfs": [
+            "/opt/keycloak/lib/quarkus:rw,tmpcopyup",
+            "/opt/keycloak/data/transaction-logs:rw",
+            "/opt/keycloak/data/tmp:rw",
+        ]
+    },
     "backend": {},
     "frontend": {},
     "ingest": {},
@@ -169,7 +177,8 @@ VAR_REF_RE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*(?:[:-][^{}]*)?\}")
 
 QUADLET_ONLY_ENV: dict[str, dict[str, str]] = {
     "redis-session": {
-        "REDIS_PASSWORD": "${REDIS_SESSION_PASSWORD:?REDIS_SESSION_PASSWORD must be set in .env}"},
+        "REDIS_PASSWORD": "${REDIS_SESSION_PASSWORD:?REDIS_SESSION_PASSWORD must be set in .env}"
+    },
     "redis-shared": {"REDIS_PASSWORD": "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}"},
 }
 
@@ -180,22 +189,43 @@ START_TIMEOUT_MARGIN_SEC = 60
 STOP_TIMEOUT_MARGIN_SEC = 15
 
 
-QUADLET_INTERNAL_NETWORKS = frozenset({
-    "net-db-backend",
-    "net-db-keycloak",
-    "net-redis-backend",
-    "net-redis-frontend",
-    "net-redis-ingest",
-    "net-redis-session",
-})
+QUADLET_INTERNAL_NETWORKS = frozenset(
+    {
+        "net-db-backend",
+        "net-db-keycloak",
+        "net-redis-backend",
+        "net-redis-frontend",
+        "net-redis-ingest",
+        "net-redis-session",
+    }
+)
 
 
 TRANSLATED_SERVICE_KEYS = {
-    "image", "profiles", "user", "read_only", "cap_drop", "cap_add",
-    "security_opt", "tmpfs", "ports", "networks", "volumes", "environment", "command",
-    "entrypoint", "healthcheck", "deploy", "ulimits", "pids_limit", "restart",
-    "stop_grace_period", "depends_on", "oom_score_adj",
-    "extra_hosts", "init",
+    "image",
+    "profiles",
+    "user",
+    "read_only",
+    "cap_drop",
+    "cap_add",
+    "security_opt",
+    "tmpfs",
+    "ports",
+    "networks",
+    "volumes",
+    "environment",
+    "command",
+    "entrypoint",
+    "healthcheck",
+    "deploy",
+    "ulimits",
+    "pids_limit",
+    "restart",
+    "stop_grace_period",
+    "depends_on",
+    "oom_score_adj",
+    "extra_hosts",
+    "init",
 }
 
 IGNORED_SERVICE_KEYS = {
@@ -216,8 +246,9 @@ IGNORED_SERVICE_KEYS = {
 
 KNOWN_SERVICE_KEYS = TRANSLATED_SERVICE_KEYS | set(IGNORED_SERVICE_KEYS)
 
-assert not (TRANSLATED_SERVICE_KEYS & set(IGNORED_SERVICE_KEYS)), \
+assert not (TRANSLATED_SERVICE_KEYS & set(IGNORED_SERVICE_KEYS)), (
     "a compose key cannot be both translated and ignored"
+)
 assert all(IGNORED_SERVICE_KEYS.values()), "every ignored key needs a stated reason"
 
 KNOWN_LIMIT_KEYS = {"memory", "cpus", "pids"}
@@ -304,6 +335,7 @@ def _image_defaults(image: str, service: str) -> str:
     Raises:
         Refusal: for a variable with no default, which cannot be resolved without guessing.
     """
+
     def default_of(match: "re.Match[str]") -> str:
         name, default = match.group(1), match.group(2)
         if default is None:
@@ -435,9 +467,7 @@ def _sh_quote(word: str) -> str:
     return "'" + word.replace("'", "'\\''") + "'"
 
 
-def _health(
-    hc: dict[str, Any], env: dict[str, Any], service: str
-) -> tuple[list[str], list[str]]:
+def _health(hc: dict[str, Any], env: dict[str, Any], service: str) -> tuple[list[str], list[str]]:
     """Translate a compose healthcheck into Quadlet ``Health*`` keys.
 
     Variable references are left for the container to expand, rewritten from host-side names to
@@ -1033,12 +1063,14 @@ def _verify_internal_networks(
         lines = text.splitlines()
         nets = [
             line.split("=", 1)[1].split(":", 1)[0].removesuffix(".network")
-            for line in lines if line.startswith("Network=")
+            for line in lines
+            if line.startswith("Network=")
         ]
         if not nets or not all(internal(net) for net in nets):
             continue
         reaching_out = [
-            line for line in lines
+            line
+            for line in lines
             if line.startswith("PublishPort=")
             or (line.startswith("AddHost=") and line.endswith(":host-gateway"))
         ]
@@ -1142,10 +1174,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         ``0`` clean, ``1`` on drift or a refusal.
     """
     p = argparse.ArgumentParser(prog="generate-quadlet.py")
-    p.add_argument("--check", action="store_true",
-                   help="fail on drift instead of writing")
-    p.add_argument("--list", action="store_true",
-                   help="print what happens to each service and exit")
+    p.add_argument("--check", action="store_true", help="fail on drift instead of writing")
+    p.add_argument(
+        "--list", action="store_true", help="print what happens to each service and exit"
+    )
     args = p.parse_args(list(sys.argv[1:] if argv is None else argv))
 
     if args.list:
@@ -1168,19 +1200,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             if actual != content:
                 drift.append(rel)
                 for line in difflib.unified_diff(
-                        actual.splitlines(), content.splitlines(),
-                        fromfile=f"{rel} (on disk)", tofile=f"{rel} (generated)", lineterm=""):
+                    actual.splitlines(),
+                    content.splitlines(),
+                    fromfile=f"{rel} (on disk)",
+                    tofile=f"{rel} (generated)",
+                    lineterm="",
+                ):
                     print(line)
         stale = []
         for root in (OUT_UNITS, OUT_VARS):
-            for name in (os.listdir(root) if os.path.isdir(root) else []):
+            for name in os.listdir(root) if os.path.isdir(root) else []:
                 rel = os.path.relpath(os.path.join(root, name), REPO).replace(os.sep, "/")
                 if rel not in files:
                     stale.append(rel)
         if drift or stale:
-            print(f"\ngenerate-quadlet: {len(drift)} file(s) drifted, {len(stale)} stale: "
-                  f"{', '.join(sorted(drift + stale))}", file=sys.stderr)
-            print("Run `python scripts/generate-quadlet.py` and commit the result.", file=sys.stderr)
+            print(
+                f"\ngenerate-quadlet: {len(drift)} file(s) drifted, {len(stale)} stale: "
+                f"{', '.join(sorted(drift + stale))}",
+                file=sys.stderr,
+            )
+            print(
+                "Run `python scripts/generate-quadlet.py` and commit the result.", file=sys.stderr
+            )
             return 1
         print(f"generate-quadlet: {len(files)} unit(s) match the compose files.")
         return 0

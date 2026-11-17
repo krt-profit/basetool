@@ -43,10 +43,19 @@ DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --no-quiesce) QUIESCE=false; shift ;;
-    --skip-upload) SKIP_UPLOAD=true; shift ;;
-    --dry-run) DRY_RUN=true; shift ;;
-    -h|--help)
+    --no-quiesce)
+      QUIESCE=false
+      shift
+      ;;
+    --skip-upload)
+      SKIP_UPLOAD=true
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    -h | --help)
       cat <<'USAGE'
 Usage: backup.sh [--no-quiesce] [--skip-upload] [--dry-run]
 
@@ -69,14 +78,19 @@ Configuration (in /etc/basetool/deploy/backup.env, sourced at start):
   RCLONE_CONFIG       path to rclone.conf with the `nextcloud` webdav remote
   BASETOOL_KEEP_DAILY / BASETOOL_KEEP_WEEKLY / BASETOOL_KEEP_MONTHLY  (GFS retention; 7/4/6)
 USAGE
-      exit 0 ;;
-    *) echo "FATAL: unknown argument: $1 (try --help)" >&2; exit 1 ;;
+      exit 0
+      ;;
+    *)
+      echo "FATAL: unknown argument: $1 (try --help)" >&2
+      exit 1
+      ;;
   esac
 done
 
 write_backup_metrics() {
   local now dur
-  now="$(date +%s)"; dur=$(( now - START_EPOCH ))
+  now="$(date +%s)"
+  dur=$((now - START_EPOCH))
   {
     echo "# HELP basetool_backup_last_success_timestamp Unix time of the last successful off-site backup."
     echo "# TYPE basetool_backup_last_success_timestamp gauge"
@@ -86,7 +100,7 @@ write_backup_metrics() {
     echo "basetool_backup_duration_seconds ${dur}"
     echo "# HELP basetool_backup_retention_limit Most snapshots the configured GFS retention can keep."
     echo "# TYPE basetool_backup_retention_limit gauge"
-    echo "basetool_backup_retention_limit $(( KEEP_DAILY + KEEP_WEEKLY + KEEP_MONTHLY ))"
+    echo "basetool_backup_retention_limit $((KEEP_DAILY + KEEP_WEEKLY + KEEP_MONTHLY))"
     if [[ "${SNAPSHOT_COUNT:-}" =~ ^[0-9]+$ ]]; then
       echo "# HELP basetool_backup_snapshots Snapshots in the off-site repository after retention was applied."
       echo "# TYPE basetool_backup_snapshots gauge"
@@ -169,13 +183,13 @@ log "dumping backend database (krt_basetool)"
 # shellcheck disable=SC2016
 rt_exec db-backend sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 -Fc "$POSTGRES_DB"' \
-  > "${STAGING}/krt_basetool.dump"
+  >"${STAGING}/krt_basetool.dump"
 
 log "dumping Keycloak database (keycloak)"
 # shellcheck disable=SC2016
 rt_exec db-keycloak sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -h 127.0.0.1 -p 15433 -Fc "$POSTGRES_DB"' \
-  > "${STAGING}/keycloak.dump"
+  >"${STAGING}/keycloak.dump"
 
 for _vol in edge-certs edge-acme-state edge-acme-webroot; do
   if ! rt_volume_exists "${_vol}"; then
@@ -183,8 +197,8 @@ for _vol in edge-certs edge-acme-state edge-acme-webroot; do
     continue
   fi
   if rt_read_mount "${_vol}" "${HELPER_IMAGE}" tar -C /src -cz . \
-       > "${STAGING}/${_vol}.tar.gz" 2>/dev/null \
-     && [[ -s "${STAGING}/${_vol}.tar.gz" ]]; then
+    >"${STAGING}/${_vol}.tar.gz" 2>/dev/null \
+    && [[ -s "${STAGING}/${_vol}.tar.gz" ]]; then
     log "  ${_vol}: captured"
   else
     rm -f "${STAGING}/${_vol}.tar.gz"
@@ -196,8 +210,8 @@ capture_redis_acl() {
   local instance="$1" path="$2" artifact="$3"
   if [[ -f "${path}" ]]; then
     if rt_read_mount "$(dirname "${path}")" "${HELPER_IMAGE}" \
-         cat "/src/$(basename "${path}")" > "${STAGING}/config/${artifact}" 2>/dev/null \
-       && [[ -s "${STAGING}/config/${artifact}" ]]; then
+      cat "/src/$(basename "${path}")" >"${STAGING}/config/${artifact}" 2>/dev/null \
+      && [[ -s "${STAGING}/config/${artifact}" ]]; then
       log "capturing the ${instance} ACL (${path})"
     else
       rm -f "${STAGING}/config/${artifact}"
@@ -214,8 +228,8 @@ log "capturing host config (basetool.env, keystore, realm-export, providers)"
 cp -p "${ENV_FILE}" "${STAGING}/config/dotenv"
 if [[ -f "${KEYSTORE_PATH}" ]]; then
   if rt_read_mount "$(dirname "${KEYSTORE_PATH}")" "${HELPER_IMAGE}" \
-       cat "/src/$(basename "${KEYSTORE_PATH}")" > "${STAGING}/config/keystore.p12" 2>/dev/null \
-     && [[ -s "${STAGING}/config/keystore.p12" ]]; then
+    cat "/src/$(basename "${KEYSTORE_PATH}")" >"${STAGING}/config/keystore.p12" 2>/dev/null \
+    && [[ -s "${STAGING}/config/keystore.p12" ]]; then
     :
   else
     rm -f "${STAGING}/config/keystore.p12"
@@ -226,8 +240,8 @@ else
 fi
 if [[ -d "${INTERNAL_TLS_DIR}" ]]; then
   if rt_read_mount "${INTERNAL_TLS_DIR}" "${HELPER_IMAGE}" tar -C /src -cf - . \
-       > "${STAGING}/config/internal-tls.tar" 2>/dev/null \
-     && [[ -s "${STAGING}/config/internal-tls.tar" ]]; then
+    >"${STAGING}/config/internal-tls.tar" 2>/dev/null \
+    && [[ -s "${STAGING}/config/internal-tls.tar" ]]; then
     :
   else
     rm -f "${STAGING}/config/internal-tls.tar"
@@ -235,7 +249,7 @@ if [[ -d "${INTERNAL_TLS_DIR}" ]]; then
   fi
 fi
 if [[ -f "${CONFIG_DIR}/realm-export.json" ]]; then
-  if rt_read_mount "${CONFIG_DIR}" "${HELPER_IMAGE}" cat /src/realm-export.json        > "${STAGING}/config/realm-export.json" 2>/dev/null      && [[ -s "${STAGING}/config/realm-export.json" ]]; then
+  if rt_read_mount "${CONFIG_DIR}" "${HELPER_IMAGE}" cat /src/realm-export.json >"${STAGING}/config/realm-export.json" 2>/dev/null && [[ -s "${STAGING}/config/realm-export.json" ]]; then
     :
   else
     rm -f "${STAGING}/config/realm-export.json"
@@ -266,7 +280,7 @@ if rt_monitoring_configured && rt_is_running grafana; then
   fi
   if [[ -f "${MON_DATA}/grafana/grafana.db" ]]; then
     rt_read_mount "${MON_DATA}/grafana" "${HELPER_IMAGE}" \
-      cat /src/grafana.db > "${STAGING}/monitoring/grafana.db" 2>/dev/null \
+      cat /src/grafana.db >"${STAGING}/monitoring/grafana.db" 2>/dev/null \
       || log "WARN: could not capture grafana.db"
   else
     log "WARN: grafana.db not found under ${MON_DATA}/grafana"
@@ -274,11 +288,11 @@ if rt_monitoring_configured && rt_is_running grafana; then
   [[ "${grafana_stopped}" == "true" ]] && { rt_monitoring_up grafana >/dev/null 2>&1 || log "WARN: failed to restart grafana"; }
   log "capturing monitoring secrets + certs"
   rt_read_mount "${MON_CONFIG}" "${HELPER_IMAGE}" \
-    sh -c 'tar -C /src -cz secrets certs 2>/dev/null || true' > "${STAGING}/monitoring/secrets.tar.gz" 2>/dev/null \
+    sh -c 'tar -C /src -cz secrets certs 2>/dev/null || true' >"${STAGING}/monitoring/secrets.tar.gz" 2>/dev/null \
     || log "WARN: could not archive monitoring secrets/certs"
   log "capturing Alertmanager state (silences + notification log)"
   rt_read_mount "${MON_DATA}/alertmanager" "${HELPER_IMAGE}" \
-    sh -c 'tar -C /src -cz . 2>/dev/null || true' > "${STAGING}/monitoring/alertmanager.tar.gz" 2>/dev/null \
+    sh -c 'tar -C /src -cz . 2>/dev/null || true' >"${STAGING}/monitoring/alertmanager.tar.gz" 2>/dev/null \
     || log "WARN: could not archive alertmanager state"
 else
   log "monitoring stack not present/running — skipping monitoring artifact capture"
@@ -294,8 +308,8 @@ if [[ "$(date -u +%u)" == "7" ]] && rt_monitoring_configured && rt_is_running pr
   snap_name="$(printf '%s' "${snap_json}" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')"
   if [[ "${snap_name}" =~ ^[0-9A-Za-z-]+$ ]]; then
     if rt_read_mount "${MON_DATA}/prometheus/snapshots/${snap_name}" "${HELPER_IMAGE}" \
-         sh -c 'tar -C /src -cz .' > "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" 2>/dev/null \
-       && [[ -s "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" ]]; then
+      sh -c 'tar -C /src -cz .' >"${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" 2>/dev/null \
+      && [[ -s "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" ]]; then
       log "captured Prometheus TSDB snapshot ${snap_name}"
     else
       rm -f "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz"
@@ -326,7 +340,7 @@ log "verifying repository integrity (restic check)"
 restic check
 
 SNAPSHOT_COUNT="$(restic_snapshot_count "${BACKUP_TAG}" || true)"
-log "snapshots kept: ${SNAPSHOT_COUNT:-unknown} (retention allows at most $(( KEEP_DAILY + KEEP_WEEKLY + KEEP_MONTHLY )))"
+log "snapshots kept: ${SNAPSHOT_COUNT:-unknown} (retention allows at most $((KEEP_DAILY + KEEP_WEEKLY + KEEP_MONTHLY)))"
 
 write_backup_metrics
 

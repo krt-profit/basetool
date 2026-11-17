@@ -91,8 +91,10 @@ def _open_provider(provider: str) -> int:
         DpopKeyError: if the provider is not present.
     """
     handle = ctypes.c_size_t(0)
-    _check(_ncrypt().NCryptOpenStorageProvider(ctypes.byref(handle), provider, 0),
-           f"opening {provider}")
+    _check(
+        _ncrypt().NCryptOpenStorageProvider(ctypes.byref(handle), provider, 0),
+        f"opening {provider}",
+    )
     return handle.value
 
 
@@ -165,8 +167,9 @@ class CngKey:
                     raise
                 continue
             key_handle = ctypes.c_size_t(0)
-            status = _ncrypt().NCryptOpenKey(provider_handle, ctypes.byref(key_handle), name, 0,
-                                             _SILENT)
+            status = _ncrypt().NCryptOpenKey(
+                provider_handle, ctypes.byref(key_handle), name, 0, _SILENT
+            )
             if status == _OK:
                 return cls(provider_handle, key_handle.value, name, candidate)
             _free(provider_handle)
@@ -221,11 +224,26 @@ class CngKey:
         digest = hashlib.sha256(data).digest()
         lib = _ncrypt()
         size = ctypes.c_ulong(0)
-        _check(lib.NCryptSignHash(self._handle(), None, digest, len(digest), None, 0,
-                                  ctypes.byref(size), _SILENT), "NCryptSignHash")
+        _check(
+            lib.NCryptSignHash(
+                self._handle(), None, digest, len(digest), None, 0, ctypes.byref(size), _SILENT
+            ),
+            "NCryptSignHash",
+        )
         signature = ctypes.create_string_buffer(size.value)
-        _check(lib.NCryptSignHash(self._handle(), None, digest, len(digest), signature, size.value,
-                                  ctypes.byref(size), _SILENT), "NCryptSignHash")
+        _check(
+            lib.NCryptSignHash(
+                self._handle(),
+                None,
+                digest,
+                len(digest),
+                signature,
+                size.value,
+                ctypes.byref(size),
+                _SILENT,
+            ),
+            "NCryptSignHash",
+        )
         if size.value != 2 * P256_COORDINATE_BYTES:
             raise DpopKeyError(f"unexpected signature length {size.value}")
         return signature.raw[: size.value]
@@ -239,8 +257,9 @@ class CngKey:
         if len(signature) != 2 * P256_COORDINATE_BYTES:
             return False
         digest = hashlib.sha256(data).digest()
-        status = _ncrypt().NCryptVerifySignature(self._handle(), None, digest, len(digest),
-                                                 signature, len(signature), _SILENT)
+        status = _ncrypt().NCryptVerifySignature(
+            self._handle(), None, digest, len(digest), signature, len(signature), _SILENT
+        )
         if _code(status) == _BAD_SIGNATURE:
             return False
         _check(status, "NCryptVerifySignature")
@@ -250,8 +269,14 @@ class CngKey:
         """Returns the key's export policy flags, or ``None`` when the provider does not say."""
         value = ctypes.c_ulong(0)
         size = ctypes.c_ulong(0)
-        status = _ncrypt().NCryptGetProperty(self._handle(), _EXPORT_POLICY, ctypes.byref(value),
-                                             ctypes.sizeof(value), ctypes.byref(size), _SILENT)
+        status = _ncrypt().NCryptGetProperty(
+            self._handle(),
+            _EXPORT_POLICY,
+            ctypes.byref(value),
+            ctypes.sizeof(value),
+            ctypes.byref(size),
+            _SILENT,
+        )
         return value.value if status == _OK else None
 
     def delete(self) -> None:
@@ -292,12 +317,20 @@ class CngKey:
         provider_handle = _open_provider(provider)
         key_handle = ctypes.c_size_t(0)
         try:
-            _check(lib.NCryptCreatePersistedKey(provider_handle, ctypes.byref(key_handle),
-                                                _ALGORITHM, name, 0, 0),
-                   f"creating the key {name!r}")
+            _check(
+                lib.NCryptCreatePersistedKey(
+                    provider_handle, ctypes.byref(key_handle), _ALGORITHM, name, 0, 0
+                ),
+                f"creating the key {name!r}",
+            )
             policy = ctypes.c_ulong(0)
-            status = lib.NCryptSetProperty(key_handle.value, _EXPORT_POLICY, ctypes.byref(policy),
-                                           ctypes.sizeof(policy), _PERSIST)
+            status = lib.NCryptSetProperty(
+                key_handle.value,
+                _EXPORT_POLICY,
+                ctypes.byref(policy),
+                ctypes.sizeof(policy),
+                _PERSIST,
+            )
             if provider == SOFTWARE_PROVIDER:
                 _check(status, "setting the export policy")
             _check(lib.NCryptFinalizeKey(key_handle.value, _SILENT), f"finalising the key {name!r}")
@@ -317,13 +350,15 @@ class CngKey:
         """Tells whether the provider hands out the private key, which it must refuse."""
         lib = _ncrypt()
         size = ctypes.c_ulong(0)
-        status = lib.NCryptExportKey(self._handle(), 0, _PRIVATE_BLOB, None, None, 0,
-                                     ctypes.byref(size), _SILENT)
+        status = lib.NCryptExportKey(
+            self._handle(), 0, _PRIVATE_BLOB, None, None, 0, ctypes.byref(size), _SILENT
+        )
         if status != _OK or size.value == 0:
             return False
         blob = ctypes.create_string_buffer(size.value)
-        status = lib.NCryptExportKey(self._handle(), 0, _PRIVATE_BLOB, None, blob, size.value,
-                                     ctypes.byref(size), _SILENT)
+        status = lib.NCryptExportKey(
+            self._handle(), 0, _PRIVATE_BLOB, None, blob, size.value, ctypes.byref(size), _SILENT
+        )
         ctypes.memset(blob, 0, len(blob))
         return status == _OK
 
@@ -331,14 +366,25 @@ class CngKey:
         """Exports the public blob and turns it into a JWK."""
         lib = _ncrypt()
         size = ctypes.c_ulong(0)
-        _check(lib.NCryptExportKey(self._handle(), 0, _PUBLIC_BLOB, None, None, 0,
-                                   ctypes.byref(size), _SILENT), "exporting the public key")
+        _check(
+            lib.NCryptExportKey(
+                self._handle(), 0, _PUBLIC_BLOB, None, None, 0, ctypes.byref(size), _SILENT
+            ),
+            "exporting the public key",
+        )
         blob = ctypes.create_string_buffer(size.value)
-        _check(lib.NCryptExportKey(self._handle(), 0, _PUBLIC_BLOB, None, blob, size.value,
-                                   ctypes.byref(size), _SILENT), "exporting the public key")
+        _check(
+            lib.NCryptExportKey(
+                self._handle(), 0, _PUBLIC_BLOB, None, blob, size.value, ctypes.byref(size), _SILENT
+            ),
+            "exporting the public key",
+        )
         data = blob.raw[: size.value]
         magic, length = struct.unpack_from("<II", data)
-        if (magic != _PUBLIC_P256_MAGIC or length != P256_COORDINATE_BYTES
-                or len(data) != 8 + 2 * length):
+        if (
+            magic != _PUBLIC_P256_MAGIC
+            or length != P256_COORDINATE_BYTES
+            or len(data) != 8 + 2 * length
+        ):
             raise DpopKeyError("the provider returned no P-256 public key")
-        return ec_public_jwk(data[8:8 + length], data[8 + length:])
+        return ec_public_jwk(data[8 : 8 + length], data[8 + length :])

@@ -19,10 +19,10 @@ adr_number() {
 }
 
 mapfile -t files < <(
-  find "$ADR_DIR" -maxdepth 1 -type f -name '*.md' |
-    sed 's#.*/##' |
-    grep -E '^[0-9]{4}-.*\.md$' |
-    sort || true
+  find "$ADR_DIR" -maxdepth 1 -type f -name '*.md' \
+    | sed 's#.*/##' \
+    | grep -E '^[0-9]{4}-.*\.md$' \
+    | sort || true
 )
 
 if [[ ${#files[@]} -eq 0 ]]; then
@@ -49,9 +49,9 @@ elif ! git rev-parse --verify --quiet "$BASE_REF" >/dev/null; then
   echo "::notice title=ADR check::Base ref '${BASE_REF}' not resolvable -- skipping the base-collision check."
 else
   mapfile -t base_files < <(
-    git ls-tree -r --name-only "$BASE_REF" -- "$ADR_DIR" 2>/dev/null |
-      sed 's#.*/##' |
-      grep -E '^[0-9]{4}-.*\.md$' || true
+    git ls-tree -r --name-only "$BASE_REF" -- "$ADR_DIR" 2>/dev/null \
+      | sed 's#.*/##' \
+      | grep -E '^[0-9]{4}-.*\.md$' || true
   )
 
   if [[ ${#base_files[@]} -eq 0 ]]; then
@@ -66,9 +66,9 @@ else
 
     merge_base=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || printf '%s' "$BASE_REF")
     mapfile -t added_files < <(
-      git diff --diff-filter=AR --name-only "$merge_base" HEAD -- "$ADR_DIR" 2>/dev/null |
-        sed 's#.*/##' |
-        grep -E '^[0-9]{4}-.*\.md$' || true
+      git diff --diff-filter=AR --name-only "$merge_base" HEAD -- "$ADR_DIR" 2>/dev/null \
+        | sed 's#.*/##' \
+        | grep -E '^[0-9]{4}-.*\.md$' || true
     )
 
     if [[ ${#added_files[@]} -eq 0 ]]; then

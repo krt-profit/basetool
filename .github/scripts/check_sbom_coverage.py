@@ -120,7 +120,7 @@ def check_module(module: str, prepare: str, publish: str) -> list[str]:
     if not any(f'id("{plugin}")' in build_text for plugin in SBOM_PLUGIN_IDS):
         problems.append(
             f"{module}: {build.relative_to(REPO)} does not apply the CycloneDX convention "
-            f"(add `id(\"basetool.supply-chain-conventions\")`; it writes "
+            f'(add `id("basetool.supply-chain-conventions")`; it writes '
             f"docs/{module}-bom.json + .xml)"
         )
 
@@ -330,7 +330,7 @@ def main() -> None:
 
     declared = modules()
     if not declared:
-        print(f"error: no `include(\"...\")` module found in {SETTINGS.relative_to(REPO)}")
+        print(f'error: no `include("...")` module found in {SETTINGS.relative_to(REPO)}')
         raise SystemExit(1)
 
     problems: list[str] = []
@@ -391,24 +391,52 @@ def selftest() -> int:
         failures += not cond
 
     declared = [
-        "backend", "frontend", "ingest", "keycloak-spi", "test-support", "logging-support", "technical-support",
-        "backend-exchange", "backend-bank", "ingest-relay",
+        "backend",
+        "frontend",
+        "ingest",
+        "keycloak-spi",
+        "test-support",
+        "logging-support",
+        "technical-support",
+        "backend-exchange",
+        "backend-bank",
+        "ingest-relay",
     ]
     shipped, inside = classify(declared)
-    check("the applications and keycloak-spi publish their own SBOM",
-          shipped == ["backend", "frontend", "ingest", "keycloak-spi"])
-    check("backend-exchange and backend-bank are shipped inside backend",
-          inside["backend-exchange"][1] == ("backend",) and inside["backend-bank"][1] == ("backend",))
+    check(
+        "the applications and keycloak-spi publish their own SBOM",
+        shipped == ["backend", "frontend", "ingest", "keycloak-spi"],
+    )
+    check(
+        "backend-exchange and backend-bank are shipped inside backend",
+        inside["backend-exchange"][1] == ("backend",) and inside["backend-bank"][1] == ("backend",),
+    )
     check("ingest-relay is shipped inside ingest", inside["ingest-relay"][1] == ("ingest",))
-    check("logging-support keeps its explicit carriers", inside["logging-support"][1] == SHIPPED_INSIDE["logging-support"][1])
-    check("technical-support keeps its explicit carriers", inside["technical-support"][1] == SHIPPED_INSIDE["technical-support"][1])
-    check("test-support is neither shipped nor inside", "test-support" not in shipped and "test-support" not in inside)
+    check(
+        "logging-support keeps its explicit carriers",
+        inside["logging-support"][1] == SHIPPED_INSIDE["logging-support"][1],
+    )
+    check(
+        "technical-support keeps its explicit carriers",
+        inside["technical-support"][1] == SHIPPED_INSIDE["technical-support"][1],
+    )
+    check(
+        "test-support is neither shipped nor inside",
+        "test-support" not in shipped and "test-support" not in inside,
+    )
     check("an application's own name is not a library", library_carrier("backend") is None)
-    check("a name without the hyphen boundary is not a library", library_carrier("backendx") is None)
-    check("a bare prefix with a trailing hyphen is not a library", library_carrier("backend-") is None)
+    check(
+        "a name without the hyphen boundary is not a library", library_carrier("backendx") is None
+    )
+    check(
+        "a bare prefix with a trailing hyphen is not a library", library_carrier("backend-") is None
+    )
     check("keycloak-spi follows no application prefix", library_carrier("keycloak-spi") is None)
-    check("the real settings file declares only modules that classify",
-          set(classify(modules())[0]) | set(classify(modules())[1]) | set(NOT_SHIPPED) == set(modules()))
+    check(
+        "the real settings file declares only modules that classify",
+        set(classify(modules())[0]) | set(classify(modules())[1]) | set(NOT_SHIPPED)
+        == set(modules()),
+    )
 
     print("selftest: FAILED" if failures else "selftest: passed")
     return 1 if failures else 0

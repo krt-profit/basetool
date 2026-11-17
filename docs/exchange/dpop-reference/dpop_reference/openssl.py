@@ -348,9 +348,12 @@ class OpenSslKey:
             return False
         buffer = ctypes.create_string_buffer(64)
         length = ctypes.c_size_t(0)
-        if lib.EVP_PKEY_get_utf8_string_param(
-            self._handle(), b"group", buffer, len(buffer), ctypes.byref(length)
-        ) <= 0:
+        if (
+            lib.EVP_PKEY_get_utf8_string_param(
+                self._handle(), b"group", buffer, len(buffer), ctypes.byref(length)
+            )
+            <= 0
+        ):
             return False
         return buffer.value in _P256_GROUPS
 
@@ -359,9 +362,12 @@ class OpenSslKey:
         lib = libcrypto()
         buffer = ctypes.create_string_buffer(1 + 2 * P256_COORDINATE_BYTES + 32)
         length = ctypes.c_size_t(0)
-        if lib.EVP_PKEY_get_octet_string_param(
-            self._handle(), b"encoded-pub-key", buffer, len(buffer), ctypes.byref(length)
-        ) <= 0:
+        if (
+            lib.EVP_PKEY_get_octet_string_param(
+                self._handle(), b"encoded-pub-key", buffer, len(buffer), ctypes.byref(length)
+            )
+            <= 0
+        ):
             raise _fail("cannot read the public key")
         point = buffer.raw[: length.value]
         if len(point) != 1 + 2 * P256_COORDINATE_BYTES or point[0] != 0x04:

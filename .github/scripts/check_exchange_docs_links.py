@@ -71,9 +71,13 @@ def german_text(repo: pathlib.Path) -> list[str]:
         One ``file:line: characters`` line per offending line.
     """
     docs = repo / "docs" / "exchange"
-    files = [path for path in docs.rglob("*")
-             if path.is_file() and path.suffix in PROSE_SUFFIXES
-             and not (path.relative_to(docs).parts[0] == "examples" and path.suffix != ".md")]
+    files = [
+        path
+        for path in docs.rglob("*")
+        if path.is_file()
+        and path.suffix in PROSE_SUFFIXES
+        and not (path.relative_to(docs).parts[0] == "examples" and path.suffix != ".md")
+    ]
     for source in RENDERED_SOURCES:
         root = repo / source
         files += sorted(root.glob("*.json")) if root.is_dir() else [root] if root.exists() else []
@@ -82,7 +86,9 @@ def german_text(repo: pathlib.Path) -> list[str]:
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             hits = GERMAN.findall(line)
             if hits:
-                found.append(f"{path.relative_to(repo).as_posix()}:{number}: {''.join(sorted(set(hits)))}")
+                found.append(
+                    f"{path.relative_to(repo).as_posix()}:{number}: {''.join(sorted(set(hits)))}"
+                )
     return found
 
 
@@ -133,8 +139,11 @@ def heading_ids(text: str) -> set[str]:
             marker = opening.group(1)
             if fence is None:
                 fence = marker
-            elif (marker[0] == fence[0] and len(marker) >= len(fence)
-                  and not line.strip(marker[0]).strip()):
+            elif (
+                marker[0] == fence[0]
+                and len(marker) >= len(fence)
+                and not line.strip(marker[0]).strip()
+            ):
                 fence = None
             continue
         if fence is not None:
@@ -284,14 +293,18 @@ def selftest() -> None:
         ], found
         assert german_text(repo) == [], german_text(repo)
         (docs / "b.md").write_text(
-            "# b\n\nOpen „Verbundene Anwendungen“.\nPlain “English”.\n", encoding="utf-8")
+            "# b\n\nOpen „Verbundene Anwendungen“.\nPlain “English”.\n", encoding="utf-8"
+        )
         (docs / "_layouts").mkdir()
         (docs / "_layouts" / "default.html").write_text("<p>Grüße</p>\n", encoding="utf-8")
         (docs / "examples" / "v1").mkdir(parents=True)
         (docs / "examples" / "README.md").write_text("# Fixtures\n", encoding="utf-8")
-        (docs / "examples" / "v1" / "umlaut.json").write_text('{"label": "Bärchen"}',
-                                                             encoding="utf-8")
-        (spec / "exchange-v1.openapi.json").write_text('{"summary": "The warehouse"}', encoding="utf-8")
+        (docs / "examples" / "v1" / "umlaut.json").write_text(
+            '{"label": "Bärchen"}', encoding="utf-8"
+        )
+        (spec / "exchange-v1.openapi.json").write_text(
+            '{"summary": "The warehouse"}', encoding="utf-8"
+        )
         schemas = repo / "ingest/src/main/resources/exchange/v1/schemas"
         schemas.mkdir(parents=True)
         (schemas / "a.schema.json").write_text('{"title": "Örtlich"}\n', encoding="utf-8")

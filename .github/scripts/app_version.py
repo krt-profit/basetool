@@ -26,7 +26,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 CHANGELOG = REPO / "CHANGELOG.md"
 
-DATED_SECTION = re.compile(r"^## \[(v\d+\.\d+\.\d+)\]\(.*?\)\s+-\s+\d{4}-\d{2}-\d{2}\s*$", re.MULTILINE)
+DATED_SECTION = re.compile(
+    r"^## \[(v\d+\.\d+\.\d+)\]\(.*?\)\s+-\s+\d{4}-\d{2}-\d{2}\s*$", re.MULTILINE
+)
 
 
 def newest_changelog_version(text: str) -> str | None:
@@ -102,18 +104,76 @@ def selftest() -> int:
     unreleased = "# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n- something\n\n"
 
     cases = [
-        ("tag build wins outright", "tag", "v1.8.4", unreleased + cut + older, {"v1.8.4"}, "ignored", "v1.8.4"),
-        ("release commit before its tag", "branch", "main", unreleased + cut + older, {"v1.8.3"}, "v1.8.3-9-gc2f77a5", "v1.8.4"),
-        ("ordinary main after the tag", "branch", "main", unreleased + cut + older, {"v1.8.3", "v1.8.4"}, "v1.8.4-3-gdeadbee", "v1.8.4-3-gdeadbee"),
-        ("ordinary main before a release", "branch", "main", unreleased + older, {"v1.8.3"}, "v1.8.3-7-gcafe123", "v1.8.3-7-gcafe123"),
-        ("release branch, tag not yet cut", "branch", "release/v1.8.4", unreleased + cut + older, {"v1.8.3"}, "v1.8.3-9-gc2f77a5", "v1.8.4"),
-        ("repository with no releases yet", "branch", "main", unreleased, set(), "abc1234", "abc1234"),
-        ("unreleased only, never matched", "branch", "main", "# Changelog\n\n## [Unreleased]\n", set(), "abc1234", "abc1234"),
+        (
+            "tag build wins outright",
+            "tag",
+            "v1.8.4",
+            unreleased + cut + older,
+            {"v1.8.4"},
+            "ignored",
+            "v1.8.4",
+        ),
+        (
+            "release commit before its tag",
+            "branch",
+            "main",
+            unreleased + cut + older,
+            {"v1.8.3"},
+            "v1.8.3-9-gc2f77a5",
+            "v1.8.4",
+        ),
+        (
+            "ordinary main after the tag",
+            "branch",
+            "main",
+            unreleased + cut + older,
+            {"v1.8.3", "v1.8.4"},
+            "v1.8.4-3-gdeadbee",
+            "v1.8.4-3-gdeadbee",
+        ),
+        (
+            "ordinary main before a release",
+            "branch",
+            "main",
+            unreleased + older,
+            {"v1.8.3"},
+            "v1.8.3-7-gcafe123",
+            "v1.8.3-7-gcafe123",
+        ),
+        (
+            "release branch, tag not yet cut",
+            "branch",
+            "release/v1.8.4",
+            unreleased + cut + older,
+            {"v1.8.3"},
+            "v1.8.3-9-gc2f77a5",
+            "v1.8.4",
+        ),
+        (
+            "repository with no releases yet",
+            "branch",
+            "main",
+            unreleased,
+            set(),
+            "abc1234",
+            "abc1234",
+        ),
+        (
+            "unreleased only, never matched",
+            "branch",
+            "main",
+            "# Changelog\n\n## [Unreleased]\n",
+            set(),
+            "abc1234",
+            "abc1234",
+        ),
     ]
 
     failures = 0
     for name, ref_type, ref_name, changelog, tags, described, expected in cases:
-        got = resolve(ref_type, ref_name, changelog, lambda t, tags=tags: t in tags, lambda d=described: d)
+        got = resolve(
+            ref_type, ref_name, changelog, lambda t, tags=tags: t in tags, lambda d=described: d
+        )
         if got != expected:
             print(f"SELFTEST FAIL: {name}: expected {expected!r}, got {got!r}")
             failures += 1

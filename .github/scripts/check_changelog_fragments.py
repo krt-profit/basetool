@@ -53,8 +53,10 @@ def parse_fragment(name: str, text: str) -> tuple[Fragment | None, list[str]]:
     """
     path = f"{FRAGMENT_DIR}/{name}"
     if not NAME_RE.match(name):
-        return None, [f"{path}: the name must be lowercase letters, digits and hyphens "
-                      "ending in '.md', e.g. 'hangar-import.md' or '1234.md'"]
+        return None, [
+            f"{path}: the name must be lowercase letters, digits and hyphens "
+            "ending in '.md', e.g. 'hangar-import.md' or '1234.md'"
+        ]
     if text.startswith("﻿"):
         return None, [f"{path}: starts with a UTF-8 BOM; save it without one"]
     if "\r" in text:
@@ -62,8 +64,10 @@ def parse_fragment(name: str, text: str) -> tuple[Fragment | None, list[str]]:
     lines = text.split("\n")
     heading = lines[0]
     if not heading.startswith("### ") or heading[4:].strip() not in SECTIONS:
-        return None, [f"{path}: the first line must be '### <section>' with one of "
-                      f"{', '.join(SECTIONS)}, found {heading!r}"]
+        return None, [
+            f"{path}: the first line must be '### <section>' with one of "
+            f"{', '.join(SECTIONS)}, found {heading!r}"
+        ]
     items: list[list[str]] = []
     findings: list[str] = []
     for number, line in enumerate(lines[1:], start=2):
@@ -72,13 +76,17 @@ def parse_fragment(name: str, text: str) -> tuple[Fragment | None, list[str]]:
         elif not line.strip():
             continue
         elif line.startswith("#"):
-            findings.append(f"{path}:{number}: a fragment holds one section; move "
-                            f"{line.strip()!r} and its items into a fragment of its own")
+            findings.append(
+                f"{path}:{number}: a fragment holds one section; move "
+                f"{line.strip()!r} and its items into a fragment of its own"
+            )
         elif line.startswith("  ") and items:
             items[-1].append(line)
         else:
-            findings.append(f"{path}:{number}: loose text; every line is a '- ' item "
-                            "or its continuation indented by two spaces")
+            findings.append(
+                f"{path}:{number}: loose text; every line is a '- ' item "
+                "or its continuation indented by two spaces"
+            )
     if not items:
         findings.append(f"{path}: no list item; add at least one line starting with '- '")
     if findings:
@@ -126,7 +134,8 @@ def check(repo: str, base: str | None) -> list[str]:
             first = item.split("\n", 1)[0]
             findings.append(
                 f"CHANGELOG.md: a new entry under [Unreleased]; move it into "
-                f"{FRAGMENT_DIR}/<name>.md (see {FRAGMENT_DIR}/README.md): {first[:120]}")
+                f"{FRAGMENT_DIR}/<name>.md (see {FRAGMENT_DIR}/README.md): {first[:120]}"
+            )
     return findings
 
 
@@ -162,12 +171,20 @@ def git_show(repo: str, rev: str, path: str) -> str:
     """
     resolved = subprocess.run(
         ["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
-        cwd=repo, capture_output=True, text=True, encoding="utf-8")
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     if resolved.returncode != 0:
         sys.exit(f"error: base {rev!r} is not a commit; fetch it first")
     shown = subprocess.run(
         ["git", "show", f"{resolved.stdout.strip()}:{path}"],
-        cwd=repo, capture_output=True, text=True, encoding="utf-8")
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     return shown.stdout if shown.returncode == 0 else ""
 
 
@@ -182,15 +199,32 @@ class TempRepo:
     def git(self, *args: str) -> str:
         """Run git in the repository with a fixed identity and return stdout."""
         env = dict(os.environ)
-        env.update({
-            "GIT_AUTHOR_NAME": "Selftest", "GIT_AUTHOR_EMAIL": "selftest@example.invalid",
-            "GIT_COMMITTER_NAME": "Selftest", "GIT_COMMITTER_EMAIL": "selftest@example.invalid",
-            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
-        })
+        env.update(
+            {
+                "GIT_AUTHOR_NAME": "Selftest",
+                "GIT_AUTHOR_EMAIL": "selftest@example.invalid",
+                "GIT_COMMITTER_NAME": "Selftest",
+                "GIT_COMMITTER_EMAIL": "selftest@example.invalid",
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": os.devnull,
+            }
+        )
         return subprocess.run(
-            ["git", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false",
-             "-c", "core.autocrlf=false", *args],
-            cwd=self.path, env=env, capture_output=True, text=True, encoding="utf-8",
+            [
+                "git",
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "tag.gpgsign=false",
+                "-c",
+                "core.autocrlf=false",
+                *args,
+            ],
+            cwd=self.path,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
             check=True,
         ).stdout
 
@@ -226,8 +260,12 @@ class TempRepo:
         """Run ``script`` with ``args`` inside the repository and return exit code and output."""
         env = dict(os.environ, PYTHONIOENCODING="utf-8")
         result = subprocess.run(
-            [sys.executable, script, *args], cwd=self.path, env=env,
-            capture_output=True, text=True, encoding="utf-8",
+            [sys.executable, script, *args],
+            cwd=self.path,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
         )
         return result.returncode, result.stdout + result.stderr
 
@@ -309,14 +347,20 @@ def _case_crlf(repo: TempRepo) -> str | None:
 
 
 LEGACY_CHANGELOG = BASE_CHANGELOG.replace(
-    "## [Unreleased]\n\n", "## [Unreleased]\n\n### Fixed\n\n- **Alt.** Noch offen.\n\n")
+    "## [Unreleased]\n\n", "## [Unreleased]\n\n### Fixed\n\n- **Alt.** Noch offen.\n\n"
+)
 
 
 def _case_new_unreleased_item(repo: TempRepo) -> str | None:
     """A pull request that adds an item under [Unreleased] fails against its base."""
     base = repo.git("rev-parse", "HEAD").strip()
-    repo.write("CHANGELOG.md", BASE_CHANGELOG.replace(
-        "## [Unreleased]\n\n", "## [Unreleased]\n\n### Added\n\n- **Neu.** Direkt eingetragen.\n\n"))
+    repo.write(
+        "CHANGELOG.md",
+        BASE_CHANGELOG.replace(
+            "## [Unreleased]\n\n",
+            "## [Unreleased]\n\n### Added\n\n- **Neu.** Direkt eingetragen.\n\n",
+        ),
+    )
     code, out = repo.run(SELF, "--repo", repo.path, "--base", base)
     if code != 1 or "**Neu.**" not in out or "changelog.d/" not in out:
         return f"expected exit 1 naming the item and changelog.d/, got {code}: {out}"
@@ -338,10 +382,14 @@ def _case_release_cut_passes(repo: TempRepo) -> str | None:
     """The release pull request, which empties [Unreleased] into a version, passes."""
     repo.write("CHANGELOG.md", LEGACY_CHANGELOG)
     base = repo.commit("chore: legacy entry")
-    repo.write("CHANGELOG.md", LEGACY_CHANGELOG.replace(
-        "## [Unreleased]\n\n",
-        "## [Unreleased]\n\n## [v1.1.0](https://github.com/krt-profit/basetool/releases/tag/v1.1.0)"
-        " - 2026-10-02\n\n"))
+    repo.write(
+        "CHANGELOG.md",
+        LEGACY_CHANGELOG.replace(
+            "## [Unreleased]\n\n",
+            "## [Unreleased]\n\n## [v1.1.0](https://github.com/krt-profit/basetool/releases/tag/v1.1.0)"
+            " - 2026-10-02\n\n",
+        ),
+    )
     code, out = repo.run(SELF, "--repo", repo.path, "--base", base)
     if code != 0:
         return f"expected exit 0, got {code}: {out}"
@@ -392,10 +440,12 @@ def main() -> int:
     :return: the process exit code.
     """
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--repo", default=os.getcwd(), help="Repo root. Default: cwd.")
-    parser.add_argument("--base", default="",
-                        help="Ref whose [Unreleased] block may not grow. Default: none.")
+    parser.add_argument(
+        "--base", default="", help="Ref whose [Unreleased] block may not grow. Default: none."
+    )
     parser.add_argument("--selftest", action="store_true", help="Run the self-test.")
     args = parser.parse_args()
     if args.selftest:

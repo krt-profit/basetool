@@ -679,8 +679,9 @@ skipped commit has no `:sha-<short>` tag. A release commit's run never skips. Th
 GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
 lets only that App and @greluc create `v*` tags, and an App token's events trigger
 `release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
-publish job stops with an error. `release-prepare.yml`, `refresh-versions.yml` and
-`release-publish.yml` read the key in the GitHub environment **`release`**, which only `main` may
+publish job stops with an error. `release-prepare.yml`, `refresh-versions.yml`,
+`native-tool-updates.yml` and `release-publish.yml` read the key in the GitHub environment
+**`release`**, which only `main` may
 deploy to (CI-SEC-16, ADR-0201 amendments 3 and 4). `release-publish.yml` runs on every push to
 `main`: its `detect` job looks up the pull request whose merge commit was pushed and ends green
 unless that is a merged `release/vX.Y.Z` PR; only then does the `publish` job enter the

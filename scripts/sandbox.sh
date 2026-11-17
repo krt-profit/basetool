@@ -43,12 +43,15 @@ check_issuer_host() {
   fi
   resolved="$(getent hosts host.docker.internal 2>/dev/null | awk '{ print $1; exit }' || true)"
   case "$resolved" in
-    127.*|::1)
-      return 0 ;;
+    127.* | ::1)
+      return 0
+      ;;
     "")
-      echo "sandbox: host.docker.internal does not resolve on this machine." >&2 ;;
+      echo "sandbox: host.docker.internal does not resolve on this machine." >&2
+      ;;
     *)
-      echo "sandbox: host.docker.internal resolves to $resolved, not to the loopback." >&2 ;;
+      echo "sandbox: host.docker.internal resolves to $resolved, not to the loopback." >&2
+      ;;
   esac
   cat >&2 <<'HOSTS'
 sandbox: the issuer is http://host.docker.internal:18080/auth/realms/basetool and the sandbox listens on
@@ -80,13 +83,17 @@ down() {
 case "$action" in
   up)
     check_issuer_host || true
-    up ;;
+    up
+    ;;
   reset)
     check_issuer_host || true
     down
-    up ;;
+    up
+    ;;
   down)
-    down ;;
+    down
+    ;;
   *)
-    usage ;;
+    usage
+    ;;
 esac

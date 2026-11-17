@@ -55,7 +55,9 @@ def tracked_instructions(root: pathlib.Path) -> list[pathlib.PurePosixPath]:
     if not names:
         names = {p.relative_to(root).as_posix() for p in root.rglob(INSTRUCTIONS)}
     return sorted(
-        pathlib.PurePosixPath(name) for name in names if pathlib.PurePosixPath(name).name == INSTRUCTIONS
+        pathlib.PurePosixPath(name)
+        for name in names
+        if pathlib.PurePosixPath(name).name == INSTRUCTIONS
     )
 
 
@@ -111,7 +113,7 @@ def check_skills(root: pathlib.Path) -> list[str]:
     stubs_dir = root / STUBS_DIR
     found = {p.name for p in skills_dir.iterdir() if p.is_dir()} if skills_dir.is_dir() else set()
     skills = sorted(found | submodule_skills(root))
-    stubs =sorted(p.name for p in stubs_dir.iterdir() if p.is_dir()) if stubs_dir.is_dir() else []
+    stubs = sorted(p.name for p in stubs_dir.iterdir() if p.is_dir()) if stubs_dir.is_dir() else []
 
     for name in skills:
         original_path = SKILLS_DIR / name / SKILL_FILE
@@ -129,7 +131,9 @@ def check_skills(root: pathlib.Path) -> list[str]:
         if not (root / original_path).is_file():
             if stub.get("name") != name:
                 problems.append(f"{stub_path}: name is {stub.get('name')!r}, expected {name!r}")
-            print(f"::notice title=Agent skills::{original_path} is absent; compared {stub_path} by name only")
+            print(
+                f"::notice title=Agent skills::{original_path} is absent; compared {stub_path} by name only"
+            )
             continue
         original = frontmatter((root / original_path).read_text(encoding="utf-8"))
         if original is None:
@@ -186,7 +190,10 @@ def selftest() -> int:
             1,
         ),
         "root alone above the limit": (lambda r: write(r, "AGENTS.md", "x" * (LIMIT_BYTES + 1)), 2),
-        "a skill without stub": (lambda r: write(r, ".claude/skills/new/SKILL.md", skill("new", "N.")), 1),
+        "a skill without stub": (
+            lambda r: write(r, ".claude/skills/new/SKILL.md", skill("new", "N.")),
+            1,
+        ),
         "a stub with another description": (
             lambda r: write(r, ".agents/skills/lint/SKILL.md", stub("lint", "Something else.")),
             1,
@@ -199,14 +206,22 @@ def selftest() -> int:
             lambda r: write(r, ".agents/skills/lint/SKILL.md", skill("lint", "Run the gate.")),
             1,
         ),
-        "a stub without skill": (lambda r: write(r, ".agents/skills/gone/SKILL.md", stub("gone", "G.")), 1),
+        "a stub without skill": (
+            lambda r: write(r, ".agents/skills/gone/SKILL.md", stub("gone", "G.")),
+            1,
+        ),
         "a submodule skill missing from the checkout without stub": (
             lambda r: write(r, ".gitmodules", '[submodule "b"]\n\tpath = .claude/skills/brand\n'),
             1,
         ),
         "an absent submodule skill with a wrong stub name": (
-            lambda r: write(r, ".agents/skills/design/SKILL.md", stub("dezign", "Brand.").replace(
-                ".claude/skills/dezign/", ".claude/skills/design/")),
+            lambda r: write(
+                r,
+                ".agents/skills/design/SKILL.md",
+                stub("dezign", "Brand.").replace(
+                    ".claude/skills/dezign/", ".claude/skills/design/"
+                ),
+            ),
             1,
         ),
     }

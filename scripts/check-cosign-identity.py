@@ -138,8 +138,14 @@ def behaviour_problems(copy: Copy) -> list[str]:
 
     if copy.is_release:
         accept = [subject("heads/main"), subject("tags/v1.9.2"), subject("tags/v10.20.300")]
-        refuse = [subject("heads/main-x"), subject("heads/maintenance"), subject("tags/vfoo"),
-                  subject("tags/v1.9.2-rc1"), subject("tags/v1.9"), subject("heads/feature")]
+        refuse = [
+            subject("heads/main-x"),
+            subject("heads/maintenance"),
+            subject("tags/vfoo"),
+            subject("tags/v1.9.2-rc1"),
+            subject("tags/v1.9"),
+            subject("heads/feature"),
+        ]
     else:
         accept = [subject("heads/main")]
         refuse = [subject("heads/main-x"), subject("heads/maintenance"), subject("tags/v1.9.2")]
@@ -167,14 +173,20 @@ def check(root: Path) -> list[str]:
     mains = [c for c in copies if not c.is_release]
 
     if not releases:
-        problems.append("no release identity regexp found (promote / deploy.sh) -- the checker "
-                        "no longer recognises the call sites, so it would pass vacuously")
+        problems.append(
+            "no release identity regexp found (promote / deploy.sh) -- the checker "
+            "no longer recognises the call sites, so it would pass vacuously"
+        )
     if not mains:
-        problems.append("no main-only identity regexp found (release-images.yml reuse gate) -- "
-                        "the checker no longer recognises the call site")
+        problems.append(
+            "no main-only identity regexp found (release-images.yml reuse gate) -- "
+            "the checker no longer recognises the call site"
+        )
     if not any(c.path.startswith("scripts/") for c in releases):
-        problems.append("no identity regexp found in scripts/ -- deploy.sh's host-side default "
-                        "is the copy that matters most and was not seen")
+        problems.append(
+            "no identity regexp found in scripts/ -- deploy.sh's host-side default "
+            "is the copy that matters most and was not seen"
+        )
 
     for copy in copies:
         if not copy.normalised.startswith("^"):
@@ -188,16 +200,20 @@ def check(root: Path) -> list[str]:
             if copy.normalised != reference.normalised:
                 problems.append(
                     f"{copy.where}: differs from {reference.where}:\n"
-                    f"    {copy.normalised}\n    {reference.normalised}")
+                    f"    {copy.normalised}\n    {reference.normalised}"
+                )
         if RELEASE_REFS not in reference.normalised:
-            problems.append(f"{reference.where}: the ref alternation is not exactly "
-                            f"{RELEASE_REFS}: {reference.normalised}")
+            problems.append(
+                f"{reference.where}: the ref alternation is not exactly "
+                f"{RELEASE_REFS}: {reference.normalised}"
+            )
         expected_main = reference.normalised.replace(RELEASE_REFS, MAIN_ONLY_REFS)
         for copy in mains:
             if copy.normalised != expected_main:
                 problems.append(
                     f"{copy.where}: the main-only copy must be the release copy narrowed to "
-                    f"heads/main:\n    {copy.normalised}\n    {expected_main}")
+                    f"heads/main:\n    {copy.normalised}\n    {expected_main}"
+                )
 
     for copy in copies:
         problems.extend(behaviour_problems(copy))
@@ -207,9 +223,12 @@ def check(root: Path) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     """Print every identity regexp found and report each problem; return the exit status."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    parser.add_argument("--root", type=Path,
-                        default=Path(__file__).resolve().parent.parent,
-                        help="repository root to scan (default: this checkout)")
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent,
+        help="repository root to scan (default: this checkout)",
+    )
     args = parser.parse_args(argv)
 
     copies = extract(args.root)

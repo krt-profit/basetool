@@ -15,7 +15,7 @@ tests_failed=0
 
 hexdig() {
   local tag="$1" pad=""
-  while (( ${#tag} + ${#pad} < 64 )); do pad="${pad}0"; done
+  while ((${#tag} + ${#pad} < 64)); do pad="${pad}0"; done
   printf 'sha256:%s%s' "${tag}" "${pad}"
 }
 
@@ -39,7 +39,7 @@ T_MINIMAL="$(mktemp -d "${TMPDIR:-/tmp}/deploy-sh-minimal.XXXXXX")"
 T_MINIMAL_OK=false
 if ln -s /dev/null "${T_MINIMAL}/.symprobe" 2>/dev/null && [[ -L "${T_MINIMAL}/.symprobe" ]]; then
   rm -f "${T_MINIMAL}/.symprobe"
-  IFS=':' read -ra t_path_dirs <<< "${PATH}"
+  IFS=':' read -ra t_path_dirs <<<"${PATH}"
   for t_dir in "${t_path_dirs[@]}"; do
     [[ -d "${t_dir}" ]] || continue
     for t_cmd in "${t_dir}"/*; do
@@ -69,17 +69,17 @@ setup_host() {
 
   mkdir -p "${T_COMPOSE_DIR}" "${T_CONFIG_DIR}" "${T_STATE_DIR}" "${T_FAKE_BIN}"
   echo "# dummy compose file — never parsed; the units are the deployment" \
-    > "${T_COMPOSE_DIR}/docker-compose.yml"
+    >"${T_COMPOSE_DIR}/docker-compose.yml"
   seed_units "${tmp}"
-  printf 'BASETOOL_KEYSTORE_HOST_PATH=%s/keystore.p12\n' "${tmp}" > "${T_CONFIG_DIR}/basetool.env"
-  : > "${tmp}/keystore.p12"
-  echo "fake-token" > "${T_TOKEN}"
-  : > "${T_DOCKER_LOG}"
+  printf 'BASETOOL_KEYSTORE_HOST_PATH=%s/keystore.p12\n' "${tmp}" >"${T_CONFIG_DIR}/basetool.env"
+  : >"${tmp}/keystore.p12"
+  echo "fake-token" >"${T_TOKEN}"
+  : >"${T_DOCKER_LOG}"
 
-  printf '#!/usr/bin/env bash\nexit 0\n' > "${T_FAKE_BIN}/flock"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"${T_FAKE_BIN}/flock"
   chmod +x "${T_FAKE_BIN}/flock"
 
-  cat > "${T_FAKE_BIN}/podman" <<'FAKE'
+  cat >"${T_FAKE_BIN}/podman" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'podman %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
@@ -160,7 +160,7 @@ esac
 FAKE
   chmod +x "${T_FAKE_BIN}/podman"
 
-  cat > "${T_FAKE_BIN}/skopeo" <<'FAKE'
+  cat >"${T_FAKE_BIN}/skopeo" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'skopeo %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
@@ -192,7 +192,7 @@ printf '{"Digest":"%s"}\n' "$d"
 FAKE
   chmod +x "${T_FAKE_BIN}/skopeo"
 
-  cat > "${T_FAKE_BIN}/systemctl" <<'FAKE'
+  cat >"${T_FAKE_BIN}/systemctl" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'systemctl %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
@@ -296,10 +296,10 @@ exit 0
 FAKE
   chmod +x "${T_FAKE_BIN}/systemctl"
 
-  printf '#!/usr/bin/env bash\nexit 0\n' > "${T_FAKE_BIN}/quadlet"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"${T_FAKE_BIN}/quadlet"
   chmod +x "${T_FAKE_BIN}/quadlet"
 
-  cat > "${T_FAKE_BIN}/cosign" <<'FAKE'
+  cat >"${T_FAKE_BIN}/cosign" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'cosign %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
@@ -336,7 +336,7 @@ FAKE
   chmod +x "${T_FAKE_BIN}/cosign"
 
   if ! install -d -m 0700 "${tmp}/.permprobe" 2>/dev/null; then
-    cat > "${T_FAKE_BIN}/install" <<'SHIM'
+    cat >"${T_FAKE_BIN}/install" <<'SHIM'
 #!/usr/bin/env bash
 set -euo pipefail
 args=()
@@ -363,15 +363,15 @@ seed_units() {
   mkdir -p "${T_UNIT_DIR}"
   local svc
   for svc in backend frontend ingest; do
-    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" > "${T_UNIT_DIR}/${svc}.container"
+    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" >"${T_UNIT_DIR}/${svc}.container"
   done
-  printf 'Volume=%s/keystore.p12:/run/secrets/keystore.p12:ro\n' "$1" >> "${T_UNIT_DIR}/backend.container"
+  printf 'Volume=%s/keystore.p12:/run/secrets/keystore.p12:ro\n' "$1" >>"${T_UNIT_DIR}/backend.container"
 }
 
 seed_monitoring_units() {
   local svc
   for svc in prometheus loki blackbox-exporter; do
-    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" > "${T_UNIT_DIR}/${svc}.container"
+    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" >"${T_UNIT_DIR}/${svc}.container"
   done
 }
 
@@ -396,7 +396,7 @@ assert_no_monitoring_recreate() {
 }
 
 write_marker() {
-  echo "$1" > "${T_STATE_DIR}/last-deployed.digests"
+  echo "$1" >"${T_STATE_DIR}/last-deployed.digests"
 }
 
 run_deploy() {
@@ -573,8 +573,8 @@ scenario_unhealthy_drift() {
   assert_no_docker "cosign verify" "a targeted restart does not re-verify signatures"
   assert_no_docker "podman pull" "a targeted restart does not re-pull images"
   if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
-     || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' \
-            "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' \
+      "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
     record 1 "no false DeployRolledBack metric is written for a runtime-health blip"
   else
     record 0 "no false DeployRolledBack metric is written for a runtime-health blip"
@@ -595,14 +595,14 @@ scenario_health_drift_restart_fails() {
   assert_excludes "rolling back" "a runtime-health fault is never a release rollback"
   assert_excludes "deploy successful" "it is not reported as a successful deploy"
   if grep -q 'basetool_deploy_last_health_restart_failed_timestamp [1-9]' \
-       "${T_STATE_DIR}/textfile/deploy-health.prom" 2>/dev/null; then
+    "${T_STATE_DIR}/textfile/deploy-health.prom" 2>/dev/null; then
     record 1 "the health-restart-failed gauge is written"
   else
     record 0 "the health-restart-failed gauge is written"
   fi
   if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
-     || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' \
-            "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' \
+      "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
     record 1 "no DeployRolledBack metric is written for a runtime-health fault"
   else
     record 0 "no DeployRolledBack metric is written for a runtime-health fault"
@@ -621,7 +621,7 @@ scenario_health_drift_respects_backoff() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "${MARKER}"
-  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" > "${T_STATE_DIR}/health-restart.digests"
+  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" >"${T_STATE_DIR}/health-restart.digests"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_STATE_backend=restarting/unhealthy" || rc=$?
   assert_exit 1 "$rc" "a backed-off health-drift tick exits non-zero"
@@ -702,7 +702,7 @@ scenario_drift_respects_backoff() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "${MARKER}"
-  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" > "${T_STATE_DIR}/reapply-failed.digests"
+  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" >"${T_STATE_DIR}/reapply-failed.digests"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_PS_backend=" || rc=$?
   assert_exit 0 "$rc" "backed-off drift tick exits 0"
@@ -718,7 +718,7 @@ scenario_drift_reapply_fails() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "${MARKER}"
-  echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
+  echo "services: {}" >"${T_STATE_DIR}/current-digest-pin.yml"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_PS_backend=" "FAKE_UP_RC=1" || rc=$?
   assert_exit 1 "$rc" "a failed drift re-apply exits non-zero"
@@ -771,17 +771,17 @@ scenario_monitoring_config_reload() {
   seed_monitoring_units
   mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
     "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
-  echo "scrape_interval: 30s" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
-  echo "same" > "${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
-  echo "same" > "${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
+  echo "scrape_interval: 30s" >"${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
+  echo "same" >"${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
+  echo "same" >"${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
   local bundle="${tmp}/bundle"
   mkdir -p "${bundle}/monitoring/prometheus" \
     "${bundle}/monitoring/alloy" "${bundle}/monitoring/blackbox"
-  echo "# dummy compose file" > "${bundle}/docker-compose.yml"
-  echo "# dummy monitoring compose" > "${bundle}/docker-compose.monitoring.yml"
-  echo "scrape_interval: 15s  # bumped" > "${bundle}/monitoring/prometheus/prometheus.yml"
-  echo "same" > "${bundle}/monitoring/alloy/config.alloy"
-  echo "same" > "${bundle}/monitoring/blackbox/blackbox.yml"
+  echo "# dummy compose file" >"${bundle}/docker-compose.yml"
+  echo "# dummy monitoring compose" >"${bundle}/docker-compose.monitoring.yml"
+  echo "scrape_interval: 15s  # bumped" >"${bundle}/monitoring/prometheus/prometheus.yml"
+  echo "same" >"${bundle}/monitoring/alloy/config.alloy"
+  echo "same" >"${bundle}/monitoring/blackbox/blackbox.yml"
   mkdir -p "${T_STATE_DIR}/monitoring-reload"
   cp -R "${T_COMPOSE_DIR}/monitoring/prometheus" "${T_STATE_DIR}/monitoring-reload/prometheus"
   cp -R "${T_COMPOSE_DIR}/monitoring/alloy" "${T_STATE_DIR}/monitoring-reload/alloy"
@@ -808,9 +808,9 @@ scenario_monitoring_reload_no_drift() {
   seed_monitoring_units
   mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
     "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
-  echo "scrape_interval: 30s" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
-  echo "same" > "${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
-  echo "same" > "${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
+  echo "scrape_interval: 30s" >"${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
+  echo "same" >"${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
+  echo "same" >"${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
   mkdir -p "${T_STATE_DIR}/monitoring-reload"
   cp -R "${T_COMPOSE_DIR}/monitoring/prometheus" "${T_STATE_DIR}/monitoring-reload/prometheus"
   cp -R "${T_COMPOSE_DIR}/monitoring/alloy" "${T_STATE_DIR}/monitoring-reload/alloy"
@@ -824,7 +824,7 @@ scenario_monitoring_reload_no_drift() {
   assert_docker "systemctl --user start loki.service" "the monitoring stack is still reconciled"
   assert_no_monitoring_recreate "no service is recreated when on-disk matches the applied snapshot"
   if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 0' \
-       "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
+    "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
     record 1 "the reconcile-disabled gauge is 0 when the reconcile is enabled and runs"
   else
     record 0 "the reconcile-disabled gauge is 0 when the reconcile is enabled and runs"
@@ -840,12 +840,12 @@ scenario_monitoring_reload_self_heals_on_noop() {
   seed_monitoring_units
   mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
     "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
-  echo "  - targets: [ingest:11272]" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
-  echo "same" > "${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
-  echo "same" > "${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
+  echo "  - targets: [ingest:11272]" >"${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
+  echo "same" >"${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
+  echo "same" >"${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
   mkdir -p "${T_STATE_DIR}/monitoring-reload/prometheus"
   echo "  - targets: [ingest:11262]" \
-    > "${T_STATE_DIR}/monitoring-reload/prometheus/prometheus.yml"
+    >"${T_STATE_DIR}/monitoring-reload/prometheus/prometheus.yml"
   cp -R "${T_COMPOSE_DIR}/monitoring/alloy" "${T_STATE_DIR}/monitoring-reload/alloy"
   cp -R "${T_COMPOSE_DIR}/monitoring/blackbox" "${T_STATE_DIR}/monitoring-reload/blackbox-exporter"
   write_marker "${MARKER}"
@@ -860,7 +860,7 @@ scenario_monitoring_reload_self_heals_on_noop() {
   assert_no_docker "restart alloy.service" "alloy is already converged — left alone"
   assert_no_docker "restart blackbox-exporter.service" "blackbox is already converged — left alone"
   if grep -q '^basetool_monitoring_config_applied_timestamp{component="prometheus"} [1-9]' \
-       "${T_STATE_DIR}/textfile/monitoring-config.prom" 2>/dev/null; then
+    "${T_STATE_DIR}/textfile/monitoring-config.prom" 2>/dev/null; then
     record 1 "the config-applied timestamp metric is emitted for PrometheusConfigStale"
   else
     record 0 "the config-applied timestamp metric is emitted for PrometheusConfigStale"
@@ -876,9 +876,9 @@ scenario_monitoring_compose_def_applied_on_noop() {
   seed_monitoring_units
   mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
     "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
-  echo "scrape_interval: 30s" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
-  echo "same" > "${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
-  echo "same" > "${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
+  echo "scrape_interval: 30s" >"${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
+  echo "same" >"${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
+  echo "same" >"${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
   mkdir -p "${T_STATE_DIR}/monitoring-reload"
   cp -R "${T_COMPOSE_DIR}/monitoring/prometheus" "${T_STATE_DIR}/monitoring-reload/prometheus"
   cp -R "${T_COMPOSE_DIR}/monitoring/alloy" "${T_STATE_DIR}/monitoring-reload/alloy"
@@ -910,7 +910,7 @@ scenario_monitoring_reconcile_disabled_when_running() {
     "the gated-off-but-running condition is logged as a loud WARN"
   assert_no_monitoring_recreate "nothing is recreated while the reconcile is gated off"
   if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 1' \
-       "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
+    "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
     record 1 "the reconcile-disabled gauge is 1 (MonitoringReconcileDisabled can fire)"
   else
     record 0 "the reconcile-disabled gauge is 1 (MonitoringReconcileDisabled can fire)"
@@ -924,7 +924,7 @@ scenario_monitoring_flag_read_from_env_file() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "${MARKER}"
-  printf 'SOME_SECRET=must-not-leak\nBASETOOL_MONITORING_ENABLED="true"\n' >> "${T_CONFIG_DIR}/basetool.env"
+  printf 'SOME_SECRET=must-not-leak\nBASETOOL_MONITORING_ENABLED="true"\n' >>"${T_CONFIG_DIR}/basetool.env"
   seed_monitoring_units
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_MON_PS=prometheus" || rc=$?
@@ -932,7 +932,7 @@ scenario_monitoring_flag_read_from_env_file() {
   assert_excludes "basetool-monitoring is RUNNING but BASETOOL_MONITORING_ENABLED != 'true'" \
     "the gated-off WARN is gone once the flag is read from .env"
   if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 0' \
-       "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
+    "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
     record 1 "the reconcile-disabled gauge is 0 (reconcile is armed)"
   else
     record 0 "the reconcile-disabled gauge is 0 (reconcile is armed)"
@@ -994,7 +994,7 @@ scenario_mixed_release_past_grace_is_refused() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
-  printf '%d\n' "$(( $(date +%s) - 1000 ))" > "${T_STATE_DIR}/mixed-release.since"
+  printf '%d\n' "$(($(date +%s) - 1000))" >"${T_STATE_DIR}/mixed-release.since"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_REV_FRONTEND=rev-two" || rc=$?
   assert_exit 1 "$rc" "a mixed release past the grace fails the deploy"
@@ -1020,7 +1020,7 @@ scenario_one_release_clears_the_mixed_sighting() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
-  printf '%d\n' "$(( $(date +%s) - 120 ))" > "${T_STATE_DIR}/mixed-release.since"
+  printf '%d\n' "$(($(date +%s) - 120))" >"${T_STATE_DIR}/mixed-release.since"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" || rc=$?
   assert_exit 0 "$rc" "one release deploys"
@@ -1103,7 +1103,7 @@ scenario_signature_failure_aborts() {
   assert_no_docker "podman pull" "nothing is pulled from an untrusted target"
   assert_no_apply "the stack is not recreated on an untrusted target"
   if grep -q 'basetool_deploy_last_failure_timestamp [1-9]' \
-       "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
     record 1 "a deploy-failure metric is written for the verification failure"
   else
     record 0 "a deploy-failure metric is written for the verification failure"
@@ -1195,7 +1195,7 @@ scenario_cosign_off_path() {
   assert_contains "but not on PATH" "it says where it found cosign, rather than aborting"
   assert_docker "cosign verify" "and it still verifies every signature"
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
   RUN_DEPLOY_MINIMAL_PATH=1 run_deploy -- "${fake[@]}" \
@@ -1214,13 +1214,13 @@ scenario_token_expiry_metric() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "${MARKER}"
-  printf '2026-10-01\n' > "${T_TOKEN}.expiry"
+  printf '2026-10-01\n' >"${T_TOKEN}.expiry"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" || rc=$?
   assert_exit 0 "$rc" "no-op tick with a token expiry file exits 0"
   assert_contains "no change" "the tick is still the idempotence no-op"
   if grep -q '^basetool_ghcr_token_expiry_timestamp [1-9]' \
-       "${T_STATE_DIR}/textfile/ghcr-token.prom" 2>/dev/null; then
+    "${T_STATE_DIR}/textfile/ghcr-token.prom" 2>/dev/null; then
     record 1 "the token-expiry gauge is written on the no-op tick"
   else
     record 0 "the token-expiry gauge is written on the no-op tick"
@@ -1235,12 +1235,12 @@ scenario_token_expiry_removed_clears_the_gauge() {
   setup_host "${tmp}"
   write_marker "${MARKER}"
 
-  printf '2026-10-01\n' > "${T_TOKEN}.expiry"
+  printf '2026-10-01\n' >"${T_TOKEN}.expiry"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" || rc=$?
   assert_exit 0 "$rc" "the tick that records an expiry exits 0"
   if grep -q '^basetool_ghcr_token_expiry_timestamp [1-9]' \
-       "${T_STATE_DIR}/textfile/ghcr-token.prom" 2>/dev/null; then
+    "${T_STATE_DIR}/textfile/ghcr-token.prom" 2>/dev/null; then
     record 1 "the gauge exists before the expiry file is removed"
   else
     record 0 "the gauge exists before the expiry file is removed"
@@ -1256,7 +1256,7 @@ scenario_token_expiry_removed_clears_the_gauge() {
     record 1 "the gauge file is gone once no expiry is recorded"
   fi
 
-  : > "${T_TOKEN}.expiry"
+  : >"${T_TOKEN}.expiry"
   rc=0
   run_deploy -- "${fake[@]}" || rc=$?
   assert_exit 0 "$rc" "the tick with an empty expiry file exits 0"
@@ -1275,15 +1275,15 @@ scenario_forced_gated_rollback_keeps_marker() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   mkdir -p "${T_COMPOSE_DIR}/quadlet/systemd"
-  printf '[Container]\nImage=docker.io/postgres:18-alpine\n' > "${T_COMPOSE_DIR}/quadlet/systemd/db-backend.container"
+  printf '[Container]\nImage=docker.io/postgres:18-alpine\n' >"${T_COMPOSE_DIR}/quadlet/systemd/db-backend.container"
   local bundle="${tmp}/bundle"
   mkdir -p "${bundle}/quadlet/systemd"
-  echo "# promoted compose" > "${bundle}/docker-compose.yml"
-  printf '[Container]\nImage=docker.io/postgres:19-alpine\n' > "${bundle}/quadlet/systemd/db-backend.container"
+  echo "# promoted compose" >"${bundle}/docker-compose.yml"
+  printf '[Container]\nImage=docker.io/postgres:19-alpine\n' >"${bundle}/quadlet/systemd/db-backend.container"
   write_marker "${MARKER}"
   echo "${DIG_BACKEND}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG_NEXT}|${DIG_KCSPI}" \
-    > "${T_STATE_DIR}/config-blocked.marker"
-  echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
+    >"${T_STATE_DIR}/config-blocked.marker"
+  echo "services: {}" >"${T_STATE_DIR}/current-digest-pin.yml"
   mapfile -t fake < <(converged_env)
   run_deploy --force -- "${fake[@]}" \
     "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" "FAKE_UP_RC=1" || rc=$?
@@ -1305,10 +1305,10 @@ scenario_config_bundle_secret_rejected() {
   setup_host "${tmp}"
   local bundle="${tmp}/bundle"
   mkdir -p "${bundle}"
-  echo "# dummy compose" > "${bundle}/docker-compose.yml"
-  echo "-----BEGIN PRIVATE KEY-----" > "${bundle}/leaked.pem"
+  echo "# dummy compose" >"${bundle}/docker-compose.yml"
+  echo "-----BEGIN PRIVATE KEY-----" >"${bundle}/leaked.pem"
   write_marker "${MARKER}"
-  echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
+  echo "services: {}" >"${T_STATE_DIR}/current-digest-pin.yml"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" \
     "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
@@ -1371,23 +1371,23 @@ scenario_config_mirrors_edge() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   local bundle="${tmp}/bundle"
-  mkdir -p "${bundle}/docker/edge/conf.d" "${bundle}/docker/edge/include"     "${bundle}/docker/acme" "${bundle}/docker/maintenance/static"
-  echo "# dummy compose file" > "${bundle}/docker-compose.yml"
-  echo "worker_processes auto;" > "${bundle}/docker/edge/nginx.conf"
-  echo "# vhost" > "${bundle}/docker/edge/conf.d/10-frontend.conf"
-  echo "# include" > "${bundle}/docker/edge/include/proxy.conf"
-  echo "#!/bin/sh" > "${bundle}/docker/acme/publish-loop.sh"
-  echo "<html></html>" > "${bundle}/docker/maintenance/static/index.html"
+  mkdir -p "${bundle}/docker/edge/conf.d" "${bundle}/docker/edge/include" "${bundle}/docker/acme" "${bundle}/docker/maintenance/static"
+  echo "# dummy compose file" >"${bundle}/docker-compose.yml"
+  echo "worker_processes auto;" >"${bundle}/docker/edge/nginx.conf"
+  echo "# vhost" >"${bundle}/docker/edge/conf.d/10-frontend.conf"
+  echo "# include" >"${bundle}/docker/edge/include/proxy.conf"
+  echo "#!/bin/sh" >"${bundle}/docker/acme/publish-loop.sh"
+  echo "<html></html>" >"${bundle}/docker/maintenance/static/index.html"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}"     "FAKE_CONFIG_BUNDLE=${bundle}"     "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "a config-only change applies"
   if [[ -f "${T_COMPOSE_DIR}/docker/edge/nginx.conf" ]]; then
     record 1 "docker/edge/nginx.conf reached the host as a FILE"
   else
     record 0 "docker/edge/nginx.conf did not reach the host (mirror_dir list not extended?)"
   fi
-  if [[ -f "${T_COMPOSE_DIR}/docker/edge/conf.d/10-frontend.conf"      && -f "${T_COMPOSE_DIR}/docker/edge/include/proxy.conf" ]]; then
+  if [[ -f "${T_COMPOSE_DIR}/docker/edge/conf.d/10-frontend.conf" && -f "${T_COMPOSE_DIR}/docker/edge/include/proxy.conf" ]]; then
     record 1 "the conf.d and include trees came with it"
   else
     record 0 "conf.d / include were not mirrored"
@@ -1412,9 +1412,9 @@ scenario_config_mirror_ignores_caller_umask() {
     setup_host "${tmp}"
     local bundle="${tmp}/bundle"
     mkdir -p "${bundle}/docker/edge/conf.d"
-    echo "# dummy compose file" > "${bundle}/docker-compose.yml"
-    echo "worker_processes auto;" > "${bundle}/docker/edge/nginx.conf"
-    echo "# vhost" > "${bundle}/docker/edge/conf.d/10-frontend.conf"
+    echo "# dummy compose file" >"${bundle}/docker-compose.yml"
+    echo "worker_processes auto;" >"${bundle}/docker/edge/nginx.conf"
+    echo "# vhost" >"${bundle}/docker/edge/conf.d/10-frontend.conf"
     write_marker "${MARKER}"
     mapfile -t fake < <(converged_env)
 
@@ -1446,10 +1446,10 @@ scenario_config_mirror_ignores_caller_umask() {
 
 write_infra_units() {
   mkdir -p "$1/quadlet/systemd"
-  echo "# dummy compose file" > "$1/docker-compose.yml"
+  echo "# dummy compose file" >"$1/docker-compose.yml"
   printf '[Container]\nImage=docker.io/postgres:18-alpine@sha256:%s\n' \
-    1111111111111111111111111111111111111111111111111111111111111111 > "$1/quadlet/systemd/db-backend.container"
-  printf '[Container]\nImage=quay.io/keycloak/keycloak:%s@sha256:%s\n' "$2" "$3" > "$1/quadlet/systemd/keycloak.container"
+    1111111111111111111111111111111111111111111111111111111111111111 >"$1/quadlet/systemd/db-backend.container"
+  printf '[Container]\nImage=quay.io/keycloak/keycloak:%s@sha256:%s\n' "$2" "$3" >"$1/quadlet/systemd/keycloak.container"
 }
 
 scenario_infra_digest_refresh_is_not_gated() {
@@ -1509,8 +1509,8 @@ scenario_edge_reloads_a_renewed_certificate() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   mkdir -p "${T_COMPOSE_DIR}/docker/edge/conf.d"
-  echo "worker_processes auto;" > "${T_COMPOSE_DIR}/docker/edge/nginx.conf"
-  echo "# vhost" > "${T_COMPOSE_DIR}/docker/edge/conf.d/10-frontend.conf"
+  echo "worker_processes auto;" >"${T_COMPOSE_DIR}/docker/edge/nginx.conf"
+  echo "# vhost" >"${T_COMPOSE_DIR}/docker/edge/conf.d/10-frontend.conf"
   mkdir -p "${T_STATE_DIR}/edge"
   cp -R "${T_COMPOSE_DIR}/docker/edge" "${T_STATE_DIR}/edge/config"
   write_marker "${MARKER}"
@@ -1518,7 +1518,7 @@ scenario_edge_reloads_a_renewed_certificate() {
   local seeded="aaaa1111  /etc/nginx/certs/profit-base.online/fullchain.pem"
   local renewed="bbbb2222  /etc/nginx/certs/profit-base.online/fullchain.pem"
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "a converged tick with unseen certificates succeeds"
   assert_contains "certificates differs" "the certificate drift is named in the log"
@@ -1529,19 +1529,19 @@ scenario_edge_reloads_a_renewed_certificate() {
     record 0 "no fingerprint was written (the volume was never readable?)"
   fi
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "an unchanged tick succeeds"
   assert_no_docker "systemctl --user restart edge.service" "an unchanged certificate recreates nothing"
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${renewed}" || rc=$?
   assert_exit 0 "$rc" "the renewal tick succeeds"
   assert_docker "systemctl --user restart edge.service" "a renewed certificate is loaded"
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_EXEC_RC=1" || rc=$?
   assert_exit 0 "$rc" "a tick whose certificate read fails still succeeds"
@@ -1562,8 +1562,8 @@ scenario_check_only_verify_fail() {
   assert_contains "SIGNATURE VERIFICATION FAILED" "the failure is reported"
   assert_no_apply "nothing is applied"
   if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
-     || ! grep -q 'basetool_deploy_last_failure_timestamp [1-9]' \
-            "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    || ! grep -q 'basetool_deploy_last_failure_timestamp [1-9]' \
+      "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
     record 1 "no deploy-failure metric is written for a dry-run verification failure"
   else
     record 0 "no deploy-failure metric is written for a dry-run verification failure"
@@ -1626,9 +1626,9 @@ podman_units() {
     printf '[Container]
 ContainerName=%s
 Image=placeholder
-' "${svc}"       > "${T_UNIT_DIR}/${svc}.container"
+' "${svc}" >"${T_UNIT_DIR}/${svc}.container"
   done
-  printf 'Volume=%s/keystore.p12:/run/secrets/keystore.p12:ro\n' "$1" >> "${T_UNIT_DIR}/backend.container"
+  printf 'Volume=%s/keystore.p12:/run/secrets/keystore.p12:ro\n' "$1" >>"${T_UNIT_DIR}/backend.container"
 }
 
 scenario_podman_resolves_without_pulling() {
@@ -1713,7 +1713,7 @@ scenario_podman_health_gate_rolls_back() {
   run_deploy -- "${pod[@]}" "${conv[@]}" >/dev/null 2>&1 || true
   local pin="${T_UNIT_DIR}/backend.container.d/10-digest-pin.conf"
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   run_deploy -- "${pod[@]}" "${conv[@]}" \
     "FAKE_REMOTE_BACKEND=${PDIG_BACKEND_NEW}" \
     "FAKE_UNHEALTHY_DIGEST=${PDIG_BACKEND_NEW}" || rc=$?
@@ -1782,16 +1782,16 @@ scenario_podman_refuses_without_quadlet
 write_bundle() {
   local b="$1"
   mkdir -p "${b}/quadlet/systemd" "${b}/quadlet/env.d"
-  echo "# promoted compose" > "${b}/docker-compose.yml"
-  printf '[Container]\nContainerName=backend\nImage=placeholder\n'  > "${b}/quadlet/systemd/backend.container"
-  printf '[Container]\nContainerName=frontend\nImage=placeholder\n' > "${b}/quadlet/systemd/frontend.container"
-  printf '[Network]\nNetworkName=net-app\n'                          > "${b}/quadlet/systemd/net-app.network"
+  echo "# promoted compose" >"${b}/docker-compose.yml"
+  printf '[Container]\nContainerName=backend\nImage=placeholder\n' >"${b}/quadlet/systemd/backend.container"
+  printf '[Container]\nContainerName=frontend\nImage=placeholder\n' >"${b}/quadlet/systemd/frontend.container"
+  printf '[Network]\nNetworkName=net-app\n' >"${b}/quadlet/systemd/net-app.network"
   # shellcheck disable=SC2016
-  printf 'BACKEND_TOKEN=${BASETOOL_KEYSTORE_HOST_PATH:?}\n'                > "${b}/quadlet/env.d/backend.env.tmpl"
+  printf 'BACKEND_TOKEN=${BASETOOL_KEYSTORE_HOST_PATH:?}\n' >"${b}/quadlet/env.d/backend.env.tmpl"
 }
 
 write_env_renderer() {
-  cat > "${T_FAKE_BIN}/render-env-d.py" <<'REND'
+  cat >"${T_FAKE_BIN}/render-env-d.py" <<'REND'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'render-env-d %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
@@ -1818,10 +1818,10 @@ scenario_podman_bundle_installs_the_units() {
   local bundle="${tmp}/bundle"
   write_bundle "${bundle}"
 
-  printf '[Container]\nContainerName=backend\nImage=OLD\n' > "${T_UNIT_DIR}/backend.container"
-  printf '[Container]\nContainerName=retired\n'             > "${T_UNIT_DIR}/retired.container"
+  printf '[Container]\nContainerName=backend\nImage=OLD\n' >"${T_UNIT_DIR}/backend.container"
+  printf '[Container]\nContainerName=retired\n' >"${T_UNIT_DIR}/retired.container"
   mkdir -p "${T_UNIT_DIR}/backend.container.d"
-  echo "# an operator drop-in" > "${T_UNIT_DIR}/backend.container.d/20-host-alias.conf"
+  echo "# an operator drop-in" >"${T_UNIT_DIR}/backend.container.d/20-host-alias.conf"
 
   write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
   mapfile -t pod < <(podman_env)
@@ -1864,11 +1864,11 @@ scenario_podman_retired_unit_is_stopped_then_removed() {
   write_env_renderer
   local bundle="${tmp}/bundle"
   write_bundle "${bundle}"
-  printf '[Container]\nContainerName=retired\n' > "${T_UNIT_DIR}/retired.container"
+  printf '[Container]\nContainerName=retired\n' >"${T_UNIT_DIR}/retired.container"
   write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   run_deploy -- "${pod[@]}" "${conv[@]}" \
     "FAKE_CONFIG_BUNDLE=${bundle}" \
     "BASETOOL_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
@@ -1915,7 +1915,7 @@ scenario_podman_runs_without_a_compose_file() {
   setup_host "${tmp}"
   podman_units "${tmp}"
   rm -f "${T_COMPOSE_DIR}/docker-compose.yml"
-  printf '[Container]\nContainerName=backend\nImage=x\n' > "${T_UNIT_DIR}/backend.container"
+  printf '[Container]\nContainerName=backend\nImage=x\n' >"${T_UNIT_DIR}/backend.container"
   write_marker "${PMARKER}"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
@@ -1934,16 +1934,16 @@ scenario_podman_changed_monitoring_and_acme_units_are_restarted() {
   write_env_renderer
   local bundle="${tmp}/bundle"
   write_bundle "${bundle}"
-  printf '[Container]\nContainerName=prometheus\nImage=NEW\n' > "${bundle}/quadlet/systemd/prometheus.container"
-  printf '[Container]\nContainerName=loki\nImage=same\n'      > "${bundle}/quadlet/systemd/loki.container"
-  printf '[Container]\nContainerName=acme\nImage=NEW\n'       > "${bundle}/quadlet/systemd/acme.container"
-  printf '[Container]\nContainerName=prometheus\nImage=OLD\n' > "${T_UNIT_DIR}/prometheus.container"
-  printf '[Container]\nContainerName=loki\nImage=same\n'      > "${T_UNIT_DIR}/loki.container"
-  printf '[Container]\nContainerName=acme\nImage=OLD\n'       > "${T_UNIT_DIR}/acme.container"
+  printf '[Container]\nContainerName=prometheus\nImage=NEW\n' >"${bundle}/quadlet/systemd/prometheus.container"
+  printf '[Container]\nContainerName=loki\nImage=same\n' >"${bundle}/quadlet/systemd/loki.container"
+  printf '[Container]\nContainerName=acme\nImage=NEW\n' >"${bundle}/quadlet/systemd/acme.container"
+  printf '[Container]\nContainerName=prometheus\nImage=OLD\n' >"${T_UNIT_DIR}/prometheus.container"
+  printf '[Container]\nContainerName=loki\nImage=same\n' >"${T_UNIT_DIR}/loki.container"
+  printf '[Container]\nContainerName=acme\nImage=OLD\n' >"${T_UNIT_DIR}/acme.container"
   write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   run_deploy -- "${pod[@]}" "${conv[@]}" \
     "BASETOOL_MONITORING_ENABLED=true" \
     "FAKE_CONFIG_BUNDLE=${bundle}" \
@@ -1966,7 +1966,7 @@ scenario_podman_changed_monitoring_and_acme_units_are_restarted() {
 }
 
 write_copying_env_renderer() {
-  cat > "${T_FAKE_BIN}/render-env-d.py" <<'REND'
+  cat >"${T_FAKE_BIN}/render-env-d.py" <<'REND'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'render-env-d %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
@@ -1995,15 +1995,15 @@ write_env_d_bundle() {
   local b="$1" backend="$2" grafana="$3" svc
   rm -rf "${b}"
   mkdir -p "${b}/quadlet/systemd" "${b}/quadlet/env.d"
-  echo "# promoted compose" > "${b}/docker-compose.yml"
+  echo "# promoted compose" >"${b}/docker-compose.yml"
   for svc in "${ENV_D_BUNDLE_UNITS[@]}"; do
     cp "${T_UNIT_DIR}/${svc}.container" "${b}/quadlet/systemd/${svc}.container"
   done
-  printf 'BACKEND_SETTING=%s\n' "${backend}" > "${b}/quadlet/env.d/backend.env.tmpl"
-  printf 'FRONTEND_SETTING=same\n'          > "${b}/quadlet/env.d/frontend.env.tmpl"
-  printf 'INGEST_SETTING=same\n'            > "${b}/quadlet/env.d/ingest.env.tmpl"
-  printf 'GF_ROLE_PATH=%s\n' "${grafana}"   > "${b}/quadlet/env.d/grafana.env.tmpl"
-  printf 'LOKI_SETTING=same\n'              > "${b}/quadlet/env.d/loki.env.tmpl"
+  printf 'BACKEND_SETTING=%s\n' "${backend}" >"${b}/quadlet/env.d/backend.env.tmpl"
+  printf 'FRONTEND_SETTING=same\n' >"${b}/quadlet/env.d/frontend.env.tmpl"
+  printf 'INGEST_SETTING=same\n' >"${b}/quadlet/env.d/ingest.env.tmpl"
+  printf 'GF_ROLE_PATH=%s\n' "${grafana}" >"${b}/quadlet/env.d/grafana.env.tmpl"
+  printf 'LOKI_SETTING=same\n' >"${b}/quadlet/env.d/loki.env.tmpl"
 }
 
 env_d_host() {
@@ -2011,24 +2011,28 @@ env_d_host() {
   setup_host "${tmp}"
   podman_units "${tmp}"
   for svc in grafana loki; do
-    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" > "${T_UNIT_DIR}/${svc}.container"
+    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" >"${T_UNIT_DIR}/${svc}.container"
   done
   write_copying_env_renderer
   ENV_D_BUNDLE="${tmp}/bundle"
   write_env_d_bundle "${ENV_D_BUNDLE}" old old
   write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
-  mapfile -t ENV_D_RUN < <(podman_env; podman_converged_env; printf '%s\n' \
-    "BASETOOL_MONITORING_ENABLED=true" \
-    "FAKE_CONFIG_BUNDLE=${ENV_D_BUNDLE}" \
-    "BASETOOL_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
-    "BASETOOL_ENV_D_DIR=${T_CONFIG_DIR}/env.d")
+  mapfile -t ENV_D_RUN < <(
+    podman_env
+    podman_converged_env
+    printf '%s\n' \
+      "BASETOOL_MONITORING_ENABLED=true" \
+      "FAKE_CONFIG_BUNDLE=${ENV_D_BUNDLE}" \
+      "BASETOOL_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+      "BASETOOL_ENV_D_DIR=${T_CONFIG_DIR}/env.d"
+  )
   run_deploy -- "${ENV_D_RUN[@]}" >/dev/null 2>&1 || true
   if grep -qx 'BACKEND_SETTING=old' "${T_CONFIG_DIR}/env.d/backend.env" 2>/dev/null; then
     record 1 "env.d: the first release renders the old environment"
   else
     record 0 "env.d: the first release renders the old environment"
   fi
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
 }
 
 assert_env_d_says() {
@@ -2089,7 +2093,7 @@ scenario_podman_acme_is_part_of_the_stack() {
   write_marker "${PMARKER_OLD}"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
   assert_exit 0 "$rc" "podman: a deploy that moves the backend exits 0"
   assert_docker "systemctl --user start acme.service" "podman: an unchanged acme unit is started, so a stopped one comes back"
@@ -2105,7 +2109,7 @@ scenario_podman_keystore_checked_where_the_unit_mounts_it() {
   setup_host "${tmp}"
   podman_units "${tmp}"
   write_marker "${PMARKER}"
-  printf 'BASETOOL_KEYSTORE_HOST_PATH=%s/nowhere.p12\n' "${tmp}" > "${T_CONFIG_DIR}/basetool.env"
+  printf 'BASETOOL_KEYSTORE_HOST_PATH=%s/nowhere.p12\n' "${tmp}" >"${T_CONFIG_DIR}/basetool.env"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
   run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
@@ -2138,8 +2142,8 @@ scenario_podman_missing_per_service_keystore_refuses() {
   setup_host "${tmp}"
   podman_units "${tmp}"
   write_marker "${PMARKER}"
-  printf 'Volume=%s/tls/ingest.p12:/run/secrets/keystore.p12:ro\n' "${tmp}" >> "${T_UNIT_DIR}/ingest.container"
-  printf 'Volume=%s/keystore.p12:/run/secrets/internal-truststore.p12:ro\n' "${tmp}" >> "${T_UNIT_DIR}/ingest.container"
+  printf 'Volume=%s/tls/ingest.p12:/run/secrets/keystore.p12:ro\n' "${tmp}" >>"${T_UNIT_DIR}/ingest.container"
+  printf 'Volume=%s/keystore.p12:/run/secrets/internal-truststore.p12:ro\n' "${tmp}" >>"${T_UNIT_DIR}/ingest.container"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
   run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
@@ -2155,7 +2159,7 @@ scenario_podman_missing_edge_trust_anchor_refuses() {
   setup_host "${tmp}"
   podman_units "${tmp}"
   write_marker "${PMARKER}"
-  printf 'Volume=%s/certs/grafana.crt:/etc/nginx/grafana-upstream.crt:ro\n' "${tmp}" >> "${T_UNIT_DIR}/backend.container"
+  printf 'Volume=%s/certs/grafana.crt:/etc/nginx/grafana-upstream.crt:ro\n' "${tmp}" >>"${T_UNIT_DIR}/backend.container"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
   run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
@@ -2173,7 +2177,7 @@ scenario_podman_runs_podman_from_root_dir() {
   write_marker "${PMARKER}"
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   (cd "${tmp}" && run_deploy -- "${pod[@]}" "${conv[@]}") || rc=$?
   assert_exit 0 "$rc" "podman: a converged stack started by hand exits 0"
   first="$(grep -m1 '^podman-cwd ' "${T_DOCKER_LOG}" || true)"
@@ -2191,7 +2195,7 @@ scenario_podman_runs_podman_from_root_dir() {
 }
 
 write_rsync_stub() {
-  cat > "${T_FAKE_BIN}/rsync" <<'RSYNC'
+  cat >"${T_FAKE_BIN}/rsync" <<'RSYNC'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'rsync %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
@@ -2214,9 +2218,9 @@ RSYNC
 seed_live_config_tree() {
   local t="$1" u
   mkdir -p "${t}/docker/acme" "${t}/docker/edge" "${t}/monitoring/prometheus" "${t}/quadlet/systemd"
-  echo "OLD acme" > "${t}/docker/acme/publish-loop.sh"
-  echo "OLD edge" > "${t}/docker/edge/nginx.conf"
-  echo "OLD prometheus" > "${t}/monitoring/prometheus/prometheus.yml"
+  echo "OLD acme" >"${t}/docker/acme/publish-loop.sh"
+  echo "OLD edge" >"${t}/docker/edge/nginx.conf"
+  echo "OLD prometheus" >"${t}/monitoring/prometheus/prometheus.yml"
   for u in "${T_UNIT_DIR}"/*.container; do
     cp "${u}" "${t}/quadlet/systemd/"
   done
@@ -2225,14 +2229,14 @@ seed_live_config_tree() {
 write_mirror_bundle() {
   local b="$1" u
   mkdir -p "${b}/docker/acme" "${b}/docker/edge" "${b}/monitoring/prometheus" "${b}/quadlet/systemd"
-  echo "# promoted compose" > "${b}/docker-compose.yml"
-  echo "NEW acme" > "${b}/docker/acme/publish-loop.sh"
-  echo "NEW edge" > "${b}/docker/edge/nginx.conf"
-  echo "NEW prometheus" > "${b}/monitoring/prometheus/prometheus.yml"
+  echo "# promoted compose" >"${b}/docker-compose.yml"
+  echo "NEW acme" >"${b}/docker/acme/publish-loop.sh"
+  echo "NEW edge" >"${b}/docker/edge/nginx.conf"
+  echo "NEW prometheus" >"${b}/monitoring/prometheus/prometheus.yml"
   for u in "${T_UNIT_DIR}"/*.container; do
     cp "${u}" "${b}/quadlet/systemd/"
   done
-  echo "# NEW release" >> "${b}/quadlet/systemd/backend.container"
+  echo "# NEW release" >>"${b}/quadlet/systemd/backend.container"
 }
 
 assert_file_says() {
@@ -2263,7 +2267,7 @@ scenario_config_mirror_failure_is_recorded_and_undone() {
   local bundle="${tmp}/bundle"
   write_mirror_bundle "${bundle}"
   write_marker "${MARKER}"
-  echo "# the previous release's pin record" > "${T_STATE_DIR}/current-digest-pin.yml"
+  echo "# the previous release's pin record" >"${T_STATE_DIR}/current-digest-pin.yml"
   target="${DIG_BACKEND}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG_NEXT}|${DIG_KCSPI}"
   mapfile -t fake < <(converged_env)
 
@@ -2305,7 +2309,7 @@ scenario_config_mirror_failure_is_recorded_and_undone() {
   fi
   assert_no_apply "nothing is started or restarted"
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" \
     "FAKE_RSYNC_FAIL_RULES=config-stage=>/docker/acme" || rc=$?
@@ -2313,7 +2317,7 @@ scenario_config_mirror_failure_is_recorded_and_undone() {
   assert_contains "in backoff window" "and says it is backing off"
   assert_excludes "config changed" "no config is staged while backing off"
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy --force -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "--force after the fix applies the release"
@@ -2350,7 +2354,7 @@ scenario_config_restore_failure_keeps_the_anchor() {
     record 0 "the incomplete-apply marker stays"
   fi
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy --force -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "the retry applies the release"
@@ -2377,10 +2381,10 @@ scenario_pull_failure_after_config_apply_is_undone() {
   write_mirror_bundle "${bundle}"
   write_marker "${MARKER}"
   printf 'services:\n  backend:\n    image: %s\n  frontend:\n    image: %s\n  ingest:\n    image: %s\n' \
-    "${REPO_BACKEND}" "${REPO_FRONTEND}" "${REPO_INGEST}" > "${T_STATE_DIR}/current-digest-pin.yml"
+    "${REPO_BACKEND}" "${REPO_FRONTEND}" "${REPO_INGEST}" >"${T_STATE_DIR}/current-digest-pin.yml"
   pin="${T_UNIT_DIR}/backend.container.d/10-digest-pin.conf"
   mkdir -p "${pin%/*}"
-  printf '[Container]\nImage=%s\n' "${REPO_BACKEND}" > "${pin}"
+  printf '[Container]\nImage=%s\n' "${REPO_BACKEND}" >"${pin}"
   dig_new="$(hexdig beef2)"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" \
@@ -2472,7 +2476,7 @@ spi_host() {
   local tmp="$1" b="$2" f="$3" i="$4" svc ref
   setup_host "${tmp}"
   mkdir -p "${T_COMPOSE_DIR}/keycloak/providers"
-  echo "OLD jar" > "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
+  echo "OLD jar" >"${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
   {
     printf 'services:\n'
     for svc in backend frontend ingest; do
@@ -2484,9 +2488,9 @@ spi_host() {
       printf '  %s:\n    image: %s\n' "${svc}" "${ref}"
       mkdir -p "${T_UNIT_DIR}/${svc}.container.d"
       printf '# Written by deploy.sh. The digest this release pinned; do not edit.\n[Container]\nImage=%s\n' "${ref}" \
-        > "${T_UNIT_DIR}/${svc}.container.d/10-digest-pin.conf"
+        >"${T_UNIT_DIR}/${svc}.container.d/10-digest-pin.conf"
     done
-  } > "${T_STATE_DIR}/current-digest-pin.yml"
+  } >"${T_STATE_DIR}/current-digest-pin.yml"
   write_marker "${b}|${f}|${i}|${DIG_CONFIG}|${DIG_KCSPI_OLD}"
   T_DOWN="${tmp}/units-down"
 }
@@ -2508,7 +2512,7 @@ assert_nothing_down() {
   if [[ ! -s "${T_DOWN}" ]]; then
     record 1 "$1"
   else
-    record 0 "$1 (still down: $(tr '\n' ' ' < "${T_DOWN}"))"
+    record 0 "$1 (still down: $(tr '\n' ' ' <"${T_DOWN}"))"
   fi
 }
 
@@ -2518,7 +2522,7 @@ assert_starts() {
   if [[ "${got:-0}" -eq "${want}" ]]; then
     record 1 "${desc}"
   else
-    record 0 "${desc} (${unit} started ${got:-0} time(s), expected ${want}; starts: $(tr '\n' ' ' < "${T_DOWN}.starts" 2>/dev/null))"
+    record 0 "${desc} (${unit} started ${got:-0} time(s), expected ${want}; starts: $(tr '\n' ' ' <"${T_DOWN}.starts" 2>/dev/null))"
   fi
 }
 
@@ -2847,7 +2851,7 @@ scenario_heal_that_fails_is_recorded_after_the_wait() {
     "heal fails: the health-restart-failed gauge DeployHealthRestartFailing reads is stamped"
   assert_health_stamp basetool_deploy_last_stack_healthy_timestamp no "heal fails: the healthy heartbeat is not stamped"
   if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
-     || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' "${T_STATE_DIR}/textfile/deploy.prom"; then
+    || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' "${T_STATE_DIR}/textfile/deploy.prom"; then
     record 1 "heal fails: no DeployRolledBack metric"
   else
     record 0 "heal fails: no DeployRolledBack metric"
@@ -2867,7 +2871,7 @@ scenario_missing_frontend_and_ingest_are_started_not_restarted() {
   local tmp rc=0
   tmp="$(mktmp)"
   heal_host "${tmp}"
-  printf 'frontend\ningest\n' > "${T_DOWN}"
+  printf 'frontend\ningest\n' >"${T_DOWN}"
   mapfile -t fake < <(spi_env)
   run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_PS_ingest=" || rc=$?
   assert_exit 0 "$rc" "missing two: the re-apply succeeds"
@@ -2889,7 +2893,7 @@ scenario_missing_backend_is_started_not_restarted() {
   local tmp rc=0
   tmp="$(mktmp)"
   heal_host "${tmp}"
-  printf 'backend\n' > "${T_DOWN}"
+  printf 'backend\n' >"${T_DOWN}"
   mapfile -t fake < <(spi_env)
   run_deploy -- "${fake[@]}" "FAKE_PS_backend=" || rc=$?
   assert_exit 0 "$rc" "missing backend: the re-apply succeeds"
@@ -2908,8 +2912,8 @@ scenario_mixed_drift_does_not_stamp_an_unhealthy_stack_healthy() {
   local tmp rc=0
   tmp="$(mktmp)"
   heal_host "${tmp}"
-  printf 'frontend\n' > "${T_DOWN}"
-  printf '%s 2 %d\n' "${MARKER}" "$(( $(date +%s) - 100000 ))" > "${T_STATE_DIR}/health-restart.digests"
+  printf 'frontend\n' >"${T_DOWN}"
+  printf '%s 2 %d\n' "${MARKER}" "$(($(date +%s) - 100000))" >"${T_STATE_DIR}/health-restart.digests"
   mapfile -t fake < <(spi_env)
   run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_STATE_backend=running/unhealthy" || rc=$?
   assert_exit 0 "$rc" "mixed: the re-apply succeeds"
@@ -2940,17 +2944,17 @@ anchor_host() {
       esac
       printf '  %s:\n    image: %s\n' "${svc}" "${ref}"
     done
-  } > "${T_STATE_DIR}/previous-digest-pin.yml"
+  } >"${T_STATE_DIR}/previous-digest-pin.yml"
   seed_release_tree "${T_STATE_DIR}/config-previous" "N-1"
-  echo "N-1 jar" > "${T_STATE_DIR}/keycloak-spi-previous.jar"
+  echo "N-1 jar" >"${T_STATE_DIR}/keycloak-spi-previous.jar"
 }
 
 seed_release_tree() {
   local t="$1" label="$2" u
   mkdir -p "${t}/docker/acme" "${t}/docker/edge" "${t}/monitoring/prometheus" "${t}/quadlet/systemd"
-  echo "${label} acme" > "${t}/docker/acme/publish-loop.sh"
-  echo "${label} edge" > "${t}/docker/edge/nginx.conf"
-  echo "${label} prometheus" > "${t}/monitoring/prometheus/prometheus.yml"
+  echo "${label} acme" >"${t}/docker/acme/publish-loop.sh"
+  echo "${label} edge" >"${t}/docker/edge/nginx.conf"
+  echo "${label} prometheus" >"${t}/monitoring/prometheus/prometheus.yml"
   for u in "${T_UNIT_DIR}"/*.container; do
     if [[ -e "${u}" ]]; then
       cp "${u}" "${t}/quadlet/systemd/"
@@ -2961,7 +2965,7 @@ seed_release_tree() {
 assert_anchors_keep_previous() {
   local p="$1"
   if grep -q "@${DIG_BACKEND_OLD}\$" "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null \
-     && ! grep -q "@${DIG_BACKEND}\$" "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null; then
+    && ! grep -q "@${DIG_BACKEND}\$" "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null; then
     record 1 "${p}: previous-digest-pin.yml still names N-1"
   else
     record 0 "${p}: previous-digest-pin.yml still names N-1 (it says: $(grep 'image:' "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null | head -n 1))"
@@ -3001,7 +3005,7 @@ scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back() {
   local tmp rc=0
   tmp="$(mktmp)"
   anchor_host "${tmp}"
-  printf 'frontend\n' > "${T_DOWN}"
+  printf 'frontend\n' >"${T_DOWN}"
   mapfile -t fake < <(spi_env)
   run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
   assert_exit 1 "$rc" "re-apply fails: the run fails"
@@ -3029,7 +3033,7 @@ scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back() {
   assert_contains "recorded re-apply failure #1" "re-apply fails: the failure is recorded"
   assert_reapply_record "${MARKER}" 1 "re-apply fails: the backoff record is keyed to the deployed target"
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
   assert_exit 0 "$rc" "re-apply fails: the next tick inside the backoff window is a quiet skip"
@@ -3044,7 +3048,7 @@ scenario_reapply_that_succeeds_keeps_the_anchors() {
   local tmp rc=0
   tmp="$(mktmp)"
   anchor_host "${tmp}"
-  printf 'frontend\n' > "${T_DOWN}"
+  printf 'frontend\n' >"${T_DOWN}"
   mapfile -t fake < <(spi_env)
   run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" || rc=$?
   assert_exit 0 "$rc" "re-apply succeeds: the run succeeds"
@@ -3065,13 +3069,13 @@ scenario_release_after_a_reapply_rotates_the_anchor_to_the_deployed_release() {
   local tmp rc=0 dig_next
   tmp="$(mktmp)"
   anchor_host "${tmp}"
-  printf 'frontend\n' > "${T_DOWN}"
+  printf 'frontend\n' >"${T_DOWN}"
   mapfile -t fake < <(spi_env)
   run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
   assert_exit 1 "$rc" "release after re-apply: the re-apply fails first"
 
   dig_next="$(hexdig beef5)"
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_REMOTE_BACKEND=${dig_next}" "FAKE_UNHEALTHY_DIGEST=${dig_next}" || rc=$?
   assert_exit 1 "$rc" "release after re-apply: the failed release fails the run"
@@ -3100,7 +3104,7 @@ scenario_reapply_of_lost_units_keeps_config_previous() {
   seed_release_tree "${T_COMPOSE_DIR}" "N"
   local bundle="${tmp}/bundle"
   seed_release_tree "${bundle}" "N"
-  echo "# promoted compose" > "${bundle}/docker-compose.yml"
+  echo "# promoted compose" >"${bundle}/docker-compose.yml"
   rm -rf "${T_UNIT_DIR}"
   mkdir -p "${T_UNIT_DIR}"
   mapfile -t fake < <(spi_env)
@@ -3125,7 +3129,7 @@ scenario_reapply_of_lost_units_keeps_config_previous() {
     "lost units, failed: the restore-failed gauge is stamped"
   assert_reapply_record "${MARKER}" 1 "lost units, failed: the backoff record is keyed to the deployed target"
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy --force -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" || rc=$?
   assert_exit 0 "$rc" "lost units, forced: the re-apply succeeds"
@@ -3135,8 +3139,8 @@ scenario_reapply_of_lost_units_keeps_config_previous() {
     record 0 "lost units, forced: the units are back"
   fi
   assert_anchors_keep_previous "lost units, forced"
-  if [[ ! -f "${T_STATE_DIR}/config-apply.incomplete" && ! -f "${T_STATE_DIR}/failed.digests" \
-        && ! -f "${T_STATE_DIR}/reapply-failed.digests" ]]; then
+  if [[ ! -f "${T_STATE_DIR}/config-apply.incomplete" && ! -f "${T_STATE_DIR}/failed.digests" &&
+    ! -f "${T_STATE_DIR}/reapply-failed.digests" ]]; then
     record 1 "lost units, forced: no incomplete-apply marker and no failure record remain"
   else
     record 0 "lost units, forced: no incomplete-apply marker and no failure record remain"
@@ -3150,7 +3154,7 @@ reapply_host() {
   seed_release_tree "${T_COMPOSE_DIR}" "N"
   T_BUNDLE="$1/bundle"
   seed_release_tree "${T_BUNDLE}" "N"
-  echo "# promoted compose" > "${T_BUNDLE}/docker-compose.yml"
+  echo "# promoted compose" >"${T_BUNDLE}/docker-compose.yml"
 }
 
 DIG_BACKEND_NEXT="$(hexdig beef5)"
@@ -3159,13 +3163,13 @@ MARKER_NEXT="${DIG_BACKEND_NEXT}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${D
 seed_rolled_back_next() {
   local now
   now="$(date +%s)"
-  printf '%s 1 %d\n' "${MARKER_NEXT}" "$(( now - 60 ))" > "${T_STATE_DIR}/failed.digests"
+  printf '%s 1 %d\n' "${MARKER_NEXT}" "$((now - 60))" >"${T_STATE_DIR}/failed.digests"
   mkdir -p "${T_STATE_DIR}/textfile"
   printf '%s\n' \
     "basetool_deploy_last_success_timestamp 1000" \
-    "basetool_deploy_last_rollback_timestamp $(( now - 60 ))" \
+    "basetool_deploy_last_rollback_timestamp $((now - 60))" \
     "basetool_deploy_last_failure_timestamp 0" \
-    "basetool_deploy_last_blocked_timestamp 0" > "${T_STATE_DIR}/textfile/deploy.prom"
+    "basetool_deploy_last_blocked_timestamp 0" >"${T_STATE_DIR}/textfile/deploy.prom"
 }
 
 scenario_reapply_flag_reapplies_the_deployed_release_and_rotates_nothing() {
@@ -3174,7 +3178,7 @@ scenario_reapply_flag_reapplies_the_deployed_release_and_rotates_nothing() {
   tmp="$(mktmp)"
   reapply_host "${tmp}"
   seed_rolled_back_next
-  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" > "${T_STATE_DIR}/reapply-failed.digests"
+  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" >"${T_STATE_DIR}/reapply-failed.digests"
   mapfile -t fake < <(spi_env)
   run_deploy --reapply -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" "FAKE_KCSPI_JAR=OLD jar" \
     "FAKE_REMOTE_BACKEND=${DIG_BACKEND_NEXT}" || rc=$?
@@ -3236,7 +3240,7 @@ scenario_reapply_flag_that_fails_rolls_nothing_back_and_backs_off_short() {
   tmp="$(mktmp)"
   reapply_host "${tmp}"
   seed_rolled_back_next
-  printf 'frontend\n' > "${T_DOWN}"
+  printf 'frontend\n' >"${T_DOWN}"
   mapfile -t fake < <(spi_env)
   run_deploy --reapply -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" "FAKE_KCSPI_JAR=OLD jar" \
     "FAKE_REMOTE_BACKEND=${DIG_BACKEND_NEXT}" \
@@ -3262,7 +3266,7 @@ scenario_reapply_flag_that_fails_rolls_nothing_back_and_backs_off_short() {
     record 0 "--reapply fails: no DeployFailed stamp (the release had shipped)"
   fi
 
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" "FAKE_KCSPI_JAR=OLD jar" \
     "FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
@@ -3285,15 +3289,15 @@ scenario_reapply_flag_is_refused_without_a_deployed_release() {
   assert_no_docker "podman login" "fresh host: the registry is not contacted"
   assert_no_docker "skopeo" "fresh host: no tag is resolved"
   assert_no_apply "fresh host: nothing is started"
-  if [[ ! -e "${T_STATE_DIR}/textfile/deploy.prom" && ! -e "${T_STATE_DIR}/failed.digests" \
-        && ! -e "${T_STATE_DIR}/reapply-failed.digests" ]]; then
+  if [[ ! -e "${T_STATE_DIR}/textfile/deploy.prom" && ! -e "${T_STATE_DIR}/failed.digests" &&
+    ! -e "${T_STATE_DIR}/reapply-failed.digests" ]]; then
     record 1 "fresh host: no metric and no failure record -- a refusal is not a deploy failure"
   else
     record 0 "fresh host: no metric and no failure record -- a refusal is not a deploy failure"
   fi
 
   write_marker "${MARKER}"
-  : > "${T_DOCKER_LOG}"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy --reapply --tag 1.2.3 -- "${fake[@]}" || rc=$?
   assert_exit 1 "$rc" "with --tag: --reapply is refused"
@@ -3301,8 +3305,8 @@ scenario_reapply_flag_is_refused_without_a_deployed_release() {
   assert_no_docker "podman login" "with --tag: the registry is not contacted"
 
   printf 'services:\n  backend:\n    image: ghcr.io/krt-profit/basetool-backend@%s\n' "${DIG_BACKEND_OLD}" \
-    > "${T_STATE_DIR}/current-digest-pin.yml"
-  : > "${T_DOCKER_LOG}"
+    >"${T_STATE_DIR}/current-digest-pin.yml"
+  : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy --reapply -- "${fake[@]}" || rc=$?
   assert_exit 1 "$rc" "pin disagrees: --reapply is refused"
@@ -3338,7 +3342,7 @@ scenario_failed_drift_reapply_backs_off_with_the_heal_durations() {
   local tmp rc=0
   tmp="$(mktmp)"
   anchor_host "${tmp}"
-  printf 'frontend\n' > "${T_DOWN}"
+  printf 'frontend\n' >"${T_DOWN}"
   mapfile -t fake < <(spi_env)
   local -a stuck=("FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar")
   run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
@@ -3346,25 +3350,29 @@ scenario_failed_drift_reapply_backs_off_with_the_heal_durations() {
   assert_contains "the next automatic attempt backs off 300s" "short backoff: failure #1 waits 300 s"
   assert_reapply_record "${MARKER}" 1 "short backoff: recorded in reapply-failed.digests"
 
-  : > "${T_DOCKER_LOG}"; rc=0
+  : >"${T_DOCKER_LOG}"
+  rc=0
   run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
   assert_exit 0 "$rc" "short backoff: the next tick is a quiet skip"
   assert_contains "s/300s) — skipping this tick" "short backoff: the first window is 300 s, not the release's 600 s"
 
-  printf '%s 1 %d\n' "${MARKER}" "$(( $(date +%s) - 400 ))" > "${T_STATE_DIR}/reapply-failed.digests"
-  : > "${T_DOCKER_LOG}"; rc=0
+  printf '%s 1 %d\n' "${MARKER}" "$(($(date +%s) - 400))" >"${T_STATE_DIR}/reapply-failed.digests"
+  : >"${T_DOCKER_LOG}"
+  rc=0
   run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
   assert_exit 1 "$rc" "short backoff: after 400 s the re-apply is retried (and fails again)"
   assert_contains "backoff of 300s elapsed — retrying" "short backoff: ...because the 300 s window has passed"
   assert_contains "recorded re-apply failure #2" "short backoff: the count goes on"
   assert_contains "the next automatic attempt backs off 600s" "short backoff: failure #2 waits 600 s (doubling)"
 
-  : > "${T_DOCKER_LOG}"; rc=0
+  : >"${T_DOCKER_LOG}"
+  rc=0
   run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
   assert_contains "s/600s) — skipping this tick" "short backoff: the second window is 600 s"
 
-  printf '%s 9 %d\n' "${MARKER}" "$(date +%s)" > "${T_STATE_DIR}/reapply-failed.digests"
-  : > "${T_DOCKER_LOG}"; rc=0
+  printf '%s 9 %d\n' "${MARKER}" "$(date +%s)" >"${T_STATE_DIR}/reapply-failed.digests"
+  : >"${T_DOCKER_LOG}"
+  rc=0
   run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
   assert_contains "s/3600s) — skipping this tick" "short backoff: capped at 3600 s, not the release's 21600 s"
   rm -rf "${tmp}"
@@ -3387,13 +3395,15 @@ scenario_failed_release_keeps_the_long_backoff() {
     record 0 "long backoff: a release failure writes no re-apply record"
   fi
 
-  : > "${T_DOCKER_LOG}"; rc=0
+  : >"${T_DOCKER_LOG}"
+  rc=0
   run_deploy -- "${fake[@]}" "${next[@]}" || rc=$?
   assert_exit 0 "$rc" "long backoff: the next tick is a quiet skip"
   assert_contains "s/600s) — skipping this tick" "long backoff: the first window is 600 s"
 
-  printf '%s 2 %d\n' "${MARKER_NEXT}" "$(date +%s)" > "${T_STATE_DIR}/failed.digests"
-  : > "${T_DOCKER_LOG}"; rc=0
+  printf '%s 2 %d\n' "${MARKER_NEXT}" "$(date +%s)" >"${T_STATE_DIR}/failed.digests"
+  : >"${T_DOCKER_LOG}"
+  rc=0
   run_deploy -- "${fake[@]}" "${next[@]}" || rc=$?
   assert_contains "s/1200s) — skipping this tick" "long backoff: the second window is 1200 s"
   rm -rf "${tmp}"
@@ -3455,16 +3465,16 @@ seed_host_scripts() {
   local dir="$1" rel
   for rel in "${HS_FILES[@]}"; do
     mkdir -p "$(dirname "${dir}/${rel}")"
-    printf 'host copy of %s\n' "${rel}" > "${dir}/${rel}"
+    printf 'host copy of %s\n' "${rel}" >"${dir}/${rel}"
   done
 }
 
 write_script_manifest() {
   local dir="$1" out="$2" rel digest
-  : > "${out}"
+  : >"${out}"
   for rel in "${HS_FILES[@]}"; do
-    digest="$(sha256sum < "${dir}/${rel}")"
-    printf '%s  %s\n' "${digest%% *}" "${rel}" >> "${out}"
+    digest="$(sha256sum <"${dir}/${rel}")"
+    printf '%s  %s\n' "${digest%% *}" "${rel}" >>"${out}"
   done
 }
 
@@ -3521,7 +3531,7 @@ scenario_host_scripts_drift_between_promotions_warns_and_is_exported() {
   setup_host "${tmp}"
   seed_host_scripts "${tmp}/host-scripts"
   write_script_manifest "${tmp}/host-scripts" "${T_COMPOSE_DIR}/host-scripts.sha256"
-  echo "edited on the host" >> "${tmp}/host-scripts/deploy.sh"
+  echo "edited on the host" >>"${tmp}/host-scripts/deploy.sh"
   rm -f "${tmp}/host-scripts/lib/common.sh"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
@@ -3543,7 +3553,7 @@ scenario_host_scripts_without_a_manifest_say_so_and_export_nothing() {
   setup_host "${tmp}"
   seed_host_scripts "${tmp}/host-scripts"
   mkdir -p "${T_STATE_DIR}/textfile"
-  echo 'basetool_host_scripts_check_timestamp_seconds 1' > "${T_STATE_DIR}/textfile/host-scripts.prom"
+  echo 'basetool_host_scripts_check_timestamp_seconds 1' >"${T_STATE_DIR}/textfile/host-scripts.prom"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
@@ -3554,7 +3564,7 @@ scenario_host_scripts_without_a_manifest_say_so_and_export_nothing() {
   else
     record 1 "the stale host-scripts.prom is removed"
   fi
-  printf 'not a manifest\n' > "${T_COMPOSE_DIR}/host-scripts.sha256"
+  printf 'not a manifest\n' >"${T_COMPOSE_DIR}/host-scripts.sha256"
   rc=0
   run_deploy -- "${fake[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${tmp}/host-scripts" || rc=$?
   assert_exit 0 "$rc" "a malformed manifest does not fail the tick"
@@ -3570,7 +3580,7 @@ scenario_host_scripts_stale_apply_path_refuses_the_release_and_the_fix_applies_i
   write_rsync_stub
   host_scripts_release_fixture "${tmp}"
   cp "${HS_DIR}/deploy.sh" "${tmp}/deploy.sh.good"
-  echo "an older order" >> "${HS_DIR}/deploy.sh"
+  echo "an older order" >>"${HS_DIR}/deploy.sh"
   run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 1 "$rc" "the release is refused"
@@ -3607,7 +3617,7 @@ scenario_host_scripts_stale_apply_path_can_be_forced_or_switched_off() {
   setup_host "${tmp}"
   write_rsync_stub
   host_scripts_release_fixture "${tmp}"
-  echo "an older order" >> "${HS_DIR}/lib/container-runtime.sh"
+  echo "an older order" >>"${HS_DIR}/lib/container-runtime.sh"
   run_deploy --force -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "--force applies past the gate"
@@ -3618,7 +3628,7 @@ scenario_host_scripts_stale_apply_path_can_be_forced_or_switched_off() {
   setup_host "${tmp}"
   write_rsync_stub
   host_scripts_release_fixture "${tmp}"
-  echo "an older order" >> "${HS_DIR}/render-env-d.py"
+  echo "an older order" >>"${HS_DIR}/render-env-d.py"
   rc=0
   run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" "BASETOOL_REQUIRE_CURRENT_SCRIPTS=false" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
@@ -3634,7 +3644,7 @@ scenario_host_scripts_stale_non_apply_script_warns_but_applies() {
   setup_host "${tmp}"
   write_rsync_stub
   host_scripts_release_fixture "${tmp}"
-  echo "an older version" >> "${HS_DIR}/restore-drill.sh"
+  echo "an older version" >>"${HS_DIR}/restore-drill.sh"
   run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "the release is applied"
@@ -3651,7 +3661,7 @@ scenario_host_scripts_bundle_without_a_manifest_applies_and_drops_the_old_one() 
   write_rsync_stub
   host_scripts_release_fixture "${tmp}"
   rm -f "${HS_BUNDLE}/host-scripts.sha256"
-  echo "stale manifest of the previous release" > "${T_COMPOSE_DIR}/host-scripts.sha256"
+  echo "stale manifest of the previous release" >"${T_COMPOSE_DIR}/host-scripts.sha256"
   run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "the release is applied"
@@ -3672,8 +3682,8 @@ scenario_host_scripts_manifest_follows_a_rollback() {
   write_rsync_stub
   host_scripts_release_fixture "${tmp}"
   previous="$(sed 's/^[0-9a-f]\{4\}/0000/' "${HS_BUNDLE}/host-scripts.sha256")"
-  printf '%s\n' "${previous}" > "${T_COMPOSE_DIR}/host-scripts.sha256"
-  echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
+  printf '%s\n' "${previous}" >"${T_COMPOSE_DIR}/host-scripts.sha256"
+  echo "services: {}" >"${T_STATE_DIR}/current-digest-pin.yml"
   run_deploy -- "${HS_FAKE[@]}" "BASETOOL_HOST_SCRIPTS_DIR=${HS_DIR}" \
     "FAKE_CONFIG_BUNDLE=${HS_BUNDLE}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" "FAKE_UP_RC=1" || rc=$?
   assert_exit 1 "$rc" "the failing release exits non-zero"
@@ -3701,14 +3711,14 @@ scenario_before_the_layout_migration_a_failed_release_restores_the_old_tree() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   mkdir -p "${T_COMPOSE_DIR}/quadlet/systemd"
-  printf '[Container]\nImage=old-release\n' > "${T_COMPOSE_DIR}/quadlet/systemd/backend.container"
-  echo "# old release compose" > "${T_COMPOSE_DIR}/docker-compose.yml"
+  printf '[Container]\nImage=old-release\n' >"${T_COMPOSE_DIR}/quadlet/systemd/backend.container"
+  echo "# old release compose" >"${T_COMPOSE_DIR}/docker-compose.yml"
   bundle="${tmp}/bundle"
   mkdir -p "${bundle}/quadlet/systemd"
-  echo "# new layout compose" > "${bundle}/docker-compose.yml"
-  printf '[Container]\nImage=new-release\n' > "${bundle}/quadlet/systemd/backend.container"
+  echo "# new layout compose" >"${bundle}/docker-compose.yml"
+  printf '[Container]\nImage=new-release\n' >"${bundle}/quadlet/systemd/backend.container"
   write_marker "${MARKER}"
-  echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
+  echo "services: {}" >"${T_STATE_DIR}/current-digest-pin.yml"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" "FAKE_UP_RC=1" || rc=$?
   assert_exit 1 "$rc" "the failed release rolls back"
@@ -3730,8 +3740,8 @@ scenario_first_deploy_after_the_layout_migration_has_no_old_release_to_roll_back
   mkdir -p "${T_COMPOSE_DIR}/scripts"
   bundle="${tmp}/bundle"
   mkdir -p "${bundle}/quadlet/systemd"
-  echo "# new layout compose" > "${bundle}/docker-compose.yml"
-  printf '[Container]\nImage=new-release\n' > "${bundle}/quadlet/systemd/backend.container"
+  echo "# new layout compose" >"${bundle}/docker-compose.yml"
+  printf '[Container]\nImage=new-release\n' >"${bundle}/quadlet/systemd/backend.container"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" "FAKE_UP_RC=1" || rc=$?
   assert_exit 2 "$rc" "the failed first deploy stops for the operator"

@@ -114,11 +114,20 @@ def resolve_commit(repo: str, ref: str) -> tuple[str, str] | None:
     inclusive through 23:59:59.
     """
     if DATE_TIME_RE.match(ref):
-        out = run_git(repo, ["log", "-1", f"--until={ref.replace('T', ' ', 1)}",
-                             "--format=%H%x09%cd", "--date=short"])
+        out = run_git(
+            repo,
+            [
+                "log",
+                "-1",
+                f"--until={ref.replace('T', ' ', 1)}",
+                "--format=%H%x09%cd",
+                "--date=short",
+            ],
+        )
     elif DATE_ONLY_RE.match(ref):
-        out = run_git(repo, ["log", "-1", f"--until={ref} 23:59:59",
-                             "--format=%H%x09%cd", "--date=short"])
+        out = run_git(
+            repo, ["log", "-1", f"--until={ref} 23:59:59", "--format=%H%x09%cd", "--date=short"]
+        )
     else:
         out = run_git(repo, ["log", "-1", "--format=%H%x09%cd", "--date=short", ref])
     if not out or not out.strip():
@@ -197,7 +206,9 @@ def write_state(repo: str, *, ref: str, sha: str, date: str, tag: str | None) ->
     in_git_dir = git_dir is not None
     gitignore_status = (
         "n/a (inside the git dir -- outside every working tree)"
-        if in_git_dir else ensure_gitignore(repo))
+        if in_git_dir
+        else ensure_gitignore(repo)
+    )
     payload = {
         "schema": STATE_SCHEMA,
         "last_covered": {"ref": ref, "sha": sha, "date": date, "tag": tag},

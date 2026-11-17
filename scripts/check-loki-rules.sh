@@ -7,10 +7,16 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RULES_DIR="${REPO_ROOT}/monitoring/loki/rules"
 IMAGE="grafana/cortex-tools:v0.11.3@sha256:ed86004a3d5eb7a8351fd1fa9c2a8f4f70c6b133eb57846c55aef9e4f485da0c"
 
-[[ -d "${RULES_DIR}" ]] || { echo "FAIL: ${RULES_DIR} does not exist"; exit 1; }
+[[ -d "${RULES_DIR}" ]] || {
+  echo "FAIL: ${RULES_DIR} does not exist"
+  exit 1
+}
 
 mapfile -t RULE_FILES < <(find "${RULES_DIR}" -type f \( -name '*.yml' -o -name '*.yaml' \) | sort)
-(( ${#RULE_FILES[@]} > 0 )) || { echo "FAIL: no rule files under ${RULES_DIR}"; exit 1; }
+((${#RULE_FILES[@]} > 0)) || {
+  echo "FAIL: no rule files under ${RULES_DIR}"
+  exit 1
+}
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
@@ -26,8 +32,8 @@ rc=0
 for f in "${RULE_FILES[@]}"; do
   name="$(basename "${f}")"
   if ! docker run --rm --network none \
-      -v "$(to_native "${WORK}")":/rules \
-      "${IMAGE}" rules lint --backend=loki "/rules/${name}"; then
+    -v "$(to_native "${WORK}")":/rules \
+    "${IMAGE}" rules lint --backend=loki "/rules/${name}"; then
     echo "FAIL: ${f#"${REPO_ROOT}/"} is not a valid Loki rule file (message above)"
     rc=1
   fi

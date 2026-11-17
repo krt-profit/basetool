@@ -97,7 +97,7 @@ def grants_outside(rendered: str, keys: tuple[str, ...], channels: tuple[str, ..
             selector = KEY_SELECTOR.match(token)
             if token in ("allkeys", "allchannels"):
                 findings.append(f"{tokens[1]}: {token}")
-            elif selector and not token[selector.end():].startswith(keys):
+            elif selector and not token[selector.end() :].startswith(keys):
                 findings.append(f"{tokens[1]}: {token}")
             elif token.startswith("&") and not token[1:].startswith(channels):
                 findings.append(f"{tokens[1]}: {token}")
@@ -144,7 +144,7 @@ def shared_passwords(own: set[str], foreign: set[str], env: dict[str, str]) -> l
     return [
         f"{first} and {second}"
         for index, first in enumerate(pool)
-        for second in pool[index + 1:]
+        for second in pool[index + 1 :]
         if (first in own or second in own) and env.get(first) and env.get(first) == env.get(second)
     ]
 
@@ -180,8 +180,10 @@ def render(template: str, env: dict[str, str], foreign: frozenset[str] = frozens
             return sha256_password(value)
         state = value.strip().lower()
         if not state:
-            problems.append(f"{name} is unset; set it to off, or to on only while an application "
-                            "still authenticates without a username")
+            problems.append(
+                f"{name} is unset; set it to off, or to on only while an application "
+                "still authenticates without a username"
+            )
             return "off"
         if state not in ("on", "off"):
             problems.append(f"{name}={value!r} is neither on nor off")
@@ -197,10 +199,14 @@ def render(template: str, env: dict[str, str], foreign: frozenset[str] = frozens
             raise Refusal(f"template line {number} is neither a comment nor a `user` rule")
         rendered = PLACEHOLDER.sub(substitute, line)
         if "{{" in rendered or "}}" in rendered:
-            raise Refusal(f"template line {number} carries a placeholder this renderer does not know")
+            raise Refusal(
+                f"template line {number} carries a placeholder this renderer does not know"
+            )
         out.append(rendered)
     if problems:
-        raise Refusal("required values are missing or invalid:\n  " + "\n  ".join(sorted(set(problems))))
+        raise Refusal(
+            "required values are missing or invalid:\n  " + "\n  ".join(sorted(set(problems)))
+        )
     defaults = [line for line in out if line.split()[1] == "default"]
     if len(defaults) != 1:
         raise Refusal(
@@ -264,9 +270,15 @@ def selftest() -> int:
     check("hash, never the password", ">pw" not in out and " pw " not in out)
     check("sha256 of the value", sha256_password("pw") in out)
     check("a $ and a space survive into the hash", sha256_password("a$b c") in out)
-    check("known digest", sha256_password("pw")
-          == "#30c952fab122c3f9759f02a6d95c3758b246b4fee239957b2d4fee46e26170c4")
-    check("state off", render(template, {**env, "REDIS_DEFAULT_USER": "OFF"}).startswith("user default off "))
+    check(
+        "known digest",
+        sha256_password("pw")
+        == "#30c952fab122c3f9759f02a6d95c3758b246b4fee239957b2d4fee46e26170c4",
+    )
+    check(
+        "state off",
+        render(template, {**env, "REDIS_DEFAULT_USER": "OFF"}).startswith("user default off "),
+    )
     unset_state = {key: value for key, value in env.items() if key != "REDIS_DEFAULT_USER"}
     for broken, label in (
         ({"REDIS_PASSWORD": "pw", "REDIS_DEFAULT_USER": "off"}, "missing variable refuses"),
@@ -279,11 +291,16 @@ def selftest() -> int:
             render(template, broken)
             failures.append(label)
     try:
-        render(template, {**env, "REDIS_PASSWORD": "s3cr3t-sentinel", "SVC_PASSWORD": "s3cr3t-sentinel"})
+        render(
+            template,
+            {**env, "REDIS_PASSWORD": "s3cr3t-sentinel", "SVC_PASSWORD": "s3cr3t-sentinel"},
+        )
         failures.append("two variables with one password refuse")
     except Refusal as refusal:
-        check("a refusal names the variables, never the value",
-              "SVC_PASSWORD" in str(refusal) and "s3cr3t" not in str(refusal))
+        check(
+            "a refusal names the variables, never the value",
+            "SVC_PASSWORD" in str(refusal) and "s3cr3t" not in str(refusal),
+        )
     with contextlib.suppress(Refusal):
         render(template, {**env, "OTHER_PASSWORD": "a$b c"}, frozenset({"OTHER_PASSWORD"}))
         failures.append("a password the other instance uses refuses")
@@ -322,29 +339,48 @@ def selftest() -> int:
         ("user svc on #0 &basetool:livesync:changed -@all", "a foreign channel"),
         ("user svc on #0 &* -@all", "a wildcard channel pattern"),
     ):
-        check(f"{label} is found", grants_outside(rule, *session_prefixes) == [f"svc: {rule.split()[4]}"])
-    check("the operator's users are exempt",
-          not grants_outside("user admin on #0 ~* &* +@all\nuser default off #0 allkeys",
-                             *session_prefixes))
-    check("an inside grant passes",
-          not grants_outside("user svc on #0 ~basetool:session:* &__keyevent@0__:del -@all",
-                             *session_prefixes))
+        check(
+            f"{label} is found",
+            grants_outside(rule, *session_prefixes) == [f"svc: {rule.split()[4]}"],
+        )
+    check(
+        "the operator's users are exempt",
+        not grants_outside(
+            "user admin on #0 ~* &* +@all\nuser default off #0 allkeys", *session_prefixes
+        ),
+    )
+    check(
+        "an inside grant passes",
+        not grants_outside(
+            "user svc on #0 ~basetool:session:* &__keyevent@0__:del -@all", *session_prefixes
+        ),
+    )
     here = os.path.dirname(os.path.abspath(__file__))
-    present = {name: read_text(os.path.join(here, name)) for name in COMMITTED_TEMPLATES
-               if os.path.exists(os.path.join(here, name))}
-    selftest_env = {name: f"selftest-{name}" for text in present.values() for name in hash_variables(text)}
+    present = {
+        name: read_text(os.path.join(here, name))
+        for name in COMMITTED_TEMPLATES
+        if os.path.exists(os.path.join(here, name))
+    }
+    selftest_env = {
+        name: f"selftest-{name}" for text in present.values() for name in hash_variables(text)
+    }
     selftest_env["REDIS_DEFAULT_USER"] = "off"
     for template_name, text in present.items():
-        foreign = frozenset().union(*(hash_variables(other) for name, other in present.items()
-                                      if name != template_name))
+        foreign = frozenset().union(
+            *(hash_variables(other) for name, other in present.items() if name != template_name)
+        )
         real = render(text, selftest_env, foreign)
         check(f"{template_name} renders", real.count("\nuser ") + 1 == real.count("user "))
         check(f"{template_name} keeps default, off", real.startswith("user default off "))
         check(f"{template_name} has no clear-text password", ">" not in real)
-        check(f"{template_name} grants its application users only its own prefixes",
-              not grants_outside(real, *COMMITTED_TEMPLATES[template_name]))
-    check("the two instances name disjoint password variables",
-          len(present) < 2 or not set.intersection(*(hash_variables(t) for t in present.values())))
+        check(
+            f"{template_name} grants its application users only its own prefixes",
+            not grants_outside(real, *COMMITTED_TEMPLATES[template_name]),
+        )
+    check(
+        "the two instances name disjoint password variables",
+        len(present) < 2 or not set.intersection(*(hash_variables(t) for t in present.values())),
+    )
     for failure in failures:
         print(f"render-redis-acl selftest FAILED: {failure}", file=sys.stderr)
     if not failures:
@@ -363,10 +399,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(prog="render-redis-acl.py")
     parser.add_argument("--env", help="the host .env")
-    parser.add_argument("--template", help="scripts/redis-session-users.acl.tmpl or "
-                                           "scripts/redis-shared-users.acl.tmpl")
-    parser.add_argument("--out", help="the ACL file to write: /etc/basetool/redis/session-users.acl "
-                                      "or /etc/basetool/redis/shared-users.acl")
+    parser.add_argument(
+        "--template",
+        help="scripts/redis-session-users.acl.tmpl or scripts/redis-shared-users.acl.tmpl",
+    )
+    parser.add_argument(
+        "--out",
+        help="the ACL file to write: /etc/basetool/redis/session-users.acl "
+        "or /etc/basetool/redis/shared-users.acl",
+    )
     parser.add_argument("--check", action="store_true", help="report drift and write nothing")
     parser.add_argument("--selftest", action="store_true", help="run the regression tests")
     args = parser.parse_args(argv)
@@ -379,23 +420,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     siblings = [os.path.join(directory, name) for name in COMMITTED_TEMPLATES if name != own]
     try:
         env = parse_env_file(args.env)
-        foreign = frozenset().union(*(hash_variables(read_text(path)) for path in siblings
-                                      if os.path.exists(path)))
+        foreign = frozenset().union(
+            *(hash_variables(read_text(path)) for path in siblings if os.path.exists(path))
+        )
         content = render(read_text(args.template), env, foreign)
         if own in COMMITTED_TEMPLATES:
             outside = grants_outside(content, *COMMITTED_TEMPLATES[own])
             if outside:
-                raise Refusal("application users are granted outside this instance's prefixes: "
-                              + "; ".join(outside))
+                raise Refusal(
+                    "application users are granted outside this instance's prefixes: "
+                    + "; ".join(outside)
+                )
     except (Refusal, EnvFileError, OSError) as exc:
         print(f"render-redis-acl: REFUSING, nothing written: {exc}", file=sys.stderr)
         return 1
     users = [line.split()[1] for line in content.splitlines()]
     default_state = content.splitlines()[0].split()[2]
     if default_state == "on":
-        print("render-redis-acl: WARNING - `default` is on: a password-only AUTH with the admin "
-              "password reaches the whole instance. Switch it off once every application "
-              "authenticates as its own user.", file=sys.stderr)
+        print(
+            "render-redis-acl: WARNING - `default` is on: a password-only AUTH with the admin "
+            "password reaches the whole instance. Switch it off once every application "
+            "authenticates as its own user.",
+            file=sys.stderr,
+        )
     if args.check:
         try:
             with open(args.out, encoding="utf-8") as handle:
@@ -403,14 +450,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         except OSError:
             current = None
         if current != content:
-            print(f"render-redis-acl: DRIFT - {args.out} does not match the template and the .env",
-                  file=sys.stderr)
+            print(
+                f"render-redis-acl: DRIFT - {args.out} does not match the template and the .env",
+                file=sys.stderr,
+            )
             return 1
         print(f"render-redis-acl: {args.out} matches ({', '.join(users)}; default {default_state})")
         return 0
     write_atomically(args.out, content)
-    print(f"render-redis-acl: wrote {args.out} ({', '.join(users)}; default {default_state}). "
-          "Apply it with ACL LOAD.")
+    print(
+        f"render-redis-acl: wrote {args.out} ({', '.join(users)}; default {default_state}). "
+        "Apply it with ACL LOAD."
+    )
     return 0
 
 

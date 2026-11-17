@@ -106,9 +106,16 @@ def selftest() -> int:
         '"${RT_CLI_ARGV[@]}" container prune --force\n'
     )
     cases = [
-        ("extraction", subcommands(script) == {"create", "image prune", "system df", "ps", "exec", "info", "container prune"}),
+        (
+            "extraction",
+            subcommands(script)
+            == {"create", "image prune", "system df", "ps", "exec", "info", "container prune"},
+        ),
         ("agreement passes", compare(["ps", "exec"], {"ps", "exec"}) == []),
-        ("a used sub-command missing from the allowlist fails", len(compare(["ps"], {"ps", "exec"})) == 1),
+        (
+            "a used sub-command missing from the allowlist fails",
+            len(compare(["ps"], {"ps", "exec"})) == 1,
+        ),
         ("an unused allowlist entry fails", len(compare(["ps", "run"], {"ps"})) == 1),
         ("a duplicate entry fails", len(compare(["ps", "ps"], {"ps"})) == 1),
     ]
