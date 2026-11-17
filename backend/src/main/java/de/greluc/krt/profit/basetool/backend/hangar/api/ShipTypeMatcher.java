@@ -19,10 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.api;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -34,6 +40,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * In-memory {@code ShipType} resolver shared by the hangar import and the exchange's {@code
@@ -45,12 +52,13 @@ import org.jetbrains.annotations.Nullable;
  * tokens, ship tokens ⊆ upload tokens. A step that finds several ship types is ambiguous and never
  * resolves to the first. Every step asks the live ship types first and the retired ones
  * (REQ-P4K-013) only when no live one answers, so a retired row never ties with or shadows a live
- * one. Stateless and static-only.
+ * one.
+ *
+ * <p>The hangar import also matches each ship type's name without its leading manufacturer word and
+ * treats the rows whose names agree without it as one ship (REQ-HANGAR-019). Stateless and
+ * static-only.
  */
 public final class ShipTypeMatcher {
-
-  /** Splits a name into alphanumeric tokens. Pre-compiled so the regex is reused per call. */
-  private static final Pattern TOKEN_SPLIT = Pattern.compile("[^a-z0-9]+");
 
   /** Strips everything outside {@code [a-z0-9]} for the normalised match form. */
   private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9]");
@@ -58,13 +66,14 @@ public final class ShipTypeMatcher {
   private ShipTypeMatcher() {}
 
   /**
-   * Builds the lookup index without key links, as the hangar import uses it.
+   * Builds the lookup index of the hangar import: no key links, and the name without the
+   * manufacturer word keyed beside the name.
    *
-   * @param shipTypes a snapshot of the {@code ship_type} table
+   * @param shipTypes a snapshot of the {@code ship_type} table, manufacturers reachable
    * @return the populated lookup index
    */
   public static @NotNull ShipTypeIndex buildIndex(@NotNull List<ShipType> shipTypes) {
-    return buildIndex(shipTypes, ShipTypeLinks.NONE);
+    return buildIndex(shipTypes, ShipTypeLinks.NONE, ManufacturerWords.of(shipTypes));
   }
 
   /**
@@ -77,28 +86,47 @@ public final class ShipTypeMatcher {
    */
   public static @NotNull ShipTypeIndex buildIndex(
       @NotNull List<ShipType> shipTypes, @NotNull ShipTypeLinks links) {
+    return buildIndex(shipTypes, links, ManufacturerWords.NONE);
+  }
+
+  /**
+   * Builds the lookup index with the given manufacturer words.
+   *
+   * @param shipTypes a snapshot of the {@code ship_type} table
+   * @param links the variant groups and the UEX alias
+   * @param words the manufacturer words a short name drops
+   * @return the populated lookup index
+   */
+  private static @NotNull ShipTypeIndex buildIndex(
+      @NotNull List<ShipType> shipTypes,
+      @NotNull ShipTypeLinks links,
+      @NotNull ManufacturerWords words) {
     List<ShipType> live = new ArrayList<>();
     List<ShipType> retired = new ArrayList<>();
     for (ShipType shipType : shipTypes) {
       (shipType.isP4kRetired() ? retired : live).add(shipType);
     }
-    return new ShipTypeIndex(Keys.of(live, links), Keys.of(retired, links));
+    return new ShipTypeIndex(Keys.of(live, links, words), Keys.of(retired, links, words));
   }
 
   /**
-   * Resolves a hangar-import entry: the name, then, when the name finds none or several, the
-   * optional slug. The slug is supplied for StarJump FleetViewer and Fleetyards entries and {@code
-   * null} for the Fleetview / HangarXPLOR formats.
+   * Resolves a hangar-import entry: the name, then, when the name finds no ship or several, the
+   * optional slug. The slug is supplied for StarJump FleetViewer, Fleetyards and Hangar Extension
+   * JSON entries and {@code null} for the other formats.
+   *
+   * <p>The name stages run on the full and the short name: exact full, exact short, normalised
+   * full, normalised short, then the token subsets of the short name. Every ship type found brings
+   * the rows of the same ship along (REQ-HANGAR-019).
    *
    * @param index lookup index produced by {@link #buildIndex(List)}
    * @param rawName trimmed entry name from the upload
    * @param slug source-provided ship slug for the fallback stage, or {@code null}
-   * @return the one matching {@code ShipType}, or {@code null} when neither resolves to exactly one
+   * @return the ships found: one resolves the entry, several are the member's choice
    */
-  public static @Nullable ShipType resolve(
+  public static @NotNull ImportShipMatch resolveImport(
       @NotNull ShipTypeIndex index, @NotNull String rawName, @Nullable String slug) {
-    ShipType live = resolveIn(index.live, rawName, slug);
-    return live != null ? live : resolveIn(index.retired, rawName, slug);
+    ImportShipMatch live = importIn(index.live, rawName, slug);
+    return live.isEmpty() ? importIn(index.retired, rawName, slug) : live;
   }
 
   /**
@@ -171,17 +199,50 @@ public final class ShipTypeMatcher {
   }
 
   /**
-   * Resolves a hangar-import entry within one partition: the name, then the slug.
+   * Resolves a hangar-import entry within one partition: the name, then the slug when the name
+   * finds no ship or several.
    *
    * @param keys one partition
    * @param rawName trimmed entry name from the upload
    * @param slug source-provided ship slug, or {@code null}
-   * @return the one matching {@code ShipType}, or {@code null}
+   * @return the single ship of the name or the slug, else the name's ships, else the slug's
    */
-  private static @Nullable ShipType resolveIn(
+  private static @NotNull ImportShipMatch importIn(
       @NotNull Keys keys, @NotNull String rawName, @Nullable String slug) {
-    ShipType byName = nameIn(keys, rawName).single();
-    return byName != null ? byName : resolveBySlug(keys, slug).single();
+    ImportShipMatch byName = keys.ships(importNameIn(keys, rawName));
+    if (byName.single() != null) {
+      return byName;
+    }
+    ImportShipMatch bySlug = keys.ships(resolveBySlug(keys, slug).candidates());
+    if (bySlug.single() != null || byName.isEmpty()) {
+      return bySlug;
+    }
+    return byName;
+  }
+
+  /**
+   * Runs the import's name stages within one partition; the first stage that finds a ship type
+   * answers.
+   *
+   * @param keys one partition
+   * @param rawName the name
+   * @return the ship types the answering stage found
+   */
+  private static @NotNull List<ShipType> importNameIn(@NotNull Keys keys, @NotNull String rawName) {
+    List<ShipType> found = keys.names.exact(rawName);
+    if (found.isEmpty()) {
+      found = keys.shortNames.exact(rawName);
+    }
+    if (found.isEmpty()) {
+      found = keys.names.normalized(rawName);
+    }
+    if (found.isEmpty()) {
+      found = keys.shortNames.normalized(rawName);
+    }
+    if (found.isEmpty()) {
+      found = keys.shortNames.tokens(rawName);
+    }
+    return found;
   }
 
   /**
@@ -208,31 +269,14 @@ public final class ShipTypeMatcher {
    * @return the ship types the answering stage found
    */
   private static @NotNull ShipTypeMatch nameIn(@NotNull Keys keys, @NotNull String rawName) {
-    List<ShipType> exact = keys.byExactLower.get(rawName.trim().toLowerCase(Locale.ROOT));
-    if (exact != null) {
-      return ShipTypeMatch.of(exact);
+    List<ShipType> found = keys.names.exact(rawName);
+    if (found.isEmpty()) {
+      found = keys.names.normalized(rawName);
     }
-    String normalized = normalizeForMatching(rawName);
-    if (!normalized.isEmpty()) {
-      List<ShipType> byNormalized = keys.byNormalized.get(normalized);
-      if (byNormalized != null) {
-        return ShipTypeMatch.of(byNormalized);
-      }
+    if (found.isEmpty()) {
+      found = keys.names.tokens(rawName);
     }
-    Set<String> fvTokens = tokenize(rawName);
-    if (fvTokens.isEmpty()) {
-      return ShipTypeMatch.NONE;
-    }
-    List<ShipType> wider = new ArrayList<>();
-    List<ShipType> narrower = new ArrayList<>();
-    for (TokenView tv : keys.tokenized) {
-      if (tv.tokens().containsAll(fvTokens)) {
-        wider.add(tv.shipType());
-      } else if (fvTokens.containsAll(tv.tokens())) {
-        narrower.add(tv.shipType());
-      }
-    }
-    return ShipTypeMatch.of(wider.isEmpty() ? narrower : wider);
+    return ShipTypeMatch.of(found);
   }
 
   /**
@@ -265,23 +309,6 @@ public final class ShipTypeMatcher {
       return "";
     }
     return NON_ALNUM.matcher(name.toLowerCase(Locale.ROOT)).replaceAll("");
-  }
-
-  /**
-   * Splits a ship name into an alphanumeric token set. Empty tokens (from leading, trailing or
-   * multiple separators) are dropped.
-   *
-   * @param name raw name (nullable)
-   * @return the token set (never null; empty set for null/empty input)
-   */
-  private static @NotNull Set<String> tokenize(@Nullable String name) {
-    if (name == null || name.isBlank()) {
-      return Set.of();
-    }
-    return TOKEN_SPLIT
-        .splitAsStream(name.toLowerCase(Locale.ROOT))
-        .filter(t -> !t.isEmpty())
-        .collect(Collectors.toCollection(HashSet::new));
   }
 
   /**
@@ -335,8 +362,8 @@ public final class ShipTypeMatcher {
   }
 
   /**
-   * The keys of one partition of the ship types; a variant base or an alias resolves only to a ship
-   * type of the same partition.
+   * The keys of one partition of the ship types; a variant base, an alias or a row of the same ship
+   * resolves only to a ship type of the same partition.
    */
   private static final class Keys {
     private final Map<UUID, ShipType> byId = new HashMap<>();
@@ -345,22 +372,44 @@ public final class ShipTypeMatcher {
     private final Map<String, ShipType> variantBase = new HashMap<>();
     private final Map<Integer, List<ShipType>> byUexId = new HashMap<>();
     private final Map<Integer, List<ShipType>> byAlias = new HashMap<>();
-    private final Map<String, List<ShipType>> byExactLower = new HashMap<>();
-    private final Map<String, List<ShipType>> byNormalized = new HashMap<>();
-    private final List<TokenView> tokenized = new ArrayList<>();
     private final Map<String, List<ShipType>> byUexSlug = new HashMap<>();
     private final Map<String, List<ShipType>> byScwikiSlug = new HashMap<>();
+
+    /** The name stages over the full names. */
+    private final ShipNameKeys names = new ShipNameKeys();
+
+    /** The name stages over the short names; {@link #names} itself when no word is known. */
+    private final ShipNameKeys shortNames;
+
+    /** The rows of one ship, keyed by the normalised name without the manufacturer word. */
+    private final Map<String, List<ShipType>> bySameShip = new HashMap<>();
+
+    /** The manufacturer words a short name drops. */
+    private final ManufacturerWords words;
+
+    /**
+     * Prepares an empty partition.
+     *
+     * @param words the manufacturer words a short name drops
+     */
+    private Keys(@NotNull ManufacturerWords words) {
+      this.words = words;
+      this.shortNames = words.isEmpty() ? names : new ShipNameKeys();
+    }
 
     /**
      * Indexes one partition of the ship types.
      *
      * @param shipTypes the partition
      * @param links the variant groups and the UEX alias
+     * @param words the manufacturer words a short name drops
      * @return the partition's keys
      */
     private static @NotNull Keys of(
-        @NotNull List<ShipType> shipTypes, @NotNull ShipTypeLinks links) {
-      Keys keys = new Keys();
+        @NotNull List<ShipType> shipTypes,
+        @NotNull ShipTypeLinks links,
+        @NotNull ManufacturerWords words) {
+      Keys keys = new Keys(words);
       shipTypes.forEach(keys::add);
       links
           .variantBaseByClassName()
@@ -397,14 +446,14 @@ public final class ShipTypeMatcher {
       if (name == null || name.isBlank()) {
         return;
       }
-      ShipTypeMatcher.add(byExactLower, name.trim().toLowerCase(Locale.ROOT), st);
-      String normalized = normalizeForMatching(name);
-      if (!normalized.isEmpty()) {
-        ShipTypeMatcher.add(byNormalized, normalized, st);
+      names.add(st, name);
+      String shortName = words.strip(name);
+      if (shortNames != names) {
+        shortNames.add(st, shortName);
       }
-      Set<String> tokens = tokenize(name);
-      if (!tokens.isEmpty()) {
-        tokenized.add(new TokenView(st, tokens));
+      String sameShip = normalizeForMatching(shortName);
+      if (!sameShip.isEmpty()) {
+        ShipTypeMatcher.add(bySameShip, sameShip, st);
       }
       String uexSlug = normalizeForMatching(st.getUexSlug());
       if (!uexSlug.isEmpty()) {
@@ -415,14 +464,312 @@ public final class ShipTypeMatcher {
         ShipTypeMatcher.add(byScwikiSlug, scwikiSlug, st);
       }
     }
+
+    /**
+     * Groups the ship types a step found into ships, each with every row of this partition that
+     * holds the same ship. A row without a name, which only a slug finds, is a ship of its own.
+     *
+     * @param found the ship types found
+     * @return the named ships ordered by their canonical row's name, then the unnamed rows
+     */
+    private @NotNull ImportShipMatch ships(@NotNull Collection<ShipType> found) {
+      Map<String, ImportShipMatch.Candidate> byShip = new LinkedHashMap<>();
+      List<ImportShipMatch.Candidate> unnamed = new ArrayList<>();
+      for (ShipType shipType : found) {
+        String key = sameShipKey(shipType);
+        if (key.isEmpty()) {
+          unnamed.add(new ImportShipMatch.Candidate(List.of(shipType)));
+        } else {
+          byShip.computeIfAbsent(
+              key,
+              sameShip ->
+                  new ImportShipMatch.Candidate(
+                      canonicalFirst(bySameShip.getOrDefault(sameShip, List.of(shipType)))));
+        }
+      }
+      List<ImportShipMatch.Candidate> ships =
+          new ArrayList<>(
+              byShip.values().stream()
+                  .sorted(
+                      Comparator.comparing(
+                          (ImportShipMatch.Candidate candidate) -> candidate.canonical().getName(),
+                          String.CASE_INSENSITIVE_ORDER))
+                  .toList());
+      ships.addAll(unnamed);
+      return new ImportShipMatch(ships);
+    }
+
+    /**
+     * Returns the key of the ship a row holds.
+     *
+     * @param shipType the row
+     * @return its normalised name without the manufacturer word, empty for a blank name
+     */
+    private @NotNull String sameShipKey(@NotNull ShipType shipType) {
+      String name = shipType.getName();
+      return name == null || name.isBlank() ? "" : normalizeForMatching(words.strip(name));
+    }
+
+    /**
+     * Orders the rows of one ship: the rows whose name carries the manufacturer word first, then by
+     * name.
+     *
+     * @param rows the rows of one ship
+     * @return the rows, canonical first
+     */
+    private @NotNull List<ShipType> canonicalFirst(@NotNull List<ShipType> rows) {
+      return rows.stream()
+          .sorted(
+              Comparator.comparing(
+                      (ShipType row) -> words.strip(row.getName()).equals(row.getName().strip()))
+                  .thenComparing(ShipType::getName, String.CASE_INSENSITIVE_ORDER))
+          .toList();
+    }
   }
 
   /**
-   * Pairing of a {@code ShipType} with its tokenised alphanumeric form, for the token-subset
-   * stages.
-   *
-   * @param shipType the ship type
-   * @param tokens its alphanumeric tokens
+   * The name stages of {@link ShipTypeMatcher} over one name form of the ship types: the exact
+   * case-insensitive name, the normalised name, then the token subsets in both directions.
    */
-  private record TokenView(@NotNull ShipType shipType, @NotNull Set<String> tokens) {}
+  private static final class ShipNameKeys {
+
+    /** Splits a name into alphanumeric tokens. */
+    private static final Pattern TOKEN_SPLIT = Pattern.compile("[^a-z0-9]+");
+
+    private final Map<String, List<ShipType>> byExactLower = new HashMap<>();
+    private final Map<String, List<ShipType>> byNormalized = new HashMap<>();
+    private final List<TokenView> tokenized = new ArrayList<>();
+
+    /**
+     * Indexes a ship type under one of its name forms; a blank name is skipped.
+     *
+     * @param shipType the ship type
+     * @param name the name form to index it under
+     */
+    void add(@NotNull ShipType shipType, @NotNull String name) {
+      if (name.isBlank()) {
+        return;
+      }
+      byExactLower
+          .computeIfAbsent(name.trim().toLowerCase(Locale.ROOT), _ -> new ArrayList<>())
+          .add(shipType);
+      String normalized = ShipTypeMatcher.normalizeForMatching(name);
+      if (!normalized.isEmpty()) {
+        byNormalized.computeIfAbsent(normalized, _ -> new ArrayList<>()).add(shipType);
+      }
+      Set<String> tokens = tokenize(name);
+      if (!tokens.isEmpty()) {
+        tokenized.add(new TokenView(shipType, tokens));
+      }
+    }
+
+    /**
+     * Finds the ship types whose name equals the given one, ignoring case and surrounding blanks.
+     *
+     * @param rawName the name
+     * @return the ship types, empty for none
+     */
+    @NotNull
+    @Unmodifiable
+    List<ShipType> exact(@NotNull String rawName) {
+      return List.copyOf(
+          byExactLower.getOrDefault(rawName.trim().toLowerCase(Locale.ROOT), List.of()));
+    }
+
+    /**
+     * Finds the ship types whose name equals the given one after {@link
+     * ShipTypeMatcher#normalizeForMatching} folding.
+     *
+     * @param rawName the name
+     * @return the ship types, empty for none or for a name that folds to nothing
+     */
+    @NotNull
+    @Unmodifiable
+    List<ShipType> normalized(@NotNull String rawName) {
+      String normalized = ShipTypeMatcher.normalizeForMatching(rawName);
+      return normalized.isEmpty()
+          ? List.of()
+          : List.copyOf(byNormalized.getOrDefault(normalized, List.of()));
+    }
+
+    /**
+     * Finds the ship types whose tokens hold every token of the name, else those whose tokens the
+     * name holds.
+     *
+     * @param rawName the name
+     * @return the ship types of the first direction that finds any, empty for none
+     */
+    @NotNull
+    @Unmodifiable
+    List<ShipType> tokens(@NotNull String rawName) {
+      Set<String> nameTokens = tokenize(rawName);
+      if (nameTokens.isEmpty()) {
+        return List.of();
+      }
+      List<ShipType> wider = new ArrayList<>();
+      List<ShipType> narrower = new ArrayList<>();
+      for (TokenView view : tokenized) {
+        if (view.tokens().containsAll(nameTokens)) {
+          wider.add(view.shipType());
+        } else if (nameTokens.containsAll(view.tokens())) {
+          narrower.add(view.shipType());
+        }
+      }
+      return List.copyOf(wider.isEmpty() ? narrower : wider);
+    }
+
+    /**
+     * Splits a name into its alphanumeric tokens; empty tokens from leading, trailing or repeated
+     * separators are dropped.
+     *
+     * @param name the name, or {@code null}
+     * @return the tokens, empty for a {@code null} or blank name
+     */
+    @NotNull
+    private static Set<String> tokenize(@Nullable String name) {
+      if (name == null || name.isBlank()) {
+        return Set.of();
+      }
+      return TOKEN_SPLIT
+          .splitAsStream(name.toLowerCase(Locale.ROOT))
+          .filter(token -> !token.isEmpty())
+          .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    /**
+     * A ship type with the tokens of the name form it is indexed under.
+     *
+     * @param shipType the ship type
+     * @param tokens its alphanumeric tokens
+     */
+    private record TokenView(@NotNull ShipType shipType, @NotNull Set<String> tokens) {}
+  }
+
+  /**
+   * The words a ship type's name opens with when it names the ship's manufacturer, such as {@code
+   * "Esperia"} in {@code "Esperia Talon"} or {@code "RSI"} in {@code "RSI Zeus Mk II ES"}
+   * (REQ-HANGAR-019).
+   *
+   * <p>Each manufacturer of a ship type contributes the first word of its name, the initials of a
+   * name of two or more words ({@code "Roberts Space Industries"} gives {@code "rsi"}, {@code
+   * "Consolidated Outland"} gives {@code "co"} for {@code "C.O."}), its nickname and its
+   * abbreviation. Words compare as {@link ShipTypeMatcher#normalizeForMatching} folds them. The set
+   * is built from every manufacturer of the snapshot, so a ship type linked to the wrong
+   * manufacturer or to none still loses its leading manufacturer word.
+   */
+  private static final class ManufacturerWords {
+
+    /** No manufacturer words: every name is its own short name. */
+    static final ManufacturerWords NONE = new ManufacturerWords(Set.of());
+
+    /** Splits a name into words at whitespace. */
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
+    /** Words a manufacturer's initials skip, as in "Musashi Industrial and Starflight Concern". */
+    private static final Set<String> NOT_INITIALLED = Set.of("and", "of", "the");
+
+    /** The normalised manufacturer words. */
+    private final Set<String> words;
+
+    /**
+     * Wraps a word set.
+     *
+     * @param words the normalised manufacturer words
+     */
+    private ManufacturerWords(@NotNull Set<String> words) {
+      this.words = words;
+    }
+
+    /**
+     * Collects the words of every manufacturer the ship types carry.
+     *
+     * @param shipTypes a snapshot of the ship types
+     * @return the manufacturer words
+     */
+    @NotNull
+    static ManufacturerWords of(@NotNull Collection<ShipType> shipTypes) {
+      Set<Manufacturer> manufacturers = Collections.newSetFromMap(new IdentityHashMap<>());
+      for (ShipType shipType : shipTypes) {
+        Manufacturer manufacturer = shipType.getManufacturer();
+        if (manufacturer != null) {
+          manufacturers.add(manufacturer);
+        }
+      }
+      Set<String> words = new HashSet<>();
+      for (Manufacturer manufacturer : manufacturers) {
+        List<String> nameWords = words(manufacturer.getName());
+        if (!nameWords.isEmpty()) {
+          words.add(nameWords.getFirst());
+        }
+        List<String> initialled =
+            nameWords.stream().filter(word -> !NOT_INITIALLED.contains(word)).toList();
+        if (initialled.size() > 1) {
+          StringBuilder initials = new StringBuilder();
+          initialled.forEach(word -> initials.append(word.charAt(0)));
+          words.add(initials.toString());
+        }
+        addWord(words, manufacturer.getNickname());
+        addWord(words, manufacturer.getAbbreviation());
+      }
+      return words.isEmpty() ? NONE : new ManufacturerWords(Set.copyOf(words));
+    }
+
+    /**
+     * Whether no manufacturer word is known, so every short name equals its name.
+     *
+     * @return {@code true} without a word
+     */
+    boolean isEmpty() {
+      return words.isEmpty();
+    }
+
+    /**
+     * Drops the leading manufacturer word of a ship name.
+     *
+     * @param name the ship name
+     * @return the name without its first word when that word names a manufacturer and more words
+     *     follow, else the trimmed name
+     */
+    @NotNull
+    String strip(@NotNull String name) {
+      String trimmed = name.strip();
+      String[] headAndRest = WHITESPACE.split(trimmed, 2);
+      if (headAndRest.length < 2
+          || !words.contains(ShipTypeMatcher.normalizeForMatching(headAndRest[0]))) {
+        return trimmed;
+      }
+      return headAndRest[1];
+    }
+
+    /**
+     * Splits a manufacturer name into its normalised words, dropping words that fold to nothing.
+     *
+     * @param name the manufacturer name, or {@code null}
+     * @return the words in order, empty for a {@code null} or blank name
+     */
+    @NotNull
+    private static List<String> words(@Nullable String name) {
+      if (name == null || name.isBlank()) {
+        return List.of();
+      }
+      return WHITESPACE
+          .splitAsStream(name.strip())
+          .map(ShipTypeMatcher::normalizeForMatching)
+          .filter(word -> !word.isEmpty())
+          .toList();
+    }
+
+    /**
+     * Adds the normalised form of a word unless it folds to nothing.
+     *
+     * @param words the word set
+     * @param word the word, or {@code null}
+     */
+    private static void addWord(@NotNull Set<String> words, @Nullable String word) {
+      String normalized = ShipTypeMatcher.normalizeForMatching(word);
+      if (!normalized.isEmpty()) {
+        words.add(normalized);
+      }
+    }
+  }
 }

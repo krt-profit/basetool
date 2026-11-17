@@ -30,6 +30,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
@@ -131,7 +132,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type135c, typeZeus));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(2);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -169,7 +170,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type135c));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(1);
@@ -199,7 +200,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(3);
     assertThat(result.duplicateCount()).isEqualTo(0);
@@ -229,7 +230,7 @@ class HangarImportServiceTest {
     when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(owned(type, 1));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(2);
     assertThat(result.duplicateCount()).isEqualTo(1);
@@ -258,7 +259,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(imported(owned(type, 3)));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(0);
     assertThat(result.duplicateCount()).isEqualTo(3);
@@ -288,7 +289,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(owned(type, 5));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(0);
     assertThat(result.duplicateCount()).isEqualTo(3);
@@ -323,7 +324,7 @@ class HangarImportServiceTest {
         .thenReturn(concat(owned(typeA, 2), owned(typeB, 1)));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(2);
     assertThat(result.duplicateCount()).isEqualTo(2);
@@ -350,7 +351,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    hangarImportService.importShips(userId, file);
+    importShips(userId, file);
 
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
@@ -375,7 +376,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    hangarImportService.importShips(userId, file);
+    importShips(userId, file);
 
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
@@ -400,7 +401,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -424,7 +425,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(wolf));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -448,7 +449,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(wolf));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -475,7 +476,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(wolf));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(2);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -500,7 +501,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(cyclone));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -525,7 +526,7 @@ class HangarImportServiceTest {
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of());
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(0);
     assertThat(result.skippedCount()).isEqualTo(2);
@@ -552,7 +553,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(blank, real));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -577,7 +578,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(hercules, c2Hercules));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -610,7 +611,7 @@ class HangarImportServiceTest {
         .thenReturn(List.of(mkICl, mkIEs, mkILn, mkILx, mkIMr, mkIIPlain));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -639,7 +640,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(plain, pirate, valiant));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -668,7 +669,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(ursa, ursaFortuna, ursaMedivac));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
@@ -677,7 +678,7 @@ class HangarImportServiceTest {
   }
 
   @Test
-  void importFleetview_stage3Ambiguous_skipsInsteadOfGuessing() {
+  void importFleetview_stage3Ambiguous_offersTheShipsInsteadOfGuessing() {
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
@@ -688,23 +689,35 @@ class HangarImportServiceTest {
 
     String json =
         """
-        [{"name":"F7C-M Super Hornet","shipname":"","type":"ship"}]
+        [
+          {"name":"F7C-M Super Hornet","shipname":"","type":"ship"},
+          {"name":"f7c-m super hornet","shipname":"","type":"ship"}
+        ]
         """;
     MockMultipartFile file = multipartFile(json);
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(mkI, heartseeker, mkII));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(0);
-    assertThat(result.skippedCount()).isEqualTo(1);
-    assertThat(result.skippedShips()).containsExactly("F7C-M Super Hornet");
+    assertThat(result.skippedCount()).isEqualTo(0);
+    assertThat(result.skippedShips()).isEmpty();
+    assertThat(result.ambiguousShips())
+        .extracting(AmbiguousShipDto::name, AmbiguousShipDto::count)
+        .containsExactly(tuple("F7C-M Super Hornet", 2));
+    assertThat(result.ambiguousShips().getFirst().options())
+        .extracting(ShipTypeOptionDto::id, ShipTypeOptionDto::name)
+        .containsExactly(
+            tuple(heartseeker.getId(), "F7C-M Super Hornet Heartseeker Mk I"),
+            tuple(mkI.getId(), "F7C-M Super Hornet Mk I"),
+            tuple(mkII.getId(), "F7C-M Super Hornet Mk II"));
     verify(shipRepository, never()).save(any(Ship.class));
   }
 
   @Test
-  void importFleetview_stage4Ambiguous_skipsInsteadOfGuessing() {
+  void importFleetview_stage4Ambiguous_offersTheShipsInsteadOfGuessing() {
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
@@ -721,12 +734,151 @@ class HangarImportServiceTest {
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(foo, bar));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(0);
-    assertThat(result.skippedCount()).isEqualTo(1);
-    assertThat(result.skippedShips()).containsExactly("Foo Bar");
+    assertThat(result.skippedShips()).isEmpty();
+    assertThat(result.ambiguousShips().getFirst().options())
+        .extracting(ShipTypeOptionDto::name)
+        .containsExactly("Bar", "Foo");
     verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  @Test
+  void importFleetview_choiceForAnAmbiguousName_importsEveryEntryAsTheChosenShip() {
+    UUID userId = UUID.randomUUID();
+    ShipType mkI = shipTypeWithName("F7C-M Super Hornet Mk I");
+    ShipType mkII = shipTypeWithName("F7C-M Super Hornet Mk II");
+    String json =
+        """
+        [
+          {"name":"F7C-M Super Hornet","shipname":"","type":"ship"},
+          {"name":"F7C-M Super Hornet","shipname":"","type":"ship"}
+        ]
+        """;
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(userWithId(userId)));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(mkI, mkII));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    FleetviewImportResponseDto result =
+        hangarImportService.importShips(
+            userId,
+            multipartFile(json),
+            List.of(new HangarImportChoiceDto(" f7c-m super hornet ", mkI.getId())));
+
+    assertThat(result.importedCount()).isEqualTo(2);
+    assertThat(result.ambiguousShips()).isEmpty();
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository, times(2)).save(captor.capture());
+    assertThat(captor.getAllValues()).extracting(Ship::getShipType).containsOnly(mkI);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.HANGAR_IMPORTED),
+            isNull(),
+            isNull(),
+            eq(userId),
+            argThat(
+                d -> d.toString().contains("created=2") && d.toString().contains("ambiguous=0")));
+  }
+
+  @Test
+  void importFleetview_choiceOutsideTheOptions_leavesTheNameAmbiguous() {
+    UUID userId = UUID.randomUUID();
+    ShipType mkI = shipTypeWithName("F7C-M Super Hornet Mk I");
+    ShipType mkII = shipTypeWithName("F7C-M Super Hornet Mk II");
+    ShipType other = shipTypeWithName("Carrack");
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(userWithId(userId)));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(mkI, mkII, other));
+
+    FleetviewImportResponseDto result =
+        hangarImportService.importShips(
+            userId,
+            multipartFile(
+                "[{\"name\":\"F7C-M Super Hornet\",\"shipname\":\"\",\"type\":\"ship\"}]"),
+            List.of(new HangarImportChoiceDto("F7C-M Super Hornet", other.getId())));
+
+    assertThat(result.importedCount()).isZero();
+    assertThat(result.ambiguousShips())
+        .extracting(AmbiguousShipDto::name)
+        .containsExactly("F7C-M Super Hornet");
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  @Test
+  void importFleetview_catalogueNamesWithTheManufacturerWord_resolveTheBareNames() {
+    UUID userId = UUID.randomUUID();
+    Manufacturer esperia = new Manufacturer();
+    esperia.setName("Esperia");
+    ShipType talon = shipTypeWithName("Esperia Talon");
+    talon.setManufacturer(esperia);
+    ShipType shrike = shipTypeWithName("Esperia Talon Shrike");
+    shrike.setManufacturer(esperia);
+    String json =
+        """
+        [
+          {"name":"Talon","shipname":"","type":"ship"},
+          {"name":"Talon Shrike","shipname":"","type":"ship"}
+        ]
+        """;
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(userWithId(userId)));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(talon, shrike));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    FleetviewImportResponseDto result = importShips(userId, multipartFile(json));
+
+    assertThat(result.importedCount()).isEqualTo(2);
+    assertThat(result.ambiguousShips()).isEmpty();
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository, times(2)).save(captor.capture());
+    assertThat(captor.getAllValues()).extracting(Ship::getShipType).containsExactly(talon, shrike);
+  }
+
+  @Test
+  void importFleetview_shipInTwoRows_matchesTheRowTheHangarAlreadyHolds() {
+    UUID userId = UUID.randomUUID();
+    Manufacturer rsi = new Manufacturer();
+    rsi.setName("Roberts Space Industries");
+    ShipType plain = shipTypeWithName("Constellation Mk IV Andromeda");
+    ShipType prefixed = shipTypeWithName("RSI Constellation Mk IV Andromeda");
+    prefixed.setManufacturer(rsi);
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(userWithId(userId)));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(plain, prefixed));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(imported(owned(plain, 1)));
+
+    FleetviewImportResponseDto result =
+        importShips(
+            userId,
+            multipartFile(
+                "[{\"name\":\"Constellation Andromeda\",\"shipname\":\"\",\"type\":\"ship\"}]"));
+
+    assertThat(result.importedCount()).isZero();
+    assertThat(result.duplicateCount()).isEqualTo(1);
+    assertThat(result.ambiguousShips()).isEmpty();
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  @Test
+  void importFleetview_shipInTwoRows_createsOnTheRowWithTheManufacturerWord() {
+    UUID userId = UUID.randomUUID();
+    Manufacturer rsi = new Manufacturer();
+    rsi.setName("Roberts Space Industries");
+    ShipType plain = shipTypeWithName("Constellation Mk IV Andromeda");
+    ShipType prefixed = shipTypeWithName("RSI Constellation Mk IV Andromeda");
+    prefixed.setManufacturer(rsi);
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(userWithId(userId)));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(plain, prefixed));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    FleetviewImportResponseDto result =
+        importShips(
+            userId,
+            multipartFile(
+                "[{\"name\":\"Constellation Andromeda\",\"shipname\":\"\",\"type\":\"ship\"}]"));
+
+    assertThat(result.importedCount()).isEqualTo(1);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getShipType()).isSameAs(prefixed);
   }
 
   @Test
@@ -749,7 +901,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(plain, pirate, valiant));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
@@ -763,8 +915,7 @@ class HangarImportServiceTest {
     MockMultipartFile emptyFile =
         new MockMultipartFile("file", "fleetview.json", "application/json", new byte[0]);
 
-    assertThrows(
-        BadRequestException.class, () -> hangarImportService.importShips(userId, emptyFile));
+    assertThrows(BadRequestException.class, () -> importShips(userId, emptyFile));
   }
 
   @Test
@@ -772,7 +923,7 @@ class HangarImportServiceTest {
     UUID userId = UUID.randomUUID();
     MockMultipartFile file = multipartFile("THIS IS NOT JSON");
 
-    assertThrows(BadRequestException.class, () -> hangarImportService.importShips(userId, file));
+    assertThrows(BadRequestException.class, () -> importShips(userId, file));
   }
 
   @Test
@@ -786,7 +937,7 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.empty());
 
-    assertThrows(NotFoundException.class, () -> hangarImportService.importShips(userId, file));
+    assertThrows(NotFoundException.class, () -> importShips(userId, file));
   }
 
   @Test
@@ -820,7 +971,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(polaris));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -852,7 +1003,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    hangarImportService.importShips(userId, file);
+    importShips(userId, file);
 
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
@@ -884,7 +1035,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    hangarImportService.importShips(userId, file);
+    importShips(userId, file);
 
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
@@ -916,7 +1067,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    hangarImportService.importShips(userId, file);
+    importShips(userId, file);
 
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
@@ -948,7 +1099,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    hangarImportService.importShips(userId, file);
+    importShips(userId, file);
 
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
@@ -991,7 +1142,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -1017,7 +1168,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
   }
@@ -1032,8 +1183,7 @@ class HangarImportServiceTest {
     MockMultipartFile file = multipartFile(mysteryJson);
 
     BadRequestException ex =
-        assertThrows(
-            BadRequestException.class, () -> hangarImportService.importShips(userId, file));
+        assertThrows(BadRequestException.class, () -> importShips(userId, file));
     assertThat(ex.getMessage()).contains("Unknown ship-list format");
   }
 
@@ -1046,7 +1196,7 @@ class HangarImportServiceTest {
             {"name":"135c","shipname":"","type":"ship"}
             """);
 
-    assertThrows(BadRequestException.class, () -> hangarImportService.importShips(userId, file));
+    assertThrows(BadRequestException.class, () -> importShips(userId, file));
   }
 
   @Test
@@ -1059,7 +1209,7 @@ class HangarImportServiceTest {
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of());
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(0);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -1096,7 +1246,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(hercules, ursa, polaris));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(3);
     assertThat(result.skippedCount()).isEqualTo(1);
@@ -1134,7 +1284,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(perseus, galaxy));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(2);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -1165,7 +1315,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(zeus));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -1197,7 +1347,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(ship));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -1230,7 +1380,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(perseus, decoy));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
@@ -1258,7 +1408,7 @@ class HangarImportServiceTest {
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of());
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(0);
     assertThat(result.skippedCount()).isEqualTo(1);
@@ -1281,7 +1431,7 @@ class HangarImportServiceTest {
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of());
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(0);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -1322,7 +1472,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(spirit));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -1353,7 +1503,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    hangarImportService.importShips(userId, file);
+    importShips(userId, file);
 
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
@@ -1385,7 +1535,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    hangarImportService.importShips(userId, file);
+    importShips(userId, file);
 
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
@@ -1416,7 +1566,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -1454,12 +1604,17 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy, hercules, perseus));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(3);
     assertThat(result.skippedCount()).isEqualTo(1);
     assertThat(result.skippedShips()).containsExactly("Alien Xyz");
     verify(shipRepository, times(3)).save(any(Ship.class));
+  }
+
+  /** Imports a file without choices, as a first import does. */
+  private FleetviewImportResponseDto importShips(UUID userId, MultipartFile file) {
+    return hangarImportService.importShips(userId, file, List.of());
   }
 
   private static ShipType shipTypeWithName(String name) {
@@ -1481,8 +1636,7 @@ class HangarImportServiceTest {
     MultipartFile file = mock(MultipartFile.class);
     when(file.getSize()).thenReturn(9L * 1024 * 1024);
 
-    assertThrows(
-        BadRequestException.class, () -> hangarImportService.importShips(UUID.randomUUID(), file));
+    assertThrows(BadRequestException.class, () -> importShips(UUID.randomUUID(), file));
   }
 
   @Test
@@ -1504,7 +1658,7 @@ class HangarImportServiceTest {
     when(orgUnitStampingService.resolveOrgUnitForImport(any())).thenReturn(null);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+    FleetviewImportResponseDto result = importShips(userId, file);
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(0);
@@ -1532,7 +1686,7 @@ class HangarImportServiceTest {
     when(orgUnitStampingService.resolveOrgUnitForImport(any()))
         .thenThrow(new BadRequestException("multi-membership importer needs a picker"));
 
-    assertThrows(BadRequestException.class, () -> hangarImportService.importShips(userId, file));
+    assertThrows(BadRequestException.class, () -> importShips(userId, file));
     verify(shipRepository, never()).save(any(Ship.class));
   }
 
@@ -1564,8 +1718,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(cat, arrastra));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result =
-        hangarImportService.importShips(userId, multipartFile(json));
+    FleetviewImportResponseDto result = importShips(userId, multipartFile(json));
 
     assertThat(result.importedCount()).isEqualTo(3);
     assertThat(result.updatedCount()).isZero();
@@ -1595,8 +1748,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(cat));
     when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
 
-    FleetviewImportResponseDto result =
-        hangarImportService.importShips(userId, multipartFile(json));
+    FleetviewImportResponseDto result = importShips(userId, multipartFile(json));
 
     assertThat(result.importedCount()).isZero();
     assertThat(result.duplicateCount()).isEqualTo(1);
@@ -1629,8 +1781,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result =
-        hangarImportService.importShips(userId, multipartFile(json));
+    FleetviewImportResponseDto result = importShips(userId, multipartFile(json));
 
     assertThat(result.importedCount()).isEqualTo(1);
     assertThat(result.skippedShips()).isEmpty();
@@ -1658,7 +1809,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(centaurus, skylark));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+    FleetviewImportResponseDto result = importShips(userId, csvFile(csv));
 
     assertThat(result.importedCount()).isEqualTo(2);
     assertThat(result.skippedShips()).isEmpty();
@@ -1698,7 +1849,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(fury));
     when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+    FleetviewImportResponseDto result = importShips(userId, csvFile(csv));
 
     assertThat(result.importedCount()).isZero();
     assertThat(result.duplicateCount()).isEqualTo(2);
@@ -1729,7 +1880,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(cat));
     when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+    FleetviewImportResponseDto result = importShips(userId, csvFile(csv));
 
     assertThat(result.importedCount()).isZero();
     assertThat(result.updatedCount()).isEqualTo(1);
@@ -1761,7 +1912,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(cat));
     when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+    FleetviewImportResponseDto result = importShips(userId, csvFile(csv));
 
     assertThat(result.updatedCount()).isZero();
     assertThat(result.duplicateCount()).isEqualTo(1);
@@ -1785,7 +1936,7 @@ class HangarImportServiceTest {
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(shipTypeWithName("Caterpillar")));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+    FleetviewImportResponseDto result = importShips(userId, csvFile(csv));
 
     assertThat(result.importedCount()).isZero();
     assertThat(result.skippedShips()).containsExactly("Mystery Craft");
@@ -1811,7 +1962,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(fury, furyLx, hercules));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    FleetviewImportResponseDto result = hangarImportService.importShips(userId, csvFile(csv));
+    FleetviewImportResponseDto result = importShips(userId, csvFile(csv));
 
     assertThat(result.skippedShips()).isEmpty();
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
@@ -1825,8 +1976,7 @@ class HangarImportServiceTest {
   void importShips_csvWithoutPledgeIdColumn_throws400() {
     MockMultipartFile file = csvFile("Name,Type\nCaterpillar,Ship\n");
 
-    assertThrows(
-        BadRequestException.class, () -> hangarImportService.importShips(UUID.randomUUID(), file));
+    assertThrows(BadRequestException.class, () -> importShips(UUID.randomUUID(), file));
   }
 
   private static final String HEADER =
@@ -1871,7 +2021,7 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    hangarImportService.importShips(
+    importShips(
         userId, multipartFile("[{\"name\":\"aurora mr\",\"shipname\":\"\",\"type\":\"ship\"}]"));
 
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
@@ -1890,7 +2040,7 @@ class HangarImportServiceTest {
     when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(hangar);
 
     FleetviewImportResponseDto result =
-        hangarImportService.importShips(
+        importShips(
             userId,
             multipartFile("[{\"name\":\"aurora mr\",\"shipname\":\"\",\"type\":\"ship\"}]"));
 
@@ -1913,7 +2063,7 @@ class HangarImportServiceTest {
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     FleetviewImportResponseDto result =
-        hangarImportService.importShips(
+        importShips(
             userId,
             multipartFile("[{\"name\":\"aurora mr\",\"shipname\":\"\",\"type\":\"ship\"}]"));
 
