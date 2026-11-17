@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipDto;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,10 +43,11 @@ import org.springframework.stereotype.Component;
  * without a P4K GUID is merged into the unretired row whose GUID is its Wiki UUID; else into the
  * single row holding a same-name record of its own record's variant group; else into the single row
  * whose name is its Wiki in-game name or, for a row only UEX wrote, its UEX full name. A row whose
- * GUID left a complete catalogue is merged into the row holding the record that succeeds it. The
- * twins are found before the run decides which rows move to their base or successor (REQ-P4K-051),
- * since a twin's identity would block such a move, and are merged once it has: a row that moves
- * keeps its own Wiki identity.
+ * GUID left a complete catalogue is merged into the row holding the record that succeeds it, and a
+ * row whose record a {@code _GS} record of the same in-game name supersedes into the row holding
+ * that record. The twins are found before the run decides which rows move to their base or
+ * successor (REQ-P4K-051), since a twin's identity would block such a move, and are merged once it
+ * has: a row that moves keeps its own Wiki identity.
  */
 @Component
 @RequiredArgsConstructor
@@ -60,7 +62,8 @@ class P4kShipTwins {
    * @param ships the catalogue's ships
    * @param shipsComplete whether the ships kind is complete, the only case a GUID can be departed
    * @param retiring the ship types this run retires (REQ-P4K-052); none of them takes a twin
-   * @return the twins, each with the row it is merged into
+   * @return the twins, each with the row it ends up merged into: a twin of a row that is itself a
+   *     twin is merged into that row's survivor
    */
   @NotNull
   List<Twin> find(
@@ -70,17 +73,38 @@ class P4kShipTwins {
       @NotNull Set<UUID> retiring) {
     Catalogue catalogue = Catalogue.of(ships, shipsComplete);
     Holders holders = Holders.of(stored, retiring);
-    List<Twin> twins = new ArrayList<>();
+    Map<UUID, Twin> byRow = new LinkedHashMap<>();
     for (ShipType row : stored) {
       Twin twin =
           row.getP4kUuid() == null
               ? copyOf(row, catalogue, holders)
-              : departed(row, catalogue, holders, retiring);
+              : successorOf(row, catalogue, holders, retiring);
       if (twin != null) {
-        twins.add(twin);
+        byRow.put(Objects.requireNonNull(row.getId()), twin);
       }
     }
+    List<Twin> twins = new ArrayList<>();
+    byRow.values().forEach(twin -> twins.add(finalSurvivor(twin, byRow)));
     return List.copyOf(twins);
+  }
+
+  /**
+   * Follows a twin's survivor while the survivor is itself a twin.
+   *
+   * @param twin the twin
+   * @param byRow the twins by the id of the row merged away
+   * @return the twin pointed at the row that stays at the end
+   */
+  @NotNull
+  private static Twin finalSurvivor(@NotNull Twin twin, @NotNull Map<UUID, Twin> byRow) {
+    Twin result = twin;
+    Set<UUID> seen = new HashSet<>();
+    Twin next = byRow.get(result.survivor().getId());
+    while (next != null && seen.add(Objects.requireNonNull(next.row().getId()))) {
+      result = new Twin(twin.row(), next.survivor(), next.record(), twin.reason());
+      next = byRow.get(next.survivor().getId());
+    }
+    return result;
   }
 
   /**
@@ -240,31 +264,41 @@ class P4kShipTwins {
   }
 
   /**
-   * Finds the row a ship type whose GUID left a complete catalogue is merged into: the row holding
-   * the single player base that carries one of its names.
+   * Finds the row a ship type holding a GUID is merged into: for a GUID that left a complete
+   * catalogue, the row holding the single player base that carries one of its names; for a listed
+   * GUID a {@code _GS} record supersedes, the row holding that record.
    *
    * @param row the ship type
    * @param catalogue the catalogue's ships
    * @param holders the rows holding a GUID
    * @param retiring the ship types this run retires
-   * @return the twin, or {@code null} when the GUID is listed or no other row holds the successor
+   * @return the twin, or {@code null} when no other row holds the successor
    */
   @Nullable
-  private static Twin departed(
+  private static Twin successorOf(
       @NotNull ShipType row,
       @NotNull Catalogue catalogue,
       @NotNull Holders holders,
       @NotNull Set<UUID> retiring) {
     UUID guid = row.getP4kUuid();
-    if (!catalogue.complete()
-        || guid == null
-        || catalogue.lists(guid)
+    if (guid == null
         || row.isHidden()
         || row.getP4kHiddenAt() != null
         || retiring.contains(row.getId())) {
       return null;
     }
-    P4kShipDto successor = P4kShipIdentityMoves.successorRecord(row, catalogue.players());
+    P4kShipDto successor;
+    ShipTypeMergeReason reason;
+    if (catalogue.lists(guid)) {
+      successor = catalogue.superseded().get(guid);
+      reason = ShipTypeMergeReason.SUPERSEDED_BY_GS_RECORD;
+    } else {
+      successor =
+          catalogue.complete()
+              ? P4kShipIdentityMoves.successorRecord(row, catalogue.players())
+              : null;
+      reason = ShipTypeMergeReason.DEPARTED_FOR_HELD_SUCCESSOR;
+    }
     if (successor == null) {
       return null;
     }
@@ -272,7 +306,7 @@ class P4kShipTwins {
     ShipType survivor = successorGuid == null ? null : holders.byGuid().get(successorGuid);
     return survivor == null || Objects.equals(survivor.getId(), row.getId())
         ? null
-        : new Twin(row, survivor, successor, ShipTypeMergeReason.DEPARTED_FOR_HELD_SUCCESSOR);
+        : new Twin(row, survivor, successor, reason);
   }
 
   /**
@@ -295,12 +329,14 @@ class P4kShipTwins {
    * @param byGuid the records by GUID
    * @param byClass the records by folded class name
    * @param players the player bases by folded in-game name, empty for a partial ships kind
+   * @param superseded the {@code _GS} records by the GUID of the record they supersede
    * @param complete whether the ships kind is complete
    */
   private record Catalogue(
       @NotNull Map<UUID, List<P4kShipDto>> byGuid,
       @NotNull Map<String, List<P4kShipDto>> byClass,
       @NotNull Map<String, List<P4kShipDto>> players,
+      @NotNull Map<UUID, P4kShipDto> superseded,
       boolean complete) {
 
     /**
@@ -326,7 +362,8 @@ class P4kShipTwins {
       }
       Map<String, List<P4kShipDto>> players =
           complete ? P4kShipIdentityMoves.playersByName(byGuid) : Map.of();
-      return new Catalogue(byGuid, byClass, players, complete);
+      return new Catalogue(
+          byGuid, byClass, players, P4kShipGoldStandard.supersededBy(ships), complete);
     }
 
     /**

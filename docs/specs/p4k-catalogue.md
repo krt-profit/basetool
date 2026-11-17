@@ -1281,6 +1281,9 @@ match (REQ-P4K-007) finds a ship type that carries the same in-game name and eit
 - holds a P4K GUID of the copy's variant group, the copy being a variant (`variantOf` set), or
 - the copy is a ship no player owns (`playability` `ai`, `mission` or `special`).
 
+A record its `_GS` record supersedes is covered when no ship type holds it and one holds the `_GS`
+record (REQ-P4K-053).
+
 The base of a group is never covered by a ship type holding one of its variants: that ship type is
 stamped with the wrong member of the group, which stays a case. A covered record is listed as
 `COVERED` in the change report; nothing is stamped, created or reviewed.
@@ -1385,8 +1388,18 @@ Rules 3 and 4 also find a row whose GUID left the catalogue and that moves to a 
 row holds.
 
 A row whose GUID left a complete catalogue is a twin of the row holding the record that succeeds it:
-the single player base carrying one of its names (REQ-P4K-051). Only this rule merges away a row
-holding a P4K GUID, whose record is gone; otherwise a P4K row is never merged away (REQ-P4K-007).
+the single player base carrying one of its names (REQ-P4K-051).
+
+A game build can carry a reworked ship as a new record whose class name is the old one plus `_GS`
+while the old record stays in the files (4.10.200: `RSI_Constellation_Phoenix` and
+`RSI_Constellation_Phoenix_GS`, both "RSI Constellation Mk IV Phoenix"; the same for Taurus). When
+both are player ships heading no variant group under the same in-game name, the `_GS` record
+supersedes the old one: the row holding the old record is a twin of the row holding the `_GS`
+record, and the old record is covered from then on (REQ-P4K-050) while no row holds it. A row
+holding the old record stays while no row holds the `_GS` record.
+
+Only these two rules merge away a row holding a P4K GUID; otherwise a P4K row is never merged away
+(REQ-P4K-007). A twin whose row is itself merged away is merged into that row's survivor.
 
 The twins are set aside while the run decides which rows move to their base or successor
 (REQ-P4K-051), since a twin's identity would block such a move. When the row a twin is merged into
@@ -1405,11 +1418,14 @@ preview reports the merges, writes nothing, and matches without the merged rows 
   is a row's name. A row both sources wrote is no twin by its full name.
 - [x] A row whose record left is merged into the row of its successor, with its hangar ships and its
   UEX vehicle id.
+- [x] The row of a record a `_GS` record supersedes is merged into the row holding the `_GS` record,
+  and the old record is covered in the next APPLY; it stays while no row holds the `_GS` record.
 - [x] A preview reports the merge as `MERGED` and changes no row.
 - [x] A second APPLY finds nothing to merge.
 
-**Enforced by:** `P4kShipTwinsImportTest`, `P4kShipTwinRulesImportTest` · **Code:** `P4kShipTwins`,
-`ShipTypeMergeService` ·
+**Enforced by:** `P4kShipTwinsImportTest`, `P4kShipTwinRulesImportTest`,
+`P4kShipGoldStandardImportTest`, `P4kShipGoldStandardTest` · **Code:** `P4kShipTwins`,
+`P4kShipGoldStandard`, `ShipTypeMergeService` ·
 **ADR:** [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
 
 ## Game texts

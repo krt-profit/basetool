@@ -48,7 +48,13 @@ enum ShipTypeMergeReason {
    * The merged row's GUID left a complete catalogue, and the surviving row holds the record that
    * succeeds it (REQ-P4K-053).
    */
-  DEPARTED_FOR_HELD_SUCCESSOR(true);
+  DEPARTED_FOR_HELD_SUCCESSOR(true),
+
+  /**
+   * The merged row's record is superseded by the {@code _GS} record of the same in-game name the
+   * surviving row holds (REQ-P4K-053).
+   */
+  SUPERSEDED_BY_GS_RECORD(true);
 
   /** Whether the merged row may hold a P4K GUID, which then leaves the catalogue with it. */
   @Getter private final boolean mergingP4kRow;

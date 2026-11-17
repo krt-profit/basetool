@@ -138,9 +138,14 @@ public class P4kShipReconciler {
         repairs.stream()
             .map(P4kShipBaseRepairs.Repair::baseGuid)
             .collect(Collectors.toUnmodifiableSet());
+    Map<UUID, P4kShipDto> superseded = P4kShipGoldStandard.supersededBy(catalogue.ships());
     for (P4kShipDto ship : catalogue.ships()) {
       UUID guid = ship.parsedGuid();
       if (guid != null && bases.contains(guid)) {
+        continue;
+      }
+      if (guid != null && isSupersededAndHeld(guid, superseded, rows)) {
+        context.getReport().covered(P4kKind.SHIP, ship);
         continue;
       }
       String rawPlayability = ship.playability();
@@ -173,6 +178,26 @@ public class P4kShipReconciler {
       settleCases(catalogue, context);
     }
     return repairs;
+  }
+
+  /**
+   * Tells whether a record is superseded by a {@code _GS} record a row holds, while no row holds
+   * the record itself; such a record is covered (REQ-P4K-053).
+   *
+   * @param guid the record's GUID
+   * @param superseded the superseding records by the GUID they supersede
+   * @param rows the stored ship types
+   * @return whether the record needs neither a row nor a case
+   */
+  private static boolean isSupersededAndHeld(
+      @NotNull UUID guid,
+      @NotNull Map<UUID, P4kShipDto> superseded,
+      @NotNull P4kRowIndex<ShipType> rows) {
+    P4kShipDto successor = superseded.get(guid);
+    UUID successorGuid = successor == null ? null : successor.parsedGuid();
+    return successorGuid != null
+        && rows.byP4kUuid(guid).isEmpty()
+        && rows.byP4kUuid(successorGuid).isPresent();
   }
 
   /**

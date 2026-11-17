@@ -61,3 +61,13 @@ case only where they do not.
   are bounded by unique candidates and fall back to a case otherwise.
 - Decisions 3–5 need the ship-type merge and the reference probe across modules; they land after
   decisions 1 and 2.
+
+## Amendment — a `_GS` record supersedes the old record of its ship (2026-11-17)
+
+LIVE 4.10.200 lists `RSI_Constellation_Phoenix` and `RSI_Constellation_Phoenix_GS`, and the same
+pair for the Taurus. Each pair consists of two player ships heading no variant group under one
+in-game name, and each record has a row of its own. Decision 5 alone would keep both rows until the
+old record leaves the files. @greluc decided that the `_GS` record supersedes the old one at once:
+the row of the old record merges into the row of the `_GS` record, and the old record is covered
+from then on (REQ-P4K-053, REQ-P4K-050). This is the one exception to "two rows a listed GUID each
+holds stay apart"; it applies only to the exact `<class>` / `<class>_GS` pair of one in-game name.
