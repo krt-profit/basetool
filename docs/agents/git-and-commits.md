@@ -25,7 +25,7 @@ A tool default that points elsewhere does not change this; pass the path explici
 
 ## Before every push
 
-**Before every `push`, run `./gradlew spotlessApply` (whole repo) — no exceptions, even for a one-line edit.** Spotless is gate-enforced in CI; a narrower local check (`compileE2eJava`, `checkstyleMain`, …) does not cover every source set and will let a formatting violation reach CI. The full checklist is [`lint-and-push.md`](lint-and-push.md).
+**Before every `push`, run `./gradlew spotlessApply` (whole repo) — no exceptions, even for a one-line edit.** It runs every formatter of the repository, Prettier, Ruff and shfmt included (REQ-OPS-058). Spotless is gate-enforced in CI; a narrower local check (`compileE2eJava`, `checkstyleMain`, …) does not cover every source set and will let a formatting violation reach CI. With `core.hooksPath` set to `.githooks`, the `pre-push` hook refuses the push while `./gradlew spotlessCheck` fails; never skip it with `--no-verify`. The full checklist is [`lint-and-push.md`](lint-and-push.md).
 
 ## Identity and DCO sign-off
 

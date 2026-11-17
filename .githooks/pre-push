@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# Profit Basetool - squadron-management web app.
+# Copyright (C) 2026 Lucas Greuloch
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
 # Refuses a push that carries commits while ./gradlew spotlessCheck fails on the working tree.
 set -eu
 

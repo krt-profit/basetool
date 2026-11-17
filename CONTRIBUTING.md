@@ -47,6 +47,7 @@ The rest of this document goes into detail.
 - [Commit messages](#commit-messages)
 - [Branch names](#branch-names)
 - [Style guides](#style-guides)
+  - [Formatting](#formatting)
   - [Java](#java)
   - [Javadoc](#javadoc)
   - [Internationalization (i18n)](#internationalization-i18n)
@@ -220,6 +221,8 @@ The README is the canonical place. The relevant sections:
 - [Running the local test stack](README.md#running-the-local-test-stack) — when you need an isolated stack with throwaway credentials. **Use this every time you spin up a stack from a worktree.** Never re-use the production `.env`, the production `keystore.p12`, or the shared `realm-export.json` — see [AGENTS.md → Testing](AGENTS.md) for the rationale.
 - [Running tests](README.md#tests) — Gradle wrapper only, never the IDE test runner.
 - [Linting, static analysis and SBOM](README.md#linting-static-analysis-and-sbom) — `./gradlew check`, Checkstyle, SpotBugs, Spotless, CycloneDX.
+- **Once per clone:** `git config core.hooksPath .githooks`, which turns on the
+  [format gate of every push](#formatting).
 
 ### Building an app image
 
@@ -370,6 +373,11 @@ entry does no harm).
   `win-x64` and `linux-x64` entries. On another platform add yours once with
   `./gradlew --write-verification-metadata sha256 :frontend:nodeSetup`; after a
   Node bump regenerate both (the Linux entry from a Linux shell or container).
+- **Ruff and shfmt are per operating system too** (REQ-OPS-058). The file carries
+  their Windows and Linux x86-64 release binaries, resolved from the vendors'
+  GitHub releases; Dependabot does not see them. After a bump in the catalog run
+  `./gradlew --write-verification-metadata sha256 installRuff installShfmt` and
+  add the other platform's entry from the release's published SHA-256 digest.
 - **If CI still fails verification on a coordinate your machine never
   complained about**, the command ran on a warm cache somewhere; run it again as
   written, or in a Linux container, and commit what it adds.
@@ -750,12 +758,42 @@ that — promotion to `:stable` and the host rollout — is in
 
 ## Style guides
 
+### Formatting
+
+Every file a formatter owns has one format, whoever or whatever writes it
+(REQ-OPS-058, [ADR-0390](docs/adr/0390-every-formatter-runs-from-spotless-and-a-pre-push-hook-holds-every-agent-to-it.md)).
+
+- **`./gradlew spotlessApply` formats the repository** and is mandatory
+  before every push; `./gradlew spotlessCheck` fails on any file it would
+  change, and `check` runs it.
+
+  | Files | Formatter | Settings |
+  | --- | --- | --- |
+  | Java, every source set | google-java-format | Google style |
+  | Gradle Kotlin scripts, `build-logic` | ktfmt | Google style |
+  | JSON | Gson | two spaces |
+  | Python | Ruff | [`ruff.toml`](ruff.toml) |
+  | Shell scripts, `.githooks/*` | shfmt | [`.editorconfig`](.editorconfig) |
+  | CSS and JS of the frontend, the Keycloak theme and `docs/exchange/assets` | Prettier | [`.prettierrc.json`](.prettierrc.json) |
+  | YAML, Markdown, `.properties` | whitespace and final newline | — |
+
+- **Ruff and shfmt are verified release binaries** that Gradle installs
+  under `build/tools/` on first use, for Linux and Windows on x86-64. Do
+  not format with another version or other options.
+- **A file no formatter owns follows [`.editorconfig`](.editorconfig)**:
+  UTF-8, LF, the indentation of its type, a final newline, no trailing
+  whitespace.
+- **The push gate.** Run `git config core.hooksPath .githooks` once per
+  clone. The versioned `pre-push` hook runs `./gradlew spotlessCheck` and
+  refuses a push that carries commits while it fails; do not skip it
+  with `--no-verify`.
+
 ### Java
 
 - **Google Java Style** is the baseline, enforced by Checkstyle
   (`config/checkstyle/google_checks.xml`).
-- **Spotless** auto-formats Java sources — `./gradlew spotlessApply` is
-  mandatory before every push. Spotless is wired into `check` with
+- **Spotless** auto-formats Java sources with google-java-format as part
+  of [`spotlessApply`](#formatting). Spotless is wired into `check` with
   `isEnforceCheck = true`, so unformatted code fails CI.
 - **Checkstyle** runs with `maxWarnings = 0`. **Every** new or changed
   warning in the changed code must be fixed; do not silence findings

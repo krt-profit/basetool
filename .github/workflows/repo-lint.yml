@@ -471,6 +471,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/ci-superseded.test.sh
 
+      - name: pre-push-hook / Self-test the format gate of every push
+        if: ${{ !cancelled() }}
+        run: bash scripts/pre-push-hook.test.sh
+
   container-checks:
     name: Container checks
     runs-on: ubuntu-latest

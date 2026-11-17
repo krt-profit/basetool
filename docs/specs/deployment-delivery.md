@@ -3637,6 +3637,49 @@ and on data, without hand-made credentials or realm files.
 **Enforced by:** `E2eStackPortsParityTest` (`:frontend:test`) · **Runbook:**
 [`docs/agents/ui-preview.md`](../agents/ui-preview.md) · **Related:** REQ-OPS-055, REQ-OPS-056
 
+### REQ-OPS-058 — One command formats the repository, and every push is held to it
+
+Every file a formatter owns has one format, whoever writes it — a person or the coding agent of any
+vendor (ADR-0390).
+
+- **One entry point.** `./gradlew spotlessApply` rewrites and `./gradlew spotlessCheck` checks:
+  Java in every source set (google-java-format), the Gradle Kotlin scripts and `build-logic`
+  (ktfmt), JSON (Gson), Python (Ruff, `ruff.toml`), the shell scripts and `.githooks/*` (shfmt,
+  options in `.editorconfig`), the CSS and JS of the frontend, the Keycloak theme and
+  `docs/exchange/assets` (Prettier, `.prettierrc.json`), and whitespace and the final newline of
+  YAML, Markdown and `.properties`. `docs/archive/` and vendored or generated files are excluded.
+- **CI fails on a difference.** `check` depends on `spotlessCheck`, so the `./gradlew build` of
+  `ci.yml` fails on any file a formatter would change.
+- **Verified binaries.** Ruff and shfmt are the vendors' release binaries, resolved by Gradle from
+  their GitHub releases with the versions in the catalog and the SHA-256 for Linux and Windows on
+  x86-64 in `gradle/verification-metadata.xml` (REQ-OPS-034). A checkout installs them under
+  `build/tools/` on first use; a platform without a verified binary fails naming itself.
+- **The push gate.** `.githooks/pre-push` runs `./gradlew spotlessCheck` and refuses a push that
+  carries commits while it fails. `core.hooksPath` is `.githooks`: Claude Code's `SessionStart`
+  hook sets it, and `AGENTS.md` tells every other agent to set it once per clone.
+- **Editor settings.** `.editorconfig` states UTF-8, LF, the indentation per file type, a final
+  newline and no trailing whitespace, except for applied migrations, test resources, golden files
+  and the changelogs, whose bytes are checked or historical.
+
+**Acceptance**
+
+- [x] `./gradlew spotlessCheck` fails while a Python, shell, CSS or JS file differs from its
+  formatter's output and passes on the formatted tree.
+- [x] From a checkout without `build/tools`, `spotlessCheck` installs Ruff and shfmt while the
+  configuration cache is stored, and a second run reuses the cache.
+- [x] The formatting changed no program: every Python file keeps its AST, every shell script its
+  shfmt syntax tree, and shellcheck stays clean.
+- [x] shfmt reading `.editorconfig` prints what it prints with the options as flags, for every
+  script.
+- [x] The hook refuses a push of commits while a file is unformatted, and lets a branch deletion
+  through.
+
+**Enforced by:** `basetool.repository-format-conventions` and `basetool.spotless-conventions`
+(`spotlessCheck`, `ruffFormatCheck`, `shfmtCheck`) · `:frontend:prettierCheck` · `.githooks/pre-push` ·
+`.github/workflows/ci.yml` · **Decision:**
+[ADR-0390](../adr/0390-every-formatter-runs-from-spotless-and-a-pre-push-hook-holds-every-agent-to-it.md)
+· **Related:** REQ-OPS-034, REQ-OPS-046, REQ-OPS-055
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

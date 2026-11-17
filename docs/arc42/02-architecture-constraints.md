@@ -45,6 +45,9 @@ even though they are style rules on paper:
   the ADR or the runbook.
   Nothing gates this beyond review.
 - **Google Java Style**, applied by Spotless and checked by Checkstyle; SpotBugs runs on `main`.
+- **One format for every file a formatter owns.** `./gradlew spotlessApply` runs google-java-format,
+  ktfmt, Gson, Ruff, shfmt and Prettier; `check` and a versioned `pre-push` hook refuse anything
+  else, whichever person or agent wrote it (REQ-OPS-058, ADR-0390).
 - **Files and methods do not grow.** Checkstyle caps a production file at 1,000 lines and a method at
   150; the larger ones are allow-listed at their current size, and an entry only goes down
   (REQ-OPS-048, ADR-0267).
