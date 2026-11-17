@@ -14884,7 +14884,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "STAR_SYSTEM", "ORBIT", "PLANET", "MOON", "CITY", "SPACE_STATION", "OUTPOST", "POI", "TERMINAL" ]
+            "enum" : [ "STAR_SYSTEM", "PLANET", "ORBIT", "MOON", "CITY", "SPACE_STATION", "OUTPOST", "POI", "TERMINAL" ]
           }
         }, {
           "in" : "query",
@@ -15039,7 +15039,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "STAR_SYSTEM", "ORBIT", "PLANET", "MOON", "CITY", "SPACE_STATION", "OUTPOST", "POI", "TERMINAL" ]
+            "enum" : [ "STAR_SYSTEM", "PLANET", "ORBIT", "MOON", "CITY", "SPACE_STATION", "OUTPOST", "POI", "TERMINAL" ]
           }
         }, {
           "in" : "path",
@@ -107717,7 +107717,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "STAR_SYSTEM", "ORBIT", "PLANET", "MOON", "CITY", "SPACE_STATION", "OUTPOST", "POI", "TERMINAL" ]
+            "enum" : [ "STAR_SYSTEM", "PLANET", "ORBIT", "MOON", "CITY", "SPACE_STATION", "OUTPOST", "POI", "TERMINAL" ]
           },
           "manual" : {
             "type" : "boolean"

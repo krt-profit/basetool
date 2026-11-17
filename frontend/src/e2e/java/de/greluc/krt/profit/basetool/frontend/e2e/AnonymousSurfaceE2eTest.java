@@ -95,37 +95,35 @@ class AnonymousSurfaceE2eTest {
   @Test
   void everyFormerPublicPageSendsAnAnonymousVisitorAway() {
     String baseUrl = STACK.baseUrl();
-    try (BrowserContext context =
-        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
-      Page page = context.newPage();
-      try {
-        for (String path : concat(FORMER_PUBLIC_PAGES, NEVER_PUBLIC_PAGES)) {
-          E2eSupport.navigate(page, baseUrl + path);
+    // A fresh context per path: no session carries over, and the redirects through Keycloak run
+    // in the page's first WebKit process; a swap into a cached one mid-redirect kills the driver.
+    for (String path : concat(FORMER_PUBLIC_PAGES, NEVER_PUBLIC_PAGES)) {
+      try (BrowserContext context =
+          browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+        Page page = context.newPage();
+        E2eSupport.navigate(page, baseUrl + path);
 
-          assertNotEquals(
-              baseUrl + path,
-              page.url(),
-              path + " must not render for an anonymous visitor (REQ-SEC-052)");
+        assertNotEquals(
+            baseUrl + path,
+            page.url(),
+            path + " must not render for an anonymous visitor (REQ-SEC-052)");
+        assertEquals(
+            0,
+            page.locator("table tbody tr").count(),
+            "no row of " + path + " may reach an anonymous visitor");
+        if (page.url().startsWith(baseUrl)) {
           assertEquals(
               0,
-              page.locator("table tbody tr").count(),
-              "no row of " + path + " may reach an anonymous visitor");
-          if (page.url().startsWith(baseUrl)) {
-            assertEquals(
-                0,
-                page.locator("form").count(),
-                "and no form of it either — /orders/create was the public request form"
-                    + " (ADR-0149)");
-          }
-          assertTrue(
-              page.url().contains("/oauth2/authorization/keycloak")
-                  || page.url().startsWith(baseUrl + "/?")
-                  || page.url().equals(baseUrl + "/")
-                  || !page.url().startsWith(baseUrl),
-              "expected the login flow or the landing page, got " + page.url());
+              page.locator("form").count(),
+              "and no form of it either — /orders/create was the public request form"
+                  + " (ADR-0149)");
         }
-      } finally {
-        page.close();
+        assertTrue(
+            page.url().contains("/oauth2/authorization/keycloak")
+                || page.url().startsWith(baseUrl + "/?")
+                || page.url().equals(baseUrl + "/")
+                || !page.url().startsWith(baseUrl),
+            "expected the login flow or the landing page, got " + page.url());
       }
     }
   }

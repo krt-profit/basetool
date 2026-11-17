@@ -351,7 +351,7 @@ the same contract as prod:
   test container never has):
 
   ```bash
-  docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-dev
+  docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-session-dev redis-shared-dev
   ./gradlew :backend:bootRun
   ```
 

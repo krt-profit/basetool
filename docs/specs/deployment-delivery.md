@@ -321,8 +321,10 @@ reloaded or started, so no container is left running without the unit that manag
 the old instance on its data directory beside the new one. A retired `.network` or `.volume` file is
 removed at the install, as before: it reaches nothing until the reload. **The stack is the units the
 host has**: the services the gated apply stops, starts and waits for are the installed `.container`
-units of the known stack order (`RT_STACK_ORDER`: `db-backend db-keycloak redis keycloak edge backend
-ingest frontend acme`), with any installed unit a stack unit `Requires=` placed before the first unit
+units of the known stack order (`RT_STACK_ORDER`: `db-backend db-keycloak redis redis-session
+redis-shared keycloak edge backend ingest frontend acme`; `redis` is the single instance a rollback to
+a release before ADR-0388 brings back, and both Redis instances start before the backend that uses
+`redis-shared` without `Requires=`), with any installed unit a stack unit `Requires=` placed before the first unit
 that requires it; every other installed unit is a monitoring unit. The list is derived again after a
 config apply and after a rollback's restore, so either side of a rename starts exactly the units its
 tree has. **Before anything is stopped or changed**, a new or changed unit whose `Volume=` mounts a
@@ -490,7 +492,7 @@ the owner's decision of 2026-09-25). When the promoted `keycloak-spi` digest mov
    what requires them; then every stack unit is **started** in dependency order and waited for
    (`Notify=healthy`). Keycloak's start re-runs the provider build on the new JAR before backend
    starts. **The edge starts right after keycloak, before backend, ingest and frontend**
-   (`db-backend db-keycloak redis keycloak edge backend ingest frontend acme`): the applications
+   (`db-backend db-keycloak redis-session redis-shared keycloak edge backend ingest frontend acme`): the applications
    fetch the issuer's discovery document through the public name, which the host alias routes
    through haproxy to the edge, so an edge that the same window stopped and starts last fails every
    application start with `Remote host terminated the handshake`. *(Corrected 2026-10-03: the edge
@@ -735,13 +737,13 @@ needs:
 - **App services (`backend`, `frontend`, `ingest`) and `keycloak`** run as a fixed non-root uid
   (10001 for the JVM apps, 1000 for Keycloak/Quarkus) and bind only high ports, so they need **no**
   capabilities — `cap_drop: [ALL]` with an empty add-back.
-- **`postgres` (db-backend, db-keycloak) and `redis`** boot as root to chown their data dir and then
+- **`postgres` (db-backend, db-keycloak) and `redis` (redis-session, redis-shared)** boot as root to chown their data dir and then
   drop to their service user via gosu, so under Docker they keep `CHOWN`/`DAC_OVERRIDE`/`FOWNER` +
   `SETGID`/`SETUID`. `no-new-privileges` still holds because gosu drops via the `CAP_SETUID` syscall,
   not a setuid binary. **That set was measured on 2026-09-16 and is wrong in both directions**
   ([`PODMAN_MIGRATION_PLAN.md` §20](../archive/PODMAN_MIGRATION_PLAN.md)): Postgres needs four of the five, `FOWNER` never among them, and
-  redis needs only `SETGID`/`SETUID`. Under Quadlet all three instead run **as their own uid** — 70,
-  70 and 999 — read-only and with no capabilities at all ([ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md)).
+  redis needs only `SETGID`/`SETUID`. Under Quadlet all four instead run **as their own uid** — 70,
+  70, 999 and 999 — read-only and with no capabilities at all ([ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md)).
 
 > [!danger] For redis, a partial capability set is worse than the full one
 > Its entrypoint tests `has_cap setuid && has_cap setgid` before dropping privileges and, finding
@@ -769,7 +771,7 @@ re-verified on every image bump** of that service before the bump is promoted (a
 healthcheck passing). The deploy health-gate is the safety net: a wrong cap set fails the container
 at start and is rolled back rather than shipped.
 
-**A read-only root filesystem is part of the baseline under Quadlet** — all eighteen units
+**A read-only root filesystem is part of the baseline under Quadlet** — all twenty units
 ([ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md)). Earlier revisions of this
 requirement said the opposite — *the JVM and DB working dirs write across the filesystem* — and that
 was never measured; when it was, on 2026-09-16, it was wrong in both halves. A healthy Spring Boot
@@ -806,12 +808,13 @@ container at all — production runs `start` without `--import-realm`, so the fi
 `generate-quadlet.py` refuses any bind mount from the config tree without `:ro`.
 
 **The data networks carry no egress** (since 2026-09-22, ADR-0162 as extended). `net-db-backend`,
-`net-db-keycloak` and the three `net-redis-*` networks are `Internal=true` in the Quadlet units, so
-`db-backend`, `db-keycloak` and `redis` — which are on nothing else — have no outbound path.
+`net-db-keycloak` and the four `net-redis-*` networks are `Internal=true` in the Quadlet units, so
+`db-backend`, `db-keycloak`, `redis-session` and `redis-shared` — which are on nothing else — have no
+outbound path.
 *(Status 2026-09-25: applied on production — the five networks recreated `internal=true`, verified
 by the missing default route in all three containers; the testing host still runs the old networks,
 see `deployment.md` → Network changes are installed, not applied.)* **The compose file keeps all five non-internal, deliberately** (accepted by @greluc on 2026-09-22):
-it also runs the local stacks, where the `-dev` twins publish `127.0.0.1:15432`, `:15433` and `:6379`
+it also runs the local stacks, where the `-dev` twins publish `127.0.0.1:15432`, `:15433`, `:6379` and `:6380`
 on these very networks for a developer's `bootRun`, and an internal network carries no DNAT — so
 `internal: true` in compose would break every local database and Redis connection with no error at
 startup. The list lives in `generate-quadlet.py` (`QUADLET_INTERNAL_NETWORKS`), which adds the key to
@@ -833,13 +836,13 @@ PostgreSQL's clean shutdown.
 - [ ] `edge` additionally runs `read_only: true` under Compose.
 - [ ] Every generated `.container` unit carries `NoNewPrivileges=true`, `DropCapability=ALL`, a
   `PidsLimit=` and `ReadOnly=true`; only `acme` adds a capability (`CHOWN`); `db-backend`,
-  `db-keycloak` and `redis` run with `User=`/`Group=` 70, 70 and 999. `check-conformance.py`'s
+  `db-keycloak`, `redis-session` and `redis-shared` run with `User=`/`Group=` 70, 70, 999 and 999. `check-conformance.py`'s
   `containers-unprivileged` and `containers-read-only` assert the running host.
 - [ ] Every `Volume=` whose source is under `/opt/basetool` ends in `:ro`, and the production
   `keycloak` unit mounts no `realm-export.json` (`generate-quadlet.py` refuses the first,
   `generate-quadlet.test.sh` asserts both).
-- [ ] `net-db-backend`, `net-db-keycloak`, `net-redis-backend`, `net-redis-frontend` and
-  `net-redis-ingest` are `Internal=true`; no unit whose every network is internal publishes a port or
+- [ ] `net-db-backend`, `net-db-keycloak`, `net-redis-backend`, `net-redis-frontend`,
+  `net-redis-ingest` and `net-redis-session` are `Internal=true`; no unit whose every network is internal publishes a port or
   aliases the host gateway (`generate-quadlet.py` refuses it).
 - [ ] Every unit with a `TimeoutStopSec=` carries a `StopTimeout=` fifteen seconds below it.
 - [ ] An image bump for any of these services is only promoted after the new image has been
@@ -1153,7 +1156,10 @@ The Redis instance backing Spring Session (frontend) and the ingest handoff stag
 exchange, the backend's registry mirror, revocations and key deny list under `exchange:*` and the
 gateway's quotas, byte budget and idempotency results under `ingest:xch:*` (ADR-0221,
 REQ-XCH-023) — runs with a durability and memory posture matched to a store whose loss forces users
-to re-login — **not** a throwaway cache (ADR-0074):
+to re-login — **not** a throwaway cache (ADR-0074). Two instances carry it since ADR-0388:
+`redis-session` holds only Spring Session, `redis-shared` everything else, and both keep AOF,
+RDB and `noeviction` (an evicted revocation re-opens access as surely as an evicted session logs a
+member out):
 
 - **Durable persistence — RDB + AOF.** `--appendonly yes --appendfsync everysec` makes AOF the
   primary durability layer (~1 fsync/s regardless of write volume; ~1 s worst-case loss on a crash),
@@ -1164,8 +1170,8 @@ to re-login — **not** a throwaway cache (ADR-0074):
   The probe was corrected instead (see the observability bullet below). Both files live on the
   `/var/lib/basetool/redis` bind mount and are **excluded from off-site backups** (REQ-OPS-010 — sessions transparently re-login). The
   `appendfsync always` mode (one fsync per write, the pre-M-7 pathology) is deliberately **not** used.
-- **Bounded memory — explicit ceiling below the cgroup.** `--maxmemory 768mb` (ADR-0221; 384mb until WP 2.1 of epic #2078) sits below the 1024 MB
-  container limit, leaving copy-on-write headroom for the RDB / AOF-rewrite forks and fragmentation,
+- **Bounded memory — explicit ceiling below the cgroup.** `redis-shared` runs `--maxmemory 768mb` (ADR-0221; 384mb until WP 2.1 of epic #2078) below its 1024 MB
+  container limit and `redis-session` `384mb` below 512 MB (ADR-0388, ADR-0085's session sizing), leaving copy-on-write headroom for the RDB / AOF-rewrite forks and fragmentation,
   so Redis manages the boundary itself instead of ceding it to the kernel OOM-killer. Raised from
   `192mb` / 256 MB by ADR-0085 for the 5000-account session index; this requirement kept quoting the
   pre-ADR-0085 pair until 2026-09-08, so its acceptance list contradicted the shipped compose file.
@@ -1174,9 +1180,9 @@ to re-login — **not** a throwaway cache (ADR-0074):
   login) while every live session survives. An evicting policy (`allkeys-*` / `volatile-*`) is a
   defect here.
 
-Both command lines — the `redis-dev` template and the `redis` prod override (which additionally
-carries `--aclfile`) — stay in lockstep on these persistence/memory flags, and both carry
-`--notify-keyspace-events Egx`, which Spring Session needs and the frontend's own ACL user may not
+Each instance's two command lines — its `-dev` service and its prod service (which additionally
+carries `--aclfile`) — stay in lockstep on these persistence/memory flags, and `redis-session`'s
+carry `--notify-keyspace-events Egx`, which Spring Session needs and the frontend's own ACL user may not
 set itself (REQ-SEC-068). The posture is
 **observable**: because `--maxmemory` is set (`redis_memory_max_bytes > 0`), the `RedisMemoryHigh`
 leading-indicator alert is functional (it self-guards on that being non-zero and was inert while
@@ -1193,12 +1199,13 @@ posture has ever had on the **primary** durability layer.
 
 **Acceptance**
 
-- [x] Both redis command lines in `docker-compose.yml` set `--appendonly yes --appendfsync everysec`,
-  `--save "60 1"`, `--maxmemory 768mb`, and `--maxmemory-policy noeviction`; the prod override keeps
-  `--aclfile` and the two lines carry identical persistence/memory flags and
-  `--notify-keyspace-events Egx`.
-- [x] `--maxmemory` (768mb) is strictly below the container memory limit (1024M) so a snapshot /
-  AOF-rewrite fork has copy-on-write headroom.
+- [x] The four Redis command lines in `docker-compose.yml` (`redis-session`, `redis-shared` and their
+  `-dev` twins) set `--appendonly yes --appendfsync everysec`, `--save "60 1"` and
+  `--maxmemory-policy noeviction`; `redis-session`'s pair sets `--maxmemory 384mb` and
+  `--notify-keyspace-events Egx`, `redis-shared`'s `--maxmemory 768mb`; the prod services keep
+  `--aclfile`.
+- [x] Each `--maxmemory` (384mb, 768mb) is strictly below its container memory limit (512M, 1024M)
+  so a snapshot / AOF-rewrite fork has copy-on-write headroom.
 - [x] The eviction policy is `noeviction`; no `allkeys-*` / `volatile-*` policy is configured.
 - [x] `RedisMemoryHigh`, `RedisEvictions`, `RedisRdbStale`, `RedisRdbSaveFailing` and
   `RedisAofWriteFailing` exist in `infrastructure.yml` and their descriptions match this posture
@@ -1211,8 +1218,8 @@ posture has ever had on the **primary** durability layer.
 `infrastructure.yml`); production carries the 768mb / 1024M pair only after the rollout in the note
 above.*
 
-**Enforced by:** `docker-compose.yml` (`x-redis` template + `redis` prod override) · the generated
-`quadlet/systemd/redis.container` (`Exec=` carries the prod line; `quadlet-drift` keeps it equal) ·
+**Enforced by:** `docker-compose.yml` (`x-redis` template + the `redis-session` / `redis-shared` services) · the generated
+`quadlet/systemd/redis-session.container` and `redis-shared.container` (`Exec=` carries the prod line; `quadlet-drift` keeps it equal) ·
 `monitoring/prometheus/alerts/infrastructure.yml` (Redis memory/persistence alerts) · **Decision:** ADR-0079
 
 ### REQ-OPS-019 — Containers with a wget-HTTPS healthcheck reap orphaned subprocesses (PID-1 zombie reaping)
@@ -1351,7 +1358,10 @@ went to 1024M (ADR-0221) — accepted by the owner on 2026-09-26 as rule 7 requi
 ADR-0085's status line. It was 14 000 MiB (13.67 GiB) on 2026-09-25. On the production host,
 where `alloy` (512M) and `node-exporter` (32M) are host services without a container limit, the
 18 Quadlet units' `Memory=` lines sum to **13 968 MiB** with Redis at 1024M (13 456 MiB before it;
-read on production 2026-09-28, ADR-0221 amendment 2). The 2026-09-13
+read on production 2026-09-28, ADR-0221 amendment 2). ADR-0388's session store and its exporter
+add 544 MiB: app 10 816 MiB + monitoring 4240 MiB = **15 056 MiB (14.70 GiB)** declared, and the
+20 Quadlet units sum to **14 512 MiB**. The owner's acceptance of that sum under rule 7 is part of
+the cut-over (#3493). The 2026-09-13
 figure of 4368 MiB monitoring still counted `cadvisor` (128M) and the docker-socket proxy (32M),
 both removed 2026-09-22. CPU quotas total 17.0 vCPU on 8 physical (overcommit is intended).
 

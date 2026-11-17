@@ -56,7 +56,7 @@ tests:
               phase: reconcile
             exp_annotations:
               summary: "Exchange registry mirror write failed (reconcile)"
-              description: "The backend could not write the exchange registry mirror to Redis (reconcile). A failed pre_commit write refused an admin's restriction; switched_off means a start with APP_EXCHANGE_MIRROR_ENABLED=false could not switch off a registry document left in Redis, so the gateway may still admit clients on it until the next successful start; any other phase leaves the mirror behind the database until the 60-second reconcile succeeds. Check Redis and the basetool-backend ACL user's ~exchange:* grant (REQ-XCH-003)."
+              description: "The backend could not write the exchange registry mirror to redis-shared (reconcile). A failed pre_commit write refused an admin's restriction; switched_off means a start with APP_EXCHANGE_MIRROR_ENABLED=false could not switch off a registry document left in redis-shared, so the gateway may still admit clients on it until the next successful start; any other phase leaves the mirror behind the database until the 60-second reconcile succeeds. Check redis-shared (RedisDown, RedisMemoryHigh) and the basetool-backend ACL user's ~exchange:* grant (REQ-XCH-003)."
 
   - name: fires - a start with the mirror off could not switch off a document left behind
     interval: 1m
@@ -72,7 +72,7 @@ tests:
               phase: switched_off
             exp_annotations:
               summary: "Exchange registry mirror write failed (switched_off)"
-              description: "The backend could not write the exchange registry mirror to Redis (switched_off). A failed pre_commit write refused an admin's restriction; switched_off means a start with APP_EXCHANGE_MIRROR_ENABLED=false could not switch off a registry document left in Redis, so the gateway may still admit clients on it until the next successful start; any other phase leaves the mirror behind the database until the 60-second reconcile succeeds. Check Redis and the basetool-backend ACL user's ~exchange:* grant (REQ-XCH-003)."
+              description: "The backend could not write the exchange registry mirror to redis-shared (switched_off). A failed pre_commit write refused an admin's restriction; switched_off means a start with APP_EXCHANGE_MIRROR_ENABLED=false could not switch off a registry document left in redis-shared, so the gateway may still admit clients on it until the next successful start; any other phase leaves the mirror behind the database until the 60-second reconcile succeeds. Check redis-shared (RedisDown, RedisMemoryHigh) and the basetool-backend ACL user's ~exchange:* grant (REQ-XCH-003)."
       - eval_time: 20m
         alertname: ExchangeMirrorWriteFailed
         exp_alerts: []

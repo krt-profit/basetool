@@ -188,33 +188,36 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Every dev-profile service: the two databases, the sandbox Keycloak, Redis, the backend, the
-   * frontend and the ingest gateway (ADR-0225); the edge and its ACME client are prod-profile only.
+   * Every dev-profile service: the two databases, the sandbox Keycloak, the two Redis instances,
+   * the backend, the frontend and the ingest gateway (ADR-0225, ADR-0388); the edge and its ACME
+   * client are prod-profile only.
    */
   private static final List<String> SERVICES =
       List.of(
           "db-backend-dev",
           "db-keycloak-dev",
           "keycloak-dev",
-          "redis-dev",
+          "redis-session-dev",
+          "redis-shared-dev",
           "backend-dev",
           "frontend-dev",
           "ingest-dev");
 
   /**
    * The host ports the dev-profile services publish: Keycloak, frontend, backend, ingest, the two
-   * databases and Redis.
+   * databases, the shared Redis and the session store.
    */
   private static final List<Integer> STACK_PORTS =
-      List.of(18080, 18081, 11261, 11262, 15432, 15433, 6379);
+      List.of(18080, 18081, 11261, 11262, 15432, 15433, 6379, 6380);
 
   /**
-   * The services whose images are pulled from a registry: the two databases and Redis. The
-   * applications and the sandbox Keycloak are built from this checkout and tagged with {@link
-   * #imageTag()}, so {@code docker compose pull} of them would fail against the registry.
+   * The services whose images are pulled from a registry: the two databases and the two Redis
+   * instances. The applications and the sandbox Keycloak are built from this checkout and tagged
+   * with {@link #imageTag()}, so {@code docker compose pull} of them would fail against the
+   * registry.
    */
   private static final List<String> PULLED_SERVICES =
-      List.of("db-backend-dev", "db-keycloak-dev", "redis-dev");
+      List.of("db-backend-dev", "db-keycloak-dev", "redis-session-dev", "redis-shared-dev");
 
   /**
    * The services whose images are built from this checkout. Each build runs Gradle with a 2 GiB
@@ -744,6 +747,10 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("KC_BOOTSTRAP_ADMIN_PASSWORD", KEYCLOAK_ADMIN_PASSWORD);
     env.put("KEYCLOAK_ADMIN_CLIENT_SECRET", "e2e-client-secret-do-not-use-in-prod");
     env.put("KEYCLOAK_FRONTEND_CLIENT_SECRET", FRONTEND_CLIENT_SECRET);
+    env.put("REDIS_SESSION_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_SESSION_PASSWORD"));
+    env.put(
+        "REDIS_SESSION_FRONTEND_PASSWORD",
+        RedisAclTemplate.E2E_PASSWORDS.get("REDIS_SESSION_FRONTEND_PASSWORD"));
     env.put("REDIS_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_PASSWORD"));
     env.put("REDIS_FRONTEND_USERNAME", RedisAclTemplate.FRONTEND_USER);
     env.put(

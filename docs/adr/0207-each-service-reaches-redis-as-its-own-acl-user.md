@@ -1,6 +1,6 @@
 # ADR-0207 — Each service reaches Redis as its own ACL user
 
-- **Status:** Accepted — shipped inert; rolled out on production 2026-09-25 (steps 2–5, `default` off); two exchange key families added by [ADR-0221](0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md) (epic #2078); the ingest user's commands amended by [ADR-0389](0389-the-ingest-gateway-runs-no-lua-in-redis.md)
+- **Status:** Accepted — shipped inert; rolled out on production 2026-09-25 (steps 2–5, `default` off); two exchange key families added by [ADR-0221](0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md) (epic #2078); the ingest user's commands amended by [ADR-0389](0389-the-ingest-gateway-runs-no-lua-in-redis.md); the users split across two instances, each with its own ACL file, by [ADR-0388](0388-the-session-store-gets-a-redis-the-ingest-gateway-cannot-reach.md)
 - **Date:** 2026-09-23
 - **Deciders:** @greluc
 - **Requirement:** [REQ-SEC-068](../specs/security-and-access.md)

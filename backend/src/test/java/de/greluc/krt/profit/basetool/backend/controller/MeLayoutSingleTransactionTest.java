@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.app.web.MeController;
@@ -107,7 +108,7 @@ class MeLayoutSingleTransactionTest {
   }
 
   @Test
-  void theTabFlagsCostTheSameStatementsWhateverTheNumberOfAcceptingUnits() {
+  void theTabFlagsCostTheSameStatementsWhateverTheNumberOfAcceptingUnits() throws Exception {
     Map<String, String> previous = enableSurfaces();
     List<UUID> units = new ArrayList<>();
     try {
@@ -125,7 +126,7 @@ class MeLayoutSingleTransactionTest {
       assertThat(capabilities.canViewPurchasingPartners()).isTrue();
       assertThat(capabilities.canViewPurchasingDelegates()).isTrue();
       assertThat(capabilities.canViewPurchasingReport()).isTrue();
-      assertThat(withFour).isEqualTo(withOne);
+      assertThat(withFour).isPositive().isEqualTo(withOne);
     } finally {
       units.forEach(id -> jdbcTemplate.update("DELETE FROM org_unit WHERE id = ?", id));
       restoreSettings(previous);
@@ -150,12 +151,8 @@ class MeLayoutSingleTransactionTest {
     }
   }
 
-  private long statementsOfOneLayoutRead() {
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
-    stats.clear();
-    meController.getLayout(jwt, userId);
-    return stats.getPrepareStatementCount();
+  private long statementsOfOneLayoutRead() throws Exception {
+    return preparedBy(() -> meController.getLayout(jwt, userId));
   }
 
   private void signInAsAdmin() {
