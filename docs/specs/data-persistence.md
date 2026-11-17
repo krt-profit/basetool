@@ -1890,7 +1890,8 @@ references. The open hangar and template views hear of the change through live s
 
 The survivor takes the Wiki identity of the merged row when it has none, or when the merged row's
 Wiki UUID is the P4K GUID the survivor holds once the caller's run is through, and the UEX identity
-when it has none. Both rows are kept as JSON in `ship_type_redirect`. The merged id stays
+when it has none. Both rows are kept as JSON in `ship_type_redirect`, with the merged row's UEX
+vehicle id when the survivor kept its own (REQ-DATA-043). The merged id stays
 resolvable through `findById`, `existsById`, `findAllById` and `getReferenceById` of
 `ShipTypeRepository`. The exchange resolves it as a `bt` reference and names journal entries by it;
 the append-only journal keeps the merged id. A row holding a P4K GUID is merged away only when its
@@ -1914,7 +1915,8 @@ sync finds a row that holds another listing of the same fetch, one of the two ke
 A listing that keeps the row takes it over; the other listing then finds its own row by its own
 name. A listing that does not is a **secondary listing**: it writes nothing and creates no row. So
 is a listing no step places whose `name` or `name_full`, carried by another listing too, is the
-name of a row holding such a listing. A secondary listing is no rejected write: it neither marks
+name of a row holding such a listing, and a listing no step places whose id a ship-type merge left
+behind (REQ-DATA-042), such as the edition 48 Constellation Phoenix Emerald merged into the Phoenix. A secondary listing is no rejected write: it neither marks
 the census incomplete nor suppresses the orphan sweep (REQ-DATA-035). A row holding a UEX id a
 partial fetch did not list is still not written.
 

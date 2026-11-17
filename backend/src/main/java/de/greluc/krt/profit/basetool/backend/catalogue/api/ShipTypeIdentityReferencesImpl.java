@@ -98,4 +98,15 @@ public class ShipTypeIdentityReferencesImpl implements ShipTypeIdentityReference
     }
     return Map.copyOf(redirects);
   }
+
+  @Override
+  public boolean isMergedUexVehicleId(int uexVehicleId) {
+    return !entityManager
+        .createQuery(
+            "SELECT r.id FROM ShipTypeRedirect r WHERE r.uexVehicleId = :uexVehicleId", UUID.class)
+        .setParameter("uexVehicleId", uexVehicleId)
+        .setMaxResults(1)
+        .getResultList()
+        .isEmpty();
+  }
 }

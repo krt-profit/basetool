@@ -61,11 +61,11 @@ import org.springframework.util.StringUtils;
  * (REQ-DATA-043): the vehicle takes the row over when its game UUID alone confirms the row's P4K
  * GUID, or when its name is the row's name and the other listing's is not; otherwise it is a
  * secondary listing, which writes nothing and creates no row. So is a vehicle no step places whose
- * shared name is the name of a row holding another listing of that name. A found row that holds an
- * unfetched UEX vehicle id of a partial fetch, or another game UUID, is not written; a game UUID
- * several UEX vehicles carry is no evidence either way. A row found by its own UEX vehicle id whose
- * game UUID is its P4K GUID keeps that UUID, and a differing UEX one is reported as a disagreement
- * (REQ-DATA-041).
+ * shared name is the name of a row holding another listing of that name, or whose id a ship-type
+ * merge left behind (REQ-DATA-042). A found row that holds an unfetched UEX vehicle id of a partial
+ * fetch, or another game UUID, is not written; a game UUID several UEX vehicles carry is no
+ * evidence either way. A row found by its own UEX vehicle id whose game UUID is its P4K GUID keeps
+ * that UUID, and a differing UEX one is reported as a disagreement (REQ-DATA-041).
  *
  * <p>On a row with a P4K GUID the manufacturer, cargo, maximum crew and mass are written only while
  * empty; a differing UEX value is reported as {@link SyncEventType#P4K_DISAGREEMENT} (REQ-P4K-031).
@@ -210,7 +210,8 @@ public class UexVehicleService {
       existingOpt = findByUniqueName(dto, census);
     }
     if (existingOpt.isEmpty()
-        && listings.isSecondary(dto, shipTypeRepository::findByNameIgnoreCase)) {
+        && (listings.isSecondary(dto, shipTypeRepository::findByNameIgnoreCase)
+            || shipTypeRepository.isMergedUexVehicleId(dto.id()))) {
       return VehicleOutcome.SECONDARY;
     }
 

@@ -75,4 +75,13 @@ public interface ShipTypeIdentityReferences {
    */
   @NotNull
   Map<UUID, UUID> findLocalIdRedirects(@NotNull Collection<UUID> ids);
+
+  /**
+   * Tells whether a merged ship type held a UEX vehicle id the ship type that stays did not take,
+   * which makes that UEX listing a second listing of the ship (REQ-DATA-043).
+   *
+   * @param uexVehicleId the UEX vehicle id
+   * @return whether a merge left the id behind
+   */
+  boolean isMergedUexVehicleId(int uexVehicleId);
 }

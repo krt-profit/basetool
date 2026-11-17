@@ -93,7 +93,12 @@ class ShipTypeMergeService {
     shipTypes.flush();
     identity.giveTo(survivor, survivorGuid);
     shipTypes.saveAndFlush(survivor);
-    redirects.alias(retiredId, survivorId, snapshot);
+    Integer leftUex = identity.uexVehicleId();
+    redirects.alias(
+        retiredId,
+        survivorId,
+        snapshot,
+        leftUex == null || leftUex.equals(survivor.getUexVehicleId()) ? null : leftUex);
     auditRecorder.record(
         AuditEventType.CATALOGUE_SHIP_TYPE_MERGED,
         survivorId,

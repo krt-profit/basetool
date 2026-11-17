@@ -94,6 +94,24 @@ class ShipTypeMergeServiceTest {
   }
 
   @Test
+  void aUexIdTheSurvivorDoesNotTakeIsKeptAsAMergedListing() {
+    ShipType survivor = shipType("Aegis Retaliator", UUID.randomUUID(), null);
+    survivor.setUexVehicleId(TWIN_UEX_ID + 1);
+    survivor = ships.saveAndFlush(survivor);
+    ShipType twin = ships.saveAndFlush(wikiTwin("Retaliator", null));
+
+    merges.merge(
+        twin.getId(),
+        survivor.getId(),
+        survivor.getP4kUuid(),
+        ShipTypeMergeReason.WIKI_UUID_IS_P4K_GUID);
+    entityManager.flush();
+
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID)).isTrue();
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID + 1)).isFalse();
+  }
+
+  @Test
   void aRowHoldingAP4kGuidIsNeverMergedAway() {
     ShipType survivor = ships.saveAndFlush(shipType("Aegis Idris-M", UUID.randomUUID(), null));
     ShipType stamped = ships.saveAndFlush(shipType("Idris-M", UUID.randomUUID(), null));

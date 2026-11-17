@@ -21,12 +21,15 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kClosedSet;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipPlayability;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,16 +39,18 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 /**
  * Merges a second ship type of a game ship into the row of its P4K record (REQ-P4K-053). A row
  * without a P4K GUID is merged into the unretired row whose GUID is its Wiki UUID; else into the
  * single row holding a same-name record of its own record's variant group; else into the single row
  * whose name is its Wiki in-game name or, for a row only UEX wrote, its UEX full name. A row whose
- * GUID left a complete catalogue is merged into the row holding the record that succeeds it. The
- * twins are found before the run decides which rows move to their base or successor (REQ-P4K-051),
- * since a twin's identity would block such a move, and are merged once it has: a row that moves
- * keeps its own Wiki identity.
+ * GUID left a complete catalogue is merged into the row holding the record that succeeds it, and a
+ * row whose record a {@code _GS} record of the same in-game name supersedes into the row holding
+ * that record. The twins are found before the run decides which rows move to their base or
+ * successor (REQ-P4K-051), since a twin's identity would block such a move, and are merged once it
+ * has: a row that moves keeps its own Wiki identity.
  */
 @Component
 @RequiredArgsConstructor
@@ -60,7 +65,8 @@ class P4kShipTwins {
    * @param ships the catalogue's ships
    * @param shipsComplete whether the ships kind is complete, the only case a GUID can be departed
    * @param retiring the ship types this run retires (REQ-P4K-052); none of them takes a twin
-   * @return the twins, each with the row it is merged into
+   * @return the twins, each with the row it ends up merged into: a twin of a row that is itself a
+   *     twin is merged into that row's survivor
    */
   @NotNull
   List<Twin> find(
@@ -70,17 +76,38 @@ class P4kShipTwins {
       @NotNull Set<UUID> retiring) {
     Catalogue catalogue = Catalogue.of(ships, shipsComplete);
     Holders holders = Holders.of(stored, retiring);
-    List<Twin> twins = new ArrayList<>();
+    Map<UUID, Twin> byRow = new LinkedHashMap<>();
     for (ShipType row : stored) {
       Twin twin =
           row.getP4kUuid() == null
               ? copyOf(row, catalogue, holders)
-              : departed(row, catalogue, holders, retiring);
+              : successorOf(row, catalogue, holders, retiring);
       if (twin != null) {
-        twins.add(twin);
+        byRow.put(Objects.requireNonNull(row.getId()), twin);
       }
     }
+    List<Twin> twins = new ArrayList<>();
+    byRow.values().forEach(twin -> twins.add(finalSurvivor(twin, byRow)));
     return List.copyOf(twins);
+  }
+
+  /**
+   * Follows a twin's survivor while the survivor is itself a twin.
+   *
+   * @param twin the twin
+   * @param byRow the twins by the id of the row merged away
+   * @return the twin pointed at the row that stays at the end
+   */
+  @NotNull
+  private static Twin finalSurvivor(@NotNull Twin twin, @NotNull Map<UUID, Twin> byRow) {
+    Twin result = twin;
+    Set<UUID> seen = new HashSet<>();
+    Twin next = byRow.get(result.survivor().getId());
+    while (next != null && seen.add(Objects.requireNonNull(next.row().getId()))) {
+      result = new Twin(twin.row(), next.survivor(), next.record(), twin.reason());
+      next = byRow.get(next.survivor().getId());
+    }
+    return result;
   }
 
   /**
@@ -240,39 +267,170 @@ class P4kShipTwins {
   }
 
   /**
-   * Finds the row a ship type whose GUID left a complete catalogue is merged into: the row holding
-   * the single player base that carries one of its names.
+   * Finds the row a ship type holding a GUID is merged into: for a GUID that left a complete
+   * catalogue, the row holding the single player base that carries one of its names; for a listed
+   * GUID a {@code _GS} record supersedes, the row holding that record.
    *
    * @param row the ship type
    * @param catalogue the catalogue's ships
    * @param holders the rows holding a GUID
    * @param retiring the ship types this run retires
-   * @return the twin, or {@code null} when the GUID is listed or no other row holds the successor
+   * @return the twin, or {@code null} when no other row holds the successor
    */
   @Nullable
-  private static Twin departed(
+  private static Twin successorOf(
       @NotNull ShipType row,
       @NotNull Catalogue catalogue,
       @NotNull Holders holders,
       @NotNull Set<UUID> retiring) {
     UUID guid = row.getP4kUuid();
-    if (!catalogue.complete()
-        || guid == null
-        || catalogue.lists(guid)
+    if (guid == null
         || row.isHidden()
         || row.getP4kHiddenAt() != null
         || retiring.contains(row.getId())) {
       return null;
     }
-    P4kShipDto successor = P4kShipIdentityMoves.successorRecord(row, catalogue.players());
-    if (successor == null) {
+    if (catalogue.lists(guid)) {
+      return into(
+          row,
+          catalogue.superseded().get(guid),
+          holders.byGuid(),
+          ShipTypeMergeReason.SUPERSEDED_BY_GS_RECORD);
+    }
+    if (!catalogue.complete()) {
       return null;
     }
-    UUID successorGuid = successor.parsedGuid();
-    ShipType survivor = successorGuid == null ? null : holders.byGuid().get(successorGuid);
-    return survivor == null || Objects.equals(survivor.getId(), row.getId())
+    P4kShipDto base = P4kShipIdentityMoves.successorRecord(row, catalogue.players());
+    if (base != null) {
+      return into(row, base, holders.byGuid(), ShipTypeMergeReason.DEPARTED_FOR_HELD_SUCCESSOR);
+    }
+    P4kShipDto named = catalogue.namedPlayer(row);
+    if (named != null) {
+      return into(row, named, holders.byGuid(), ShipTypeMergeReason.DEPARTED_FOR_HELD_SUCCESSOR);
+    }
+    return editionOf(row, catalogue, holders);
+  }
+
+  /**
+   * Finds the row a vanished edition of a ship is merged into: its class name extends the class
+   * name of a player base, or of that base's {@code _GS} record, by a suffix, and one of its names
+   * begins with that base's in-game name. The row holding the base, or moving to it in this run,
+   * takes it.
+   *
+   * @param row the ship type whose GUID left a complete catalogue
+   * @param catalogue the catalogue's ships
+   * @param holders the rows holding a GUID
+   * @return the twin, or {@code null} when the row is no edition of a ship that has a row
+   */
+  @Nullable
+  private static Twin editionOf(
+      @NotNull ShipType row, @NotNull Catalogue catalogue, @NotNull Holders holders) {
+    P4kShipDto base = catalogue.editionBase(row.getClassName());
+    String baseName = base == null ? null : P4kMatchKeys.fold(base.nameEn());
+    UUID baseGuid = base == null ? null : base.parsedGuid();
+    if (base == null
+        || baseName == null
+        || baseName.isEmpty()
+        || baseGuid == null
+        || namesOf(row).stream().noneMatch(name -> name.startsWith(baseName + " "))) {
+      return null;
+    }
+    Map<UUID, ShipType> holding = new HashMap<>(holders.byGuid());
+    if (!holding.containsKey(baseGuid)) {
+      ShipType heir = heirOf(base, row, catalogue, holders);
+      if (heir != null) {
+        holding.put(baseGuid, heir);
+      }
+    }
+    return into(row, base, holding, ShipTypeMergeReason.EDITION_OF_BASE);
+  }
+
+  /**
+   * Finds the single other row whose GUID left the catalogue and that moves to a base no row holds
+   * yet (REQ-P4K-051).
+   *
+   * @param base the base
+   * @param row the row asking
+   * @param catalogue the catalogue's ships
+   * @param holders the rows holding a GUID
+   * @return the row moving to the base, or {@code null} when none or several do
+   */
+  @Nullable
+  private static ShipType heirOf(
+      @NotNull P4kShipDto base,
+      @NotNull ShipType row,
+      @NotNull Catalogue catalogue,
+      @NotNull Holders holders) {
+    UUID baseGuid = base.parsedGuid();
+    List<ShipType> heirs = new ArrayList<>();
+    for (Map.Entry<UUID, ShipType> holder : holders.byGuid().entrySet()) {
+      ShipType other = holder.getValue();
+      P4kShipDto successor =
+          catalogue.lists(holder.getKey())
+              ? null
+              : P4kShipIdentityMoves.successorRecord(other, catalogue.players());
+      if (!Objects.equals(other.getId(), row.getId())
+          && successor != null
+          && Objects.equals(successor.parsedGuid(), baseGuid)) {
+        heirs.add(other);
+      }
+    }
+    return heirs.size() == 1 ? heirs.getFirst() : null;
+  }
+
+  /**
+   * Builds the twin of a row and the row holding a record.
+   *
+   * @param row the twin
+   * @param record the record the survivor holds, or {@code null}
+   * @param holding the rows holding a GUID, by GUID
+   * @param reason the evidence
+   * @return the twin, or {@code null} when no other row holds the record
+   */
+  @Nullable
+  private static Twin into(
+      @NotNull ShipType row,
+      @Nullable P4kShipDto record,
+      @NotNull Map<UUID, ShipType> holding,
+      @NotNull ShipTypeMergeReason reason) {
+    UUID guid = record == null ? null : record.parsedGuid();
+    ShipType survivor = guid == null ? null : holding.get(guid);
+    return record == null || survivor == null || Objects.equals(survivor.getId(), row.getId())
         ? null
-        : new Twin(row, survivor, successor, ShipTypeMergeReason.DEPARTED_FOR_HELD_SUCCESSOR);
+        : new Twin(row, survivor, record, reason);
+  }
+
+  /**
+   * Returns the folded names of a ship type: its name, UEX full name and Wiki in-game name.
+   *
+   * @param row the ship type
+   * @return the distinct non-empty folded names
+   */
+  @NotNull
+  private static Set<String> namesOf(@NotNull ShipType row) {
+    Set<String> names = new HashSet<>();
+    for (String name :
+        List.of(
+            nullToEmpty(row.getName()),
+            nullToEmpty(row.getNameFull()),
+            nullToEmpty(row.getGameName()))) {
+      String folded = P4kMatchKeys.fold(name);
+      if (folded != null && !folded.isEmpty()) {
+        names.add(folded);
+      }
+    }
+    return names;
+  }
+
+  /**
+   * Replaces a missing name by an empty one.
+   *
+   * @param name the name, or {@code null}
+   * @return the name, or an empty string
+   */
+  @NotNull
+  private static String nullToEmpty(@Nullable String name) {
+    return name == null ? "" : name;
   }
 
   /**
@@ -295,12 +453,16 @@ class P4kShipTwins {
    * @param byGuid the records by GUID
    * @param byClass the records by folded class name
    * @param players the player bases by folded in-game name, empty for a partial ships kind
+   * @param allPlayers the player records, variants included, by folded in-game name
+   * @param superseded the {@code _GS} records by the GUID of the record they supersede
    * @param complete whether the ships kind is complete
    */
   private record Catalogue(
       @NotNull Map<UUID, List<P4kShipDto>> byGuid,
       @NotNull Map<String, List<P4kShipDto>> byClass,
       @NotNull Map<String, List<P4kShipDto>> players,
+      @NotNull Map<String, List<P4kShipDto>> allPlayers,
+      @NotNull Map<UUID, P4kShipDto> superseded,
       boolean complete) {
 
     /**
@@ -314,6 +476,7 @@ class P4kShipTwins {
     static Catalogue of(@NotNull List<P4kShipDto> ships, boolean complete) {
       Map<UUID, List<P4kShipDto>> byGuid = new HashMap<>();
       Map<String, List<P4kShipDto>> byClass = new HashMap<>();
+      Map<String, List<P4kShipDto>> allPlayers = new HashMap<>();
       for (P4kShipDto ship : ships) {
         UUID guid = ship.parsedGuid();
         if (guid != null) {
@@ -323,10 +486,87 @@ class P4kShipTwins {
         if (className != null && !className.isEmpty()) {
           byClass.computeIfAbsent(className, _ -> new ArrayList<>()).add(ship);
         }
+        String name = P4kMatchKeys.fold(ship.nameEn());
+        if (name != null && !name.isEmpty() && isPlayer(ship)) {
+          allPlayers.computeIfAbsent(name, _ -> new ArrayList<>()).add(ship);
+        }
       }
       Map<String, List<P4kShipDto>> players =
           complete ? P4kShipIdentityMoves.playersByName(byGuid) : Map.of();
-      return new Catalogue(byGuid, byClass, players, complete);
+      return new Catalogue(
+          byGuid, byClass, players, allPlayers, P4kShipGoldStandard.supersededBy(ships), complete);
+    }
+
+    /**
+     * Returns the single player record, a variant or not, whose in-game name is one of a ship
+     * type's names.
+     *
+     * @param row the ship type
+     * @return the record, or {@code null} when none or several carry its names
+     */
+    @Nullable
+    P4kShipDto namedPlayer(@NotNull ShipType row) {
+      Map<UUID, P4kShipDto> found = new HashMap<>();
+      for (String name : namesOf(row)) {
+        for (P4kShipDto record : allPlayers.getOrDefault(name, List.of())) {
+          UUID guid = record.parsedGuid();
+          if (guid != null) {
+            found.putIfAbsent(guid, record);
+          }
+        }
+      }
+      return found.size() == 1 ? found.values().iterator().next() : null;
+    }
+
+    /**
+     * Returns the player base whose class name, or whose {@code _GS} record's class name, an
+     * edition's class name extends by a suffix; the longest such class name wins.
+     *
+     * @param className the edition's class name, or {@code null}
+     * @return the base, its {@code _GS} record when it has one, or {@code null}
+     */
+    @Nullable
+    P4kShipDto editionBase(@Nullable String className) {
+      String key = P4kMatchKeys.fold(className);
+      if (key == null) {
+        return null;
+      }
+      for (int cut = key.lastIndexOf('_'); cut > 0; cut = key.lastIndexOf('_', cut - 1)) {
+        String prefix = key.substring(0, cut);
+        P4kShipDto base = playerBase(prefix + "_GS");
+        if (base == null) {
+          base = playerBase(prefix);
+        }
+        if (base != null) {
+          return base;
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Returns the single player base of a folded class name.
+     *
+     * @param key the folded class name
+     * @return the record, or {@code null} when absent, repeated, a variant or no player ship
+     */
+    @Nullable
+    private P4kShipDto playerBase(@NotNull String key) {
+      P4kShipDto record = P4kShipIdentityMoves.sole(byClass.get(key));
+      return record != null && !StringUtils.hasText(record.variantOf()) && isPlayer(record)
+          ? record
+          : null;
+    }
+
+    /**
+     * Tells whether a player can own a record's ship.
+     *
+     * @param record the record
+     * @return whether its playability is {@code player}
+     */
+    private static boolean isPlayer(@NotNull P4kShipDto record) {
+      return P4kClosedSet.parse(P4kShipPlayability.class, record.playability())
+          == P4kShipPlayability.PLAYER;
     }
 
     /**

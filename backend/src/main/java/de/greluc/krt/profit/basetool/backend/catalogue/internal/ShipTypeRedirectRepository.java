@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -53,20 +54,23 @@ public interface ShipTypeRedirectRepository extends JpaRepository<ShipTypeRedire
    * @param retiredId the ship type merged away
    * @param survivorId the ship type that stays
    * @param snapshot both rows as JSON, from {@link #snapshot}
+   * @param uexVehicleId the merged ship type's UEX vehicle id the survivor did not take, or {@code
+   *     null}
    * @return the number of aliases written
    */
   @Modifying(flushAutomatically = true)
   @Query(
       value =
           """
-          INSERT INTO ship_type_redirect (id, canonical_id, retired_snapshot)
-          VALUES (:retiredId, :survivorId, CAST(:snapshot AS jsonb))
+          INSERT INTO ship_type_redirect (id, canonical_id, retired_snapshot, uex_vehicle_id)
+          VALUES (:retiredId, :survivorId, CAST(:snapshot AS jsonb), :uexVehicleId)
           """,
       nativeQuery = true)
   int alias(
       @Param("retiredId") UUID retiredId,
       @Param("survivorId") UUID survivorId,
-      @Param("snapshot") String snapshot);
+      @Param("snapshot") String snapshot,
+      @Param("uexVehicleId") @Nullable Integer uexVehicleId);
 
   /**
    * Points the aliases of a ship type being merged away at the one that stays, so every alias
