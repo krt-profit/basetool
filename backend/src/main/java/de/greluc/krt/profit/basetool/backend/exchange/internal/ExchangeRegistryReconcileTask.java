@@ -32,8 +32,12 @@ import org.springframework.stereotype.Component;
 
 /**
  * Rewrites the exchange registry's Redis mirror at startup and reconciles it on a fixed delay,
- * repairing the revocation mirror alongside (REQ-XCH-003, REQ-XCH-008); active only while the
- * mirror is enabled.
+ * repairing the revocation mirror first (REQ-XCH-003, REQ-XCH-008); active only while the mirror is
+ * enabled.
+ *
+ * <p>The registry is written only after the revocations were repaired, so an emptied Redis never
+ * holds a registry that admits a client without the deny list and revocations it must enforce; a
+ * failed repair leaves the gateway on {@code 503 REGISTRY_UNAVAILABLE} until the next run.
  */
 @Component
 @ConditionalOnProperty(prefix = "app.exchange.mirror", name = "enabled", havingValue = "true")
@@ -45,20 +49,28 @@ public class ExchangeRegistryReconcileTask {
   private final ExchangeRevocationSync revocationSync;
   private final TaskMetrics taskMetrics;
 
-  /** Writes the mirror once the application is ready; a failure is left to the reconcile. */
+  /**
+   * Repairs the revocations and then writes the registry once the application is ready; a failed
+   * repair skips the registry write, and either failure is left to the reconcile.
+   */
   @EventListener(ApplicationReadyEvent.class)
   public void writeOnStartup() {
-    mirrorSync.resyncQuietly(ExchangeMirrorPhase.STARTUP);
     try {
       revocationSync.repair();
     } catch (RuntimeException e) {
-      log.warn("Exchange revocation mirror repair at startup failed: {}", e.toString());
+      log.warn(
+          "Exchange revocation mirror repair at startup failed; the registry waits for the"
+              + " reconcile: {}",
+          e.toString());
+      return;
     }
+    mirrorSync.resyncQuietly(ExchangeMirrorPhase.STARTUP);
   }
 
   /**
-   * Compares the mirror with the database and rewrites it on a difference, recorded as the {@code
-   * exchange_registry_reconcile} job.
+   * Repairs the revocation mirror, then compares the registry mirror with the database and rewrites
+   * it on a difference, recorded as the {@code exchange_registry_reconcile} job; a failed repair
+   * fails the run before the registry is touched.
    */
   @Scheduled(
       fixedDelayString = "${app.exchange.mirror.reconcile-interval:PT60S}",
@@ -67,12 +79,12 @@ public class ExchangeRegistryReconcileTask {
     taskMetrics.record(
         ScheduledJob.EXCHANGE_REGISTRY_RECONCILE,
         () -> {
-          if (mirrorSync.resync(ExchangeMirrorPhase.RECONCILE)) {
-            log.warn("Exchange registry mirror diverged from the database and was rewritten");
-          }
           int repaired = revocationSync.repair();
           if (repaired > 0) {
             log.warn("Exchange revocation mirror lacked {} entries and was repaired", repaired);
+          }
+          if (mirrorSync.resync(ExchangeMirrorPhase.RECONCILE)) {
+            log.warn("Exchange registry mirror diverged from the database and was rewritten");
           }
         });
   }

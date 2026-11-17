@@ -37,13 +37,16 @@
     - render-redis-acl.py
     - mint-internal-tls.sh
 
-- name: Install the Redis ACL rules template
+- name: Install the Redis ACL rules templates
   ansible.builtin.copy:
-    src: "{{ basetool_host_scripts_src }}/redis-users.acl.tmpl"
-    dest: "{{ basetool_host_release_dir }}/scripts/redis-users.acl.tmpl"
+    src: "{{ basetool_host_scripts_src }}/{{ item }}"
+    dest: "{{ basetool_host_release_dir }}/scripts/{{ item }}"
     owner: root
     group: root
     mode: "0644"
+  loop:
+    - redis-session-users.acl.tmpl
+    - redis-shared-users.acl.tmpl
 
 - name: Install the systemd units and their timers
   ansible.builtin.copy:

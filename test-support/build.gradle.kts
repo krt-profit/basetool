@@ -26,7 +26,8 @@ tasks.named<Test>("test") {
   inputs
     .files(
       layout.settingsDirectory.file("docker-compose.yml"),
-      layout.settingsDirectory.file("quadlet/systemd/redis.container"),
+      layout.settingsDirectory.file("quadlet/systemd/redis-session.container"),
+      layout.settingsDirectory.file("quadlet/systemd/redis-shared.container"),
       layout.settingsDirectory.file("quadlet/systemd/db-backend.container"),
       layout.settingsDirectory.file("backend/src/test/resources/application-test.yml"),
     )

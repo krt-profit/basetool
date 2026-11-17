@@ -43,7 +43,7 @@ tests:
               reason: client_suspended
             exp_annotations:
               summary: "Backend exchange gate refusing (client_suspended)"
-              description: "The backend's ExchangeGate has been refusing exchange requests the gateway let through for 15 minutes (client_suspended). The gateway checks the same registry first, so a sustained backend refusal means the two disagree: a stale gateway cache, a mirror that is behind the database (see ExchangeMirrorWriteFailed), or a gateway that no longer relays capabilities or the connection time. Members' clients get the gateway's own code for the reason meanwhile (CLIENT_SUSPENDED, SCOPE_MISSING, CLIENT_REVOKED ...); under revocations_unreadable the backend cannot read the Redis revocation mirror and answers 503 REGISTRY_UNAVAILABLE."
+              description: "The backend's ExchangeGate has been refusing exchange requests the gateway let through for 15 minutes (client_suspended). The gateway checks the same registry first, so a sustained backend refusal means the two disagree: a stale gateway cache, a mirror that is behind the database (see ExchangeMirrorWriteFailed), or a gateway that no longer relays capabilities or the connection time. Members' clients get the gateway's own code for the reason meanwhile (CLIENT_SUSPENDED, SCOPE_MISSING, CLIENT_REVOKED ...); under revocations_unreadable the backend cannot read the revocation mirror in redis-shared and answers 503 REGISTRY_UNAVAILABLE."
 
   - name: silent - a single refusal during a suspension race
     interval: 1m
