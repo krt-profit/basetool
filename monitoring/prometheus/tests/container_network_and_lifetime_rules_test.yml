@@ -9,7 +9,7 @@ tests:
     input_series:
       - series: 'podman_container_info{id="03d4ed33ec21",name="edge",image="ghcr.io/x@sha256:a",pod_id="",pod_name="",ports=""}'
         values: "1x10"
-      - series: 'podman_container_info{id="28fc90dfa123",name="redis",image="docker.io/redis@sha256:b",pod_id="",pod_name="",ports=""}'
+      - series: 'podman_container_info{id="28fc90dfa123",name="redis-session",image="docker.io/redis@sha256:b",pod_id="",pod_name="",ports=""}'
         values: "1x10"
       - series: 'podman_container_net_input_total{id="03d4ed33ec21",pod_id="",pod_name=""}'
         values: "0+1000x10"
@@ -35,7 +35,7 @@ tests:
         exp_samples:
           - labels: 'basetool:container:start_time_seconds{name="edge"}'
             value: 1000
-          - labels: 'basetool:container:start_time_seconds{name="redis"}'
+          - labels: 'basetool:container:start_time_seconds{name="redis-session"}'
             value: 1000
 
   - name: podman - a counter with no matching info series is dropped, not emitted unlabelled
