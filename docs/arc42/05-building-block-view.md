@@ -552,8 +552,10 @@ identity Prometheus sends (ADR-0265, REQ-OBS-005). Rules, dashboards and probes:
 `catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply,
 purchasing and the Materialbörse update only their own references and emit their own audit/live
 events. The catalogue archives both original item/price/stat sets in `game_item_redirect` before
-retiring the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical
-ids have a separate reference seam for bulk reads. The same six modules answer
+retiring the duplicate. `UexItemTwins` and `UexItemTwinMerger` hand it the rows a second UEX
+listing of an item created, and the redirect keeps that listing's UEX item id (REQ-DATA-044).
+Repository identity lookups resolve retained ids, while preloaded canonical ids have a separate
+reference seam for bulk reads. The same six modules answer
 `catalogue.api.GameItemReferenceParticipant`, so the P4K import hides a seeded item only when no
 member row references it (REQ-P4K-056).
 

@@ -34,6 +34,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.jetbrains.annotations.Nullable;
 
 /** Preserves a retired local catalogue id as a direct alias of the surviving item. */
 @Entity
@@ -56,4 +57,12 @@ public class GameItemRedirect extends AbstractEntity<UUID> {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "retired_snapshot", nullable = false, columnDefinition = "jsonb")
   private String retiredSnapshot;
+
+  /**
+   * The UEX item id of a second UEX listing merged into the surviving item, which the UEX item sync
+   * then skips (REQ-DATA-044); {@code null} when the retired row's listing moved onto the survivor.
+   */
+  @Column(name = "uex_item_id")
+  @Nullable
+  private Integer uexItemId;
 }
