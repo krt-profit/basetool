@@ -70,6 +70,9 @@ class P4kShopTerminalLinkTest {
   /** The place name every test row uses. */
   private static final String CITY = "Krt Area18";
 
+  /** The registry name of a pharmacy, which UEX lists as a "Medical Shop". */
+  private static final String PHARMACY_REGISTRY = "Pharmacy_Krt_Area18";
+
   /** The UEX and game name of the test outpost. */
   private static final String OUTPOST_NAME = "Krt Shubin Outpost";
 
@@ -316,7 +319,7 @@ class P4kShopTerminalLinkTest {
     Terminal pharmacy = terminal("Medical Shop - Krt Area18");
     ObjectNode shop =
         P4kShopFixtures.withItems(
-            P4kShopFixtures.shop(KEY, "Pharmacy_Krt_Area18", AREA18), P4kShopFixtures.HEAVY_ARMOUR);
+            P4kShopFixtures.shop(KEY, PHARMACY_REGISTRY, AREA18), P4kShopFixtures.HEAVY_ARMOUR);
 
     runs.apply(catalogue(shop), false);
 
