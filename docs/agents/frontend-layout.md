@@ -8,7 +8,8 @@ The Java code is packaged by domain: a new controller, view row or view helper g
 `frontend.<domain>.web`, a DTO mirror, form or view model into `frontend.<domain>.model`, the
 domain's backend calls into `frontend.<domain>.client`. Cross-cutting code goes into the kernel
 package of its concern — `kernel.backend` (the backend seam, relays, caches), `kernel.security`,
-`kernel.session`, `kernel.layout`, `kernel.web` (error handling, binding, request contexts, template
+`kernel.session`, `kernel.redis` (the connection to the shared Redis), `kernel.layout`, `kernel.web`
+(error handling, binding, request contexts, template
 beans), `kernel.livesync`, `kernel.observability`, `kernel.model` (shared types and the reference
 DTOs several domains share). Nothing else exists: `DomainPackageLayoutTest` fails on a main class
 outside these packages.

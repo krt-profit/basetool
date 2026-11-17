@@ -1,9 +1,11 @@
 # ADR-0388 — The session store gets a Redis the ingest gateway cannot reach
 
-- **Status:** Proposed
+- **Status:** Accepted — the frontend holds its two connections; the second instance, its
+  operations and the cut-over follow (#3493)
 - **Date:** 2026-11-16
 - **Deciders:** @greluc
-- **Related:** [REQ-SEC-068](../specs/security-and-access.md), [REQ-OPS-018](../specs/deployment-delivery.md),
+- **Related:** [REQ-SEC-089](../specs/security-and-access.md),
+  [REQ-SEC-068](../specs/security-and-access.md), [REQ-OPS-018](../specs/deployment-delivery.md),
   [REQ-OPS-010](../specs/backup-recovery.md), [REQ-XCH-008](../specs/external-exchange.md),
   [REQ-XCH-023](../specs/external-exchange.md) ·
   [ADR-0079](0079-redis-session-store-aof-and-maxmemory-noeviction.md),
@@ -70,10 +72,14 @@ We will run two Redis instances, cut along the services that reach them:
    `GETDEL` on `ingest:handoff:*` and the two live-sync channels. It keeps AOF `everysec` and
    `noeviction`, because an evicted revocation re-opens access, and is sized for the exchange budget
    and the handoff quotas.
-3. **The frontend holds two connections.** Spring Session gets its own connection factory
-   (`@SpringSessionRedisConnectionFactory`) to `redis-session`; live sync and the handoff pickup use
-   `redis-shared`. Only `redis-session` is in the frontend's readiness group and in its `Requires=`;
-   `ingest` requires `redis-shared`; the backend stays without a Redis dependency at start.
+3. **The frontend holds two connections.** The auto-configured one (`spring.data.redis.*`) is
+   `redis-session`: Spring Session, the session gauge and the readiness probe use it. Live sync and
+   the handoff pickup use a second connection to `redis-shared` (`app.shared-redis.*`,
+   `SharedRedis`), which is deliberately not a `RedisConnectionFactory` bean: a second bean of that
+   type switches Spring Boot's connection auto-configuration off and lets an unqualified injection
+   pick either store. Only `redis-session` is in the frontend's readiness group and in its
+   `Requires=`; `ingest` requires `redis-shared`; the backend stays without a Redis dependency at
+   start.
 4. **Each instance has its own ACL template and file**, rendered by `render-redis-acl.py` with
    exactly one `default` line, `off`, and its own `admin` password. Both files are in the backup set;
    the data of both stays out of it (REQ-OPS-010).

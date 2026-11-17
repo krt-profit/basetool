@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
+import de.greluc.krt.profit.basetool.frontend.kernel.redis.SharedRedis;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -31,8 +32,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -54,7 +53,7 @@ public class LiveSyncRedisConfig {
    * Builds the Redis fan-out bean, taking the handler through an {@link ObjectProvider} to break
    * the construction cycle between the two.
    *
-   * @param redisTemplate the auto-configured string Redis template
+   * @param sharedRedis the connection to the shared Redis the fan-out publishes on (ADR-0388)
    * @param handlerProvider lazy provider of the relay handler
    * @param meterRegistry registry the fan-out counters bind to
    * @param liveSyncProperties the live-sync settings supplying the channel name
@@ -64,7 +63,7 @@ public class LiveSyncRedisConfig {
   @NotNull
   @Bean
   public RedisLiveSyncFanout redisLiveSyncFanout(
-      StringRedisTemplate redisTemplate,
+      SharedRedis sharedRedis,
       ObjectProvider<LiveSyncWebSocketHandler> handlerProvider,
       MeterRegistry meterRegistry,
       LiveSyncProperties liveSyncProperties,
@@ -76,7 +75,7 @@ public class LiveSyncRedisConfig {
         liveSyncProperties.redis().presenceChannel(),
         instanceId);
     return new RedisLiveSyncFanout(
-        redisTemplate,
+        sharedRedis.template(),
         handlerProvider,
         meterRegistry,
         catalogueCacheEviction,
@@ -110,7 +109,7 @@ public class LiveSyncRedisConfig {
    * Subscribes the Redis fan-out to both the {@code changed} relay channel (ADR-0094) and the
    * editor-presence channel (ADR-0126), dispatching on {@link #liveSyncRedisListenerExecutor()}.
    *
-   * @param connectionFactory the auto-configured Redis connection factory
+   * @param sharedRedis the connection to the shared Redis the channels live on (ADR-0388)
    * @param fanout the Redis fan-out (also the message listener for both channels)
    * @param listenerExecutor the bounded dispatch executor, qualified by bean name
    * @return the message-listener container
@@ -118,11 +117,11 @@ public class LiveSyncRedisConfig {
   @NotNull
   @Bean
   public RedisMessageListenerContainer liveSyncRedisMessageListenerContainer(
-      RedisConnectionFactory connectionFactory,
+      SharedRedis sharedRedis,
       RedisLiveSyncFanout fanout,
       @Qualifier("liveSyncRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor) {
     RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-    container.setConnectionFactory(connectionFactory);
+    container.setConnectionFactory(sharedRedis.connectionFactory());
     container.setTaskExecutor(listenerExecutor);
     container.addMessageListener(fanout, new ChannelTopic(fanout.channel()));
     container.addMessageListener(fanout, new ChannelTopic(fanout.presenceChannel()));

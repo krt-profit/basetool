@@ -97,6 +97,11 @@ app:
       enabled: ${APP_LIVESYNC_REDIS_ENABLED:true}
       channel: ${APP_LIVESYNC_REDIS_CHANNEL:basetool:livesync:changed}
       presence-channel: ${APP_LIVESYNC_REDIS_PRESENCE_CHANNEL:basetool:livesync:presence}
+  shared-redis:
+    host: ${REDIS_SHARED_HOST:localhost}
+    port: ${REDIS_SHARED_PORT:6379}
+    username: ${REDIS_SHARED_USERNAME:}
+    password: ${REDIS_SHARED_PASSWORD:}
   session:
     anonymous-timeout: ${APP_SESSION_ANONYMOUS_TIMEOUT:30m}
     authenticated-timeout: ${APP_SESSION_AUTHENTICATED_TIMEOUT:720h}
