@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
@@ -32,15 +33,11 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
-import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,7 +71,6 @@ class MaterialExchangeBoardNoNPlusOneTest {
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private LocationRepository locationRepository;
-  @Autowired private EntityManagerFactory entityManagerFactory;
 
   private final List<Object> created = new ArrayList<>();
 
@@ -95,44 +91,41 @@ class MaterialExchangeBoardNoNPlusOneTest {
   }
 
   @Test
-  void theBoardAndAnOffersDetailStayStatementBoundedWhateverTheOffers() {
+  void theBoardAndAnOffersDetailStayStatementBoundedWhateverTheOffers() throws Exception {
     List<MaterialExchangeOffer> few = seed(FEW);
     List<MaterialExchangeOffer> many = seed(MANY);
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
 
-    long fewBoard = boardStatements(stats, few);
-    long manyBoard = boardStatements(stats, many);
+    long fewBoard = boardStatements(few);
+    long manyBoard = boardStatements(many);
     assertThat(manyBoard)
         .as("board statements for " + MANY + " offers against " + FEW + " (N+1)")
+        .isPositive()
         .isEqualTo(fewBoard)
         .isLessThanOrEqualTo(STATEMENT_BOUND);
 
     signInAs(many.getFirst().getOwner());
-    stats.clear();
-    var detail = boardService.detail(many.getFirst().getId());
-    assertThat(detail.material()).isNotNull();
-    assertThat(detail.amount()).isEqualTo(4.0);
-    assertThat(stats.getPrepareStatementCount())
+    var detail = measured(() -> boardService.detail(many.getFirst().getId()));
+    assertThat(detail.result().material()).isNotNull();
+    assertThat(detail.result().amount()).isEqualTo(4.0);
+    assertThat(detail.statements())
         .as("detail statements")
+        .isPositive()
         .isLessThanOrEqualTo(STATEMENT_BOUND);
   }
 
-  private long boardStatements(Statistics stats, List<MaterialExchangeOffer> offers) {
+  private long boardStatements(List<MaterialExchangeOffer> offers) throws Exception {
     signInAs(offers.getFirst().getOwner());
-    stats.clear();
-    PageResponse<MaterialExchangeOfferDto> board =
-        boardService.board("mein", null, null, null, null, 0, 50, false);
-    long statements = stats.getPrepareStatementCount();
-    assertThat(board.content()).hasSize(offers.size());
-    assertThat(board.content())
+    var board = measured(() -> boardService.board("mein", null, null, null, null, 0, 50, false));
+    List<MaterialExchangeOfferDto> content = board.result().content();
+    assertThat(content).hasSize(offers.size());
+    assertThat(content)
         .allSatisfy(dto -> {
           assertThat(dto.material()).isNotNull();
           assertThat(dto.quality()).isEqualTo(500);
           assertThat(dto.amount()).isEqualTo(4.0);
           assertThat(dto.availableAmount()).isEqualTo(10.0);
         });
-    return statements;
+    return board.statements();
   }
 
   private void signInAs(User user) {
