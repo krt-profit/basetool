@@ -45,19 +45,18 @@ import sys
 src, dst = sys.argv[1], sys.argv[2]
 body = open(src, encoding="utf-8").read().split(chr(10))
 
-out = []
+out = ["lego_stub() { :; }"]
 for line in body:
-    stripped = line.strip()
-    if "/lego " in stripped:
-        out.append(line[:len(line) - len(line.lstrip())] + ": # lego stubbed out")
-    elif stripped.startswith("sleep "):
+    if line.strip().startswith("sleep "):
         out.append(line[:len(line) - len(line.lstrip())] + "exit 0")
     else:
-        out.append(line)
+        out.append(line.replace("/lego ", "lego_stub "))
 
 script = chr(10).join(out)
 if "ACME_HOSTS" not in script:
     sys.exit("FAIL: the extracted script never mentions ACME_HOSTS")
+if script.count("lego_stub ") < 2:
+    sys.exit("FAIL: the extracted script no longer calls /lego migrate and /lego run")
 open(dst, "w", newline="\n", encoding="utf-8").write(script + "\n")
 print(f"==> extracted {len(out)} lines of the acme command")
 PY
