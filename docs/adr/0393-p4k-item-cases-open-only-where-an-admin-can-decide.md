@@ -79,3 +79,10 @@ modules answer through a new observer SPI, `GameItemReferenceParticipant`, which
 holding member item references implement next to their `GameItemReassignmentParticipant`. The SC
 exchange journal is not asked: a hidden item still resolves by id, so hiding breaks no journal
 entry.
+
+## Amendment — an item every source dropped leaves the pickers (REQ-P4K-057)
+
+597 visible items had no P4K GUID, a Wiki deletion stamp and no live UEX id: 528 ship records an
+older Wiki served as items and 69 debris and AI templates. The pickers offered them beside the real
+ship names. Such an item is now not selectable, the same way a retired one is not, and selectable
+again once a source lists it.

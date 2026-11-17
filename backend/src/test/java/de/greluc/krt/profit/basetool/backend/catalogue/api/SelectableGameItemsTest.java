@@ -116,6 +116,31 @@ class SelectableGameItemsTest {
     assertThat(lookup.requireSelectable(item)).isSameAs(item);
   }
 
+  @Test
+  void anItemEverySourceDroppedIsRefused() {
+    GameItem item = item();
+    item.setScwikiDeletedAt(Instant.now());
+    item.setUexItemId(4711);
+    item.setUexDeletedAt(Instant.now());
+
+    assertThat(item.isWithoutSource()).isTrue();
+    assertThatThrownBy(() -> lookup.requireSelectable(item))
+        .isInstanceOf(RetiredGameItemException.class);
+  }
+
+  @Test
+  void anItemTheWikiDroppedStaysSelectableWhileTheP4kOrUexListsIt() {
+    GameItem p4k = item();
+    p4k.setScwikiDeletedAt(Instant.now());
+    p4k.setP4kUuid(UUID.randomUUID());
+    GameItem uex = item();
+    uex.setScwikiDeletedAt(Instant.now());
+    uex.setUexItemId(4712);
+
+    assertThat(lookup.requireSelectable(p4k)).isSameAs(p4k);
+    assertThat(lookup.requireSelectable(uex)).isSameAs(uex);
+  }
+
   private static GameItem item() {
     GameItem item = new GameItem();
     item.setId(UUID.randomUUID());
