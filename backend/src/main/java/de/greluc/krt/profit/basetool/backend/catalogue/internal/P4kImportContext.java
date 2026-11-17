@@ -111,6 +111,9 @@ public final class P4kImportContext {
   /** The GUID that claimed each row in this run, per kind. */
   private final Map<P4kKind, Map<UUID, UUID>> claims = new EnumMap<>(P4kKind.class);
 
+  /** The seeded rows this run retires before matching (REQ-P4K-052), per kind. */
+  private final Map<P4kKind, Set<UUID>> retired = new EnumMap<>(P4kKind.class);
+
   /** The rows the run matched or created, per kind and P4K GUID. */
   private final Map<P4kKind, Map<UUID, P4kKeyedRow>> stamped = new EnumMap<>(P4kKind.class);
 
@@ -217,6 +220,28 @@ public final class P4kImportContext {
    */
   public boolean isRepeatedName(@NotNull P4kKind kind, @Nullable String name) {
     return isIn(repeatedNames, kind, name);
+  }
+
+  /**
+   * Records a seeded row this run retires, so matching neither stamps it nor reviews it
+   * (REQ-P4K-052); a preview records it too, so it reports what the APPLY does.
+   *
+   * @param kind the kind
+   * @param rowId the row
+   */
+  public void retire(@NotNull P4kKind kind, @NotNull UUID rowId) {
+    retired.computeIfAbsent(kind, _ -> new HashSet<>()).add(rowId);
+  }
+
+  /**
+   * Whether this run retires a row.
+   *
+   * @param kind the kind
+   * @param rowId the row, or {@code null} before it is saved
+   * @return {@code true} when {@link #retire} recorded it
+   */
+  public boolean isRetired(@NotNull P4kKind kind, @Nullable UUID rowId) {
+    return rowId != null && retired.getOrDefault(kind, Set.of()).contains(rowId);
   }
 
   /**

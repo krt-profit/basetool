@@ -75,6 +75,7 @@ public class P4kShipReconciler {
   private final P4kManufacturerReconciler manufacturerReconciler;
   private final P4kShipClassAliases classAliases;
   private final P4kRunResolvedCases resolvedCases;
+  private final P4kSeededShipRetirement seededRetirement;
 
   /**
    * Reconciles every ship, then the variant groups and the store slugs; the manufacturers must be
@@ -90,9 +91,10 @@ public class P4kShipReconciler {
       @NotNull P4kLoadoutReconciler.LoadoutStream loadouts,
       @NotNull P4kImportContext context) {
     List<ShipType> all = shipTypeRepository.findAll();
+    Set<UUID> retired = seededRetirement.retire(all, catalogue.ships(), context);
     Map<String, List<ShipType>> aliased = classAliases.byClassName(all);
     List<P4kShipBaseRepairs.Repair> repairs =
-        baseRepairs.eligible(catalogue, loadouts, all, aliased, context);
+        baseRepairs.eligible(catalogue, loadouts, all, aliased, retired, context);
     Set<UUID> repairRows =
         repairs.stream()
             .map(repair -> Objects.requireNonNull(repair.row().getId()))

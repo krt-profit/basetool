@@ -311,7 +311,8 @@ created row has `source_systems = P4K`, and a created ship needs a name no ship 
 
 No row created by an earlier `seedNew` run is deleted or soft-deleted automatically, for any kind:
 members may reference it in inventory, hangar or orders. Where the current seeding rule of its kind
-would not create such a row, it goes on the review list and the admins decide (REQ-P4K-016).
+would not create such a row, it goes on the review list and the admins decide (REQ-P4K-016); a
+ship type nothing references retires itself instead (REQ-P4K-052).
 
 **Acceptance**
 
@@ -1337,6 +1338,30 @@ finds the GUID listed.
 
 **Enforced by:** `P4kShipIdentityMovesTest`, `P4kShipIdentityFollowImportTest` · **Code:**
 `P4kShipIdentityMoves`, `P4kShipBaseRepairs` · **ADR:**
+[ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
+
+### REQ-P4K-052 — a seeded NPC ship type nothing references retires itself
+
+An earlier seeding created ship types for records that are NPC ships (`ai`) or mission targets
+(`mission`), which no rule creates any more (REQ-P4K-009). Before it matches, an APPLY retires each
+such ship type that no module references. The modules are asked through
+`ShipTypeReferenceParticipant`: hangar ships, mission units, mission template units, journaled
+exchange ship states and the items the catalogue links to a vehicle. A retired ship type is hidden
+as by an admin's hide (REQ-P4K-016) and gives its in-game name up for its record's class name,
+unless another ship type already carries that class name. The ship it copies can then take the
+name. Matching leaves it alone and opens no `SEEDED_NOT_CREATABLE` case for it, now or in a later
+run. A referenced one stays a case (REQ-P4K-010). The report lists the hide and the rename as
+`CHANGED`; a preview reports them and writes nothing.
+
+**Acceptance**
+
+- [x] An unreferenced seeded NPC ship type is hidden, renamed to its class name and opens no case,
+  also in the next APPLY.
+- [x] A seeded NPC ship type a hangar ship, an exchange journal entry or an item references stays
+  visible and opens a case.
+
+**Enforced by:** `P4kSeededShipRetirementImportTest` · **Code:** `P4kSeededShipRetirement`,
+`ShipTypeReferenceParticipant` and its implementations · **ADR:**
 [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
 
 ## Game texts
