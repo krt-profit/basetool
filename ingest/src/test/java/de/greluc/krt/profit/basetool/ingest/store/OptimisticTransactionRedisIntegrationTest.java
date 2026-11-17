@@ -125,7 +125,8 @@ class OptimisticTransactionRedisIntegrationTest {
             template,
             List.of(COUNTER),
             () -> {
-              long read = Long.parseLong(String.valueOf(template.opsForValue().get(COUNTER)));
+              Long read = StoredNumbers.parse(template.opsForValue().get(COUNTER));
+              assertThat(read).as("the counter holds a number").isNotNull();
               if (attempts.incrementAndGet() == 1) {
                 observer.opsForValue().set(COUNTER, "5");
               }
