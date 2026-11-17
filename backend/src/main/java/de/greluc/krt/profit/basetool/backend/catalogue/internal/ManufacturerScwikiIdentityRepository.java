@@ -56,6 +56,17 @@ public interface ManufacturerScwikiIdentityRepository
   List<IdentityRef> findIdentityRefs();
 
   /**
+   * The Wiki name of every identity with the id of its manufacturer, in one query, for the UEX twin
+   * rule (REQ-DATA-045).
+   *
+   * @return one pair per identity
+   */
+  @Query(
+      "SELECT i.manufacturer.id AS manufacturerId, i.wikiName AS wikiName"
+          + " FROM ManufacturerScwikiIdentity i")
+  List<WikiNameRef> findWikiNameRefs();
+
+  /**
    * Every identity of a manufacturer that has more than one, with its manufacturer, ordered by
    * manufacturer name and Wiki name.
    *
@@ -105,5 +116,23 @@ public interface ManufacturerScwikiIdentityRepository
      * @return the manufacturer id
      */
     UUID getManufacturerId();
+  }
+
+  /** A Wiki name with the id of the manufacturer its identity belongs to. */
+  interface WikiNameRef {
+
+    /**
+     * Returns the id of the manufacturer the identity belongs to.
+     *
+     * @return the manufacturer id
+     */
+    UUID getManufacturerId();
+
+    /**
+     * Returns the Wiki's own name for the identity.
+     *
+     * @return the Wiki name
+     */
+    String getWikiName();
   }
 }

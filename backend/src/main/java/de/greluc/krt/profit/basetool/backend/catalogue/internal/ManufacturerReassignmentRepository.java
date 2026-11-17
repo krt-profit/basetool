@@ -50,6 +50,7 @@ interface ManufacturerReassignmentRepository extends Repository<Manufacturer, UU
    *
    * @param retiredId the retired manufacturer id
    * @param survivorId the surviving manufacturer id
+   * @return the number of game items changed
    */
   @Modifying(flushAutomatically = true)
   @Query(
@@ -65,13 +66,14 @@ interface ManufacturerReassignmentRepository extends Repository<Manufacturer, UU
           WHERE manufacturer_id = :retiredId OR p4k_manufacturer_id = :retiredId
           """,
       nativeQuery = true)
-  void repointItems(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
+  int repointItems(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
 
   /**
    * Reassigns the manufacturer of each affected ship type and increments its version.
    *
    * @param retiredId the retired manufacturer id
    * @param survivorId the surviving manufacturer id
+   * @return the number of ship types changed
    */
   @Modifying(flushAutomatically = true)
   @Query(
@@ -82,7 +84,7 @@ interface ManufacturerReassignmentRepository extends Repository<Manufacturer, UU
           WHERE manufacturer_id = :retiredId
           """,
       nativeQuery = true)
-  void repointShips(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
+  int repointShips(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
 
   /** A manufacturer id and version read while locking the row. */
   interface LockedRow {

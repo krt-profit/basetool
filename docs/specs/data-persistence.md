@@ -243,6 +243,8 @@ Consequences that must hold:
   identity (this is what keeps the result ping-pong-free across runs). A row still unclaimed
   (`uex_company_id IS NULL`, a legacy hand-seeded / P4K-only row) is adopted as canonical by the
   first matching UEX company.
+- A company that no alias, name or code places joins the row holding a P4K GUID its name names,
+  and a row UEX created beside such a row is merged into it (REQ-DATA-045).
 - Any lookup of a manufacturer by abbreviation must be duplicate-tolerant (deterministic
   `findFirst … ORDER BY created_at`), never a bare `Optional` derived query that would throw
   `IncorrectResultSizeDataAccessException` once a P4K- or hand-seeded row shares a code.
@@ -1923,3 +1925,50 @@ partial fetch did not list is still not written.
 - [x] A second listing of a shared name creates no row (`UexVehicleServiceUuidMatchTest`).
 
 **Code:** `UexVehicleService`, `UexVehicleListings` · **ADR:** ADR-0392
+
+### REQ-DATA-045 — a manufacturer UEX names differently merges into its P4K row
+
+UEX names some brands differently from the game files, so the UEX manufacturer sync created a
+second row beside the row holding the P4K GUID: "Musashi Industrial and Starflight Concern" beside
+"Musashi Industrial & Starflight Concern", "Vanduul Clans" beside "Vanduul", `Grey&apos;s Market`
+beside "Grey's Market". Items and ship types then split between the two rows (REQ-DATA-004 merges
+only companies of one UEX name or code).
+
+A row is a **UEX twin** of a row holding a P4K GUID when it holds a UEX company and no P4K GUID, no
+SC Wiki UUID, no Wiki identity and no reviewed P4K alias, and its folded name names exactly one row
+holding a P4K GUID: that row's folded name, or the folded Wiki name of one of that row's Wiki
+identities. Folding decodes HTML entities (`&apos;`, `&amp;`), reads `&` as "and", turns every run
+of characters that are neither letters nor digits into one blank and ignores case. A name that
+names two such rows names none.
+
+- After the upsert loop of a sync whose company fetch was complete and in which every company
+  carried its id and name, every twin is merged into the row it names, each in its own transaction
+  that reads the rule again first. The merge is the one an admin confirms for a review case
+  (REQ-P4K-016), without a case: items (both manufacturer roles), ship types, P4K aliases, UEX
+  companies and Wiki identities move to the row holding the P4K GUID, which takes the twin's UEX
+  company as its own when it holds none or a higher one; open review cases naming the twin follow
+  it; the twin is deleted. The twin's UEX company id stays mapped to the surviving row in
+  `manufacturer_uex_company`, so the next sync resolves the company to it. A merge that fails is
+  logged and tried again by the next sync.
+- A company that no alias, name or code places and whose name names a row holding a P4K GUID by
+  the same rule joins that row instead of creating a twin.
+- Each merge records `CATALOGUE_MANUFACTURER_MERGED` (REQ-AUDIT-001), actor `system`, subject the
+  surviving row, with the merged row's id, the evidence (`NAME` or `WIKI_NAME`), the UEX company id
+  and the number of moved items and ship types.
+
+**Acceptance**
+
+- [x] Over the production rows the rule finds exactly the twelve twins and no near miss ("Crusader
+  Security", "Garrity Arms", "Stegman's", "United Planets Of Earth" …); a row holding another
+  identity is no twin; a name two rows carry names none (`ManufacturerUexTwinsTest`).
+- [x] A twin merges with its item, ship-type and UEX references and is audited, and a second sync
+  creates no row; a new company naming a P4K row joins it (`ManufacturerUexTwinSyncIntegrationTest`).
+- [x] A partial fetch or a company without id merges nothing; a company placed by name never asks
+  the rule (`UexManufacturerServiceTest`).
+- [x] An admin's review-case merge still moves the references and leaves the applied case alone
+  (`P4kManufacturerPrecedenceTest`).
+
+**Enforced by:** `ManufacturerUexTwinsTest`, `ManufacturerUexTwinSyncIntegrationTest`,
+`UexManufacturerServiceTest` · **Code:** `ManufacturerUexTwins`, `ManufacturerUexTwinService`,
+`ManufacturerReviewMerge`, `UexManufacturerService` · **ADR:**
+[ADR-0394](../adr/0394-the-p4k-import-resolves-manufacturer-families-and-borrowed-names-itself.md)
