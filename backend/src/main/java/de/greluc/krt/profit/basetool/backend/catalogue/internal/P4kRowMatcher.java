@@ -298,7 +298,9 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       return new Held<>();
     }
     if (seeded.test(row) && !creatable) {
-      report.review(kind, record, guid, P4kReviewReason.SEEDED_NOT_CREATABLE, row.getId());
+      if (row.getP4kHiddenAt() == null && !context.isRetired(kind, row.getId())) {
+        report.review(kind, record, guid, P4kReviewReason.SEEDED_NOT_CREATABLE, row.getId());
+      }
       return new Held<>();
     }
     UUID wiki = wikiUuid.apply(row);

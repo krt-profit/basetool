@@ -422,6 +422,23 @@ class ExchangeResolveServiceTest {
   }
 
   @Test
+  void theIdOfAMergedShipTypeResolvesToTheOneItWasMergedInto() {
+    ShipType survivor = shipType("Aegis Idris-M", "AEGS_Idris_M");
+    UUID merged = UUID.randomUUID();
+    when(shipTypeRepository.findAll()).thenReturn(List.of(survivor));
+    when(shipTypeRepository.findLocalIdRedirects(List.of(merged)))
+        .thenReturn(Map.of(merged, survivor.getId()));
+
+    Result result =
+        only(
+            resolve(
+                ExchangeCatalogKind.SHIP_TYPE,
+                new ExchangeItemRef(null, merged.toString(), null, null, null, null, null, null)));
+
+    assertThat(result.ref().bt()).isEqualTo(survivor.getId().toString());
+  }
+
+  @Test
   void aShipP4kGuidResolvesBeforeTheName() {
     ShipType titan = shipType("Avenger Titan", "AEGS_Avenger_Titan");
     titan.setP4kUuid(UUID.randomUUID());

@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -63,6 +64,7 @@ class P4kShipBaseRepairs {
    * @param loadouts the repeatable stream of its loadouts
    * @param ships the current stored ship types
    * @param aliases the current UEX class aliases and their ship rows
+   * @param retiring the ship types this run retires, which hold no identity a repair must respect
    * @param context the run after item and manufacturer reconciliation
    * @return the repairs eligible in this run
    */
@@ -72,6 +74,7 @@ class P4kShipBaseRepairs {
       @NotNull P4kLoadoutReconciler.LoadoutStream loadouts,
       @NotNull List<ShipType> ships,
       @NotNull Map<String, List<ShipType>> aliases,
+      @NotNull Set<UUID> retiring,
       @NotNull P4kImportContext context) {
     if (!catalogue.head().isComplete(P4kKind.SHIP)
         || !catalogue.head().isComplete(P4kCatalogue.PAINTS)
@@ -88,9 +91,10 @@ class P4kShipBaseRepairs {
         byGuid.computeIfAbsent(guid, _ -> new ArrayList<>()).add(record);
       }
     }
+    Predicate<ShipType> retired = row -> row.isP4kRetired() || retiring.contains(row.getId());
     List<Repair> proposed = new ArrayList<>();
     for (P4kReviewCase selection : cases.findByShipRepairRowIdIsNotNull()) {
-      Repair repair = eligibleSelection(selection, rows, byGuid, context);
+      Repair repair = eligibleSelection(selection, rows, byGuid, retired, context);
       if (repair != null) {
         proposed.add(repair);
       }
@@ -101,13 +105,15 @@ class P4kShipBaseRepairs {
             .collect(Collectors.toUnmodifiableSet());
     for (P4kShipIdentityMoves.Move move :
         P4kShipIdentityMoves.find(byGuid, true, ships, selected)) {
-      if (isValidBase(move.row(), move.base(), move.baseGuid(), move.variant(), rows, context)) {
+      if (isValidBase(
+          move.row(), move.base(), move.baseGuid(), move.variant(), rows, retired, context)) {
         proposed.add(new Repair(null, move.row(), move.base(), move.baseGuid()));
       }
     }
     List<Repair> candidates =
         proposed.stream()
-            .filter(repair -> ownsProjectedIdentity(repair, catalogue.ships(), ships, aliases))
+            .filter(
+                repair -> ownsProjectedIdentity(repair, catalogue.ships(), ships, aliases, retired))
             .filter(repair -> paintsResolve(catalogue, repair.base(), context))
             .toList();
     if (candidates.isEmpty()) {
@@ -128,6 +134,7 @@ class P4kShipBaseRepairs {
    * @param selection the pending choice
    * @param rows the stored ships by local id
    * @param byGuid the incoming ships by P4K GUID
+   * @param retired whether a stored ship type is out of the game or retired by this run
    * @param context the run
    * @return the approved base input, or null while proof is missing
    */
@@ -136,6 +143,7 @@ class P4kShipBaseRepairs {
       @NotNull P4kReviewCase selection,
       @NotNull Map<UUID, ShipType> rows,
       @NotNull Map<UUID, List<P4kShipDto>> byGuid,
+      @NotNull Predicate<ShipType> retired,
       @NotNull P4kImportContext context) {
     UUID baseGuid = selection.getGuid();
     UUID oldGuid = selection.getShipRepairVariantGuid();
@@ -158,7 +166,7 @@ class P4kShipBaseRepairs {
         || !sameKey(selection.getShipRepairBaseClass(), base.className())
         || !sameKey(selection.getShipRepairVariantClass(), variant.className())
         || !baseGuid.equals(P4kGuids.parse(variant.variantOf()))
-        || !isValidBase(row, base, baseGuid, variant, rows, context)) {
+        || !isValidBase(row, base, baseGuid, variant, rows, retired, context)) {
       return null;
     }
     return new Repair(selection, row, base, baseGuid);
@@ -174,6 +182,7 @@ class P4kShipBaseRepairs {
    * @param baseGuid the base record's GUID
    * @param variant the variant the ship type holds, or {@code null} for a departed GUID
    * @param rows the stored ships by local id
+   * @param retired whether a stored ship type is out of the game or retired by this run
    * @param context the run
    * @return whether the ship type may move to the base
    */
@@ -183,6 +192,7 @@ class P4kShipBaseRepairs {
       @NotNull UUID baseGuid,
       @Nullable P4kShipDto variant,
       @NotNull Map<UUID, ShipType> rows,
+      @NotNull Predicate<ShipType> retired,
       @NotNull P4kImportContext context) {
     UUID rowId = row.getId();
     return !StringUtils.hasText(base.variantOf())
@@ -196,7 +206,7 @@ class P4kShipBaseRepairs {
         && rows.values().stream()
             .noneMatch(other ->
                 !Objects.equals(rowId, other.getId())
-                    && !other.isP4kRetired()
+                    && !retired.test(other)
                     && (baseGuid.equals(other.getP4kUuid())
                         || sameKey(base.className(), other.getClassName())
                         || sameKey(base.nameEn(), other.getName())))
@@ -210,13 +220,15 @@ class P4kShipBaseRepairs {
    * @param records the incoming ship records
    * @param ships the stored ship rows
    * @param aliases the UEX class aliases by normalized name
+   * @param retired whether a stored ship type is out of the game or retired by this run
    * @return whether any same-name variants can continue to resolve through the base
    */
   private static boolean ownsProjectedIdentity(
       @NotNull Repair repair,
       @NotNull List<P4kShipDto> records,
       @NotNull List<ShipType> ships,
-      @NotNull Map<String, List<ShipType>> aliases) {
+      @NotNull Map<String, List<ShipType>> aliases,
+      @NotNull Predicate<ShipType> retired) {
     P4kShipDto base = repair.base();
     UUID rowId = Objects.requireNonNull(repair.row().getId());
     UUID baseGuid = repair.baseGuid();
@@ -237,7 +249,7 @@ class P4kShipBaseRepairs {
           || ships.stream()
               .anyMatch(other ->
                   !rowId.equals(other.getId())
-                      && !other.isP4kRetired()
+                      && !retired.test(other)
                       && (guid.equals(other.getP4kUuid())
                           || guid.equals(other.getExternalUuid())
                           || sameKey(record.className(), other.getClassName())))) {

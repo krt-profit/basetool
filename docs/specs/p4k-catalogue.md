@@ -311,7 +311,8 @@ created row has `source_systems = P4K`, and a created ship needs a name no ship 
 
 No row created by an earlier `seedNew` run is deleted or soft-deleted automatically, for any kind:
 members may reference it in inventory, hangar or orders. Where the current seeding rule of its kind
-would not create such a row, it goes on the review list and the admins decide (REQ-P4K-016).
+would not create such a row, it goes on the review list and the admins decide (REQ-P4K-016); a
+ship type nothing references retires itself instead (REQ-P4K-052).
 
 **Acceptance**
 
@@ -1338,6 +1339,72 @@ finds the GUID listed.
 **Enforced by:** `P4kShipIdentityMovesTest`, `P4kShipIdentityFollowImportTest` · **Code:**
 `P4kShipIdentityMoves`, `P4kShipBaseRepairs` · **ADR:**
 [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
+
+### REQ-P4K-052 — a seeded NPC ship type nothing references retires itself
+
+An earlier seeding created ship types for records that are NPC ships (`ai`) or mission targets
+(`mission`), which no rule creates any more (REQ-P4K-009). Before it matches, an APPLY retires each
+such ship type that no module references. The modules are asked through
+`ShipTypeReferenceParticipant`: hangar ships, mission units, mission template units, journaled
+exchange ship states and the items the catalogue links to a vehicle. A retired ship type is hidden
+as by an admin's hide (REQ-P4K-016) and gives its in-game name up for its record's class name,
+unless another ship type already carries that class name. The ship it copies can then take the
+name. Matching leaves it alone and opens no `SEEDED_NOT_CREATABLE` case for it, now or in a later
+run. A referenced one stays a case (REQ-P4K-010). The report lists the hide and the rename as
+`CHANGED`; a preview reports them and writes nothing.
+
+**Acceptance**
+
+- [x] An unreferenced seeded NPC ship type is hidden, renamed to its class name and opens no case,
+  also in the next APPLY.
+- [x] A seeded NPC ship type a hangar ship, an exchange journal entry or an item references stays
+  visible and opens a case.
+
+**Enforced by:** `P4kSeededShipRetirementImportTest` · **Code:** `P4kSeededShipRetirement`,
+`ShipTypeReferenceParticipant` and its implementations · **ADR:**
+[ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
+
+### REQ-P4K-053 — a second ship type of a record's ship is merged into the row of its GUID
+
+The Wiki and UEX create a ship type when their name steps find none, so a game ship can end up
+with a second row beside the one holding its P4K GUID. After retiring the seeded NPC ship types
+(REQ-P4K-052) and before it matches, an APPLY merges such a twin into the row of its ship through
+the ship-type merge (REQ-DATA-042). The row it is merged into holds a GUID the catalogue lists and
+is neither retired nor retiring. A row without a P4K GUID is a twin of, in this order:
+
+1. the row whose GUID is its Wiki UUID — the Wiki files a vehicle under the UUID the game gives the
+   record;
+2. else the single row holding a record of the same variant group and in-game name as its own
+   record, which its Wiki UUID or its class name names;
+3. else the single row whose name is its Wiki in-game name, also when that row's GUID left the
+   catalogue and it moves to a successor no other row holds.
+
+A row whose GUID left a complete catalogue is a twin of the row holding the record that succeeds it:
+the single player base carrying one of its names (REQ-P4K-051). Only this rule merges away a row
+holding a P4K GUID, whose record is gone; otherwise a P4K row is never merged away (REQ-P4K-007).
+
+The twins are set aside while the run decides which rows move to their base or successor
+(REQ-P4K-051), since a twin's identity would block such a move. When the row a twin is merged into
+moves, it keeps its own Wiki UUID. The report lists each merge as `MERGED`, with both names; a
+preview reports the merges, writes nothing, and matches without the merged rows as the APPLY does.
+
+**Acceptance**
+
+- [x] A Wiki row whose UUID is a stored row's GUID is merged into that row in an APPLY: its hangar
+  ships, mission units and linked items move, its id resolves to the survivor, and the survivor takes
+  the Wiki UUID.
+- [x] A Wiki row of the edition a row leaves for its base is merged, and the row keeps its own Wiki
+  UUID.
+- [x] A Wiki row of an edition, or a row carrying an edition's class, is merged into the row of its
+  base; so is a Wiki row whose in-game name is a row's name.
+- [x] A row whose record left is merged into the row of its successor, with its hangar ships and its
+  UEX vehicle id.
+- [x] A preview reports the merge as `MERGED` and changes no row.
+- [x] A second APPLY finds nothing to merge.
+
+**Enforced by:** `P4kShipTwinsImportTest`, `P4kShipTwinRulesImportTest` · **Code:** `P4kShipTwins`,
+`ShipTypeMergeService` ·
+**ADR:** [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
 
 ## Game texts
 

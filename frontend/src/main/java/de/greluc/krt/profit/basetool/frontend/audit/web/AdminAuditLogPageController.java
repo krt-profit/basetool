@@ -290,6 +290,7 @@ public class AdminAuditLogPageController {
                   "MISSION_OBJECTIVE_UPDATED",
                   "MISSION_OBJECTIVE_REMOVED",
                   "MISSION_OBJECTIVE_REORDERED",
+                  "MISSION_CATALOGUE_REASSIGNED",
                   "MISSION_AUDIT_EXPORTED",
                   "MISSION_AUDIT_PURGED")),
           Map.entry(
@@ -369,6 +370,7 @@ public class AdminAuditLogPageController {
                   "HANGAR_IMPORTED",
                   "HANGAR_FITTED_RESET",
                   "HANGAR_HOME_LOCATION_SET",
+                  "HANGAR_SHIP_CATALOGUE_REASSIGNED",
                   "HANGAR_AUDIT_EXPORTED",
                   "HANGAR_AUDIT_PURGED")),
           Map.entry(
@@ -499,6 +501,7 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED",
                   "CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED",
                   "CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED",
+                  "CATALOGUE_SHIP_TYPE_MERGED",
                   "CATALOGUE_LOCATION_CREATED",
                   "CATALOGUE_LOCATION_UPDATED",
                   "CATALOGUE_LOCATION_DELETED",

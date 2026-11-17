@@ -132,6 +132,14 @@ public class ExchangeEntryLabels {
     for (ShipType type : shipTypeRepository.findAllById(typeIds)) {
       types.put(type.getId(), type.getName());
     }
+    shipTypeRepository
+        .findLocalIdRedirects(typeIds)
+        .forEach((merged, survivor) -> {
+          String name = types.get(survivor);
+          if (name != null) {
+            types.put(merged, name);
+          }
+        });
     put(labels, materialOf, materials);
     put(labels, itemOf, items);
     put(labels, shipTypeOf, types);

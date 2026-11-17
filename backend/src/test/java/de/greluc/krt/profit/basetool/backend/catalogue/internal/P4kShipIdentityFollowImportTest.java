@@ -31,7 +31,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** A ship type's P4K identity follows the catalogue's base and successor (REQ-P4K-051). */
@@ -110,27 +109,8 @@ class P4kShipIdentityFollowImportTest {
     return ship;
   }
 
-  /**
-   * Builds the fixture with a player base and a same-name player edition of it; the base takes over
-   * the player ship's loadout.
-   */
+  /** Builds the fixture with a player base and a same-name player edition of it. */
   private static ObjectNode catalogue() {
-    ObjectNode root = P4kTestCatalogues.tree();
-    ObjectNode base = P4kTestCatalogues.record(root, "ships", P4kTestCatalogues.PLAYER_SHIP);
-    base.put("guid", BASE.toString()).put("className", BASE_CLASS).putNull("variantOf");
-    ((ObjectNode) base.get("name")).put("en", NAME);
-    ObjectNode edition = P4kTestCatalogues.record(root, "ships", P4kTestCatalogues.AI_SHIP);
-    edition
-        .put("guid", EDITION.toString())
-        .put("className", "TEST_Follow_Edition")
-        .put("playability", "player")
-        .put("variantOf", BASE.toString());
-    ((ObjectNode) edition.get("name")).put("en", NAME);
-    for (var node : (ArrayNode) root.get("loadouts")) {
-      if (P4kTestCatalogues.PLAYER_SHIP.toString().equals(node.get("entityGuid").asString())) {
-        ((ObjectNode) node).put("entityGuid", BASE.toString());
-      }
-    }
-    return root;
+    return P4kTestCatalogues.withEdition(BASE, BASE_CLASS, EDITION, "TEST_Follow_Edition", NAME);
   }
 }
