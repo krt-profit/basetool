@@ -1,0 +1,193 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.catalogue.internal;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import jakarta.persistence.EntityManager;
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Consumer;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * The twin rules besides the Wiki UUID: same variant group and name, Wiki in-game name, and a
+ * departed record whose successor has a row (REQ-P4K-053).
+ */
+@SpringBootTest
+@Transactional
+class P4kShipTwinRulesImportTest {
+
+  private static final UUID BASE = UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1f001");
+  private static final UUID EDITION = UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1f002");
+  private static final UUID DEPARTED = UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1f0ff");
+  private static final String BASE_CLASS = "TEST_Rules_Base";
+  private static final String EDITION_CLASS = "TEST_Rules_Edition";
+  private static final String NAME = "Rules Test Ship";
+  private static final int DEPARTED_UEX_ID = 990_101;
+
+  @Autowired private P4kImportService imports;
+  @Autowired private P4kImportJobRepository jobs;
+  @Autowired private P4kImportChangeRepository changes;
+  @Autowired private ShipTypeRepository ships;
+  @Autowired private EntityManager entityManager;
+  @Autowired private JdbcTemplate jdbc;
+
+  @Test
+  void aWikiRowOfAnEditionMergesIntoTheRowOfItsBase() {
+    assertMerged(
+        twin -> twin.setExternalUuid(EDITION), ShipTypeMergeReason.SAME_VARIANT_GROUP_AND_NAME);
+  }
+
+  @Test
+  void aRowCarryingAnEditionsClassMergesIntoTheRowOfItsBase() {
+    assertMerged(
+        twin -> twin.setClassName(EDITION_CLASS), ShipTypeMergeReason.SAME_VARIANT_GROUP_AND_NAME);
+  }
+
+  @Test
+  void aWikiRowWhoseInGameNameIsARowsNameMergesIntoIt() {
+    assertMerged(twin -> twin.setGameName(NAME), ShipTypeMergeReason.WIKI_GAME_NAME_IS_P4K_NAME);
+  }
+
+  @Test
+  void aRowWhoseRecordLeftMergesIntoTheRowOfItsSuccessor() {
+    ShipType survivor = ships.saveAndFlush(base());
+    ShipType departed = new ShipType();
+    departed.setName("Rules Test Ship Old");
+    departed.setGameName(NAME);
+    departed.setP4kUuid(DEPARTED);
+    departed.setClassName("TEST_Rules_Old");
+    departed.setUexVehicleId(DEPARTED_UEX_ID);
+    departed.setSourceSystems(GameItemSourceSystem.BOTH);
+    UUID departedId = ships.saveAndFlush(departed).getId();
+    UUID ship = insertShip(departedId);
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    UUID runId = runs.apply(catalogue(), false).runId();
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(count(departedId)).isZero();
+    assertThat(jdbc.queryForObject("SELECT ship_type_id FROM ship WHERE id = ?", UUID.class, ship))
+        .isEqualTo(survivor.getId());
+    ShipType kept = ships.findById(survivor.getId()).orElseThrow();
+    assertThat(kept.getP4kUuid()).isEqualTo(BASE);
+    assertThat(kept.getUexVehicleId()).isEqualTo(DEPARTED_UEX_ID);
+    assertThat(merges(runId)).singleElement().extracting(P4kImportChange::getGuid).isEqualTo(BASE);
+  }
+
+  @Test
+  void aPreviewReportsADepartedRowsMergeAndKeepsIt() {
+    ships.saveAndFlush(base());
+    ShipType departed = new ShipType();
+    departed.setName("Rules Test Ship Old");
+    departed.setGameName(NAME);
+    departed.setP4kUuid(DEPARTED);
+    departed.setSourceSystems(GameItemSourceSystem.BOTH);
+    UUID departedId = ships.saveAndFlush(departed).getId();
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    List<P4kImportChange> report = runs.previewWithReport(catalogue()).changes();
+
+    assertThat(report)
+        .anyMatch(change ->
+            change.getChangeType() == P4kChangeType.MERGED && BASE.equals(change.getGuid()));
+    assertThat(count(departedId)).isOne();
+  }
+
+  private void assertMerged(Consumer<ShipType> identity, ShipTypeMergeReason reason) {
+    ShipType survivor = ships.saveAndFlush(base());
+    ShipType twin = new ShipType();
+    twin.setName("Rules Test Twin");
+    twin.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    identity.accept(twin);
+    UUID twinId = ships.saveAndFlush(twin).getId();
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    UUID runId = runs.apply(catalogue(), false).runId();
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(count(twinId)).isZero();
+    assertThat(ships.findById(twinId)).map(ShipType::getId).contains(survivor.getId());
+    assertThat(ships.findById(survivor.getId()).orElseThrow().getExternalUuid()).isEqualTo(BASE);
+    assertThat(merges(runId))
+        .singleElement()
+        .extracting(P4kImportChange::getOldValue)
+        .isEqualTo("Rules Test Twin");
+    assertThat(
+            jdbc.queryForList(
+                "SELECT details FROM audit_event WHERE event_type = 'CATALOGUE_SHIP_TYPE_MERGED'",
+                String.class))
+        .anyMatch(details -> details.contains(reason.name()));
+  }
+
+  private List<P4kImportChange> merges(UUID runId) {
+    return P4kImportRuns.report(changes, runId).stream()
+        .filter(change ->
+            change.getChangeType() == P4kChangeType.MERGED && change.getKind() == P4kKind.SHIP)
+        .toList();
+  }
+
+  private int count(UUID shipTypeId) {
+    Integer found =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM ship_type WHERE id = ?", Integer.class, shipTypeId);
+    return found == null ? 0 : found;
+  }
+
+  private UUID insertShip(UUID shipTypeId) {
+    UUID owner = UUID.randomUUID();
+    jdbc.update("INSERT INTO app_user (id) VALUES (?)", owner);
+    UUID ship = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO ship (id, ship_type_id, owner_id, insurance, version)"
+            + " VALUES (?, ?, ?, 'LTI', 0)",
+        ship,
+        shipTypeId,
+        owner);
+    return ship;
+  }
+
+  private static ShipType base() {
+    ShipType ship = new ShipType();
+    ship.setName(NAME);
+    ship.setP4kUuid(BASE);
+    ship.setClassName(BASE_CLASS);
+    ship.setExternalUuid(BASE);
+    ship.setSourceSystems(GameItemSourceSystem.BOTH);
+    return ship;
+  }
+
+  private static byte[] catalogue() {
+    return P4kTestCatalogues.bytes(
+        P4kTestCatalogues.withEdition(BASE, BASE_CLASS, EDITION, EDITION_CLASS, NAME));
+  }
+}

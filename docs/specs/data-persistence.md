@@ -1853,7 +1853,8 @@ when it has none. Both
 rows are kept as JSON in `ship_type_redirect`. The merged id stays resolvable through
 `findById`, `existsById`, `findAllById` and `getReferenceById` of `ShipTypeRepository`. The
 exchange resolves it as a `bt` reference and names journal entries by it; the append-only journal
-keeps the merged id. A row holding a P4K GUID is never merged away (REQ-P4K-007).
+keeps the merged id. A row holding a P4K GUID is merged away only when its record left the
+catalogue (REQ-P4K-053); otherwise it never is (REQ-P4K-007).
 
 **Enforced by:** `ShipTypeMergeServiceTest` · **Code:** `ShipTypeMergeService`,
 `ShipTypeIdentityReferences`, `ShipTypeReassignmentParticipant` and its implementations · **ADR:**

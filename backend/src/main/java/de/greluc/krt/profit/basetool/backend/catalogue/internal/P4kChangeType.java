@@ -35,8 +35,7 @@ public enum P4kChangeType {
   COVERED,
 
   /**
-   * A ship type the Wiki or UEX created a second time, merged into the row of the record's GUID
-   * (REQ-P4K-053).
+   * A second ship type of a record's ship, merged into the row holding the record (REQ-P4K-053).
    */
   MERGED,
 

@@ -94,7 +94,8 @@ public class P4kShipReconciler {
       @NotNull P4kImportContext context) {
     List<ShipType> found = shipTypeRepository.findAll();
     Set<UUID> retired = seededRetirement.retire(found, catalogue.ships(), context);
-    List<P4kShipTwins.Twin> twinRows = twins.find(found, catalogue.ships(), retired);
+    List<P4kShipTwins.Twin> twinRows =
+        twins.find(found, catalogue.ships(), catalogue.head().isComplete(P4kKind.SHIP), retired);
     Set<UUID> twinIds =
         twinRows.stream()
             .map(twin -> Objects.requireNonNull(twin.row().getId()))
