@@ -170,15 +170,8 @@ class ScWikiManufacturerSyncServiceTest {
             eq("name"),
             eq("Aegis Dynamics"),
             eq("Aegis Dynamics Wiki"));
-    verify(syncReportService)
-        .logP4kDisagreement(
-            eq(SyncSourceSystem.SCWIKI),
-            any(),
-            eq("manufacturer"),
-            eq(uuid),
-            eq("abbreviation"),
-            eq("AEG"),
-            eq("AEGS"));
+    verify(syncReportService, never())
+        .logP4kDisagreement(any(), any(), any(), any(), eq("abbreviation"), any(), any());
   }
 
   @Test

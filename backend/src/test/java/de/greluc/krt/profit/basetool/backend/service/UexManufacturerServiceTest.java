@@ -183,9 +183,8 @@ class UexManufacturerServiceTest {
             "name",
             "Aegis Dynamics",
             "Aegis Dynamics UEX");
-    verify(syncReportService)
-        .logP4kDisagreement(
-            SyncSourceSystem.UEX, run, "manufacturer", guid, "abbreviation", "AEG", "AEGS");
+    verify(syncReportService, never())
+        .logP4kDisagreement(any(), any(), any(), any(), eq("abbreviation"), any(), any());
   }
 
   @Test

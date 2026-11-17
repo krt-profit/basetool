@@ -866,10 +866,12 @@ selectable again.
   adopts a row UEX created by its name. The SC Wiki sync matches a row by its P4K GUID before its
   own UUID.
 - **Name and abbreviation:** on a row with a P4K GUID only the import writes `name` and
-  `abbreviation` (from `code`); UEX writes them only on rows the P4K does not know. A UEX/P4K
-  disagreement goes to `external_sync_report` as `P4K_DISAGREEMENT` with
+  `abbreviation` (from `code`); UEX writes them only on rows the P4K does not know. A name that
+  differs from the P4K's goes to `external_sync_report` as `P4K_DISAGREEMENT` with
   `column=…;stored=…;source=…`, the source being UEX or the SC Wiki; a value equal ignoring
-  case is no disagreement.
+  case is no disagreement. The abbreviation is never compared: the UEX nickname ("Anvil", "C.O.")
+  and the SC Wiki code (class-name style, `AEGS`) are no P4K codes, so the comparison reported a
+  difference for nearly every manufacturer on every run.
 - **Name conflict:** when another row already holds the P4K name (`name` is unique), the import does
   not rename; it records the conflict in the report and opens a review case (`NAME_CONFLICT`, about
   the row the import would have renamed). Merging two rows is an admin action; the import never
@@ -879,8 +881,8 @@ selectable again.
 - **UEX keeps** `nickname`, `industry`, `wiki`, `is_item_manufacturer`, `is_vehicle_manufacturer` and
   the alias table.
 - **The SC Wiki manufacturer sync** is a cross-check: it writes only its `scwiki_*` columns, never the
-  name or abbreviation, and is never an identity source; a name or code that differs from the P4K
-  goes to `external_sync_report`.
+  name or abbreviation, and is never an identity source; a name that differs from the P4K goes to
+  `external_sync_report`.
 
 **Acceptance**
 

@@ -229,8 +229,9 @@ public class UexManufacturerService {
   /**
    * Writes the canonical display identity + UEX cross-reference columns onto the row. Only the
    * canonical company of a brand calls this; duplicates leave these fields untouched. On a row the
-   * P4K knows, the P4K leads the name and abbreviation: they stay, and a differing UEX value is
-   * reported (REQ-P4K-020). The description is never written; the P4K leads it.
+   * P4K knows, the P4K leads the name and abbreviation: they stay, and a differing UEX name is
+   * reported; the UEX nickname is no code, so it is never compared with the abbreviation
+   * (REQ-P4K-020). The description is never written; the P4K leads it.
    *
    * @param manufacturer the row being stamped
    * @param dto inbound UEX row
@@ -252,14 +253,6 @@ public class UexManufacturerService {
           "name",
           manufacturer.getName(),
           dto.name());
-      syncReportService.logP4kDisagreement(
-          SyncSourceSystem.UEX,
-          runId,
-          AGGREGATE,
-          p4kUuid,
-          "abbreviation",
-          manufacturer.getAbbreviation(),
-          abbreviation);
     }
     if (StringUtils.hasText(dto.nickname())) {
       manufacturer.setNickname(dto.nickname());
