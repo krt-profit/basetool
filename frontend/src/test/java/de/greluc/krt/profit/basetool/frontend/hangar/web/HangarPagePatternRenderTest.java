@@ -331,6 +331,11 @@ class HangarPagePatternRenderTest {
         .contains("class=\"page-head\"")
         .containsPattern("class=\"page-eyebrow\"[^>]*>Einsatz &amp; Flotte<")
         .contains("data-testid=\"hangar-import\"")
+        .containsPattern(
+            "id=\"import-ambiguous-section\" data-testid=\"hangar-import-ambiguous\" hidden")
+        .containsPattern(
+            "id=\"import-apply-choices\"[^>]*data-testid=\"hangar-import-apply\" hidden disabled")
+        .contains("data-choice-none=\"Nicht importieren\"")
         .contains("data-testid=\"hangar-add-ship\"")
         .contains("data-testid=\"overflow-menu-toggle\"")
         .containsPattern(
