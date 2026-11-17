@@ -19,7 +19,8 @@ BACKUP_DIR="${BASETOOL_BACKUP_DIR:-/var/lib/basetool/backup}"
 STAGING_BASE="${BACKUP_DIR}/staging"
 LOCKFILE="${BASETOOL_LOCKFILE:-/run/lock/basetool-deploy.lock}"
 BACKUP_ENV="${BASETOOL_BACKUP_ENV:-/etc/basetool/deploy/backup.env}"
-REDIS_ACL_PATH="${BASETOOL_REDIS_ACL_HOST_PATH:-/var/lib/basetool/redis/users.acl}"
+REDIS_SESSION_ACL_PATH="${BASETOOL_REDIS_SESSION_ACL_HOST_PATH:-/etc/basetool/redis/session-users.acl}"
+REDIS_SHARED_ACL_PATH="${BASETOOL_REDIS_SHARED_ACL_HOST_PATH:-/etc/basetool/redis/shared-users.acl}"
 
 WRITER_SERVICES=(frontend backend ingest)
 LOCK_WAIT="${BASETOOL_BACKUP_LOCK_WAIT:-300}"
@@ -137,7 +138,7 @@ INTERNAL_TLS_DIR="${BASETOOL_INTERNAL_TLS_DIR:-/etc/basetool/secrets/tls}"
 cd "${COMPOSE_DIR}"
 
 if [[ "${DRY_RUN}" == "true" ]]; then
-  log "DRY RUN — would back up: krt_basetool + keycloak dumps, the edge-certs/edge-acme-state/edge-acme-webroot volumes, basetool.env, ${KEYSTORE_PATH}, ${INTERNAL_TLS_DIR} (if present), ${REDIS_ACL_PATH}, realm-export.json, keycloak/providers"
+  log "DRY RUN — would back up: krt_basetool + keycloak dumps, the edge-certs/edge-acme-state/edge-acme-webroot volumes, basetool.env, ${KEYSTORE_PATH}, ${INTERNAL_TLS_DIR} (if present), ${REDIS_SESSION_ACL_PATH}, ${REDIS_SHARED_ACL_PATH}, realm-export.json, keycloak/providers"
   log "DRY RUN — quiesce=${QUIESCE} (stop: ${WRITER_SERVICES[*]}); repo=${RESTIC_REPOSITORY}; retention ${KEEP_DAILY}/${KEEP_WEEKLY}/${KEEP_MONTHLY}"
   log "existing snapshots:"
   restic snapshots --compact 2>&1 | sed 's/^/  /' || log "  (repo not reachable / not initialized yet)"
@@ -205,18 +206,23 @@ for _vol in edge-certs edge-acme-state edge-acme-webroot; do
   fi
 done
 
-if [[ -f "${REDIS_ACL_PATH}" ]]; then
-  if rt_read_mount "$(dirname "${REDIS_ACL_PATH}")" "${HELPER_IMAGE}" \
-    cat "/src/$(basename "${REDIS_ACL_PATH}")" >"${STAGING}/config/users.acl" 2>/dev/null \
-    && [[ -s "${STAGING}/config/users.acl" ]]; then
-    log "capturing the redis ACL (${REDIS_ACL_PATH})"
+capture_redis_acl() {
+  local instance="$1" path="$2" artifact="$3"
+  if [[ -f "${path}" ]]; then
+    if rt_read_mount "$(dirname "${path}")" "${HELPER_IMAGE}" \
+      cat "/src/$(basename "${path}")" >"${STAGING}/config/${artifact}" 2>/dev/null \
+      && [[ -s "${STAGING}/config/${artifact}" ]]; then
+      log "capturing the ${instance} ACL (${path})"
+    else
+      rm -f "${STAGING}/config/${artifact}"
+      log "WARN: could not read ${path} — ${instance} will NOT start from this snapshot"
+    fi
   else
-    rm -f "${STAGING}/config/users.acl"
-    log "WARN: could not read ${REDIS_ACL_PATH} — redis will NOT start from this snapshot"
+    log "WARN: no ${instance} ACL at ${path} — ${instance} will NOT start from this snapshot"
   fi
-else
-  log "WARN: no redis ACL at ${REDIS_ACL_PATH} — redis will NOT start from this snapshot"
-fi
+}
+capture_redis_acl redis-session "${REDIS_SESSION_ACL_PATH}" session-users.acl
+capture_redis_acl redis-shared "${REDIS_SHARED_ACL_PATH}" shared-users.acl
 
 log "capturing host config (basetool.env, keystore, realm-export, providers)"
 cp -p "${ENV_FILE}" "${STAGING}/config/dotenv"
