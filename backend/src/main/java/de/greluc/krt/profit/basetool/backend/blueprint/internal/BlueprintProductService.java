@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepo
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintFormerNameRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
@@ -341,13 +342,23 @@ public class BlueprintProductService implements BlueprintProducts {
   /**
    * Indexes every product an existing reference may still name by its recipes' name keys, as {@link
    * #productsByNameKey()} does but with the recipes the P4K stamped or an admin hid, for moving
-   * references that already exist (REQ-P4K-013).
+   * references that already exist (REQ-P4K-013). An output name a P4K APPLY replaced stays a name
+   * key of its product (REQ-P4K-079), so it resolves while no other product carries it.
    *
    * @return name key to the products it names, in master-scan order; never {@code null}
    */
   @NotNull
   Map<String, List<ResolvedProduct>> knownProductsByNameKey() {
-    return nameIndex(buildProductMap(blueprintRepository.findActiveProductRows("")));
+    Map<String, ProductAccumulator> products =
+        buildProductMap(blueprintRepository.findActiveProductRows(""));
+    for (BlueprintFormerNameRow row : blueprintRepository.findActiveFormerNameRows()) {
+      ProductAccumulator product =
+          products.get(productKeys.of(row.producedItemGuid(), row.outputName()));
+      if (product != null) {
+        product.nameKeys.add(productKeys.nameKey(row.formerName()));
+      }
+    }
+    return nameIndex(products);
   }
 
   /**

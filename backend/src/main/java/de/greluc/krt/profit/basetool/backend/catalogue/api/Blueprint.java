@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -35,7 +37,9 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -67,7 +71,8 @@ import org.jetbrains.annotations.UnmodifiableView;
       "dismantleReturns",
       "requirementGroups",
       "recipeModifiers",
-      "summaryProperties"
+      "summaryProperties",
+      "formerNames"
     })
 @NoArgsConstructor
 public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
@@ -299,6 +304,37 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
   @OrderBy("orderIndex ASC")
   @BatchSize(size = 64)
   private List<BlueprintSummaryProperty> summaryProperties = new ArrayList<>();
+
+  /**
+   * The output names a P4K APPLY replaced; each stays a name of the blueprint's product, so a key
+   * derived from it still resolves (REQ-P4K-079).
+   */
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
+  @ElementCollection(fetch = FetchType.LAZY)
+  @CollectionTable(name = "blueprint_former_name", joinColumns = @JoinColumn(name = "blueprint_id"))
+  @Column(name = "name", nullable = false)
+  private Set<String> formerNames = new HashSet<>();
+
+  /**
+   * Returns the output names a P4K APPLY replaced.
+   *
+   * @return an unmodifiable view of the former names
+   */
+  @NotNull
+  @UnmodifiableView
+  public Set<String> getFormerNames() {
+    return Collections.unmodifiableSet(formerNames);
+  }
+
+  /**
+   * Keeps an output name a P4K APPLY replaced as a name of the blueprint's product (REQ-P4K-079).
+   *
+   * @param name the replaced output name
+   */
+  public void addFormerName(@NotNull String name) {
+    formerNames.add(name);
+  }
 
   /**
    * Returns the ordered ingredient lines as an unmodifiable view. Mutate the recipe through {@link

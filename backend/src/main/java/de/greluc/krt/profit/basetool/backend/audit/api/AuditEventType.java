@@ -812,6 +812,11 @@ public enum AuditEventType {
    * details say which.
    */
   CATALOGUE_MATERIAL_SOURCELESS_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
+  /**
+   * A P4K APPLY retired a leftover material no member uses: it hid the row, or deleted it once the
+   * row handed its identity to its twin (REQ-P4K-076…078); the details say which.
+   */
+  CATALOGUE_MATERIAL_LEFTOVER_RETIRED(AuditDomain.CATALOGUE),
   /** An admin created a material category. */
   CATALOGUE_MATERIAL_CATEGORY_CREATED(AuditDomain.CATALOGUE),
   /** An admin renamed a material category. */

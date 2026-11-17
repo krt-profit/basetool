@@ -103,8 +103,7 @@ final class P4kCommodityRules implements P4kMatchRules<Material> {
    *     another commodity too
    */
   @Nullable
-  private static UUID subtypeKey(
-      @NotNull P4kCommodityJoin join, @NotNull P4kCommodityDto commodity) {
+  static UUID subtypeKey(@NotNull P4kCommodityJoin join, @NotNull P4kCommodityDto commodity) {
     return commodity.equals(join.single(commodity.subtypeGuid()))
         ? P4kGuids.parse(commodity.subtypeGuid())
         : null;
@@ -158,6 +157,18 @@ final class P4kCommodityRules implements P4kMatchRules<Material> {
 
   /**
    * Returns the listed record a material belongs to.
+   *
+   * @param row a stored material
+   * @return the record of {@link #owner(Material)}, or {@code null} when it belongs to none
+   */
+  @Nullable
+  P4kCommodityDto recordOf(@NotNull Material row) {
+    UUID owner = owner(row);
+    return owner == null ? null : records.get(owner);
+  }
+
+  /**
+   * Returns the GUID of the listed record a material belongs to.
    *
    * @param row a stored material
    * @return the GUID it follows, else the listed GUID it holds, else the record whose Wiki key its

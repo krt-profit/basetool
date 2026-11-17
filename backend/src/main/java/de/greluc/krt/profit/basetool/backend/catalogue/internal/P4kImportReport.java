@@ -132,7 +132,8 @@ public final class P4kImportReport {
   }
 
   /**
-   * Records a second row of a record's ship merged into the row of its GUID (REQ-P4K-053).
+   * Records a twin merged into the row that stays: a second ship type into the row of its GUID
+   * (REQ-P4K-053), a leftover material into the material that takes its identity (REQ-P4K-076…078).
    *
    * @param kind the kind
    * @param record the record the surviving row holds

@@ -599,7 +599,11 @@ The coverage list holds the **Katalog** area
     edit makes one, `CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED` with `field` when the admin hands it
     back, REQ-P4K-024/025); a P4K APPLY's hide of a UEX commodity no game source knows, and its
     lift (`CATALOGUE_MATERIAL_SOURCELESS_VISIBILITY_CHANGED`, subject the material, `hidden=`,
-    `run=`, REQ-P4K-075); manufacturer, ship-type and terminal visibility
+    `run=`, REQ-P4K-075); a P4K APPLY's retirement of a leftover material no member uses, hidden
+    or deleted once its twin took its identity (`CATALOGUE_MATERIAL_LEFTOVER_RETIRED`, subject the
+    retired material, `rule=SEEDED_NOT_CREATABLE|MANUAL_TWIN|WIKI_TWIN`, `deleted=`, `twin=` the
+    material that took its identity when there is one, `run=`, REQ-P4K-076…078); manufacturer,
+    ship-type and terminal visibility
     (`*_VISIBILITY_CHANGED`, `hidden=`); the admin choice of a manufacturer's primary SC Wiki entry
     among its Wiki duplicates (`CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED` with `from=` and `to=`
     the Wiki UUIDs, ADR-0361); locations (`CATALOGUE_LOCATION_*`); the loading-dock

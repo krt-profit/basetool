@@ -60,6 +60,8 @@ import org.springframework.stereotype.Component;
  * ({@link MaterialP4kOverride}) is kept, and a differing P4K value is reported as {@code
  * P4K_DISAGREEMENT}. A material no record reconciles takes the group of its {@code ResourceType}
  * ({@link P4kMaterialTypeGroups}), and an APPLY settles the commodity cases it no longer raises.
+ * Before the match the leftover materials nothing references are retired ({@link
+ * P4kSeededCommodityRetirement}, {@link P4kMaterialTwins}).
  */
 @Component
 @RequiredArgsConstructor
@@ -80,11 +82,13 @@ public class P4kCommodityReconciler {
   private final P4kReviewCaseRepository reviewCaseRepository;
   private final SyncReportService syncReportService;
   private final P4kRunResolvedCases resolvedCases;
+  private final P4kSeededCommodityRetirement seededRetirement;
+  private final P4kMaterialTwins twins;
 
   /**
-   * Reconciles every commodity, groups the other materials by their {@code ResourceType} and, on an
-   * APPLY, settles the commodity cases the run no longer raises; the resource groups must be
-   * reconciled first.
+   * Retires the leftover materials, reconciles every commodity, groups the other materials by their
+   * {@code ResourceType} and, on an APPLY, settles the commodity cases the run no longer raises;
+   * the resource groups must be reconciled first.
    *
    * @param catalogue the catalogue, whose blueprints and commodities reference the commodities
    * @param types the catalogue's resource types
@@ -100,7 +104,7 @@ public class P4kCommodityReconciler {
     P4kCommodityJoin join = P4kCommodityJoin.of(catalogue, types);
     join.reviewUnresolved(context);
     context.indexRepeated(P4kKind.COMMODITY, join.commodities());
-    List<Material> stored = materialRepository.findAll();
+    List<Material> stored = retireLeftovers(materialRepository.findAll(), catalogue, join, context);
     P4kRowIndex<Material> materials =
         new P4kRowIndex<>(stored, Material::getScwikiUuid, _ -> null, Material::getName);
     context.indexCommodityRows(materials);
@@ -122,6 +126,43 @@ public class P4kCommodityReconciler {
           context);
     }
     return outcome;
+  }
+
+  /**
+   * Retires the leftover materials before the match: the seeded commodities no rule would create
+   * (REQ-P4K-076), then the admin and Wiki-only twins (REQ-P4K-077, REQ-P4K-078).
+   *
+   * @param loaded the stored materials
+   * @param catalogue the catalogue
+   * @param join the run's join
+   * @param context the run
+   * @return the materials the run matches: the stored ones without those whose identity a twin took
+   *     or that a twin replaces
+   */
+  @NotNull
+  private List<Material> retireLeftovers(
+      @NotNull List<Material> loaded,
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kCommodityJoin join,
+      @NotNull P4kImportContext context) {
+    P4kCommodityRules rules = P4kCommodityRules.of(catalogue.commodities(), join, loaded);
+    Set<Material> leaving = Collections.newSetFromMap(new IdentityHashMap<>());
+    leaving.addAll(seededRetirement.retire(loaded, join, rules, context));
+    leaving.addAll(twins.settle(without(loaded, leaving), rules, context));
+    return without(loaded, leaving);
+  }
+
+  /**
+   * Leaves the given materials out of a list.
+   *
+   * @param rows the materials
+   * @param left the materials to leave out
+   * @return the other materials, in list order
+   */
+  @NotNull
+  @Unmodifiable
+  private static List<Material> without(@NotNull List<Material> rows, @NotNull Set<Material> left) {
+    return rows.stream().filter(row -> !left.contains(row)).toList();
   }
 
   /**

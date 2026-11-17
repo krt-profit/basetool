@@ -27,8 +27,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Reports which materials a module's rows reference, so the catalogue hides only a material no game
- * source knows that nothing uses (REQ-P4K-075). Every implementation joins the caller's transaction
+ * Reports which materials a module's member rows reference, so the P4K import hides or retires only
+ * a material no member uses (REQ-P4K-075…078). Every implementation joins the caller's transaction
  * ({@code MANDATORY}).
  */
 @ObserverSpi

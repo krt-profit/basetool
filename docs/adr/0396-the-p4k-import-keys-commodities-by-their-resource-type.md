@@ -3,8 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-11-17
 - **Deciders:** @greluc
-- **Related:** spec [`p4k-catalogue.md`](../specs/p4k-catalogue.md) (REQ-P4K-016, REQ-P4K-024…026,
-  REQ-P4K-070…075) · [ADR-0339](0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) ·
+- **Related:** spec [`p4k-catalogue.md`](../specs/p4k-catalogue.md) (REQ-P4K-010, REQ-P4K-016,
+  REQ-P4K-024…026, REQ-P4K-029, REQ-P4K-070…079) · [ADR-0339](0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) ·
   [ADR-0393](0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
 
 ## Context
@@ -84,3 +84,34 @@ price brings them back.
   Supplies)" beside the existing "Man-made" / "Hergestellte Produkte".
 - The 6 seeded `SEEDED_NOT_CREATABLE` rows, twin handovers and removals, the Party Favors /
   Fireworks merge and the blueprint aliases stay for later rules.
+
+## Amendment — leftover materials and replaced blueprint names (2026-11-17)
+
+The owner decided on 2026-11-17 that a leftover material nothing uses is hidden or folded into its
+twin automatically, that every such action is audited, and that no case opens where nothing is
+left to decide. Before the commodity pass an APPLY therefore retires:
+
+9. **A seeded commodity no rule would create (REQ-P4K-076).** Unless a member row references it,
+   it hands its P4K identity to the live material its record's Wiki key names, which the pass then
+   matches as usual, and is deleted; while a catalogue row references it, deleting it would break
+   that row, so it is hidden under its name and GUID instead. Without such a twin it is hidden,
+   as seeded items are (REQ-P4K-056).
+10. **An admin twin holding the P4K name (REQ-P4K-077)** and **an invisible Wiki-only twin
+    (REQ-P4K-078)** that nothing references are deleted; the Wiki-only twin first hands its Wiki
+    identity to the material a UEX or refinery-screen alias names. Both run in the APPLY, not the
+    SC Wiki sync: it reads the rows, the aliases and the references in one transaction under the
+    lock both syncs share, and the cases these twins raised are settled in the same run.
+11. **The member/catalogue split of the material references.** `MaterialReferenceParticipant` is
+    answered by the member modules only; the catalogue reads its own references
+    (`CatalogueMaterialReferences`), so a member's reference keeps a case open and a catalogue
+    row's only turns a deletion into a hide.
+12. **A replaced blueprint output name stays a name of its product (REQ-P4K-079).** An element
+    collection of `blueprint` (`blueprint_former_name`, V437) keeps it, and the key upgrade of the
+    members' fallback keys resolves through it, so a key of the old name moves in the same APPLY;
+    a name another product carries stays ambiguous. V437 backfills the names earlier APPLYs
+    replaced from their change reports where the old name belonged to one product. The
+    personal-blueprint import's `blueprint_external_alias` was not used: it maps a Game.log name
+    the member's import learned, and the key upgrade only moves its keys.
+
+A merge of two visible, priced materials (Party Favors / Fireworks) needs a material merge that
+moves references across many tables and stays out of these rules.
