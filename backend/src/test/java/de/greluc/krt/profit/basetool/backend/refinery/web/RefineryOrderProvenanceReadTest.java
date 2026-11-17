@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.web;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -41,14 +42,11 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderProv
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,7 +87,6 @@ class RefineryOrderProvenanceReadTest {
   @Autowired private LocationRepository locationRepository;
   @Autowired private RefineryOrderRepository refineryOrderRepository;
   @Autowired private EntityManager entityManager;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private ObjectMapper objectMapper;
 
   private MockMvc mockMvc;
@@ -144,20 +141,17 @@ class RefineryOrderProvenanceReadTest {
       save(webOwner, RefineryOrderProvenance.createdInWeb(CREATED), null);
       save(clientOwner, RefineryOrderProvenance.createdByClient(CLIENT + i % 2, CREATED), null);
     }
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
 
-    long webStatements = listStatements(stats, webOwner);
-    long clientStatements = listStatements(stats, clientOwner);
+    long webStatements = listStatements(webOwner);
+    long clientStatements = listStatements(clientOwner);
 
+    assertThat(webStatements).isPositive();
     assertThat(clientStatements).isLessThanOrEqualTo(webStatements + 1);
   }
 
-  private long listStatements(Statistics stats, User owner) throws Exception {
+  private long listStatements(User owner) throws Exception {
     flushAndClear();
-    stats.clear();
-    read(get(ORDERS + "/my-orders").param("size", "50"), owner);
-    return stats.getPrepareStatementCount();
+    return preparedBy(() -> read(get(ORDERS + "/my-orders").param("size", "50"), owner));
   }
 
   private UUID save(

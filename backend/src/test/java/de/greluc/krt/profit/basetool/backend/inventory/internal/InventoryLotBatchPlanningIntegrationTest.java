@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
@@ -40,7 +41,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityProvenan
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
-import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
@@ -49,7 +49,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -73,28 +72,20 @@ class InventoryLotBatchPlanningIntegrationTest {
   @Autowired private StockLotWritePlans plans;
   @Autowired private StockQuantityProvenance provenance;
   @Autowired private JdbcTemplate jdbc;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private StockOfferLookup offers;
 
   /** The holder and ordinary physical lot of one isolated test action. */
   private record Fixture(UUID holder, StockLot lot, UUID row) {}
 
   @Test
-  void planningReadsOfferFactsInBatchesAsThePhysicalLotGrows() {
+  void planningReadsOfferFactsInBatchesAsThePhysicalLotGrows() throws Exception {
     Fixture few = seed();
     Fixture many = seed();
-    var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    boolean enabled = statistics.isStatisticsEnabled();
     try {
       seedOfferedRows(few, 3);
       seedOfferedRows(many, 30);
-      statistics.setStatisticsEnabled(true);
-      statistics.clear();
-      inspect(few, 3);
-      long fewStatements = statistics.getPrepareStatementCount();
-      statistics.clear();
-      inspect(many, 30);
-      assertThat(statistics.getPrepareStatementCount()).isEqualTo(fewStatements);
+      long fewStatements = preparedBy(() -> inspect(few, 3));
+      assertThat(preparedBy(() -> inspect(many, 30))).isPositive().isEqualTo(fewStatements);
       assertThat(offers.offerFacts(List.of(few.row())).get(few.row()).activeAmount())
           .isEqualTo(1.0);
       jdbc.update(
@@ -104,7 +95,6 @@ class InventoryLotBatchPlanningIntegrationTest {
       assertThat(historical.offered()).isTrue();
       assertThat(historical.activeAmount()).isZero();
     } finally {
-      statistics.setStatisticsEnabled(enabled);
       jdbc.update(
           "DELETE FROM material_exchange_offer WHERE owner_id IN (?, ?)",
           few.holder(),
