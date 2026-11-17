@@ -35,10 +35,12 @@ The drawing shows the request path only; `redis` stands for `redis-shared`. Besi
 frontend and backend reach keycloak (OIDC, the admin API) and keycloak's SPI calls the backend back;
 keycloak alone owns `db-keycloak`.
 
-The connections run over **eighteen** container networks, each named for what it joins
+The connections run over **nineteen** container networks, each named for what it joins
 (`net-proxy-*`, `net-db-*`, `net-redis-*`, `net-backend-*`, `net-edge-ingress`, `net-acme-egress`,
-`net-monitoring-core`, `net-monitoring-scrape`, `net-blackbox-v6`). Apart from the two monitoring
-networks each joins a small named set — usually one pair, plus a data store's exporter — and a
+`net-monitoring-core`, `net-monitoring-scrape`, `net-monitoring-redis`, `net-blackbox-v6`). Apart
+from `net-monitoring-core` and `net-monitoring-scrape` each joins a small named set — usually one
+pair, plus a data store's exporter; `net-monitoring-redis` holds Prometheus and the two Redis
+exporters alone — and a
 container reaches exactly the containers it shares a network with. The units are in
 [`quadlet/systemd/`](../../quadlet/systemd/).
 

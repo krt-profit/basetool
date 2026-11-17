@@ -245,7 +245,7 @@ staging, monitoring state, the deploy account's state in `/var/lib/basetool/depl
 | `/etc/basetool/secrets/tls/` | `basetool:basetool 0755`; `<svc>.p12` `0640` (apps `root:110000` + ACL `u:basetool:r`, keycloak `root:root` + ACL `u:100999:r`, `u:basetool:r`); `truststore.p12`, `ca.crt` `root:root 0644` | the per-service internal TLS material (REQ-SEC-070) — absent on a host until its rollout step 2; **present on production since 2026-09-25**; the units mount it from step 3 on — `truststore.p12` in the three apps and in keycloak, whose Discord precheck trusts the backend through it (REQ-SEC-022) | minted by the owner with `mint-internal-tls.sh`; see [Internal TLS](#internal-tls-per-service-certificates-from-a-private-ca) |
 | `/etc/basetool/secrets/backend-truststore.p12` (+ `.backup-*`), `keycloak.container.d/50-backend-truststore.conf` | — | **obsolete**: the Keycloak precheck's former hand-built truststore and the hand-installed drop-in that mounted it | nothing reads either once the managed keycloak mount is deployed — the precheck trusts `tls/truststore.p12` (REQ-SEC-022, ADR-0051 amendment). Remove them, with the `KRT_BACKEND_TRUSTSTORE_*` lines of `basetool.env`, once per host: [One-time cleanup](#one-time-cleanup-the-hand-built-precheck-truststore) |
 | `/etc/basetool/realm-export.json` | `root:100999` + ACL `u:basetool:r` | Keycloak realm seed, bind-mounted into keycloak | only seeds an empty realm; the live realm is in `db-keycloak` |
-| `/var/lib/basetool/redis/session-users.acl`, `/var/lib/basetool/redis-shared/users.acl` | `root:root 0644` | the two Redis ACLs, one user per service, **rendered** by `render-redis-acl.py` (SHA-256 hashes, no password) and **with** a `user default …` line | without that line redis resets `default` to `nopass`; check `grep -c '^user default ' …` = 1 — see [The Redis ACL](#the-redis-acl) |
+| `/etc/basetool/redis/session-users.acl`, `/etc/basetool/redis/shared-users.acl` | `root:root 0644`, dir `root:root 0755` | the two Redis ACLs, one user per service, **rendered** by `render-redis-acl.py` (SHA-256 hashes, no password) and **with** a `user default …` line | without that line redis resets `default` to `nopass`; check `grep -c '^user default ' …` = 1 — see [The Redis ACL](#the-redis-acl). They live outside the instances' data directories, which each container owns and could otherwise rewrite for its next start |
 | `/etc/basetool/deploy/ghcr-pull-token` | `deploy:deploy 0600`, dir `0700` | classic PAT, `read:packages` only | optional sidecar `ghcr-pull-token.expiry` (ISO date) |
 | `/etc/basetool/deploy/backup.env`, `/etc/basetool/deploy/rclone.conf` | `deploy`-readable | restic repository, password, rclone remote | [`backup.md`](backup.md) |
 | `/etc/basetool/monitoring/secrets/*`, `/etc/basetool/monitoring/certs/*` | translated uids | Prometheus web auth, scrape password, Alertmanager routes, `basetool-ca.crt`, Grafana's own cert | [`monitoring/README.md`](../monitoring/README.md) |
@@ -259,8 +259,8 @@ Two Redis instances run, cut along the services that reach them (ADR-0388, REQ-S
 
 | Instance | Holds | Reached by | Data | ACL file |
 |---|---|---|---|---|
-| `redis-session` | Spring Session (`basetool:session:*`) | frontend | `/var/lib/basetool/redis` | `/var/lib/basetool/redis/session-users.acl` |
-| `redis-shared` | `exchange:*`, `ingest:*`, the live-sync and notification channels | frontend, backend, ingest | `/var/lib/basetool/redis-shared` | `/var/lib/basetool/redis-shared/users.acl` |
+| `redis-session` | Spring Session (`basetool:session:*`) | frontend | `/var/lib/basetool/redis` | `/etc/basetool/redis/session-users.acl` |
+| `redis-shared` | `exchange:*`, `ingest:*`, the live-sync and notification channels | frontend, backend, ingest | `/var/lib/basetool/redis-shared` | `/etc/basetool/redis/shared-users.acl` |
 
 Each ACL file is the **only** authentication its instance has: `--requirepass` was removed on
 2026-09-16, and once `--aclfile` is in play a file without a `default` entry makes Redis reset
@@ -273,12 +273,14 @@ Since REQ-SEC-068 / ADR-0207 the files are **rendered, never written by hand**:
 [`scripts/redis-shared-users.acl.tmpl`](../scripts/redis-shared-users.acl.tmpl) — the rules,
 committed and reviewed — from `basetool.env`, with every password replaced by its SHA-256 (`#<hex>`),
 so the files on disk and in every backup hold no credential. The role installs them next to
-`render-env-d.py`. It refuses, writing nothing, when a variable is missing or the result lacks
-exactly one `default` line.
+`render-env-d.py`. It refuses, writing nothing and naming variables only, when a variable is
+missing — `REDIS_DEFAULT_USER` included, which has no default —, when two password variables of
+either instance hold the same value, when the template grants an application user a key or channel
+outside its instance's prefixes, or when the result lacks exactly one `default` line.
 
 | Instance | User | Password in `basetool.env` | May do |
 |---|---|---|---|
-| both | `default` | `REDIS_SESSION_PASSWORD` / `REDIS_PASSWORD` | everything while `REDIS_DEFAULT_USER` is `on` (the default); **nothing** once it is `off` |
+| both | `default` | `REDIS_SESSION_PASSWORD` / `REDIS_PASSWORD` | everything while `REDIS_DEFAULT_USER` is `on`; **nothing** once it is `off` (`check-conformance.py --only redis-default-user-off`) |
 | both | `admin` | `REDIS_SESSION_PASSWORD` / `REDIS_PASSWORD` | everything — the operator's user for `ACL LOAD` and inspection; only that instance's own container environment carries it, as `REDIS_PASSWORD` |
 | both | `monitoring` | `REDIS_SESSION_EXPORTER_PASSWORD` / `REDIS_EXPORTER_PASSWORD` | only the commands `redis-session-exporter` / `redis-shared-exporter` send (`PING`, `CLIENT SETNAME`/`SETINFO`, `COMMAND INFO`, `INFO`, `CONFIG GET`, `LATENCY LATEST`/`HISTOGRAM`); no key, no `SCAN` (a session key's name is a session id), no `CLIENT TRACKING`/`LIST`/`KILL`/`PAUSE`, no `SLOWLOG` |
 | `redis-session` | `basetool-frontend` | `REDIS_SESSION_FRONTEND_PASSWORD` | `basetool:session:*`, the session-event and keyspace-event channels, `SCAN`, `INFO` |
@@ -339,18 +341,19 @@ render_redis_acl() {
   ${UPOD} exec "$1" sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOAD'   # OK
   ${UPOD} exec "$1" sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL USERS'  # the users the render printed
 }
-render_redis_acl redis-session redis-session-users.acl.tmpl /var/lib/basetool/redis/session-users.acl
-render_redis_acl redis-shared redis-shared-users.acl.tmpl /var/lib/basetool/redis-shared/users.acl
+render_redis_acl redis-session redis-session-users.acl.tmpl /etc/basetool/redis/session-users.acl
+render_redis_acl redis-shared redis-shared-users.acl.tmpl /etc/basetool/redis/shared-users.acl
 ```
 
 Each container's `REDIS_PASSWORD` is that instance's admin password (`REDIS_SESSION_PASSWORD` for
 `redis-session`). `ACL LOAD` needs no restart and signs nobody out. A file rendered for the first
 time is a new file: run `restorecon -F` on it before the unit first mounts it.
 `check-conformance.py --only redis-requires-auth` still proves both instances refuse an
-unauthenticated `PING`.
+unauthenticated `PING`, and `--only redis-default-user-off` that both refuse a password-only `AUTH`
+with their admin password while `admin` accepts it — the password stays inside the container.
 
 **Why `.new` and `cat`** *(corrected 2026-09-25)*. Each unit mounts its single file
-(`Volume=/var/lib/basetool/redis/session-users.acl:/etc/redis/users.acl:ro`), and a single-file bind mount follows
+(`Volume=/etc/basetool/redis/session-users.acl:/etc/redis/users.acl:ro`), and a single-file bind mount follows
 the **inode**, not the name. `render-redis-acl.py` writes atomically — a temporary file renamed over
 the target, i.e. a **new** inode — so rendering straight onto the live path would leave the
 container on the old inode, and `ACL LOAD` would quietly reload the **old** rules (the same reason
@@ -386,10 +389,22 @@ own environment: render, `ACL LOAD`, then restart that unit so the container see
 
 The release that carries ADR-0388's second instance retires the `redis` and `redis-exporter` units
 and starts `redis-session`, `redis-shared` and an exporter for each. `redis-session` keeps
-`/var/lib/basetool/redis`, so the sessions stay and nobody is signed out; it loads the new
-`session-users.acl` and leaves `users.acl` untouched for a rollback. `redis-shared` starts empty in
-`/var/lib/basetool/redis-shared`. Every step below is a production write; run them in one sitting
-with `basetool-deploy.timer` stopped.
+`/var/lib/basetool/redis`, so the sessions stay and nobody is signed out; it loads
+`/etc/basetool/redis/session-users.acl` and leaves `/var/lib/basetool/redis/users.acl` untouched for
+a rollback. `redis-shared` starts empty in `/var/lib/basetool/redis-shared` and loads
+`/etc/basetool/redis/shared-users.acl`. Both ACL files live outside the data directories, which
+each container owns. Every step below is a production write; run them in one sitting with
+`basetool-deploy.timer` stopped.
+
+0. **Read first: the data fits the session store** (read-only, no approval needed).
+   `redis-session` loads the whole of today's AOF — the exchange and ingest keys included, until
+   step 6 removes them — under `maxmemory 384mb` with `noeviction`, and refuses every write,
+   logins included, while it is over:
+
+   ```bash
+   ${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin INFO memory' \
+     | grep -E '^used_memory:'   # must be below 300000000 (~286 MiB); above it, stop
+   ```
 
 1. **Three new passwords into `basetool.env`**, generated on the host. The running release reads
    none of them, so this step is inert until the deploy:
@@ -406,16 +421,17 @@ with `basetool-deploy.timer` stopped.
 
 2. **The role** (from WSL): `ansible-playbook site.yml --limit production --tags
    directories,selinux,scripts --check --diff`, then without `--check --diff`. It creates
-   `/var/lib/basetool/redis-shared` owned by the container's user and installs both templates;
-   without the directory `redis-shared` dies on its first write and the health gate rolls the deploy
-   back.
+   `/var/lib/basetool/redis-shared` owned by the container's user and the root-owned
+   `/etc/basetool/redis`, and installs both templates; without the data directory `redis-shared`
+   dies on its first write and the health gate rolls the deploy back.
 3. **Render both ACL files** as new files, before the units that mount them exist. No `ACL LOAD`:
    the running `redis` keeps its own file.
 
    ```bash
    cd /
-   for pair in redis-session-users.acl.tmpl:/var/lib/basetool/redis/session-users.acl \
-               redis-shared-users.acl.tmpl:/var/lib/basetool/redis-shared/users.acl; do
+   stat -c '%U:%G %a' /etc/basetool/redis   # root:root 755, from step 2
+   for pair in redis-session-users.acl.tmpl:/etc/basetool/redis/session-users.acl \
+               redis-shared-users.acl.tmpl:/etc/basetool/redis/shared-users.acl; do
      /opt/basetool/scripts/render-redis-acl.py --env /etc/basetool/basetool.env \
        --template "/opt/basetool/scripts/${pair%%:*}" --out "${pair#*:}.new" || break
      grep -c '^user default ' "${pair#*:}.new"   # must be 1
@@ -428,7 +444,9 @@ with `basetool-deploy.timer` stopped.
 4. **Deploy the release.** Until the backend's reconcile has rewritten the registry and the
    revocations into `redis-shared` (at most 60 s) the exchange answers `503 REGISTRY_UNAVAILABLE`;
    quotas, budgets, idempotency answers and pending handoffs start empty.
-5. **Verify**: `check-conformance.py --only redis-requires-auth` passes for both instances; `ACL
+5. **Verify**: `check-conformance.py --only redis-requires-auth` and `--only
+   redis-default-user-off` pass for both instances, `--only redis-session-isolated` finds only
+   `redis-session`, `frontend` and `redis-session-exporter` on `net-redis-session`; `ACL
    USERS` in `redis-session` lists `default`, `admin`, `monitoring` and `basetool-frontend` only;
    `redis_up` is 1 for `redis="session"` and `redis="shared"`; a signed-in browser stays signed in,
    a mission page receives live updates, a refinery import reaches its review form, and an exchange
@@ -444,13 +462,19 @@ with `basetool-deploy.timer` stopped.
      | grep -c -v "^basetool:session:"'   # 0
    ```
 
-7. Start `basetool-deploy.timer` again. Once no rollback to a release before the split is wanted,
+7. **Take a snapshot now**: `systemctl start basetool-backup.service`, and check its log names
+   both `session-users.acl` and `shared-users.acl`. Until a snapshot carries them, the Sunday
+   restore drill reads the last one from before the split, misses both ACLs and fires
+   `RestoreDrillArtifactNotRestorable`.
+8. Start `basetool-deploy.timer` again. Once no rollback to a release before the split is wanted,
    delete `/var/lib/basetool/redis/users.acl` and its `users.acl.backup-*` copies.
 
 **Rollback**: an application rollback to the release before the split brings back the `redis` unit
 on `/var/lib/basetool/redis` with its kept `users.acl`. The sessions survive; the exchange answers
 `503 REGISTRY_UNAVAILABLE` until the backend's reconcile has rewritten the registry, and
-`/var/lib/basetool/redis-shared` stays unused until the split is deployed again.
+`/var/lib/basetool/redis-shared` stays unused until the split is deployed again. Snapshots from
+after the split no longer carry `users.acl`; a host restored for a rollback takes it from the last
+snapshot before the cut-over.
 
 ##### Rollout: one ACL user per service (needs the owner's yes)
 
@@ -496,8 +520,9 @@ can be stopped and rolled back on its own.
    grep -c -E '^REDIS_(FRONTEND|BACKEND|INGEST)_PASSWORD=' /etc/basetool/basetool.env   # 3
    ```
 
-3. **Render with `default` still on, and load it** — the block above, first load without `--user
-   admin`. Nothing changes for the applications yet; `admin` and the three service users now exist.
+3. **Render with `default` still on, and load it** — append `REDIS_DEFAULT_USER=on` to
+   `basetool.env` (the renderer refuses while it is unset), then the block above, first load without
+   `--user admin`. Nothing changes for the applications yet; `admin` and the three service users now exist.
    Before rendering, confirm that `basetool.env`'s `REDIS_EXPORTER_PASSWORD` is the password the hand-written
    file gives `monitoring` — the render re-derives that user's hash from `basetool.env`, and a mismatch takes
    `redis-exporter` down (`redis_up == 0`). Compare digests, never the values:
@@ -523,13 +548,14 @@ can be stopped and rolled back on its own.
    on `default`; `RedisAclDenials` stays silent; log in, open a mission (live sync), run one
    refinery import. On 1.11.0, `ACL LOG` shows the frontend's refused `config|get` from its
    restart (see the note above; verified gone on production after the v1.12.0 deploy, 2026-09-25); nothing else.
-5. **Switch `default` off**: append `REDIS_DEFAULT_USER=off` to `basetool.env`, render, `ACL LOAD` as
+5. **Switch `default` off**: set `REDIS_DEFAULT_USER=off` in `basetool.env`, render, `ACL LOAD` as
    `admin`. Verify `${UPOD} exec redis sh -c 'redis-cli ping'` answers `NOAUTH`,
    `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'` (password-only, i.e.
    `default`) answers `WRONGPASS … or user is disabled`, `${UPOD} healthcheck run redis` is healthy,
-   and `redis-exporter` still scrapes (`redis_up == 1`).
+   and `redis-exporter` still scrapes (`redis_up == 1`); `check-conformance.py --only
+   redis-default-user-off` passes.
 
-**Rollback**, from any step: step 5 — set `REDIS_DEFAULT_USER=on` (or delete the line), render,
+**Rollback**, from any step: step 5 — set `REDIS_DEFAULT_USER=on`, render,
 `ACL LOAD`. Step 4 — delete the three `REDIS_*_USERNAME` lines **and** the three
 `REDIS_{FRONTEND,BACKEND,INGEST}_PASSWORD` lines, render `env.d/`, restart the three services: they
 are back on `default` with the shared password — except ingest from the release after 1.12.0 on,

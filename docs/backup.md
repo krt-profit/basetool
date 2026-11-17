@@ -231,8 +231,8 @@ easy to miss:
 ```
   edge-certs: captured
   edge-acme-state: captured
-  capturing the redis-session ACL (/var/lib/basetool/redis/session-users.acl)
-  capturing the redis-shared ACL (/var/lib/basetool/redis-shared/users.acl)
+  capturing the redis-session ACL (/etc/basetool/redis/session-users.acl)
+  capturing the redis-shared ACL (/etc/basetool/redis/shared-users.acl)
   capturing host config (basetool.env, keystore, realm-export, providers)
 ```
 
@@ -303,12 +303,13 @@ flock /run/lock/basetool-deploy.lock true      # returns once no deploy is runni
      setfacl -m u:100999:r /etc/basetool/secrets/tls/keycloak.p12
      restorecon -RF /etc/basetool/secrets/tls
    fi
-   # the two Redis ACLs: plain root-owned files, nothing namespaced about them
-   install -o root -g root -m 0644 "${R}/config/session-users.acl" /var/lib/basetool/redis/session-users.acl
-   install -o root -g root -m 0644 "${R}/config/shared-users.acl" /var/lib/basetool/redis-shared/users.acl
+   # the two Redis ACLs: plain root-owned files, outside every directory a container writes to
+   install -d -o root -g root -m 0755 /etc/basetool/redis
+   install -o root -g root -m 0644 "${R}/config/session-users.acl" /etc/basetool/redis/session-users.acl
+   install -o root -g root -m 0644 "${R}/config/shared-users.acl" /etc/basetool/redis/shared-users.acl
    restorecon -F /etc/basetool/basetool.env /etc/basetool/realm-export.json /etc/basetool/secrets/keystore.p12 \
-     /var/lib/basetool/redis/session-users.acl /var/lib/basetool/redis-shared/users.acl
-   grep -c '^user default ' /var/lib/basetool/redis/session-users.acl /var/lib/basetool/redis-shared/users.acl   # MUST print 1 each
+     /etc/basetool/redis/session-users.acl /etc/basetool/redis/shared-users.acl
+   grep -c '^user default ' /etc/basetool/redis/session-users.acl /etc/basetool/redis/shared-users.acl   # MUST print 1 each
    ```
 
    The keystore ACL is re-applied by hand because restic does not carry POSIX ACLs; verify with

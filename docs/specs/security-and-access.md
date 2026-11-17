@@ -5994,10 +5994,13 @@ the internet-facing ingest gateway above all — was a compromise of every membe
   neither `EVAL` nor `EVALSHA` and `ACL DRYRUN` refuses both.
 - **The rules are code.** `scripts/redis-session-users.acl.tmpl` and
   `scripts/redis-shared-users.acl.tmpl` are the single sources, one per instance;
-  `render-redis-acl.py` renders each on the host with SHA-256 hashes (never a clear-text password),
-  refuses a partial render or a file without exactly one `default` line, and its self-test refuses a
-  session template that names a shared key or channel, and the reverse. The Testcontainers suites
-  and the E2E stack load the same templates.
+  `render-redis-acl.py` renders each on the host with SHA-256 hashes (never a clear-text password)
+  and refuses, naming variables only: a partial render, an unset `REDIS_DEFAULT_USER` (it has no
+  default), one password under two variables — on one instance or across both —, an application
+  user granted a key or channel outside its instance's prefixes (the session store:
+  `basetool:session:` and the keyspace events; the shared Redis: `ingest:`, `exchange:`, the
+  live-sync and notification channels), and a file without exactly one `default` line. The
+  Testcontainers suites and the E2E stack load the same templates.
 - **Merging changes nothing for the applications.** A service uses its own user only when its
   `REDIS_<SVC>_USERNAME` is set; empty, it sends a password-only `AUTH` with the shared
   `REDIS_PASSWORD`, which is `default`, exactly as before.
@@ -6057,8 +6060,13 @@ the internet-facing ingest gateway above all — was a compromise of every membe
   *`RedisAclFrontendIntegrationTest#theSessionStoreAclMatrixHoldsForEveryUser` and
   `#theSharedAclMatrixHoldsForEveryUser`; measured against `redis_exporter` v1.97.0 with `ACL LOG`
   empty.*
-- [x] A password-only `AUTH` works while `default` is on and fails once it is off.
-  *`RedisAclFrontendIntegrationTest`.*
+- [x] A password-only `AUTH` works while `default` is on and fails once it is off; on a host both
+  instances prove it with their own admin password, which never leaves the container.
+  *`RedisAclFrontendIntegrationTest`; `check-conformance.py` `redis-default-user-off`,
+  `check-conformance.test.sh`.*
+- [x] The renderer refuses an unset `REDIS_DEFAULT_USER`, one password under two variables of
+  either instance and an application grant outside its instance's prefixes, and never prints a
+  value. *`render-redis-acl.py --selftest`.*
 - [x] Under `prod` the gateway refuses to start with a blank or `default` Redis username, read
   through the shipped `application.yml`; `dev` and `test` keep the fallback.
   *`RedisUsernameGuardTest`.*
@@ -6783,7 +6791,8 @@ state, the ingest handoff and the three pub/sub channels live in `redis-shared`.
   `net-redis-frontend`, `net-redis-ingest` and `net-redis-backend`. `frontend` requires
   `redis-session`, `ingest` requires `redis-shared`; the backend requires neither.
 - **Each instance has its own ACL file and admin password** (`REDIS_SESSION_PASSWORD`,
-  `REDIS_PASSWORD`), rendered from its own template; the session store's file names no user of the
+  `REDIS_PASSWORD`), rendered from its own template into the root-owned `/etc/basetool/redis/`,
+  outside the data directories the containers own; the session store's file names no user of the
   backend or the gateway. Both files are backup artifacts and restore-drill checks
   (`redis_session_acl`, `redis_shared_acl`); the data of neither is (REQ-OPS-010).
 - **Monitoring tells them apart.** Each instance has its own exporter, every Redis series carries a
@@ -6803,7 +6812,8 @@ and `redis-shared` services of the compose files and their Quadlet units
   *`SharedRedisIntegrationTest`, `SharedRedisConfigTest`.*
 - [x] `redis-session` and `redis-shared` run as separate containers, and only `frontend` and the
   session exporter join `net-redis-session`, so the ingest gateway has no route to the session store.
-  *`generate-quadlet.py --check`, `generate-quadlet.test.sh` (every Redis network `Internal=true`).*
+  *`generate-quadlet.py --check`, `generate-quadlet.test.sh` (every Redis network `Internal=true`);
+  on a host `check-conformance.py` `redis-session-isolated`, `check-conformance.test.sh`.*
 - [x] Each instance loads its own ACL file with exactly one `default` line, off in the E2E stack; the
   session store knows no backend or gateway user, and the shared Redis grants the frontend no
   session key. *`RedisAclFrontendIntegrationTest`, `render-redis-acl.py --selftest`.*

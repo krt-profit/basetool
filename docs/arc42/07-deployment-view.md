@@ -56,7 +56,7 @@ are not backup artifacts; the storage, transaction and capacity contracts are ca
 [REQ-BANK-014/015](../specs/bank.md) and
 [ADR-0368](../adr/0368-bank-export-snapshots-and-rendering-have-separate-lifetimes.md).
 
-Quadlet `.container`, `.network` and `.volume` files — eighteen containers, seventeen networks and
+Quadlet `.container`, `.network` and `.volume` files — twenty containers, nineteen networks and
 three volumes, plus one `env.d` template per container — are generated from the compose files by
 [`scripts/generate-quadlet.py`](../../scripts/generate-quadlet.py), committed under
 [`quadlet/`](../../quadlet/), kept honest by the `quadlet-drift` CI job — a Dependabot compose bump
@@ -92,8 +92,8 @@ Consequences worth stating:
   `net-redis-session`, which only the frontend and its exporter join; `redis-shared` holds the
   exchange and ingest keys and the pub/sub channels on the three other `net-redis-*` networks, so the
   internet-facing gateway has no route to a session (REQ-SEC-089, ADR-0388).
-- **Each Redis ACL is rendered, not written.** `/var/lib/basetool/redis/session-users.acl` and
-  `/var/lib/basetool/redis-shared/users.acl` come from `scripts/redis-session-users.acl.tmpl` and
+- **Each Redis ACL is rendered, not written.** `/etc/basetool/redis/session-users.acl` and
+  `/etc/basetool/redis/shared-users.acl` come from `scripts/redis-session-users.acl.tmpl` and
   `scripts/redis-shared-users.acl.tmpl` through `render-redis-acl.py` (installed by the role), one
   user per service and SHA-256 hashes only, and are applied live with `ACL LOAD` (REQ-SEC-068,
   ADR-0207).

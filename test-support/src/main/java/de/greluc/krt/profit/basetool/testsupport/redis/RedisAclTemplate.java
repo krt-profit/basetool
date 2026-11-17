@@ -96,8 +96,8 @@ public final class RedisAclTemplate {
   /**
    * Renders the session store's template.
    *
-   * @param values the template variables; every {@code hash} variable must be non-empty, a missing
-   *     {@code state} variable means {@code on}
+   * @param values the template variables; every {@code hash} variable must be non-empty, every
+   *     {@code state} variable {@code on} or {@code off}
    * @return the ACL file content, one {@code user} line per rule, ending in a newline
    * @throws IllegalArgumentException when a required value is missing or a state is invalid
    */
@@ -108,8 +108,8 @@ public final class RedisAclTemplate {
   /**
    * Renders the shared Redis's template.
    *
-   * @param values the template variables; every {@code hash} variable must be non-empty, a missing
-   *     {@code state} variable means {@code on}
+   * @param values the template variables; every {@code hash} variable must be non-empty, every
+   *     {@code state} variable {@code on} or {@code off}
    * @return the ACL file content, one {@code user} line per rule, ending in a newline
    * @throws IllegalArgumentException when a required value is missing or a state is invalid
    */
@@ -144,7 +144,10 @@ public final class RedisAclTemplate {
           }
           replacement = sha256Password(value);
         } else {
-          replacement = value.isBlank() ? "on" : value.strip().toLowerCase(Locale.ROOT);
+          replacement = value.strip().toLowerCase(Locale.ROOT);
+          if (replacement.isEmpty()) {
+            throw new IllegalArgumentException(matcher.group(2) + " is unset");
+          }
           if (!"on".equals(replacement) && !"off".equals(replacement)) {
             throw new IllegalArgumentException(matcher.group(2) + " is neither on nor off");
           }

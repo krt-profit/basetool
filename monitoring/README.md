@@ -57,10 +57,12 @@ namespace the host has no route into, so Loki (`127.0.0.1:3100`) and Tempo's OTL
 `BASETOOL_ALLOY_LOKI_ENDPOINT` / `BASETOOL_ALLOY_TEMPO_ENDPOINT` in `/etc/sysconfig/alloy`). The host services
 bind all interfaces and are kept off the internet by the default-deny `firewalld` zone.
 
-**Networks** (Quadlet `.network` units): `net-monitoring-scrape` (Prometheus, the exporters, the app
-management ports), `net-monitoring-core` (Prometheus, Alertmanager, Loki, Tempo, Grafana — never an
-application container), `net-blackbox-v6` (the blackbox exporter's own IPv6 egress for the v6
-probes), plus the app data networks the exporters bridge into. `net-docker-proxy` exists only in the
+**Networks** (Quadlet `.network` units): `net-monitoring-scrape` (Prometheus, the other exporters,
+the app management ports), `net-monitoring-redis` (internal; Prometheus and the two Redis exporters
+alone, because an exporter's `/scrape?target=` connects to any address it is given),
+`net-monitoring-core` (Prometheus, Alertmanager, Loki, Tempo, Grafana — never an application
+container), `net-blackbox-v6` (the blackbox exporter's own IPv6 egress for the v6 probes), plus the
+app data networks the exporters bridge into. `net-docker-proxy` exists only in the
 compose file.
 
 **Grafana is the only UI**, published by the native edge (`docker/edge/conf.d/40-grafana.conf.template`)

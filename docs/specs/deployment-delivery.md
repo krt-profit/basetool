@@ -715,7 +715,7 @@ re-verified on every image bump** of that service before the bump is promoted (a
 healthcheck passing). The deploy health-gate is the safety net: a wrong cap set fails the container
 at start and is rolled back rather than shipped.
 
-**A read-only root filesystem is part of the baseline under Quadlet** — all eighteen units
+**A read-only root filesystem is part of the baseline under Quadlet** — all twenty units
 ([ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md)). Earlier revisions of this
 requirement said the opposite — *the JVM and DB working dirs write across the filesystem* — and that
 was never measured; when it was, on 2026-09-16, it was wrong in both halves. A healthy Spring Boot

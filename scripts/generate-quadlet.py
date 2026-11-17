@@ -92,8 +92,8 @@ PATH_VARS = {
     "BASETOOL_KEYCLOAK_KEYSTORE_HOST_PATH": "/etc/basetool/secrets/tls/keycloak.p12",
     "BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH": "/etc/basetool/secrets/tls/truststore.p12",
     "BASETOOL_TRUSTSTORE_HOST_PATH": "/etc/basetool/secrets/tls/truststore.p12",
-    "BASETOOL_REDIS_SESSION_ACL_HOST_PATH": "/var/lib/basetool/redis/session-users.acl",
-    "BASETOOL_REDIS_SHARED_ACL_HOST_PATH": "/var/lib/basetool/redis-shared/users.acl",
+    "BASETOOL_REDIS_SESSION_ACL_HOST_PATH": "/etc/basetool/redis/session-users.acl",
+    "BASETOOL_REDIS_SHARED_ACL_HOST_PATH": "/etc/basetool/redis/shared-users.acl",
     "BASETOOL_UPSTREAM_CA_HOST_PATH": "/etc/basetool/monitoring/certs/basetool-ca.crt",
     "BASETOOL_GRAFANA_UPSTREAM_CERT_HOST_PATH": "/etc/basetool/monitoring/certs/grafana.crt",
 }

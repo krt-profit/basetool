@@ -398,7 +398,7 @@ services:
           pids: 512
     volumes:
       - /var/lib/basetool/redis:/data
-      - ${BASETOOL_REDIS_SESSION_ACL_HOST_PATH:-/var/lib/basetool/redis/session-users.acl}:/etc/redis/users.acl:ro
+      - ${BASETOOL_REDIS_SESSION_ACL_HOST_PATH:-/etc/basetool/redis/session-users.acl}:/etc/redis/users.acl:ro
     networks:
       - net-redis-session
 
@@ -409,7 +409,7 @@ services:
     command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl
     volumes:
       - /var/lib/basetool/redis-shared:/data
-      - ${BASETOOL_REDIS_SHARED_ACL_HOST_PATH:-/var/lib/basetool/redis-shared/users.acl}:/etc/redis/users.acl:ro
+      - ${BASETOOL_REDIS_SHARED_ACL_HOST_PATH:-/etc/basetool/redis/shared-users.acl}:/etc/redis/users.acl:ro
     networks:
       - net-redis-frontend
       - net-redis-ingest

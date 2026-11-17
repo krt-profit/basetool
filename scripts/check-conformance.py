@@ -62,9 +62,15 @@ UNPRIVILEGED_CONTAINERS = {
 
 # Each Redis instance and the host ACL file it loads (ADR-0388).
 REDIS_ACL_FILES = {
-    "redis-session": "/var/lib/basetool/redis/session-users.acl",
-    "redis-shared": "/var/lib/basetool/redis-shared/users.acl",
+    "redis-session": "/etc/basetool/redis/session-users.acl",
+    "redis-shared": "/etc/basetool/redis/shared-users.acl",
 }
+
+# The session store's network and who may be on it (REQ-SEC-089): the exporter only while the
+# monitoring stack runs.
+SESSION_NETWORK = "net-redis-session"
+SESSION_NETWORK_REQUIRED = frozenset({"redis-session", "frontend"})
+SESSION_NETWORK_ALLOWED = SESSION_NETWORK_REQUIRED | {"redis-session-exporter"}
 
 EXPECTED_APP_CONTAINERS = (
     "edge",
@@ -829,6 +835,94 @@ def check_redis_requires_auth(ctx: Context) -> str:
     return f"an unauthenticated ping is refused with -NOAUTH by {' and '.join(REDIS_ACL_FILES)}"
 
 
+def check_redis_default_user_off(ctx: Context) -> str:
+    """A password-only ``AUTH`` must not open either Redis instance.
+
+    Inside each container, authenticates first as ``admin`` and then password-only (which is
+    ``default``) with the instance's admin password from the unit's own environment. Both ACL users
+    carry that password's hash, so ``admin`` answering ``PONG`` while the password-only ``AUTH`` is
+    refused ``WRONGPASS`` proves ``default`` is off. The password never leaves the container; only
+    the first line of each reply is printed.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming the instances whose ``default`` is off.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when ``default`` answers, the probe cannot prove anything, or an instance cannot
+            be found.
+    """
+    for name, acl_file in REDIS_ACL_FILES.items():
+        cmd = (
+            f"{ctx.runner.container_cli} exec {name} sh -c "
+            "'REDISCLI_AUTH=\"$REDIS_PASSWORD\" redis-cli --no-auth-warning --user admin ping 2>&1 "
+            "| head -n 1; REDISCLI_AUTH=\"$REDIS_PASSWORD\" redis-cli --no-auth-warning ping 2>&1 "
+            "| head -n 1' || echo ABSENT"
+        )
+        lines = ctx.runner.run(cmd).strip().splitlines()
+
+        if lines == ["ABSENT"]:
+            raise CheckFailed(f"no running {name} container on this host")
+        if len(lines) != 2 or lines[0].strip().upper() != "PONG":
+            first = lines[0] if lines else "no output"
+            raise CheckFailed(
+                f"{name}'s admin user did not answer PONG to the unit's own REDIS_PASSWORD "
+                f"({first!r}). Without that the password-only probe "
+                "proves nothing about `default`; compare the unit's environment with "
+                f"{acl_file} before reading anything into it.")
+        password_only = lines[1].strip()
+        if password_only.upper() == "PONG":
+            raise CheckFailed(
+                f"{name} answered PONG to a password-only AUTH: `default` is on, so the admin "
+                "password works without a username and an application with an empty "
+                "REDIS_<SVC>_USERNAME still reaches the whole instance. Render "
+                f"{acl_file} with REDIS_DEFAULT_USER=off and ACL LOAD it.")
+        if "WRONGPASS" not in password_only.upper():
+            raise CheckFailed(
+                f"{name} answered {password_only!r} to a password-only AUTH - expected WRONGPASS. "
+                "That is neither the healthy answer nor the known failure.")
+    return f"a password-only AUTH is refused by {' and '.join(REDIS_ACL_FILES)} (default off)"
+
+
+def check_redis_session_isolated(ctx: Context) -> str:
+    """Only the frontend and the session store's exporter share the session store's network.
+
+    Lists the running containers attached to :data:`SESSION_NETWORK`. The store and the frontend
+    must be there, the exporter may be, and nothing else: every container on that network reaches
+    the sessions with every member's OAuth2 refresh token.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming the containers on the network.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when another container is attached, or the store or the frontend is missing.
+    """
+    out = ctx.runner.run(
+        f'{ctx.runner.container_cli} ps --filter network={SESSION_NETWORK} '
+        '--format "{{.Names}}"')
+    names = {line.strip() for line in out.splitlines() if line.strip()}
+    missing = SESSION_NETWORK_REQUIRED - names
+    if missing:
+        raise CheckFailed(
+            f"{', '.join(sorted(missing))} not found on {SESSION_NETWORK} (the filter saw "
+            f"{', '.join(sorted(names)) or 'nothing'}). That is not a pass: it says nothing about "
+            "who else is attached.")
+    intruders = names - SESSION_NETWORK_ALLOWED
+    if intruders:
+        raise CheckFailed(
+            f"{', '.join(sorted(intruders))} on {SESSION_NETWORK}: every container there reaches the "
+            "session store, whose keys hold every member's OAuth2 refresh token (REQ-SEC-089, "
+            "ADR-0388). Take the network off its unit.")
+    return f"{SESSION_NETWORK} holds {', '.join(sorted(names))} only"
+
+
 def check_containers_running(ctx: Context) -> str:
     """Every prod-profile container is up, and none is unhealthy.
 
@@ -1571,6 +1665,10 @@ CHECKS: tuple[Check, ...] = (
     Check("client-address-visible", "REQ-SEC-023 / ADR-0112", True, check_client_address_visible),
     Check("containers-running", "REQ-OPS-003", True, check_containers_running),
     Check("redis-requires-auth", "REQ-SEC-023 / ADR-0088", True, check_redis_requires_auth),
+    Check("redis-default-user-off", "REQ-SEC-068 / ADR-0207", True,
+          check_redis_default_user_off),
+    Check("redis-session-isolated", "REQ-SEC-089 / ADR-0388", True,
+          check_redis_session_isolated),
     Check("scrape-targets-up", "REQ-OBS-005", True, check_scrape_targets_up),
     Check("container-metrics", "REQ-OBS-006", True, check_container_metrics),
     Check("log-streams", "REQ-OBS-005", True, check_log_streams),

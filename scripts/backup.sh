@@ -19,8 +19,8 @@ BACKUP_DIR="${BASETOOL_BACKUP_DIR:-/var/lib/basetool/backup}"
 STAGING_BASE="${BACKUP_DIR}/staging"
 LOCKFILE="${BASETOOL_LOCKFILE:-/run/lock/basetool-deploy.lock}"
 BACKUP_ENV="${BASETOOL_BACKUP_ENV:-/etc/basetool/deploy/backup.env}"
-REDIS_SESSION_ACL_PATH="${BASETOOL_REDIS_SESSION_ACL_HOST_PATH:-/var/lib/basetool/redis/session-users.acl}"
-REDIS_SHARED_ACL_PATH="${BASETOOL_REDIS_SHARED_ACL_HOST_PATH:-/var/lib/basetool/redis-shared/users.acl}"
+REDIS_SESSION_ACL_PATH="${BASETOOL_REDIS_SESSION_ACL_HOST_PATH:-/etc/basetool/redis/session-users.acl}"
+REDIS_SHARED_ACL_PATH="${BASETOOL_REDIS_SHARED_ACL_HOST_PATH:-/etc/basetool/redis/shared-users.acl}"
 
 WRITER_SERVICES=(frontend backend ingest)
 LOCK_WAIT="${BASETOOL_BACKUP_LOCK_WAIT:-300}"
