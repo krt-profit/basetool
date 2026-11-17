@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.web;
 
+import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -45,13 +46,10 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -96,7 +94,6 @@ class RefineryOrderReadNoNPlusOneTest {
   @Autowired private MissionParticipantRepository missionParticipantRepository;
   @Autowired private RefineryOrderRepository refineryOrderRepository;
   @Autowired private EntityManager entityManager;
-  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private ObjectMapper objectMapper;
 
   private MockMvc mockMvc;
@@ -124,44 +121,42 @@ class RefineryOrderReadNoNPlusOneTest {
   void theOrderReadsStayStatementBoundedWhateverTheMissions() throws Exception {
     Seed few = seed(FEW);
     Seed many = seed(MANY);
-    Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    stats.setStatisticsEnabled(true);
 
-    long fewList = listStatements(stats, few);
-    long manyList = listStatements(stats, many);
+    long fewList = listStatements(few);
+    long manyList = listStatements(many);
     assertThat(manyList)
         .as("my-orders statements for " + MANY + " missions against " + FEW + " (N+1)")
+        .isPositive()
         .isEqualTo(fewList)
         .isLessThanOrEqualTo(STATEMENT_BOUND);
 
     UUID orderId = many.orders().getFirst();
-    clear(stats);
-    JsonNode detail = read(get(ORDERS + "/" + orderId), many.owner());
-    assertThat(detail.get("mission").get("id").asString())
-        .isEqualTo(many.missions().getFirst().toString());
-    assertThat(detail.get("mission").get("name").asString()).startsWith("Op ");
-    assertThat(stats.getPrepareStatementCount())
+    flushAndClear();
+    var detail = measured(() -> read(get(ORDERS + "/" + orderId), many.owner()));
+    JsonNode mission = detail.result().get("mission");
+    assertThat(mission.get("id").asString()).isEqualTo(many.missions().getFirst().toString());
+    assertThat(mission.get("name").asString()).startsWith("Op ");
+    assertThat(detail.statements())
         .as("detail statements")
+        .isPositive()
         .isLessThanOrEqualTo(STATEMENT_BOUND);
   }
 
-  private long listStatements(Statistics stats, Seed seed) throws Exception {
-    clear(stats);
-    JsonNode page = read(get(ORDERS + "/my-orders").param("size", "50"), seed.owner());
-    long statements = stats.getPrepareStatementCount();
-    JsonNode content = page.get("content");
+  private long listStatements(Seed seed) throws Exception {
+    flushAndClear();
+    var page = measured(() -> read(get(ORDERS + "/my-orders").param("size", "50"), seed.owner()));
+    JsonNode content = page.result().get("content");
     assertThat(content.size()).isEqualTo(seed.orders().size());
     for (JsonNode row : content) {
       assertThat(row.get("mission").get("id").asString()).isNotBlank();
       assertThat(row.get("mission").get("name").asString()).startsWith("Op ");
     }
-    return statements;
+    return page.statements();
   }
 
-  private void clear(Statistics stats) {
+  private void flushAndClear() {
     entityManager.flush();
     entityManager.clear();
-    stats.clear();
   }
 
   private JsonNode read(

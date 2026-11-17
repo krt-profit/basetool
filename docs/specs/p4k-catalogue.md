@@ -1367,17 +1367,26 @@ run. A referenced one stays a case (REQ-P4K-010). The report lists the hide and 
 ### REQ-P4K-053 — a second ship type of a record's ship is merged into the row of its GUID
 
 The Wiki and UEX create a ship type when their name steps find none, so a game ship can end up
-with a second row beside the one holding its P4K GUID. A row without a P4K GUID whose Wiki UUID is
-the GUID another row holds stands for that row's ship: the Wiki files the vehicle under the same
-UUID the game gives the record. After retiring the seeded NPC ship types (REQ-P4K-052) and before
-it matches, an APPLY merges each such row into the row of the GUID through the ship-type merge
-(REQ-DATA-042), when the catalogue lists the record and the row of the GUID is neither retired nor
-retiring. The twins are set aside while the run decides which rows move to their base or successor
-(REQ-P4K-051), since a twin's Wiki UUID would block such a move. When the row of the GUID moves, the
-twin is the Wiki entry of the record it leaves: it is merged all the same, and the row keeps its own
-Wiki UUID. The report lists each merge as `MERGED`, with both names; a preview reports the merges,
-writes nothing, and matches without the merged rows as the APPLY does. A row holding a P4K GUID is
-never merged away (REQ-P4K-007).
+with a second row beside the one holding its P4K GUID. After retiring the seeded NPC ship types
+(REQ-P4K-052) and before it matches, an APPLY merges such a twin into the row of its ship through
+the ship-type merge (REQ-DATA-042). The row it is merged into holds a GUID the catalogue lists and
+is neither retired nor retiring. A row without a P4K GUID is a twin of, in this order:
+
+1. the row whose GUID is its Wiki UUID — the Wiki files a vehicle under the UUID the game gives the
+   record;
+2. else the single row holding a record of the same variant group and in-game name as its own
+   record, which its Wiki UUID or its class name names;
+3. else the single row whose name is its Wiki in-game name, also when that row's GUID left the
+   catalogue and it moves to a successor no other row holds.
+
+A row whose GUID left a complete catalogue is a twin of the row holding the record that succeeds it:
+the single player base carrying one of its names (REQ-P4K-051). Only this rule merges away a row
+holding a P4K GUID, whose record is gone; otherwise a P4K row is never merged away (REQ-P4K-007).
+
+The twins are set aside while the run decides which rows move to their base or successor
+(REQ-P4K-051), since a twin's identity would block such a move. When the row a twin is merged into
+moves, it keeps its own Wiki UUID. The report lists each merge as `MERGED`, with both names; a
+preview reports the merges, writes nothing, and matches without the merged rows as the APPLY does.
 
 **Acceptance**
 
@@ -1386,10 +1395,15 @@ never merged away (REQ-P4K-007).
   the Wiki UUID.
 - [x] A Wiki row of the edition a row leaves for its base is merged, and the row keeps its own Wiki
   UUID.
+- [x] A Wiki row of an edition, or a row carrying an edition's class, is merged into the row of its
+  base; so is a Wiki row whose in-game name is a row's name.
+- [x] A row whose record left is merged into the row of its successor, with its hangar ships and its
+  UEX vehicle id.
 - [x] A preview reports the merge as `MERGED` and changes no row.
 - [x] A second APPLY finds nothing to merge.
 
-**Enforced by:** `P4kShipTwinsImportTest` · **Code:** `P4kShipTwins`, `ShipTypeMergeService` ·
+**Enforced by:** `P4kShipTwinsImportTest`, `P4kShipTwinRulesImportTest` · **Code:** `P4kShipTwins`,
+`ShipTypeMergeService` ·
 **ADR:** [ADR-0392](../adr/0392-the-p4k-import-resolves-ship-identity-conflicts-itself.md)
 
 ## Game texts

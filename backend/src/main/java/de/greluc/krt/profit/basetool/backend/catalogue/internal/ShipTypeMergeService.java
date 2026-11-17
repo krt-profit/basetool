@@ -54,7 +54,8 @@ class ShipTypeMergeService {
 
   /**
    * Merges one ship type into another inside the caller's transaction. A row that holds a P4K GUID
-   * is never merged away, since its record's identity stays with it (REQ-P4K-007).
+   * is merged away only when the evidence is that its record left the catalogue; otherwise its
+   * record's identity stays with it (REQ-P4K-007).
    *
    * @param retiredId the ship type to merge away
    * @param survivorId the ship type that stays
@@ -62,7 +63,7 @@ class ShipTypeMergeService {
    *     null} when it holds none; a Wiki UUID equal to it outranks the survivor's own
    * @param reason the evidence that both stand for the same game ship
    * @return whether the merge happened; {@code false} when a row is gone or the retired row holds a
-   *     P4K GUID
+   *     P4K GUID the evidence does not let go
    */
   @Transactional(propagation = Propagation.MANDATORY)
   boolean merge(
@@ -76,7 +77,9 @@ class ShipTypeMergeService {
     List<ShipType> locked = shipTypes.lockMergeRows(List.of(retiredId, survivorId));
     ShipType retired = find(locked, retiredId);
     ShipType survivor = find(locked, survivorId);
-    if (retired == null || survivor == null || retired.getP4kUuid() != null) {
+    if (retired == null
+        || survivor == null
+        || (retired.getP4kUuid() != null && !reason.isMergingP4kRow())) {
       return false;
     }
     final String snapshot = redirects.snapshot(retiredId, survivorId);

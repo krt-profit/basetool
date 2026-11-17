@@ -19,9 +19,31 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
 /** The evidence that two ship types stand for the same game ship, recorded with their merge. */
+@RequiredArgsConstructor
 enum ShipTypeMergeReason {
 
   /** The Wiki UUID of the merged row is the P4K GUID the surviving row holds (REQ-P4K-053). */
-  WIKI_UUID_IS_P4K_GUID
+  WIKI_UUID_IS_P4K_GUID(false),
+
+  /**
+   * The merged row's record is a same-name member of the variant group the surviving row's record
+   * belongs to (REQ-P4K-053).
+   */
+  SAME_VARIANT_GROUP_AND_NAME(false),
+
+  /** The merged row's Wiki in-game name is the surviving row's P4K-led name (REQ-P4K-053). */
+  WIKI_GAME_NAME_IS_P4K_NAME(false),
+
+  /**
+   * The merged row's GUID left a complete catalogue, and the surviving row holds the record that
+   * succeeds it (REQ-P4K-053).
+   */
+  DEPARTED_FOR_HELD_SUCCESSOR(true);
+
+  /** Whether the merged row may hold a P4K GUID, which then leaves the catalogue with it. */
+  @Getter private final boolean mergingP4kRow;
 }

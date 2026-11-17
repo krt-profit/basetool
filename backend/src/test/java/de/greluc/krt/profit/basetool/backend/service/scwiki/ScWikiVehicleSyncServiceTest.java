@@ -462,6 +462,84 @@ class ScWikiVehicleSyncServiceTest {
   }
 
   @Test
+  void theBaseOfASharedNameLinksTheStoredRowAndItsVariantsCountAsCovered() {
+    UUID medical = UUID.randomUUID();
+    UUID cargo = UUID.randomUUID();
+    UUID base = UUID.randomUUID();
+    ShipType galaxy = new ShipType();
+    galaxy.setName("Galaxy");
+    galaxy.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(
+                    galaxyDto(medical, "RSI_Galaxy_TEMP_Medical"),
+                    galaxyDto(cargo, "RSI_Galaxy_TEMP_Cargo"),
+                    galaxyDto(base, "RSI_Galaxy"))));
+    when(shipTypeRepository.findByNameIgnoreCase("Galaxy")).thenReturn(Optional.of(galaxy));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    assertEquals(1, service.syncVehicles());
+
+    verify(shipTypeRepository, times(1)).save(galaxy);
+    assertEquals(base, galaxy.getExternalUuid());
+    assertEquals(GameItemSourceSystem.BOTH, galaxy.getSourceSystems());
+    verify(syncReportService, times(2))
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            any(),
+            eq("Galaxy"),
+            eq("Name is held by a sibling Wiki vehicle of this census."));
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository).markScwikiDeletedExcept(eq(Set.of(medical, cargo, base)), any());
+  }
+
+  @Test
+  void aSharedNameWithoutABaseAmongItsCarriersStaysAConflict() {
+    ShipType galaxy = new ShipType();
+    galaxy.setName("Galaxy");
+    galaxy.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(
+                    galaxyDto(UUID.randomUUID(), "RSI_Galaxy_TEMP_Medical"),
+                    galaxyDto(UUID.randomUUID(), "RSI_Galaxy_TEMP_Cargo"))));
+    when(shipTypeRepository.findByNameIgnoreCase("Galaxy")).thenReturn(Optional.of(galaxy));
+
+    assertEquals(0, service.syncVehicles());
+
+    verify(shipTypeRepository, never()).save(any());
+    verify(syncReportService, times(2))
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            any(),
+            eq("Galaxy"),
+            eq("Name is shared by several Wiki vehicles."));
+    verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
+  }
+
+  /**
+   * Builds a Wiki vehicle named {@code Galaxy}, as the Wiki lists the base and its module variants.
+   *
+   * @param uuid the vehicle's UUID
+   * @param className its class name
+   * @return the vehicle
+   */
+  private static ScWikiVehicleDto galaxyDto(UUID uuid, String className) {
+    return ScWikiVehicleDto.builder()
+        .uuid(uuid)
+        .name("Galaxy")
+        .gameName("RSI Galaxy")
+        .className(className)
+        .build();
+  }
+
+  @Test
   void ofTwoUnstoredVariantsSharingANameOnlyTheFirstIsCreated() {
     UUID first = UUID.randomUUID();
     UUID second = UUID.randomUUID();

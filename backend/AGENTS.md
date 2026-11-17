@@ -68,3 +68,6 @@ Full rules: [`docs/agents/backend-testing.md`](../docs/agents/backend-testing.md
 - **Reuse a Spring test context, do not open one** (REQ-OPS-041, `TestContextBudgetTest`, budget
   36): plain `@SpringBootTest` without a mock, `@LeafServiceMockTest` for a leaf-service mock, and
   the field name the other classes already use.
+- **Count a statement bound on the calling thread** with `support.StatementCounter`
+  (`preparedBy` / `measured`), never with the global `getPrepareStatementCount()`, and assert the
+  count is positive where `0 == 0` would pass.

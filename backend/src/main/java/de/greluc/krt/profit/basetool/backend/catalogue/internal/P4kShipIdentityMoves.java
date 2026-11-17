@@ -153,6 +153,25 @@ final class P4kShipIdentityMoves {
       @NotNull ShipType ship,
       @NotNull Map<String, List<P4kShipDto>> playersByName,
       @NotNull Set<UUID> held) {
+    P4kShipDto base = successorRecord(ship, playersByName);
+    if (base == null) {
+      return null;
+    }
+    UUID baseGuid = Objects.requireNonNull(base.parsedGuid());
+    return held.contains(baseGuid) ? null : new Move(ship, base, baseGuid, null);
+  }
+
+  /**
+   * Returns the single player base whose in-game name is one of a ship type's names, whoever holds
+   * it.
+   *
+   * @param ship the ship type
+   * @param playersByName the catalogue's player bases by folded in-game name
+   * @return the record, or {@code null} when none or several carry its names
+   */
+  @Nullable
+  static P4kShipDto successorRecord(
+      @NotNull ShipType ship, @NotNull Map<String, List<P4kShipDto>> playersByName) {
     Set<UUID> seen = new HashSet<>();
     List<P4kShipDto> candidates = new ArrayList<>();
     Stream.of(ship.getName(), ship.getNameFull(), ship.getGameName())
@@ -162,12 +181,7 @@ final class P4kShipIdentityMoves {
         .flatMap(name -> playersByName.getOrDefault(name, List.of()).stream())
         .filter(record -> seen.add(record.parsedGuid()))
         .forEach(candidates::add);
-    if (candidates.size() != 1) {
-      return null;
-    }
-    P4kShipDto base = candidates.getFirst();
-    UUID baseGuid = Objects.requireNonNull(base.parsedGuid());
-    return held.contains(baseGuid) ? null : new Move(ship, base, baseGuid, null);
+    return candidates.size() == 1 ? candidates.getFirst() : null;
   }
 
   /**
@@ -177,8 +191,7 @@ final class P4kShipIdentityMoves {
    * @return the bases by name
    */
   @NotNull
-  private static Map<String, List<P4kShipDto>> playersByName(
-      @NotNull Map<UUID, List<P4kShipDto>> byGuid) {
+  static Map<String, List<P4kShipDto>> playersByName(@NotNull Map<UUID, List<P4kShipDto>> byGuid) {
     Map<String, List<P4kShipDto>> byName = new HashMap<>();
     for (List<P4kShipDto> records : byGuid.values()) {
       P4kShipDto record = sole(records);
@@ -246,7 +259,7 @@ final class P4kShipIdentityMoves {
    * @return the record, or {@code null} when absent or repeated
    */
   @Nullable
-  private static P4kShipDto sole(@Nullable List<P4kShipDto> records) {
+  static P4kShipDto sole(@Nullable List<P4kShipDto> records) {
     return records != null && records.size() == 1 ? records.getFirst() : null;
   }
 }
