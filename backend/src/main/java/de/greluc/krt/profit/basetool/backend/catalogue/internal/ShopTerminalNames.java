@@ -36,8 +36,8 @@ import org.jetbrains.annotations.Unmodifiable;
  */
 final class ShopTerminalNames {
 
-  /** UEX's separator between a terminal's shop part and its place. */
-  private static final String PLACE_SEPARATOR = " - ";
+  /** UEX's separator between a terminal's shop part, its district and its place. */
+  static final String PLACE_SEPARATOR = " - ";
 
   /** The shortest shop part that matches; {@code TDD} is the shortest UEX uses. */
   private static final int MIN_PART_LENGTH = 3;
@@ -58,7 +58,7 @@ final class ShopTerminalNames {
       @NotNull Shop shop, @NotNull List<StarmapPlaceRow> terminals) {
     List<String> keys =
         Stream.of(shop.getRegistryName(), shop.getEntityName(), shop.getBrand())
-            .map(ShopTerminalNames::compact)
+            .map(StarmapNames::compact)
             .filter(Objects::nonNull)
             .toList();
     List<StarmapPlaceRow> best = new ArrayList<>();
@@ -93,20 +93,7 @@ final class ShopTerminalNames {
       return null;
     }
     int cut = name.indexOf(PLACE_SEPARATOR);
-    String part = compact(cut < 0 ? name : name.substring(0, cut));
+    String part = StarmapNames.compact(cut < 0 ? name : name.substring(0, cut));
     return part == null || part.length() < MIN_PART_LENGTH ? null : part;
-  }
-
-  /**
-   * Compacts a name: normalised (REQ-P4K-035) and without spaces.
-   *
-   * @param name the name, or {@code null}
-   * @return the compact name, or {@code null} when nothing is left
-   */
-  @Contract(pure = true)
-  @Nullable
-  static String compact(@Nullable String name) {
-    String normalised = StarmapNames.normalise(name);
-    return normalised == null ? null : normalised.replace(" ", "");
   }
 }
