@@ -174,7 +174,9 @@ rt_login() {
   local registry="$1" user="$2" pwfile="$3"
   ${RT_CLI} login "${registry}" --username "${user}" --password-stdin <"${pwfile}" || return 1
 
-  podman login "${registry}" --username "${user}" --password-stdin <"${pwfile}"
+  # The caller's own credential (REGISTRY_AUTH_FILE, read by skopeo and cosign) goes through skopeo:
+  # a podman call here would leave a libpod lock in /dev/shm that RemoveIPC= cannot unlink under SELinux.
+  skopeo login "${registry}" --username "${user}" --password-stdin <"${pwfile}"
 }
 
 rt_service_container_ids() {

@@ -956,6 +956,12 @@ expect_call "the password is piped, not passed" podman \
   'rt_login ghcr.io someone '"${WORK}"'/token' '--password-stdin'
 expect_no_call "the value itself is never in an argv" podman \
   'rt_login ghcr.io someone '"${WORK}"'/token' 'hunter2'
+expect_call "the caller's own credential is written by skopeo, which leaves no libpod lock behind" podman \
+  'rt_login ghcr.io someone '"${WORK}"'/token' 'skopeo login ghcr.io --username someone --password-stdin'
+run_rt podman 'rt_login ghcr.io someone '"${WORK}"'/token' >/dev/null 2>&1
+if [[ "$(grep -c '^podman login' "$LOG")" == "1" ]]; then ok "...and podman logs in once, for the service user only"; else
+  bad "podman login ran $(grep -c '^podman login' "$LOG") times"
+fi
 
 say ""
 say "== lib/common.sh: the helpers the four operational scripts share (OPS-SIMP-04) =="
