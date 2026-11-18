@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:ffe087d6-0bbe-4acf-ab6a-30c24e02e015",
+  "serialNumber" : "urn:uuid:10963537-5825-4cb8-b4b7-ed3c84cf3229",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-11-15T09:25:45Z",
+    "timestamp" : "2026-11-18T10:18:09Z",
     "tools" : {
       "components" : [
         {
@@ -17,16 +17,16 @@
     },
     "component" : {
       "type" : "application",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@1.25.0?project_path=%3Aingest",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@1.26.0?project_path=%3Aingest",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "ingest",
-      "version" : "1.25.0",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@1.25.0?project_path=%3Aingest",
+      "version" : "1.26.0",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@1.26.0?project_path=%3Aingest",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/43698967177"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/44283164881"
         },
         {
           "type" : "vcs",
@@ -826,11 +826,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.0?project_path=%3Alogging-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "logging-support",
-      "version" : "1.25.0",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support",
+      "version" : "1.26.0",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.0?project_path=%3Alogging-support",
       "modified" : false,
       "properties" : [
         {
@@ -841,11 +841,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.0?project_path=%3Atechnical-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "technical-support",
-      "version" : "1.25.0",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support",
+      "version" : "1.26.0",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.0?project_path=%3Atechnical-support",
       "modified" : false,
       "properties" : [
         {
@@ -4259,6 +4259,78 @@
         {
           "type" : "vcs",
           "url" : "https://github.com/logfellow/logstash-logback-encoder"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.apache.commons/commons-pool2@2.13.1?type=jar",
+      "group" : "org.apache.commons",
+      "name" : "commons-pool2",
+      "version" : "2.13.1",
+      "description" : "The Apache Commons Object Pooling Library.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "01939067d71f2f34123b160319389b88"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "cf7e8c0242d4c483c42c083b8188ab360ab60f9a"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "f77a5060d6936a9144023584232f9de3f2248f1abfe156e9d31795f18770674f"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "a531827dab147f9368b86ac6ba5c52a523215d6057938bdec68a9b51e027ba696738491234f2f5ebf9f1ca6a5d83922bd3f735c496a518b635dacddbd914dc6a"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "dcd562f33c484f608f993d3867e648b19ae704545693aa74e8efb55a684572e6"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "b5ddec5bf94c91e241c84880f66a63f429bb2a0abc5b39378f6015e7b246560fef488eb4e6ae17f403c2a3322371b54098e62e0ceb87d59fbdbf548ba0faabcf"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "07463ab14f29cd0df5055679f705939224c855aa5398d92f9d7f8968a4f1339c197600a80b3fa00f765c1a8cb498e02a"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "ff3ccad9176f30bbe3fcd8686d4f31769da7fc337930307a49259439ae935c9db6ccc1e4ab1a7965b0f652c862423e2f"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.apache.commons/commons-pool2@2.13.1?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "build-system",
+          "url" : "https://github.com/apache/commons-pool/actions"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://issues.apache.org/jira/browse/POOL"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://gitbox.apache.org/repos/asf?p=commons-pool.git"
         }
       ],
       "properties" : [
@@ -9724,15 +9796,16 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@1.25.0?project_path=%3Aingest",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@1.26.0?project_path=%3Aingest",
       "dependsOn" : [
         "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar",
         "pkg:maven/com.networknt/json-schema-validator@3.0.9?type=jar",
-        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support",
-        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.0?project_path=%3Alogging-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.0?project_path=%3Atechnical-support",
         "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.2?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
+        "pkg:maven/org.apache.commons/commons-pool2@2.13.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-devtools@4.1.2?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.1.2?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.2?type=jar",
@@ -9744,14 +9817,14 @@
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.0?project_path=%3Alogging-support",
       "dependsOn" : [
         "pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.0?project_path=%3Atechnical-support",
       "dependsOn" : [
         "pkg:maven/io.micrometer/micrometer-observation@1.17.2?type=jar"
       ]
@@ -10169,6 +10242,10 @@
       "dependsOn" : [
         "pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar"
       ]
+    },
+    {
+      "ref" : "pkg:maven/org.apache.commons/commons-pool2@2.13.1?type=jar",
+      "dependsOn" : [ ]
     },
     {
       "ref" : "pkg:maven/org.apache.logging.log4j/log4j-api@2.25.5?type=jar",

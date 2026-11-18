@@ -2,6 +2,210 @@
 
 ## [Unreleased]
 
+## [v1.26.0](https://github.com/krt-profit/basetool/releases/tag/v1.26.0) - 2026-11-18
+
+### Added
+
+- **Schiffsliste importieren.** Passt ein Name auf mehrere Schiffe, zeigt das Import-Ergebnis ihn
+  unter „Nicht eindeutig" mit einer Auswahl; „Auswahl importieren" übernimmt die gewählten Schiffe,
+  ohne Doppelte anzulegen.
+
+### Changed
+
+- **Frontend, Redis.** Live-Sync und Ingest-Handoff laufen über eine eigene Redis-Verbindung
+  (`REDIS_SHARED_*`), die Sessions über die bisherige. Noch zeigen beide auf dieselbe Instanz;
+  das bereitet den getrennten Session-Store vor (ADR-0388). Ist diese Redis beim Start nicht
+  erreichbar, startet das Frontend trotzdem; Live-Sync verbindet sich nach.
+
+- **P4K-Import, Schiffe.** NPC-, Missions- und Editionskopien eines Schiffs, das schon einen
+  Schiffstyp hat, landen nicht mehr in der Prüfliste; der Bericht führt sie als „Durch Schiffstyp
+  abgedeckt“. Schiffsfälle, die ein Import nicht mehr findet, schließt er selbst.
+
+- **P4K-Import, Schiffe.** Ein Schiffstyp, der die GUID einer gleichnamigen Edition trägt, wechselt
+  beim Import selbst auf die Basis (z. B. Carrack BIS2950 → Carrack). Verschwindet die GUID eines
+  Schiffstyps aus dem Spiel, folgt er dem neuen Record mit seinem Namen (z. B. Hammerhead → GS)
+  und bleibt für Hangar und Missionen erhalten.
+
+- **P4K-Import, Schiffe.** Früher angelegte NPC-Schiffstypen, auf die nichts verweist (etwa
+  „Drake Clipper“ einer KI-Crew), versteckt der Import selbst und gibt ihren Namen für das echte
+  Schiff frei; sie landen nicht mehr in der Prüfliste.
+
+- **P4K-Import, Schiffe.** Hat das Wiki einen Schiffstyp ein zweites Mal angelegt (etwa „Idris-M“
+  neben „Aegis Idris-M“), führt der Import beide zusammen: Hangar-Schiffe, Missionseinheiten und
+  Vorlagen zeigen danach auf den verbleibenden Schiffstyp, alte Verweise funktionieren weiter.
+
+- **P4K-Import, Schiffe.** Der Import erkennt weitere doppelte Schiffstypen und führt sie
+  zusammen: Wiki-Einträge einer Sonderedition (etwa „Eclipse“ neben „Aegis Eclipse“), Einträge mit
+  dem Spielnamen eines Schiffstyps und alte Schiffstypen, deren Spielobjekt durch ein neues ersetzt
+  wurde (etwa die Constellation Aquila).
+
+- **P4K-Import, Schiffe.** Schiffstypen, die nur UEX angelegt hat und deren voller UEX-Name der
+  Spielname eines Schiffstyps ist (etwa „Prowler“ neben „Esperia Prowler“), führt der Import mit
+  diesem zusammen.
+
+- **P4K-Import, Schiffe.** Führt das Spiel ein Schiff unter einem alten und einem überarbeiteten
+  `_GS`-Datensatz mit gleichem Namen (etwa die Constellation Mk IV Phoenix und Taurus), führt der
+  Import die beiden Schiffstypen zum überarbeiteten zusammen. Verschwundene Sondereditionen (etwa
+  Phoenix Emerald, Hammerhead 2949 Best In Show) gehen in ihrem Grundschiff auf, und UEX legt sie
+  danach nicht neu an.
+
+- **P4K-Import, Gegenstände.** Prüffälle zu Gegenständen schließen sich, sobald ein Import sie nicht mehr findet. Ein
+  gespeicherter Gegenstand, der zu einem anderen Spieleintrag gehört, gilt nicht mehr als Namenstreffer, seine Kopien
+  zählen als abgedeckt, und namenlose oder nicht erhältliche Gegenstände öffnen keinen Fall mehr.
+
+- **Server.** Die Einstellung, über die die Dienste den eigenen Server erreichen, liegt jetzt in einer
+  eigenen Zusatzdatei. So bleibt sie nach dem Update auf Rocky Linux 10.3 mit Podman 6 wirksam, ohne
+  die Grundeinstellungen der Distribution außer Kraft zu setzen.
+
+- **P4K-Import, Gegenstände.** Früher angelegte Welt- und NPC-Objekte (Konsolen, Türen, Bildschirme, Haarfarben …), die
+  kein Mitglied verwendet, verschwinden aus den Auswahllisten, statt als Prüffall zu warten; verwendete bleiben ein Fall.
+
+- **Abgleichbericht, Hersteller.** UEX und SC Wiki melden keine Kürzel-Abweichung zu den Spieldateien mehr, denn
+  UEX-Spitzname und Wiki-Code sind keine Spielcodes; rund 117 Meldungen am Tag entfallen, Namensabweichungen bleiben.
+
+- **UEX-Sync, Gegenstände.** Listet UEX einen Gegenstand doppelt, führt der Abgleich den zweiten
+  Eintrag mit dem Gegenstand aus dem Spiel zusammen, samt Verweisen und Preisen; Mitglieder sehen
+  ihn nur noch einmal.
+
+- **Erhältlich bei.** Der P4K-Import ordnet deutlich mehr Shops ihrem UEX-Terminal zu, auch bei
+  abweichender Schreibweise, Spitznamen oder Shops in einem Stadtviertel; die Artikelseite nennt
+  dadurch für viel mehr Shops den Terminalnamen.
+
+- **P4K-Prüfliste.** Orte und Shops, die es im Spiel nicht gibt oder deren Verknüpfung nichts
+  anzeigen würde, erzeugen keinen Prüffall mehr; offene Fälle dieser Art schließt der nächste
+  Import.
+
+- **P4K-Import, Rohstoffe.** Rohstoffe finden ihren SC-Wiki-Eintrag über ihren Ressourcentyp, die drei SLAM-Verpackungen
+  zählen als ein Rohstoff, und Rohstoffe ohne Kategorie bekommen die ihres Ressourcentyps; die meisten Rohstoff-Prüffälle
+  und Identitätsmeldungen entfallen.
+
+- **Rohstoffe.** Rohstoffe, die es im Spiel nicht gibt, öffnen keinen Kategorie-Prüffall mehr. UEX-Rohstoffe ohne
+  Spielquelle, Preis und Verwendung (etwa Boron, Xenon, Coal) verschwinden aus Listen und Auswahlfeldern, bis eine Quelle
+  oder ein Preis sie zurückbringt.
+
+- **Rohstoffkategorien.** Zwei gleichnamige Kategorien unterscheidet ein Zusatz, etwa „Hergestellte Produkte (Bulk
+  Supplies)“.
+
+- **Rohstoffe.** Doppelte Rohstoff-Einträge, die niemand verwendet, räumt der P4K-Import selbst auf: etwa „Audio-Visual
+  Equipment“, „Lastaprene“ und „Raw Ouratite“ gehen in ihrem Gegenstück auf, „Construction Salvage“ und „Construction
+  Rubble“ übergeben ihre Wiki-Daten an die gleichnamigen UEX-Rohstoffe. Die zugehörigen Prüffälle schließen sich.
+
+- **Blaupausen.** Benennt das Spiel eine Blaupause um, bleiben deine Einträge unter dem alten Namen ihr zugeordnet, etwa
+  bei den Neutrino-Racing-Helmen und -Anzügen.
+
+### Fixed
+
+- Navigation: „Tastenkürzel“ und „Anpassen“ im Benutzermenü der Leiste kleben nicht mehr aneinander, sondern stehen mit Abstand in einem eigenen Abschnitt.
+
+- **Große Änderung bestätigen.** Die Bestätigungsseite für zurückgehaltene Massenänderungen einer
+  verbundenen Anwendung lädt jetzt auch große Änderungen, etwa einen Umzug des ganzen Lagers, statt
+  bei „Wird geladen …“ stehen zu bleiben. Scheitert das Laden doch einmal, zeigt sie eine Meldung
+  mit „Erneut versuchen“.
+
+- **Bedarf & Spenden.** Lange Material- und Itemnamen brechen in der Bedarfsliste auf Tablets um.
+  Die Zeilenaktionen bleiben sichtbar, und die Seite scrollt nicht mehr seitlich.
+
+- **Schiffskatalog.** Die Schiffsbeschreibung bleibt leer, wenn keine englische Fassung vorliegt.
+
+- **Bedarf & Spenden.** Die Bedarfsliste passt auf Tablets auch mit langen Namen und Hinweisen
+  in den Inhaltsbereich. Auf dem Dashboard bleiben lange Material- und Itemnamen in ihrer Kachel lesbar.
+
+- **Ankaufbericht.** „Kopieren" im Forumtext-Dialog legt den Text wieder in die Zwischenablage,
+  statt in Chrome, Edge und anderen Chromium-Browsern nur einen Fehler zu melden.
+
+- **Updates.** Ein Update, das einen Dienst umbenennt oder entfernt, nimmt die Anwendung erst im
+  eigentlichen Neustart vom Netz statt schon während des Herunterladens. Scheitert es vorher, läuft
+  die bisherige Version ungestört weiter, und ein zurückgerolltes Update startet wieder alle Dienste
+  der bisherigen Version.
+
+- **Updates.** Fehlt auf dem Server ein Verzeichnis oder eine Datei, die ein neuer Dienst braucht,
+  lehnt die Auslieferung das Update ab, bevor sie etwas ändert.
+
+- **Schiffstypen-Abgleich.** UEX- und SC-Wiki-Abgleich finden einen Schiffstyp auch unter dem
+  Spielnamen, den der P4K-Import vergibt (z. B. „Anvil Carrack“ statt „Carrack“). Nach einem
+  P4K-Import entsteht dadurch kein zweiter Schiffstyp mit dem Kurznamen mehr.
+
+- **Auftrag anlegen.** Auf dem Handy ragt die Materialzeile in Safari auch beim erneuten Öffnen des
+  Formulars nicht mehr über den rechten Bildschirmrand hinaus.
+
+- **UEX-Sync, Schiffe.** Listet UEX ein Schiff doppelt (etwa „Retaliator“ und „Retaliator Bomber“
+  oder zweimal „Sabre Raven EX“), hängt nur noch eine Listung am Schiffstyp; die andere legt keinen
+  zweiten Schiffstyp mehr an und blockiert den Abgleich nicht mehr.
+
+- **Navigation anpassen.** Wer kurz hintereinander verschiebt und zurücksetzt oder einen Favoriten
+  verschiebt und gleich entfernt, sieht keinen falschen Hinweis „In einem anderen Fenster geändert“
+  mehr; beide Änderungen werden gespeichert.
+
+- **Schiffsliste importieren.** Exporte wie CCU Game Fleetview erkennen wieder Schiffe, deren
+  Katalogname mit dem Hersteller beginnt („Talon" findet „Esperia Talon"). Steht ein Schiff zweimal
+  im Katalog, mit und ohne Hersteller, zählt es als ein Schiff und landet bei dem Eintrag, den dein
+  Hangar schon nutzt.
+
+- **SC-Wiki-Abgleich, Schiffe.** Teilen sich mehrere Wiki-Fahrzeuge einen Namen und ist eines die Basis der anderen
+  (etwa die Galaxy und ihre Module), verknüpft die Basis den Schiffstyp. Die Galaxy bekommt ihre Wiki-Daten, und der
+  tägliche Wiki-Abgleich bleibt nicht mehr hängen.
+
+- **P4K-Import, Gegenstände.** Ein Gegenstand, der die GUID einer gleichnamigen Kopie oder eine nicht mehr geführte GUID
+  trägt, wechselt zu dem Eintrag, den seine Wiki-UUID oder sein Klassenname nennt; sein GUID-Konflikt schließt sich.
+
+- **Gegenstände.** Auswahllisten bieten keine Gegenstände mehr an, die keine Quelle mehr führt (kein P4K-Treffer, im SC
+  Wiki gelöscht, kein aktiver UEX-Eintrag), meist alte Schiffseinträge, die das Wiki früher als Gegenstände lieferte.
+  Bestehende Einträge zeigen sie weiter.
+
+- **P4K-Import, Hersteller.** Hersteller, die die Spieldateien doppelt führen (etwa RSI und RSI_2025), zählen als eine
+  Marke; rund 2.250 Gegenstände und 300 Schiffe bekommen so wieder ihren Hersteller. Einträge, die nur den Namen einer
+  anderen Marke tragen, überschreiben ihn nicht mehr, und Hersteller-Prüffälle schließen sich selbst.
+
+- **P4K-Import, Schiffe.** Nennt der Schiffsname eine andere Marke als die Spieldateien, gilt der Name: Die Esperia
+  Stinger ist wieder Esperia, die Vanduul Scythe wieder Vanduul.
+
+- **Katalog, Hersteller.** Hersteller, die UEX anders schreibt als die Spieldateien (etwa „Vanduul
+  Clans“ neben „Vanduul“ oder „Musashi Industrial and Starflight Concern“ neben MISC), gibt es nicht
+  mehr doppelt: Der UEX-Abgleich führt sie mit dem Hersteller aus den Spieldateien zusammen, Items
+  und Schiffstypen hängen danach an diesem.
+
+- **Katalog, Materialien.** Waren, die UEX doppelt führt, gibt es nicht mehr zweimal: „Party
+  Favors“ geht beim nächsten UEX-Abgleich in „Fireworks“ auf, dem Material aus den Spieldateien.
+  Lagerbestände, Aufträge, Bedarfe, Einkäufe, Börsen-Gesuche, Raffinerieaufträge und Terminalpreise
+  hängen danach an „Fireworks“.
+
+- **Aufträge.** Findet der Item-Auftragseditor keine bearbeitende Einheit, sagt der Hinweis jetzt,
+  dass in der Profit-Hierarchie gerade keine aktive Einheit zur Auswahl steht, statt auf eine
+  Freischaltung in den Einstellungen zu verweisen, die es nicht mehr gibt.
+
+- **Server.** Der Deploy-Lauf meldet sich für sein eigenes Registry-Login über skopeo statt über
+  Podman an. So bleibt keine Podman-Sperrdatei zurück, deren Löschung SELinux bei jedem Lauf
+  verweigert und protokolliert.
+
+- **Testsystem: Einweisungsdaten.** `scripts/seed-briefing.py` läuft wieder durch: Ein einziger
+  Profit-Bereich trägt alle Test-Staffeln und das Spezialkommando, die Aufträge legt der Logistiker
+  an, und der Seed-Client bekommt den `kc-admin-api`-Scope, den Keycloak 26.8.2 für das Admin-API
+  verlangt. Nach dem Leeren der Datenbank braucht der Seed vorher den P4K-Import.
+
+### Security
+
+- **Exchange-Gateway.** Das Gateway schickt Redis keine Lua-Skripte mehr: Byte-Budget,
+  Schreibkontingente und Idempotenz-Sperren laufen als optimistische Transaktionen. Jeder
+  Redis-Befehl läuft höchstens einmal, mit 2 s Zeitlimit; Abbrüche zählt eine neue Metrik mit Alarm.
+  Vor dem Release wird die Redis-ACL neu gerendert und geladen (ADR-0389).
+
+- **Redis-Monitoring.** Der Monitoring-Nutzer darf nur noch die Befehle des Exporters, kein
+  `CLIENT TRACKING` mehr, über das sich Session-IDs mitlesen ließen; kein Dienst-Nutzer darf es.
+
+- **Redis getrennt.** Die Sessions liegen in einer eigenen Redis-Instanz (`redis-session`), die nur
+  das Frontend erreicht; Exchange, Ingest-Übergaben und Live-Sync laufen über `redis-shared`. Der
+  Umzug braucht drei neue Passwörter (`REDIS_SESSION_*`) und zwei gerenderte ACL-Dateien unter
+  `/etc/basetool/redis/`; niemand wird abgemeldet (ADR-0388).
+
+- **Redis-ACL gehärtet.** `render-redis-acl.py` verweigert ein ungesetztes `REDIS_DEFAULT_USER`, ein
+  Passwort unter zwei Variablen und Rechte außerhalb der eigenen Instanz; `check-conformance.py`
+  prüft neu, dass `default` aus ist und nur Frontend und Exporter am Session-Netz hängen. Der
+  Registry-Abgleich schreibt die Sperrlisten vor der Registry.
+
+- **Laufzeit, Java4Shell (CVE-2026-114938).** Backend, Frontend, Ingest und Keycloak starten mit abgeschaltetem
+  hardwarebeschleunigtem Base64-Decoder (`-XX:-UseBASE64Intrinsics`). Das schließt die Pre-Auth-Lücke auf
+  AVX-512-Hosts, bis gepatchte JDK-Images erscheinen.
+
 ## [v1.25.0](https://github.com/krt-profit/basetool/releases/tag/v1.25.0) - 2026-11-15
 
 ### Added

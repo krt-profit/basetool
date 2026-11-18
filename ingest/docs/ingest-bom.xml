@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:ffe087d6-0bbe-4acf-ab6a-30c24e02e015" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:10963537-5825-4cb8-b4b7-ed3c84cf3229" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-11-15T09:25:45Z</timestamp>
+    <timestamp>2026-11-18T10:18:09Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -11,15 +11,15 @@
         </component>
       </components>
     </tools>
-    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.25.0?project_path=%3Aingest">
+    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.26.0?project_path=%3Aingest">
       <group>de.greluc.krt.profit.basetool</group>
       <name>ingest</name>
-      <version>1.25.0</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/ingest@1.25.0?project_path=%3Aingest</purl>
+      <version>1.26.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/ingest@1.26.0?project_path=%3Aingest</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/43698967177</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/44283164881</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -438,21 +438,21 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.0?project_path=%3Alogging-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>logging-support</name>
-      <version>1.25.0</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support</purl>
+      <version>1.26.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.0?project_path=%3Alogging-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.0?project_path=%3Atechnical-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>technical-support</name>
-      <version>1.25.0</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support</purl>
+      <version>1.26.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.0?project_path=%3Atechnical-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -2068,6 +2068,44 @@
       <externalReferences>
         <reference type="vcs">
           <url>https://github.com/logfellow/logstash-logback-encoder</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.apache.commons/commons-pool2@2.13.1?type=jar">
+      <group>org.apache.commons</group>
+      <name>commons-pool2</name>
+      <version>2.13.1</version>
+      <description>The Apache Commons Object Pooling Library.</description>
+      <hashes>
+        <hash alg="MD5">01939067d71f2f34123b160319389b88</hash>
+        <hash alg="SHA-1">cf7e8c0242d4c483c42c083b8188ab360ab60f9a</hash>
+        <hash alg="SHA-256">f77a5060d6936a9144023584232f9de3f2248f1abfe156e9d31795f18770674f</hash>
+        <hash alg="SHA-512">a531827dab147f9368b86ac6ba5c52a523215d6057938bdec68a9b51e027ba696738491234f2f5ebf9f1ca6a5d83922bd3f735c496a518b635dacddbd914dc6a</hash>
+        <hash alg="SHA3-256">dcd562f33c484f608f993d3867e648b19ae704545693aa74e8efb55a684572e6</hash>
+        <hash alg="SHA3-512">b5ddec5bf94c91e241c84880f66a63f429bb2a0abc5b39378f6015e7b246560fef488eb4e6ae17f403c2a3322371b54098e62e0ceb87d59fbdbf548ba0faabcf</hash>
+        <hash alg="SHA-384">07463ab14f29cd0df5055679f705939224c855aa5398d92f9d7f8968a4f1339c197600a80b3fa00f765c1a8cb498e02a</hash>
+        <hash alg="SHA3-384">ff3ccad9176f30bbe3fcd8686d4f31769da7fc337930307a49259439ae935c9db6ccc1e4ab1a7965b0f652c862423e2f</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+          <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.apache.commons/commons-pool2@2.13.1?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="build-system">
+          <url>https://github.com/apache/commons-pool/actions</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://issues.apache.org/jira/browse/POOL</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://gitbox.apache.org/repos/asf?p=commons-pool.git</url>
         </reference>
       </externalReferences>
       <properties>
@@ -4903,14 +4941,15 @@
       <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.18.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.3.6?type=jar"/>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.25.0?project_path=%3Aingest">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.26.0?project_path=%3Aingest">
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar"/>
       <dependency ref="pkg:maven/com.networknt/json-schema-validator@3.0.9?type=jar"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.0?project_path=%3Alogging-support"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.0?project_path=%3Atechnical-support"/>
       <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar"/>
       <dependency ref="pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.2?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
+      <dependency ref="pkg:maven/org.apache.commons/commons-pool2@2.13.1?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-devtools@4.1.2?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.1.2?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.2?type=jar"/>
@@ -4920,11 +4959,11 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.1.2?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.2?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.25.0?project_path=%3Alogging-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.0?project_path=%3Alogging-support">
       <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.25.0?project_path=%3Atechnical-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.0?project_path=%3Atechnical-support">
       <dependency ref="pkg:maven/io.micrometer/micrometer-observation@1.17.2?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-annotations@2.4.0?type=jar">
@@ -5170,6 +5209,7 @@
     <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar">
       <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar"/>
     </dependency>
+    <dependency ref="pkg:maven/org.apache.commons/commons-pool2@2.13.1?type=jar"/>
     <dependency ref="pkg:maven/org.apache.logging.log4j/log4j-api@2.25.5?type=jar"/>
     <dependency ref="pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.25.5?type=jar">
       <dependency ref="pkg:maven/org.apache.logging.log4j/log4j-api@2.25.5?type=jar"/>
