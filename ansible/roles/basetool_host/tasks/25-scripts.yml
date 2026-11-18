@@ -48,6 +48,13 @@
     - redis-session-users.acl.tmpl
     - redis-shared-users.acl.tmpl
 
+- name: Remove the scripts the role no longer installs
+  ansible.builtin.file:
+    path: "{{ basetool_host_release_dir }}/scripts/{{ item }}"
+    state: absent
+  loop:
+    - redis-users.acl.tmpl
+
 - name: Install the systemd units and their timers
   ansible.builtin.copy:
     src: "{{ basetool_host_scripts_src }}/../{{ item.source }}"

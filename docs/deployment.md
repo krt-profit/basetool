@@ -774,7 +774,8 @@ PowerShell here, and the comparison strips the carriage returns.
    No output is a match. A line starting `<` is a file the tag has and the host lacks or holds with other
    bytes: **that blocks the promotion**. A line starting `>` for a name that is not in the list is a
    leftover on the host (read it, it does not block); a `>` for a listed name is the other half of a
-   `<`.
+   `<`. The role's `scripts` tag removes the files it no longer installs (`redis-users.acl.tmpl`), so a
+   `>` line for one of them only means that tag has not run since its release.
 
 5. **On any `<` line, do not promote.** Run the role from a checkout **of that tag** (not `main`; the
    hashes must be the tag's), as an owner-approved production write:

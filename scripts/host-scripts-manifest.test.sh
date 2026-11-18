@@ -96,6 +96,32 @@ scenario_role_installs_exactly_the_listed_files() {
   done
 }
 
+retired_entries() {
+  sed -n '/^- name: Remove the scripts the role no longer installs$/,/^$/{s/^    - \([A-Za-z0-9._/-]*\)$/\1/p}' "${ROLE_TASKS}/25-scripts.yml"
+}
+
+scenario_role_removes_the_retired_files() {
+  echo "Scenario: the role removes the files it retired, and none of them is still listed"
+  local rel
+  if retired_entries | grep -qxF -- "redis-users.acl.tmpl"; then
+    record 1 "the role removes redis-users.acl.tmpl"
+  else
+    record 0 "the role removes redis-users.acl.tmpl"
+  fi
+  for rel in $(retired_entries); do
+    if list_entries | grep -qxF -- "${rel}"; then
+      record 0 "the retired ${rel} is still in the list"
+    else
+      record 1 "the retired ${rel} is not in the list"
+    fi
+    if [[ -e "${SCRIPT_DIR}/${rel}" ]]; then
+      record 0 "the retired ${rel} is still under scripts/"
+    else
+      record 1 "the retired ${rel} is gone from scripts/"
+    fi
+  done
+}
+
 scenario_apply_path_is_listed_and_complete() {
   echo "Scenario: deploy.sh's apply path is a subset of the list and covers what it sources"
   local rel
@@ -198,6 +224,7 @@ scenario_the_release_ships_the_manifest() {
 
 scenario_list_names_real_unique_files
 scenario_role_installs_exactly_the_listed_files
+scenario_role_removes_the_retired_files
 scenario_apply_path_is_listed_and_complete
 scenario_generate_matches_sha256sum_and_verifies
 scenario_rev_reads_bytes_exactly
