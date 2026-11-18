@@ -857,9 +857,9 @@ candidate, is cut to the 200 characters `item-ref` allows (REQ-XCH-026). Per cat
 | `kind` | `bt` | `scRecord` | `scGuid` | `uexId` | `locKey` | `name` |
 | --- | --- | --- | --- | --- | --- | --- |
 | `BLUEPRINT` | the product key (the produced item's GUID, else the normalized output name), or a name key a client stored before its product moved to the GUID (deprecated) | `blueprint.scwiki_key` | the blueprint's Wiki or game-file UUID, or its output item's | the output item's UEX id | the output item's `name_key` | the web import's chain: exact, alias, pack-tag strip, fuzzy |
-| `ITEM` | the item id | `class_name` | Wiki or game-file UUID | UEX item id | `name_key` | exact, case-insensitive; duplicates `ambiguous` |
-| `MATERIAL` | the material id | `scwiki_key` | Wiki or game-file UUID | UEX commodity id | `name_key` | exact, canonical (`MaterialNameCanonicalizer`), external alias, fuzzy — visible materials only |
-| `SHIP_TYPE` | the ship type id | `class_name`, else the `variantOf` group base | P4K GUID or Wiki UUID | UEX vehicle id, then the ADR-0307 alias | `name_key` | the hangar import's `ShipTypeMatcher` name stages; duplicates `ambiguous` |
+| `ITEM` | the item id, or the id of an item merged into it | `class_name` | Wiki or game-file UUID | UEX item id | `name_key` | exact, case-insensitive; duplicates `ambiguous` |
+| `MATERIAL` | the material id, or the id of a material merged into it (REQ-DATA-046) | `scwiki_key` | Wiki or game-file UUID | UEX commodity id | `name_key` | exact, canonical (`MaterialNameCanonicalizer`), external alias, fuzzy — visible materials only |
+| `SHIP_TYPE` | the ship type id, or the id of a ship type merged into it (REQ-DATA-042) | `class_name`, else the `variantOf` group base | P4K GUID or Wiki UUID | UEX vehicle id, then the ADR-0307 alias | `name_key` | the hangar import's `ShipTypeMatcher` name stages; duplicates `ambiguous` |
 
 Ship types resolve through `ShipTypeMatcher`, which the hangar import shares (REQ-P4K-032,
 [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md)):
@@ -885,9 +885,12 @@ gateway reports unknown request fields as `UNKNOWN_FIELD` warnings (WP 3.2).
 - [x] The anonymised corpus fixture
   (`backend/src/test/resources/fixtures/blueprint-corpus/game-log-corpus-v1.json`) resolves the same
   through the exchange and through the web import (`ExchangeResolveCorpusTest`).
+- [x] The `bt` of a material or ship type merged into another resolves to the one it was merged
+  into, and a stock op naming a merged material books onto that material
+  (`ExchangeResolveServiceTest`, `ExchangeStockWriteControllerTest`).
 
 **Enforced by:** `ExchangeResolveCorpusTest`, `ExchangeResolveServiceTest`,
-`ExchangeResolveControllerTest`, `ShipTypeMatcherTest` · **Status:** backend built — WP 3.1 (#2083);
+`ExchangeResolveControllerTest`, `ExchangeStockWriteControllerTest`, `ShipTypeMatcherTest` · **Status:** backend built — WP 3.1 (#2083);
 served by the gateway with WP 3.2 (#2082); ship-type order of ADR-0341 built (#3042)
 
 ### REQ-XCH-013 — Each resource has a snapshot and a database-sequenced change feed
@@ -1056,11 +1059,13 @@ suggestion never hides an exact item, whichever key the op sends beside `name`. 
 A lot of an item the P4K retired (swept or hidden, REQ-P4K-013) takes no new stock: a
 `set-quantity` that raises it is `rejected` `ITEM_RETIRED`, after the version and `unchanged`
 checks, unless the batch's falls of the same item cover the rise — a move between places or a
-stolen marking, which the web allows on a held entry too. Every fall of the batch counts from the
+stolen marking, which the web allows on a held entry too. A lot of a material that is not
+selectable (retired, or hidden as a commodity no game source knows, REQ-P4K-075) takes no new stock
+by the same rules, refused as `rejected` `MATERIAL_RETIRED`. Every fall of the batch counts from the
 start, whichever comes first; a fall the plan refuses gives its amount back, an applied rise uses
-its amount up (`ExchangeRetiredItemCover`). Falls, shares and unshares of a retired item stay
-open, and so does an undo, which restores what the member held. The reason is additive in v1: the
-`change-result` schema has always allowed any reason of its pattern.
+its amount up (`ExchangeRetiredStockCover`). Falls, shares and unshares of a retired item or
+material stay open, and so does an undo, which restores what the member held. Both reasons are
+additive in v1: the `change-result` schema has always allowed any reason of its pattern.
 
 A lot carries an additive `split` (`exchange.stock.read`, no new scope): `personal`, the member's
 personal rows, and `pools`, one entry `{orgUnit: {id}, quantity}` per unit in whose pool the
@@ -1194,6 +1199,9 @@ production had landed at quality 0 (203 journal entries, 36 lots).
 - [x] A rise of a retired item's lot is `ITEM_RETIRED` and books nothing, a fall of it applies, a
   move of it applies whichever op comes first but not beyond its fall, and a refused fall covers no
   later rise. *`ExchangeStockWriteControllerTest`.*
+- [x] A rise of a lot of a material hidden as a commodity no game source knows is
+  `MATERIAL_RETIRED` and books nothing, while a fall and a move of it apply.
+  *`ExchangeStockWriteControllerTest`.*
 
 The feed's lot key is the one the change log records, `m:<material>|l:<location>|q:<quality>|s:<0|1>`
 or `i:<item>|…`; a snapshot pages lots by their lowest row id. The material reference carries the
@@ -3106,7 +3114,8 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   of a pledged entry), `STOCK_OFFERED` (a partial `stolen` or `move-pool` would leave less than the
   entry offers on the Materialbörse), `OVER_ALLOCATION`,
   `EARMARK_TARGET_INVALID`, `ITEM_RETIRED` (a `book-in` whose `material` resolves to an item the
-  P4K retired, REQ-P4K-013; the ops on an existing entry of such an item stay open), and those of
+  P4K retired, REQ-P4K-013; the ops on an existing entry of such an item stay open),
+  `MATERIAL_RETIRED` (the same for a material that is not selectable), and those of
   REQ-XCH-016 for the material, the place and the unit. The Lager decides its own refusals
   (`PoolEntryCommands`); every holder lot the batch touches takes its advisory lock first, then all
 their rows are locked in ascending id order (ADR-0229). `dryRun`
@@ -3144,6 +3153,8 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
 - [x] A `book-in` of an item the P4K retired is refused `ITEM_RETIRED` and books nothing, and the
   gateway relays the refusal as the backend answers it. *`ExchangeOrgStockWriteControllerTest`,
   `ExchangeGoldenAnswerTest` (ingest).*
+- [x] A `book-in` of a material hidden as a commodity no game source knows is refused
+  `MATERIAL_RETIRED` and books nothing. *`ExchangeOrgStockWriteControllerTest`.*
 - [x] A stale version is `VERSION_CONFLICT`, earmarked stock is protected unless the book-out names
   the earmark, and a replayed idempotency key returns the first result (the gateway's filter, as for
   every write). *`ExchangeOrgStockWriteControllerTest`, `ExchangeIdempotencyFilterTest`.*

@@ -47,7 +47,8 @@ Everything else — clothing, paints, decoration, turrets, consumables (medical 
 food, drink, scrip), cargo, a ship's fixed parts and items without a known type — is bookable only
 as the output of a blueprint, so everything a job order produces stays bookable by hand. The item-order picker (`orderable=true`) is unchanged: outputs of an active blueprint with a
 resolved RESOURCE ingredient. The create path does not re-check the picker's rule, but it refuses
-an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
+an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013) and a material the material
+pickers do not offer (`CATALOGUE_MATERIAL_RETIRED`, REQ-P4K-013).
 
 **Acceptance**
 

@@ -70,9 +70,10 @@ import tools.jackson.databind.ObjectMapper;
  * book-out, which lowers linked Materialbörse offers and audits each offer it lowers or removes;
  * they are counted in the result. A share moves part of a lot's personal stock into the pool of one
  * of the member's direct units, an unshare moves the member's own stock in a pool back to personal,
- * both through the Lager's rebooking ({@link ExchangeStockShares}). A rise of a P4K-retired item is
- * refused unless the batch's falls of that item cover it ({@link ExchangeRetiredItemCover}). The
- * {@link ExchangeChangeSetRunner} runs the change set (ADR-0285).
+ * both through the Lager's rebooking ({@link ExchangeStockShares}). A rise of a P4K-retired item or
+ * of a material that is not selectable is refused unless the batch's falls of that entry cover it
+ * ({@link ExchangeRetiredStockCover}). The {@link ExchangeChangeSetRunner} runs the change set
+ * (ADR-0285).
  */
 @Service
 @RequiredArgsConstructor
@@ -330,7 +331,7 @@ public class ExchangeStockWriteService
       List<Planned<StockWrite>> early,
       List<Lot> lots,
       Map<String, List<StockRow>> locked) {
-    ExchangeRetiredItemCover cover = retiredCover(ops, catalogue, lots);
+    ExchangeRetiredStockCover cover = retiredCover(ops, catalogue, lots);
     Map<String, BigDecimal> quantities = new HashMap<>();
     ExchangeStockShares.Ledger ledger =
         new ExchangeStockShares.Ledger(
@@ -367,7 +368,7 @@ public class ExchangeStockWriteService
                 : unwritten(caller, lot.key(), decision.refusal(), latest));
         continue;
       }
-      boolean retired = Objects.requireNonNull(catalogue.get(i)).retired();
+      String retiredReason = Objects.requireNonNull(catalogue.get(i)).retiredReason();
       BigDecimal rise = target.subtract(current);
       Planned<StockWrite> decided;
       if (removedByPatch != null) {
@@ -377,8 +378,10 @@ public class ExchangeStockWriteService
             ExchangeChangeSetAdapter.versionConflict(patchChangeOf(caller, lot.key(), latest));
       } else if (current.compareTo(target) == 0) {
         decided = ExchangeChangeSetAdapter.skip(UNCHANGED, null);
-      } else if (retired && rise.signum() > 0 && !cover.covers(lot.catalogueId(), rise)) {
-        decided = ExchangeChangeSetAdapter.skip(REJECTED, ExchangeLotCatalogue.ITEM_RETIRED);
+      } else if (retiredReason != null
+          && rise.signum() > 0
+          && !cover.covers(lot.catalogueId(), rise)) {
+        decided = ExchangeChangeSetAdapter.skip(REJECTED, retiredReason);
       } else if (current.signum() == 0
           && !Boolean.TRUE.equals(op.override())
           && removedElsewhere(caller, latest(caller, lot.key(), latest).orElse(null))) {
@@ -390,7 +393,7 @@ public class ExchangeStockWriteService
         ledger.changed(lot.key(), unit, rows, current, target);
         decided = ExchangeChangeSetAdapter.write(new Change(i, lot, current, target, rows, null));
       }
-      if (retired) {
+      if (retiredReason != null) {
         cover.settle(lot.catalogueId(), decided instanceof Write<StockWrite>, expected, target);
       }
       plan.add(decided);
@@ -425,25 +428,25 @@ public class ExchangeStockWriteService
   }
 
   /**
-   * Counts the falls every {@code set-quantity} of a retired item claims, before any op is decided,
-   * so a move of retired stock applies whichever of its fall and rise comes first.
+   * Counts the falls every {@code set-quantity} of a retired item or material claims, before any op
+   * is decided, so a move of retired stock applies whichever of its fall and rise comes first.
    *
    * @param ops the ops
    * @param catalogue each op's material or item, by op index
    * @param lots each op's lot, {@code null} for an op that ended before its lot
-   * @return the cover the batch's rises of retired items draw on
+   * @return the cover the batch's rises of retired items and materials draw on
    */
-  private static @NotNull ExchangeRetiredItemCover retiredCover(
+  private static @NotNull ExchangeRetiredStockCover retiredCover(
       @NotNull List<ExchangeStockChangeSet.Op> ops,
       @NotNull Map<Integer, ExchangeLotCatalogue.Entry> catalogue,
       @NotNull List<@Nullable Lot> lots) {
-    ExchangeRetiredItemCover cover = new ExchangeRetiredItemCover();
+    ExchangeRetiredStockCover cover = new ExchangeRetiredStockCover();
     for (int i = 0; i < ops.size(); i++) {
       ExchangeStockChangeSet.Op op = ops.get(i);
       Lot lot = lots.get(i);
       if (lot != null
           && !ExchangeStockShares.isRebooking(op)
-          && Objects.requireNonNull(catalogue.get(i)).retired()) {
+          && Objects.requireNonNull(catalogue.get(i)).retiredReason() != null) {
         cover.offer(
             lot.catalogueId(),
             round(op.expectedQuantity().amount(), lot.unit()),

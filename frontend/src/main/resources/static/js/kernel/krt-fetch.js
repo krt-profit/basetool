@@ -677,12 +677,14 @@ function ownerOrgUnitRequiredMessage(problem) {
 /** The `krtFetchI18n` property holding the wording of each retired-catalogue-row refusal. */
 const CATALOGUE_RETIRED_WORDING = new Map([
     ['CATALOGUE_ITEM_RETIRED', 'itemRetired'],
+    ['CATALOGUE_MATERIAL_RETIRED', 'materialRetired'],
     ['CATALOGUE_BLUEPRINT_RETIRED', 'blueprintRetired'],
 ]);
 
 /**
- * Returns the localized message for a CATALOGUE_ITEM_RETIRED or CATALOGUE_BLUEPRINT_RETIRED problem
- * from `window.krtFetchI18n`, or null for any other problem (REQ-P4K-013).
+ * Returns the localized message for a CATALOGUE_ITEM_RETIRED, CATALOGUE_MATERIAL_RETIRED or
+ * CATALOGUE_BLUEPRINT_RETIRED problem from `window.krtFetchI18n`, or null for any other problem
+ * (REQ-P4K-013).
  *
  * @param {any} problem the parsed RFC 7807 body, or null
  * @returns {string | null} the localized message, or null when this is not such a refusal

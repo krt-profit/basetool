@@ -38,6 +38,12 @@ public enum CatalogueProblemCode implements ProblemCode {
   /** A write would set or keep a game item the P4K retired on an entry (REQ-P4K-013). */
   CATALOGUE_ITEM_RETIRED(HttpStatus.BAD_REQUEST),
 
+  /**
+   * A book-in would put a material that is invisible, retired or hidden as a commodity no game
+   * source knows on a stock entry (REQ-P4K-013, REQ-P4K-075).
+   */
+  CATALOGUE_MATERIAL_RETIRED(HttpStatus.BAD_REQUEST),
+
   /** A write would set or keep a blueprint the P4K retired on an entry (REQ-P4K-013). */
   CATALOGUE_BLUEPRINT_RETIRED(HttpStatus.BAD_REQUEST),
 

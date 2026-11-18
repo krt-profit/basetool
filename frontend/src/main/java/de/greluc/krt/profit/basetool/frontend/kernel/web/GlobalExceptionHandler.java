@@ -723,6 +723,7 @@ public class GlobalExceptionHandler {
         "error.orgUnit.seatRequiresKrtMember");
     m.put("LAST_ADMIN", "error.role.lastAdmin");
     m.put("CATALOGUE_ITEM_RETIRED", "error.catalogue.itemRetired");
+    m.put("CATALOGUE_MATERIAL_RETIRED", "error.catalogue.materialRetired");
     m.put("CATALOGUE_BLUEPRINT_RETIRED", "error.catalogue.blueprintRetired");
     m.put("SUPPLY_DISABLED", "error.supply.disabled");
     m.put("SUPPLY_UNIT_CANNOT_RAISE", "error.supply.unitCannotRaise");

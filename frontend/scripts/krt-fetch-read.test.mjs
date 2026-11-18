@@ -127,6 +127,7 @@ function harness(script = [], page = {}) {
     };
     context.window.krtFetchI18n = {
         itemRetired: 'Item retired wording',
+        materialRetired: 'Material retired wording',
         blueprintRetired: 'Blueprint retired wording',
     };
     vm.createContext(context);
@@ -276,6 +277,10 @@ await test('a retired-row refusal reads its page-wide wording and no other probl
     assert.equal(
         h.krtFetch.catalogueRetiredMessage({ code: 'CATALOGUE_ITEM_RETIRED', detail: 'backend' }),
         'Item retired wording',
+    );
+    assert.equal(
+        h.krtFetch.catalogueRetiredMessage({ code: 'CATALOGUE_MATERIAL_RETIRED', detail: 'x' }),
+        'Material retired wording',
     );
     assert.equal(
         h.krtFetch.catalogueRetiredMessage({ code: 'CATALOGUE_BLUEPRINT_RETIRED', detail: 'x' }),

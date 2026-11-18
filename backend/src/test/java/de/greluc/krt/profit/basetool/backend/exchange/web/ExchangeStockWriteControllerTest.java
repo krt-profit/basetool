@@ -103,6 +103,7 @@ class ExchangeStockWriteControllerTest {
   private String client;
   private boolean wasEnabled;
   private final List<UUID> materials = new ArrayList<>();
+  private final List<UUID> materialRedirects = new ArrayList<>();
   private final List<UUID> items = new ArrayList<>();
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> cities = new ArrayList<>();
@@ -149,6 +150,7 @@ class ExchangeStockWriteControllerTest {
     missions.forEach(id -> jdbc.update("DELETE FROM mission WHERE id = ?", id));
     jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
     jdbc.update("DELETE FROM app_user WHERE id = ?", member);
+    materialRedirects.forEach(id -> jdbc.update("DELETE FROM material_redirect WHERE id = ?", id));
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
     items.forEach(id -> jdbc.update("DELETE FROM game_item WHERE id = ?", id));
     locations.forEach(id -> jdbc.update("DELETE FROM location WHERE id = ?", id));
@@ -239,6 +241,20 @@ class ExchangeStockWriteControllerTest {
           assertThat(e.getAction().name()).isEqualTo("STOCK_SET_QUANTITY");
           assertThat(e.getAfterState()).contains("12.5");
         });
+  }
+
+  @Test
+  void theIdOfAMergedMaterialBooksOntoTheMaterialItWasMergedInto() throws Exception {
+    UUID fireworks = material("SCU", null);
+    UUID partyFavors = mergedInto(fireworks);
+    String area18 = locationName(location(null));
+
+    set(partyFavors, area18, 0, "4", "0", "SCU")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(total(fireworks)).isEqualTo(4.0);
+    assertThat(total(partyFavors)).isZero();
   }
 
   @Test
@@ -816,6 +832,44 @@ class ExchangeStockWriteControllerTest {
   }
 
   @Test
+  void aRiseOfAMaterialHiddenAsSourcelessIsRefusedWhileAFallStillApplies() throws Exception {
+    UUID boron = sourcelessHidden(material("SCU", null));
+    UUID orison = location(null);
+    String place = locationName(orison);
+    row(boron, orison, 0, 3, null);
+
+    set(boron, place, 0, "5", "3", "SCU")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].result").value("rejected"))
+        .andExpect(jsonPath("$.results[0].reason").value("MATERIAL_RETIRED"));
+    set(boron, locationName(location(null)), 0, "2", "0", "SCU")
+        .andExpect(jsonPath("$.results[0].reason").value("MATERIAL_RETIRED"));
+    assertThat(total(boron)).isEqualTo(3.0);
+
+    set(boron, place, 0, "1", "3", "SCU").andExpect(jsonPath("$.applied").value(1));
+    assertThat(total(boron)).isEqualTo(1.0);
+  }
+
+  @Test
+  void aMoveOfAMaterialHiddenAsSourcelessApplies() throws Exception {
+    UUID boron = sourcelessHidden(material("SCU", null));
+    UUID orison = location(null);
+    UUID area18 = location(null);
+    row(boron, orison, 0, 3, null);
+
+    change(
+            "{\"ops\":["
+                + op(boron, locationName(area18), 0, "2", "0", "SCU")
+                + ","
+                + op(boron, locationName(orison), 0, "1", "3", "SCU")
+                + "]}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2));
+    assertThat(total(boron)).isEqualTo(3.0);
+  }
+
+  @Test
   void repeatedCutsCountOnlyOnceTheyReachNinetyPercentOfTheWindowStart() throws Exception {
     UUID laranite = material("SCU", null);
     List<String> places = new ArrayList<>();
@@ -1118,6 +1172,23 @@ class ExchangeStockWriteControllerTest {
   }
 
   /**
+   * Records an id merged into a material, the redirect a material merge leaves behind.
+   *
+   * @param survivor the material the id was merged into
+   * @return the merged id
+   */
+  private @NotNull UUID mergedInto(@NotNull UUID survivor) {
+    UUID merged = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO material_redirect (id, canonical_id, retired_snapshot)"
+            + " VALUES (?, ?, '{}'::jsonb)",
+        merged,
+        survivor);
+    materialRedirects.add(merged);
+    return merged;
+  }
+
+  /**
    * Seeds a material with the given name and no UEX commodity.
    *
    * @param name the name
@@ -1190,6 +1261,17 @@ class ExchangeStockWriteControllerTest {
   private @NotNull UUID retired(@NotNull UUID item) {
     jdbc.update("UPDATE game_item SET p4k_deleted_at = now() WHERE id = ?", item);
     return item;
+  }
+
+  /**
+   * Stamps a material as hidden for being a commodity no game source knows, as REQ-P4K-075 does.
+   *
+   * @param material the material, without a game source and without a price
+   * @return {@code material}
+   */
+  private @NotNull UUID sourcelessHidden(@NotNull UUID material) {
+    jdbc.update("UPDATE material SET sourceless_hidden_at = now() WHERE id = ?", material);
+    return material;
   }
 
   /**

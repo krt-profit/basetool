@@ -504,6 +504,21 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void catalogueMaterialRetired400_mapsToTheRetiredMaterialKey() {
+    BackendServiceException ex =
+        new BackendServiceException(
+            "retired", null, 400, "CATALOGUE_MATERIAL_RETIRED", "corr-mat", List.of(), null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+    assertEquals("CATALOGUE_MATERIAL_RETIRED", body.get("code"));
+    assertEquals("error.catalogue.materialRetired", body.get("message"));
+  }
+
+  @Test
   void catalogueBlueprintRetired400_mapsToTheRetiredBlueprintKey() {
     BackendServiceException ex =
         new BackendServiceException(
