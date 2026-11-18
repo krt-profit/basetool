@@ -326,8 +326,10 @@ def render_component(indent: str, tool: Tool, version: str, checksums: Mapping[s
     for name in sorted(checksums):
         lines += [
             f'{indent}{XML_INDENT}<artifact name="{name}">',
-            f'{indent}{XML_INDENT * 2}<sha256 value="{checksums[name]}" '
-            f'origin="{tool.source.origin}"/>',
+            (
+                f'{indent}{XML_INDENT * 2}<sha256 value="{checksums[name]}" '
+                f'origin="{tool.source.origin}"/>'
+            ),
             f"{indent}{XML_INDENT}</artifact>",
         ]
     lines.append(f"{indent}</component>")
@@ -441,23 +443,34 @@ def pull_request_body(bumps: Sequence[Bump]) -> str:
         )
     return "\n".join(
         [
-            "Weekly update proposal for the native tools Gradle resolves from their publishers, "
-            "which Dependabot and refreshVersions do not see (REQ-OPS-059, ADR-0391).",
+            (
+                "Weekly update proposal for the native tools Gradle resolves from their "
+                "publishers, which Dependabot and refreshVersions do not see (REQ-OPS-059, "
+                "ADR-0391)."
+            ),
             "",
             "| Tool | From | To | Release |",
             "| --- | --- | --- | --- |",
             *rows,
             "",
-            "The checksums in `gradle/verification-metadata.xml` are the publishers' SHA-256 "
-            "digests: the GitHub release asset `digest` and nodejs.org `SHASUMS256.txt`. The "
-            "workflow's `./gradlew spotlessApply` verified the Linux files against them; the "
-            "Windows files are verified on the first Windows build.",
+            (
+                "The checksums in `gradle/verification-metadata.xml` are the publishers' SHA-256 "
+                "digests: the GitHub release asset `digest` and nodejs.org `SHASUMS256.txt`. The "
+                "workflow's `./gradlew spotlessApply` verified the Linux files against them; the "
+                "Windows files are verified on the first Windows build."
+            ),
             "",
-            "When a formatter's new version changes the format, its reformat is a commit of its own "
-            "and listed in `.git-blame-ignore-revs`. Read the linked release notes before merging.",
+            (
+                "When a formatter's new version changes the format, its reformat is a commit of "
+                "its own and listed in `.git-blame-ignore-revs`. Read the linked release notes "
+                "before merging."
+            ),
             "",
-            "The workflow rebuilds this branch from `main` every week while the pull request is "
-            "open. Closing it unmerged refuses these versions: the same set is not proposed again.",
+            (
+                "The workflow rebuilds this branch from `main` every week while the pull request "
+                "is open. Closing it unmerged refuses these versions: the same set is not "
+                "proposed again."
+            ),
             "",
         ]
     )

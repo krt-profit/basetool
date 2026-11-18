@@ -74,6 +74,7 @@ def git_tag_exists(tag: str) -> bool:
             ["git", "rev-parse", "--verify", "--quiet", f"refs/tags/{tag}"],
             cwd=REPO,
             capture_output=True,
+            check=False,
         ).returncode
         == 0
     )

@@ -3799,6 +3799,34 @@ proposes their bumps, so the formatters every agent runs do not fall behind (ADR
 [ADR-0391](../adr/0391-native-tool-versions-are-proposed-weekly-from-their-publishers-digests.md)
 · **Related:** REQ-OPS-034, REQ-OPS-044, REQ-OPS-058
 
+### REQ-OPS-060 — Python passes Ruff's lint, and CI fails on a finding
+
+Every Python file Ruff formats is linted by it as well, so an unused import, a union annotation the
+target Python cannot evaluate or a `subprocess.run` that leaves its exit code implicit fails the
+build, not a later run of the script.
+
+- **One task, Ruff's defaults.** `./gradlew ruffLint` runs `ruff check --no-fix` with `ruff.toml`
+  over the files `ruffFormat` owns: every `*.py` outside `docs/archive/` and the vendored trees. The
+  rule set is the default of the Ruff version in the catalog; `ruff.toml` selects none of its own.
+- **CI fails on a finding.** The root project's `check` depends on `ruffLint`, so the
+  `./gradlew build` of `ci.yml` fails on any finding. A finding is fixed in the code; a `# noqa`
+  stays for a line where the rule is wrong.
+- **The verified binary.** `ruffLint` runs the Ruff release binary of REQ-OPS-058 and is up to date
+  while the Python files, `ruff.toml` and the binary are unchanged.
+- **A Ruff update brings its rules.** A version bump of REQ-OPS-059 that enables further default
+  rules carries the fixes for their findings on its own pull request.
+
+**Acceptance**
+
+- [x] `./gradlew ruffLint` passes on the tree and fails on a planted file with an unused import.
+- [x] `./gradlew :check` runs `ruffLint`.
+- [x] The sweep to zero findings changed no behaviour: the self-tests and checks CI runs for every
+  touched script pass, the checkers print what they printed before, `generate-quadlet.py --check`
+  regenerates the committed units unchanged, and the DPoP reference tests pass on Linux and Windows.
+
+**Enforced by:** `basetool.repository-format-conventions` (`ruffLint`, `registerNativeLinter`) ·
+`.github/workflows/ci.yml` · **Related:** REQ-OPS-034, REQ-OPS-058, REQ-OPS-059
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

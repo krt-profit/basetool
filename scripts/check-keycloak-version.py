@@ -31,7 +31,7 @@ import sys
 import tempfile
 
 CATALOG = "gradle/libs.versions.toml"
-CATALOG_KEY = re.compile(r'^keycloak\s*=\s*"([^"]*)"\s*$', re.M)
+CATALOG_KEY = re.compile(r'^keycloak\s*=\s*"([^"]*)"\s*$', re.MULTILINE)
 RELEASE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 RUNTIME_PINS = (
     "docker-compose.yml",

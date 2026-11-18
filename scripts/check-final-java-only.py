@@ -34,7 +34,7 @@ MIN_FILES = 5000
 MIN_JAVA_FILES = 3800
 
 FLAGS = re.compile(r"--enable-preview|jdk\.incubator")
-MODULE_IMPORT = re.compile(r"^[ \t]*import[ \t]+module[ \t]+[\w.]+[ \t]*;", re.M)
+MODULE_IMPORT = re.compile(r"^[ \t]*import[ \t]+module[ \t]+[\w.]+[ \t]*;", re.MULTILINE)
 SKIPPED_SUFFIXES = (
     ".md",
     ".png",

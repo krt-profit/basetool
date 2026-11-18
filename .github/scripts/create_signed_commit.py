@@ -24,14 +24,13 @@ import json
 import os
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from http_budget import connection_timeout, read_before_deadline
-
 
 for _stream in (sys.stdout, sys.stderr):
     with contextlib.suppress(AttributeError, ValueError):

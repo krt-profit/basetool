@@ -17,13 +17,15 @@ quotation mark in its sources, nor in the OpenAPI document and schemas it render
 fixtures under examples/ are data under test and are not read.
 """
 
+from __future__ import annotations
+
 import argparse
 import pathlib
 import re
 import sys
 import tempfile
 
-LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)|^ {0,3}\[[^\]]+\]:[ \t]*<?([^\s>]+)>?", re.M)
+LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)|^ {0,3}\[[^\]]+\]:[ \t]*<?([^\s>]+)>?", re.MULTILINE)
 
 HEADING = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$")
 
@@ -46,7 +48,7 @@ GENERATED_PAGES = {
     "schemas/index.md": "ingest/src/main/resources/exchange/v1/schemas",
 }
 
-NAV_PATH = re.compile(r"^\s*path:\s*(\S+)\s*$", re.M)
+NAV_PATH = re.compile(r"^\s*path:\s*(\S+)\s*$", re.MULTILINE)
 
 GERMAN = re.compile("[äöüÄÖÜßẞ„‚]")
 

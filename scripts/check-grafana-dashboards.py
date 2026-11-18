@@ -32,13 +32,13 @@ def provisioned_datasource_uids(path: pathlib.Path) -> set[str]:
     """Read the datasource uids out of the provisioning file's ``uid:`` lines, without a YAML parser."""
     if not path.is_file():
         return set()
-    return set(re.findall(r"^\s*uid:\s*(\S+)\s*$", path.read_text(encoding="utf-8"), re.M))
+    return set(re.findall(r"^\s*uid:\s*(\S+)\s*$", path.read_text(encoding="utf-8"), re.MULTILINE))
 
 
 def walk_panels(panels, path="panels"):
     """Yield ``(path, panel)`` for every panel, descending into collapsed rows."""
     for i, panel in enumerate(panels or []):
-        where = "%s[%d]" % (path, i)
+        where = f"{path}[{i}]"
         if panel.get("type") == "row":
             yield from walk_panels(panel.get("panels"), where + ".panels")
         else:
@@ -88,7 +88,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.dashboards.is_dir():
-        print("ERROR: no dashboard directory at %s" % args.dashboards, file=sys.stderr)
+        print(f"ERROR: no dashboard directory at {args.dashboards}", file=sys.stderr)
         return 2
 
     known_uids = provisioned_datasource_uids(args.datasources)
@@ -98,7 +98,7 @@ def main() -> int:
     seen_uids: dict[str, str] = {}
     files = sorted(args.dashboards.glob("*.json"))
     if not files:
-        print("ERROR: %s contains no dashboards" % args.dashboards, file=sys.stderr)
+        print(f"ERROR: {args.dashboards} contains no dashboards", file=sys.stderr)
         return 2
 
     total_panels = 0
@@ -108,43 +108,42 @@ def main() -> int:
             doc = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             problems.append(
-                "%s: not valid UTF-8 JSON -- Grafana will skip it silently (%s)" % (name, exc)
+                f"{name}: not valid UTF-8 JSON -- Grafana will skip it silently ({exc})"
             )
             continue
 
         uid, title = doc.get("uid"), doc.get("title")
         if not uid:
-            problems.append("%s: no uid -- its URL is then unstable across re-provisions" % name)
+            problems.append(f"{name}: no uid -- its URL is then unstable across re-provisions")
         elif uid in seen_uids:
             problems.append(
-                "%s: uid %r is already used by %s -- provisioning is last-writer-wins, so one "
-                "dashboard silently replaces the other" % (name, uid, seen_uids[uid])
+                f"{name}: uid {uid!r} is already used by {seen_uids[uid]} -- provisioning is "
+                "last-writer-wins, so one dashboard silently replaces the other"
             )
         else:
             seen_uids[uid] = name
         if not title:
-            problems.append("%s: no title" % name)
+            problems.append(f"{name}: no title")
 
         panel_ids: dict[int, str] = {}
         for where, panel in walk_panels(doc.get("panels")):
             total_panels += 1
             pid = panel.get("id")
             if pid is None:
-                problems.append("%s: %s has no id" % (name, where))
+                problems.append(f"{name}: {where} has no id")
             elif pid in panel_ids:
                 problems.append(
-                    "%s: panel id %s used twice (%s and %s) -- panel deep links resolve to "
-                    "whichever comes first" % (name, pid, panel_ids[pid], where)
+                    f"{name}: panel id {pid} used twice ({panel_ids[pid]} and {where}) -- panel "
+                    "deep links resolve to whichever comes first"
                 )
             else:
                 panel_ids[pid] = where
             if not (panel.get("title") or "").strip():
-                problems.append("%s: %s (id %s) has no title" % (name, where, pid))
+                problems.append(f"{name}: {where} (id {pid}) has no title")
 
         for a, b in overlapping(doc.get("panels")):
             problems.append(
-                "%s: panels %s and %s overlap on the grid -- Grafana draws one over the other"
-                % (name, a, b)
+                f"{name}: panels {a} and {b} overlap on the grid -- Grafana draws one over the other"
             )
 
         if known_uids:
@@ -152,20 +151,20 @@ def main() -> int:
                 if ds_uid in known_uids or variable_ref.match(ds_uid):
                     continue
                 problems.append(
-                    "%s: references datasource uid %r, which %s does not provision -- those panels "
-                    "render 'Datasource not found', which looks like 'no data'"
-                    % (name, ds_uid, args.datasources)
+                    f"{name}: references datasource uid {ds_uid!r}, which {args.datasources} does "
+                    "not provision -- those panels render 'Datasource not found', which looks "
+                    "like 'no data'"
                 )
 
     if problems:
-        print("Grafana dashboard check FAILED (%d problem(s)):\n" % len(problems), file=sys.stderr)
+        print(f"Grafana dashboard check FAILED ({len(problems)} problem(s)):\n", file=sys.stderr)
         for p in problems:
-            print("  - %s" % p, file=sys.stderr)
+            print(f"  - {p}", file=sys.stderr)
         return 1
 
     print(
-        "Grafana dashboards OK: %d dashboards, %d panels, %d provisioned datasource uid(s)."
-        % (len(files), total_panels, len(known_uids))
+        f"Grafana dashboards OK: {len(files)} dashboards, {total_panels} panels, "
+        f"{len(known_uids)} provisioned datasource uid(s)."
     )
     return 0
 

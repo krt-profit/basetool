@@ -54,8 +54,10 @@ def parse_fragment(name: str, text: str) -> tuple[Fragment | None, list[str]]:
     path = f"{FRAGMENT_DIR}/{name}"
     if not NAME_RE.match(name):
         return None, [
-            f"{path}: the name must be lowercase letters, digits and hyphens "
-            "ending in '.md', e.g. 'hangar-import.md' or '1234.md'"
+            (
+                f"{path}: the name must be lowercase letters, digits and hyphens "
+                "ending in '.md', e.g. 'hangar-import.md' or '1234.md'"
+            )
         ]
     if text.startswith("﻿"):
         return None, [f"{path}: starts with a UTF-8 BOM; save it without one"]
@@ -65,8 +67,10 @@ def parse_fragment(name: str, text: str) -> tuple[Fragment | None, list[str]]:
     heading = lines[0]
     if not heading.startswith("### ") or heading[4:].strip() not in SECTIONS:
         return None, [
-            f"{path}: the first line must be '### <section>' with one of "
-            f"{', '.join(SECTIONS)}, found {heading!r}"
+            (
+                f"{path}: the first line must be '### <section>' with one of "
+                f"{', '.join(SECTIONS)}, found {heading!r}"
+            )
         ]
     items: list[list[str]] = []
     findings: list[str] = []
@@ -173,6 +177,7 @@ def git_show(repo: str, rev: str, path: str) -> str:
         ["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
         cwd=repo,
         capture_output=True,
+        check=False,
         text=True,
         encoding="utf-8",
     )
@@ -182,6 +187,7 @@ def git_show(repo: str, rev: str, path: str) -> str:
         ["git", "show", f"{resolved.stdout.strip()}:{path}"],
         cwd=repo,
         capture_output=True,
+        check=False,
         text=True,
         encoding="utf-8",
     )
@@ -264,6 +270,7 @@ class TempRepo:
             cwd=self.path,
             env=env,
             capture_output=True,
+            check=False,
             text=True,
             encoding="utf-8",
         )

@@ -8,9 +8,13 @@ import ctypes
 import hashlib
 import struct
 import sys
+from typing import TYPE_CHECKING
 
 from .base import DpopKeyError
 from .jose import P256_COORDINATE_BYTES, ec_public_jwk, jwk_thumbprint
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 SOFTWARE_PROVIDER = "Microsoft Software Key Storage Provider"
 PLATFORM_PROVIDER = "Microsoft Platform Crypto Provider"
@@ -297,7 +301,7 @@ class CngKey:
         self._key_handle = None
         self._provider_handle = None
 
-    def __enter__(self) -> CngKey:
+    def __enter__(self) -> Self:
         """Returns the key for a ``with`` block."""
         return self
 

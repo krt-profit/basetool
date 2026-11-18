@@ -29,7 +29,7 @@ import argparse
 import contextlib
 import os
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 from env_file import EnvFileError, parse_env_file
 

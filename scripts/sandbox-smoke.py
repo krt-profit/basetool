@@ -13,6 +13,8 @@ cap answers `429 DPOP_PROOF_LIMIT`. The login and the calls are `scripts/sandbox
 signs with the DPoP reference in `docs/exchange/dpop-reference`, standard library only.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import pathlib
@@ -22,9 +24,8 @@ import time
 import urllib.parse
 import uuid
 
-from sandbox_client import DEFAULT_CA, ROOT, SandboxSession
-
 from dpop_reference import delete_installation_key, open_installation_key
+from sandbox_client import DEFAULT_CA, ROOT, SandboxSession
 
 
 class Smoke:

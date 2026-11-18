@@ -38,7 +38,8 @@ import os
 import subprocess
 import sys
 import time
-from typing import Iterable, NamedTuple
+from collections.abc import Iterable
+from typing import NamedTuple
 
 DEFAULT_DIRS = ("/etc/basetool/monitoring/certs",)
 

@@ -21,13 +21,13 @@ from __future__ import annotations
 
 import argparse
 import difflib
-import io
 import ipaddress
 import math
 import os
 import re
 import sys
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import yaml
 
@@ -135,22 +135,29 @@ DISPOSITION: dict[str, tuple[str, str]] = {
     "redis-shared-exporter": ("container", ""),
     "node-exporter": (
         "host-service",
-        "mounts /run/systemd/private for its systemd collector, which a rootless container cannot "
-        "reach -- and node_systemd_unit_state is exactly the signal this migration gains, because "
-        "Quadlet units ARE systemd units. It also owns the textfile directory the cgroup collector "
-        "writes into. As a packaged host service it needs none of those mounts.",
+        (
+            "mounts /run/systemd/private for its systemd collector, which a rootless container "
+            "cannot reach -- and node_systemd_unit_state is exactly the signal this migration "
+            "gains, because Quadlet units ARE systemd units. It also owns the textfile directory "
+            "the cgroup collector writes into. As a packaged host service it needs none of those "
+            "mounts."
+        ),
     ),
     "alloy": (
         "host-service",
-        "mounts /var/log and carries group_add 4/473 to read root:adm files such as auth.log. A "
-        "rootless container's supplementary groups are namespace groups, not host groups, so that "
-        "read stops working. Running it on the host restores it and removes the last consumer of "
-        "the container socket.",
+        (
+            "mounts /var/log and carries group_add 4/473 to read root:adm files such as auth.log. "
+            "A rootless container's supplementary groups are namespace groups, not host groups, "
+            "so that read stops working. Running it on the host restores it and removes the last "
+            "consumer of the container socket."
+        ),
     ),
     "podman-exporter": (
         "host-service",
-        "a Podman-only exporter with no Compose counterpart; the role installs it as a user unit "
-        "of the service user, because a system-level one would talk to the root podman.",
+        (
+            "a Podman-only exporter with no Compose counterpart; the role installs it as a user "
+            "unit of the service user, because a system-level one would talk to the root podman."
+        ),
     ),
 }
 
@@ -336,7 +343,7 @@ def _image_defaults(image: str, service: str) -> str:
         Refusal: for a variable with no default, which cannot be resolved without guessing.
     """
 
-    def default_of(match: "re.Match[str]") -> str:
+    def default_of(match: re.Match[str]) -> str:
         name, default = match.group(1), match.group(2)
         if default is None:
             raise Refusal(
@@ -415,7 +422,7 @@ def _seconds(value: Any, where: str) -> int:
         Refusal: on a duration this parser does not understand, rather than a silent zero.
     """
     if isinstance(value, (int, float)):
-        return int(math.ceil(float(value)))
+        return math.ceil(float(value))
     text = str(value).strip()
     if re.fullmatch(r"\d+", text):
         return int(text)
@@ -426,7 +433,7 @@ def _seconds(value: Any, where: str) -> int:
             f"{where}: {value!r} is not a duration this generator can read. It feeds "
             "TimeoutStartSec=, and guessing a start budget is how a unit gets killed mid-start."
         )
-    return int(math.ceil(sum(float(a) * units[b] for a, b in parts)))
+    return math.ceil(sum(float(a) * units[b] for a, b in parts))
 
 
 def _escape_percent(value: str) -> str:
@@ -459,9 +466,8 @@ def _sh_quote(word: str) -> str:
     """
     if not word:
         return "''"
-    if "${" in word and not re.search(r"[`\\]", word):
-        if "$" not in VAR_REF_RE.sub("", word):
-            return '"' + word.replace('"', '\\"') + '"'
+    if "${" in word and not re.search(r"[`\\]", word) and "$" not in VAR_REF_RE.sub("", word):
+        return '"' + word.replace('"', '\\"') + '"'
     if re.fullmatch(r"[A-Za-z0-9_@%+=:,./-]+", word):
         return word
     return "'" + word.replace("'", "'\\''") + "'"
@@ -905,7 +911,8 @@ def _verify_run_as_against_role() -> None:
             different ``container_uid``; when a service is named by both RUN_AS and READ_ONLY;
             or when READ_ONLY names something that does not become a container.
     """
-    doc = yaml.safe_load(io.open(ROLE_DEFAULTS, encoding="utf-8"))
+    with open(ROLE_DEFAULTS, encoding="utf-8") as handle:
+        doc = yaml.safe_load(handle)
     by_path: dict[str, int] = {}
     for entry in doc.get("basetool_host_container_owners") or []:
         for path in entry.get("paths") or []:
@@ -961,7 +968,8 @@ def _verify_front_end(
             not join, when a pin falls outside that network's subnet, or when the role's trusted
             list is not exactly the set of pinned addresses.
     """
-    doc = yaml.safe_load(io.open(ROLE_DEFAULTS, encoding="utf-8"))
+    with open(ROLE_DEFAULTS, encoding="utf-8") as handle:
+        doc = yaml.safe_load(handle)
 
     for service, front in sorted(FRONT_END.items()):
         pins: dict[str, str] = front.get("pins") or {}
@@ -1106,7 +1114,8 @@ def generate() -> tuple[dict[str, str], list[str]]:
     rendered_units: dict[str, str] = {}
 
     for path in (COMPOSE_APP, COMPOSE_MON):
-        doc = yaml.safe_load(io.open(path, encoding="utf-8"))
+        with open(path, encoding="utf-8") as handle:
+            doc = yaml.safe_load(handle)
         for name, spec in (doc.get("networks") or {}).items():
             spec = spec or {}
             if not spec.get("external"):
@@ -1196,7 +1205,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         drift = []
         for rel, content in sorted(files.items()):
             path = os.path.join(REPO, rel)
-            actual = io.open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+            actual = ""
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as handle:
+                    actual = handle.read()
             if actual != content:
                 drift.append(rel)
                 for line in difflib.unified_diff(
@@ -1230,7 +1242,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     os.makedirs(OUT_VARS, exist_ok=True)
     for rel, content in sorted(files.items()):
         path = os.path.join(REPO, rel)
-        io.open(path, "w", encoding="utf-8", newline="\n").write(content)
+        with open(path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(content)
     print(f"generate-quadlet: wrote {len(files)} file(s)")
     for note in notes:
         print(f"  note: {note}")

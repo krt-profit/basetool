@@ -42,7 +42,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 HARDEN = SCRIPT_DIR / "harden-keycloak-realm.py"
 sys.path.insert(0, str(SCRIPT_DIR / "keycloak"))
-from hardening_probe import Browser, Outcome, parse_forms  # noqa: E402
+from hardening_probe import Browser, Outcome, parse_forms
 
 REALM = "basetool"
 CLIENT = "hardening-probe"
@@ -106,7 +106,7 @@ class SmtpSink:
     PORT = 2525
     LOG = "/tmp/mail.log"
 
-    def __init__(self, stack: "Stack") -> None:
+    def __init__(self, stack: Stack) -> None:
         self.stack = stack
 
     def start(self) -> None:
@@ -143,7 +143,7 @@ class SmtpSink:
         out = []
         for raw in completed.stdout.split("\n=====\n"):
             if raw.strip():
-                out.append({"to": re.findall(r"RCPT TO:\s*(\S+)", raw, re.I), "data": raw})
+                out.append({"to": re.findall(r"RCPT TO:\s*(\S+)", raw, re.IGNORECASE), "data": raw})
         return out
 
 
@@ -217,7 +217,9 @@ class Stack:
 
     def kcadm(self, *args: str) -> str:
         """Run kcadm inside the container; returns stdout."""
-        completed = subprocess.run(self.kcadm_prefix() + list(args), capture_output=True, text=True)
+        completed = subprocess.run(
+            self.kcadm_prefix() + list(args), capture_output=True, text=True, check=False
+        )
         if completed.returncode != 0:
             raise SystemExit(f"FATAL: kcadm {' '.join(args)}: {completed.stderr.strip()}")
         return completed.stdout
@@ -235,7 +237,9 @@ class Stack:
             " ".join(self.kcadm_prefix()),
             *extra,
         ]
-        return subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
+        return subprocess.run(
+            command, capture_output=True, text=True, encoding="utf-8", check=False
+        )
 
     def create_user(self, username: str, password: str, role: str | None) -> None:
         """Create an enabled user with a password and optionally a realm role."""

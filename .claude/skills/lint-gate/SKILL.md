@@ -33,6 +33,7 @@ the how-to behind that rule.
 | `:frontend:testClientErrorCspJs` | Node | the beacon's CSP violation report: policy name, sink, code origin (REQ-SEC-064) |
 | `:frontend:checkExchangeDocs` | Python + markdownlint (pinned in `.github/tools/markdownlint`) + Node | everything under `docs/exchange/` exactly as the Exchange Docs workflow checks it, the Jekyll build aside: **no German text** (no umlaut, `ß` or `„`: write *Connected applications*, *warehouse*, *Material Exchange*), every relative link and anchor resolving, **markdownlint lines of at most 100 characters** (tables and code blocks exempt — rewrap the whole paragraph after an edit), the DPoP reference tests, the OpenAPI reference preparation. Needs Python on `PATH` (`python3`, `python` on Windows, or `-PpythonExecutable=…`). Run it after **every** edit of the developer pages: `./gradlew :frontend:checkExchangeDocs` |
 | `:frontend:testTypecheckRatchet` | Node | every script (subfolders too) is listed in a domain of `typecheck-ratchet.json`; each script lives in its domain's folder; no suppression pragma; `tsconfig.json` keeps `strict`, `checkJs`, `noImplicitAny` and `useUnknownInCatchVariables` on (REQ-FE-018) |
+| `ruffLint` (root) | Ruff (`ruff check --no-fix`) | every Python file `ruffFormat` owns, with Ruff's default rules and `ruff.toml` — e.g. `subprocess.run` without an explicit `check=`, `%` formatting (write an f-string), a PEP 604 union without `from __future__ import annotations` on the py39 target, `open()` outside a `with` (REQ-OPS-060) |
 
 Before pushing, run the whole sweep and get it to **zero findings**:
 
@@ -45,6 +46,10 @@ For a faster loop on a CSS/JS/template-only change, the frontend gates alone:
 ```bash
 ./gradlew :frontend:lintCss :frontend:lintCssInline :frontend:lintJs :frontend:lintProbeJs :frontend:lintHtml :frontend:prettierCheck :frontend:typecheckJs :frontend:testTypecheckRatchet
 ```
+
+## Auto-fixing Python findings
+
+`./gradlew ruffLint` lists them. Ruff's safe fixes come from the binary Gradle installed: `build/tools/ruff/ruff check --config ruff.toml --fix <file.py>` (`ruff.exe` on Windows), then `./gradlew spotlessApply` and `ruffLint` again. Review every fix Ruff calls unsafe before you keep it.
 
 ## Auto-fixing CSS / JS findings
 

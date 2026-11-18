@@ -8,13 +8,13 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -66,7 +66,9 @@ def bash_file(path: Path) -> subprocess.CompletedProcess:
 
 def function(path: str, name: str) -> str:
     """Extract a named top-level Bash function for isolated command-failure fixtures."""
-    return re.search(rf"^{name}\(\) \{{.*?^\}}", (ROOT / path).read_text(), re.M | re.S)[0]
+    return re.search(
+        rf"^{name}\(\) \{{.*?^\}}", (ROOT / path).read_text(), re.MULTILINE | re.DOTALL
+    )[0]
 
 
 class OperationsTests(unittest.TestCase):
