@@ -30,5 +30,6 @@ COPY --from=spi /app/keycloak-spi.jar /opt/keycloak/providers/keycloak-spi.jar
 COPY keycloak-theme/krt-theme/ /opt/keycloak/themes/krt-theme/
 COPY docker/sandbox/keycloak/realm-basetool.json /opt/keycloak/data/import/realm-basetool.json
 COPY --chmod=755 docker/sandbox/keycloak/entrypoint.sh /opt/keycloak/bin/sandbox-entrypoint.sh
+ENV JAVA_OPTS_APPEND="-XX:-UseBASE64Intrinsics"
 ENTRYPOINT ["/opt/keycloak/bin/sandbox-entrypoint.sh"]
 CMD ["start-dev", "--import-realm", "--cache=local"]
