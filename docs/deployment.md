@@ -114,6 +114,13 @@ adds it to that list in the same PR — repo-lint's `check-deploy-podman-allowli
 otherwise — and the role run that installs the script installs the rule. That is strictly narrower than the
 `docker` group of the retired host, which was root-equivalent.
 
+Every sudo call is recorded in the journal and `/var/log/secure` (in Loki through alloy), and only
+there: no sudoers file sets a `logfile` (REQ-OPS-016). The four `deploy` units run under
+`ProtectSystem=strict` and cannot write one, so a `Defaults logfile=…` line makes every bridge call
+log `sudo: unable to open log file … Read-only file system` into `/var/log/basetool/*.log`. The
+role's hardening step removes it from `/etc/sudoers` and fails on one anywhere else; the CIS rule
+that adds it, `sudo_custom_logfile`, is deselected in the tailoring.
+
 **Container uids are translated.** Container uid *N* is host uid `100000 + N − 1`: 10001 → 110000
 (backend, frontend, ingest, loki, tempo), 1000 → 100999 (keycloak), 999 → 100998 (redis-session, redis-shared),
 70 → 100069 (postgres), 101 → 100100 (edge), 472 → 100471 (grafana), 65534 → 165533 (prometheus,

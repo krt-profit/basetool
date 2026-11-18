@@ -978,6 +978,12 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   `deploy` account itself never runs `podman`: every podman call goes through the sudo bridge as
   the service user, and the account's own registry credential (`REGISTRY_AUTH_FILE`, read by
   skopeo and cosign) is written by `skopeo login`.
+- **The journal is the only sudo record.** sudo logs every bridge call through syslog to the journal
+  and `/var/log/secure`, which alloy ships to Loki. No sudoers file sets a `logfile`: the sandboxed
+  deploy-account units cannot write one in `/var/log`, and giving them a `ReadWritePaths` entry for
+  a second, unshipped copy would widen their sandbox for nothing. The CIS rule that asks for one
+  (`sudo_custom_logfile`) is deselected in the role's tailoring, and `60-hardening.yml` removes a
+  `Defaults logfile=` line from `/etc/sudoers` and fails while any sudoers file still sets one.
 
   > [!note] Corrected 2026-09-22 — four directives this requirement named are gone, on purpose
   > It required `NoNewPrivileges`, `RestrictNamespaces`, an **empty** `CapabilityBoundingSet` and a
@@ -1052,10 +1058,14 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   `bin_t`, `/etc/basetool/deploy` `etc_t` and `/var/lib/basetool/deploy` `var_lib_t`; the host-script
   logs in `/var/log/basetool` stay `var_log_t` so logrotate can rotate them (ADR-0319,
   `tasks/40-selinux.yml`).
+- [ ] No file under `/etc/sudoers` or `/etc/sudoers.d` sets a sudo `logfile`; the tailoring deselects
+  `sudo_custom_logfile` and `60-hardening.yml` removes and refuses one. On a host,
+  `/var/log/basetool/*.log` carries no `unable to open log file` line from sudo.
 
 **Enforced by:** `scripts/basetool-deploy.service` (sandbox) · `scripts/deploy.sh` (`write_token_expiry_metric`,
 `HOME` for the cosign cache) · `monitoring/prometheus/alerts/ops-automation.yml` (token alerts) ·
 `ansible/roles/basetool_host/tasks/22-deploy-user.yml` (the sudoers bridge) ·
+`ansible/roles/basetool_host/tasks/60-hardening.yml` and `defaults/main.yml` (no sudo `logfile`) ·
 `scripts/basetool-*.timer`, `ansible/roles/basetool_host/templates/basetool-deploy-account-order.conf.j2`,
 `scripts/lib/container-runtime.sh` (`rt_runtime_visible`, `rt_probe_service_user`, `rt_login`) ·
 `scripts/container-runtime.test.sh` (the caller's credential through `skopeo login`) ·

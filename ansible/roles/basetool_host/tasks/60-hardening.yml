@@ -295,3 +295,42 @@
   when:
     - not ansible_check_mode
     - basetool_host_journal_upload_state.status.ActiveState | default('') == 'failed'
+
+- name: Take back the sudo log file the tailoring excuses this host from
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers
+    regexp: '^\s*Defaults\s+logfile\s*='
+    state: absent
+    validate: "visudo -cf %s"
+  register: basetool_host_sudo_logfile_removed
+  when:
+    - basetool_host_hardening_exclusions
+      | selectattr('rule', 'equalto', 'sudo_custom_logfile') | list | length > 0
+
+- name: Read whether any sudoers file still names a log file of its own
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -rlE
+      - '^\s*Defaults\S*\s.*\blogfile\s*='
+      - /etc/sudoers
+      - /etc/sudoers.d
+  register: basetool_host_sudo_logfile_left
+  changed_when: false
+  failed_when: basetool_host_sudo_logfile_left.rc > 1
+  check_mode: false
+  when:
+    - basetool_host_hardening_exclusions
+      | selectattr('rule', 'equalto', 'sudo_custom_logfile') | list | length > 0
+
+- name: Refuse a sudo log file the sandboxed deploy-account units cannot write
+  ansible.builtin.assert:
+    that: basetool_host_sudo_logfile_left.stdout | trim | length == 0
+    fail_msg: >-
+      {{ basetool_host_sudo_logfile_left.stdout | trim }} still sets a sudo `logfile`. The journal is
+      the sudo record on this host (REQ-OPS-016): deploy.sh, backup.sh, restore-drill.sh and
+      container-cleanup.sh run under ProtectSystem=strict and cannot write a file in /var/log, so
+      every sudo bridge call would log "unable to open log file". Remove the line with visudo.
+  when:
+    - basetool_host_sudo_logfile_left is not skipped
+    - not (ansible_check_mode and basetool_host_sudo_logfile_removed is changed)
