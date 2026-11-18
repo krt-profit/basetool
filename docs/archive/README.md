@@ -69,6 +69,9 @@ section number, not because it describes the system today.
 | [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.11.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.11.0 | 2026-09-25 |
 | [`RELEASE_1.14.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.14.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.14.0 | 2026-10 |
 | [`RELEASE_1.17.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.17.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.17.0, the internal-only backend (#2638) | 2026-10-17 |
+| [`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.23.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.23.0: roles in the Basetool, P4K catalogue version 2, bank and refinery orders on the exchange | 2026-11 |
+| [`RELEASE_1.25.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.25.0_PRODUCTION_RUNBOOK.md) | The production rollout of v1.25.0: the patch change, the ship origin, Grafana's Keycloak-only sign-in | 2026-11-15 |
+| [`RELEASE_1.26.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.26.0_PRODUCTION_RUNBOOK.md) | The rollout of v1.26.0 on both hosts: the Redis split and Rocky 10.3 with Podman 6 | 2026-11-18 |
 | [`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md) | The Keycloak side of the ingest gateway, including onboarding an approved ingest client | Applied 2026-06 → 2026-09; archived 2026-10-13 |
 | [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md) | The twelve realm hardening steps (WP-K2) | Archived 2026-10-13; per-step state as of that date |
 | [`OWNER_STEPS_2026-10.md`](OWNER_STEPS_2026-10.md) | The owner-only host and realm steps of October 2026 | Archived 2026-10-13 |

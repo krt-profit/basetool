@@ -1,3 +1,7 @@
+> **Archived 2026-11-18.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the hosts and the code as they were.
+>
+> **Current truth:** [`deployment.md`](../deployment.md). Index of the archive: [`README.md`](README.md).
+
 # Release 1.26.0 — rollout runbook (testing and production)
 
 > **Doc type:** Operator runbook for **one** release, the move of both hosts from **v1.25.0 to
@@ -11,13 +15,13 @@
 > read-only look at both hosts that day (both on v1.25.0, Podman 5.8.2, kernel 211.74.1 running,
 > 264.16.1 installed, the `redis` unit holding 35–41 MB). The version number assumes *Release ·
 > Prepare* runs with `1.26.0`. **Historical once 1.26.0 is live on both hosts and §6 is done**: move it
-> to `docs/archive/` then and let [`deployment.md`](deployment.md) stay the living truth.
+> to `docs/archive/` then and let [`deployment.md`](../deployment.md) stay the living truth.
 >
 > **Every step that writes to production is a production write.** It waits for @greluc's explicit
 > yes, in chat, to that exact step (AGENTS.md → *Production host access*). Nothing here is approval.
 
 Shell conventions (`cd /`, `${UCTL}`, `${UPOD}`) are the ones in
-[`deployment.md` → Shell conventions](deployment.md#shell-conventions-used-below). SSH to both hosts
+[`deployment.md` → Shell conventions](../deployment.md#shell-conventions-used-below). SSH to both hosts
 goes over the tailnet; the hosts' public or LAN addresses do not answer on port 22. The Ansible
 controller's inventory points at the tailnet names, and its key is admitted from the controller's
 tailnet address on both hosts.
@@ -123,13 +127,13 @@ ansible-playbook site.yml --limit <host> --tags directories,selinux,deploy,scrip
 and `host-updates-metrics.sh` changed in this range, and only those two tags install them. The old
 `redis-users.acl.tmpl` stays on the host as a `>` line; it is not in the list and does not block.
 
-Then the comparison of [`deployment.md` → Before a promotion](deployment.md#before-a-promotion-the-host-scripts)
+Then the comparison of [`deployment.md` → Before a promotion](../deployment.md#before-a-promotion-the-host-scripts)
 against `v1.26.0`; a `<` line blocks the promotion.
 
 ### 4.3 Redis cut-over, before the deploy
 
 Steps 0, 1 and 3 of
-[`deployment.md` → Cut-over](deployment.md#cut-over-the-session-store-gets-its-own-instance-adr-0388-needs-the-owners-yes):
+[`deployment.md` → Cut-over](../deployment.md#cut-over-the-session-store-gets-its-own-instance-adr-0388-needs-the-owners-yes):
 the memory check (`used_memory` below 300000000), the three passwords, both ACL files rendered as
 new files with `restorecon`. Step 2 is §4.2. `REDIS_DEFAULT_USER` must be set in `basetool.env`
 (production: `off`); the renderer refuses an unset value.
@@ -181,7 +185,7 @@ backup snapshot that carries both ACL files, then `systemctl start basetool-depl
 
 - **Release:** an application rollback to 1.25.0 brings back `redis` on `/var/lib/basetool/redis`
   with its kept `users.acl`; the sessions survive, the exchange answers `503` until the backend's
-  reconcile has run ([`deployment.md` → Cut-over, Rollback](deployment.md#cut-over-the-session-store-gets-its-own-instance-adr-0388-needs-the-owners-yes)).
+  reconcile has run ([`deployment.md` → Cut-over, Rollback](../deployment.md#cut-over-the-session-store-gets-its-own-instance-adr-0388-needs-the-owners-yes)).
   The three new passwords may stay; 1.25.0 does not read them.
 - **OS:** boot the previous kernel from the boot menu if 264.16.1 fails. Podman 6 is not downgraded
   in place; a host that cannot run it is restored from the PVE snapshot (testing) or rebuilt
