@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Local, never-committed pointer for how far release notes have been written.
 
 Imported by ``gather_changes.py`` (:func:`read_state`) and ``track_release_notes.py``

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Profit Basetool - squadron-management web app.
 # Copyright (C) 2026 Lucas Greuloch

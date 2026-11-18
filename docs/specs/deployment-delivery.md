@@ -3845,6 +3845,9 @@ build, not a later run of the script.
   stays for a line where the rule is wrong.
 - **The verified binary.** `ruffLint` runs the Ruff release binary of REQ-OPS-058 and is up to date
   while the Python files, `ruff.toml` and the binary are unchanged.
+- **A shebang means executable.** A Python file with a `#!` line is committed as mode `100755`; a
+  module that is only imported carries no shebang. Ruff checks this (`EXE001`, `EXE002`) only on a
+  filesystem with an executable bit, so the Linux run of CI is the verdict, not a Windows run.
 - **A Ruff update brings its rules.** A version bump of REQ-OPS-059 that enables further default
   rules carries the fixes for their findings on its own pull request.
 
@@ -3852,6 +3855,8 @@ build, not a later run of the script.
 
 - [x] `./gradlew ruffLint` passes on the tree and fails on a planted file with an unused import.
 - [x] `./gradlew :check` runs `ruffLint`.
+- [x] `ruffLint` passes on Linux, where the `EXE` rules apply: every Python file with a shebang is
+  executable in the index, and the import-only modules carry none.
 - [x] The sweep to zero findings changed no behaviour: the self-tests and checks CI runs for every
   touched script pass, the checkers print what they printed before, `generate-quadlet.py --check`
   regenerates the committed units unchanged, and the DPoP reference tests pass on Linux and Windows.
