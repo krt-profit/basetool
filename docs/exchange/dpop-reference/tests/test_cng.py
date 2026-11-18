@@ -9,6 +9,7 @@ import uuid
 
 from dpop_reference.base import DpopKeyError
 from dpop_reference.cng import PLATFORM_PROVIDER, SOFTWARE_PROVIDER, CngKey
+
 from tests.support import BackendChecks
 
 

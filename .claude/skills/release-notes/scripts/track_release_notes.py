@@ -61,19 +61,24 @@ def do_set(repo: str, ref: str, force: bool) -> int:
 
     state = st.read_state(repo)
     old_sha = ((state or {}).get("last_covered") or {}).get("sha")
-    if old_sha and old_sha != sha and not force:
-        if st.commit_exists(repo, old_sha) and not st.is_ancestor(repo, old_sha, sha):
-            print(
-                f"refusing to move the pointer: {sha[:12]} ({date}) is not ahead of the "
-                f"current pointer {old_sha[:12]}.",
-                file=sys.stderr,
-            )
-            print(
-                "This would make the next resume re-emit already-covered changes. "
-                "Pass --force to override (e.g. after an intentional history rewrite).",
-                file=sys.stderr,
-            )
-            return 3
+    if (
+        old_sha
+        and old_sha != sha
+        and not force
+        and st.commit_exists(repo, old_sha)
+        and not st.is_ancestor(repo, old_sha, sha)
+    ):
+        print(
+            f"refusing to move the pointer: {sha[:12]} ({date}) is not ahead of the "
+            f"current pointer {old_sha[:12]}.",
+            file=sys.stderr,
+        )
+        print(
+            "This would make the next resume re-emit already-covered changes. "
+            "Pass --force to override (e.g. after an intentional history rewrite).",
+            file=sys.stderr,
+        )
+        return 3
 
     tag = st.newest_version_tag(repo, sha)
     result = st.write_state(repo, ref=ref, sha=sha, date=date, tag=tag)

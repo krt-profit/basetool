@@ -163,7 +163,10 @@ def unreleased_fragments(repo: str, rev: str) -> str:
     """
     exists = (
         subprocess.run(
-            ["git", "cat-file", "-e", f"{rev}:changelog.d"], cwd=repo, capture_output=True
+            ["git", "cat-file", "-e", f"{rev}:changelog.d"],
+            cwd=repo,
+            capture_output=True,
+            check=False,
         ).returncode
         == 0
     )
@@ -299,7 +302,7 @@ TRACK_CMD = ".claude/skills/release-notes/scripts/track_release_notes.py"
 def load_state_module():
     """Import the sibling ``release_state`` helper, or return ``None`` if absent."""
     try:
-        import release_state  # noqa: PLC0415
+        import release_state
 
         return release_state
     except ImportError:
@@ -425,9 +428,8 @@ def main() -> None:
     args = parser.parse_args()
 
     repo = os.path.abspath(args.repo)
-    if not os.path.isdir(os.path.join(repo, ".git")):
-        if not os.path.exists(os.path.join(repo, ".git")):
-            sys.exit(f"error: {repo} is not a git repository")
+    if not os.path.exists(os.path.join(repo, ".git")):
+        sys.exit(f"error: {repo} is not a git repository")
 
     state = load_state_module()
     since, resumed, anchor_desc = resolve_since(repo, args.since, state)

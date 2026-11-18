@@ -28,7 +28,7 @@ import os
 import re
 import sys
 import time
-from typing import Iterator, Sequence
+from collections.abc import Iterator, Sequence
 
 DEFAULT_PATTERN = (
     r"user\.slice/user-\d+\.slice/user@\d+\.service/(?:app\.slice/)?(?P<name>[^/]+)\.service$"

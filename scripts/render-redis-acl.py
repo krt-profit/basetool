@@ -36,7 +36,7 @@ import re
 import stat
 import sys
 import tempfile
-from typing import Sequence
+from collections.abc import Sequence
 
 from env_file import EnvFileError, parse_env_file
 
@@ -95,11 +95,13 @@ def grants_outside(rendered: str, keys: tuple[str, ...], channels: tuple[str, ..
             continue
         for token in tokens[2:]:
             selector = KEY_SELECTOR.match(token)
-            if token in ("allkeys", "allchannels"):
-                findings.append(f"{tokens[1]}: {token}")
-            elif selector and not token[selector.end() :].startswith(keys):
-                findings.append(f"{tokens[1]}: {token}")
-            elif token.startswith("&") and not token[1:].startswith(channels):
+            if (
+                token in ("allkeys", "allchannels")
+                or selector
+                and not token[selector.end() :].startswith(keys)
+                or token.startswith("&")
+                and not token[1:].startswith(channels)
+            ):
                 findings.append(f"{tokens[1]}: {token}")
     return findings
 

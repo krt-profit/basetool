@@ -46,7 +46,7 @@ class Base64UrlTest(unittest.TestCase):
 
     def test_round_trip_never_pads(self) -> None:
         """Every length round-trips and no output carries ``=``, ``+`` or ``/``."""
-        for length in range(0, 41):
+        for length in range(41):
             data = os.urandom(length)
             encoded = b64url_encode(data)
             self.assertNotRegex(encoded, r"[=+/]")

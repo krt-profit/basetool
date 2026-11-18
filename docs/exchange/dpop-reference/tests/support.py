@@ -10,6 +10,7 @@ import unittest
 from dpop_reference.base import DpopKey
 from dpop_reference.jose import b64url_decode
 from dpop_reference.proof import build_proof
+
 from tests import p256
 
 

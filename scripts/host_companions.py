@@ -8,9 +8,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -48,8 +48,7 @@ def generate(revision: str | None = None) -> list[str]:
             return subprocess.run(
                 ["git", "show", f"{revision}:{path}"],
                 check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 timeout=30,
             ).stdout
         return (ROOT / path).read_bytes()

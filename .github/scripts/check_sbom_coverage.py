@@ -50,8 +50,10 @@ SHIPPED_INSIDE = {
         ("backend", "frontend", "ingest"),
     ),
     "logging-support": (
-        "LogSafe and the PII maskers every application's logback configuration names (ADR-0205); "
-        "a plain JAR inside the three boot JARs, never an artifact of its own",
+        (
+            "LogSafe and the PII maskers every application's logback configuration names "
+            "(ADR-0205); a plain JAR inside the three boot JARs, never an artifact of its own"
+        ),
         ("backend", "frontend", "ingest"),
     ),
 }
@@ -84,8 +86,10 @@ def classify(declared: list[str]) -> tuple[list[str], dict[str, tuple[str, tuple
         carrier = library_carrier(module)
         if carrier is not None and module not in inside:
             inside[module] = (
-                f"library module of the {carrier} application, compiled into its boot JAR and "
-                f"never an artifact of its own",
+                (
+                    f"library module of the {carrier} application, compiled into its boot JAR and "
+                    f"never an artifact of its own"
+                ),
                 (carrier,),
             )
     shipped = [m for m in declared if m not in NOT_SHIPPED and m not in inside]

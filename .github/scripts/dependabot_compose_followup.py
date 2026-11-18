@@ -283,9 +283,11 @@ def sync_keycloak_from(dockerfile: str, pins: dict[str, set[str]]) -> tuple[str,
     digests = {digest for found in refs.values() for digest in found}
     if len(refs) != 1 or len(digests) != 1:
         return dockerfile, [
-            f"::warning title=dependabot-compose-followup::{TEST_IMAGES_COMPOSE} pins "
-            f"{KEYCLOAK_IMAGE} {len(refs)} time(s) to {len(digests)} digest(s); "
-            f"leaving {SANDBOX_KEYCLOAK_DOCKERFILE}"
+            (
+                f"::warning title=dependabot-compose-followup::{TEST_IMAGES_COMPOSE} pins "
+                f"{KEYCLOAK_IMAGE} {len(refs)} time(s) to {len(digests)} digest(s); "
+                f"leaving {SANDBOX_KEYCLOAK_DOCKERFILE}"
+            )
         ]
     (ref,) = refs
     (digest,) = digests

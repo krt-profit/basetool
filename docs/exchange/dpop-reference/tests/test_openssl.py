@@ -13,6 +13,7 @@ from pathlib import Path
 from dpop_reference.base import DpopKeyError
 from dpop_reference.jose import jwk_thumbprint
 from dpop_reference.openssl import OpenSslKey
+
 from tests.support import BackendChecks
 
 

@@ -14,9 +14,9 @@ import os
 import re
 import shlex
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from collections.abc import Callable
 
 
 def _load_kcadm():
@@ -1703,10 +1703,12 @@ class Planner:
     ) -> None:
         """Hand a role change the provisioning identity cannot make to the operator."""
         lines = [
-            f"{spec.client_id}: service-account roles could not be {problem} — this needs an "
-            f"identity holding manage-users (the provisioning client deliberately does not). "
-            f"By hand: Admin Console -> Clients -> {spec.client_id} -> Service account "
-            f"roles -> {instruction}"
+            (
+                f"{spec.client_id}: service-account roles could not be {problem} — this needs an "
+                f"identity holding manage-users (the provisioning client deliberately does not). "
+                f"By hand: Admin Console -> Clients -> {spec.client_id} -> Service account "
+                f"roles -> {instruction}"
+            )
         ]
         for container, names in sorted(roles.items()):
             for name in names:

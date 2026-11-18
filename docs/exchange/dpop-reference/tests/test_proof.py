@@ -8,6 +8,7 @@ import unittest
 
 from dpop_reference.jose import access_token_hash, jwk_thumbprint
 from dpop_reference.proof import NonceCache, asks_for_nonce, authorization_header, build_proof
+
 from tests.support import decode_proof
 from tests.test_jose import RFC9449_JWK
 

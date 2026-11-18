@@ -239,7 +239,7 @@ def render_files(root: Path, files, profile, overrides) -> dict:
     proc = subprocess.run(cmd, cwd=str(root), env=env, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         raise RuntimeError(
-            "`%s` failed (exit %d):\n%s" % (" ".join(cmd), proc.returncode, proc.stderr.strip())
+            f"`{' '.join(cmd)}` failed (exit {proc.returncode}):\n{proc.stderr.strip()}"
         )
     return json.loads(proc.stdout).get("services", {})
 
@@ -329,26 +329,27 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
     try:
         services = render(root, scenario)
     except RuntimeError as exc:
-        problems.append("%s: %s" % (scenario.name, exc))
-        return "%s: NOT RENDERED" % scenario.name
+        problems.append(f"{scenario.name}: {exc}")
+        return f"{scenario.name}: NOT RENDERED"
 
     hostname, relative_path, issuers = collect(services)
 
     if not issuers:
         problems.append(
-            "%s: no service sets KEYCLOAK_ISSUER_URI -- either the compose file list or the profile "
-            "is wrong (every service here carries a `profiles:` key, and a render without one is "
-            "empty), or the variable was renamed. Either way this scenario checked nothing."
-            % scenario.name
+            f"{scenario.name}: no service sets KEYCLOAK_ISSUER_URI -- either the compose file list "
+            "or the profile is wrong (every service here carries a `profiles:` key, and a render "
+            "without one is empty), or the variable was renamed. Either way this scenario checked "
+            "nothing."
         )
-        return "%s: NO ISSUERS" % scenario.name
+        return f"{scenario.name}: NO ISSUERS"
 
     distinct = sorted(set(issuers.values()))
     if scenario.require_agreement and len(distinct) > 1:
         problems.append(
-            "%s: the services do not agree on the issuer -- %s. Three apps validating two issuers "
-            "is the same outage as one wrong issuer."
-            % (scenario.name, ", ".join("%s=%s" % (n, i) for n, i in sorted(issuers.items())))
+            "{}: the services do not agree on the issuer -- {}. Three apps validating two issuers "
+            "is the same outage as one wrong issuer.".format(
+                scenario.name, ", ".join(f"{n}={i}" for n, i in sorted(issuers.items()))
+            )
         )
 
     if scenario.expect:
@@ -359,27 +360,24 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
             wanted = expected_map.get(name)
             if wanted is None:
                 problems.append(
-                    "%s: %s sets KEYCLOAK_ISSUER_URI=%s and this scenario does not account for it "
-                    "-- a new service joined the stack; decide which issuer it must validate"
-                    % (scenario.name, name, issuer)
+                    f"{scenario.name}: {name} sets KEYCLOAK_ISSUER_URI={issuer} and this scenario "
+                    "does not account for it -- a new service joined the stack; decide which "
+                    "issuer it must validate"
                 )
             elif issuer != wanted:
                 problems.append(
-                    "%s: %s validates %s but this scenario requires %s -- %s"
-                    % (scenario.name, name, issuer, wanted, scenario.why)
+                    f"{scenario.name}: {name} validates {issuer} but this scenario requires {wanted} -- {scenario.why}"
                 )
         for name in sorted(set(expected_map) - set(issuers)):
             problems.append(
-                "%s: %s is expected to validate %s but sets no KEYCLOAK_ISSUER_URI at all"
-                % (scenario.name, name, expected_map[name])
+                f"{scenario.name}: {name} is expected to validate {expected_map[name]} but sets no KEYCLOAK_ISSUER_URI at all"
             )
 
     if hostname is None:
         problems.append(
-            "%s: no service sets KC_HOSTNAME, so the issuer above is checked against nothing"
-            % scenario.name
+            f"{scenario.name}: no service sets KC_HOSTNAME, so the issuer above is checked against nothing"
         )
-        return "%s: NO KEYCLOAK" % scenario.name
+        return f"{scenario.name}: NO KEYCLOAK"
 
     full_url = "://" in hostname
     host_path = norm_path(urlsplit(hostname).path) if full_url else None
@@ -387,11 +385,11 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
 
     if full_url and host_path != rel:
         problems.append(
-            "%s: KC_HOSTNAME=%s has path %r but KC_HTTP_RELATIVE_PATH=%r. Keycloak would SERVE "
-            "under %r and ADVERTISE issuer links under %r, report healthy, and the apps would die "
-            "at start-up on 'The Issuer ... did not match the requested issuer' -- which reads as a "
-            "backend fault (ADR-0166)."
-            % (
+            "{}: KC_HOSTNAME={} has path {!r} but KC_HTTP_RELATIVE_PATH={!r}. Keycloak "
+            "would SERVE under {!r} and ADVERTISE issuer links under {!r}, report healthy, "
+            "and the apps would die at start-up on 'The Issuer ... did not match the requested "
+            "issuer' -- which reads as a "
+            "backend fault (ADR-0166).".format(
                 scenario.name,
                 hostname,
                 host_path or "/",
@@ -402,10 +400,7 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
         )
 
     if not scenario.enforce_pair:
-        return "%s: issuer %s (explicit override; pair check skipped by design)" % (
-            scenario.name,
-            distinct[0],
-        )
+        return f"{scenario.name}: issuer {distinct[0]} (explicit override; pair check skipped by design)"
 
     for name, issuer in sorted(issuers.items()):
         if scenario.pair_services is not None and name not in scenario.pair_services:
@@ -413,37 +408,33 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
         base, realm = split_issuer(issuer)
         if realm is None:
             problems.append(
-                "%s: %s has KEYCLOAK_ISSUER_URI=%s, which names no realm"
-                % (scenario.name, name, issuer)
+                f"{scenario.name}: {name} has KEYCLOAK_ISSUER_URI={issuer}, which names no realm"
             )
             continue
         if full_url:
             expected = hostname.rstrip("/")
             if base.rstrip("/") != expected:
                 problems.append(
-                    "%s: %s validates issuer base %s, but KC_HOSTNAME=%s makes Keycloak advertise "
-                    "%s" % (scenario.name, name, base, hostname, expected)
+                    f"{scenario.name}: {name} validates issuer base {base}, but "
+                    f"KC_HOSTNAME={hostname} makes Keycloak advertise {expected}"
                 )
         else:
             parts = urlsplit(base)
             if parts.hostname != hostname:
                 problems.append(
-                    "%s: %s validates issuer host %s, but KC_HOSTNAME=%s"
-                    % (scenario.name, name, parts.hostname, hostname)
+                    f"{scenario.name}: {name} validates issuer host {parts.hostname}, but KC_HOSTNAME={hostname}"
                 )
             if norm_path(parts.path) != rel:
                 problems.append(
-                    "%s: %s validates issuer path %r, but KC_HTTP_RELATIVE_PATH=%r -- Keycloak "
-                    "serves its realms under that prefix"
-                    % (scenario.name, name, norm_path(parts.path) or "/", relative_path)
+                    "{}: {} validates issuer path {!r}, but KC_HTTP_RELATIVE_PATH={!r} -- Keycloak "
+                    "serves its realms under that prefix".format(
+                        scenario.name, name, norm_path(parts.path) or "/", relative_path
+                    )
                 )
 
-    return "%s: KC_HOSTNAME=%s + %s -> %s (%d service(s))" % (
-        scenario.name,
-        hostname,
-        relative_path,
-        " and ".join(distinct),
-        len(issuers),
+    return (
+        f"{scenario.name}: KC_HOSTNAME={hostname} + {relative_path} -> "
+        f"{' and '.join(distinct)} ({len(issuers)} service(s))"
     )
 
 
@@ -462,13 +453,13 @@ def check_spring_defaults(root: Path, problems: list) -> str:
     for rel in SPRING_CONFIGS:
         path = root / rel
         if not path.exists():
-            problems.append("spring-defaults: %s does not exist -- the file list is stale" % rel)
+            problems.append(f"spring-defaults: {rel} does not exist -- the file list is stale")
             continue
         found = SPRING_ISSUER.findall(path.read_text(encoding="utf-8"))
         if not found:
             problems.append(
-                "spring-defaults: %s no longer configures issuer-uri from KEYCLOAK_ISSUER_URI -- "
-                "this gate has stopped watching it" % rel
+                f"spring-defaults: {rel} no longer configures issuer-uri from KEYCLOAK_ISSUER_URI "
+                "-- this gate has stopped watching it"
             )
             continue
         for default in found:
@@ -477,11 +468,11 @@ def check_spring_defaults(root: Path, problems: list) -> str:
             checked += 1
             if default != expected:
                 problems.append(
-                    "spring-defaults: %s falls back to %s, but docker-compose.yml deploys %s. An "
-                    "app started without KEYCLOAK_ISSUER_URI would validate the wrong issuer."
-                    % (rel, default, expected)
+                    f"spring-defaults: {rel} falls back to {default}, but docker-compose.yml "
+                    f"deploys {expected}. An app started without KEYCLOAK_ISSUER_URI would "
+                    "validate the wrong issuer."
                 )
-    return "spring-defaults: %d fallback default(s) match %s" % (checked, expected)
+    return f"spring-defaults: {checked} fallback default(s) match {expected}"
 
 
 def check_monitoring_oidc(root: Path, problems: list) -> str:
@@ -505,37 +496,37 @@ def check_monitoring_oidc(root: Path, problems: list) -> str:
         try:
             services = render_files(root, [MONITORING], None, overrides)
         except RuntimeError as exc:
-            problems.append("monitoring-oidc (%s): %s" % (label, exc))
+            problems.append(f"monitoring-oidc ({label}): {exc}")
             return "monitoring-oidc: NOT RENDERED"
 
         env = (services.get("grafana") or {}).get("environment") or {}
         if not env:
             problems.append(
-                "monitoring-oidc (%s): docker-compose.monitoring.yml has no `grafana` service with "
-                "an environment -- this rule has stopped watching anything" % label
+                f"monitoring-oidc ({label}): docker-compose.monitoring.yml has no `grafana` "
+                "service with an environment -- this rule has stopped watching anything"
             )
             return "monitoring-oidc: NO GRAFANA"
 
-        expected_prefix = "%s/realms/%s/protocol/openid-connect" % (base, REALM)
+        expected_prefix = f"{base}/realms/{REALM}/protocol/openid-connect"
         for key, endpoint in sorted(GRAFANA_OIDC_ENDPOINTS.items()):
             actual = env.get(key)
             if not actual:
                 problems.append(
-                    "monitoring-oidc (%s): %s is not set. Grafana's generic_oauth has no discovery "
-                    "option, so a missing endpoint is a login that cannot complete." % (label, key)
+                    f"monitoring-oidc ({label}): {key} is not set. Grafana's generic_oauth has no "
+                    "discovery option, so a missing endpoint is a login that cannot complete."
                 )
                 continue
             checked += 1
-            expected = "%s/%s" % (expected_prefix, endpoint)
+            expected = f"{expected_prefix}/{endpoint}"
             if actual != expected:
                 problems.append(
-                    "monitoring-oidc (%s): %s is %s but the apps validate issuer %s/realms/%s, so it "
-                    "should be %s. Grafana would send members to a realm other than the one minting "
-                    "their tokens, and the login fails with nothing wrong in any log."
-                    % (label, key, actual, base, REALM, expected)
+                    f"monitoring-oidc ({label}): {key} is {actual} but the apps validate issuer "
+                    f"{base}/realms/{REALM}, so it should be {expected}. Grafana would send "
+                    "members to a realm other than the one minting their tokens, and the login "
+                    "fails with nothing wrong in any log."
                 )
     return (
-        "monitoring-oidc: %d Grafana endpoint(s) follow the issuer, defaults and override" % checked
+        f"monitoring-oidc: {checked} Grafana endpoint(s) follow the issuer, defaults and override"
     )
 
 
@@ -555,7 +546,7 @@ def check_prometheus_targets(root: Path, problems: list) -> str:
     path = root / PROMETHEUS
     if not path.exists():
         problems.append(
-            "prometheus-targets: %s does not exist -- the file list is stale" % PROMETHEUS
+            f"prometheus-targets: {PROMETHEUS} does not exist -- the file list is stale"
         )
         return "prometheus-targets: MISSING"
 
@@ -572,19 +563,19 @@ def check_prometheus_targets(root: Path, problems: list) -> str:
 
     if not identity_targets:
         problems.append(
-            "prometheus-targets: no probe target under %r at all. The Keycloak discovery document "
-            "and the two management-surface denies are supposed to be probed from outside "
-            "(REQ-OBS-012); finding none means they were dropped or the base moved without this "
-            "rule noticing." % identity_path
+            f"prometheus-targets: no probe target under {identity_path!r} at all. The Keycloak "
+            "discovery document and the two management-surface denies are supposed to be probed "
+            "from outside (REQ-OBS-012); finding none means they were dropped or the base moved "
+            "without this rule noticing."
         )
         return "prometheus-targets: NONE FOUND"
 
     for url in sorted(set(identity_targets)):
         if not url.startswith(PROD_BASE + "/") and url != PROD_BASE:
             problems.append(
-                "prometheus-targets: %s is probed, but docker-compose.yml deploys identity at %s. "
-                "prometheus.yml is not interpolated, so a domain move never reaches it on its own."
-                % (url, PROD_BASE)
+                f"prometheus-targets: {url} is probed, but docker-compose.yml deploys identity at "
+                f"{PROD_BASE}. prometheus.yml is not interpolated, so a domain move never reaches "
+                "it on its own."
             )
 
     present = set(identity_targets)
@@ -592,15 +583,14 @@ def check_prometheus_targets(root: Path, problems: list) -> str:
         expected = PROD_BASE + suffix.format(realm=REALM)
         if expected not in present:
             problems.append(
-                "prometheus-targets: %s is not probed. Either it was dropped or it was moved off the "
-                "identity base -- both leave the endpoint uncovered, and an uncovered probe is "
-                "indistinguishable from a passing one (REQ-OBS-012)." % expected
+                f"prometheus-targets: {expected} is not probed. Either it was dropped or it was "
+                "moved off the identity base -- both leave the endpoint uncovered, and an "
+                "uncovered probe is indistinguishable from a passing one (REQ-OBS-012)."
             )
 
-    return "prometheus-targets: %d identity probe(s) on %s, all %d required present" % (
-        len(present),
-        PROD_BASE,
-        len(REQUIRED_PROBE_SUFFIXES),
+    return (
+        f"prometheus-targets: {len(present)} identity probe(s) on {PROD_BASE}, "
+        f"all {len(REQUIRED_PROBE_SUFFIXES)} required present"
     )
 
 
@@ -612,11 +602,11 @@ def check_prod_base_is_real(root: Path, problems: list) -> None:
         problems: accumulator; a mismatch is appended.
     """
     text = (root / BASE).read_text(encoding="utf-8")
-    if ("KC_HOSTNAME: ${BASETOOL_KEYCLOAK_HOSTNAME:-%s}" % PROD_BASE) not in text:
+    if (f"KC_HOSTNAME: ${{BASETOOL_KEYCLOAK_HOSTNAME:-{PROD_BASE}}}") not in text:
         problems.append(
-            "self-check: docker-compose.yml no longer defaults KC_HOSTNAME to %s, so this script's "
-            "PROD_BASE -- and every expectation built from it -- is stale. Update PROD_BASE in "
-            "scripts/check-keycloak-issuer.py in the same change." % PROD_BASE
+            f"self-check: docker-compose.yml no longer defaults KC_HOSTNAME to {PROD_BASE}, so "
+            "this script's PROD_BASE -- and every expectation built from it -- is stale. Update "
+            "PROD_BASE in scripts/check-keycloak-issuer.py in the same change."
         )
 
 
@@ -654,7 +644,9 @@ def main() -> int:
         unknown = [name for name in wanted if name not in known]
         if unknown:
             print(
-                "unknown check(s): %s (known: %s)" % (", ".join(unknown), ", ".join(sorted(known))),
+                "unknown check(s): {} (known: {})".format(
+                    ", ".join(unknown), ", ".join(sorted(known))
+                ),
                 file=sys.stderr,
             )
             return 2
@@ -671,9 +663,9 @@ def main() -> int:
         summaries.append(extra_checks[name](root, problems))
 
     if problems:
-        print("Keycloak issuer check FAILED (%d problem(s)):\n" % len(problems), file=sys.stderr)
+        print(f"Keycloak issuer check FAILED ({len(problems)} problem(s)):\n", file=sys.stderr)
         for problem in problems:
-            print("  - %s" % problem, file=sys.stderr)
+            print(f"  - {problem}", file=sys.stderr)
         print(
             "\nThe issuer the apps validate must be the one Keycloak advertises. ADR-0166 carries "
             "the measured hostname/relative-path table.",
@@ -682,11 +674,11 @@ def main() -> int:
         return 1
 
     print(
-        "Keycloak issuer OK -- %d stack(s) and %d further surface(s) checked:"
-        % (len(scenarios), len(extras))
+        f"Keycloak issuer OK -- {len(scenarios)} stack(s) and {len(extras)} further surface(s) "
+        "checked:"
     )
     for summary in summaries:
-        print("  %s" % summary)
+        print(f"  {summary}")
     return 0
 
 

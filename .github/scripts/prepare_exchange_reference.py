@@ -161,7 +161,9 @@ def check_site(docs: pathlib.Path) -> list[str]:
     for needle in ("Redoc.init", "dataset.spec", "theme:"):
         if needle not in code:
             problems.append(f"assets/js/reference.js does not contain {needle}")
-    defined = set(re.findall(r"^\s*(--[a-z0-9-]+):", stylesheet.read_text(encoding="utf-8"), re.M))
+    defined = set(
+        re.findall(r"^\s*(--[a-z0-9-]+):", stylesheet.read_text(encoding="utf-8"), re.MULTILINE)
+    )
     for name in sorted(set(re.findall(r"token\(\"(--[a-z0-9-]+)\"\)", code)) - defined):
         problems.append(f"assets/js/reference.js reads {name}, which krt-docs.css does not define")
     return problems

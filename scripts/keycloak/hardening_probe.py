@@ -118,7 +118,7 @@ class Browser:
             if target.startswith(self.redirect_uri):
                 return target, ""
             url = target
-            status, page, location = self._fetch(url)
+            _, page, location = self._fetch(url)
             hops += 1
         return url, page
 

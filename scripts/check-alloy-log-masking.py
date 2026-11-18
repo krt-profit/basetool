@@ -31,7 +31,7 @@ DEFAULT_CONFIG = pathlib.Path("monitoring/alloy/config.alloy")
 
 BLOCK_HEADER = re.compile(r"\bstage\.replace\b\s*\{")
 
-ATTRIBUTE = re.compile(r'^[ \t]*(\w+)[ \t]*=[ \t]*"((?:[^"\\]|\\.)*)"', re.M)
+ATTRIBUTE = re.compile(r'^[ \t]*(\w+)[ \t]*=[ \t]*"((?:[^"\\]|\\.)*)"', re.MULTILINE)
 
 
 def skip_string(text: str, i: int) -> int:
@@ -117,9 +117,7 @@ def capturing_groups(pattern: str) -> int:
             in_class = True
         elif c == "(":
             rest = pattern[i + 1 :]
-            if not rest.startswith("?"):
-                count += 1
-            elif rest.startswith("?P<") or rest.startswith("?<"):
+            if not rest.startswith("?") or rest.startswith(("?P<", "?<")):
                 count += 1
         i += 1
     return count
@@ -146,50 +144,50 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.config.is_file():
-        print("FATAL: %s does not exist" % args.config, file=sys.stderr)
+        print(f"FATAL: {args.config} does not exist", file=sys.stderr)
         return 2
 
     text = args.config.read_text(encoding="utf-8")
     stages = list(replace_stages(text))
     if not stages:
         print(
-            "FATAL: %s contains no stage.replace blocks -- either the masking was removed or this "
-            "checker no longer finds it. Both are a problem; neither is a pass." % args.config,
+            f"FATAL: {args.config} contains no stage.replace blocks -- either the masking was removed or this "
+            "checker no longer finds it. Both are a problem; neither is a pass.",
             file=sys.stderr,
         )
         return 2
 
     problems: list[str] = []
     for line_no, attrs in stages:
-        where = "%s:%d" % (args.config.as_posix(), line_no)
+        where = f"{args.config.as_posix()}:{line_no}"
         expression = attrs.get("expression")
         if expression is None:
-            problems.append("%s: stage.replace has no expression" % where)
+            problems.append(f"{where}: stage.replace has no expression")
             continue
 
         if "${" in attrs.get("replace", ""):
             problems.append(
-                "%s: replace = \"%s\" contains '${' -- stage.replace expands no back-references, so "
+                "{}: replace = \"{}\" contains '${{' -- stage.replace expands no back-references, so "
                 "those characters are written into Loki verbatim. Drop the reference and keep the "
-                "field name outside the capture group." % (where, unescape(attrs["replace"]))
+                "field name outside the capture group.".format(where, unescape(attrs["replace"]))
             )
 
         groups = capturing_groups(unescape(expression))
         if groups > 1:
             problems.append(
-                '%s: expression = "%s" has %d capturing groups -- stage.replace overwrites EVERY one '
-                "of them, so the field name in group 1 is destroyed along with the value. Wrap only "
-                "the value; use (?:...) for the rest." % (where, unescape(expression), groups)
+                f'{where}: expression = "{unescape(expression)}" has {groups} capturing groups -- '
+                "stage.replace overwrites EVERY one of them, so the field name in group 1 is "
+                "destroyed along with the value. Wrap only the value; use (?:...) for the rest."
             )
 
     if problems:
         print(
-            "Alloy log-masking check FAILED (%d problem(s) in %d stage.replace block(s)):\n"
-            % (len(problems), len(stages)),
+            f"Alloy log-masking check FAILED ({len(problems)} problem(s) in "
+            f"{len(stages)} stage.replace block(s)):\n",
             file=sys.stderr,
         )
         for problem in problems:
-            print("  - %s" % problem, file=sys.stderr)
+            print(f"  - {problem}", file=sys.stderr)
         print(
             "\nREQ-OBS-007: a mask puts exactly the value in one capture group and nothing else.",
             file=sys.stderr,
@@ -197,8 +195,8 @@ def main() -> int:
         return 1
 
     print(
-        "Alloy log masking OK: %d stage.replace block(s), each with at most one capture group and "
-        "no back-reference in its replacement." % len(stages)
+        f"Alloy log masking OK: {len(stages)} stage.replace block(s), each with at most one "
+        "capture group and no back-reference in its replacement."
     )
     return 0
 

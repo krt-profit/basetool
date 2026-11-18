@@ -49,31 +49,39 @@ SIGNATURES: dict[str, tuple[list[str], list[str]]] = {
     ),
     "KeycloakBackendTruststoreUnreadable": (
         [
-            "2026-11-13 09:06:49,400 traceId=, parentId=, spanId=, sampled= WARN  "
-            "[de.greluc.krt.profit.basetool.keycloak.spi.gate.BackendTrustSupport] (build-7) Failed to load "
-            "the backend truststore; the Discord account-existence precheck will fail open until it is "
-            "fixed.: java.nio.file.NoSuchFileException: /run/secrets/backend-truststore.p12",
+            (
+                "2026-11-13 09:06:49,400 traceId=, parentId=, spanId=, sampled= WARN  "
+                "[de.greluc.krt.profit.basetool.keycloak.spi.gate.BackendTrustSupport] (build-7) Failed to load "
+                "the backend truststore; the Discord account-existence precheck will fail open until it is "
+                "fixed.: java.nio.file.NoSuchFileException: /run/secrets/backend-truststore.p12"
+            ),
         ],
         [
-            "2026-11-13 09:06:49,421 traceId=, parentId=, spanId=, sampled= WARN  [org.keycloak.services] "
-            "(build-7) KC-SERVICES0047: discord-guild-role-gate "
-            "(de.greluc.krt.profit.basetool.keycloak.spi.gate.DiscordGuildRoleGateAuthenticatorFactory) is "
-            "implementing the internal SPI authenticator. This SPI is internal and may change without notice",
+            (
+                "2026-11-13 09:06:49,421 traceId=, parentId=, spanId=, sampled= WARN  [org.keycloak.services] "
+                "(build-7) KC-SERVICES0047: discord-guild-role-gate "
+                "(de.greluc.krt.profit.basetool.keycloak.spi.gate.DiscordGuildRoleGateAuthenticatorFactory) is "
+                "implementing the internal SPI authenticator. This SPI is internal and may change without notice"
+            ),
         ],
     ),
     "KeycloakAccountExistenceProbeFailing": (
         [
-            "2026-11-12 08:27:52,026 traceId=557ba1e505862830f19b66f754f21205, parentId=16b72ad0e382fedb, "
-            "spanId=f0b32fbd8524aa0b, sampled=true WARN  "
-            "[de.greluc.krt.profit.basetool.keycloak.spi.gate.BackendAccountChecker] (executor-thread-19) "
-            "Account-existence probe could not reach the backend (SSLHandshakeException); skipping the "
-            "check.: javax.net.ssl.SSLHandshakeException: (certificate_unknown) PKIX path building failed",
+            (
+                "2026-11-12 08:27:52,026 traceId=557ba1e505862830f19b66f754f21205, parentId=16b72ad0e382fedb, "
+                "spanId=f0b32fbd8524aa0b, sampled=true WARN  "
+                "[de.greluc.krt.profit.basetool.keycloak.spi.gate.BackendAccountChecker] (executor-thread-19) "
+                "Account-existence probe could not reach the backend (SSLHandshakeException); skipping the "
+                "check.: javax.net.ssl.SSLHandshakeException: (certificate_unknown) PKIX path building failed"
+            ),
         ],
         [
-            "2026-11-13 09:06:49,400 traceId=, parentId=, spanId=, sampled= WARN  "
-            "[de.greluc.krt.profit.basetool.keycloak.spi.gate.BackendTrustSupport] (build-7) Failed to load "
-            "the backend truststore; the Discord account-existence precheck will fail open until it is "
-            "fixed.: java.nio.file.NoSuchFileException: /run/secrets/backend-truststore.p12",
+            (
+                "2026-11-13 09:06:49,400 traceId=, parentId=, spanId=, sampled= WARN  "
+                "[de.greluc.krt.profit.basetool.keycloak.spi.gate.BackendTrustSupport] (build-7) Failed to load "
+                "the backend truststore; the Discord account-existence precheck will fail open until it is "
+                "fixed.: java.nio.file.NoSuchFileException: /run/secrets/backend-truststore.p12"
+            ),
         ],
     ),
 }

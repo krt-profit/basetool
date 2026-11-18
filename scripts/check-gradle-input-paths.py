@@ -50,7 +50,7 @@ PATH_CALLS = (
 
 STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')
 IDENT = re.compile(r"[A-Za-z_]\w*")
-VAL_DECL = re.compile(r"^\s*val\s+([A-Za-z_]\w*)\s*(?::[^=\n]+)?=", re.M)
+VAL_DECL = re.compile(r"^\s*val\s+([A-Za-z_]\w*)\s*(?::[^=\n]+)?=", re.MULTILINE)
 ROOT_PROJECT = re.compile(r"(?<!\w)rootProject\b")
 
 

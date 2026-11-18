@@ -40,9 +40,8 @@ import urllib.parse
 import uuid
 from collections import Counter, defaultdict
 
-from sandbox_client import DEFAULT_CA, ROOT, Answer, SandboxSession
-
 from dpop_reference.openssl import OpenSslKey
+from sandbox_client import DEFAULT_CA, ROOT, Answer, SandboxSession
 
 CLIENT = "sandbox-client"
 STATION = "Sandbox Station Storage"
@@ -96,7 +95,7 @@ def percentile(values: list[float], share: float) -> float:
     if not values:
         return 0.0
     ordered = sorted(values)
-    rank = max(0, min(len(ordered) - 1, int(round(share * len(ordered) + 0.5)) - 1))
+    rank = max(0, min(len(ordered) - 1, round(share * len(ordered) + 0.5) - 1))
     return ordered[rank]
 
 
@@ -295,15 +294,14 @@ class Docker:
 def metric_deltas(before: dict, after: dict) -> dict[str, dict[str, float]]:
     """Lists, per service, every series that changed and the value of every gauge after."""
     changes = {}
-    for service in after:
-        if "unreachable" in after[service] or "unreachable" in before.get(service, {}):
+    for service, current in after.items():
+        if "unreachable" in current or "unreachable" in before.get(service, {}):
             changes[service] = {
-                "unreachable": after[service].get("unreachable")
-                or before[service].get("unreachable")
+                "unreachable": current.get("unreachable") or before[service].get("unreachable")
             }
             continue
         moved = {}
-        for series, value in after[service].items():
+        for series, value in current.items():
             previous = before[service].get(series, 0.0)
             if value != previous:
                 moved[series] = (
@@ -510,7 +508,7 @@ class Worker(threading.Thread):
 
     def stock_write(self, kind: str, count: int) -> None:
         """Sets `count` distinct lots of the member to their known quantity plus one."""
-        qualities = self.random.sample(range(0, 1001), count)
+        qualities = self.random.sample(range(1001), count)
         ops = [stock_op(q, self.lots.get(q, 0) + 1, self.lots.get(q, 0)) for q in qualities]
         answer = self.send(kind, "POST", "/exchange/v1/me/stock/changes", {"ops": ops}, True)
         if answer is None or answer.status != 200:

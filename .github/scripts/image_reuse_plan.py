@@ -39,7 +39,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from app_version import newest_changelog_version  # noqa: E402
+from app_version import newest_changelog_version
 
 APP_DOCKERFILE = "docker/app/Dockerfile"
 MODULES = ("backend", "frontend", "ingest")
@@ -84,8 +84,7 @@ def copy_sources(dockerfile: str) -> list[str]:
         operands = [t for t in tokens if not t.startswith("--")]
         for src in operands[:-1]:
             src = src.rstrip("/")
-            if src.startswith("./"):
-                src = src[2:]
+            src = src.removeprefix("./")
             if src and src not in sources:
                 sources.append(src)
     return sources
@@ -255,7 +254,7 @@ def git(*args: str) -> subprocess.CompletedProcess:
     :param args: the git arguments.
     :return: the completed process; callers check ``returncode``.
     """
-    return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True)
+    return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=False)
 
 
 def show(rev: str, path: str) -> str | None:

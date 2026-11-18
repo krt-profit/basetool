@@ -12,9 +12,13 @@ import os
 import stat
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .base import DpopKeyError
 from .jose import P256_COORDINATE_BYTES, der_to_raw, ec_public_jwk, jwk_thumbprint, raw_to_der
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 LIBCRYPTO_ENV = "DPOP_REFERENCE_LIBCRYPTO"
 
@@ -327,7 +331,7 @@ class OpenSslKey:
             libcrypto().EVP_PKEY_free(self._pkey)
             self._pkey = None
 
-    def __enter__(self) -> OpenSslKey:
+    def __enter__(self) -> Self:
         """Returns the key for a ``with`` block."""
         return self
 

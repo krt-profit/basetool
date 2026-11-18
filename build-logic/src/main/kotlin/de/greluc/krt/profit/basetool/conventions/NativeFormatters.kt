@@ -1,11 +1,8 @@
 package de.greluc.krt.profit.basetool.conventions
 
-import org.gradle.api.Action
 import org.gradle.api.Project
 import org.gradle.api.file.FileCollection
 import org.gradle.api.tasks.Exec
-import org.gradle.api.tasks.PathSensitivity
-import org.gradle.process.CommandLineArgumentProvider
 
 /**
  * Registers the tasks `<name>Check` and `<name>Apply`, which run the native formatter [tool] over
@@ -31,44 +28,17 @@ fun Project.registerNativeFormatter(
   checkArguments: List<String>,
   applyArguments: List<String>,
 ) {
-  val projectDirectory = layout.projectDirectory.asFile
-  val executable = tool.executable.get().asFile.path
-  fun runOverSources(arguments: List<String>) =
-    Action<Exec> {
-      dependsOn(tool.install)
-      this.executable = executable
-      workingDir = projectDirectory
-      argumentProviders.add(
-        CommandLineArgumentProvider {
-          arguments + sources.files.map { it.relativeTo(projectDirectory).path }
-        },
-      )
-      onlyIf("there are files to format") { !sources.isEmpty }
-    }
-
-  val apply = tasks.register("${name}Apply", Exec::class.java, runOverSources(applyArguments))
+  val apply =
+    tasks.register("${name}Apply", Exec::class.java, runNativeTool(tool, sources, applyArguments))
   apply.configure {
     group = "formatting"
     description = "Reformats the files $name owns in place."
   }
 
-  val marker = layout.buildDirectory.file("format-checks/$name")
-  val check = tasks.register("${name}Check", Exec::class.java, runOverSources(checkArguments))
+  val check = registerNativeVerification("${name}Check", tool, sources, settings, checkArguments)
   check.configure {
-    group = "verification"
     description = "Fails when $name would reformat a file; ./gradlew spotlessApply fixes it."
     mustRunAfter(apply)
-    inputs.files(sources).withPropertyName("sources").withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs
-      .files(settings)
-      .withPropertyName("settings")
-      .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs
-      .file(tool.executable)
-      .withPropertyName("executable")
-      .withPathSensitivity(PathSensitivity.NONE)
-    outputs.file(marker).withPropertyName("marker")
-    doLast { marker.get().asFile.writeText("") }
   }
 
   tasks.named("spotlessCheck") { dependsOn(check) }

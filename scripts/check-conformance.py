@@ -30,20 +30,20 @@ import concurrent.futures
 import dataclasses
 import datetime as dt
 import getpass
-import io
 import ipaddress
 import json
 import os
 import re
 import shlex
-import urllib.parse
 import shutil
 import socket
 import ssl
 import subprocess
 import sys
+import urllib.parse
 import uuid
-from typing import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import Callable
 
 DEFAULT_HOSTS = {
     "frontend": "profit-base.online",
@@ -269,6 +269,7 @@ class HostRunner:
                 input=stdin.encode() if stdin is not None else None,
                 capture_output=True,
                 timeout=self.timeout,
+                check=False,
             )
         except subprocess.TimeoutExpired as exc:
             raise CheckFailed(f"host command timed out after {self.timeout}s: {command}") from exc
@@ -1003,9 +1004,7 @@ def check_containers_running(ctx: Context) -> str:
         status = status_by_name.get(name)
         if status is None:
             problems.append(f"{name} is absent")
-        elif not status.startswith("Up"):
-            problems.append(f"{name} is {status!r}")
-        elif "unhealthy" in status:
+        elif not status.startswith("Up") or "unhealthy" in status:
             problems.append(f"{name} is {status!r}")
     if problems:
         raise CheckFailed("; ".join(problems))
@@ -1632,7 +1631,8 @@ def _compose_pinned_version(service: str, path: str = COMPOSE_MONITORING) -> str
         image line cannot be found.
     """
     try:
-        lines = io.open(path, encoding="utf-8").read().splitlines()
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
     except OSError:
         return None
     inside = False

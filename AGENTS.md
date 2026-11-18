@@ -82,8 +82,8 @@ Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. The `test` pr
   `SessionStart` hook does it). `.githooks/pre-push` refuses a push while `spotlessCheck` fails;
   never skip it with `--no-verify`.
 - **Before every push: `./gradlew spotlessApply` (whole repo) and every lint gate green** — the
-  frontend's Stylelint, ESLint, HTMLHint, `typecheckJs` and `checkExchangeDocs` fail CI
-  independently of the formatters and Checkstyle.
+  frontend's Stylelint, ESLint, HTMLHint, `typecheckJs` and `checkExchangeDocs` and the Python
+  lint `ruffLint` fail CI independently of the formatters and Checkstyle.
 - The checklist and the tasks: [`docs/agents/lint-and-push.md`](docs/agents/lint-and-push.md); the
   recipe: the `lint-gate` skill. Read [`docs/agents/pitfalls.md`](docs/agents/pitfalls.md) before
   you push.

@@ -22,16 +22,16 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-
-from http_budget import connection_timeout, read_before_deadline
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from http_budget import connection_timeout, read_before_deadline
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "docs" / "exchange" / "dpop-reference"))
 
-from dpop_reference import (  # noqa: E402
+from dpop_reference import (
     DpopKey,
     NonceCache,
     asks_for_nonce,
