@@ -1265,6 +1265,8 @@ assert_eq "$(query "$state" "client('basetool-frontend')['directAccessGrantsEnab
   "the frontend client keeps the password grant off"
 assert_contains "$(query "$state" "scope_names('default', 'basetool-seed')")" "'extractor-ingest'" \
   "the seed client's tokens carry the backend audience"
+assert_contains "$(query "$state" "scope_names('default', 'basetool-seed')")" "'kc-admin-api'" \
+  "the seed client's service account carries the Admin API audience it creates the accounts with"
 assert_contains "$output" "SEED_CLIENT_SECRET" "the operator is told where the seed secret goes"
 assert_not_contains "$output" "re-render env.d" "the seed secret goes into no host .env"
 output="$(run_provisioner "$state")"

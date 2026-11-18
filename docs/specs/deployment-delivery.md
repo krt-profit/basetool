@@ -3451,7 +3451,8 @@ neither tool can reach production (ADR-0279).
   through the Admin API and every Basetool row through `/api/v1`, signed in as the account the row
   belongs to, so permissions, audit and optimistic locking apply as for real users. It writes no SQL.
 - **It signs in through a testing-only client.** `basetool-seed` (password grant, service account
-  with `manage-users`, `query-users`, `view-users`, `view-realm`) is created only by
+  with `manage-users`, `query-users`, `view-users`, `view-realm`, and the `kc-admin-api` default
+  scope that carries the Admin API audience Keycloak 26.8.2 enforces) is created only by
   `provision-keycloak-realm.py --seed-client`, which refuses a production origin before it reads the
   realm. The testing backend accepts it through `BASETOOL_BACKEND_ACCEPTED_CLIENT_IDS` in the testing
   `basetool.env` (REQ-SEC-024); the release default stays `basetool-frontend,basetool-ingest-gateway`.
@@ -3459,24 +3460,35 @@ neither tool can reach production (ADR-0279).
   earns Admin as a subject of `APP_BOOTSTRAP_ADMIN_SUBS` in the testing `basetool.env` (REQ-SEC-088),
   and the seed then assigns every other planned role through `PUT /api/v1/users/{id}/roles/{role}`
   as `seed-admin`, after the approvals that grant KRT Member. Without Admin the seed stops at the
-  activation and names the setting with the account's id.
+  activation and names the setting with the account's id; the next run after the setting signs in
+  again and goes on.
 - **It refuses production.** `seed` and `purge` exit when `--keycloak-url` or `--api-url` names a
   production host, and the client secret is read only from `$SEED_CLIENT_SECRET`.
 - **Its accounts are marked and synthetic.** Every seeded account carries an `@briefing.invalid`
   address and a synthetic name; `seed` refuses to take over an account outside that domain, and
   `purge` deletes exactly the accounts inside it.
-- **The data is the briefing's:** an Organisationsleitung, two Bereiche, three profit-eligible
-  Staffeln and a Spezialkommando with leads; five presenter accounts (`demo-mitglied`,
+- **The data is the briefing's:** an Organisationsleitung and two Bereiche, of which only the Profit
+  Bereich parents the three Staffeln and the Spezialkommando with leads, so all four are eligible
+  responsible units (REQ-ORDERS-050); five presenter accounts (`demo-mitglied`,
   `demo-logistiker`, `demo-offizier`, `demo-staffelleitung` — responsible holder of Alpha's account —
   and `demo-bereichsleitung`) and a numbered participant pool across the Logistiker, Einsatz-Manager,
   officer and lead tracks; `supply.enabled` on and `purchasing.enabled` reported when on; missions in
   every lifecycle state, internal and public, with crew, steps, objectives and frequencies, and an
   operation with payouts of which one is marked paid; ships, blueprints, Lager stock at several
-  qualities with a stolen row and allocations; job orders open, in progress and done with priorities,
-  Bearbeiter and SK claims; refinery orders running, ready and stored plus an extractor sample;
+  qualities with a stolen row and allocations; job orders open, in progress and done, created by
+  Alpha's Logistiker as a writer of the requesting unit, with priorities, Bearbeiter and the claims
+  of two Staffeln on the SK order; refinery orders running, ready and stored plus an extractor sample;
   Materialbörse offers and requests with a minimum quality and a delivery signal; needs, pledged and
   received donations; an org-unit account per Staffel with balance, target and history and one open
   deposit and one open withdrawal request; one registered connected-application client.
+- **It needs the game catalogue.** A storage place sits on a starmap object (REQ-P4K-036): on a
+  database without one the seed creates `Test-Station Port Olisar` on the first visible starmap
+  object that carries none, and without any it stops the catalogue step with the hint to run the P4K
+  import first. Ship types and the refinery location come from the UEX sync; without them the hangar
+  and refinery domains are reported.
+- **Its API calls match the backend.** `scripts/check-seed-api-contract.py` reads every literal API
+  call of the seed and fails when its method and path are no operation of the committed `openapi.json`
+  or a literal body field is not in the request schema.
 - **It is repeatable.** A second run reuses the accounts and the passwords saved in `--out` and skips
   the data once the test org structure exists; `--only` repeats chosen domains. A failing domain is
   reported and the run goes on; the exit code is non-zero.
@@ -3495,28 +3507,40 @@ neither tool can reach production (ADR-0279).
 - [x] `seed-briefing.py --selftest` covers the account plan (unique names, every track, the SK lead
   outside every Staffel, the ranked accounts holding the Officer role, no admin among presenters and
   participants), the production refusal, the out-directory refusal, the state round trip and the
-  handout, the role assignment through the role API (each missing role once) and the stop with the
-  bootstrap hint when `seed-admin` is no Admin. It runs in `repo-lint.yml`.
+  handout, the role assignment through the role API (each missing role once), the stop with the
+  bootstrap hint when `seed-admin` is no Admin, that hint for a still-pending `seed-admin`, the
+  activation going on in the run whose first login grants the bootstrap Admin, and exactly one Profit
+  Bereich in the plan. It runs in `repo-lint.yml`.
+- [x] `check-seed-api-contract.py` passes on the seed and, with `--selftest`, reports a missing
+  operation, an unknown body field, a body sent to an operation without one and a seed whose calls
+  it no longer finds. Both run in `repo-lint.yml`.
 - [x] `testing-reset.test.sh` covers the usage refusal, the host-marker refusal, the stop–drop–create–
   start order, that only the Basetool database is touched, and both failure paths. It runs in
   `repo-lint.yml`.
 - [x] `provision-keycloak-realm.test.sh` case 21: no seed client without the flag; with it a
-  confidential client with password grant, service account and the backend audience; the frontend
+  confidential client with password grant, service account, the backend audience and the
+  `kc-admin-api` default scope; the frontend
   keeps the password grant off; a later run keeps the client; a production origin is refused before
   kcadm runs.
 - [x] Against the local sandbox stack, a fresh seed of twelve participants builds every domain but
   the refinery (no refinery location in the sandbox catalogue, reported), and with a refinery location
   every domain; a second run skips the data and exits 0; `purge` deletes all nineteen accounts.
+- [x] Against the local sandbox stack on Keycloak 26.8.2 with an emptied Basetool database holding
+  one visible starmap object, a seed of twenty participants activates in one run after the bootstrap
+  setting and builds every domain but the hangar and the refinery (no UEX data, reported): one Profit
+  Bereich parents all four test units, five job orders carry two Staffel claims, and the storage
+  place sits on the starmap object; a second run skips the data and exits 0.
 - [ ] The seed runs against the testing host on the release of the briefing, and the reset and a
   second seed restore the same state.
 
 **Enforced by:** `scripts/seed-briefing.py` · `scripts/testing-reset.sh` ·
 `scripts/provision-keycloak-realm.py` (`--seed-client`) · `scripts/testing-reset.test.sh`,
-`seed-briefing.py --selftest` (`repo-lint.yml`) · `scripts/provision-keycloak-realm.test.sh`
+`seed-briefing.py --selftest`, `scripts/check-seed-api-contract.py` (`repo-lint.yml`) ·
+`scripts/provision-keycloak-realm.test.sh`
 (`keycloak-provisioner.yml`) · **Decision:**
 [ADR-0279](../adr/0279-the-testing-system-is-seeded-through-its-api-and-emptied-by-a-database-wipe.md) ·
 **Runbook:** [`deployment.md` → Seeding and emptying the testing system](../deployment.md#seeding-and-emptying-the-testing-system) ·
-**Related:** REQ-OPS-033, REQ-SEC-024, REQ-ORG-017
+**Related:** REQ-OPS-033, REQ-SEC-024, REQ-ORG-017, REQ-ORDERS-050, REQ-P4K-036
 
 ### REQ-OPS-051 — A change records its changelog entry as a fragment, and the release folds it in
 

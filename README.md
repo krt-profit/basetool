@@ -272,7 +272,8 @@ Optional channels ship as safe no-ops until configured: transactional e-mail (SM
 
 For Keycloak 26.8.2, the provisioner assigns the built-in `kc-admin-api` scope to `backend-service`;
 its tokens need both the Admin API audience and scope for user synchronization and connected-app
-disconnects. See [the service-account contract](docs/keycloak/README.md#backend-service-service-account-roles-admin-api).
+disconnects. With `--seed-client` the testing-only `basetool-seed` client gets the same scope, which
+the briefing seed creates its accounts with. See [the service-account contract](docs/keycloak/README.md#backend-service-service-account-roles-admin-api).
 
 Personal owner pickers offer active direct memberships while the owner holds `KRT Member`. In Lager rebooking and refinery storage, the effective active unit is preselected when eligible, then the sole eligible unit. If several options remain, choose the destination in the dialog.
 
