@@ -40,9 +40,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * Projects managed {@link JobOrder}s into {@link JobOrderDto}s with per-bucket order-linked stock
- * and, for SK-responsible orders, per-squadron material claims. Every stock figure comes from one
- * {@link QualityBucketAllocator} run per order and material, so a stock row counts toward exactly
- * one quality bucket (REQ-ORDERS-037). Read-only.
+ * and per-squadron material claims. Every stock figure comes from one {@link
+ * QualityBucketAllocator} run per order and material, so a stock row counts toward exactly one
+ * quality bucket (REQ-ORDERS-037). Read-only.
  */
 @Slf4j
 @Service
@@ -52,7 +52,7 @@ public class JobOrderStockProjectionService {
   /** Loads the order-linked stock rows. */
   private final OrderLinkedStockRows orderLinkedStockRows;
 
-  /** Supplies the per-order / page-batched SK material-claim view. */
+  /** Supplies the per-order / page-batched material-claim view. */
   private final ClaimBucketSource claimBucketSource;
 
   /** Maps the base order + material rows to their DTOs. */
@@ -65,7 +65,7 @@ public class JobOrderStockProjectionService {
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
 
   /**
-   * Projects a single order with its per-bucket stock and, for an SK order, its claim view.
+   * Projects a single order with its per-bucket stock and its claim view.
    *
    * @param jobOrder the managed order to project.
    * @return the assembled order DTO.

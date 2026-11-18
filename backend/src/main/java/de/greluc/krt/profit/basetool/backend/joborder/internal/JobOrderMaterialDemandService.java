@@ -82,7 +82,7 @@ public class JobOrderMaterialDemandService {
   /** Supplies the batched order-linked stock index and the bucket quality floors. */
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
 
-  /** Supplies the batched per-order claim view for public Spezialkommando orders. */
+  /** Supplies the batched per-order claim view. */
   private final MaterialClaimService materialClaimService;
 
   /** Maps the responsible OrgUnit to the badge reference the grouping is rendered with. */
@@ -156,7 +156,7 @@ public class JobOrderMaterialDemandService {
    * @param order the contributing order.
    * @param requirement the order's bucket (material, quality tier and outstanding amount).
    * @param booked the order-linked stock the allocator attributed to this bucket.
-   * @param claimByBucket the order's claim view, keyed by bucket; empty for a non-SK order.
+   * @param claimByBucket the order's claim view, keyed by bucket.
    */
   private void accumulate(
       @NotNull GroupAccumulator group,

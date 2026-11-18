@@ -25,9 +25,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One squadron's material claim ("Eintragung") on a public SK order, as exposed at the API
- * boundary. The owning bucket (material + quality) is carried by the enclosing {@link
- * ClaimBucketDto}; this record only adds the per-squadron facts.
+ * One squadron's material claim ("Eintragung") on a job order, as exposed at the API boundary. The
+ * owning bucket (material + quality) is carried by the enclosing {@link ClaimBucketDto}; this
+ * record only adds the per-squadron facts.
  *
  * @param id claim primary key
  * @param claimingOrgUnit the squadron that signed up (slim reference for the badge)

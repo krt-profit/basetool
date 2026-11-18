@@ -26,8 +26,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The Spezialkommando claim view of a job order, as the order's stock projection embeds it (plan
- * §5.3); implemented by the job-order module.
+ * The material-claim view of a job order, as the order's stock projection embeds it (plan §5.3);
+ * implemented by the job-order module.
  */
 public interface ClaimBucketSource {
 

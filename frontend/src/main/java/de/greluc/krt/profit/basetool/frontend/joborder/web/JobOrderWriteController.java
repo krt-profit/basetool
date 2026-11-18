@@ -555,8 +555,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX create-or-update of a material claim on a public SK order, relaying the backend status and
-   * RFC 7807 {@code code} verbatim (400, 403, 409).
+   * AJAX create-or-update of a material claim on a job order, relaying the backend status and RFC
+   * 7807 {@code code} verbatim (400, 403, 409).
    *
    * @param id the order id
    * @param dto the claim payload (material, quality bucket, claiming squadron, amount)

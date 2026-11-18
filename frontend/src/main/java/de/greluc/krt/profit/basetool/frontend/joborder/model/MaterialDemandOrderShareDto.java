@@ -35,7 +35,8 @@ import java.util.UUID;
  * @param type the order kind name ({@code MATERIAL} or {@code ITEM}) this share came from
  * @param requiredAmount this order's outstanding required amount for the bucket
  * @param bookedAmount the inventory linked to this order for the bucket
- * @param claimedAmount the amount claimed on this order's bucket; {@code 0.0} for a non-SK order
+ * @param claimedAmount the amount claimed on this order's bucket; {@code 0.0} when no squadron has
+ *     claimed
  */
 @DtoMirror
 public record MaterialDemandOrderShareDto(
