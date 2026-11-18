@@ -95,6 +95,7 @@ material_exchange_request_interest materialexchange
 material_external_alias catalogue
 material_occurrence catalogue
 material_price catalogue
+material_redirect catalogue
 member_active_org_unit scope
 member_blueprint_sharing blueprint
 member_home_location identity

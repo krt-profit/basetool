@@ -82,7 +82,7 @@ class ManufacturerReviewMerge {
     p4kAliases.findOfManufacturer(retiredId).forEach(alias -> alias.setManufacturer(survivor));
     uexCompanies.findOfManufacturer(retiredId).forEach(alias -> alias.setManufacturer(survivor));
     wikiIdentities.findOfManufacturer(retiredId).forEach(alias -> alias.setManufacturer(survivor));
-    repointOpenReviews(retiredId, survivorId, activeCaseId);
+    reviewCases.repointOpenReferences(P4kKind.MANUFACTURER, retiredId, survivorId, activeCaseId);
     if (retiredCompany != null && !uexCompanies.existsById(retiredCompany)) {
       uexCompanies.save(new ManufacturerUexCompany(retiredCompany, survivor));
     }
@@ -95,18 +95,6 @@ class ManufacturerReviewMerge {
     entityManager.lock(survivor, LockModeType.OPTIMISTIC_FORCE_INCREMENT);
     manufacturers.delete(retired);
     return new MovedReferences(items, shipTypes);
-  }
-
-  private void repointOpenReviews(UUID retiredId, UUID survivorId, @Nullable UUID activeCaseId) {
-    for (P4kReviewCase review : reviewCases.findOpenReferences(P4kKind.MANUFACTURER, retiredId)) {
-      if (review.getId().equals(activeCaseId)) {
-        continue;
-      }
-      UUID row = retiredId.equals(review.getRowId()) ? survivorId : review.getRowId();
-      UUID other = retiredId.equals(review.getOtherRowId()) ? survivorId : review.getOtherRowId();
-      review.setRowId(row);
-      review.setOtherRowId(Objects.equals(row, other) ? null : other);
-    }
   }
 
   private void lockRows(Manufacturer survivor, Manufacturer retired) {

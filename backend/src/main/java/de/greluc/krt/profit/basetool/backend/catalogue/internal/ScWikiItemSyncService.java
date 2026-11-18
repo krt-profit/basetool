@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
@@ -572,7 +572,7 @@ public class ScWikiItemSyncService {
         if (outcome != BackfillOutcome.SKIPPED) {
           syncReportService.recordApplied(1);
         }
-      } catch (GameItemReconciliationBusyException _) {
+      } catch (CatalogueReconciliationBusyException _) {
         ctx.deferred++;
         ctx.failedWrites++;
         syncReportService.recordFailed(1);
@@ -607,7 +607,7 @@ public class ScWikiItemSyncService {
         return self.getObject()
             .upsertBackfillItemWithinTransaction(
                 dto, kind, ctx.runId, ctx.now, manufacturer, uexId);
-      } catch (GameItemReconciliationBusyException failure) {
+      } catch (CatalogueReconciliationBusyException failure) {
         if (attempt >= RECONCILIATION_ATTEMPTS || Thread.currentThread().isInterrupted()) {
           throw failure;
         }

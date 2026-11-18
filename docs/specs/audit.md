@@ -176,8 +176,9 @@ web, naming its client (REQ-AUDIT-005):
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX sync (one summary event per run and catalogue — `REFINERY_METHODS_SYNCED` /
   `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion
-  (`REFINERY_ORDERS_REASSIGNED`); a patch change's cancellation of the running orders started
-  before its live time, one summary event per trigger (`REFINERY_ORDERS_CANCELED_BY_PATCH`, subject
+  (`REFINERY_ORDERS_REASSIGNED`); a refinery good moved onto the material its own was merged into
+  (`REFINERY_CATALOGUE_REASSIGNED`, REQ-DATA-046); a patch change's cancellation of the running
+  orders started before its live time, one summary event per trigger (`REFINERY_ORDERS_CANCELED_BY_PATCH`, subject
   the patch change with its label, details `canceled` and `patchChange`,
   [REQ-PATCH-006](patch-change.md#req-patch-006--the-refinery-effect-ends-the-running-orders-started-before-the-live-time)). An exchange client's refinery-order writes (REQ-XCH-052)
   record the same events under the client's id: a create `REFINERY_ORDER_CREATED`, an update
@@ -608,7 +609,11 @@ The coverage list holds the **Katalog** area
     `run=`, REQ-P4K-075); a P4K APPLY's retirement of a leftover material no member uses, hidden
     or deleted once its twin took its identity (`CATALOGUE_MATERIAL_LEFTOVER_RETIRED`, subject the
     retired material, `rule=SEEDED_NOT_CREATABLE|MANUAL_TWIN|WIKI_TWIN`, `deleted=`, `twin=` the
-    material that took its identity when there is one, `run=`, REQ-P4K-076…078); manufacturer,
+    material that took its identity when there is one, `run=`, REQ-P4K-076…078); the UEX
+    commodity sync's merge of a material a second UEX listing keeps into the material holding the
+    P4K GUID (`CATALOGUE_MATERIAL_MERGED`, actor `system`, subject the surviving material, labelled
+    by its name, `retiredMaterial=`, `rule=UEX_WIKI_KEY`, `uexCommodityId=`, `references=`,
+    REQ-DATA-046); manufacturer,
     ship-type and terminal visibility
     (`*_VISIBILITY_CHANGED`, `hidden=`); the admin choice of a manufacturer's primary SC Wiki entry
     among its Wiki duplicates (`CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED` with `from=` and `to=`
@@ -653,6 +658,8 @@ counts them (REQ-OBS-011).
   its committed outcome (`SyncRunServiceTest`).
 - [x] Each merged UEX manufacturer twin records one `CATALOGUE_MANUFACTURER_MERGED` event with the
   moved references (`ManufacturerUexTwinSyncIntegrationTest`).
+- [x] Each merged UEX commodity twin records one `CATALOGUE_MATERIAL_MERGED` event, and each moved
+  member row its owner-domain reassignment event (`MaterialMergeIntegrationTest`).
 - [x] The starmap links, the visibility overrides and the storage places on a starmap object record
   their events (`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`).
 - [ ] The shop link records its event (planned above).
@@ -1054,6 +1061,15 @@ The merge of an item UEX lists twice (REQ-DATA-044) moves the twin's references 
 owner-domain events and records the merge itself as `CATALOGUE_ITEM_MERGED`, actor `system`,
 subject the surviving item, with `retiredItem`, the rule token (`GAME_UUID`, `UNIQUE_NAME`,
 `GS_RECORD`), the merged `uexItemId` and the number of moved `references`.
+
+The merge of a commodity UEX lists twice (REQ-DATA-046) moves the twin's member references through
+the same owner-domain events, with `retiredMaterial`, `survivorMaterial` and the table as `subject`:
+stock entries, stock floors, job-order material lines, item-order material lines, handovers, claims
+and provision credits (`JOB_ORDER_ITEM_CATALOGUE_REASSIGNED`), supply, purchasing and Materialbörse
+requests, and refinery goods as `REFINERY_CATALOGUE_REASSIGNED` in the Raffinerie area. It records
+the merge itself as `CATALOGUE_MATERIAL_MERGED`, actor `system`, subject the surviving material,
+with `retiredMaterial`, the rule token (`UEX_WIKI_KEY`), the merged `uexCommodityId` and the number
+of moved `references`.
 
 The hierarchy foundation records every automatic ending of an ineligible legacy material promise
 as `JOB_ORDER_CLAIM_WITHDRAWN` with safe claim/unit identities and bounded reason `UNIT_INELIGIBLE`.

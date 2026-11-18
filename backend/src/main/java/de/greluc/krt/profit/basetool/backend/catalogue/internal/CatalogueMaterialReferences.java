@@ -32,8 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Reports the catalogue's own material references (REQ-P4K-075, REQ-P4K-076): recipe ingredients
- * and dismantle returns, UEX refinery yields and terminal prices, external name aliases, and a
- * material that refines into it. Each of them would refuse the material's deletion.
+ * and dismantle returns, UEX refinery yields and terminal prices, external name aliases, a material
+ * that refines into it, and the id of a material merged into it (REQ-DATA-046). Each of them would
+ * refuse the material's deletion.
  */
 @Component
 @RequiredArgsConstructor
@@ -48,7 +49,9 @@ class CatalogueMaterialReferences {
           + " UNION SELECT p.material.id FROM MaterialPrice p WHERE p.material.id IN :ids"
           + " UNION SELECT a.material.id FROM MaterialExternalAlias a WHERE a.material.id IN :ids"
           + " UNION SELECT m.refinedMaterial.id FROM Material m"
-          + " WHERE m.refinedMaterial.id IN :ids";
+          + " WHERE m.refinedMaterial.id IN :ids"
+          + " UNION SELECT r.canonicalMaterial.id FROM MaterialRedirect r"
+          + " WHERE r.canonicalMaterial.id IN :ids";
 
   private final EntityManager entityManager;
 

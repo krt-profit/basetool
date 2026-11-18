@@ -566,7 +566,10 @@ member row references it (REQ-P4K-056). Inventory, job orders, supply, purchasin
 Materialbörse and the refinery answer `catalogue.api.MaterialReferenceParticipant`, and the
 catalogue reads its own references beside them, so the P4K import hides a UEX commodity no game
 source knows only when nothing references it (REQ-P4K-075) and retires a leftover seeded, admin or
-Wiki-only twin only when no member uses it (REQ-P4K-076…078).
+Wiki-only twin only when no member uses it (REQ-P4K-076…078). The same SPI moves those references
+when `MaterialMergeService` merges a material a second UEX listing keeps into the material holding
+the P4K GUID; `UexCommodityTwins` and `UexCommodityTwinMerger` find the pairs in the UEX commodity
+sync, and `material_redirect` keeps the merged id and its UEX commodity id (REQ-DATA-046).
 
 `ScWikiRequestExecutor` owns pacing/retry transport, `ScWikiClient` owns the scoped game build,
 and `SyncChunkWriter` owns isolated application transactions. `SyncRunService` persists attempt

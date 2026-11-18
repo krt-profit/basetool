@@ -19,9 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceParticipant;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import jakarta.persistence.EntityManager;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +36,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Reports the materials refinery orders put in or take out (REQ-P4K-075). */
+/**
+ * Reports the materials refinery orders put in or take out (REQ-P4K-075) and moves them onto the
+ * material a merge keeps (REQ-DATA-046).
+ */
 @Component
 @RequiredArgsConstructor
 public class RefineryMaterialReferences implements MaterialReferenceParticipant {
@@ -41,11 +50,45 @@ public class RefineryMaterialReferences implements MaterialReferenceParticipant 
           + " UNION SELECT g.outputMaterial.id FROM RefineryGood g"
           + " WHERE g.outputMaterial.id IN :ids";
 
+  /** The audited table of a moved good. */
+  private static final String SUBJECT = "refinery_good";
+
   private final EntityManager entityManager;
+  private final RefineryMaterialReassignmentRepository reassignments;
+  private final AuditRecorder auditRecorder;
+  private final LiveSyncPublisher liveSyncPublisher;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull Set<UUID> referencedMaterials(@NotNull Collection<UUID> materialIds) {
     return MaterialReferenceParticipant.referenced(entityManager, REFERENCED, materialIds);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public int reassignMaterial(@NotNull UUID retiredId, @NotNull UUID survivorId) {
+    List<UUID> orders = reassignments.orders(retiredId);
+    int changed =
+        record(reassignments.inputs(retiredId, survivorId), retiredId, survivorId)
+            + record(reassignments.outputs(retiredId, survivorId), retiredId, survivorId);
+    if (changed > 0) {
+      liveSyncPublisher.publishAfterCommit(
+          LiveSyncTopic.global(LiveSyncTopicClass.REFINERY), List.of("queue"));
+      for (UUID order : orders) {
+        liveSyncPublisher.publishAfterCommit(
+            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), List.of("order"));
+      }
+    }
+    return changed;
+  }
+
+  private int record(List<UUID> rows, UUID retiredId, UUID survivorId) {
+    return MaterialReferenceParticipant.recordMoved(
+        auditRecorder,
+        AuditEventType.REFINERY_CATALOGUE_REASSIGNED,
+        rows,
+        retiredId,
+        survivorId,
+        SUBJECT);
   }
 }

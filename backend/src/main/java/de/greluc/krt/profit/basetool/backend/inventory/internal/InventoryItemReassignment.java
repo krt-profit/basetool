@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReassignmentParticipant;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceParticipant;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
@@ -80,7 +80,7 @@ public class InventoryItemReassignment
               StockLot.key(null, survivorId, lot.getLocationId(), null, lot.getStolen())));
     }
     if (!InventoryStockCommands.tryLockInOrder(inventoryRepository, locks)) {
-      throw new GameItemReconciliationBusyException();
+      throw new CatalogueReconciliationBusyException();
     }
     int changed =
         record(
