@@ -324,17 +324,23 @@ case "$cmd" in
     case "$scenario" in
       pasta-no-alias)
         printf '[Container]\nAddHost=localhost:127.0.0.1\n' ;;
-      *)
+      pasta-ula-alias | pasta-last-wins | pasta-v6-only)
         printf '[Container]\nAddHost=localhost:127.0.0.1\nAddHost=alloy:host-gateway\n'
         printf '[Container]\nAddHost=ingest.example.test:fd00:169:254::2\nAddHost=edge.example.test:fd00:28:15::10\n'
+        printf '[Network]\nSubnet=172.28.15.0/24\nSubnet=fd00:28:15::/64\n' ;;
+      *)
+        printf '[Container]\nAddHost=localhost:127.0.0.1\nAddHost=alloy:host-gateway\n'
+        printf '[Container]\nAddHost=ingest.example.test:2001:db8::10\nAddHost=edge.example.test:fd00:28:15::10\n'
         printf '[Network]\nSubnet=172.28.15.0/24\nSubnet=fd00:28:15::/64\n' ;;
     esac
     ;;
   *"ps -eo args="*)
     case "$scenario" in
-      pasta-absent)  printf '' ;;
-      pasta-v6-only) echo "/usr/bin/pasta --config-net --map-guest-addr fd00:169:254::2 --quiet" ;;
-      *)             echo "/usr/bin/pasta --config-net --map-guest-addr 169.254.1.2 --map-guest-addr fd00:169:254::2 --dns-forward 169.254.1.1 --quiet" ;;
+      pasta-absent)    printf '' ;;
+      pasta-v6-only)   echo "/usr/bin/pasta --config-net --map-guest-addr fd00:169:254::2 --quiet" ;;
+      pasta-last-wins) echo "/usr/bin/pasta --config-net --map-guest-addr 169.254.1.2 --map-guest-addr fd00:169:254::2 --map-guest-addr fc00::2 --quiet" ;;
+      pasta-ula-alias) echo "/usr/bin/pasta --config-net --map-guest-addr 169.254.1.2 --map-guest-addr fd00:169:254::2 --address fc00::3 --gateway fc00::1 --quiet" ;;
+      *)               echo "/usr/bin/pasta --config-net --map-guest-addr 169.254.1.2 --map-guest-addr fc00::2 --address fc00::3 --gateway fc00::1 --dns-forward 169.254.1.1 --quiet" ;;
     esac
     ;;
   *".config/containers/systemd"*|*"/etc/containers/systemd/users/"*)
@@ -871,8 +877,14 @@ STUB_SCENARIO=updates-runtime assert_status \
   security-updates-enabled fail "runtime is not excluded" -- "${STUB_ARGS[@]}"
 
 STUB_SCENARIO=healthy assert_status \
-  "pasta-maps-host-aliases passes when pasta maps host-gateway and the v6 alias, not a subnet address" \
-  pasta-maps-host-aliases pass "every host-alias address (169.254.1.2, fd00:169:254::2)" -- "${STUB_ARGS[@]}"
+  "pasta-maps-host-aliases passes under Podman 6 with host-gateway mapped and the v6 alias on the host's own address" \
+  pasta-maps-host-aliases pass "every host-alias address (169.254.1.2)" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=pasta-ula-alias assert_status \
+  "pasta-maps-host-aliases fails a v6 ULA alias that Podman 6's --address redirects away from the host" \
+  pasta-maps-host-aliases fail "alias names to fd00:169:254::2" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=pasta-last-wins assert_status \
+  "pasta-maps-host-aliases fails a v6 mapping that a later --map-guest-addr of the same version replaced" \
+  pasta-maps-host-aliases fail "alias names to fd00:169:254::2" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=pasta-v6-only assert_status \
   "pasta-maps-host-aliases fails when a v6-only mapping replaced podman's host-gateway one" \
   pasta-maps-host-aliases fail "alias names to 169.254.1.2" -- "${STUB_ARGS[@]}"

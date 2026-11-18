@@ -3145,9 +3145,10 @@ IPv6. The exporter now also joins a dedicated `net-blackbox-v6` network (IPv6-en
 path and the alert is a **true** signal. On a rootless host that alone is not enough: a container
 cannot reach its own host through the host's public address, so the public names are aliased to
 the gateway (ADR-0196, `basetool_host_public_name_aliases`), and the IPv6 probes additionally need
-the v6 half of that alias plus pasta's v6 guest-address mapping
-(`basetool_host_public_name_aliases_v6`, `basetool_host_pasta_map_guest_addrs`). Without it the v6
-probes failed against themselves while IPv6 served correctly (fixed 2026-09-22, v1.9.2). `EdgeIpv6Unreachable` (warning) fires only when a
+the v6 half of that alias (`basetool_host_public_name_aliases_v6`). Under Podman 6 it names the host's
+own public IPv6 address, which a container reaches directly; a v6 guest-address mapping reaches no
+host service there (ADR-0196 Amendment 3). Without a working v6 alias the v6 probes fail against
+themselves while IPv6 serves correctly. `EdgeIpv6Unreachable` (warning) fires only when a
 vhost answers over IPv4 but not IPv6 (guarded `on(instance)` against the v4 probe, so a full outage
 pages once via `BlackboxProbeFailed`); `DnsResolutionFailed` (warning) fires when the apex stops
 resolving an A or AAAA record. Its scope is `job=~"blackbox-dns-.*"`, which the negative probe's job

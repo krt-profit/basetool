@@ -144,6 +144,28 @@ Amendment 1 are unchanged; only the file that carries the setting moves.
 when an address an alias points at is not mapped, so a setting that is on disk but not in force is
 caught where the aliases depend on it.
 
+## Amendment 3 — under Podman 6 the IPv6 alias is the host's own address — 2026-11-18
+
+Amendment 2's measurement showed that pasta *received* the v6 mapping under Podman 6.1.1. It did not
+show that the mapping *works*, and it does not: after the production host booted into Podman 6,
+every IPv6 probe timed out against `fd00:169:254::2` and `EdgeIpv6Unreachable` fired, while the
+public names answered over IPv6 from the host and from outside. Two Podman 6 changes cause it:
+
+| question (Podman 6.1.1, passt 0^20260728, testing host) | answer |
+| --- | --- |
+| Does podman still replace our `--map-guest-addr`? | **No — it appends its own** (`169.254.1.2`, `fc00::2`) after ours, and pasta keeps the last one per IP version. |
+| Does the rootless netns still carry the host's IPv6 address? | **No.** Podman passes `--address fc00::3 --gateway fc00::1`. |
+| Does a v6 mapping reach the host then? | **No**, neither `fd00:169:254::2` nor podman's `fc00::2`, from the netns and from a container: pasta redirects a mapped address to the `-a` address, not to the host. |
+| Does `--map-host-loopback fd00:169:254::2` work? | Yes, but it lands on the host's loopback, which exposes every `[::1]`-only listener to every container. Rejected. |
+| Does a container reach the host's **public** IPv6 address? | **Yes** — `308` over port 80 from a container on an IPv6 bridge, because the netns no longer holds that address itself. |
+
+**The decision.** On a Podman 6 host the v6 alias points the public names at the host's own public
+IPv6 address (`basetool_host_public_name_aliases_v6`, host inventory), and the role maps only
+`169.254.1.2` (`basetool_host_pasta_map_guest_addrs`). The IPv4 aliases are unchanged: podman's own
+v4 mapping is the same address and keeps working. The IPv6 probes now take the same path as an
+external IPv6 client from the host's own address onwards. `pasta-maps-host-aliases` applies pasta's
+rules (last mapping per version, none through an `-a` address) instead of only finding the argument.
+
 ## Consequences
 
 **The probes no longer traverse public DNS or internet routing.** TLS, the certificate, haproxy, the

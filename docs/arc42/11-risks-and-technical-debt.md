@@ -83,9 +83,9 @@ networks live in the service user's network namespace and outbound leaves throug
 not fold such a connection back into the host (measured 2026-09-22 on 22, 80 and 443, both
 families). [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
 therefore aliases every public name a container dials to `host-gateway`, and its Amendment 1 does
-the same for IPv6: `containers.conf` restates the v4 `--map-guest-addr` and adds a v6 one in
-`pasta_options`, and the blackbox exporter — the only container with an IPv6 route — gets the v6
-aliases, so both address families can be probed.
+the same for IPv6 for the blackbox exporter, the only container with an IPv6 route, so both address
+families can be probed. Under Podman 6 its v6 aliases name the host's own public IPv6 address, which a
+container reaches directly; a v6 guest-address mapping no longer reaches the host (Amendment 3).
 
 **What that costs is smaller than it sounds.** A probe still traverses TLS, the certificate,
 haproxy, the PROXY header, the edge, vhost routing and the application. What it does not traverse is
@@ -98,9 +98,10 @@ it with one source, the host's own public address (measured 2026-10-24). That ad
 does not reach the Keycloak console. ADR-0318 takes the frontend's and the backend's Keycloak calls
 off the hairpin once `BASETOOL_KEYCLOAK_BACKCHANNEL_URI` is set; their aliases can then go.
 
-Three things to know before changing it. Podman **replaces** its own `--map-guest-addr` rather than
-appending, so dropping the v4 entry from `pasta_options` takes `host-gateway` from open to
-unreachable — measured. The setting lives in the drop-in `containers.conf.d/50-basetool.conf`, never
+Three things to know before changing it. Podman 6 **appends** its own `--map-guest-addr 169.254.1.2`
+and `fc00::2` after `pasta_options` and gives the namespace `-a fc00::3`; pasta keeps the last mapping per
+IP version and redirects a mapped address to the `-a` one, so only the v4 mapping reaches the host —
+measured (ADR-0196 Amendment 3). The setting lives in the drop-in `containers.conf.d/50-basetool.conf`, never
 in a main user `containers.conf`, because Podman 6 reads only the highest-precedence main file and
 would then skip the vendor one (ADR-0196 Amendment 2); `check-conformance.py`'s
 `pasta-maps-host-aliases` reads the running pasta. And if a future podman drops `pasta_options` for
