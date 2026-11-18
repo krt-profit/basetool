@@ -815,11 +815,11 @@ protection for a host that has not got the check yet, and it is how the first in
 > [`EXCHANGE_GO_LIVE_RUNBOOK.md`](archive/EXCHANGE_GO_LIVE_RUNBOOK.md); **1.17.0** (the internal-only
 > backend, #2638) → [`RELEASE_1.17.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.17.0_PRODUCTION_RUNBOOK.md);
 > **1.23.0** (roles in the Basetool, P4K catalogue version 2, bank and refinery orders on the
-> exchange) → [`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.23.0_PRODUCTION_RUNBOOK.md);
+> exchange) → [`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.23.0_PRODUCTION_RUNBOOK.md);
 > **1.25.0** (the patch change, the ship origin, Grafana's Keycloak-only sign-in) →
-> [`RELEASE_1.25.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.25.0_PRODUCTION_RUNBOOK.md); **1.26.0** (the Redis
+> [`RELEASE_1.25.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.25.0_PRODUCTION_RUNBOOK.md); **1.26.0** (the Redis
 > split, Rocky 10.3 with Podman 6, both hosts) →
-> [`RELEASE_1.26.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.26.0_PRODUCTION_RUNBOOK.md).
+> [`RELEASE_1.26.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.26.0_PRODUCTION_RUNBOOK.md).
 
 ```bash
 gh workflow run promote.yml -f version=1.9.3
@@ -1980,7 +1980,7 @@ switch. Every write below needs @greluc's explicit approval for this host.
 
 **Rollback.** Redeploy the previous release — for 1.23.0 together with a restore of the database
 backup taken before the promotion, because `V344` drops columns that v1.22.3 maps
-([`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md` §5](RELEASE_1.23.0_PRODUCTION_RUNBOOK.md#5-rollback)) —, run **its** provisioner (it creates the four realm
+([`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md` §5](archive/RELEASE_1.23.0_PRODUCTION_RUNBOOK.md#5-rollback)) —, run **its** provisioner (it creates the four realm
 roles again and gives `basetool-frontend` the `roles` scope back), then write the assignments back
 from the export, dry run first:
 
