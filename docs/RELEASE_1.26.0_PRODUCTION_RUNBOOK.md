@@ -115,9 +115,13 @@ with the new passwords for a release that does not read them yet.
 From the tag's `ansible/`:
 
 ```bash
-ansible-playbook site.yml --limit <host> --tags directories,selinux,deploy,scripts -K --check --diff
-ansible-playbook site.yml --limit <host> --tags directories,selinux,deploy,scripts -K
+ansible-playbook site.yml --limit <host> --tags directories,selinux,deploy,scripts,observability,updates -K --check --diff
+ansible-playbook site.yml --limit <host> --tags directories,selinux,deploy,scripts,observability,updates -K
 ```
+
+`observability` and `updates` are needed here: `cert-expiry-metrics.py`, `cgroup-container-metrics.py`
+and `host-updates-metrics.sh` changed in this range, and only those two tags install them. The old
+`redis-users.acl.tmpl` stays on the host as a `>` line; it is not in the list and does not block.
 
 Then the comparison of [`deployment.md` → Before a promotion](deployment.md#before-a-promotion-the-host-scripts)
 against `v1.26.0`; a `<` line blocks the promotion.
@@ -170,8 +174,8 @@ backup snapshot that carries both ACL files, then `systemctl start basetool-depl
 
 | Host | §3 OS | §4 release | §4.6 post | By |
 |---|---|---|---|---|
-| testing | | | | |
-| production | | | | |
+| testing | 2026-11-18 10:24 UTC: Rocky 10.3, kernel 264.16.1, Podman 6.1.1, 18 containers healthy, `pasta-maps-host-aliases` and `host-exporter-versions` green | 10:55 UTC: `deploy successful`, `v438`, 20 containers healthy | 11:03 UTC: 0 keys left, snapshot with both ACLs, timer on; no `deploy` lock and no SELinux denial on the next tick | @greluc, Claude |
+| production | 2026-11-18 10:34 UTC: the same versions, 18 containers healthy, `pasta-maps-host-aliases` and `host-exporter-versions` green | 11:26 UTC: `deploy successful`, `v438`, 20 containers healthy; `redis-requires-auth`, `redis-default-user-off`, `redis-session-isolated` green | 11:34 UTC: 0 keys left, snapshot with both ACLs, timer on; no `deploy` lock on the next tick | @greluc, Claude |
 
 ## 7. Rollback
 
