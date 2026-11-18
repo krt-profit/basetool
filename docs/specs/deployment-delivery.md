@@ -3217,6 +3217,9 @@ after the apps, and the promotion failed.
   `sha256sum -c` accepts it, the config image and the release workflow ship it.
 - [x] `monitoring/prometheus/tests/host_scripts_drift_test.yml` covers both alerts, including the absent
   metric.
+- [x] `host-scripts-manifest.test.sh` checks the list against the role in both directions: every file
+  the role writes under `scripts/` is listed, and the number of destinations it reads equals the
+  list's length, so a parser that matches nothing fails.
 
 **Enforced by:** `scripts/deploy.sh` (`check_host_scripts_applied`, `assert_host_scripts_current_or_die`) ·
 `scripts/host-scripts-manifest.sh` · `scripts/host-scripts.list` · `docker/config/Dockerfile` ·

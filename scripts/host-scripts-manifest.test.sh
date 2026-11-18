@@ -43,16 +43,41 @@ list_entries() {
   grep -v '^$' "${LIST}"
 }
 
+is_listed() {
+  grep -qxF -- "$1" "${LIST}"
+}
+
 role_mentions() {
   grep -qE "(^|[[:space:]\"/:])$(printf '%s' "$1" | sed 's/\./\\./g')([[:space:]\"]|$)" "${ROLE_TASKS}"/*.yml
 }
 
+looped_script_destinations() {
+  # Prints the loop items of each task whose dest is .../scripts/{{ item }}; a task starts at "- name:".
+  awk '
+    function flush(i) { if (to_scripts) for (i = 0; i < n; i++) print items[i]; to_scripts = 0; in_loop = 0; n = 0 }
+    /^[[:space:]]*- name:/ { flush(); next }
+    /^[[:space:]]*dest:.*\/scripts\/[{][{] item [}][}]"/ { to_scripts = 1; next }
+    /^[[:space:]]*loop:[[:space:]]*$/ { in_loop = 1; next }
+    in_loop && /^[[:space:]]*- [A-Za-z0-9._\/-]+[[:space:]]*$/ { sub(/^[[:space:]]*- /, ""); sub(/[[:space:]]*$/, ""); items[n++] = $0; next }
+    { in_loop = 0 }
+    END { flush() }
+  ' "$1"
+}
+
 role_destinations() {
-  grep -ho 'code/scripts/[A-Za-z0-9._/-]*' "${ROLE_TASKS}"/*.yml | sed 's#^code/scripts/##' | sort -u
+  local file
+  for file in "${ROLE_TASKS}"/*.yml; do
+    looped_script_destinations "${file}"
+  done
+  grep -h '^[[:space:]]*dest:.*/scripts/' "${ROLE_TASKS}"/*.yml | grep -o '/scripts/[A-Za-z0-9._/-]*"' | sed 's#^/scripts/##; s#"$##'
 }
 
 apply_path_entries() {
   sed -n 's/^APPLY_PATH_SCRIPTS=(\(.*\))$/\1/p' "${SCRIPT_DIR}/deploy.sh" | tr ' ' '\n'
+}
+
+is_on_apply_path() {
+  grep -qxF -- "$1" <<<"$(apply_path_entries)"
 }
 
 sourced_libs() {
@@ -76,7 +101,7 @@ scenario_list_names_real_unique_files() {
 
 scenario_role_installs_exactly_the_listed_files() {
   echo "Scenario: the Ansible role installs exactly the files the list names"
-  local rel dest
+  local rel dest n_list n_dest
   for rel in $(list_entries); do
     if role_mentions "${rel}"; then
       record 1 "the role installs ${rel}"
@@ -84,11 +109,11 @@ scenario_role_installs_exactly_the_listed_files() {
       record 0 "the role installs ${rel}"
     fi
   done
-  for dest in $(role_destinations); do
-    case "${dest}" in
-      lib | docker-cleanup.sh | *"{"*) continue ;;
-    esac
-    if list_entries | grep -qxF -- "${dest}"; then
+  n_list="$(list_entries | wc -l | tr -d '[:space:]')"
+  n_dest="$(role_destinations | sort -u | wc -l | tr -d '[:space:]')"
+  check "the role's script destinations are read, one per listed file (${n_dest} of ${n_list})" test "${n_dest}" = "${n_list}"
+  for dest in $(role_destinations | sort -u); do
+    if is_listed "${dest}"; then
       record 1 "the role's ${dest} is in the list"
     else
       record 0 "the role installs ${dest} but the list omits it"
@@ -100,20 +125,20 @@ scenario_apply_path_is_listed_and_complete() {
   echo "Scenario: deploy.sh's apply path is a subset of the list and covers what it sources"
   local rel
   for rel in $(apply_path_entries); do
-    if list_entries | grep -qxF -- "${rel}"; then
+    if is_listed "${rel}"; then
       record 1 "${rel} (apply path) is in the list"
     else
       record 0 "${rel} (apply path) is in the list"
     fi
   done
   for rel in $(sourced_libs); do
-    if apply_path_entries | grep -qxF -- "${rel}"; then
+    if is_on_apply_path "${rel}"; then
       record 1 "deploy.sh sources ${rel} and gates on it"
     else
       record 0 "deploy.sh sources ${rel} but APPLY_PATH_SCRIPTS omits it"
     fi
   done
-  if apply_path_entries | grep -qxF -- "deploy.sh" && apply_path_entries | grep -qxF -- "render-env-d.py"; then
+  if is_on_apply_path "deploy.sh" && is_on_apply_path "render-env-d.py"; then
     record 1 "deploy.sh and the env renderer it runs are gated"
   else
     record 0 "deploy.sh and the env renderer it runs are gated"
