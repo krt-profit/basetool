@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemPriceDto;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,7 +34,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -93,9 +91,10 @@ public class UexItemPriceSyncService {
     }
 
     Instant now = Instant.now();
-    PriceLookups loaded = chunkWriter.inNewTransaction(this::loadLookups);
+    UexMergedListings loaded = chunkWriter.inNewTransaction(this::loadLookups);
     UexMatrixLookups lookups = loaded.lookups();
-    List<UexItemPriceDto> rows = withoutListedTwinPrices(dtos, lookups, loaded.mergedListings());
+    List<UexItemPriceDto> rows =
+        loaded.withoutListedTwinPrices(dtos, UexItemPriceDto::idItem, UexItemPriceDto::idTerminal);
     SyncChunkWriter.Outcome<UUID> outcome =
         chunkWriter.write(
             rows,
@@ -149,80 +148,13 @@ public class UexItemPriceSyncService {
    * @return the id maps and the merged listings they resolve
    */
   @NotNull
-  private PriceLookups loadLookups() {
-    List<UexKeyRef> itemRefs = new ArrayList<>(gameItemRepository.findUexItemRefs());
-    Set<Integer> held = new HashSet<>();
-    itemRefs.forEach(ref -> held.add(ref.getUexId()));
-    Set<Integer> mergedListings = new HashSet<>();
-    for (UexKeyRef merged : redirects.findMergedUexItemRefs()) {
-      if (held.add(merged.getUexId())) {
-        mergedListings.add(merged.getUexId());
-        itemRefs.add(merged);
-      }
-    }
-    return new PriceLookups(
-        new UexMatrixLookups(
-            itemRefs,
-            terminalRepository.findUexTerminalRefs(),
-            gameItemPriceRepository.findPriceKeyRefs()),
-        Set.copyOf(mergedListings));
+  private UexMergedListings loadLookups() {
+    return UexMergedListings.of(
+        gameItemRepository.findUexItemRefs(),
+        redirects.findMergedUexItemRefs(),
+        terminalRepository.findUexTerminalRefs(),
+        gameItemPriceRepository.findPriceKeyRefs());
   }
-
-  /**
-   * Drops the prices of a merged second listing at a terminal where the listing the item holds has
-   * a price of its own in the same fetch, so the item's own price wins (REQ-DATA-044).
-   *
-   * @param dtos the fetched prices
-   * @param lookups the run's id maps, which resolve a merged listing to its item
-   * @param mergedListings the UEX item ids of merged second listings no row holds
-   * @return the prices to write
-   */
-  @NotNull
-  static List<UexItemPriceDto> withoutListedTwinPrices(
-      @NotNull List<UexItemPriceDto> dtos,
-      @NotNull UexMatrixLookups lookups,
-      @NotNull Set<Integer> mergedListings) {
-    if (mergedListings.isEmpty()) {
-      return dtos;
-    }
-    Set<UexMatrixLookups.Pair> listed = new HashSet<>();
-    for (UexItemPriceDto dto : dtos) {
-      UexMatrixLookups.Pair pair = pair(dto, lookups);
-      if (pair != null && !mergedListings.contains(dto.idItem())) {
-        listed.add(pair);
-      }
-    }
-    return dtos.stream()
-        .filter(
-            dto -> !mergedListings.contains(dto.idItem()) || !listed.contains(pair(dto, lookups)))
-        .toList();
-  }
-
-  /**
-   * Resolves a fetched price to its (item, terminal) pair.
-   *
-   * @param dto the fetched price
-   * @param lookups the run's id maps
-   * @return the pair, or {@code null} when the item or the terminal is unknown
-   */
-  @Nullable
-  private static UexMatrixLookups.Pair pair(
-      @NotNull UexItemPriceDto dto, @NotNull UexMatrixLookups lookups) {
-    UUID itemId = lookups.parentId(dto.idItem());
-    UUID terminalId = lookups.terminalId(dto.idTerminal());
-    return itemId == null || terminalId == null
-        ? null
-        : new UexMatrixLookups.Pair(itemId, terminalId);
-  }
-
-  /**
-   * The id maps of one item-price run.
-   *
-   * @param lookups the item, terminal and price-row ids
-   * @param mergedListings the UEX item ids of merged second listings the item ids resolve
-   */
-  private record PriceLookups(
-      @NotNull UexMatrixLookups lookups, @NotNull Set<Integer> mergedListings) {}
 
   /**
    * Writes one chunk of item-price rows inside its transaction: the chunk's existing rows are

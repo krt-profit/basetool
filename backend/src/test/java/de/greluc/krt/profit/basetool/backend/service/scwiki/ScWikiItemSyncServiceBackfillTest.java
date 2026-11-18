@@ -39,9 +39,9 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
@@ -631,7 +631,7 @@ class ScWikiItemSyncServiceBackfillTest {
     ScWikiItemSyncService writer = mock(ScWikiItemSyncService.class);
     when(self.getObject()).thenReturn(writer);
     when(writer.upsertBackfillItemWithinTransaction(any(), any(), any(), any(), any(), any()))
-        .thenThrow(new GameItemReconciliationBusyException())
+        .thenThrow(new CatalogueReconciliationBusyException())
         .thenReturn(ScWikiItemSyncService.BackfillOutcome.RECONCILED);
 
     assertEquals(1, service.syncItems());
@@ -648,7 +648,7 @@ class ScWikiItemSyncServiceBackfillTest {
     ScWikiItemSyncService writer = mock(ScWikiItemSyncService.class);
     when(self.getObject()).thenReturn(writer);
     when(writer.upsertBackfillItemWithinTransaction(any(), any(), any(), any(), any(), any()))
-        .thenThrow(new GameItemReconciliationBusyException());
+        .thenThrow(new CatalogueReconciliationBusyException());
 
     assertEquals(0, service.syncItems());
 

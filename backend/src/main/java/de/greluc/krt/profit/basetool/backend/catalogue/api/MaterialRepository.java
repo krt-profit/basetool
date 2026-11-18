@@ -19,23 +19,56 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/** Spring Data repository for Material. */
+/**
+ * Spring Data repository for Material; the id lookups resolve the id of a merged material
+ * (REQ-DATA-046).
+ */
 @Repository
-public interface MaterialRepository extends JpaRepository<Material, UUID> {
+public interface MaterialRepository
+    extends JpaRepository<Material, UUID>, MaterialIdentityReferences {
+
+  @Override
+  @NotNull
+  Optional<Material> findById(@NotNull UUID id);
+
+  @Override
+  boolean existsById(@NotNull UUID id);
+
+  @Override
+  @NotNull
+  List<Material> findAllById(@NotNull Iterable<UUID> ids);
+
+  @Override
+  @NotNull
+  Material getReferenceById(@NotNull UUID id);
+
+  /**
+   * Locks the materials a merge joins, in id order, so no row can take a new reference to either
+   * while the merge moves them (REQ-DATA-046).
+   *
+   * @param ids the materials of the merge
+   * @return the locked rows that still exist
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT m FROM Material m WHERE m.id IN :ids ORDER BY m.id")
+  List<Material> lockMergeRows(@Param("ids") Collection<UUID> ids);
 
   /** The name, job-order and refinery-input filters of {@link #searchPicker}, after the rule. */
   String PICKER_FILTER =

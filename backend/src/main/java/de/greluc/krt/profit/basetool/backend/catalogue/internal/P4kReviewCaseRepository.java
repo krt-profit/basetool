@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -125,6 +126,28 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
       """)
   List<P4kReviewCase> findOpenReferences(
       @Param("kind") P4kKind kind, @Param("retiredId") UUID retiredId);
+
+  /**
+   * Points the open cases of a kind that name a row being merged away at the row that stays; a case
+   * whose two rows become one keeps only the first.
+   *
+   * @param kind the review kind that owns the reference
+   * @param retiredId the row being merged away
+   * @param survivorId the row that stays
+   * @param keptCaseId a case that keeps its rows, or {@code null}
+   */
+  default void repointOpenReferences(
+      P4kKind kind, UUID retiredId, UUID survivorId, @Nullable UUID keptCaseId) {
+    for (P4kReviewCase review : findOpenReferences(kind, retiredId)) {
+      if (review.getId().equals(keptCaseId)) {
+        continue;
+      }
+      UUID row = retiredId.equals(review.getRowId()) ? survivorId : review.getRowId();
+      UUID other = retiredId.equals(review.getOtherRowId()) ? survivorId : review.getOtherRowId();
+      review.setRowId(row);
+      review.setOtherRowId(Objects.equals(row, other) ? null : other);
+    }
+  }
 
   /**
    * Finds the cases of one kind and set of reasons, whatever their status.

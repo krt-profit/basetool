@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -55,7 +56,11 @@ import org.springframework.transaction.annotation.Transactional;
  * or unchanged feed leaves local data untouched. A non-empty catalogue also replaces each listed
  * material's locations through {@link UexCommodityOccurrenceSync} (REQ-DATA-031). UEX never renames
  * a material: a UEX name that differs from the name of a row the P4K matched is reported to {@code
- * external_sync_report} (REQ-P4K-024).
+ * external_sync_report} (REQ-P4K-024). After a complete catalogue write the materials second UEX
+ * listings keep are merged into the materials of their commodities ({@link
+ * UexCommodityTwinMerger}); a listing a merge left behind writes nothing, and its prices go to the
+ * material it was merged into unless that material's own listing prices the same terminal
+ * (REQ-DATA-046).
  */
 @Slf4j
 @Service
@@ -79,6 +84,12 @@ public class UexCommodityService {
 
   /** Records the name disagreements with the P4K. */
   private final SyncReportService syncReportService;
+
+  /** Knows the UEX commodity ids a material merge left behind (REQ-DATA-046). */
+  private final MaterialRedirectRepository redirects;
+
+  /** Merges the materials second UEX listings keep after a complete fetch (REQ-DATA-046). */
+  private final UexCommodityTwinMerger twinMerger;
 
   /**
    * Runs the full commodity + price sync (see class Javadoc). Deliberately holds no transaction:
@@ -115,6 +126,7 @@ public class UexCommodityService {
       if (commodityFetch.complete()
           && outcome.failedRows() == 0
           && outcome.results().size() == commodities.size()) {
+        twinMerger.mergeTwins(commodities, runId);
         occurrenceSync.replaceAll(commodities);
         chunkWriter.recordSweep(true);
       } else {
@@ -151,12 +163,16 @@ public class UexCommodityService {
     }
     chunkWriter.recordSkipped(dtos.size() - usable.size());
 
-    UexMatrixLookups lookups = chunkWriter.inNewTransaction(this::loadPriceLookups);
+    UexMergedListings loaded = chunkWriter.inNewTransaction(this::loadPriceLookups);
+    UexMatrixLookups lookups = loaded.lookups();
     createMissingMaterials(usable, lookups);
+    List<UexCommodityPriceDto> written =
+        loaded.withoutListedTwinPrices(
+            usable, UexCommodityPriceDto::idCommodity, UexCommodityPriceDto::idTerminal);
 
     SyncChunkWriter.Outcome<UUID> outcome =
         chunkWriter.write(
-            usable,
+            written,
             SyncChunkWriter.DEFAULT_CHUNK_SIZE,
             chunk -> writePriceChunk(chunk, lookups),
             "commodity price",
@@ -216,38 +232,40 @@ public class UexCommodityService {
    *
    * @param dto the inbound UEX commodity row
    * @param runId the sync run, for the report of a name the P4K leads
-   * @return the row's UEX commodity id once saved, or {@code null} when the row lacks an id or a
-   *     name
+   * @return the row's UEX commodity id once saved or, for a listing a material merge left behind
+   *     (REQ-DATA-046), once skipped; {@code null} when the row lacks an id or a name
    */
   @Nullable
   private Integer upsertCommodity(@NotNull UexCommodityDto dto, @NotNull UUID runId) {
     if (dto.id() == null || dto.name() == null) {
       return null;
     }
+    Optional<Material> held = materialRepository.findByIdCommodity(dto.id());
+    if (held.isEmpty() && redirects.isMergedUexCommodityId(dto.id())) {
+      return dto.id();
+    }
     Material material =
-        materialRepository
-            .findByIdCommodity(dto.id())
-            .orElseGet(() ->
-                materialRepository
-                    .findByName(dto.name())
-                    .map(m -> {
-                      m.setIdCommodity(dto.id());
-                      if (m.getSourceSystems() == MaterialSourceSystem.MANUAL) {
-                        log.info(
-                            "Manual material '{}' is now linked to UEX commodity id={}",
-                            m.getName(),
-                            dto.id());
-                        m.setSourceSystems(MaterialSourceSystem.UEX_ONLY);
-                      }
-                      promoteOnUexAdoption(m);
-                      return m;
-                    })
-                    .orElseGet(() -> {
-                      Material newMaterial = new Material();
-                      newMaterial.setIdCommodity(dto.id());
-                      newMaterial.setName(dto.name());
-                      return newMaterial;
-                    }));
+        held.orElseGet(() ->
+            materialRepository
+                .findByName(dto.name())
+                .map(m -> {
+                  m.setIdCommodity(dto.id());
+                  if (m.getSourceSystems() == MaterialSourceSystem.MANUAL) {
+                    log.info(
+                        "Manual material '{}' is now linked to UEX commodity id={}",
+                        m.getName(),
+                        dto.id());
+                    m.setSourceSystems(MaterialSourceSystem.UEX_ONLY);
+                  }
+                  promoteOnUexAdoption(m);
+                  return m;
+                })
+                .orElseGet(() -> {
+                  Material newMaterial = new Material();
+                  newMaterial.setIdCommodity(dto.id());
+                  newMaterial.setName(dto.name());
+                  return newMaterial;
+                }));
 
     reportNameDisagreement(material, dto, runId);
     material.setType(determineMaterialType(dto));
@@ -280,16 +298,18 @@ public class UexCommodityService {
   }
 
   /**
-   * Reads the three id maps the price phase resolves every row against — one query each: material
-   * id by {@code id_commodity}, terminal id by {@code id_terminal}, and existing price id by
-   * (material, terminal).
+   * Reads the id maps the price phase resolves every row against: material id by {@code
+   * id_commodity}, a merged listing no material holds resolving to the material it was merged into
+   * (REQ-DATA-046), terminal id by {@code id_terminal}, and existing price id by (material,
+   * terminal).
    *
-   * @return the lookups, holding ids only
+   * @return the lookups, holding ids only, and the merged listings they resolve
    */
   @NotNull
-  private UexMatrixLookups loadPriceLookups() {
-    return new UexMatrixLookups(
+  private UexMergedListings loadPriceLookups() {
+    return UexMergedListings.of(
         materialRepository.findUexCommodityRefs(),
+        redirects.findMergedUexCommodityRefs(),
         terminalRepository.findUexTerminalRefs(),
         materialPriceRepository.findPriceKeyRefs());
   }

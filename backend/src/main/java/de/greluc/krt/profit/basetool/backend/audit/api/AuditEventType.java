@@ -30,19 +30,19 @@ import org.jetbrains.annotations.NotNull;
 @RequiredArgsConstructor
 public enum AuditEventType {
 
-  /** A warehouse row was linked to the surviving catalogue item. */
+  /** A warehouse row was linked to the surviving catalogue item or material. */
   INVENTORY_ITEM_CATALOGUE_REASSIGNED(AuditDomain.INVENTORY),
   /** A stock floor was linked or combined during catalogue reconciliation. */
   MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED(AuditDomain.INVENTORY),
-  /** A job-order item was linked to the surviving catalogue item. */
+  /** A job-order line was linked to the surviving catalogue item or material. */
   JOB_ORDER_ITEM_CATALOGUE_REASSIGNED(AuditDomain.JOB_ORDER),
   /** An owned, default or aliased blueprint was linked to the surviving catalogue item. */
   BLUEPRINT_CATALOGUE_REASSIGNED(AuditDomain.BLUEPRINT),
-  /** A supply need or donation was linked to the surviving catalogue item. */
+  /** A supply need or donation was linked to the surviving catalogue item or material. */
   SUPPLY_CATALOGUE_REASSIGNED(AuditDomain.SUPPLY),
-  /** A purchasing deal was linked to the surviving catalogue item. */
+  /** A purchasing deal was linked to the surviving catalogue item or material. */
   PURCHASING_CATALOGUE_REASSIGNED(AuditDomain.PURCHASING),
-  /** A Materialbörse item offer or request was linked to the surviving catalogue item. */
+  /** A Materialbörse offer or request was linked to the surviving catalogue item or material. */
   MARKET_CATALOGUE_REASSIGNED(AuditDomain.MARKET),
   /** A hangar ship was linked to the ship type its own was merged into. */
   HANGAR_SHIP_CATALOGUE_REASSIGNED(AuditDomain.HANGAR),
@@ -292,6 +292,8 @@ public enum AuditEventType {
   REFINERY_YIELDS_SYNCED(AuditDomain.REFINERY),
   /** A deleted user's refinery orders were bulk-reassigned to the fallback admin. */
   REFINERY_ORDERS_REASSIGNED(AuditDomain.REFINERY),
+  /** A refinery good was linked to the material its own was merged into (REQ-DATA-046). */
+  REFINERY_CATALOGUE_REASSIGNED(AuditDomain.REFINERY),
   /**
    * A patch change cancelled the running refinery orders started before its live time — one summary
    * event per trigger with the count; the subject is the patch change (REQ-PATCH-006).
@@ -817,6 +819,11 @@ public enum AuditEventType {
    * row handed its identity to its twin (REQ-P4K-076…078); the details say which.
    */
   CATALOGUE_MATERIAL_LEFTOVER_RETIRED(AuditDomain.CATALOGUE),
+  /**
+   * A material a second UEX listing keeps beside the material holding the P4K GUID was merged into
+   * it (REQ-DATA-046).
+   */
+  CATALOGUE_MATERIAL_MERGED(AuditDomain.CATALOGUE),
   /** An admin created a material category. */
   CATALOGUE_MATERIAL_CATEGORY_CREATED(AuditDomain.CATALOGUE),
   /** An admin renamed a material category. */

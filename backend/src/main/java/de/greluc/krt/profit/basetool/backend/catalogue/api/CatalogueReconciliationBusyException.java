@@ -23,11 +23,11 @@ import java.io.Serial;
 import org.springframework.dao.CannotAcquireLockException;
 
 /** Requires a fresh catalogue reconciliation transaction after a busy reference-owner lock. */
-public final class GameItemReconciliationBusyException extends CannotAcquireLockException {
+public final class CatalogueReconciliationBusyException extends CannotAcquireLockException {
   @Serial private static final long serialVersionUID = 1L;
 
   /** Reports contention without waiting while the catalogue's foreign-key fence is held. */
-  public GameItemReconciliationBusyException() {
+  public CatalogueReconciliationBusyException() {
     super("Catalogue reconciliation reference locks are busy");
   }
 }

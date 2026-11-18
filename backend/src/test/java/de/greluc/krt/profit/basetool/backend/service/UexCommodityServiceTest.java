@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialRedirectRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalReposito
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityOccurrenceSync;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityTwinMerger;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityPriceDto;
 import java.math.BigDecimal;
@@ -72,6 +74,10 @@ class UexCommodityServiceTest {
   @Mock private UexCommodityOccurrenceSync occurrenceSync;
 
   @Mock private SyncReportService syncReportService;
+
+  @Mock private MaterialRedirectRepository redirects;
+
+  @Mock private UexCommodityTwinMerger twinMerger;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
   @Spy
@@ -413,6 +419,68 @@ class UexCommodityServiceTest {
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
     verify(occurrenceSync).replaceAll(catalogue);
+  }
+
+  @Test
+  void aCompleteCatalogue_handsItsListingsToTheTwinMergeBeforeTheLocations() {
+    List<UexCommodityDto> catalogue = List.of(commodity(30, "Fireworks", 0, 0));
+    UUID run = UUID.randomUUID();
+    when(syncReportService.beginRun()).thenReturn(run);
+    when(uexClient.getCommodities()).thenReturn(fetched(catalogue));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
+    when(materialRepository.findByIdCommodity(30)).thenReturn(Optional.empty());
+    when(materialRepository.findByName("Fireworks")).thenReturn(Optional.empty());
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    var order = inOrder(twinMerger, occurrenceSync);
+    order.verify(twinMerger).mergeTwins(catalogue, run);
+    order.verify(occurrenceSync).replaceAll(catalogue);
+  }
+
+  @Test
+  void aListingAMaterialMergeLeftBehind_writesNothingAndKeepsTheCatalogueComplete() {
+    List<UexCommodityDto> catalogue = List.of(commodity(54, "Party Favors", 0, 0));
+    UUID run = UUID.randomUUID();
+    when(syncReportService.beginRun()).thenReturn(run);
+    when(uexClient.getCommodities()).thenReturn(fetched(catalogue));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
+    when(materialRepository.findByIdCommodity(54)).thenReturn(Optional.empty());
+    when(redirects.isMergedUexCommodityId(54)).thenReturn(true);
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    verify(materialRepository, never()).findByName(any());
+    verify(materialRepository, never()).save(any());
+    verify(twinMerger).mergeTwins(catalogue, run);
+    verify(occurrenceSync).replaceAll(catalogue);
+  }
+
+  @Test
+  void
+      aMergedListingsPrice_goesToTheMaterialItWasMergedInto_unlessItsOwnListingPricesTheTerminal() {
+    UUID fireworks = UUID.randomUUID();
+    UUID shared = UUID.randomUUID();
+    UUID twinOnly = UUID.randomUUID();
+    List<UexCommodityPriceDto> prices =
+        List.of(price(30, 10, "1"), price(54, 10, "4761"), price(54, 11, "4900"));
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(prices));
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(30, fireworks)));
+    when(redirects.findMergedUexCommodityRefs()).thenReturn(List.of(ref(54, fireworks)));
+    when(terminalRepository.findUexTerminalRefs())
+        .thenReturn(List.of(ref(10, shared), ref(11, twinOnly)));
+    when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
+    stubPriceSaveAssignsId();
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    ArgumentCaptor<MaterialPrice> saved = ArgumentCaptor.forClass(MaterialPrice.class);
+    verify(materialPriceRepository, times(2)).save(saved.capture());
+    assertEquals(
+        List.of(new BigDecimal("1"), new BigDecimal("4900")),
+        saved.getAllValues().stream().map(MaterialPrice::getPriceSell).sorted().toList());
+    verify(materialRepository, never()).findByIdCommodity(any());
   }
 
   @Test
@@ -837,6 +905,16 @@ class UexCommodityServiceTest {
           }
           return mp;
         });
+  }
+
+  private static UexCommodityPriceDto price(int commodity, int terminal, String sell) {
+    return UexCommodityPriceDto.builder()
+        .idCommodity(commodity)
+        .commodityName("Commodity " + commodity)
+        .idTerminal(terminal)
+        .terminalName("Terminal " + terminal)
+        .priceSell(new BigDecimal(sell))
+        .build();
   }
 
   private static UexCommodityDto commodity(

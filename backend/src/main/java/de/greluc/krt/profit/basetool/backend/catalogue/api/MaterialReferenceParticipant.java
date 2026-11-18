@@ -19,17 +19,22 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.platform.api.ObserverSpi;
 import jakarta.persistence.EntityManager;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Reports which materials a module's member rows reference, so the P4K import hides or retires only
- * a material no member uses (REQ-P4K-075…078). Every implementation joins the caller's transaction
- * ({@code MANDATORY}).
+ * a material no member uses (REQ-P4K-075…078), and moves those references when a material merges
+ * into another (REQ-DATA-046). Every implementation joins the caller's transaction ({@code
+ * MANDATORY}).
  */
 @ObserverSpi
 public interface MaterialReferenceParticipant {
@@ -59,6 +64,37 @@ public interface MaterialReferenceParticipant {
   }
 
   /**
+   * Audits each row a merge moved onto the material that stays, one event per row.
+   *
+   * @param auditRecorder the audit trail
+   * @param type the module's catalogue-reassignment event type
+   * @param rows the moved rows
+   * @param retiredId the material merged away
+   * @param survivorId the material that stays
+   * @param subject the table of the moved rows
+   * @return the number of moved rows
+   */
+  static int recordMoved(
+      @NotNull AuditRecorder auditRecorder,
+      @NotNull AuditEventType type,
+      @NotNull List<UUID> rows,
+      @NotNull UUID retiredId,
+      @NotNull UUID survivorId,
+      @NotNull String subject) {
+    for (UUID row : rows) {
+      auditRecorder.record(
+          type,
+          row,
+          null,
+          null,
+          AuditDetails.of("retiredMaterial", retiredId)
+              .with("survivorMaterial", survivorId)
+              .with("subject", subject));
+    }
+    return rows.size();
+  }
+
+  /**
    * Tells which of the given materials one of the module's rows references.
    *
    * @param materialIds the materials asked about
@@ -66,4 +102,15 @@ public interface MaterialReferenceParticipant {
    */
   @NotNull
   Set<UUID> referencedMaterials(@NotNull Collection<UUID> materialIds);
+
+  /**
+   * Moves the module's references from a merged material to the one that stays, bumps the version
+   * of every changed row and audits each in the module's own area. The caller holds both material
+   * rows locked.
+   *
+   * @param retiredId the material merged away
+   * @param survivorId the material that stays
+   * @return the number of rows whose reference moved
+   */
+  int reassignMaterial(@NotNull UUID retiredId, @NotNull UUID survivorId);
 }

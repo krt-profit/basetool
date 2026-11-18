@@ -2041,3 +2041,75 @@ names two such rows names none.
 `UexManufacturerServiceTest` · **Code:** `ManufacturerUexTwins`, `ManufacturerUexTwinService`,
 `ManufacturerReviewMerge`, `UexManufacturerService` · **ADR:**
 [ADR-0394](../adr/0394-the-p4k-import-resolves-manufacturer-families-and-borrowed-names-itself.md)
+
+### REQ-DATA-046 — a commodity UEX lists twice keeps one material
+
+UEX lists some commodities twice, and each listing kept a material of its own: "Fireworks" (UEX
+commodity 30) holds the P4K GUID of the record `PartyFavors`, whose in-game name is "Fireworks",
+while "Party Favors" (UEX 54) holds the SC Wiki UUID of that record's `ResourceType` and every
+terminal price. Members saw both, and stock could be split between them.
+
+A material is a **twin** of the material holding a P4K GUID when it holds a UEX commodity id but no
+P4K GUID, and its SC Wiki UUID is the stored `p4k_subtype_uuid` of exactly one other material, the
+`ResourceType` the SC Wiki keys the commodity by (REQ-P4K-070); that material holds the P4K GUID of
+a record still in the catalogue, a UEX commodity id of its own and no SC Wiki UUID
+(`MaterialMergeRule.UEX_WIKI_KEY`). After the upsert loop of a sync whose commodity fetch was
+complete and wrote every listing, and before the locations are replaced (REQ-DATA-031), the UEX
+commodity sync merges every twin into that material when the fetch lists both UEX commodity ids,
+each in a transaction of its own (`UexCommodityTwinMerger`). On the rows of 2026-11-17 the rule finds Party
+Favors / Fireworks and no other pair: the seeded twins of REQ-P4K-076 hold no UEX listing, the
+admin and Wiki-only twins of REQ-P4K-077/078 hold no UEX listing either, and the material matched
+for "Carinite" and "Construction Pieces" holds both the P4K GUID and the SC Wiki UUID itself.
+
+The merge (`MaterialMergeService`) locks both rows in id order, reads the rule again, and keeps
+both rows and their prices as JSON. Each member module moves its references through
+`MaterialReferenceParticipant#reassignMaterial` on the rows themselves, bumping their versions, and
+audits each moved row in its own area: stock entries and stock floors (a floor both materials hold
+for an org unit and quality tier keeps the higher minimum and target), job-order material lines,
+item-order material lines, handovers, claims and provision credits, supply needs and donations,
+purchasing deals, Materialbörse requests and refinery goods (`REFINERY_CATALOGUE_REASSIGNED`). The
+catalogue moves recipe ingredients, dismantle returns, refinery yields, terminal prices, external
+aliases, refined-from links and locations; where both materials hold a price or yield at one
+terminal or the same location, the surviving material's row stays. Open commodity review cases
+naming the twin follow it, and the twin is deleted. The survivor keeps its name, its UEX listing
+and every value it holds; it takes the twin's SC Wiki identity (and turns `BOTH`), the Wiki,
+group, German name, description and refined-from values it lacks, and the job-order and raw-material
+flags either row set. A merge a unique key refuses, such as two claims of one unit on one order
+line, rolls back alone, is counted as failed and is tried again by the next sync.
+
+`material_redirect` (V438) keeps the twin's id and its UEX commodity id, so the merged id still
+resolves through `findById`, `existsById`, `findAllById` and `getReferenceById` of
+`MaterialRepository`, and the P4K import counts the redirect as a catalogue reference of the
+survivor (REQ-P4K-076). A fetched listing whose id only such a redirect holds writes nothing,
+adopts no row by name and creates none, and counts as written, so it neither marks the catalogue
+incomplete nor stops the location replacement. The commodity-price sync resolves it to the
+survivor: its price at a terminal the survivor's own listing prices in the same fetch is dropped,
+its other prices are written there, and no placeholder material is created for it. Each merge is
+reported as `SOURCE_RECORDS_MERGED` (aggregate `commodity`) and audited as
+`CATALOGUE_MATERIAL_MERGED`, actor `system`, subject the survivor, with the merged id, the rule, the
+merged UEX commodity id and the number of moved references.
+
+**Acceptance**
+
+- [x] The rule finds Party Favors / Fireworks and refuses a seeded row without a listing, a material
+  holding the GUID and the Wiki key itself, a game row with a Wiki UUID of its own, a listing the
+  fetch lacks, a `ResourceType` two materials hold, a record that left the catalogue and a twin
+  holding a P4K GUID (`UexCommodityTwinsTest`).
+- [x] A merge moves the stock, supply, purchasing, Materialbörse, recipe, alias and refined-from
+  references, keeps the survivor's price at a shared terminal and takes the twin's other prices,
+  hands over the Wiki identity, keeps the merged id resolvable and its UEX id known, repoints an
+  older redirect and is audited; a shared stock floor keeps the higher settings; a pair the rule no
+  longer holds for merges nothing (`MaterialMergeIntegrationTest`).
+- [x] Each twin merges in its own transaction, a failing one is counted and the next still merges
+  (`UexCommodityTwinMergerTest`).
+- [x] A complete catalogue hands its listings to the twin merge before the locations; a merged
+  listing writes nothing and keeps the catalogue complete; its price yields to the survivor's own
+  listing at a shared terminal and goes to the survivor elsewhere (`UexCommodityServiceTest`).
+
+**Enforced by:** `UexCommodityTwinsTest`, `MaterialMergeIntegrationTest`,
+`UexCommodityTwinMergerTest`, `UexCommodityServiceTest` · **Code:** `MaterialMergeRule`,
+`UexCommodityTwins`, `UexCommodityTwinMerger`, `MaterialMergeService`, `MaterialMergeIdentity`,
+`MaterialReferenceParticipant` and its implementations, `CatalogueMaterialReassignmentRepository`,
+`MaterialIdentityReferences`, `UexMergedListings`, `UexCommodityService`,
+`V438__create_material_redirect.sql` · **ADR:**
+[ADR-0396](../adr/0396-the-p4k-import-keys-commodities-by-their-resource-type.md)

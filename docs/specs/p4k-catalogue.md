@@ -1339,10 +1339,12 @@ positive buy nor a positive sell price, is marked `material.sourceless_hidden_at
 APPLY unless something references it. The member modules answer through the observer SPI
 `MaterialReferenceParticipant`: stock entries and stock floors, job-order material lines,
 item-order material lines, handovers, claims and provision credits, supply needs and donations,
-purchasing deals, Materialbörse requests and refinery goods. The catalogue reads its own
-references itself (`CatalogueMaterialReferences`): recipe ingredients, dismantle returns, refinery
-yields, terminal prices, external aliases and refined-from links. `P4kMaterialReferences` asks
-both, so the leftover rules (REQ-P4K-076…078) can tell a member's reference from a catalogue row's.
+purchasing deals, Materialbörse requests and refinery goods; the same SPI moves them when a
+material merges into another (REQ-DATA-046). The catalogue reads its own references itself
+(`CatalogueMaterialReferences`): recipe ingredients, dismantle returns, refinery yields, terminal
+prices, external aliases, refined-from links and the redirect of a material merged into it.
+`P4kMaterialReferences` asks both, so the leftover rules (REQ-P4K-076…078) can tell a member's
+reference from a catalogue row's.
 
 A marked material leaves every list and picker (`SelectableMaterialJpql.SELECTABLE_MATERIAL`,
 `Material#isSourcelessHidden()`) only while it stays without a game source and without a price, so
@@ -1378,7 +1380,8 @@ opening a `SEEDED_NOT_CREATABLE` case:
   and stamps it as usual, so it takes the name, the German name and the group the P4K leads and the
   description where it has none. The seeded row is **deleted** when no catalogue row references it
   (`CatalogueMaterialReferences`: a recipe line, a dismantle return, a refinery yield, a price, an
-  alias or a refined-from link would refuse the deletion); while one does, it is **hidden**
+  alias, a refined-from link or a merged material's redirect would refuse the deletion); while one
+  does, it is **hidden**
   (`p4k_hidden_at`) under its name followed by its GUID in parentheses, so the twin can take the
   name, and the catalogue row keeps pointing at it.
 - **No twin.** Otherwise the seeded row is hidden as an admin's hide would (REQ-P4K-016), as items

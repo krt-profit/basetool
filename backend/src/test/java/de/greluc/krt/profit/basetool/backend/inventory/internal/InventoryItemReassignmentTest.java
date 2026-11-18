@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReconciliationBusyException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
@@ -161,7 +161,7 @@ class InventoryItemReassignmentTest {
             publisher);
 
     org.junit.jupiter.api.Assertions.assertThrows(
-        GameItemReconciliationBusyException.class,
+        CatalogueReconciliationBusyException.class,
         () -> participant.reassignGameItem(retired, canonical));
 
     org.mockito.Mockito.verify(repository, org.mockito.Mockito.never())

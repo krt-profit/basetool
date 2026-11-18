@@ -4,7 +4,8 @@
 - **Date:** 2026-11-17
 - **Deciders:** @greluc
 - **Related:** spec [`p4k-catalogue.md`](../specs/p4k-catalogue.md) (REQ-P4K-010, REQ-P4K-016,
-  REQ-P4K-024…026, REQ-P4K-029, REQ-P4K-070…079) · [ADR-0339](0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) ·
+  REQ-P4K-024…026, REQ-P4K-029, REQ-P4K-070…079) · spec
+  [`data-persistence.md`](../specs/data-persistence.md) (REQ-DATA-046) · [ADR-0339](0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) ·
   [ADR-0393](0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
 
 ## Context
@@ -114,4 +115,35 @@ left to decide. Before the commodity pass an APPLY therefore retires:
     the member's import learned, and the key upgrade only moves its keys.
 
 A merge of two visible, priced materials (Party Favors / Fireworks) needs a material merge that
-moves references across many tables and stays out of these rules.
+moves references across many tables and stays out of these rules; the next amendment decides it.
+
+## Amendment — a commodity UEX lists twice merges into its P4K material (2026-11-18)
+
+The owner decided on 2026-11-17 that UEX double listings merge automatically into the row holding
+the game identity, that references and prices move to that row, that the second UEX id stays known
+and that every action is audited, as ships (ADR-0392), items (REQ-DATA-044) and manufacturers
+(REQ-DATA-045) already do. For commodities that is Party Favors (UEX 54, SC Wiki `PartyFavors`,
+priced) beside Fireworks (UEX 30, the P4K GUID of the record `PartyFavors`).
+
+13. **The evidence is the Wiki key (REQ-DATA-046).** A material without a P4K GUID whose SC Wiki
+    UUID is the stored `p4k_subtype_uuid` of exactly one material holding a P4K GUID stands for the
+    same commodity (REQ-P4K-070). The rule asks for a UEX listing on both rows and no SC Wiki UUID on
+    the game row, so the seeded, admin and Wiki-only twins of decisions 9 and 10, which hold no
+    listing, stay with those rules, and a row holding both keys itself has no twin. It reads only
+    stored columns, so it runs in the UEX commodity sync after a complete fetch, the way the item
+    twin merge runs in the item sync, and not in the APPLY: the duplicate is UEX's, and a scheduled
+    sync settles it without waiting for an admin's APPLY.
+14. **One SPI for reading and moving references.** `MaterialReferenceParticipant` gains
+    `reassignMaterial`; each member module moves its own rows, bumps their versions and audits them
+    in its own area with the catalogue-reassignment event it already has, the refinery with the new
+    `REFINERY_CATALOGUE_REASSIGNED`. The catalogue moves its own rows; a price, yield or location
+    both rows hold for one terminal or place stays with the game row, which keeps its own listing.
+15. **The merged id stays resolvable.** `material_redirect` (V438) keeps the twin's id with both
+    rows as JSON and the twin's UEX commodity id; `MaterialRepository`'s id lookups resolve it, the
+    UEX commodity sync skips the listing, and the price sync writes its prices onto the game row
+    except where the game row's own listing prices the terminal. The merge is audited as
+    `CATALOGUE_MATERIAL_MERGED`.
+
+Consequences: on the next UEX sync after the deploy Party Favors merges into Fireworks, which turns
+`BOTH` with the Wiki UUID and takes the 25 terminal prices UEX lists for commodity 54. Every list
+and picker shows one "Fireworks", and stock booked on Party Favors appears there.

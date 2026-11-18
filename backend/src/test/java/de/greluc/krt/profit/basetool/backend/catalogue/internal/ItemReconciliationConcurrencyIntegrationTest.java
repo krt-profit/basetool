@@ -23,10 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReassignmentParticipant;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
@@ -124,7 +124,7 @@ class ItemReconciliationConcurrencyIntegrationTest {
       var merging =
           pool.submit(() -> {
             assertThatThrownBy(() -> merge(merger, fixture))
-                .isInstanceOf(GameItemReconciliationBusyException.class);
+                .isInstanceOf(CatalogueReconciliationBusyException.class);
             booking.get(15, TimeUnit.SECONDS);
             assertThat(
                     jdbc.queryForObject(
