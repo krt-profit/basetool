@@ -102,7 +102,7 @@ class P4kShipBaseData {
     writer.lead(
         "manufacturer_id",
         row.getManufacturer(),
-        context.manufacturer(ship.manufacturerGuid()),
+        context.shipManufacturer(ship),
         row::setManufacturer,
         Manufacturer::getName);
     facts(row, ship, writer::lead);

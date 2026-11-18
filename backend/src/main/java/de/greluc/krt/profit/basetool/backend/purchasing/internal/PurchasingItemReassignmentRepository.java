@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -50,4 +51,16 @@ interface PurchasingItemReassignmentRepository extends Repository<PurchasingDeal
   @NotNull
   List<UUID> deals(
       @Param("retiredId") @NotNull UUID retiredId, @Param("survivorId") @NotNull UUID survivorId);
+
+  /**
+   * Lists which of the given items a purchasing deal references.
+   *
+   * @param ids the items asked about
+   * @return the referenced ones
+   */
+  @Query(
+      value = "SELECT DISTINCT game_item_id FROM purchasing_deal WHERE game_item_id IN (:ids)",
+      nativeQuery = true)
+  @NotNull
+  List<UUID> referenced(@Param("ids") @NotNull Collection<UUID> ids);
 }

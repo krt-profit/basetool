@@ -40,9 +40,10 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Each P4K-matched material takes its group from the catalogue; a material left without one opens a
- * review case the admin resolves with an existing group, and an admin category goes once no
- * material uses it (REQ-P4K-025, owner decision on the category mapping).
+ * Each P4K-matched material takes its group from the catalogue; a material the game files know left
+ * without one opens a review case the admin resolves with an existing group, one the game files
+ * lack opens none, and an admin category goes once no material uses it (REQ-P4K-025, REQ-P4K-074,
+ * owner decisions on the category mapping and on N1).
  */
 @SpringBootTest
 @Transactional
@@ -51,6 +52,13 @@ class P4kMaterialGroupReviewTest {
   private static final UUID BORASE = UUID.fromString("001c7bc6-2bb6-4f66-a8ef-a1c63e80ffc5");
   private static final UUID MINERAL = UUID.fromString("8e17c99b-1bf6-49cb-838e-e7eb72a9088f");
   private static final UUID ADMIN = UUID.fromString("00000000-0000-0000-0000-00000000a4d1");
+
+  /** A record of the fixture whose resource group the catalogue does not list. */
+  private static final String UNGROUPED_RECORD = "Ouratite";
+
+  /** A resource type no group lists. */
+  private static final UUID GROUPLESS_TYPE =
+      UUID.fromString("0f000000-0000-4000-8000-0000000c0f01");
 
   @Autowired private P4kImportService service;
   @Autowired private P4kImportJobRepository jobRepository;
@@ -124,18 +132,32 @@ class P4kMaterialGroupReviewTest {
   @Test
   void aMaterialLeftWithoutAGroup_opensACase_andKeepsItsAdminCategoryReadable() {
     MaterialCategory erz = adminCategory("Raffiniertes Erz");
-    Material unknown = material("Not In The Game", erz);
+    Material ungrouped = material(UNGROUPED_RECORD, erz);
 
     runs.apply(withMineral(), false);
 
-    assertThat(groupCase(unknown).getStatus()).isEqualTo(P4kReviewStatus.OPEN);
-    assertThat(unknown.getCategory()).isEqualTo(erz);
+    assertThat(groupCase(ungrouped).getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+    assertThat(ungrouped.getCategory()).isEqualTo(erz);
     assertThat(categoryRepository.findById(erz.getId())).isPresent();
   }
 
   @Test
-  void theAdminAssignsAnExistingGroup_andTheNextApplyLeavesTheCaseResolved() {
+  void aMaterialTheGameFilesLack_opensNoCase() {
     Material unknown = material("Not In The Game", null);
+
+    runs.apply(withMineral(), false);
+
+    assertThat(
+            reviewCaseRepository.findByKindAndGuidAndReason(
+                P4kKind.COMMODITY,
+                P4kMaterialGroupReview.caseGuid(unknown.getName()),
+                P4kReviewReason.NO_RESOURCE_GROUP))
+        .isEmpty();
+  }
+
+  @Test
+  void theAdminAssignsAnExistingGroup_andTheNextApplyLeavesTheCaseResolved() {
+    Material unknown = material(UNGROUPED_RECORD, null);
     runs.apply(withMineral(), false);
     MaterialCategory mineral = categoryRepository.findByP4kUuid(MINERAL).orElseThrow();
     P4kReviewCase open = groupCase(unknown);
@@ -158,7 +180,7 @@ class P4kMaterialGroupReviewTest {
 
   @Test
   void assigningAGroupToAMaterialThatNoLongerExists_isRefused_andLeavesTheCaseOpen() {
-    Material gone = material("Gone Before The Assignment", null);
+    Material gone = material(UNGROUPED_RECORD, null);
     runs.apply(withMineral(), false);
     MaterialCategory mineral = categoryRepository.findByP4kUuid(MINERAL).orElseThrow();
     P4kReviewCase open = groupCase(gone);
@@ -182,9 +204,11 @@ class P4kMaterialGroupReviewTest {
   void aMaterialThatVanishesIsExcludedFromTheGroupReviewInPreviewAndApply() {
     Material vanished = material("Vanished P4K commodity", null);
     vanished.setP4kUuid(UUID.randomUUID());
+    vanished.setScwikiUuid(GROUPLESS_TYPE);
     List<UUID> listed = P4kSweepFixtures.guids(19);
     listed.forEach(guid -> material("Sweep " + guid, null).setP4kUuid(guid));
     ObjectNode root = P4kTestCatalogues.tree();
+    P4kCommodityFixtures.resourceType(root, GROUPLESS_TYPE, "Groupless", "Groupless", null);
     P4kSweepFixtures.listOnly(root, "commodities", BORASE, listed);
     ObjectNode completeness = (ObjectNode) root.get("completeness").get("commodities");
     completeness.put("status", "partial");
@@ -212,7 +236,7 @@ class P4kMaterialGroupReviewTest {
   @Test
   void assigningAnAdminCategory_orKeepingAGroupCase_isRefused() {
     MaterialCategory erz = adminCategory("Erz");
-    Material unknown = material("Not In The Game", erz);
+    Material unknown = material(UNGROUPED_RECORD, erz);
     runs.apply(withMineral(), false);
     P4kReviewCase open = groupCase(unknown);
 

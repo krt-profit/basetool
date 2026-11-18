@@ -104,15 +104,28 @@ class P4kIdentityCleanupTest {
   }
 
   @Test
-  void aRowHoldingAnotherGuid_isNotReassigned() {
-    UUID other = UUID.randomUUID();
+  void aRowHoldingADepartedGuid_followsTheFreeRecordItsClassNames() {
     GameItem shield = item("Claimed shield", P4kTestCatalogues.SHIELD_CLASS);
-    shield.setP4kUuid(other);
+    shield.setP4kUuid(UUID.randomUUID());
 
     runs.apply(P4kTestCatalogues.fixtureBytes(), false);
 
-    assertThat(shield.getP4kUuid()).isEqualTo(other);
-    assertThat(hasConflict(P4kKind.ITEM, P4kTestCatalogues.SHIELD)).isTrue();
+    assertThat(shield.getP4kUuid()).isEqualTo(P4kTestCatalogues.SHIELD);
+    assertThat(hasConflict(P4kKind.ITEM, P4kTestCatalogues.SHIELD)).isFalse();
+  }
+
+  @Test
+  void aRowHoldingAnotherGuid_isNotReassigned_whenAnotherRowHoldsTheRecordItsClassNames() {
+    UUID other = UUID.randomUUID();
+    GameItem claimed = item("Claimed shield", P4kTestCatalogues.SHIELD_CLASS);
+    claimed.setP4kUuid(other);
+    GameItem holder = item("Holding shield", null);
+    holder.setP4kUuid(P4kTestCatalogues.SHIELD);
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    assertThat(claimed.getP4kUuid()).isEqualTo(other);
+    assertThat(holder.getP4kUuid()).isEqualTo(P4kTestCatalogues.SHIELD);
   }
 
   @Test
@@ -152,6 +165,7 @@ class P4kIdentityCleanupTest {
     UUID twinGuid = UUID.fromString("0f000000-0000-4000-8000-0000000000c1");
     twin.put("guid", twinGuid.toString());
     twin.put("className", "Aslarite_Twin");
+    twin.put("subtypeGuid", "0f000000-0000-4000-8000-0000000000c2");
     ((ArrayNode) root.get("commodities")).add(twin);
 
     runs.apply(P4kTestCatalogues.bytes(root), false);

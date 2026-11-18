@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -75,4 +76,21 @@ interface MaterialExchangeItemReassignmentRepository
   @NotNull
   List<UUID> requests(
       @Param("retiredId") @NotNull UUID retiredId, @Param("survivorId") @NotNull UUID survivorId);
+
+  /**
+   * Lists which of the given items an item offer or request references.
+   *
+   * @param ids the items asked about
+   * @return the referenced ones
+   */
+  @Query(
+      value =
+          """
+          SELECT item_game_item_id FROM material_exchange_offer WHERE item_game_item_id IN (:ids)
+          UNION SELECT item_game_item_id FROM material_exchange_request
+           WHERE item_game_item_id IN (:ids)
+          """,
+      nativeQuery = true)
+  @NotNull
+  List<UUID> referenced(@Param("ids") @NotNull Collection<UUID> ids);
 }

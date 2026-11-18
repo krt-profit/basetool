@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -45,9 +46,10 @@ import org.springframework.stereotype.Component;
  * Reconciles the catalogue's {@code blueprints} with {@code blueprint} (REQ-P4K-027…029, ADR-0340):
  * match by P4K GUID, SC Wiki UUID and {@code scwiki_key}; the P4K leads the produced item and its
  * GUID, the category, the craft time, {@code defaultAvailable}, the dismantle time and efficiency,
- * the recipe of the first tier and the dismantle returns. With the run's seeding box ticked an
- * unmatched blueprint is created when its produced item exists or the run creates it; every other
- * unmatched blueprint is reported {@code UNMATCHED}.
+ * the recipe of the first tier and the dismantle returns; an output name an APPLY replaces stays a
+ * name of the product (REQ-P4K-079). With the run's seeding box ticked an unmatched blueprint is
+ * created when its produced item exists or the run creates it; every other unmatched blueprint is
+ * reported {@code UNMATCHED}.
  */
 @Component
 @RequiredArgsConstructor
@@ -56,6 +58,7 @@ public class P4kBlueprintReconciler {
   private final BlueprintRepository blueprintRepository;
   private final MaterialRepository materialRepository;
   private final P4kReviewCaseRepository reviewCaseRepository;
+  private final BlueprintNameNormalizer nameNormalizer;
 
   /**
    * The values the P4K leads on one blueprint.
@@ -97,10 +100,14 @@ public class P4kBlueprintReconciler {
    * reconciled first.
    *
    * @param catalogue the catalogue
+   * @param types the catalogue's resource types, which decide the commodity a resource joins
    * @param context the run
    * @return the recipe lines whose material or item the run resolved
    */
-  public int reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
+  public int reconcile(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kResourceTypes types,
+      @NotNull P4kImportContext context) {
     P4kRowIndex<Blueprint> stored =
         new P4kRowIndex<>(
             blueprintRepository.findAll(),
@@ -119,7 +126,10 @@ public class P4kBlueprintReconciler {
             _ -> false);
     P4kRecipeLinks links =
         new P4kRecipeLinks(
-            context, P4kCommodityJoin.of(catalogue), materialRepository, reviewCaseRepository);
+            context,
+            P4kCommodityJoin.of(catalogue, types),
+            materialRepository,
+            reviewCaseRepository);
     Map<UUID, P4kKeyedRow> items = context.stampedRows(P4kKind.ITEM);
     int resolved = 0;
     for (P4kBlueprintDto blueprint : catalogue.blueprints()) {
@@ -208,11 +218,15 @@ public class P4kBlueprintReconciler {
         values.producedItem(),
         row::setOutputItem,
         GameItem::getName);
+    String formerName = row.getOutputName();
     writer.lead(
         "output_name",
-        row.getOutputName(),
+        formerName,
         values.producedItem() == null ? null : values.producedItem().getName(),
         row::setOutputName);
+    if (context.isApply()) {
+      keepFormerName(row, formerName);
+    }
     writer.lead(
         "produced_item_guid",
         row.getProducedItemGuid(),
@@ -252,6 +266,25 @@ public class P4kBlueprintReconciler {
     changed |= writeRecipe(row, blueprint, values.recipe(), context);
     changed |= writeReturns(row, blueprint, values.returns(), context);
     return changed;
+  }
+
+  /**
+   * Keeps the output name an APPLY replaced as a name of the blueprint's product, so a member's key
+   * derived from it still resolves (REQ-P4K-079); a name that keys the same as the new one or as a
+   * kept one adds nothing.
+   *
+   * @param row the blueprint, holding its new output name
+   * @param formerName the output name before the APPLY, or {@code null}
+   */
+  private void keepFormerName(@NotNull Blueprint row, @Nullable String formerName) {
+    String key = nameNormalizer.normalize(formerName);
+    if (formerName == null
+        || key.isEmpty()
+        || key.equals(nameNormalizer.normalize(row.getOutputName()))
+        || row.getFormerNames().stream().map(nameNormalizer::normalize).anyMatch(key::equals)) {
+      return;
+    }
+    row.addFormerName(formerName.strip());
   }
 
   /**

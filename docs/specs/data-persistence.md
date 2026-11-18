@@ -243,6 +243,8 @@ Consequences that must hold:
   identity (this is what keeps the result ping-pong-free across runs). A row still unclaimed
   (`uex_company_id IS NULL`, a legacy hand-seeded / P4K-only row) is adopted as canonical by the
   first matching UEX company.
+- A company that no alias, name or code places joins the row holding a P4K GUID its name names,
+  and a row UEX created beside such a row is merged into it (REQ-DATA-045).
 - Any lookup of a manufacturer by abbreviation must be duplicate-tolerant (deterministic
   `findFirst … ORDER BY created_at`), never a bare `Optional` derived query that would throw
   `IncorrectResultSizeDataAccessException` once a P4K- or hand-seeded row shares a code.
@@ -1187,7 +1189,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 54 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_p4k_alias`, `manufacturer_scwiki_identity`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
+| `catalogue` | 57 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_former_name`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_p4k_alias`, `manufacturer_scwiki_identity`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `quality_tier`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_redirect`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `scope` | 1 | `member_active_org_unit` |
 | `admin` | 1 | `system_setting` |
@@ -1747,7 +1749,8 @@ locks without waiting while holding that fence; a busy lot rolls back and retrie
 times in fresh transactions. Exhaustion records a deferred failure and suppresses cleanup.
 Stock, order, allocation, ownership and location records retain their ids and quantities.
 Both original item rows and their complete price/statistic sets are archived before active
-duplicates are removed. A colliding price keeps the newer source timestamp; a colliding statistic
+duplicates are removed. A colliding price keeps the newer source timestamp (the merge of a second
+UEX listing keeps the game row's own, REQ-DATA-044); a colliding statistic
 keeps the Wiki survivor value, with both originals retained in the archive.
 Every changed user row keeps optimistic-lock and audit semantics. Duplicate minimum-stock
 settings of one unit retain the greater minimum and target; the notification is re-armed.
@@ -1930,3 +1933,111 @@ partial fetch did not list is still not written.
 - [x] A second listing of a shared name creates no row (`UexVehicleServiceUuidMatchTest`).
 
 **Code:** `UexVehicleService`, `UexVehicleListings` · **ADR:** ADR-0392
+
+### REQ-DATA-044 — an item UEX lists twice keeps one row
+
+UEX lists some items twice. One listing sits on the item's **game row**, a row holding a P4K GUID,
+or an external UUID on a row the SC Wiki or the P4K wrote; the other created a **twin**: a
+`UEX_ONLY` row holding a UEX item id but neither a P4K GUID nor an external UUID. Members saw both,
+and the SC Wiki item sync reported the pair as `MULTI_MATCH_AMBIGUOUS` every day. After every
+complete UEX item fetch (REQ-DATA-014) the UEX item sync merges each twin whose listing the fetch
+holds into the game row the first matching rule names, each only on a single candidate:
+
+1. **Game UUID** (`GAME_UUID`): the twin's listing carries a game UUID that exactly one row holds as
+   `p4k_uuid` or `external_uuid`, and that row is a game row carrying the listing's name as its
+   `name` or `uex_name` (compared by `UexIdentityCensus.nameKey`). A game UUID held by a row of
+   another name, by several rows or by no game row merges nothing, by no rule: UEX copies a UUID
+   onto the wrong listing.
+2. **Unique name** (`UNIQUE_NAME`): no row holds the listing's game UUID, or it carries none, and
+   exactly one visible game row (`GameItem#isSelectable`, REQ-P4K-057) carries its name.
+3. **`_GS` record** (`GS_RECORD`): two visible game rows carry its name, and one's class name is the
+   other's plus `_GS`; the twin goes into the `_GS` row, as ADR-0392 does for ships.
+
+The game row must hold a UEX item id of its own that the same fetch lists; a name rule also needs
+the twin's kind and manufacturer to agree with the game row's (`ItemIdentityCompatibility`). A
+referenced twin is merged too.
+
+The merge runs per pair in a transaction of its own, under the row locks of REQ-DATA-034, and
+reuses its steps: both rows are archived in `game_item_redirect`, every module moves its
+references through `GameItemReassignmentParticipant` and audits them in its own area, recipes,
+loadout ports, paints, shop rows and stats move, and the twin is deleted. The game row keeps its
+own UEX listing and, at a terminal both rows list, its own price; the twin's other prices move to
+it. The redirect keeps the twin's UEX item id (`game_item_redirect.uex_item_id`), so the merged id
+still resolves through `GameItemRepository#findById` and the twin is never created again. Each
+merge is reported as `SOURCE_RECORDS_MERGED` and audited as `CATALOGUE_ITEM_MERGED` with the merged
+id, the rule, the merged UEX item id and the number of moved references.
+
+A fetched listing no resolution step places whose id is such a merged id (`isMergedUexItemId`)
+writes nothing and creates no row; it is no rejected write, so it neither marks the census
+incomplete nor suppresses the orphan sweep (REQ-DATA-035). A merged listing whose game UUID finds
+the game row while the row's own listing left a complete fetch takes the row over.
+The UEX item-price sync resolves a merged listing to its game row: its price at a terminal the
+game row's own listing also lists in the fetch is dropped, its other prices are written there, and
+it counts as a known item for the stale-price sweep (REQ-DATA-005).
+
+**Acceptance**
+
+- [x] Each rule merges its twin into the game row and moves a reference; a game UUID on a row of
+  another name merges nothing (`UexItemTwinsTest`, `UexItemTwinMergeIntegrationTest`).
+- [x] The game row keeps its UEX listing and its price at a shared terminal and takes the twin's
+  other prices; the merge keeps the twin's UEX item id and is audited
+  (`ItemReconciliationServiceTest`, `UexItemTwinMergeIntegrationTest`).
+- [x] A name rule refuses a twin whose kind contradicts the game row, and no twin merges into a row
+  without a UEX listing of its own (`ItemReconciliationServiceTest`).
+- [x] A merged listing writes nothing, creates no row and leaves the sweep running; a complete fetch
+  hands its listings to the twin merge (`UexItemSyncServiceTest`).
+- [x] A merged listing's price yields to the game row's own at a terminal both list and keeps the
+  stale-price sweep running (`UexItemPriceSyncServiceTest`).
+
+**Enforced by:** `UexItemTwinsTest`, `UexItemTwinMergeIntegrationTest`,
+`ItemReconciliationServiceTest`, `UexItemSyncServiceTest`, `UexItemPriceSyncServiceTest` ·
+**Code:** `UexItemTwins`, `UexItemTwinMerger`, `ItemReconciliationService#mergeUexTwin`,
+`UexItemSyncService`, `UexItemPriceSyncService`, `V435__game_item_redirect_uex_item_id.sql` ·
+**ADR:** [ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
+
+### REQ-DATA-045 — a manufacturer UEX names differently merges into its P4K row
+
+UEX names some brands differently from the game files, so the UEX manufacturer sync created a
+second row beside the row holding the P4K GUID: "Musashi Industrial and Starflight Concern" beside
+"Musashi Industrial & Starflight Concern", "Vanduul Clans" beside "Vanduul", `Grey&apos;s Market`
+beside "Grey's Market". Items and ship types then split between the two rows (REQ-DATA-004 merges
+only companies of one UEX name or code).
+
+A row is a **UEX twin** of a row holding a P4K GUID when it holds a UEX company and no P4K GUID, no
+SC Wiki UUID, no Wiki identity and no reviewed P4K alias, and its folded name names exactly one row
+holding a P4K GUID: that row's folded name, or the folded Wiki name of one of that row's Wiki
+identities. Folding decodes HTML entities (`&apos;`, `&amp;`), reads `&` as "and", turns every run
+of characters that are neither letters nor digits into one blank and ignores case. A name that
+names two such rows names none.
+
+- After the upsert loop of a sync whose company fetch was complete and in which every company
+  carried its id and name, every twin is merged into the row it names, each in its own transaction
+  that reads the rule again first. The merge is the one an admin confirms for a review case
+  (REQ-P4K-016), without a case: items (both manufacturer roles), ship types, P4K aliases, UEX
+  companies and Wiki identities move to the row holding the P4K GUID, which takes the twin's UEX
+  company as its own when it holds none or a higher one; open review cases naming the twin follow
+  it; the twin is deleted. The twin's UEX company id stays mapped to the surviving row in
+  `manufacturer_uex_company`, so the next sync resolves the company to it. A merge that fails is
+  logged and tried again by the next sync.
+- A company that no alias, name or code places and whose name names a row holding a P4K GUID by
+  the same rule joins that row instead of creating a twin.
+- Each merge records `CATALOGUE_MANUFACTURER_MERGED` (REQ-AUDIT-001), actor `system`, subject the
+  surviving row, with the merged row's id, the evidence (`NAME` or `WIKI_NAME`), the UEX company id
+  and the number of moved items and ship types.
+
+**Acceptance**
+
+- [x] Over the production rows the rule finds exactly the twelve twins and no near miss ("Crusader
+  Security", "Garrity Arms", "Stegman's", "United Planets Of Earth" …); a row holding another
+  identity is no twin; a name two rows carry names none (`ManufacturerUexTwinsTest`).
+- [x] A twin merges with its item, ship-type and UEX references and is audited, and a second sync
+  creates no row; a new company naming a P4K row joins it (`ManufacturerUexTwinSyncIntegrationTest`).
+- [x] A partial fetch or a company without id merges nothing; a company placed by name never asks
+  the rule (`UexManufacturerServiceTest`).
+- [x] An admin's review-case merge still moves the references and leaves the applied case alone
+  (`P4kManufacturerPrecedenceTest`).
+
+**Enforced by:** `ManufacturerUexTwinsTest`, `ManufacturerUexTwinSyncIntegrationTest`,
+`UexManufacturerServiceTest` · **Code:** `ManufacturerUexTwins`, `ManufacturerUexTwinService`,
+`ManufacturerReviewMerge`, `UexManufacturerService` · **ADR:**
+[ADR-0394](../adr/0394-the-p4k-import-resolves-manufacturer-families-and-borrowed-names-itself.md)

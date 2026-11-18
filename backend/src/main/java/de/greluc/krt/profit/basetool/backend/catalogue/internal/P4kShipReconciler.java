@@ -91,6 +91,7 @@ public class P4kShipReconciler {
       @NotNull P4kCatalogue catalogue,
       @NotNull P4kLoadoutReconciler.LoadoutStream loadouts,
       @NotNull P4kImportContext context) {
+    context.indexShipBrands(P4kShipBrands.of(catalogue.manufacturers(), context));
     List<ShipType> found = shipTypeRepository.findAll();
     Set<UUID> retired = seededRetirement.retire(found, catalogue.ships(), context);
     List<P4kShipTwins.Twin> twinRows =
@@ -313,7 +314,7 @@ public class P4kShipReconciler {
       row.setName(name.strip());
       row.setNameDe(P4kFields.germanName(ship.name()));
       row.setClassName(StringNormalization.blankToNull(ship.className()));
-      row.setManufacturer(context.manufacturer(ship.manufacturerGuid()));
+      row.setManufacturer(context.shipManufacturer(ship));
       row.setDescriptionEn(
           StringNormalization.blankToNull(P4kLocalisedText.enOf(ship.description())));
       row.setDescriptionDe(

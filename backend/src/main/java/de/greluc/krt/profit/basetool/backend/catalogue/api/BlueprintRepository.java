@@ -230,6 +230,21 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   List<BlueprintProductRow> findActiveProductRows(@Param("q") String q);
 
   /**
+   * Projects the output names a P4K APPLY replaced on the recipes {@link
+   * #findActiveProductRows(String)} reads, each beside the recipe's current product identity
+   * (REQ-P4K-079).
+   *
+   * @return one row per former name of an active recipe
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintFormerNameRow(b.producedItemGuid, b.outputName, f)
+      FROM Blueprint b JOIN b.formerNames f
+      WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
+      """)
+  List<BlueprintFormerNameRow> findActiveFormerNameRows();
+
+  /**
    * Projects the recipes a new reference may name as {@link #findActiveProductRows(String)} does,
    * without a recipe the P4K sweep stamped or an admin hid (REQ-P4K-013).
    *

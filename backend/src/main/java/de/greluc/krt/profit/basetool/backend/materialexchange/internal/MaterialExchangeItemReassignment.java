@@ -22,10 +22,13 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReassignmentParticipant;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceParticipant;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -34,16 +37,24 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Preserves the Materialbörse's catalogue references and their audit trail when catalogue items
- * converge: an item offer or request named by a retired catalogue row moves to the survivor.
+ * Reports the Materialbörse's catalogue item references (REQ-P4K-056) and preserves them with their
+ * audit trail when catalogue items converge: an item offer or request named by a retired catalogue
+ * row moves to the survivor.
  */
 @Component
 @RequiredArgsConstructor
-public class MaterialExchangeItemReassignment implements GameItemReassignmentParticipant {
+public class MaterialExchangeItemReassignment
+    implements GameItemReassignmentParticipant, GameItemReferenceParticipant {
 
   private final MaterialExchangeItemReassignmentRepository repository;
   private final AuditRecorder auditRecorder;
   private final LiveSyncPublisher liveSyncPublisher;
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull Set<UUID> referencedGameItems(@NotNull Collection<UUID> gameItemIds) {
+    return gameItemIds.isEmpty() ? Set.of() : Set.copyOf(repository.referenced(gameItemIds));
+  }
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)

@@ -105,6 +105,7 @@ public class CatalogueMentionSource implements PersonMentionSource {
     return Set.of(
         "blueprint",
         "blueprint_category",
+        "blueprint_former_name",
         "city",
         "faction",
         "game_item",

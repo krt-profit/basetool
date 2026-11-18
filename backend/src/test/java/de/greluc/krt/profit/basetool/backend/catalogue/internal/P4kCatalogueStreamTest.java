@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -64,6 +65,27 @@ class P4kCatalogueStreamTest {
     assertThat(fromPlain.ships()).hasSize(4);
     assertThat(fromGzip).isEqualTo(fromPlain);
     assertThat(fromZstd).isEqualTo(fromPlain);
+  }
+
+  @Test
+  void theResourceTypes_areReadWithTheGroupsThatListThem_andAreEmptyWhenTheFileLacksThem()
+      throws IOException {
+    UUID type = UUID.fromString("8950d9c5-8a54-4e2c-87a2-c56c1b9edd3c");
+    UUID group = UUID.fromString("c1a21fd1-16e0-465f-9f51-f5f931de0dea");
+    ObjectNode root = P4kTestCatalogues.tree();
+    P4kCommodityFixtures.resourceType(root, type, "Slam", "SLAM", group);
+
+    P4kCatalogue catalogue = read(P4kTestCatalogues.bytes(root), Long.MAX_VALUE);
+
+    assertThat(catalogue.resourceTypes())
+        .singleElement()
+        .satisfies(parsed -> {
+          assertThat(parsed.parsedGuid()).isEqualTo(type);
+          assertThat(parsed.className()).isEqualTo("Slam");
+          assertThat(parsed.nameEn()).isEqualTo("SLAM");
+          assertThat(parsed.groupGuids()).containsExactly(group.toString());
+        });
+    assertThat(read(P4kTestCatalogues.fixtureBytes(), Long.MAX_VALUE).resourceTypes()).isEmpty();
   }
 
   @Test

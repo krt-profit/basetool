@@ -213,14 +213,6 @@ public class ScWikiManufacturerSyncService {
           "name",
           manufacturer.getName(),
           dto.name());
-      syncReportService.logP4kDisagreement(
-          SyncSourceSystem.SCWIKI,
-          runId,
-          "manufacturer",
-          p4kUuid,
-          "abbreviation",
-          manufacturer.getAbbreviation(),
-          dto.code());
     }
     manufacturer.setScwikiUuid(dto.uuid());
     if (StringUtils.hasText(dto.code())) {

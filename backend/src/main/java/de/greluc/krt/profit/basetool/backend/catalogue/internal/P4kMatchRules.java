@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A kind's rules for a stored row that a class-name or name step of {@link P4kRowMatcher} found for
- * a record of another GUID; the defaults cover no record and consider every row.
+ * a record of another GUID, and the key the SC Wiki holds for a record; the defaults cover no
+ * record, consider every row and take the record's GUID as its Wiki key.
  *
  * @param <T> the row type
  */
@@ -63,5 +66,41 @@ public interface P4kMatchRules<T> {
    */
   default boolean isCandidate(@NotNull UUID guid, @NotNull T row) {
     return true;
+  }
+
+  /**
+   * Returns the UUID the SC Wiki keys the record of a GUID by; the Wiki step of the match looks it
+   * up, and a row holding it reports no {@code IDENTITY_MISMATCH} (REQ-P4K-070).
+   *
+   * @param guid the record's GUID
+   * @return the Wiki key, the GUID itself unless the kind keys its records otherwise
+   */
+  @NotNull
+  default UUID wikiKey(@NotNull UUID guid) {
+    return guid;
+  }
+
+  /**
+   * Returns the GUID of another record that a row's own facts name in place of the GUID it holds;
+   * the row then takes that GUID, and the GUID it holds no longer finds it (REQ-P4K-055).
+   *
+   * @param row a stored row
+   * @return the GUID the row follows, or {@code null} when it keeps the one it holds
+   */
+  @Nullable
+  default UUID followedGuid(@NotNull T row) {
+    return null;
+  }
+
+  /**
+   * Finds a row that follows a GUID it does not hold and that no other step of the match would find
+   * for that GUID (REQ-P4K-058).
+   *
+   * @param guid the record's GUID
+   * @return the following row, empty when there is none
+   */
+  @NotNull
+  default Optional<T> follower(@NotNull UUID guid) {
+    return Optional.empty();
   }
 }

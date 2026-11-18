@@ -591,6 +591,11 @@ The coverage list holds the **Katalog** area
     id, recorded in the transaction that stores the run's outcome, with `source`, `aggregate`,
     `status`, the committed counts (`fetched`, `applied`, `skipped`, `failed`) and `sweep`; the
     detail stays in `external_sync_report`;
+  - `CATALOGUE_MANUFACTURER_MERGED`, one event per manufacturer row only UEX created that the UEX
+    sync merges into the row of its brand holding the P4K GUID (REQ-DATA-045), actor `system`,
+    subject the surviving row, labelled by its name, recorded in the merge's transaction with
+    `retiredManufacturer`, `rule` (`NAME` or `WIKI_NAME`), `uexCompanyId`, `items` and
+    `shipTypes`, the moved references;
   - every catalogue master-data mutation: materials and material external aliases
     (`CATALOGUE_MATERIAL_*`, `CATALOGUE_MATERIAL_ALIAS_*`: created, updated, deleted; the material
     categories are the P4K resource groups, written only by the P4K APPLY of
@@ -598,7 +603,13 @@ The coverage list holds the **Katalog** area
     entries of the retired admin editor); the P4K overrides of a material's resource group and
     refined material (`CATALOGUE_MATERIAL_P4K_OVERRIDE_SET` with `field` and `valueId` when an
     edit makes one, `CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED` with `field` when the admin hands it
-    back, REQ-P4K-024/025); manufacturer, ship-type and terminal visibility
+    back, REQ-P4K-024/025); a P4K APPLY's hide of a UEX commodity no game source knows, and its
+    lift (`CATALOGUE_MATERIAL_SOURCELESS_VISIBILITY_CHANGED`, subject the material, `hidden=`,
+    `run=`, REQ-P4K-075); a P4K APPLY's retirement of a leftover material no member uses, hidden
+    or deleted once its twin took its identity (`CATALOGUE_MATERIAL_LEFTOVER_RETIRED`, subject the
+    retired material, `rule=SEEDED_NOT_CREATABLE|MANUAL_TWIN|WIKI_TWIN`, `deleted=`, `twin=` the
+    material that took its identity when there is one, `run=`, REQ-P4K-076…078); manufacturer,
+    ship-type and terminal visibility
     (`*_VISIBILITY_CHANGED`, `hidden=`); the admin choice of a manufacturer's primary SC Wiki entry
     among its Wiki duplicates (`CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED` with `from=` and `to=`
     the Wiki UUIDs, ADR-0361); locations (`CATALOGUE_LOCATION_*`); the loading-dock
@@ -640,6 +651,8 @@ counts them (REQ-OBS-011).
   (`AdminAuditLogPageControllerTest`).
 - [x] Each finished UEX or SC Wiki sync run records one `CATALOGUE_SYNC_RUN_FINISHED` summary with
   its committed outcome (`SyncRunServiceTest`).
+- [x] Each merged UEX manufacturer twin records one `CATALOGUE_MANUFACTURER_MERGED` event with the
+  moved references (`ManufacturerUexTwinSyncIntegrationTest`).
 - [x] The starmap links, the visibility overrides and the storage places on a starmap object record
   their events (`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`).
 - [ ] The shop link records its event (planned above).
@@ -1036,6 +1049,11 @@ ship and `MISSION_CATALOGUE_REASSIGNED` per mission unit or mission template, wi
 surviving ship-type ids and a fixed subject token; the catalogue records the merge itself as
 `CATALOGUE_SHIP_TYPE_MERGED`, with the retired id, the evidence token and the number of moved
 references.
+
+The merge of an item UEX lists twice (REQ-DATA-044) moves the twin's references through the same
+owner-domain events and records the merge itself as `CATALOGUE_ITEM_MERGED`, actor `system`,
+subject the surviving item, with `retiredItem`, the rule token (`GAME_UUID`, `UNIQUE_NAME`,
+`GS_RECORD`), the merged `uexItemId` and the number of moved `references`.
 
 The hierarchy foundation records every automatic ending of an ineligible legacy material promise
 as `JOB_ORDER_CLAIM_WITHDRAWN` with safe claim/unit identities and bounded reason `UNIT_INELIGIBLE`.

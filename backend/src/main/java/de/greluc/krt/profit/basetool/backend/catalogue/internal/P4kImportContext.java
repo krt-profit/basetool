@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipDto;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -104,6 +105,9 @@ public final class P4kImportContext {
 
   /** The ship-type rows, indexed once when the ships are reconciled. */
   @Nullable private P4kRowIndex<ShipType> shipRows;
+
+  /** The brands a ship's name can begin with, collected once the manufacturers are matched. */
+  @Nullable private P4kShipBrands shipBrands;
 
   /** The material rows, indexed once when the commodities are reconciled. */
   @Nullable private P4kRowIndex<Material> commodityRows;
@@ -432,6 +436,28 @@ public final class P4kImportContext {
   public Manufacturer manufacturer(@Nullable String guid) {
     UUID parsed = P4kGuids.parse(guid);
     return parsed == null ? null : manufacturerByGuid.get(parsed);
+  }
+
+  /**
+   * Keeps the brands a ship's name can begin with; the ships are reconciled after it.
+   *
+   * @param brands the brands of this run's matched manufacturers
+   */
+  void indexShipBrands(@NotNull P4kShipBrands brands) {
+    shipBrands = brands;
+  }
+
+  /**
+   * Returns a ship's manufacturer: the brand its English name begins with, else the one its
+   * manufacturer GUID resolves to (REQ-P4K-059).
+   *
+   * @param ship the ship record
+   * @return the manufacturer, or {@code null} when neither resolves
+   */
+  @Nullable
+  public Manufacturer shipManufacturer(@NotNull P4kShipDto ship) {
+    Manufacturer named = shipBrands == null ? null : shipBrands.named(ship.nameEn());
+    return named != null ? named : manufacturer(ship.manufacturerGuid());
   }
 
   /** Keeps the GUIDs whose source records represent paint logos or shops. */

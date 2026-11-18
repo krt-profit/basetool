@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemPriceDto;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,9 +45,11 @@ import org.springframework.transaction.annotation.Transactional;
  * per (item, terminal) pair (REQ-DATA-005).
  *
  * <p>Items and terminals resolve through id maps read once per run; unknown ones are skipped, not
- * created. Rows are written through {@link SyncChunkWriter} after a transaction-free fetch, and
- * pairs UEX no longer returns are cleared via {@link GameItemPriceRepository#clearPricesByIds}
- * unless nothing was written. Disabled unless {@code krt.uex.item-price-sync-enabled} is set.
+ * created. A merged second UEX listing resolves to the item it was merged into, where its price
+ * yields to the item's own listing at a terminal both list (REQ-DATA-044). Rows are written through
+ * {@link SyncChunkWriter} after a transaction-free fetch, and pairs UEX no longer returns are
+ * cleared via {@link GameItemPriceRepository#clearPricesByIds} unless nothing was written. Disabled
+ * unless {@code krt.uex.item-price-sync-enabled} is set.
  */
 @Slf4j
 @Service
@@ -61,6 +65,9 @@ public class UexItemPriceSyncService {
 
   /** Writes the matrix in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
+
+  /** Resolves the merged second UEX listings to the items they were merged into (REQ-DATA-044). */
+  private final GameItemRedirectRepository redirects;
 
   /**
    * Runs the full item-price matrix sync. No-op (with an INFO line) when the feature flag is off;
@@ -86,22 +93,19 @@ public class UexItemPriceSyncService {
     }
 
     Instant now = Instant.now();
-    UexMatrixLookups lookups =
-        chunkWriter.inNewTransaction(() ->
-            new UexMatrixLookups(
-                gameItemRepository.findUexItemRefs(),
-                terminalRepository.findUexTerminalRefs(),
-                gameItemPriceRepository.findPriceKeyRefs()));
+    PriceLookups loaded = chunkWriter.inNewTransaction(this::loadLookups);
+    UexMatrixLookups lookups = loaded.lookups();
+    List<UexItemPriceDto> rows = withoutListedTwinPrices(dtos, lookups, loaded.mergedListings());
     SyncChunkWriter.Outcome<UUID> outcome =
         chunkWriter.write(
-            dtos,
+            rows,
             SyncChunkWriter.DEFAULT_CHUNK_SIZE,
             chunk -> writeChunk(chunk, lookups, now),
             "item price",
             dto -> "(idItem=" + dto.idItem() + ", idTerminal=" + dto.idTerminal() + ")");
     Set<UUID> seenPriceIds = new HashSet<>(outcome.results());
     int processed = seenPriceIds.size();
-    int skipped = dtos.size() - outcome.results().size() - outcome.failedRows();
+    int skipped = rows.size() - outcome.results().size() - outcome.failedRows();
 
     boolean cleanupAllowed =
         fetched.complete()
@@ -131,11 +135,94 @@ public class UexItemPriceSyncService {
     }
     log.info(
         "Finished UEX item-price sync: {} processed, {} skipped (unknown item / terminal), {}"
-            + " failed.",
+            + " failed, {} merged-listing price(s) left to the item's own listing.",
         processed,
         skipped,
-        outcome.failedRows());
+        outcome.failedRows(),
+        dtos.size() - rows.size());
   }
+
+  /**
+   * Reads the run's id maps in the caller's transaction; a merged second UEX listing no row holds
+   * resolves to the item it was merged into (REQ-DATA-044).
+   *
+   * @return the id maps and the merged listings they resolve
+   */
+  @NotNull
+  private PriceLookups loadLookups() {
+    List<UexKeyRef> itemRefs = new ArrayList<>(gameItemRepository.findUexItemRefs());
+    Set<Integer> held = new HashSet<>();
+    itemRefs.forEach(ref -> held.add(ref.getUexId()));
+    Set<Integer> mergedListings = new HashSet<>();
+    for (UexKeyRef merged : redirects.findMergedUexItemRefs()) {
+      if (held.add(merged.getUexId())) {
+        mergedListings.add(merged.getUexId());
+        itemRefs.add(merged);
+      }
+    }
+    return new PriceLookups(
+        new UexMatrixLookups(
+            itemRefs,
+            terminalRepository.findUexTerminalRefs(),
+            gameItemPriceRepository.findPriceKeyRefs()),
+        Set.copyOf(mergedListings));
+  }
+
+  /**
+   * Drops the prices of a merged second listing at a terminal where the listing the item holds has
+   * a price of its own in the same fetch, so the item's own price wins (REQ-DATA-044).
+   *
+   * @param dtos the fetched prices
+   * @param lookups the run's id maps, which resolve a merged listing to its item
+   * @param mergedListings the UEX item ids of merged second listings no row holds
+   * @return the prices to write
+   */
+  @NotNull
+  static List<UexItemPriceDto> withoutListedTwinPrices(
+      @NotNull List<UexItemPriceDto> dtos,
+      @NotNull UexMatrixLookups lookups,
+      @NotNull Set<Integer> mergedListings) {
+    if (mergedListings.isEmpty()) {
+      return dtos;
+    }
+    Set<UexMatrixLookups.Pair> listed = new HashSet<>();
+    for (UexItemPriceDto dto : dtos) {
+      UexMatrixLookups.Pair pair = pair(dto, lookups);
+      if (pair != null && !mergedListings.contains(dto.idItem())) {
+        listed.add(pair);
+      }
+    }
+    return dtos.stream()
+        .filter(
+            dto -> !mergedListings.contains(dto.idItem()) || !listed.contains(pair(dto, lookups)))
+        .toList();
+  }
+
+  /**
+   * Resolves a fetched price to its (item, terminal) pair.
+   *
+   * @param dto the fetched price
+   * @param lookups the run's id maps
+   * @return the pair, or {@code null} when the item or the terminal is unknown
+   */
+  @Nullable
+  private static UexMatrixLookups.Pair pair(
+      @NotNull UexItemPriceDto dto, @NotNull UexMatrixLookups lookups) {
+    UUID itemId = lookups.parentId(dto.idItem());
+    UUID terminalId = lookups.terminalId(dto.idTerminal());
+    return itemId == null || terminalId == null
+        ? null
+        : new UexMatrixLookups.Pair(itemId, terminalId);
+  }
+
+  /**
+   * The id maps of one item-price run.
+   *
+   * @param lookups the item, terminal and price-row ids
+   * @param mergedListings the UEX item ids of merged second listings the item ids resolve
+   */
+  private record PriceLookups(
+      @NotNull UexMatrixLookups lookups, @NotNull Set<Integer> mergedListings) {}
 
   /**
    * Writes one chunk of item-price rows inside its transaction: the chunk's existing rows are

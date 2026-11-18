@@ -557,8 +557,16 @@ identity Prometheus sends (ADR-0265, REQ-OBS-005). Rules, dashboards and probes:
 `catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply,
 purchasing and the Materialbörse update only their own references and emit their own audit/live
 events. The catalogue archives both original item/price/stat sets in `game_item_redirect` before
-retiring the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical
-ids have a separate reference seam for bulk reads.
+retiring the duplicate. `UexItemTwins` and `UexItemTwinMerger` hand it the rows a second UEX
+listing of an item created, and the redirect keeps that listing's UEX item id (REQ-DATA-044).
+Repository identity lookups resolve retained ids, while preloaded canonical ids have a separate
+reference seam for bulk reads. The same six modules answer
+`catalogue.api.GameItemReferenceParticipant`, so the P4K import hides a seeded item only when no
+member row references it (REQ-P4K-056). Inventory, job orders, supply, purchasing, the
+Materialbörse and the refinery answer `catalogue.api.MaterialReferenceParticipant`, and the
+catalogue reads its own references beside them, so the P4K import hides a UEX commodity no game
+source knows only when nothing references it (REQ-P4K-075) and retires a leftover seeded, admin or
+Wiki-only twin only when no member uses it (REQ-P4K-076…078).
 
 `ScWikiRequestExecutor` owns pacing/retry transport, `ScWikiClient` owns the scoped game build,
 and `SyncChunkWriter` owns isolated application transactions. `SyncRunService` persists attempt

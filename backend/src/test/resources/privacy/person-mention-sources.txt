@@ -316,6 +316,7 @@ exempt-name-holder|p4k_import_job.result_json
 exempt-name-holder|p4k_import_job.source_filename
 exempt-table|blueprint
 exempt-table|blueprint_category
+exempt-table|blueprint_former_name
 exempt-table|city
 exempt-table|faction
 exempt-table|flyway_schema_history

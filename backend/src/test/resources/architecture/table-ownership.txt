@@ -17,6 +17,7 @@ blueprint catalogue
 blueprint_category catalogue
 blueprint_dismantle_return catalogue
 blueprint_external_alias blueprint
+blueprint_former_name catalogue
 blueprint_ingredient catalogue
 blueprint_modifier_segment catalogue
 blueprint_requirement_group catalogue

@@ -21,12 +21,16 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
@@ -39,6 +43,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -52,6 +57,7 @@ class ItemReconciliationServiceTest {
   @Mock private GameItemStatRepository stats;
   @Mock private SyncReportService reports;
   @Mock private P4kMergeConflictRecorder p4kConflicts;
+  @Mock private AuditRecorder auditRecorder;
 
   @Test
   void differentP4kGuidsAreNeverMergedButGoToTheP4kReview() {
@@ -210,9 +216,101 @@ class ItemReconciliationServiceTest {
         .allSatisfy(price -> assertThat(price.getGameItem()).isSameAs(canonical));
   }
 
+  @Test
+  void aUexTwinKeepsTheTargetsListingAndPriceAndLeavesItsUexIdOnTheRedirect() {
+    GameItem twin = item(GameItemSourceSystem.UEX_ONLY);
+    twin.setUexItemId(92);
+    GameItem target = item(GameItemSourceSystem.BOTH);
+    target.setExternalUuid(UUID.randomUUID());
+    target.setUexItemId(91);
+    when(items.lockReconciliationRows(any())).thenReturn(List.of(twin, target));
+    when(redirects.snapshot(twin.getId(), target.getId())).thenReturn("{}");
+    when(recipes.blueprints(twin.getId(), target.getId())).thenReturn(2);
+    Terminal shared = new Terminal();
+    shared.setId(UUID.randomUUID());
+    Terminal twinOnly = new Terminal();
+    twinOnly.setId(UUID.randomUUID());
+    GameItemPrice own = price(target, shared, 10, 1);
+    GameItemPrice newer = price(twin, shared, 99, 9);
+    GameItemPrice moved = price(twin, twinOnly, 30, 3);
+    when(prices.findByGameItemId(target.getId())).thenReturn(List.of(own));
+    when(prices.findByGameItemId(twin.getId())).thenReturn(List.of(newer, moved));
+    UUID runId = UUID.randomUUID();
+
+    assertThat(
+            service().mergeUexTwin(twin.getId(), target.getId(), UexItemTwinRule.GAME_UUID, runId))
+        .isTrue();
+
+    assertThat(own.getPriceBuy()).isEqualTo(10d);
+    verify(prices).delete(newer);
+    assertThat(moved.getGameItem()).isSameAs(target);
+    assertThat(target.getUexItemId()).isEqualTo(91);
+    ArgumentCaptor<GameItemRedirect> redirect = ArgumentCaptor.forClass(GameItemRedirect.class);
+    verify(redirects).saveAndFlush(redirect.capture());
+    assertThat(redirect.getValue().getId()).isEqualTo(twin.getId());
+    assertThat(redirect.getValue().getUexItemId()).isEqualTo(92);
+    verify(items).delete(twin);
+    verify(reports)
+        .logUexEvent(
+            eq(runId),
+            eq(SyncEventType.SOURCE_RECORDS_MERGED),
+            eq("game_item"),
+            eq(target.getExternalUuid()),
+            eq("Same Item"),
+            contains("rule=GAME_UUID"));
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditRecorder)
+        .record(
+            eq(AuditEventType.CATALOGUE_ITEM_MERGED),
+            eq(target.getId()),
+            eq("Same Item"),
+            isNull(),
+            details.capture());
+    assertThat(details.getValue().toString())
+        .contains("retiredItem=" + twin.getId(), "uexItemId=92", "references=2");
+  }
+
+  @Test
+  void aNameRuleTwinWhoseKindContradictsTheTargetIsNotMerged() {
+    GameItem twin = item(GameItemSourceSystem.UEX_ONLY);
+    twin.setUexItemId(92);
+    twin.setKind(GameItemKind.ARMOR);
+    GameItem target = item(GameItemSourceSystem.P4K);
+    target.setP4kUuid(UUID.randomUUID());
+    target.setUexItemId(91);
+    target.setKind(GameItemKind.WEAPON);
+    when(items.lockReconciliationRows(any())).thenReturn(List.of(twin, target));
+
+    assertThat(
+            service()
+                .mergeUexTwin(
+                    twin.getId(), target.getId(), UexItemTwinRule.UNIQUE_NAME, UUID.randomUUID()))
+        .isFalse();
+
+    verify(items, never()).delete(any());
+    verifyNoInteractions(redirects, prices, stats, recipes, auditRecorder);
+  }
+
+  @Test
+  void aTwinIsNotMergedIntoARowWithoutAUexListingOfItsOwn() {
+    GameItem twin = item(GameItemSourceSystem.UEX_ONLY);
+    twin.setUexItemId(92);
+    GameItem target = item(GameItemSourceSystem.WIKI_ONLY);
+    target.setExternalUuid(UUID.randomUUID());
+    when(items.lockReconciliationRows(any())).thenReturn(List.of(twin, target));
+
+    assertThat(
+            service()
+                .mergeUexTwin(
+                    twin.getId(), target.getId(), UexItemTwinRule.GAME_UUID, UUID.randomUUID()))
+        .isFalse();
+
+    verifyNoInteractions(redirects, auditRecorder);
+  }
+
   private ItemReconciliationService service() {
     return new ItemReconciliationService(
-        items, redirects, recipes, prices, stats, List.of(), reports, p4kConflicts);
+        items, redirects, recipes, prices, stats, List.of(), reports, p4kConflicts, auditRecorder);
   }
 
   private static ItemReconciliationService.WikiIdentity sameItem() {

@@ -26,9 +26,9 @@ import org.jetbrains.annotations.Unmodifiable;
 /**
  * The parts of a version-2 catalogue the import holds in memory: the head, the five base kinds, the
  * starmap objects, the shops, the curated ship store slugs, the paints, the resource groups, the
- * blueprint categories and the crafting records the blueprints refer to. The loadouts are streamed
- * in a pass of their own ({@link P4kCatalogueReader#readLoadouts}); every other kind of the file is
- * skipped while reading.
+ * resource types, the blueprint categories and the crafting records the blueprints refer to. The
+ * loadouts are streamed in a pass of their own ({@link P4kCatalogueReader#readLoadouts}); every
+ * other kind of the file is skipped while reading.
  *
  * @param head the head
  * @param manufacturers the manufacturers, empty when the file has none
@@ -41,6 +41,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param shipStoreSlugs the curated ship store slugs, empty when the file has none
  * @param paints the paints, empty when the file has none
  * @param resourceGroups the resource groups, empty when the file has none
+ * @param resourceTypes the resource types, empty when the file has none
  * @param blueprintCategories the blueprint categories, empty when the file has none
  * @param crafting the gameplay properties, dismantle processes and crafting globals
  */
@@ -56,11 +57,15 @@ public record P4kCatalogue(
     @NotNull @Unmodifiable List<P4kShipStoreSlug> shipStoreSlugs,
     @NotNull @Unmodifiable List<P4kPaintDto> paints,
     @NotNull @Unmodifiable List<P4kResourceGroupDto> resourceGroups,
+    @NotNull @Unmodifiable List<P4kResourceTypeDto> resourceTypes,
     @NotNull @Unmodifiable List<P4kBlueprintCategoryDto> blueprintCategories,
     @NotNull P4kCraftingReferences crafting) {
 
   /** The top-level field holding the paints, also its completeness key. */
   public static final String PAINTS = "paints";
+
+  /** The top-level field holding the resource types, also its completeness key. */
+  public static final String RESOURCE_TYPES = "resourceTypes";
 
   /** The top-level field holding the loadouts, also its completeness key. */
   public static final String LOADOUTS = "loadouts";
@@ -79,6 +84,7 @@ public record P4kCatalogue(
    * @param shipStoreSlugs the ship store slugs
    * @param paints the paints
    * @param resourceGroups the resource groups
+   * @param resourceTypes the resource types
    * @param blueprintCategories the blueprint categories
    * @param crafting the crafting records
    */
@@ -93,6 +99,7 @@ public record P4kCatalogue(
     shipStoreSlugs = List.copyOf(shipStoreSlugs);
     paints = List.copyOf(paints);
     resourceGroups = List.copyOf(resourceGroups);
+    resourceTypes = List.copyOf(resourceTypes);
     blueprintCategories = List.copyOf(blueprintCategories);
   }
 
