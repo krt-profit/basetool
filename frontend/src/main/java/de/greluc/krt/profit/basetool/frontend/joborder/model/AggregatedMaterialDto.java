@@ -34,8 +34,8 @@ import java.util.List;
  * @param totalQuantity the summed required quantity for this material+quality
  * @param currentStock the stock linked to the order for this material at or above the bucket's
  *     quality floor
- * @param claims the per-squadron claims on this bucket (empty for non-SK orders)
- * @param openAmount {@code totalQuantity − Σ claims}; {@code null} for non-SK orders
+ * @param claims the per-squadron claims on this bucket; empty when no squadron has claimed
+ * @param openAmount the uncovered outstanding demand less the claims, floored at 0
  */
 @DtoMirror
 public record AggregatedMaterialDto(

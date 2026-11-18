@@ -26,7 +26,7 @@ import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code ClaimDto}: one squadron's material claim ("Eintragung") on
- * a public SK order.
+ * a job order.
  *
  * @param id claim primary key
  * @param claimingOrgUnit the squadron that signed up (slim reference)

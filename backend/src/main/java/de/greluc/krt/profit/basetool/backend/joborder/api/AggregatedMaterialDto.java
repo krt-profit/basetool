@@ -36,8 +36,9 @@ import org.jetbrains.annotations.Nullable;
  *     (REQ-ORDERS-025); {@code 0} once all lines are done
  * @param currentStock linked stock attributed to this bucket (REQ-ORDERS-037); {@code null} only
  *     before the projection enriches the row
- * @param claims per-squadron claims; populated only for public SK orders
- * @param openAmount {@code totalQuantity} minus the claims; {@code null} for non-SK orders
+ * @param claims per-squadron claims on this bucket; empty when no squadron has claimed
+ * @param openAmount the uncovered outstanding demand less the claims, floored at 0; {@code null}
+ *     only before the projection enriches the row
  */
 public record AggregatedMaterialDto(
     MaterialDto material,

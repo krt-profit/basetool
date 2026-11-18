@@ -248,7 +248,7 @@ public enum AuditEventType {
   JOB_ORDER_ITEM_HANDOVER_CREATED(AuditDomain.JOB_ORDER),
   /** A production booking was recorded against an item order (units manufactured). */
   JOB_ORDER_PRODUCTION_BOOKED(AuditDomain.JOB_ORDER),
-  /** A squadron claim on a public SK order was created or updated (upsert). */
+  /** A squadron claim on a job order was created or updated (upsert). */
   JOB_ORDER_CLAIM_UPSERTED(AuditDomain.JOB_ORDER),
   /** A squadron claim was withdrawn. */
   JOB_ORDER_CLAIM_WITHDRAWN(AuditDomain.JOB_ORDER),

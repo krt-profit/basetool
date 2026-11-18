@@ -24,15 +24,16 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
 import java.util.List;
 
 /**
- * Claim view of one aggregated material bucket on a public SK order: the required amount, the
- * amount claimed across squadrons, the open remainder and the individual claims.
+ * Claim view of one aggregated material bucket of a job order: the required amount, the amount
+ * claimed across squadrons, the open remainder and the individual claims.
  *
  * @param material the bucket's material (with {@code quantityType} for unit-aware formatting)
  * @param qualityRequirement the code of the bucket's quality tier
  * @param qualityTier the bucket's quality tier
  * @param requiredAmount total amount the order needs for this bucket
  * @param claimedAmount total already claimed across all squadrons
- * @param openRemaining {@code requiredAmount − claimedAmount}, floored at 0
+ * @param openRemaining the uncovered outstanding demand (requirement less linked stock) less {@code
+ *     claimedAmount}, floored at 0
  * @param claims the individual per-squadron claims on this bucket
  */
 public record ClaimBucketDto(

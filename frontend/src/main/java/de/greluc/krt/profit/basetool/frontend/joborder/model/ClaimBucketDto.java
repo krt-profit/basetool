@@ -26,14 +26,15 @@ import java.util.List;
 
 /**
  * Frontend mirror of the backend {@code ClaimBucketDto}: required, claimed and open amounts plus
- * the individual claims of one material bucket on a public SK order.
+ * the individual claims of one material bucket of a job order.
  *
  * @param material the bucket's material (carries {@code quantityType} for unit-aware display)
  * @param qualityRequirement the code of the bucket's quality tier
  * @param qualityTier the bucket's quality tier, with its labels and floor
  * @param requiredAmount total amount the order needs for this bucket
  * @param claimedAmount total already claimed across all squadrons
- * @param openRemaining {@code requiredAmount − claimedAmount}, floored at 0
+ * @param openRemaining the uncovered outstanding demand (requirement less linked stock) less {@code
+ *     claimedAmount}, floored at 0
  * @param claims the individual per-squadron claims on this bucket
  */
 @DtoMirror

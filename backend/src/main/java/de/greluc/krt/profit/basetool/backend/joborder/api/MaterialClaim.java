@@ -52,7 +52,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * A squadron's claim ("Eintragung") for part of one material bucket {@code (jobOrder, material,
- * qualityTier)} on a public Spezialkommando job order.
+ * qualityTier)} on a job order.
  *
  * <p>One claim per bucket and claiming org unit. Claims are signal-only and never move inventory;
  * they form an independent aggregate, so changing one never bumps the order's {@code @Version}.
@@ -73,7 +73,7 @@ public class MaterialClaim extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  /** The public SK job order this claim signs up against. */
+  /** The job order this claim signs up against. */
   @ManyToOne(optional = false, fetch = FetchType.LAZY)
   @JoinColumn(name = "job_order_id", nullable = false)
   private JobOrder jobOrder;

@@ -27,7 +27,7 @@ import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code JobOrderMaterialDto}. {@code claims} and {@code openAmount}
- * are filled only for public SK orders; a {@code null} {@code openAmount} hides the claim columns.
+ * are filled for every order; a {@code null} {@code openAmount} hides the claim columns.
  *
  * @param id material-line primary key
  * @param material the required material (carries {@code quantityType} for unit-aware display)
@@ -35,8 +35,8 @@ import java.util.UUID;
  * @param qualityTier the line's quality tier, with its labels and floor
  * @param amount the required amount
  * @param currentStock the summed linked-inventory stock
- * @param claims the per-squadron claims on this bucket (empty for non-SK orders)
- * @param openAmount {@code required − Σ claims}; {@code null} for non-SK orders
+ * @param claims the per-squadron claims on this bucket; empty when no squadron has claimed
+ * @param openAmount the uncovered outstanding demand less the claims, floored at 0
  * @param version optimistic-lock version
  */
 @DtoMirror

@@ -34,8 +34,9 @@ import org.jetbrains.annotations.Nullable;
  * @param qualityTier the line's quality tier
  * @param amount the required amount in the material's own unit
  * @param currentStock the linked stock attributed to this line (REQ-ORDERS-037)
- * @param claims per-squadron claims on this bucket; populated only for public SK orders
- * @param openAmount {@code required − Σ claims}; {@code null} for non-SK orders
+ * @param claims per-squadron claims on this bucket; empty when no squadron has claimed
+ * @param openAmount the uncovered outstanding demand less the claims, floored at 0; {@code null}
+ *     when the line was mapped without the stock projection
  * @param version optimistic-lock version
  */
 public record JobOrderMaterialDto(
