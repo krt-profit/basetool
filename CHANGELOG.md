@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [v1.26.1](https://github.com/krt-profit/basetool/releases/tag/v1.26.1) - 2026-11-18
+
+### Fixed
+
+- **Überwachung.** Die IPv6-Prüfungen der Website, von Grafana und vom Ingest melden unter Podman 6
+  keinen Ausfall mehr, obwohl die Seiten über IPv6 erreichbar sind. Sie erreichen den Server jetzt
+  über seine eigene öffentliche IPv6-Adresse.
+
+- Build: Python scripts with a shebang are committed executable and import-only modules carry none, so
+  `ruffLint` passes on Linux CI again (REQ-OPS-060).
+
+- **P4K-Import, Gegenstände und Hersteller.** Ein Import bricht nicht mehr mit einem doppelten
+  `p4k_uuid` ab, wenn eine Zeile zu dem Datensatz umzieht, den ihre SC-Wiki-UUID oder ihr
+  Klassenname nennt, und eine andere Zeile ihre bisherige GUID übernimmt. Kommt der Umzug nicht
+  zustande, behält die Zeile ihre GUID.
+
+- **Überwachung.** `LogStreamSilent` meldet eine ruhige Logdatei wie `fail2ban.log` nach einem
+  Neustart von Alloy nicht mehr als „nicht getailt“. Die Regel prüft jetzt, ob Alloy die Datei
+  liest, statt ob seit dem Neustart eine neue Zeile kam.
+
 ## [v1.26.0](https://github.com/krt-profit/basetool/releases/tag/v1.26.0) - 2026-11-18
 
 ### Added
