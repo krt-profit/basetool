@@ -3378,8 +3378,8 @@ therefore alerts on:
   `config.alloy` warns about. **`loki_source_file_read_lines_total` must not be the guard:** its
   series is created by the first line a tailer reads, so after every Alloy restart (each monitoring
   reconcile and each Ansible run replaces the process) a file that receives no new line stays absent
-  and fires on a healthy host. `fail2ban.log` is such a file: with SSH reachable only over Tailscale
-  it gains lines only when fail2ban itself restarts. Locked by
+  and fires on a healthy host. `fail2ban.log` is such a file: on a host whose SSH port sees no
+  attempts it gains lines only when fail2ban itself restarts. Locked by
   `logstreamsilent_tailer_presence_test.yml`. **`LogStreamSilent` guards eight tails, each its own
   rule with a distinct `stream` label:**
   `host-auth`, `host-auditd`, `host-fail2ban`, `keycloak`, `backend`,
