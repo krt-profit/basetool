@@ -164,6 +164,7 @@ FAKE
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'skopeo %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+[[ "${1:-}" == "login" ]] && exit 0
 if [[ "$*" == *--config* ]]; then
   case "$*" in
     *basetool-backend@*)      r="${FAKE_REV_BACKEND:-rev-one}" ;;

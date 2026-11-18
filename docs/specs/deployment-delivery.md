@@ -973,6 +973,11 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   /var/lib/basetool/textfile /var/log/basetool /run/lock /opt/basetool`) — NOT the whole
   `/var/lib/basetool`, whose database and redis bind mounts are written by the containers,
   out-of-band from this sandbox.
+  `RemoveIPC` makes systemd delete the `deploy` account's IPC objects when the unit stops, and
+  SELinux forbids it to unlink a libpod lock (`container_runtime_tmpfs_t`) in `/dev/shm`. So the
+  `deploy` account itself never runs `podman`: every podman call goes through the sudo bridge as
+  the service user, and the account's own registry credential (`REGISTRY_AUTH_FILE`, read by
+  skopeo and cosign) is written by `skopeo login`.
 
   > [!note] Corrected 2026-09-22 — four directives this requirement named are gone, on purpose
   > It required `NoNewPrivileges`, `RestrictNamespaces`, an **empty** `CapabilityBoundingSet` and a
@@ -1052,7 +1057,8 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 `HOME` for the cosign cache) · `monitoring/prometheus/alerts/ops-automation.yml` (token alerts) ·
 `ansible/roles/basetool_host/tasks/22-deploy-user.yml` (the sudoers bridge) ·
 `scripts/basetool-*.timer`, `ansible/roles/basetool_host/templates/basetool-deploy-account-order.conf.j2`,
-`scripts/lib/container-runtime.sh` (`rt_runtime_visible`, `rt_probe_service_user`) ·
+`scripts/lib/container-runtime.sh` (`rt_runtime_visible`, `rt_probe_service_user`, `rt_login`) ·
+`scripts/container-runtime.test.sh` (the caller's credential through `skopeo login`) ·
 **Runbook:** `docs/deployment.md` → *Accounts and what runs where*, *Internal keystore and
 certificate rotation*, *Token rotation*
 
