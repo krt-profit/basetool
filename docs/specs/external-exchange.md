@@ -857,9 +857,9 @@ candidate, is cut to the 200 characters `item-ref` allows (REQ-XCH-026). Per cat
 | `kind` | `bt` | `scRecord` | `scGuid` | `uexId` | `locKey` | `name` |
 | --- | --- | --- | --- | --- | --- | --- |
 | `BLUEPRINT` | the product key (the produced item's GUID, else the normalized output name), or a name key a client stored before its product moved to the GUID (deprecated) | `blueprint.scwiki_key` | the blueprint's Wiki or game-file UUID, or its output item's | the output item's UEX id | the output item's `name_key` | the web import's chain: exact, alias, pack-tag strip, fuzzy |
-| `ITEM` | the item id | `class_name` | Wiki or game-file UUID | UEX item id | `name_key` | exact, case-insensitive; duplicates `ambiguous` |
-| `MATERIAL` | the material id | `scwiki_key` | Wiki or game-file UUID | UEX commodity id | `name_key` | exact, canonical (`MaterialNameCanonicalizer`), external alias, fuzzy — visible materials only |
-| `SHIP_TYPE` | the ship type id | `class_name`, else the `variantOf` group base | P4K GUID or Wiki UUID | UEX vehicle id, then the ADR-0307 alias | `name_key` | the hangar import's `ShipTypeMatcher` name stages; duplicates `ambiguous` |
+| `ITEM` | the item id, or the id of an item merged into it | `class_name` | Wiki or game-file UUID | UEX item id | `name_key` | exact, case-insensitive; duplicates `ambiguous` |
+| `MATERIAL` | the material id, or the id of a material merged into it (REQ-DATA-046) | `scwiki_key` | Wiki or game-file UUID | UEX commodity id | `name_key` | exact, canonical (`MaterialNameCanonicalizer`), external alias, fuzzy — visible materials only |
+| `SHIP_TYPE` | the ship type id, or the id of a ship type merged into it (REQ-DATA-042) | `class_name`, else the `variantOf` group base | P4K GUID or Wiki UUID | UEX vehicle id, then the ADR-0307 alias | `name_key` | the hangar import's `ShipTypeMatcher` name stages; duplicates `ambiguous` |
 
 Ship types resolve through `ShipTypeMatcher`, which the hangar import shares (REQ-P4K-032,
 [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md)):
@@ -885,9 +885,12 @@ gateway reports unknown request fields as `UNKNOWN_FIELD` warnings (WP 3.2).
 - [x] The anonymised corpus fixture
   (`backend/src/test/resources/fixtures/blueprint-corpus/game-log-corpus-v1.json`) resolves the same
   through the exchange and through the web import (`ExchangeResolveCorpusTest`).
+- [x] The `bt` of a material or ship type merged into another resolves to the one it was merged
+  into, and a stock op naming a merged material books onto that material
+  (`ExchangeResolveServiceTest`, `ExchangeStockWriteControllerTest`).
 
 **Enforced by:** `ExchangeResolveCorpusTest`, `ExchangeResolveServiceTest`,
-`ExchangeResolveControllerTest`, `ShipTypeMatcherTest` · **Status:** backend built — WP 3.1 (#2083);
+`ExchangeResolveControllerTest`, `ExchangeStockWriteControllerTest`, `ShipTypeMatcherTest` · **Status:** backend built — WP 3.1 (#2083);
 served by the gateway with WP 3.2 (#2082); ship-type order of ADR-0341 built (#3042)
 
 ### REQ-XCH-013 — Each resource has a snapshot and a database-sequenced change feed

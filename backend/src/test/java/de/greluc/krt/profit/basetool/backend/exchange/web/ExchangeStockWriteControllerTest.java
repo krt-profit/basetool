@@ -103,6 +103,7 @@ class ExchangeStockWriteControllerTest {
   private String client;
   private boolean wasEnabled;
   private final List<UUID> materials = new ArrayList<>();
+  private final List<UUID> materialRedirects = new ArrayList<>();
   private final List<UUID> items = new ArrayList<>();
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> cities = new ArrayList<>();
@@ -149,6 +150,7 @@ class ExchangeStockWriteControllerTest {
     missions.forEach(id -> jdbc.update("DELETE FROM mission WHERE id = ?", id));
     jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
     jdbc.update("DELETE FROM app_user WHERE id = ?", member);
+    materialRedirects.forEach(id -> jdbc.update("DELETE FROM material_redirect WHERE id = ?", id));
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
     items.forEach(id -> jdbc.update("DELETE FROM game_item WHERE id = ?", id));
     locations.forEach(id -> jdbc.update("DELETE FROM location WHERE id = ?", id));
@@ -239,6 +241,20 @@ class ExchangeStockWriteControllerTest {
           assertThat(e.getAction().name()).isEqualTo("STOCK_SET_QUANTITY");
           assertThat(e.getAfterState()).contains("12.5");
         });
+  }
+
+  @Test
+  void theIdOfAMergedMaterialBooksOntoTheMaterialItWasMergedInto() throws Exception {
+    UUID fireworks = material("SCU", null);
+    UUID partyFavors = mergedInto(fireworks);
+    String area18 = locationName(location(null));
+
+    set(partyFavors, area18, 0, "4", "0", "SCU")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(total(fireworks)).isEqualTo(4.0);
+    assertThat(total(partyFavors)).isZero();
   }
 
   @Test
@@ -1115,6 +1131,23 @@ class ExchangeStockWriteControllerTest {
     UUID id = UUID.randomUUID();
     insertMaterial(id, "Stock write " + id, unit, commodity);
     return id;
+  }
+
+  /**
+   * Records an id merged into a material, the redirect a material merge leaves behind.
+   *
+   * @param survivor the material the id was merged into
+   * @return the merged id
+   */
+  private @NotNull UUID mergedInto(@NotNull UUID survivor) {
+    UUID merged = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO material_redirect (id, canonical_id, retired_snapshot)"
+            + " VALUES (?, ?, '{}'::jsonb)",
+        merged,
+        survivor);
+    materialRedirects.add(merged);
+    return merged;
   }
 
   /**

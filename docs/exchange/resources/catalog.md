@@ -24,15 +24,20 @@ What each field is matched against, per kind:
 | `kind` | `guid` | `bt` | `scRecord` | `scGuid` | `uexId` | `locKey` | `name` |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `BLUEPRINT` | the produced item's GUID, the product's key | the product key, the same value as a blueprint's feed `key`, or a name key stored earlier (deprecated) | the blueprint's Wiki key | the blueprint's Wiki or game-file UUID, or its output item's | the output item's UEX id | the output item's name key | the web import's chain: exact, alias, pack-tag strip, fuzzy |
-| `ITEM` | — | the item id | the class name | the Wiki or game-file UUID | the UEX item id | the name key | exact, ignoring case |
-| `MATERIAL` | — | the material id | the Wiki key | the Wiki or game-file UUID | the UEX commodity id | the name key | exact, canonical, alias, fuzzy |
-| `SHIP_TYPE` | — | the ship type id | the class name, else the base of its variant group | the game-file GUID or the Wiki UUID | the UEX vehicle id, else its curated class-name alias | the name key | the hangar import's ship-type matching; a name several ship types share is `ambiguous` |
+| `ITEM` | — | the item id, or the id of an item merged into it | the class name | the Wiki or game-file UUID | the UEX item id | the name key | exact, ignoring case |
+| `MATERIAL` | — | the material id, or the id of a material merged into it | the Wiki key | the Wiki or game-file UUID | the UEX commodity id | the name key | exact, canonical, alias, fuzzy |
+| `SHIP_TYPE` | — | the ship type id, or the id of a ship type merged into it | the class name, else the base of its variant group | the game-file GUID or the Wiki UUID | the UEX vehicle id, else its curated class-name alias | the name key | the hangar import's ship-type matching; a name several ship types share is `ambiguous` |
 
 A reference takes the first of its fields, in the order `guid`, `bt`, `scRecord`, `scGuid`, `uexId`,
 `locKey`, that resolves to exactly one entry. If none does, a `name` that resolves to exactly one
 entry wins; otherwise the first field that resolved to several decides, and a reference with
 nothing that resolved is `unmatched`. `v1` accepts `nameLocale` but does not use it for matching:
 send `locKey`, which is the same in every language, whenever you have it.
+
+When the Basetool merges two entries of one thing, such as a commodity UEX listed twice, the `bt`
+of the merged entry keeps resolving to the one that stays. The answer carries the current `bt`;
+store it in place of the old one. The merged entry's `name` is not kept as an alias, so send the
+`bt`, not the old name.
 
 The answer is a [`resolve-response`](../schemas/) with one result per reference, in request order:
 

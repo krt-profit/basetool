@@ -3,6 +3,13 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-18
+
+- **Fixed: a merged material's id resolves again.** The `bt` of a material the Basetool merged into
+  another, such as "Party Favors" into "Fireworks", resolves to the material that stays, in
+  `catalog/resolve` and in every op that names a material, as it already did for items and ship
+  types. It answered `unmatched` before ([catalogue](resources/catalog.md)). No schema changes.
+
 ## 2026-11-14
 
 - **Fixed: a long catalogue name no longer fails a read.** `catalog/locations` and

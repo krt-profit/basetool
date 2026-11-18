@@ -2078,8 +2078,9 @@ line, rolls back alone, is counted as failed and is tried again by the next sync
 
 `material_redirect` (V438) keeps the twin's id and its UEX commodity id, so the merged id still
 resolves through `findById`, `existsById`, `findAllById` and `getReferenceById` of
-`MaterialRepository`, and the P4K import counts the redirect as a catalogue reference of the
-survivor (REQ-P4K-076). A fetched listing whose id only such a redirect holds writes nothing,
+`MaterialRepository`. The exchange resolves it as a `bt` reference, in `catalog/resolve` and in
+every op that names a material (REQ-XCH-012), and the P4K import counts the redirect as a
+catalogue reference of the survivor (REQ-P4K-076). A fetched listing whose id only such a redirect holds writes nothing,
 adopts no row by name and creates none, and counts as written, so it neither marks the catalogue
 incomplete nor stops the location replacement. The commodity-price sync resolves it to the
 survivor: its price at a terminal the survivor's own listing prices in the same fetch is dropped,

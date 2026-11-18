@@ -143,7 +143,7 @@ public class ExchangeResolveService {
         switch (request.kind()) {
           case BLUEPRINT -> blueprintCatalog(refs);
           case ITEM -> itemCatalog(refs);
-          case MATERIAL -> materialCatalog();
+          case MATERIAL -> materialCatalog(refs);
           case SHIP_TYPE -> shipTypeCatalog(refs);
         };
 
@@ -405,12 +405,7 @@ public class ExchangeResolveService {
         add(byLocKey, lower(row.nameKey()), entry);
       }
     }
-    redirects.forEach((retiredId, canonicalId) -> {
-      Set<Entry> entries = byId.get(canonicalId);
-      if (entries != null) {
-        byId.put(retiredId, entries);
-      }
-    });
+    addRedirects(byId, redirects);
     return new Catalog(
         Map.of(),
         bt -> Outcome.of(byId.get(parseUuid(bt))),
@@ -424,12 +419,13 @@ public class ExchangeResolveService {
   /**
    * Builds the material catalogue over the visible materials: Wiki key, Wiki and game-file UUID,
    * UEX commodity id, and a name chain of exact name, canonical name, external alias, then fuzzy
-   * suggestions.
+   * suggestions; the id of a merged material finds the one it was merged into (REQ-DATA-046).
    *
+   * @param refs the references, to look up only the ids no visible material holds
    * @return the catalogue
    */
   @NotNull
-  private Catalog materialCatalog() {
+  private Catalog materialCatalog(@NotNull List<ExchangeItemRef> refs) {
     List<Material> materials =
         materialRepository.findAll().stream()
             .filter(m -> Boolean.TRUE.equals(m.getIsVisible()))
@@ -460,6 +456,11 @@ public class ExchangeResolveService {
       if (target != null && byId.containsKey(target.getId())) {
         add(byAlias, lower(alias.getExternalName()), toEntry(target));
       }
+    }
+    List<UUID> unknownIds =
+        present(refs, r -> parseUuid(r.bt())).stream().filter(id -> !byId.containsKey(id)).toList();
+    if (!unknownIds.isEmpty()) {
+      addRedirects(byId, materialRepository.findLocalIdRedirects(unknownIds));
     }
     return new Catalog(
         Map.of(),
@@ -541,14 +542,7 @@ public class ExchangeResolveService {
     }
     List<UUID> ids = present(refs, r -> parseUuid(r.bt()));
     if (!ids.isEmpty()) {
-      shipTypeRepository
-          .findLocalIdRedirects(ids)
-          .forEach((merged, survivor) -> {
-            Set<Entry> entries = byId.get(survivor);
-            if (entries != null) {
-              byId.put(merged, entries);
-            }
-          });
+      addRedirects(byId, shipTypeRepository.findLocalIdRedirects(ids));
     }
     ShipTypeMatcher.ShipTypeIndex index =
         ShipTypeMatcher.buildIndex(
@@ -670,6 +664,23 @@ public class ExchangeResolveService {
     if (key != null && entry != null) {
       index.computeIfAbsent(key, _ -> new LinkedHashSet<>()).add(entry);
     }
+  }
+
+  /**
+   * Lets each merged id find the entries of the row it was merged into; a merged id whose row is
+   * not in the catalogue stays unmatched.
+   *
+   * @param byId entries by id
+   * @param redirects the row each merged id was merged into, by merged id
+   */
+  private static void addRedirects(
+      @NotNull Map<UUID, Set<Entry>> byId, @NotNull Map<UUID, UUID> redirects) {
+    redirects.forEach((mergedId, survivorId) -> {
+      Set<Entry> entries = byId.get(survivorId);
+      if (entries != null) {
+        byId.put(mergedId, entries);
+      }
+    });
   }
 
   /**

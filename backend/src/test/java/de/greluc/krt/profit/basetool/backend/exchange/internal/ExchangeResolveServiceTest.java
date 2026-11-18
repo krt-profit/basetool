@@ -439,6 +439,42 @@ class ExchangeResolveServiceTest {
   }
 
   @Test
+  void theIdOfAMergedMaterialResolvesToTheOneItWasMergedInto() {
+    Material fireworks = material("Fireworks", true);
+    Material laranite = material("Laranite", true);
+    UUID merged = UUID.randomUUID();
+    when(materialRepository.findAll()).thenReturn(List.of(fireworks, laranite));
+    when(materialRepository.findLocalIdRedirects(List.of(merged)))
+        .thenReturn(Map.of(merged, fireworks.getId()));
+
+    ExchangeResolveResponse response =
+        resolve(
+            ExchangeCatalogKind.MATERIAL,
+            ref(merged.toString(), null, "Party Favors"),
+            ref(laranite.getId().toString(), null, null));
+
+    assertThat(response.results())
+        .extracting(Result::status)
+        .containsExactly(Status.RESOLVED, Status.RESOLVED);
+    assertThat(response.results().get(0).ref().bt()).isEqualTo(fireworks.getId().toString());
+    assertThat(response.results().get(0).ref().name()).isEqualTo("Fireworks");
+    assertThat(response.results().get(1).ref().bt()).isEqualTo(laranite.getId().toString());
+  }
+
+  @Test
+  void theIdOfAMaterialMergedIntoAHiddenOneStaysUnmatched() {
+    Material hidden = material("Hidden Ore", false);
+    UUID merged = UUID.randomUUID();
+    when(materialRepository.findAll()).thenReturn(List.of(hidden));
+    when(materialRepository.findLocalIdRedirects(List.of(merged)))
+        .thenReturn(Map.of(merged, hidden.getId()));
+
+    Result result = only(resolve(ExchangeCatalogKind.MATERIAL, ref(merged.toString(), null, null)));
+
+    assertThat(result.status()).isEqualTo(Status.UNMATCHED);
+  }
+
+  @Test
   void aShipP4kGuidResolvesBeforeTheName() {
     ShipType titan = shipType("Avenger Titan", "AEGS_Avenger_Titan");
     titan.setP4kUuid(UUID.randomUUID());
