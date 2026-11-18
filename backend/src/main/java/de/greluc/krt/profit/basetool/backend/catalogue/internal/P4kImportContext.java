@@ -294,6 +294,19 @@ public final class P4kImportContext {
   }
 
   /**
+   * Whether this run matched or created a row for a GUID; a preview records the match although it
+   * writes no GUID onto the row.
+   *
+   * @param kind the kind
+   * @param guid the GUID, or {@code null}
+   * @param row the row
+   * @return {@code true} when {@link #stamp} gave the row the GUID in this run
+   */
+  boolean isStampedWith(@NotNull P4kKind kind, @Nullable UUID guid, @NotNull P4kKeyedRow row) {
+    return guid != null && row.equals(stamped.getOrDefault(kind, Map.of()).get(guid));
+  }
+
+  /**
    * Returns the rows the run matched or created so far, by P4K GUID; a preview holds the rows it
    * matched although it writes no GUID onto them.
    *
@@ -564,7 +577,7 @@ public final class P4kImportContext {
   /**
    * Returns the unmatched manufacturers no seeded row took.
    *
-   * @return the records in catalogue order
+   * @return the records in the order the run held them
    */
   @NotNull
   @Unmodifiable

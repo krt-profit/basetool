@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,15 @@ class P4kItemCaseRulesImportTest {
 
   /** A namesake of the Custodian SMG the test adds: same name, another size. */
   private static final UUID CUSTODIAN_S3 = UUID.fromString("0f000000-0000-4000-8000-0000000c0b03");
+
+  /** An item the test adds; a row holding its GUID moves to {@link #OTHER_POSTER}. */
+  private static final UUID POSTER = UUID.fromString("0f000000-0000-4000-8000-0000000c0b10");
+
+  /** An item the test adds that a row holding {@link #POSTER} names by its own facts. */
+  private static final UUID OTHER_POSTER = UUID.fromString("0f000000-0000-4000-8000-0000000c0b11");
+
+  /** The class name of {@link #OTHER_POSTER}. */
+  private static final String OTHER_POSTER_CLASS = "carryable_poster_other";
 
   /** The fixture's heavy-armour blueprint. */
   private static final UUID HEAVY_BLUEPRINT =
@@ -168,6 +178,67 @@ class P4kItemCaseRulesImportTest {
   }
 
   @Test
+  void aGuidAMovingRowGivesUpLandsOnTheRowItsWikiUuidNames_whicheverRowLoadsFirst() {
+    GameItem wiki = items.saveAndFlush(wikiRow(POSTER));
+    GameItem moving = item("Other Poster", POSTER);
+    moving.setExternalUuid(OTHER_POSTER);
+    items.saveAndFlush(moving);
+
+    UUID runId = runs.apply(P4kTestCatalogues.bytes(withPosters()), false).runId();
+
+    assertThat(items.findByP4kUuid(POSTER))
+        .hasValueSatisfying(row -> assertThat(row.getId()).isEqualTo(wiki.getId()));
+    assertThat(items.findByP4kUuid(OTHER_POSTER))
+        .hasValueSatisfying(row -> assertThat(row.getId()).isEqualTo(moving.getId()));
+    assertThat(hasCase(POSTER, P4kReviewReason.GUID_CONFLICT)).isFalse();
+    assertThat(hasCase(OTHER_POSTER, P4kReviewReason.GUID_CONFLICT)).isFalse();
+    assertThat(P4kImportRuns.report(changes, runId))
+        .anyMatch(change ->
+            is(change, P4kChangeType.CHANGED, OTHER_POSTER)
+                && "p4k_uuid".equals(change.getFieldName()));
+  }
+
+  @Test
+  void aPreviewHandsTheGuidAMovingRowGivesUpOnAsTheApplyDoes() {
+    items.saveAndFlush(wikiRow(POSTER));
+    GameItem moving = item("Other Poster", POSTER);
+    moving.setExternalUuid(OTHER_POSTER);
+    items.saveAndFlush(moving);
+
+    List<P4kImportChange> report =
+        runs.previewWithReport(P4kTestCatalogues.bytes(withPosters())).changes();
+
+    assertThat(report)
+        .anyMatch(change ->
+            is(change, P4kChangeType.CHANGED, OTHER_POSTER)
+                && "p4k_uuid".equals(change.getFieldName()))
+        .noneMatch(change ->
+            is(change, P4kChangeType.CHANGED, POSTER) && "name".equals(change.getFieldName()))
+        .noneMatch(change ->
+            is(change, P4kChangeType.REVIEW, POSTER)
+                || is(change, P4kChangeType.REVIEW, OTHER_POSTER));
+  }
+
+  @Test
+  void aRowWhoseMoveDoesNotHappenKeepsItsGuid_andNoSecondRowTakesIt() {
+    GameItem wiki = items.saveAndFlush(wikiRow(POSTER));
+    GameItem stuck = item("Other Poster", POSTER);
+    stuck.setClassName(OTHER_POSTER_CLASS);
+    items.saveAndFlush(stuck);
+    GameItem taker = item("Other Poster Wiki", null);
+    taker.setExternalUuid(OTHER_POSTER);
+    items.saveAndFlush(taker);
+
+    runs.apply(P4kTestCatalogues.bytes(withPosters()), false);
+
+    assertThat(items.findByP4kUuid(OTHER_POSTER))
+        .hasValueSatisfying(row -> assertThat(row.getId()).isEqualTo(taker.getId()));
+    assertThat(items.findByP4kUuid(POSTER))
+        .hasValueSatisfying(row -> assertThat(row.getId()).isEqualTo(stuck.getId()));
+    assertThat(wiki.getP4kUuid()).isNull();
+  }
+
+  @Test
   void anApplyClosesTheItemCasesItNoLongerRaises_andLeavesAnAdminDecision() {
     UUID firstRun = runs.apply(P4kTestCatalogues.fixtureBytes(), false).runId();
     P4kReviewCase stale = cases.saveAndFlush(guidConflict(CUSTODIAN, firstRun));
@@ -209,6 +280,42 @@ class P4kItemCaseRulesImportTest {
     P4kTestCatalogues.record(root, "blueprints", HEAVY_BLUEPRINT)
         .put("producedItemGuid", produced.toString());
     return root;
+  }
+
+  /**
+   * Builds the fixture with two poster records of their own names and class names, {@link #POSTER}
+   * listed before {@link #OTHER_POSTER}.
+   *
+   * @return the catalogue tree
+   */
+  private static ObjectNode withPosters() {
+    ObjectNode root = P4kTestCatalogues.tree();
+    ObjectNode template = P4kTestCatalogues.record(root, "items", CUSTODIAN);
+    ((ArrayNode) root.get("items"))
+        .add(poster(template, POSTER, "carryable_poster", "Poster"))
+        .add(poster(template, OTHER_POSTER, OTHER_POSTER_CLASS, "Other Poster"));
+    return root;
+  }
+
+  private static ObjectNode poster(ObjectNode template, UUID guid, String className, String name) {
+    ObjectNode poster = template.deepCopy();
+    poster.put("guid", guid.toString());
+    poster.put("className", className);
+    ((ObjectNode) poster.get("name")).put("en", name);
+    return poster;
+  }
+
+  /**
+   * Builds a SC Wiki row of a record that holds no P4K GUID yet and carries the record's name.
+   *
+   * @param wikiUuid the record's GUID as its SC Wiki UUID
+   * @return the row, unsaved
+   */
+  private static GameItem wikiRow(UUID wikiUuid) {
+    GameItem wiki = item("Poster", null);
+    wiki.setExternalUuid(wikiUuid);
+    wiki.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    return wiki;
   }
 
   private static GameItem item(String name, UUID p4kUuid) {

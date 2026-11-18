@@ -95,46 +95,72 @@ public class P4kManufacturerReconciler {
             rows::byName,
             _ -> false,
             new P4kManufacturerRules(families, stored, rows::byP4kUuid));
-    for (P4kManufacturerDto manufacturer : manufacturers) {
-      UUID guid = manufacturer.parsedGuid();
-      if (P4kManufacturerRecordPath.isAuxiliary(manufacturer.recordPath())) {
-        if (guid != null) {
-          auxiliaryGuids.add(guid);
-        }
-        observeAuxiliary(manufacturer, guid, rows, aliasGuids, context);
-        continue;
-      }
-      if (guid != null) {
-        canonicalGuids.add(guid);
-      }
-      if (guid != null && aliasGuids.contains(guid)) {
-        context.getReport().matched(P4kKind.MANUFACTURER, false);
-        continue;
-      }
-      boolean borrower = families.lenderOf(guid) != null;
-      boolean ownBrand = !borrower && !families.isSibling(guid);
-      matcher.reconcile(
-          manufacturer,
-          null,
-          borrower ? null : manufacturer.nameEn(),
-          false,
-          context,
-          rows,
-          (row, matchedGuid) -> {
-            context.indexManufacturer(matchedGuid, row);
-            return write(row, manufacturer, matchedGuid, borrower, context);
-          },
-          unmatchedGuid -> {
-            if (unmatchedGuid == null || !ownBrand) {
-              context.getReport().unmatched(P4kKind.MANUFACTURER, manufacturer);
-            } else {
-              context.holdUnmatchedManufacturer(unmatchedGuid, manufacturer);
+    matcher.forEachMovesFirst(
+        manufacturers,
+        stored,
+        context,
+        manufacturerRepository::flush,
+        manufacturer -> {
+          UUID guid = manufacturer.parsedGuid();
+          if (P4kManufacturerRecordPath.isAuxiliary(manufacturer.recordPath())) {
+            if (guid != null) {
+              auxiliaryGuids.add(guid);
             }
-          },
-          (row, coveredGuid) -> context.indexManufacturer(coveredGuid, row));
-    }
+            observeAuxiliary(manufacturer, guid, rows, aliasGuids, context);
+            return;
+          }
+          if (guid != null) {
+            canonicalGuids.add(guid);
+          }
+          if (guid != null && aliasGuids.contains(guid)) {
+            context.getReport().matched(P4kKind.MANUFACTURER, false);
+            return;
+          }
+          reconcileCanonical(manufacturer, guid, families, matcher, rows, context);
+        });
     auxiliaryGuids.removeAll(canonicalGuids);
     context.indexAuxiliaryManufacturers(auxiliaryGuids);
+  }
+
+  /**
+   * Matches one canonical record that no reviewed alias resolves: a borrower never by name, and an
+   * unmatched record of its own brand is held for seeding (REQ-P4K-021, REQ-P4K-058).
+   *
+   * @param manufacturer the record
+   * @param guid the record's GUID, or {@code null}
+   * @param families the catalogue's brands
+   * @param matcher the run's manufacturer matcher
+   * @param rows the manufacturer rows
+   * @param context the run
+   */
+  private void reconcileCanonical(
+      @NotNull P4kManufacturerDto manufacturer,
+      @Nullable UUID guid,
+      @NotNull P4kManufacturerFamilies families,
+      @NotNull P4kRowMatcher<Manufacturer> matcher,
+      @NotNull P4kRowIndex<Manufacturer> rows,
+      @NotNull P4kImportContext context) {
+    boolean borrower = families.lenderOf(guid) != null;
+    boolean ownBrand = !borrower && !families.isSibling(guid);
+    matcher.reconcile(
+        manufacturer,
+        null,
+        borrower ? null : manufacturer.nameEn(),
+        false,
+        context,
+        rows,
+        (row, matchedGuid) -> {
+          context.indexManufacturer(matchedGuid, row);
+          return write(row, manufacturer, matchedGuid, borrower, context);
+        },
+        unmatchedGuid -> {
+          if (unmatchedGuid == null || !ownBrand) {
+            context.getReport().unmatched(P4kKind.MANUFACTURER, manufacturer);
+          } else {
+            context.holdUnmatchedManufacturer(unmatchedGuid, manufacturer);
+          }
+        },
+        (row, coveredGuid) -> context.indexManufacturer(coveredGuid, row));
   }
 
   private static void observeAuxiliary(

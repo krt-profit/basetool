@@ -22,9 +22,13 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -41,7 +45,9 @@ import org.jetbrains.annotations.Nullable;
  * {@code GUID_CONFLICT} review case and leave the rows as they are, unless the kind's {@link
  * P4kMatchRules} say a row the key found already stands for the record (REQ-P4K-050), which then
  * needs neither a row of its own nor a case, or leave the row out of the class-name and name steps
- * (REQ-P4K-054).
+ * (REQ-P4K-054). A row whose own facts move it to another record gives its GUID up only once the
+ * run matched it to that record (REQ-P4K-055), so a GUID never lands on a second row; {@link
+ * #forEachMovesFirst} matches those records first.
  *
  * @param <T> the row type
  * @param kind the kind
@@ -157,6 +163,47 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
   }
 
   /**
+   * Runs a reconciler's step on every record, the records a stored row moves to (REQ-P4K-055,
+   * REQ-P4K-058) first; an APPLY flushes those moves before the other records, so the database sees
+   * a GUID leave its row before another row takes it.
+   *
+   * @param records the kind's records, in catalogue order
+   * @param stored the kind's stored rows, before the run matches any record
+   * @param context the run
+   * @param flush writes the pending row changes to the database
+   * @param step reconciles one record
+   * @param <R> the record type
+   */
+  public <R extends P4kRecord> void forEachMovesFirst(
+      @NotNull List<R> records,
+      @NotNull Collection<T> stored,
+      @NotNull P4kImportContext context,
+      @NotNull Runnable flush,
+      @NotNull Consumer<R> step) {
+    Set<UUID> followed = new HashSet<>();
+    for (T row : stored) {
+      UUID guid = rules.followedGuid(row);
+      if (guid != null) {
+        followed.add(guid);
+      }
+    }
+    List<R> moves = new ArrayList<>();
+    List<R> others = new ArrayList<>();
+    for (R record : records) {
+      if (followed.contains(record.parsedGuid())) {
+        moves.add(record);
+      } else {
+        others.add(record);
+      }
+    }
+    moves.forEach(step);
+    if (context.isApply() && !moves.isEmpty()) {
+      flush.run();
+    }
+    others.forEach(step);
+  }
+
+  /**
    * Matches one record and handles the outcome the way every reconciler does: a matched row is
    * enriched, stamped, indexed under the keys it now holds and counted; an unmatched record goes to
    * the reconciler's own rule; a held one is already on the review list.
@@ -249,7 +296,9 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       if (rules.covers(guid, holder.get())) {
         return new Covered<>(holder.get());
       }
-      holder = Optional.empty();
+      if (movedAway(holder.get(), context)) {
+        holder = Optional.empty();
+      }
     }
     Optional<T> found =
         holder.or(() -> rules.follower(guid)).or(() -> byWikiUuid.apply(rules.wikiKey(guid)));
@@ -326,6 +375,18 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
   private boolean followsAnother(@NotNull T row, @NotNull UUID guid) {
     UUID followed = rules.followedGuid(row);
     return followed != null && !followed.equals(guid);
+  }
+
+  /**
+   * Tells whether this run matched a row to the record its own facts move it to (REQ-P4K-055): an
+   * APPLY has then written the new GUID onto it, a preview has recorded the match.
+   *
+   * @param row a row that follows another record than the GUID it holds
+   * @param context the run
+   * @return {@code true} when the move happened, so the GUID the row holds is free for another row
+   */
+  private boolean movedAway(@NotNull T row, @NotNull P4kImportContext context) {
+    return context.isStampedWith(kind, rules.followedGuid(row), row);
   }
 
   /**

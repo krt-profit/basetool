@@ -103,14 +103,8 @@ class P4kManufacturerFamilyImportTest {
   void aRecordBorrowingABrandsNameKeepsItsOwnName_andOpensNoNameConflict() {
     manufacturers.saveAndFlush(manufacturer("Aegis Dynamics", AEGS));
     Manufacturer fishkill = manufacturers.saveAndFlush(manufacturer("Fishkill", FSKI));
-    ObjectNode root = P4kTestCatalogues.tree();
-    ObjectNode borrower = P4kTestCatalogues.record(root, "manufacturers", AEGS).deepCopy();
-    borrower.put("guid", FSKI.toString());
-    borrower.put("className", "FSKI");
-    borrower.put("code", "FSKI");
-    ((ArrayNode) root.get("manufacturers")).add(borrower);
 
-    runs.apply(P4kTestCatalogues.bytes(root), false);
+    runs.apply(P4kTestCatalogues.bytes(withBorrower()), false);
 
     assertThat(fishkill.getName()).isEqualTo("Fishkill");
     assertThat(fishkill.getAbbreviation()).isEqualTo("FSKI");
@@ -118,6 +112,22 @@ class P4kManufacturerFamilyImportTest {
             cases.findByKindAndGuidAndReason(
                 P4kKind.MANUFACTURER, FSKI, P4kReviewReason.NAME_CONFLICT))
         .isEmpty();
+  }
+
+  @Test
+  void aBorrowerTheMovingRowGivesUpLandsOnItsWikiRow_whicheverRowLoadsFirst() {
+    Manufacturer fishkill = manufacturer("Fishkill", null);
+    fishkill.setScwikiUuid(FSKI);
+    manufacturers.saveAndFlush(fishkill);
+    Manufacturer aegis = manufacturers.saveAndFlush(manufacturer("Aegis Dynamics", FSKI));
+
+    runs.apply(P4kTestCatalogues.bytes(withBorrower()), false);
+    manufacturers.flush();
+
+    assertThat(aegis.getP4kUuid()).isEqualTo(AEGS);
+    assertThat(fishkill.getP4kUuid()).isEqualTo(FSKI);
+    assertThat(openCase(AEGS)).isFalse();
+    assertThat(openCase(FSKI)).isFalse();
   }
 
   @Test
@@ -156,6 +166,22 @@ class P4kManufacturerFamilyImportTest {
     sibling.put("className", "AEGS_ENV");
     sibling.put("code", "");
     ((ArrayNode) root.get("manufacturers")).add(sibling);
+    return root;
+  }
+
+  /**
+   * Builds the fixture with {@link #FSKI}, a record borrowing the name key of Aegis Dynamics under
+   * a code of its own, listed before every other manufacturer.
+   *
+   * @return the catalogue tree
+   */
+  private static ObjectNode withBorrower() {
+    ObjectNode root = P4kTestCatalogues.tree();
+    ObjectNode borrower = P4kTestCatalogues.record(root, "manufacturers", AEGS).deepCopy();
+    borrower.put("guid", FSKI.toString());
+    borrower.put("className", "FSKI");
+    borrower.put("code", "FSKI");
+    ((ArrayNode) root.get("manufacturers")).insert(0, borrower);
     return root;
   }
 

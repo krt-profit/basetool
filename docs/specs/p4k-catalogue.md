@@ -820,11 +820,20 @@ held no longer finds it: that record matches its own row, is covered by the move
 copy (REQ-P4K-054), or stays unmatched. Neither record opens a `GUID_CONFLICT` case. Facts that
 name both records leave the row as it is.
 
+A GUID never lands on a second row. A run matches the records rows move to before every other
+record, and an APPLY writes those moves to the database before it goes on, so the GUID a row gives
+up has left it before another row takes it. A row whose move does not happen in the run — its
+record goes to another row or is held for review — keeps the GUID it holds, and that record matches
+it. A preview reports the same outcome as the APPLY.
+
 **Acceptance**
 
 - [x] A row stamped with a copy moves to the item its SC Wiki UUID names; the copy is covered and no
   case opens.
 - [x] A swept row holding a departed GUID moves to the item its SC Wiki UUID names and reappears.
+- [x] The GUID a moving row gives up lands on the row whose SC Wiki UUID it is in the same APPLY,
+  whichever of the two rows loads first, and a preview reports the same.
+- [x] A row whose move does not happen keeps its GUID, and no second row takes it.
 
 **Enforced by:** `P4kItemCaseRulesImportTest` · **Code:** `P4kItemCoverage`, `P4kRowMatcher` ·
 **ADR:** [ADR-0393](../adr/0393-p4k-item-cases-open-only-where-an-admin-can-decide.md)
@@ -986,6 +995,9 @@ The catalogue lists some brands more than once, and some records carry another b
   descriptions, and is never created; matched by its GUID it leads only its `code`. A row holding
   such a record that carries the brand's name moves to the brand while no row holds the brand
   (ArcCorp from `GHEX` to `ARCC`).
+- **Moves first.** As for items (REQ-P4K-055), the run matches the records a row moves to before the
+  others and an APPLY writes those moves first, so a GUID never lands on a second row; a row whose
+  move does not happen keeps the GUID it holds.
 - **Cases settle.** After items and ships, an APPLY closes the open manufacturer `GUID_CONFLICT`
   and `NAME_CONFLICT` cases it no longer raises and reopens those it raises again (REQ-P4K-016); a
   partial kind settles only the GUIDs it lists.
