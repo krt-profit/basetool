@@ -171,7 +171,8 @@ web, naming its client (REQ-AUDIT-005):
   its shortages, cancelled attempts and ended commitments carry no event of their own.
   Adding or removing an assignee who is not a direct member of the processing unit (REQ-ORDERS-047)
   records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in place of
-  `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is SK-public; the assignee is the
+  `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the assignee reads the order anyway as a member
+  of the Profit hierarchy; the assignee is the
   target user, and the details carry only `assignee=<id>` — no handle, unit name or free text.
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX sync (one summary event per run and catalogue — `REFINERY_METHODS_SYNCED` /

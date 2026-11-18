@@ -63,7 +63,7 @@ rounded on the **sum** rather than per contribution:
 |--------------|-----------------------------------------------------------------------------------------------------------------------------|
 | Bedarf       | summed outstanding required amount across the section's orders                                                              |
 | Bestand      | summed inventory **linked to those orders** that the quality-bucket allocation counts toward this bucket (REQ-ORDERS-037)    |
-| Eintragungen | summed material claims lodged on those orders' buckets; `0` when no contributing order is a public SK order                 |
+| Eintragungen | summed material claims lodged on those orders' buckets, whichever unit is responsible; `0` when no Staffel has claimed      |
 | Offen        | `Bedarf − Bestand`, floored at 0                                                                                            |
 
 `Bestand` is the same per-bucket figure the order's own material list shows, resolved through the

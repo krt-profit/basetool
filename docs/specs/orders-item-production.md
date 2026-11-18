@@ -286,11 +286,12 @@ ADR-0099
 
 ### REQ-ORDERS-026 — Order-detail tab layout and KPI band
 
-> **Approved shared-order target - not implemented:** the central detail and action capabilities
-> follow [orders-core.md](orders-core.md). Shared participation and material/quality contribution
-> lines are available for Bereich-, SK- and Staffel-responsible orders; claiming is not SK-public-only
-> and there is no duplicate enrolment. The active responsible Staffel contributes through its
-> responsibility, without enrolling as its own supporter.
+> **Implemented shared-order detail:** the central detail and action capabilities follow
+> [orders-core.md](orders-core.md). Shared participation and material/quality contribution lines
+> are available on every active order, whether a Bereich, an SK or a Staffel is responsible, with
+> no duplicate enrolment. The active responsible Staffel contributes through its responsibility,
+> without enrolling as its own supporter (`MaterialClaimAuthority.claimable`,
+> `MaterialClaimService.claimingOptions`).
 >
 > **Implemented MATERIAL/ITEM read:** Requesters receive the same permitted progress, handover
 > and linked-stock facts. Requester-specific panel and KPI omissions are removed. Show ITEM manufacturing/delivery counts, current material demand
@@ -564,7 +565,7 @@ mission referenced by its stock.
 **Acceptance**
 
 - [ ] Every caller who passes `canSeeJobOrder` gets owner and location on all four endpoints,
-  including a member of an uninvolved squadron on an SK-public order.
+  including a Profit member of an uninvolved unit.
 - [ ] A concrete requester gets the same permitted linked-stock facts on all four endpoints; an
   unrelated reader remains refused.
 - [ ] A caller who may read the order but not an internal mission earmarked on its linked stock sees
@@ -728,8 +729,8 @@ move re-fetches the page's `collectionResults` fragment in place.
 - [ ] Flipping the delivered toggle persists via `PATCH /inventory/{id}/delivered` with the order id
   + version, and reaches a peer viewing the same order / the order-detail inline stock without a
     reload.
-- [ ] Every viewer of the order sees each row's owner and location, including a member of an
-  uninvolved squadron on an SK-public order (REQ-ORDERS-029).
+- [ ] Every viewer of the order sees each row's owner and location, including a Profit member of
+  an uninvolved unit (REQ-ORDERS-029).
 
 **Enforced by:** `ItemCollectionPageControllerTest` (model + fragment + partial-failure),
 `ItemCollectionRenderTest` (flattened rows + empty state), `InventoryItemServiceBookOutTest`
