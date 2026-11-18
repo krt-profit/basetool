@@ -1820,11 +1820,13 @@ for why the missing-probe half is not redundant.
   `basetool_host_public_name_aliases`; the role writes the drop-ins and removes them when the list
   is empty, and `env-reaches-the-units` fails when its first entry and `BASETOOL_KEYCLOAK_HOST_ALIAS`
   disagree.
-- [ ] The running pasta maps every address an alias points at: `host-gateway` and each link-local or
-  unique-local target outside the container subnets. The role writes the mapping as the service
-  user's drop-in `containers.conf.d/50-basetool.conf` and keeps no main user `containers.conf`, so the
-  vendor `containers.conf` stays in force under Podman 6; `pasta-maps-host-aliases` fails on an
-  unmapped address.
+- [ ] The running pasta maps every address an alias points at to the host: `host-gateway` and each
+  link-local or unique-local target outside the container subnets, judged by pasta's rules (the last
+  mapping per IP version, none for a version pasta gives its own `-a` address). Under Podman 6 an
+  IPv6 alias names the host's own public IPv6 address (ADR-0196 Amendment 3). The role writes the
+  mapping as the service user's drop-in `containers.conf.d/50-basetool.conf` and keeps no main user
+  `containers.conf`, so the vendor `containers.conf` stays in force under Podman 6;
+  `pasta-maps-host-aliases` fails on an alias pasta does not map to the host.
 - [ ] `BASETOOL_EXTRA_JAVA_OPTS` unset ⇒ `JAVA_TOOL_OPTIONS` is character-identical to before, and the
   truststore mount points at the same file as the keystore mount (read, but never consulted).
 - [ ] The documented trust store recipe starts from `$JAVA_HOME/lib/security/cacerts`, so selecting

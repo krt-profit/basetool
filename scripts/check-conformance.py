@@ -1439,11 +1439,39 @@ def _pasta_alias_addresses(units: str) -> set[ipaddress._BaseAddress]:
     return needed
 
 
+def _pasta_effective_maps(args: list[str]) -> set[ipaddress._BaseAddress]:
+    """Return the guest addresses one pasta command line actually maps to the host.
+
+    pasta keeps one ``--map-guest-addr`` per IP version, the last one given, and redirects it to
+    the address ``-a``/``--address`` assigns for that version when one is given, the host's own
+    address only otherwise (pasta(1)). Podman 6 assigns ``fc00::3`` to the rootless netns, so an
+    IPv6 mapping there reaches no host service.
+
+    Args:
+        args: the whitespace-split command line of one pasta process.
+
+    Returns:
+        The mapped addresses that lead to the host.
+    """
+    last: dict[int, ipaddress._BaseAddress] = {}
+    assigned: set[int] = set()
+    for flag, value in zip(args, args[1:]):
+        address = _parse_address(value)
+        if address is None:
+            continue
+        if flag == "--map-guest-addr":
+            last[address.version] = address
+        elif flag in ("-a", "--address"):
+            assigned.add(address.version)
+    return {address for version, address in last.items() if version not in assigned}
+
+
 def check_pasta_maps_host_aliases(ctx: Context) -> str:
-    """Every host alias in the Quadlet sources must be an address the running pasta maps.
+    """Every host alias in the Quadlet sources must be an address pasta maps to the host.
 
     The mapping comes from the service user's ``containers.conf.d`` drop-in (ADR-0196). The check
-    reads the arguments of the running pasta, so a setting that is on disk but not in force fails.
+    reads the arguments of the running pasta and applies pasta's own rules to them, so a setting
+    that is on disk but not in force, overridden by a later argument or redirected by ``-a`` fails.
 
     Args:
         ctx: the run context.
@@ -1470,19 +1498,16 @@ def check_pasta_maps_host_aliases(ctx: Context) -> str:
 
     mapped: set[ipaddress._BaseAddress] = set()
     for line in pasta.splitlines():
-        args = line.split()
-        for flag, value in zip(args, args[1:]):
-            address = _parse_address(value) if flag == "--map-guest-addr" else None
-            if address is not None:
-                mapped.add(address)
+        mapped |= _pasta_effective_maps(line.split())
 
     missing = sorted(str(address) for address in needed - mapped)
     if missing:
         raise CheckFailed(
-            f"pasta maps {', '.join(sorted(str(a) for a in mapped)) or 'nothing'}, but the units "
-            f"alias names to {', '.join(missing)}: those names are unreachable from every "
-            "container. Check the service user's containers.conf.d drop-in, then restart the "
-            "rootless network."
+            f"pasta maps {', '.join(sorted(str(a) for a in mapped)) or 'nothing'} to the host, but "
+            f"the units alias names to {', '.join(missing)}: those names are unreachable from "
+            "every container. Under Podman 6 an IPv6 alias has to be the host's own public "
+            "address (ADR-0196 Amendment 3); otherwise check the service user's "
+            "containers.conf.d drop-in, then restart the rootless network."
         )
     return f"pasta maps every host-alias address ({', '.join(sorted(str(a) for a in needed))})"
 

@@ -612,7 +612,10 @@ The aliases only work while pasta maps the addresses they point at. The role wri
 precedence, so a user's main file would stop the vendor `/usr/share/containers/containers.conf` from
 being read. `check-conformance.py`'s `pasta-maps-host-aliases` reads the running pasta's arguments
 and fails when an alias address (`host-gateway`, or a link-local or unique-local target outside every
-container subnet) is not mapped. A changed drop-in takes effect when the rootless network restarts,
+container subnet) is not mapped to the host by pasta's rules: the last mapping per IP version, and
+none for a version that pasta gives its own `-a` address. Under Podman 6 that rules out any IPv6
+mapping, so `basetool_host_public_name_aliases_v6` points the public names at the host's own public
+IPv6 address, which a container reaches directly (ADR-0196 Amendment 3). A changed drop-in takes effect when the rootless network restarts,
 that is when every container of the service user has stopped, at the latest at the next reboot.
 
 ### On the host

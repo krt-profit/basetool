@@ -167,7 +167,7 @@ are not in this public repository.
 | Variable | Why it matters |
 |---|---|
 | `basetool_host_public_name_aliases` | **Required on every rootless host, production included** ([ADR-0196](../docs/adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)). A container cannot reach the host through its own public address, so each public name a container dials — the frontend, ingest and grafana hosts — is aliased to `host-gateway`. `backend` is on the list for the OIDC issuer it resolves at startup, not for any vhost of its own. The first entry must match `BASETOOL_KEYCLOAK_HOST_ALIAS` in the host `basetool.env`. Empty removes the drop-ins, so a hand-written one does not survive the next run: put it here. |
-| `basetool_host_public_name_aliases_v6` | the same names on the IPv6 guest address, for `blackbox-exporter` only |
+| `basetool_host_public_name_aliases_v6` | the same names on the host's own public IPv6 address (Podman 6, ADR-0196 Amendment 3), for `blackbox-exporter` only |
 | `basetool_host_edge_trusted_proxies` | the edge's five pinned addresses (default in `defaults/main.yml`); must equal the pins `scripts/generate-quadlet.py` writes into `edge.container` — the generator refuses a mismatch — and `EDGE_TRUSTED_PROXY` in `basetool.env` must name the same five |
 | `basetool_host_jvm_truststore_path` | only where the edge holds a privately signed certificate (testing); production sets nothing |
 | `basetool_host_admin_user`, `basetool_host_admin_authorized_keys` | **Required.** The operator's login and its public keys; the role installs exactly these keys and no others |

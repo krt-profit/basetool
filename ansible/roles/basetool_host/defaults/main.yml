@@ -279,7 +279,6 @@ basetool_host_public_name_alias_v6_services:
 
 basetool_host_pasta_map_guest_addrs:
   - "169.254.1.2"
-  - "fd00:169:254::2"
 
 basetool_host_jvm_truststore_path: ""
 basetool_host_jvm_truststore_dest: /run/secrets/jvm-truststore.p12
