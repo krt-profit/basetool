@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.FlushModeType;
 import jakarta.persistence.Tuple;
 import java.util.Collection;
 import java.util.HashMap;
@@ -33,7 +34,12 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Keeps the material lookups working for the ids of merged materials (REQ-DATA-046). */
+/**
+ * Keeps the material lookups working for the ids of merged materials (REQ-DATA-046). A current id
+ * loads as the default lookup loads it, from the persistence context first and without a flush;
+ * only an id no material holds is looked up among the redirects, and that lookup never flushes,
+ * since a redirect is written by a statement the merge runs at once.
+ */
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MaterialIdentityReferencesImpl implements MaterialIdentityReferences {
@@ -42,15 +48,12 @@ public class MaterialIdentityReferencesImpl implements MaterialIdentityReference
 
   @Override
   public @NotNull Optional<Material> findById(@NotNull UUID id) {
-    return entityManager
-        .createQuery(
-            "SELECT m FROM Material m WHERE m.id = :id OR m.id ="
-                + " (SELECT r.canonicalMaterial.id FROM MaterialRedirect r WHERE r.id = :id)",
-            Material.class)
-        .setParameter("id", id)
-        .getResultList()
-        .stream()
-        .findFirst();
+    Material current = entityManager.find(Material.class, id);
+    if (current != null) {
+      return Optional.of(current);
+    }
+    return Optional.ofNullable(findLocalIdRedirects(List.of(id)).get(id))
+        .map(canonicalId -> entityManager.find(Material.class, canonicalId));
   }
 
   @Override
@@ -93,6 +96,7 @@ public class MaterialIdentityReferencesImpl implements MaterialIdentityReference
                     + " FROM MaterialRedirect r WHERE r.id IN :ids",
                 Tuple.class)
             .setParameter("ids", new LinkedHashSet<>(ids))
+            .setFlushMode(FlushModeType.COMMIT)
             .getResultList()) {
       redirects.put(redirect.get("retiredId", UUID.class), redirect.get("canonicalId", UUID.class));
     }
