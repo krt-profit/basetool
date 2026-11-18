@@ -3178,6 +3178,9 @@ after the apps, and the promotion failed.
   (`<sha256>  <path>` per file, `sha256sum -c` format), generated from the commit by
   `scripts/host-scripts-manifest.sh generate` in the `build-config` job, and the job fails when the
   file is missing or empty. A repo self-test keeps the list equal to what the role installs.
+- **A file the role stops installing is removed by it.** When a file leaves the list, the role's
+  `scripts` tag deletes it from `/opt/basetool/scripts` (`state: absent`, in the same task file as the
+  install), so after that run no retired file shows up as a leftover in the comparison below.
 - **The host compares on every tick.** `deploy.sh` keeps the deployed release's manifest as
   `/opt/basetool/host-scripts.sha256` (delivered and rolled back with the config tree) and hashes the
   listed files in its own directory against it on every tick that stages no bundle (a staging tick
@@ -3213,7 +3216,8 @@ after the apps, and the promotion failed.
   non-apply script warns and applies; the manifest is applied with the config tree and put back by a
   rollback.
 - [x] `host-scripts-manifest.test.sh`: the list equals what the role installs, the apply path is a
-  subset of it and covers what `deploy.sh` sources, `generate` is byte-exact from a revision and
+  subset of it and covers what `deploy.sh` sources, every file the role removes is neither listed nor
+  under `scripts/` (and `redis-users.acl.tmpl` is among them), `generate` is byte-exact from a revision and
   `sha256sum -c` accepts it, the config image and the release workflow ship it.
 - [x] `monitoring/prometheus/tests/host_scripts_drift_test.yml` covers both alerts, including the absent
   metric.
