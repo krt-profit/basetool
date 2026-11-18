@@ -153,29 +153,51 @@ public class P4kItemReconciler {
             P4kItemCoverage.of(items, stored));
     Set<UUID> obtainable = obtainable(catalogue);
     seededRetirement.retire(stored, items, obtainable, context);
-    for (P4kItemDto item : items) {
-      String rawPlayability = item.playability();
-      P4kItemPlayability playability = P4kClosedSet.parse(P4kItemPlayability.class, rawPlayability);
-      if (rawPlayability != null && playability == null) {
-        context.getReport().unknownValue(P4kKind.ITEM, item, PLAYABILITY, rawPlayability);
-      }
-      UUID itemGuid = item.parsedGuid();
-      P4kSeeding seeding =
-          P4kSeeding.forItem(playability, itemGuid != null && obtainable.contains(itemGuid));
-      matcher.reconcile(
-          item,
-          item.className(),
-          item.nameEn(),
-          seeding == P4kSeeding.CREATE,
-          context,
-          rows,
-          (row, _) -> enrich(row, item, values(item, context), context),
-          guid -> unmatched(item, guid, seeding, context));
-    }
+    matcher.forEachMovesFirst(
+        items,
+        stored,
+        context,
+        gameItemRepository::flush,
+        item -> reconcileItem(item, obtainable, matcher, rows, context));
     if (context.isApply()) {
       resolvedCases.settleRun(
           P4kKind.ITEM, SETTLED_REASONS, items, catalogue.head().isComplete(P4kKind.ITEM), context);
     }
+  }
+
+  /**
+   * Matches one item under the seeding rule its playability and obtainability give it; an unknown
+   * playability is reported.
+   *
+   * @param item the record
+   * @param obtainable the items a shop sells or a blueprint produces
+   * @param matcher the run's item matcher
+   * @param rows the item rows
+   * @param context the run
+   */
+  private void reconcileItem(
+      @NotNull P4kItemDto item,
+      @NotNull Set<UUID> obtainable,
+      @NotNull P4kRowMatcher<GameItem> matcher,
+      @NotNull P4kRowIndex<GameItem> rows,
+      @NotNull P4kImportContext context) {
+    String rawPlayability = item.playability();
+    P4kItemPlayability playability = P4kClosedSet.parse(P4kItemPlayability.class, rawPlayability);
+    if (rawPlayability != null && playability == null) {
+      context.getReport().unknownValue(P4kKind.ITEM, item, PLAYABILITY, rawPlayability);
+    }
+    UUID itemGuid = item.parsedGuid();
+    P4kSeeding seeding =
+        P4kSeeding.forItem(playability, itemGuid != null && obtainable.contains(itemGuid));
+    matcher.reconcile(
+        item,
+        item.className(),
+        item.nameEn(),
+        seeding == P4kSeeding.CREATE,
+        context,
+        rows,
+        (row, _) -> enrich(row, item, values(item, context), context),
+        guid -> unmatched(item, guid, seeding, context));
   }
 
   /**
