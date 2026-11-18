@@ -114,6 +114,13 @@ adds it to that list in the same PR — repo-lint's `check-deploy-podman-allowli
 otherwise — and the role run that installs the script installs the rule. That is strictly narrower than the
 `docker` group of the retired host, which was root-equivalent.
 
+Every sudo call is recorded in the journal and `/var/log/secure` (in Loki through alloy), and only
+there: no sudoers file sets a `logfile` (REQ-OPS-016). The four `deploy` units run under
+`ProtectSystem=strict` and cannot write one, so a `Defaults logfile=…` line makes every bridge call
+log `sudo: unable to open log file … Read-only file system` into `/var/log/basetool/*.log`. The
+role's hardening step removes it from `/etc/sudoers` and fails on one anywhere else; the CIS rule
+that adds it, `sudo_custom_logfile`, is deselected in the tailoring.
+
 **Container uids are translated.** Container uid *N* is host uid `100000 + N − 1`: 10001 → 110000
 (backend, frontend, ingest, loki, tempo), 1000 → 100999 (keycloak), 999 → 100998 (redis-session, redis-shared),
 70 → 100069 (postgres), 101 → 100100 (edge), 472 → 100471 (grafana), 65534 → 165533 (prometheus,
@@ -605,7 +612,10 @@ The aliases only work while pasta maps the addresses they point at. The role wri
 precedence, so a user's main file would stop the vendor `/usr/share/containers/containers.conf` from
 being read. `check-conformance.py`'s `pasta-maps-host-aliases` reads the running pasta's arguments
 and fails when an alias address (`host-gateway`, or a link-local or unique-local target outside every
-container subnet) is not mapped. A changed drop-in takes effect when the rootless network restarts,
+container subnet) is not mapped to the host by pasta's rules: the last mapping per IP version, and
+none for a version that pasta gives its own `-a` address. Under Podman 6 that rules out any IPv6
+mapping, so `basetool_host_public_name_aliases_v6` points the public names at the host's own public
+IPv6 address, which a container reaches directly (ADR-0196 Amendment 3). A changed drop-in takes effect when the rootless network restarts,
 that is when every container of the service user has stopped, at the latest at the next reboot.
 
 ### On the host
@@ -774,7 +784,8 @@ PowerShell here, and the comparison strips the carriage returns.
    No output is a match. A line starting `<` is a file the tag has and the host lacks or holds with other
    bytes: **that blocks the promotion**. A line starting `>` for a name that is not in the list is a
    leftover on the host (read it, it does not block); a `>` for a listed name is the other half of a
-   `<`.
+   `<`. The role's `scripts` tag removes the files it no longer installs (`redis-users.acl.tmpl`), so a
+   `>` line for one of them only means that tag has not run since its release.
 
 5. **On any `<` line, do not promote.** Run the role from a checkout **of that tag** (not `main`; the
    hashes must be the tag's), as an owner-approved production write:

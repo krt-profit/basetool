@@ -978,6 +978,12 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   `deploy` account itself never runs `podman`: every podman call goes through the sudo bridge as
   the service user, and the account's own registry credential (`REGISTRY_AUTH_FILE`, read by
   skopeo and cosign) is written by `skopeo login`.
+- **The journal is the only sudo record.** sudo logs every bridge call through syslog to the journal
+  and `/var/log/secure`, which alloy ships to Loki. No sudoers file sets a `logfile`: the sandboxed
+  deploy-account units cannot write one in `/var/log`, and giving them a `ReadWritePaths` entry for
+  a second, unshipped copy would widen their sandbox for nothing. The CIS rule that asks for one
+  (`sudo_custom_logfile`) is deselected in the role's tailoring, and `60-hardening.yml` removes a
+  `Defaults logfile=` line from `/etc/sudoers` and fails while any sudoers file still sets one.
 
   > [!note] Corrected 2026-09-22 — four directives this requirement named are gone, on purpose
   > It required `NoNewPrivileges`, `RestrictNamespaces`, an **empty** `CapabilityBoundingSet` and a
@@ -1052,10 +1058,14 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   `bin_t`, `/etc/basetool/deploy` `etc_t` and `/var/lib/basetool/deploy` `var_lib_t`; the host-script
   logs in `/var/log/basetool` stay `var_log_t` so logrotate can rotate them (ADR-0319,
   `tasks/40-selinux.yml`).
+- [ ] No file under `/etc/sudoers` or `/etc/sudoers.d` sets a sudo `logfile`; the tailoring deselects
+  `sudo_custom_logfile` and `60-hardening.yml` removes and refuses one. On a host,
+  `/var/log/basetool/*.log` carries no `unable to open log file` line from sudo.
 
 **Enforced by:** `scripts/basetool-deploy.service` (sandbox) · `scripts/deploy.sh` (`write_token_expiry_metric`,
 `HOME` for the cosign cache) · `monitoring/prometheus/alerts/ops-automation.yml` (token alerts) ·
 `ansible/roles/basetool_host/tasks/22-deploy-user.yml` (the sudoers bridge) ·
+`ansible/roles/basetool_host/tasks/60-hardening.yml` and `defaults/main.yml` (no sudo `logfile`) ·
 `scripts/basetool-*.timer`, `ansible/roles/basetool_host/templates/basetool-deploy-account-order.conf.j2`,
 `scripts/lib/container-runtime.sh` (`rt_runtime_visible`, `rt_probe_service_user`, `rt_login`) ·
 `scripts/container-runtime.test.sh` (the caller's credential through `skopeo login`) ·
@@ -1810,11 +1820,13 @@ for why the missing-probe half is not redundant.
   `basetool_host_public_name_aliases`; the role writes the drop-ins and removes them when the list
   is empty, and `env-reaches-the-units` fails when its first entry and `BASETOOL_KEYCLOAK_HOST_ALIAS`
   disagree.
-- [ ] The running pasta maps every address an alias points at: `host-gateway` and each link-local or
-  unique-local target outside the container subnets. The role writes the mapping as the service
-  user's drop-in `containers.conf.d/50-basetool.conf` and keeps no main user `containers.conf`, so the
-  vendor `containers.conf` stays in force under Podman 6; `pasta-maps-host-aliases` fails on an
-  unmapped address.
+- [ ] The running pasta maps every address an alias points at to the host: `host-gateway` and each
+  link-local or unique-local target outside the container subnets, judged by pasta's rules (the last
+  mapping per IP version, none for a version pasta gives its own `-a` address). Under Podman 6 an
+  IPv6 alias names the host's own public IPv6 address (ADR-0196 Amendment 3). The role writes the
+  mapping as the service user's drop-in `containers.conf.d/50-basetool.conf` and keeps no main user
+  `containers.conf`, so the vendor `containers.conf` stays in force under Podman 6;
+  `pasta-maps-host-aliases` fails on an alias pasta does not map to the host.
 - [ ] `BASETOOL_EXTRA_JAVA_OPTS` unset ⇒ `JAVA_TOOL_OPTIONS` is character-identical to before, and the
   truststore mount points at the same file as the keystore mount (read, but never consulted).
 - [ ] The documented trust store recipe starts from `$JAVA_HOME/lib/security/cacerts`, so selecting
@@ -3178,6 +3190,9 @@ after the apps, and the promotion failed.
   (`<sha256>  <path>` per file, `sha256sum -c` format), generated from the commit by
   `scripts/host-scripts-manifest.sh generate` in the `build-config` job, and the job fails when the
   file is missing or empty. A repo self-test keeps the list equal to what the role installs.
+- **A file the role stops installing is removed by it.** When a file leaves the list, the role's
+  `scripts` tag deletes it from `/opt/basetool/scripts` (`state: absent`, in the same task file as the
+  install), so after that run no retired file shows up as a leftover in the comparison below.
 - **The host compares on every tick.** `deploy.sh` keeps the deployed release's manifest as
   `/opt/basetool/host-scripts.sha256` (delivered and rolled back with the config tree) and hashes the
   listed files in its own directory against it on every tick that stages no bundle (a staging tick
@@ -3213,10 +3228,14 @@ after the apps, and the promotion failed.
   non-apply script warns and applies; the manifest is applied with the config tree and put back by a
   rollback.
 - [x] `host-scripts-manifest.test.sh`: the list equals what the role installs, the apply path is a
-  subset of it and covers what `deploy.sh` sources, `generate` is byte-exact from a revision and
+  subset of it and covers what `deploy.sh` sources, every file the role removes is neither listed nor
+  under `scripts/` (and `redis-users.acl.tmpl` is among them), `generate` is byte-exact from a revision and
   `sha256sum -c` accepts it, the config image and the release workflow ship it.
 - [x] `monitoring/prometheus/tests/host_scripts_drift_test.yml` covers both alerts, including the absent
   metric.
+- [x] `host-scripts-manifest.test.sh` checks the list against the role in both directions: every file
+  the role writes under `scripts/` is listed, and the number of destinations it reads equals the
+  list's length, so a parser that matches nothing fails.
 
 **Enforced by:** `scripts/deploy.sh` (`check_host_scripts_applied`, `assert_host_scripts_current_or_die`) ·
 `scripts/host-scripts-manifest.sh` · `scripts/host-scripts.list` · `docker/config/Dockerfile` ·
