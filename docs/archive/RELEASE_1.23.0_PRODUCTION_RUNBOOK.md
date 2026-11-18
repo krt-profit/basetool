@@ -1,3 +1,7 @@
+> **Archived 2026-11-18.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the hosts and the code as they were.
+>
+> **Current truth:** [`deployment.md`](../deployment.md). Index of the archive: [`README.md`](README.md).
+
 # Release 1.23.0 — production rollout runbook
 
 > **Doc type:** Operator runbook for **one** release — the move of production (and, through
@@ -6,14 +10,14 @@
 > exchange (ADR-0354) and the refinery orders on the exchange (#3174, ADR-0351). Written 2026-11-09
 > from an audit of the 38 pull requests between `v1.22.3` and `87f6a5896`, plus #3174, and from
 > read-only reads of production the same day. **Historical once 1.23.0 is live and §4 is done**:
-> move it to `docs/archive/` then and let [`deployment.md`](deployment.md) stay the living truth.
+> move it to `docs/archive/` then and let [`deployment.md`](../deployment.md) stay the living truth.
 >
 > **Every step that writes to a host, to Keycloak or to the live app is a production write**: it
 > waits for @greluc's explicit yes, in chat, to that exact command (AGENTS.md → *Production host
 > access*). Nothing here is approval, and no write in this document has been executed.
 
 Shell conventions (`cd /`, `${UCTL}`, `${UPOD}`) are the ones in
-[`deployment.md` → Shell conventions](deployment.md#shell-conventions-used-below).
+[`deployment.md` → Shell conventions](../deployment.md#shell-conventions-used-below).
 
 ---
 
@@ -38,7 +42,7 @@ Shell conventions (`cd /`, `${UCTL}`, `${UPOD}`) are the ones in
 
 ### 1.1 Host scripts
 
-Mandatory for every promotion ([`deployment.md` → Before a promotion](deployment.md#before-a-promotion-the-host-scripts)).
+Mandatory for every promotion ([`deployment.md` → Before a promotion](../deployment.md#before-a-promotion-the-host-scripts)).
 Run on 2026-11-09 against `v1.22.3`, `origin/main` and #3174's head: all 14 files match. Repeat it
 against the tag `v1.23.0` once it exists; a `<` line blocks the promotion.
 
@@ -54,7 +58,7 @@ UserSyncService : No users fetched from Keycloak.
 
 The last successful sync ran on 2026-11-05 04:00. `UserSyncStale` covers it. Disconnecting a
 connected app reaches the same Admin API. Step 1 of the role switch
-([`deployment.md` → Roles in the Basetool](deployment.md#roles-in-the-basetool-the-switch-and-its-rollback))
+([`deployment.md` → Roles in the Basetool](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback))
 needs a working sync, and the provisioner that assigns the scope also deletes the realm roles, so it
 must not run before the promotion. Assign the one scope by hand instead — exactly what the
 provisioner does later, so its run reports nothing for it:
@@ -106,7 +110,7 @@ From this moment until §3.2, a new Grafana login is denied; open Grafana sessio
 
 ### 3.1 Bring the realm to the new shape
 
-The kcadm session of [`keycloak/README.md` → Runbook](keycloak/README.md#runbook--a-kcadm-session-on-the-production-container),
+The kcadm session of [`keycloak/README.md` → Runbook](../keycloak/README.md#runbook--a-kcadm-session-on-the-production-container),
 with the provisioner of the tag `v1.23.0` (copy `provision-keycloak-realm.py`, `keycloak_kcadm.py` and
 `scripts/keycloak/` to the host), dry run first. The `basetool-provisioner` client needs the
 `kc-admin-api` default scope besides its two roles: without it the login succeeds and the first
@@ -118,7 +122,7 @@ python3 provision-keycloak-realm.py --realm basetool --public-origin https://pro
 ```
 
 The dry run exits `2` and lists, besides what
-[`deployment.md` step 6](deployment.md#roles-in-the-basetool-the-switch-and-its-rollback) names
+[`deployment.md` step 6](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback) names
 (the three realm roles deleted, `roles` withheld from `basetool-frontend`, Grafana's `client roles`
 mapper added and `realm roles` mapper removed, `view-realm` withdrawn from `backend-service` — under
 `[manual]` when the withdrawal is refused): the three `exchange.refinery.*` and the three
@@ -164,7 +168,7 @@ role gone.
    afterwards.
 2. **VerseKit in the registry** (Admin → Verbundene Anwendungen): grant `exchange.refinery.read`,
    `exchange.refinery.write`, `exchange.refinery.store` and `writesPerDay` = 2000
-   ([`legal/approved-clients.md`](legal/approved-clients.md)).
+   ([`legal/approved-clients.md`](../legal/approved-clients.md)).
 3. **Not now:** the three bank scopes for VerseKit and the bank switch wait for VerseKit 5.3.0; the
    switch stays off (REQ-BXCH-006).
 
@@ -173,10 +177,10 @@ role gone.
 Prefer a fix forward: there is no rollback that keeps the data written after the promotion.
 
 1. Stop the deploy timer, promote `1.22.3` (`gh workflow run promote.yml -f version=1.22.3`).
-2. Restore the §1.3 snapshot of the Basetool database ([`backup.md` → Restoring](backup.md#restoring-disaster-recovery));
+2. Restore the §1.3 snapshot of the Basetool database ([`backup.md` → Restoring](../backup.md#restoring-disaster-recovery));
    v1.22.3 does not start on the 1.23.0 schema.
 3. Run v1.22.3's provisioner, then `scripts/restore-keycloak-realm-roles.py` with `roles.tsv`, as in
-   [`deployment.md` → Rollback](deployment.md#roles-in-the-basetool-the-switch-and-its-rollback).
+   [`deployment.md` → Rollback](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback).
    v1.22.3's provisioner does not know `kc-admin-api`; keep the §1.2 assignment.
 4. Start the deploy timer.
 
