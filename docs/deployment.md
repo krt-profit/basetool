@@ -816,7 +816,9 @@ protection for a host that has not got the check yet, and it is how the first in
 > **1.23.0** (roles in the Basetool, P4K catalogue version 2, bank and refinery orders on the
 > exchange) → [`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.23.0_PRODUCTION_RUNBOOK.md);
 > **1.25.0** (the patch change, the ship origin, Grafana's Keycloak-only sign-in) →
-> [`RELEASE_1.25.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.25.0_PRODUCTION_RUNBOOK.md).
+> [`RELEASE_1.25.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.25.0_PRODUCTION_RUNBOOK.md); **1.26.0** (the Redis
+> split, Rocky 10.3 with Podman 6, both hosts) →
+> [`RELEASE_1.26.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.26.0_PRODUCTION_RUNBOOK.md).
 
 ```bash
 gh workflow run promote.yml -f version=1.9.3
