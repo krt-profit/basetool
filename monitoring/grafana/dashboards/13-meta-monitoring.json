@@ -301,7 +301,7 @@
       },
       "type": "timeseries",
       "title": "Log stream read rate (per tailed file)",
-      "description": "Lines/s Alloy reads per tailed file (loki_source_file_read_lines_total). A file going flat while others flow, or a path disappearing, is the LogStreamSilent signal.",
+      "description": "Lines/s Alloy reads per tailed file (loki_source_file_read_lines_total). A quiet file has no series here until its first new line after an Alloy restart; LogStreamSilent reads the tailer's loki_source_file_file_bytes_total instead, which is present for as long as the file is tailed.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

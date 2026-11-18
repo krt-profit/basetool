@@ -239,7 +239,7 @@ groups:
           description: "Loki ingested zero log lines for 30 minutes while baseline edge traffic should keep the app=\"edge\" stream flowing — the Alloy shipper or Loki ingest path is likely dead. All log-derived alerts are blind until it recovers."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path=~"/hostlog/(auth\\.log|secure)"})
+        expr: absent(loki_source_file_file_bytes_total{path=~"/hostlog/(auth\\.log|secure)"})
         for: 1h
         labels:
           severity: warning
@@ -249,7 +249,7 @@ groups:
           description: "Alloy is not tailing the host SSH log — /hostlog/auth.log on Debian, /hostlog/secure on the RHEL family, and neither is being read. The failed-auth / root-login / password-on-key-only-host detectors are blind. Check the /var/log mount and that the file is group-adm readable; on RHEL, rsyslog writes it root:root unless $FileGroup says otherwise."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/hostlog/audit/audit.log"})
+        expr: absent(loki_source_file_file_bytes_total{path="/hostlog/audit/audit.log"})
         for: 1h
         labels:
           severity: warning
@@ -259,7 +259,7 @@ groups:
           description: "Alloy is not tailing /hostlog/audit/audit.log — the sshd_config/authorized_keys tamper detector is blind. Confirm /var/log/audit is traversable (0750 root:adm) and log_group=adm in auditd.conf."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/logs/keycloak/keycloak.log"})
+        expr: absent(loki_source_file_file_bytes_total{path="/logs/keycloak/keycloak.log"})
         for: 1h
         labels:
           severity: warning
@@ -269,7 +269,7 @@ groups:
           description: "Alloy is not tailing /logs/keycloak/keycloak.log — KeycloakErrorRateHigh is blind, and with it the fail-open Discord SPI precheck, whose failure mode is a security gate degrading open while logins keep succeeding (no other signal exists). Check the /var/log/basetool/keycloak mount on the alloy container and that Keycloak still runs with `--log=console,file --log-file=/var/log/keycloak/keycloak.log`."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/logs/backend/backend.json"})
+        expr: absent(loki_source_file_file_bytes_total{path="/logs/backend/backend.json"})
         for: 1h
         labels:
           severity: warning
@@ -279,7 +279,7 @@ groups:
           description: "Alloy is not tailing /logs/backend/backend.json — the backend half of HealthContributorHanging is blind (the alert keeps evaluating on the frontend half, so it still looks healthy) and the backend's masked application log is missing from Grafana for incident review. Check the /var/log/basetool/backend mount and that the app's JSON file appender is still writing."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/logs/frontend/frontend.json"})
+        expr: absent(loki_source_file_file_bytes_total{path="/logs/frontend/frontend.json"})
         for: 1h
         labels:
           severity: warning
@@ -289,7 +289,7 @@ groups:
           description: "Alloy is not tailing /logs/frontend/frontend.json — FrontendKeycloakBackchannelFailing (the 2026-07-22 lost-token-grant detector) is blind, and so is the frontend half of HealthContributorHanging. Check the /var/log/basetool/frontend mount and that the app's JSON file appender is still writing."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/logs/ingest/ingest.json"})
+        expr: absent(loki_source_file_file_bytes_total{path="/logs/ingest/ingest.json"})
         for: 1h
         labels:
           severity: warning
@@ -299,7 +299,7 @@ groups:
           description: "Alloy is not tailing /logs/ingest/ingest.json — no Loki ruler alert reads this stream today, so nothing else will notice; the loss is forensic, and it lands exactly when an IngestHandoffErrors or ExchangeRelayFailing page needs the gateway's own log. Check the /var/log/basetool/ingest mount and that the app's JSON file appender is still writing."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/hostlog/fail2ban.log"})
+        expr: absent(loki_source_file_file_bytes_total{path="/hostlog/fail2ban.log"})
         for: 1h
         labels:
           severity: warning
@@ -309,7 +309,7 @@ groups:
           description: "Alloy is not tailing /hostlog/fail2ban.log — the record of SSH-jail bans/unbans is gone, so an SshFailedAuthSpike can no longer be read against whether fail2ban actually banned the source. Check the /var/log mount and that fail2ban.log is 0640 root:adm (Alloy reads it via its supplementary adm group)."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/hostlog/basetool/deploy.log"})
+        expr: absent(loki_source_file_file_bytes_total{path="/hostlog/basetool/deploy.log"})
         for: 1h
         labels:
           severity: warning

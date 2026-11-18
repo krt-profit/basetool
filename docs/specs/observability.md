@@ -3371,10 +3371,17 @@ therefore alerts on:
   stop firing if Alloy stops tailing, because `rate()` over an absent stream is empty, not zero, and
   `TargetDown` cannot see a healthy-but-not-shipping Alloy. `LokiIngestSilent` (whole-pipeline
   silence), per-tail `LogStreamSilent` (via `absent()` of that file's
-  `loki_source_file_read_lines_total` series — a tailed file keeps its series present even when
-  quiet, so absence means the file is not being tailed at all, the permission-drift failure
-  `config.alloy` warns about) and `LokiWriteFailing` (shipper-side entry drops) — all warning — cover
-  it. **`LogStreamSilent` guards eight tails, each its own rule with a distinct `stream` label:**
+  `loki_source_file_file_bytes_total` gauge) and `LokiWriteFailing` (shipper-side entry drops) — all
+  warning — cover it. Alloy sets that gauge when a file's tailer first reaches the end of the file
+  and deletes it when the tailer stops, so it is present for exactly as long as the file is tailed,
+  quiet or not; its absence means the file is not being tailed at all, the permission-drift failure
+  `config.alloy` warns about. **`loki_source_file_read_lines_total` must not be the guard:** its
+  series is created by the first line a tailer reads, so after every Alloy restart (each monitoring
+  reconcile and each Ansible run replaces the process) a file that receives no new line stays absent
+  and fires on a healthy host. `fail2ban.log` is such a file: with SSH reachable only over Tailscale
+  it gains lines only when fail2ban itself restarts. Locked by
+  `logstreamsilent_tailer_presence_test.yml`. **`LogStreamSilent` guards eight tails, each its own
+  rule with a distinct `stream` label:**
   `host-auth`, `host-auditd`, `host-fail2ban`, `keycloak`, `backend`,
   `frontend`, `ingest` and `ops-deploy`. (It guarded ten until 2026-09-20; the `npm-access` /
   `npm-error` file tails were removed with their producer, NPM.) It is deliberately **one rule per
@@ -3393,7 +3400,7 @@ therefore alerts on:
   (ADR-0095), `keycloak-stdout`, the `mon-*` streams, `edge`, `acme` and `postgres-*` — are
   deliberately given **no** per-stream liveness alert, for two independent reasons: neither
   container-stdout source (`loki.source.docker` before 2026-09-20, `loki.source.journal` since)
-  exposes a per-target `loki_source_file_read_lines_total` series to take `absent()` of, and a
+  exposes a per-target `loki_source_file_*` series to take `absent()` of, and a
   native-error breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a quiet
   stream would be a permanent false alarm. Whole-pipeline silence is still caught by
   `LokiIngestSilent` — **but not partial silence**: on cutover day the journal source read a path

@@ -1,0 +1,123 @@
+rule_files:
+  - ../alerts/meta.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - every file is tailed and fail2ban and keycloak have had no new line since the Alloy restart
+    interval: 1m
+    input_series:
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/secure"}'
+        values: "11688267+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/audit/audit.log"}'
+        values: "7913305+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/keycloak/keycloak.log"}'
+        values: "3999+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/backend/backend.json"}'
+        values: "4751135+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/frontend/frontend.json"}'
+        values: "22578690+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/ingest/ingest.json"}'
+        values: "3440573+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/fail2ban.log"}'
+        values: "4617+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/basetool/deploy.log"}'
+        values: "895191+0x120"
+      - series: 'loki_source_file_read_lines_total{path="/logs/backend/backend.json"}'
+        values: "0+20x120"
+      - series: 'loki_source_file_read_lines_total{path="/logs/frontend/frontend.json"}'
+        values: "0+60x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: LogStreamSilent
+        exp_alerts: []
+
+  - name: loud - fail2ban.log is not tailed at all and the other seven are
+    interval: 1m
+    input_series:
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/secure"}'
+        values: "11688267+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/audit/audit.log"}'
+        values: "7913305+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/keycloak/keycloak.log"}'
+        values: "3999+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/backend/backend.json"}'
+        values: "4751135+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/frontend/frontend.json"}'
+        values: "22578690+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/ingest/ingest.json"}'
+        values: "3440573+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/basetool/deploy.log"}'
+        values: "895191+0x120"
+    alert_rule_test:
+      - eval_time: 50m
+        alertname: LogStreamSilent
+        exp_alerts: []
+      - eval_time: 70m
+        alertname: LogStreamSilent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              stream: host-fail2ban
+              path: /hostlog/fail2ban.log
+            exp_annotations:
+              summary: "Log stream not being tailed: fail2ban"
+              description: "Alloy is not tailing /hostlog/fail2ban.log — the record of SSH-jail bans/unbans is gone, so an SshFailedAuthSpike can no longer be read against whether fail2ban actually banned the source. Check the /var/log mount and that fail2ban.log is 0640 root:adm (Alloy reads it via its supplementary adm group)."
+
+  - name: loud - the keycloak tailer stops and Alloy deletes its gauge
+    interval: 1m
+    input_series:
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/secure"}'
+        values: "11688267+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/audit/audit.log"}'
+        values: "7913305+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/keycloak/keycloak.log"}'
+        values: "3999+0x20 stale"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/backend/backend.json"}'
+        values: "4751135+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/frontend/frontend.json"}'
+        values: "22578690+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/ingest/ingest.json"}'
+        values: "3440573+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/fail2ban.log"}'
+        values: "4617+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/basetool/deploy.log"}'
+        values: "895191+0x120"
+    alert_rule_test:
+      - eval_time: 75m
+        alertname: LogStreamSilent
+        exp_alerts: []
+      - eval_time: 85m
+        alertname: LogStreamSilent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              stream: keycloak
+              path: /logs/keycloak/keycloak.log
+            exp_annotations:
+              summary: "Log stream not being tailed: Keycloak"
+              description: "Alloy is not tailing /logs/keycloak/keycloak.log — KeycloakErrorRateHigh is blind, and with it the fail-open Discord SPI precheck, whose failure mode is a security gate degrading open while logins keep succeeding (no other signal exists). Check the /var/log/basetool/keycloak mount on the alloy container and that Keycloak still runs with `--log=console,file --log-file=/var/log/keycloak/keycloak.log`."
+
+  - name: silent - host-auth reads /hostlog/auth.log on a Debian host
+    interval: 1m
+    input_series:
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/auth.log"}'
+        values: "52311+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/audit/audit.log"}'
+        values: "7913305+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/keycloak/keycloak.log"}'
+        values: "3999+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/backend/backend.json"}'
+        values: "4751135+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/frontend/frontend.json"}'
+        values: "22578690+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/logs/ingest/ingest.json"}'
+        values: "3440573+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/fail2ban.log"}'
+        values: "4617+0x120"
+      - series: 'loki_source_file_file_bytes_total{path="/hostlog/basetool/deploy.log"}'
+        values: "895191+0x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: LogStreamSilent
+        exp_alerts: []
