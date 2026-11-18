@@ -184,8 +184,9 @@ as the `backend-service` confidential client's service account. Because the buil
 here instead.
 
 **Keycloak 26.8.2 requires an Admin API audience and scope.** Assign the built-in `kc-admin-api`
-client scope to `backend-service` as a default scope through the realm provisioner (REQ-OPS-033).
-The scope supplies the realm's Admin API audience and includes `kc-admin-api` in the token's
+client scope to `backend-service` as a default scope through the realm provisioner (REQ-OPS-033);
+on a testing system, `--seed-client` gives the `basetool-seed` client the same default scope for the
+briefing seed's account management (REQ-OPS-050). The scope supplies the realm's Admin API audience and includes `kc-admin-api` in the token's
 `scope` claim. Roles alone are insufficient: custom clients without this assignment receive `401`.
 The provisioner references the existing built-in scope and leaves its mapper and Keycloak's
 security check intact; a missing built-in scope requires a correctly upgraded realm. Generated

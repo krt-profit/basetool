@@ -60,7 +60,13 @@ STAFFELN = (
     ("Test-Staffel Charlie", "TSC"),
 )
 SPECIAL_COMMAND = ("Test-Spezialkommando", "TSK")
-BEREICHE = (("Test-Bereich Logistik", "TBL"), ("Test-Bereich Einsatz", "TBE"))
+PROFIT_DEPARTMENT = "PROFIT"
+# The one Profit Bereich parents every test Staffel and the special command, which makes them the
+# eligible responsible units of the order system (REQ-ORDERS-050); the other Bereich has none.
+BEREICHE = (
+    ("Test-Bereich Logistik", "TBL", PROFIT_DEPARTMENT),
+    ("Test-Bereich Einsatz", "TBE", None),
+)
 ORGANISATIONSLEITUNG = ("Test-Organisationsleitung", "TOL")
 
 TRACK_MEMBER = "Mitglied"
@@ -578,10 +584,10 @@ class Seeder:
         """Sign every account in once, approve the pending ones, assign the roles and accept the
         terms. `seed-admin` must be an Admin of the Basetool first, as a bootstrap subject."""
         for account in self.accounts:
-            me = self.api.call(account, "GET", "/users/me", ok=(200, 403))
-            if isinstance(me, dict) and me.get("id"):
-                account.user_id = me["id"]
-        self.api.post(self.admin, "/terms/acceptance")
+            self.sign_in(account)
+        self.api.call(self.admin, "POST", "/terms/acceptance", ok=(200, 201, 204, 403))
+        if not self.admin.user_id:
+            self.sign_in(self.admin)
         self.require_admin()
         pending = {
             r["username"]: r
@@ -603,6 +609,16 @@ class Seeder:
             self.api.post(account, "/terms/acceptance")
             if not account.user_id:
                 account.user_id = self.api.get(account, "/users/me")["id"]
+
+    def sign_in(self, account: Account) -> None:
+        """Read `account`'s Basetool id, which a pending registration does not yet reveal.
+
+        The login that grants a bootstrap subject Admin still answers 403; the next one returns
+        the id.
+        """
+        me = self.api.call(account, "GET", "/users/me", ok=(200, 403))
+        if isinstance(me, dict) and me.get("id"):
+            account.user_id = me["id"]
 
     def require_admin(self) -> None:
         """Stop unless `seed-admin` holds Admin in the Basetool, naming the bootstrap setting.
@@ -677,21 +693,24 @@ class Seeder:
                     "active": True,
                 },
             )
-        for name, short in BEREICHE:
+        profit_bereich = ""
+        for name, short, department in BEREICHE:
             bereich = self.api.post(
                 admin,
                 "/org-units/bereiche",
                 {
                     "name": name,
                     "shorthand": short,
-                    "department": "PROFIT",
+                    **({"department": department} if department else {}),
                     "active": True,
                     "description": "Testdaten für die Einweisung",
                     "parentOrgUnitId": ol["id"],
                 },
             )
             self.bereiche.append(bereich["id"])
-        for index, (name, short) in enumerate(STAFFELN):
+            if department == PROFIT_DEPARTMENT:
+                profit_bereich = bereich["id"]
+        for name, short in STAFFELN:
             squadron = self.api.post(
                 admin,
                 "/squadrons",
@@ -699,7 +718,6 @@ class Seeder:
                     "name": name,
                     "shorthand": short,
                     "active": True,
-                    "isProfitEligible": True,
                     "description": "Testdaten für die Einweisung",
                 },
             )
@@ -708,7 +726,7 @@ class Seeder:
             self.api.patch(
                 admin,
                 f"/org-units/{squadron['id']}/parent",
-                {"parentOrgUnitId": self.bereiche[min(index, 1)], "version": squadron["version"]},
+                {"parentOrgUnitId": profit_bereich, "version": squadron["version"]},
             )
         command = self.api.post(
             admin,
@@ -717,7 +735,6 @@ class Seeder:
                 "name": SPECIAL_COMMAND[0],
                 "shorthand": SPECIAL_COMMAND[1],
                 "active": True,
-                "isProfitEligible": True,
                 "description": "Testdaten für die Einweisung",
             },
         )
@@ -725,9 +742,12 @@ class Seeder:
         self.api.patch(
             admin,
             f"/org-units/{command['id']}/parent",
-            {"parentOrgUnitId": self.bereiche[0], "version": command["version"]},
+            {"parentOrgUnitId": profit_bereich, "version": command["version"]},
         )
-        print(f"  {len(self.staffeln)} Staffeln, 1 Spezialkommando, {len(self.bereiche)} Bereiche")
+        print(
+            f"  {len(self.staffeln)} Staffeln and 1 Spezialkommando under the Profit Bereich, "
+            f"{len(self.bereiche)} Bereiche"
+        )
 
     def load_org_structure(self) -> None:
         """Read back the ids of an existing test org structure."""
@@ -744,14 +764,6 @@ class Seeder:
     def memberships(self) -> None:
         """Staffel and special-command memberships, role flags, ranks and the leads."""
         admin = self.admin
-        for squadron in self.staffeln.values():
-            self.api.patch(admin, f"/squadrons/{squadron}/profit-eligible", {"eligible": True})
-        if self.special_command:
-            self.api.patch(
-                admin,
-                f"/special-commands/{self.special_command}/profit-eligible",
-                {"eligible": True},
-            )
         groups = {
             short: self.api.post(
                 admin, f"/squadrons/{squadron}/kommando-groups", {"name": "Kommandogruppe Rot"}
@@ -807,10 +819,7 @@ class Seeder:
                 {"role": "LEITER", "userId": leader.user_id},
             )
         self.api.keycloak.forget_tokens()
-        print(
-            f"  {sum(1 for a in self.accounts if a.staffel or a.special_command)} memberships, "
-            f"every test unit profit-eligible"
-        )
+        print(f"  {sum(1 for a in self.accounts if a.staffel or a.special_command)} memberships")
 
     def settings(self) -> None:
         """Switch Bedarf & Spenden on, keep Ankauf off and open every test unit for donations."""
@@ -861,13 +870,7 @@ class Seeder:
             if kind == "RAW":
                 body["isManualRawMaterial"] = True
             pool.append(self.api.post(admin, "/materials", body))
-        locations = content(self.api.get(admin, "/locations/lookup"))
-        if not locations:
-            locations = [
-                self.api.post(
-                    admin, "/locations", {"name": "Test-Station Port Olisar", "hidden": False}
-                )
-            ]
+        locations = content(self.api.get(admin, "/locations/lookup")) or [self.storage_place()]
         refineries = content(self.api.get(admin, "/locations/refineries"))
         methods = content(self.api.get(admin, "/refining-methods"))
         if not methods:
@@ -907,6 +910,42 @@ class Seeder:
             f"  {len(raw)} raw / {len(refined)} refined materials, {len(locations)} locations, "
             f"{len(ship_types)} ship types"
         )
+
+    def storage_place(self) -> dict:
+        """Create the test storage place on the first visible starmap object that carries none.
+
+        A storage place sits on a starmap object (REQ-P4K-036), and only the P4K import creates
+        those, so an emptied testing database needs that import before the seed.
+        """
+        page = 0
+        while True:
+            result = self.api.get(
+                self.admin, f"/catalog/admin/starmap/objects?page={page}&size=200"
+            )
+            target = next(
+                (
+                    o
+                    for o in content(result)
+                    if o.get("visible") and not o.get("retired") and not o.get("storagePlaceId")
+                ),
+                None,
+            )
+            if target is not None:
+                return self.api.post(
+                    self.admin,
+                    "/locations",
+                    {
+                        "name": "Test-Station Port Olisar",
+                        "hidden": False,
+                        "starmapObjectId": target["id"],
+                    },
+                )
+            page += 1
+            if page >= (result or {}).get("totalPages", 0):
+                raise SeedError(
+                    "the catalogue has no storage place and no visible starmap object to put one "
+                    "on; run the P4K import on the testing system, then the seed again"
+                )
 
     def all_pages(self, account: Account, path: str) -> list:
         """Every row of a paged list endpoint, read in pages of 200."""
@@ -1036,8 +1075,10 @@ class Seeder:
         print(f"  {sum(len(r) for r in self.stock.values())} rows, {stolen}")
 
     def job_orders(self) -> None:
-        """Open, in-progress and done job orders with priorities, Bearbeiter and SK claims."""
-        member = self.by_name("demo-mitglied")
+        """Open, in-progress and done job orders with priorities, Bearbeiter and Staffel claims.
+
+        Alpha's Logistiker creates them, as a writer of the requesting unit (REQ-ORDERS-053).
+        """
         logistician = self.by_name("demo-logistiker")
         alpha = self.staffeln[STAFFELN[0][1]]
         specs = [
@@ -1051,7 +1092,7 @@ class Seeder:
             if not responsible:
                 continue
             order = self.api.post(
-                member,
+                logistician,
                 "/orders",
                 {
                     "responsibleOrgUnitId": responsible,
@@ -1744,6 +1785,78 @@ def bootstrap_selftest() -> bool:
     return True
 
 
+class ActivationPassed(Exception):
+    """Raised by `FakeSignInApi` once the activation gets past the Admin check."""
+
+
+class FakeSignInApi:
+    """The sign-in, terms and role-read endpoints of the Basetool API in memory, for the self-test.
+
+    `pending` answers every call with 403, as for a registration no admin approved; otherwise
+    seed-admin's first `/users/me` still answers 403, as the login that grants the bootstrap Admin.
+    """
+
+    def __init__(self, pending: bool):
+        self.pending = pending
+        self.signed_in: set[str] = set()
+
+    def call(
+        self,
+        account: Account,
+        method: str,
+        path: str,
+        body: Any = None,
+        ok: tuple[int, ...] = (200, 201, 204),
+    ) -> Any:
+        """Answer `/users/me`, `/terms/acceptance` and `/users/{id}/roles`; stop at anything else."""
+        if path == "/users/me":
+            first = account.username not in self.signed_in
+            self.signed_in.add(account.username)
+            granting = account.username == "seed-admin" and first
+            status = 403 if self.pending or granting else 200
+            data = {"id": f"id-{account.username}"}
+        elif path == "/terms/acceptance":
+            status, data = (403 if self.pending else 200), None
+        elif path.endswith("/roles"):
+            status, data = (403 if self.pending else 200), {"roles": [ROLE_ADMIN]}
+        else:
+            raise ActivationPassed(path)
+        if status not in ok:
+            raise SeedError(f"{account.username}: {method} {path} -> HTTP {status}")
+        return data if status == 200 else None
+
+    def get(self, account: Account, path: str) -> Any:
+        """GET `path` as `account`."""
+        return self.call(account, "GET", path)
+
+    def post(self, account: Account, path: str, body: Any = None) -> Any:
+        """POST `body` to `path` as `account`."""
+        return self.call(account, "POST", path, body)
+
+
+def activation_selftest() -> bool:
+    """Whether the activation names the bootstrap setting for a pending seed-admin and gets past
+    the Admin check in the run whose first login grants it."""
+    accounts = plan_accounts(3)
+    admin = next(a for a in accounts if a.username == "seed-admin")
+    admin.keycloak_id = "kc-seed-admin"
+    try:
+        Seeder(FakeSignInApi(pending=True), accounts, Path(".")).activate()
+        return False
+    except SeedError as error:
+        if f"APP_BOOTSTRAP_ADMIN_SUBS={admin.keycloak_id}" not in str(error):
+            return False
+    for account in accounts:
+        account.user_id = ""
+    try:
+        Seeder(FakeSignInApi(pending=False), accounts, Path(".")).activate()
+        return False
+    except ActivationPassed:
+        return admin.user_id == "id-seed-admin"
+    except SeedError:
+        return False
+
+
 def selftest() -> int:
     """Check the offline parts: account plan, production guard, handout and extractor sample."""
     failures: list[str] = []
@@ -1799,8 +1912,16 @@ def selftest() -> int:
         all(set(a.roles) <= set(BASETOOL_ROLES) for a in accounts),
         "every planned role is a Basetool role code",
     )
+    check(
+        [department for _, _, department in BEREICHE].count(PROFIT_DEPARTMENT) == 1,
+        "exactly one Bereich is the Profit Bereich",
+    )
     check(roles_selftest(), "roles are assigned through the Basetool role API, once")
     check(bootstrap_selftest(), "a seed-admin without Admin stops the seed with the bootstrap hint")
+    check(
+        activation_selftest(),
+        "a pending seed-admin gets the bootstrap hint; the granting login does not stop the seed",
+    )
     for url in (
         "https://profit-base.online",
         "https://auth.profit-base.online/auth",

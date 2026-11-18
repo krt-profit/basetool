@@ -199,6 +199,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/seed-briefing.py --selftest
 
+      - name: briefing-seed / Self-test the seed's API contract check
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-seed-api-contract.py --selftest
+
+      - name: briefing-seed / Check the seed's API calls against the committed OpenAPI
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-seed-api-contract.py
+
       - name: briefing-seed / Self-test the testing-host database reset
         if: ${{ !cancelled() }}
         run: bash scripts/testing-reset.test.sh

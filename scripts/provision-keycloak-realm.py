@@ -371,7 +371,7 @@ def seed_client_spec(realm: str) -> ClientSpec:
         attributes={**_CONFIDENTIAL_ATTRIBUTES, "oauth2.jwt.authorization.grant.enabled": "false"},
         redirect_uris=[],
         web_origins=[],
-        default_scopes=[*_STANDARD_DEFAULT, "extractor-ingest", "service_account"],
+        default_scopes=[*_STANDARD_DEFAULT, "extractor-ingest", "service_account", ADMIN_API_SCOPE],
         optional_scopes=list(_OPTIONAL_WITHOUT_OFFLINE),
         withheld_scopes=[OFFLINE_ACCESS],
         withheld_scope_reason=_NO_OFFLINE_SESSION,

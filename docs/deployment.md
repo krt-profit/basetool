@@ -1005,7 +1005,10 @@ for a production origin, and the reset refuses a host whose `basetool.env` lacks
 1. Create the seed client with the realm provisioner, as in [Keycloak realm shape](#keycloak-realm-shape)
    (the kcadm session of `docs/keycloak/README.md`), adding `--seed-client`: dry run first, then
    `--apply`. Read the secret in the Admin Console → Clients → `basetool-seed` → Credentials and keep
-   it in the password manager. It goes into no host `basetool.env`.
+   it in the password manager. It goes into no host `basetool.env`. The client carries the
+   `kc-admin-api` default scope; without it Keycloak answers the seed's first account lookup with
+   `401`. A seed client created before the provisioner assigned that scope gets it from the same
+   `--seed-client` dry run and `--apply`.
 2. Let the testing backend accept the client: set
    `BASETOOL_BACKEND_ACCEPTED_CLIENT_IDS=basetool-frontend,basetool-ingest-gateway,basetool-seed` in
    `/etc/basetool/basetool.env`, render `env.d/` and restart the backend as in
@@ -1018,6 +1021,13 @@ for a production origin, and the reset refuses a host whose `basetool.env` lacks
    `/etc/basetool/basetool.env`, render `env.d/`, restart the backend and run the seed again. The
    grant applies while no other active admin exists, which is the case on an emptied testing
    database; the id stays valid until `purge` deletes the account.
+
+**Before seeding an emptied database**
+
+Run the P4K import and the UEX sync in the admin area first. A storage place sits on a starmap
+object, which only the P4K import creates; without one the seed stops its catalogue step and seeds
+nothing else. Ship types and the refinery location come from the UEX sync; without them the hangar and
+refinery domains are reported as failed.
 
 **Seeding**
 
