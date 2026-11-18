@@ -103,13 +103,13 @@ retired_entries() {
 scenario_role_removes_the_retired_files() {
   echo "Scenario: the role removes the files it retired, and none of them is still listed"
   local rel
-  if retired_entries | grep -qxF -- "redis-users.acl.tmpl"; then
+  if grep -qxF -- "redis-users.acl.tmpl" <<<"$(retired_entries)"; then
     record 1 "the role removes redis-users.acl.tmpl"
   else
     record 0 "the role removes redis-users.acl.tmpl"
   fi
   for rel in $(retired_entries); do
-    if list_entries | grep -qxF -- "${rel}"; then
+    if grep -qxF -- "${rel}" "${LIST}"; then
       record 0 "the retired ${rel} is still in the list"
     else
       record 1 "the retired ${rel} is not in the list"
