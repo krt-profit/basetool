@@ -66,6 +66,10 @@ class OrdersCreateFormPatternRenderTest {
 
   private static final Pattern FORM = Pattern.compile("(?s)<form\\b.*?</form>");
 
+  private static final String NO_PROFIT_UNIT =
+      "In der Profit-Hierarchie steht gerade keine aktive Einheit als bearbeitende Einheit zur"
+          + " Auswahl.";
+
   @Autowired private WebApplicationContext context;
 
   @MockitoBean private BackendApiClient backendApiClient;
@@ -155,7 +159,8 @@ class OrdersCreateFormPatternRenderTest {
         .contains("data-modal-id=\"orders-scmdb-modal\" data-testid=\"orders-scmdb-open\"")
         .contains("id=\"scmdb-import-text\"")
         .containsPattern("id=\"comment-count\"[^>]*>0 / 1000<")
-        .contains("id=\"minquality-options-template\" hidden");
+        .contains("id=\"minquality-options-template\" hidden")
+        .doesNotContain(NO_PROFIT_UNIT);
 
     try (InputStream template =
         getClass().getResourceAsStream("/templates/joborder/orders-create.html")) {
@@ -211,6 +216,49 @@ class OrdersCreateFormPatternRenderTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void itemEditFormHidesTheKindAndSavesChanges() throws Exception {
     CapabilityStubs.logistician(backendApiClient);
+    UUID id = stubEditableItemOrder();
+
+    String html = render("/orders/" + id + "/items/edit");
+
+    assertThat(html)
+        .contains("<h1>Auftrag bearbeiten</h1>")
+        .containsPattern("class=\"krt-segmented [^\"]*\"[^>]*hidden=\"hidden\"")
+        .containsPattern("name=\"orderModeToggle\" value=\"item\"[^>]*checked=\"checked\"")
+        .containsPattern("id=\"mode-material\" hidden=\"hidden\"")
+        .doesNotContain("id=\"mode-item\" hidden")
+        .containsPattern("id=\"item-comment-count\"[^>]*>4 / 1000<")
+        .contains("/orders/" + id + "/items/update");
+    List<String> forms = forms(html);
+    assertThat(forms).hasSize(2);
+    assertThat(forms.get(1)).contains("Änderungen speichern").doesNotContain("Auftrag anlegen");
+  }
+
+  /**
+   * The item editor names the missing Profit unit once, in the visible item form, when the eligible
+   * responsible units come back empty (REQ-ORDERS-050).
+   */
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
+  void itemEditWithoutProfitUnitsNamesTheMissingUnitInTheItemForm() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
+    UUID id = stubEditableItemOrder();
+    doReturn(List.of())
+        .when(backendApiClient)
+        .get(eq("/api/v1/org-units/profit-responsible"), anyTypeRef());
+
+    List<String> forms = forms(render("/orders/" + id + "/items/edit"));
+
+    assertThat(forms).hasSize(2);
+    assertThat(forms.get(0)).doesNotContain(NO_PROFIT_UNIT);
+    assertThat(forms.get(1)).containsOnlyOnce(NO_PROFIT_UNIT);
+  }
+
+  /**
+   * Answers the order read with an open item order the caller may process.
+   *
+   * @return the stubbed order's id
+   */
+  private @NotNull UUID stubEditableItemOrder() {
     UUID id = UUID.randomUUID();
     JobOrderDto order =
         new JobOrderDto(
@@ -245,19 +293,6 @@ class OrdersCreateFormPatternRenderTest {
     doReturn(order)
         .when(backendApiClient)
         .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
-
-    String html = render("/orders/" + id + "/items/edit");
-
-    assertThat(html)
-        .contains("<h1>Auftrag bearbeiten</h1>")
-        .containsPattern("class=\"krt-segmented [^\"]*\"[^>]*hidden=\"hidden\"")
-        .containsPattern("name=\"orderModeToggle\" value=\"item\"[^>]*checked=\"checked\"")
-        .containsPattern("id=\"mode-material\" hidden=\"hidden\"")
-        .doesNotContain("id=\"mode-item\" hidden")
-        .containsPattern("id=\"item-comment-count\"[^>]*>4 / 1000<")
-        .contains("/orders/" + id + "/items/update");
-    List<String> forms = forms(html);
-    assertThat(forms).hasSize(2);
-    assertThat(forms.get(1)).contains("Änderungen speichern").doesNotContain("Auftrag anlegen");
+    return id;
   }
 }

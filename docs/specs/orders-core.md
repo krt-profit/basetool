@@ -1,4 +1,4 @@
-> **Doc type:** Living spec. Last reviewed: 2026-11-11.
+> **Doc type:** Living spec. Last reviewed: 2026-11-18.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0356, ADR-0359, ADR-0360
 
 # Shared JobOrder model
@@ -50,6 +50,11 @@ cannot be a second Profit designation. The active Profit Bereich itself and its 
 Staffeln and Spezialkommandos are eligible responsible units. Retire isProfitEligible as an
 independent eligibility/access setting for Staffeln and SKs throughout the Auftragssystem.
 
+Every responsible-unit picker offers exactly these eligible units. The create form opens only with
+at least one of them (REQ-ORDERS-053). When the item editor's picker has none, the form says that
+no active unit of the Profit hierarchy can be chosen and names no setting, because no setting
+outside the hierarchy can make a unit eligible.
+
 The Profit Bereich may be directly responsible; it is not merely an intake address. A writer
 of the current responsible unit may transfer responsibility immediately and unilaterally to a
 valid target within the order's original Profit hierarchy boundary. No target acceptance is
@@ -69,12 +74,15 @@ the recovery path then. The transfer submits the responsibility version the live
   flag cannot admit an outside unit or exclude a unit within the actual eligible hierarchy.
 - [ ] Reassignment takes effect without target approval and retains requester/history.
 - [ ] The detail page offers the transfer only through its dialog and only with the capability.
+- [ ] A responsible-unit picker without an eligible unit names the missing Profit unit and no
+  per-unit setting.
 
 **Enforced by:** The MATERIAL/ITEM foundation is covered by
 `JobOrderHierarchyAuthorityIntegrationTest`, `ProfitHierarchyIntegrationTest`,
 `ProfitHierarchyWriteRaceIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
 `ProfitHierarchyNoticeIntegrationTest` and `V379ProfitHierarchyMigrationTest`; the detail-page
-dialog by `OrdersDetailPatternRenderTest` and `JobOrderResponsibilityRecoveryMvcTest`.
+dialog by `OrdersDetailPatternRenderTest` and `JobOrderResponsibilityRecoveryMvcTest`; the empty
+responsible-unit picker by `OrdersCreateFormPatternRenderTest`.
 The aUEC workflow follows its own implementation slice.
 **Issues:** #3193, #3197, #3200
 

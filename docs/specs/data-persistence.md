@@ -432,9 +432,9 @@ Invariants that must hold:
   lands, a later one throws) still drops the cache rather than stranding the persisted threshold until
   the TTL. Caching them is therefore allowed under the eviction gate above.
 - **Every SpecialCommand lifecycle mutation evicts precisely**: `AdminSpecialCommandsPageController`'s
-  create / update / soft-delete / re-activate (classic **and** AJAX twins) and
-  `SpecialCommandAdminProxyController`'s profit-eligible flip call `evict(SQUADRON, ORG_UNIT)`, because an
-  SK's name / shorthand / active / profit-eligible fields feed the cached org-unit pickers below.
+  create / update / soft-delete / re-activate (classic **and** AJAX twins) call
+  `evict(SQUADRON, ORG_UNIT)`, because an SK's name / shorthand / active fields feed the cached
+  org-unit pickers below.
   Member-roster mutations (add / remove / flags / lead) change none of those fields, so they deliberately
   do **not** evict. The admin switcher no longer reads an SK catalogue at all: since ADR-0151 it asks the
   per-principal `GET /api/v1/org-units/me/switchable`, which is never cached.
@@ -479,10 +479,9 @@ Invariants that must hold:
 
 **Acceptance** (`OrgUnitContextAdviceTest`): `availableSquadrons()` routes the squadron catalogue
 through `getCached`, never a plain `get`; the switcher asks `/api/v1/org-units/me/switchable` and touches neither
-the squadron nor the SpecialCommand catalogue. (`AdminSpecialCommandsPageControllerMvcTest`,
-`SpecialCommandAdminProxyControllerTest`): every SK lifecycle mutation — create / update / delete /
-activate (classic and AJAX) and the profit-eligible flip — evicts `SQUADRON` and `ORG_UNIT`, while a
-member-roster mutation does not. (`AdminSettingsPageControllerMvcTest`): every settings save — classic
+the squadron nor the SpecialCommand catalogue. (`AdminSpecialCommandsPageControllerMvcTest`): every
+SK lifecycle mutation — create / update / delete / activate (classic and AJAX) — evicts `SQUADRON`
+and `ORG_UNIT`, while a member-roster mutation does not. (`AdminSettingsPageControllerMvcTest`): every settings save — classic
 and AJAX, including a partial save where a later PUT throws — clears the catalogue caches.
 (`AdminMaterialsPageControllerTest`): a material create and a field-edit AJAX write — including a
 `QUANTITY_TYPE` edit that the former `updateType` guard skipped — evict `MATERIAL`, while a rejected

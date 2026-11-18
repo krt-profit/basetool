@@ -93,7 +93,7 @@ maintain their own notes; membership or Profit reading alone grants no enrollmen
 visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003, ADR-0301).
 
 - **Who may be assigned.** A Logistician of the order may assign **any active account** (approved,
-  present and enabled in Keycloak), including members of units that are not profit-eligible; an
+  present and enabled in Keycloak), including members of units outside the Profit hierarchy; an
   inactive account answers `400`. The assignee picker
   (`GET /api/v1/orders/{id}/assignee-candidates?query=`, gated like assigning someone else) is a
   handle search over all active accounts, at most 20 hits: direct members of the processing
@@ -118,7 +118,7 @@ visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003, A
 - **Audit.** Adding or removing an assignee who is not a direct member of the processing unit
   records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in the
   Aufträge area instead of `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is visible
-  to them anyway (an SK-public order). The assignee is the target user; the details carry no
+  to them anyway (as a member of the Profit hierarchy). The assignee is the target user; the details carry no
   handle, unit name or free text (REQ-AUDIT-001). The removal by account erasure keeps its existing
   summary event.
 - **Notice.** The assignment notice of REQ-ORDERS-043 applies unchanged.

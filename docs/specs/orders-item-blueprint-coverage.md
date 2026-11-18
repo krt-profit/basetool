@@ -112,21 +112,20 @@ data exposed.
 - [ ] Queue/order/support/personal visibility alone does not reveal named blueprint owners.
 
 The blueprint-coverage view MUST be visible **only to members of the order's responsible
-squadron/SK** (and to admins, who hold system-wide oversight). This is **stricter** than the
-order's own visibility: an SK-responsible order is publicly readable by every profit-eligible
-member ([`security-and-access.md`](security-and-access.md)), but the named per-member coverage
-is restricted to members of that SK. The gate is
+unit** (and to admins, who hold system-wide oversight). This is **stricter** than the order's own
+visibility: every member of the Profit hierarchy, the requesting and supporting units and personal
+Bearbeiter read the order ([orders-core.md](orders-core.md), REQ-ORDERS-052), but the named
+per-member coverage is restricted to members of the responsible unit. The gate is
 `@jobOrderAccessPolicy.canSeeJobOrderBlueprintOwners`, which evaluates the standard org-unit
 scope predicate against the order's responsible org unit (so a non-admin matches only org
-units in their own membership set, with no SK-public escape). A non-member who can otherwise
-open a public SK order's detail page receives HTTP 403 from the endpoint, and the frontend
-simply omits the section. The global blueprint-sharing opt-in (`REQ-INV-018`) does **not** widen
+units in their own membership set). Any other reader who can open the order's detail page
+receives HTTP 403 from the endpoint, and the frontend simply omits the section. The global blueprint-sharing opt-in (`REQ-INV-018`) does **not** widen
 this gate — it changes only which owners are counted *inside* the view, never who may open it.
 
 **Acceptance**
 
 - [ ] A member of the responsible org unit receives the coverage view (HTTP 200).
-- [ ] A non-member who can read a public SK order's detail receives HTTP 403 from the
+- [ ] A reader of the order who is not a member of the responsible unit receives HTTP 403 from the
   coverage endpoint, and the detail page renders without the section.
 - [ ] An admin receives the coverage view for any order.
 

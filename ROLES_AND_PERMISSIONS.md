@@ -593,10 +593,10 @@ legacy provenance alone does not invalidate a currently eligible responsible uni
 unit members or leadership reading verifiable historical relations share the complete permitted
 order facts. Former individual membership confers no access. Requester edits require current requester authority, the observed need version and preservation
 of booked work. Shared read grants no Blueprint, Mission, unrelated Inventory, Bank or gateway right.
-⁴ Stricter than `canSeeJobOrder` — **no** SK-public escape: the coverage view
-names members by name together with their blueprints and is therefore limited to members
-of the **responsible** org unit. Anyone who sees the SK job order only
-via the public queue gets `403`; the frontend hides the section. Admins without a pin always,
+⁴ Stricter than `canSeeJobOrder`: the coverage view names members together with their
+blueprints and is therefore limited to members of the **responsible** org unit. Every other
+reader of the order — a Profit member of another unit, the requesting or a supporting unit, a
+personal editor — gets `403`; the frontend hides the section. Admins without a pin always,
 with a pin only for the matching unit.
 ⁵ Self-or-Logistician rule (`verifyAssigneeAccess`): anyone who sees the job order
 may add/remove **themselves** and maintain **their own** note (max. 500
@@ -610,9 +610,10 @@ in „Alle" and „Ich bearbeite", never in „Zu bearbeiten", and widens no oth
 claims, handovers, production, someone else's entry — answers `403`; the producer-owner panel retains its independent gate. Adding or removing an editor who is not a direct member of the processing unit is
 audited as `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `_REMOVED`.
 
-**Material contribution rights in the current SK workflow.** A current claim-management grant
-permits the matching Staffel's promises, with its observed version; it does not confer general
-order processing. Explicit provision attribution additionally needs the actual stock action's
+**Material contribution rights.** Staffel participation and material promises work on every
+MATERIAL and ITEM order, whichever Profit unit is responsible. The current writer grant of the
+Staffel or of the responsible unit permits that Staffel's promises, with its observed version; it
+does not confer general order processing. Explicit provision attribution additionally needs the actual stock action's
 Inventory rights. Read access alone does not permit attribution or correction.
 
 The optional provision picker uses the declared material and quality to read only currently
@@ -1291,15 +1292,19 @@ active unit or sole option preselected.
   (a) **ownerless Bereichsleitung operations** (V145) are visible to all
   members-or-above and (b) **participants** of the linked
   missions view the operation across Staffeln (#500; details in the box in §3.6).
-- **Conditionally staffel-scoped**: `JobOrder` (+ `JobOrderMaterial` /
-  `JobOrderHandover` / `MaterialClaim`). A job order carries
-  `responsible_org_unit_id` (the **processing** unit — drives the
-  visibility, changeable only via `PATCH /{id}/responsible-org-unit`) and
-  `requesting_org_unit_id` (the **requester** — grants **no**
-  visibility). Responsible = **SK** → public to all Staffeln
-  (shared queue that Staffeln join via a Material-Claim);
-  responsible = **Staffel** → private to that Staffel + admins. SK job order *edits*
-  run through the role gate (Logistician+), not through the Staffel scope.
+- **Profit-wide read, unit-scoped writes**: `JobOrder` (+ `JobOrderMaterial` /
+  `JobOrderHandover` / `MaterialClaim` and the Staffel participations). A job order carries
+  `responsible_org_unit_id` (the **processing** unit — the active Profit Bereich or one of its
+  active Staffeln/SKs, changeable only via `PATCH /{id}/responsible-org-unit`; an order whose unit
+  drops out of that hierarchy is read-only until transferred, REQ-ORDERS-055) and
+  `requesting_org_unit_id` (the **customer**, which need not belong to Profit). Every member of the
+  active Profit Bereich and its active Staffeln/SKs reads every order, as do the requesting,
+  responsible and supporting units, their leadership, personal editors and admins
+  (REQ-ORDERS-052). Writes need the current writer grant (Logistician or leadership) of the
+  responsible or the requesting unit, depending on the action (REQ-ORDERS-053). Any eligible Staffel
+  other than the responsible one may support any active order and keep its own promises there —
+  material promises on every MATERIAL and ITEM order, whichever unit is responsible
+  (REQ-ORDERS-051).
 - **Oversight overview** (no aggregate of its own): the blueprint availability
   (`/blueprint-overview`) aggregates the per-user `personal_blueprint` rows across
   the members of the org units the caller **oversees** — the units of their leadership seats,
@@ -1422,7 +1427,7 @@ einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMI
 | Missions, Operations (`/missions/**`, `/operations/**`), mission finance (`/missions/{id}/finance-entries`)                          | `isAuthenticated()`; mission delete `ADMIN`; operation create/edit/payout `MISSION_MANAGER` grant in the owning unit, delete `ADMIN`; frequency writes `MISSION_MANAGER` (pin-aware flag) | always                                                                         |
 | Hangar, both tabs „Meine Schiffe" · „Org-Einheit" (`/hangar`, `/hangar/squadron`), Lager (`/inventory/**`), Raffinerie (`/refinery-orders/**`) | `isAuthenticated()`; Lager wipe `ADMIN`                                 | always                                                                         |
 | Materialbörse (`/materialboerse`)                                                                                                    | `hasRole('KRT_MEMBER')`                                                 | `KRT_MEMBER`                                                                   |
-| Aufträge (`/orders/**`, `/orders/material-demand`, item / material collection)                                                      | `isAuthenticated()`; current contextual authority for the concrete order, participation, promise, fulfillment or unlink | „Aufträge" + „Materialbedarf" if `canViewJobOrders`, else „Meine Aufträge" if `canViewOwnJobOrders`, else „Aufträge" (only „Ich bearbeite") if `canViewAssignedJobOrders`, plus „Auftrag anlegen" when neither of the first two applies |
+| Aufträge (`/orders/**`, `/orders/material-demand`, item / material collection)                                                      | `isAuthenticated()`; current contextual authority for the concrete order, participation, promise, fulfillment or unlink | „Aufträge" with its „Materialbedarf" tab if `canViewOrderWorkspace` (a member of any active org unit, a personal editor or a linked aUEC holder; the scopes Meine · Ich bearbeite · Zu bearbeiten · Alle show only permitted orders, REQ-ORDERS-056); „Meine Aufträge" and „Zugewiesene Aufträge" as quick access with `canViewOwnJobOrders` / `canViewAssignedJobOrders`; „Auftrag anlegen" (quick-access action and page button) only with `canCreateJobOrders` |
 | Blueprint-Verfügbarkeit (`/blueprint-overview`)                                                                                      | `isAuthenticated()` (backend `canAccessBlueprintOverview`)              | if `canAccessBlueprintOverview`                                                |
 | Materialien, Material-Übersicht, Profitberechnung (`/materials/**`, `/materials/profit-calculation`)                                | `isAuthenticated()`; profit calculation `KRT_MEMBER`/`ADMIN`             | always                                                                         |
 | Mein Inventar, Meine Blueprints (`/personal-inventory/**`)                                                                           | `isAuthenticated()`                                                     | always, in the personal menu („Persönlich“) of the drawer’s user row           |
