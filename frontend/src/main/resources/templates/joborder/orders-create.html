@@ -47,8 +47,6 @@
 
                 <fieldset class="form-section">
                     <legend class="form-section__head" th:text="|1 · #{orders.create.section.order}|">1 · Auftrag</legend>
-                    <div th:if="${#lists.isEmpty(responsibleOptions)}" class="alert alert-danger" role="alert"
-                         th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</div>
                     <div class="form-grid">
                         <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
                         <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
@@ -137,7 +135,7 @@
                 <fieldset class="form-section" th:unless="${requesterItemEdit == true}">
                     <legend class="form-section__head" th:text="|1 · #{orders.create.section.order}|">1 · Auftrag</legend>
                     <div th:if="${#lists.isEmpty(responsibleOptions)}" class="alert alert-danger" role="alert"
-                         th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</div>
+                         th:text="#{orders.create.responsible.none}">Keine aktive Einheit der Profit-Hierarchie zur Auswahl.</div>
                     <div class="form-grid">
                         <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('item-responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderItemForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
                         <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('item-requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderItemForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
