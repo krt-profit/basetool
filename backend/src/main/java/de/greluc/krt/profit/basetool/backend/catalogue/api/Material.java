@@ -345,4 +345,15 @@ public class Material extends AbstractEntity<UUID> implements P4kKeyedRow {
   public boolean isSourcelessHidden() {
     return sourcelessHiddenAt != null && isWithoutGameSource() && !isPriced();
   }
+
+  /**
+   * Whether new stock may take the row: it is visible, the P4K neither swept nor hid it, and it is
+   * not hidden as a commodity no game source knows (REQ-P4K-013, REQ-P4K-075); {@link
+   * SelectableMaterialJpql#SELECTABLE_MATERIAL} is its query form.
+   *
+   * @return {@code false} for an invisible, a retired or a sourceless hidden material
+   */
+  public boolean isSelectable() {
+    return Boolean.TRUE.equals(isVisible) && !isP4kRetired() && !isSourcelessHidden();
+  }
 }

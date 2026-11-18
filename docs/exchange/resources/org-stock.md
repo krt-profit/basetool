@@ -364,6 +364,7 @@ listed with its reason. The entries an op created or changed reach you through t
 | `OVER_ALLOCATION` | `book-in`, `allocation-add`, `allocation-change` | The earmarks of one kind add up to more than `quantity`, or, for an earmark op, to more than the entry holds. |
 | `EARMARK_TARGET_INVALID` | `book-in`, `book-out`, `sell`, moves, earmark ops | An earmark names a job order that does not need the material or item, an unknown mission or a hidden mission for a new earmark, a mission for an item, a target twice, or — when taking from an entry — a target the entry is not earmarked to or more than it holds there; `allocation-add` names a target the entry is already earmarked to, `allocation-change` one it is not. |
 | `ITEM_RETIRED` | `book-in` | `material` resolves to an item the game no longer has, or one the Basetool hid; it cannot be booked in. The entries that hold it can still be taken from, moved and marked. |
+| `MATERIAL_RETIRED` | `book-in` | `material` resolves to a material the game no longer has, or one the Basetool hid; it cannot be booked in. The entries that hold it can still be taken from, moved and marked. |
 | `UNIT_MISMATCH`, `LOCATION_UNKNOWN`, `STOLEN_MARKING_DISABLED`, `UNMATCHED`, `AMBIGUOUS` | as for [stock](stock.md) | |
 
 ### The mass-change guard

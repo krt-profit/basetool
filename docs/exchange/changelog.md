@@ -9,6 +9,12 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   another, such as "Party Favors" into "Fireworks", resolves to the material that stays, in
   `catalog/resolve` and in every op that names a material, as it already did for items and ship
   types. It answered `unmatched` before ([catalogue](resources/catalog.md)). No schema changes.
+- **New: per-op reason `MATERIAL_RETIRED`.** A material the game no longer has, or one the Basetool
+  hid, such as a commodity no game source knows, is no longer booked in: a stock rise of its lot that
+  the batch's falls of it do not cover, and an org-stock `book-in` of it, are `rejected`
+  `MATERIAL_RETIRED`. Falls, moves, shares and unshares still apply
+  ([stock](resources/stock.md#what-a-change-books), [errors](errors.md)).
+  No schema changes.
 
 ## 2026-11-14
 

@@ -20,9 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 /**
- * The JPQL rule of the materials the lists and pickers offer (REQ-P4K-013, REQ-P4K-075). The
- * fragment is a compile-time constant, so a {@code @Query} concatenates it; its query must alias
- * the material {@code m}.
+ * The JPQL rule of the materials the lists and pickers offer (REQ-P4K-013, REQ-P4K-075), the query
+ * form of {@link Material#isSelectable()}. The fragment is a compile-time constant, so a
+ * {@code @Query} concatenates it; its query must alias the material {@code m}.
  */
 public final class SelectableMaterialJpql {
 

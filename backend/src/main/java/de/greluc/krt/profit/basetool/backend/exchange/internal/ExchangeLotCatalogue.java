@@ -58,6 +58,12 @@ public class ExchangeLotCatalogue {
   /** The refusal of booking in an item the P4K retired (REQ-P4K-013). */
   static final String ITEM_RETIRED = "ITEM_RETIRED";
 
+  /**
+   * The refusal of booking in a material that is not selectable: retired, or hidden as a commodity
+   * no game source knows (REQ-P4K-013, REQ-P4K-075).
+   */
+  static final String MATERIAL_RETIRED = "MATERIAL_RETIRED";
+
   private final ExchangeResolveService resolveService;
   private final MaterialRepository materialRepository;
   private final GameItemRepository gameItemRepository;
@@ -170,24 +176,31 @@ public class ExchangeLotCatalogue {
     }
 
     /**
-     * Whether the entry is an item the P4K swept or an admin hid through a review case, which no
-     * write may book in; an item hidden as not obtainable is booked, because the client read it
-     * from the game (REQ-P4K-048).
+     * The refusal no write may book the entry in past: {@code ITEM_RETIRED} for an item the P4K
+     * swept or an admin hid through a review case, {@code MATERIAL_RETIRED} for a material that is
+     * not {@linkplain Material#isSelectable() selectable}. An item hidden as not obtainable is
+     * booked, because the client read it from the game (REQ-P4K-048).
      *
-     * @return {@code true} for a retired item
+     * @return the refusal's reason, or {@code null} when the entry may take new stock
      */
-    boolean retired() {
-      return gameItem != null && gameItem.isP4kRetired();
+    @Nullable
+    String retiredReason() {
+      if (gameItem != null) {
+        return gameItem.isP4kRetired() ? ITEM_RETIRED : null;
+      }
+      return material != null && !material.isSelectable() ? MATERIAL_RETIRED : null;
     }
 
     /**
-     * The entry as a book-in sees it: a retired item ends the op {@code rejected ITEM_RETIRED}.
+     * The entry as a book-in sees it: a retired item or material ends the op {@code rejected} with
+     * its {@link #retiredReason()}.
      *
-     * @return this entry, or the refusal of a retired item
+     * @return this entry, or the refusal of a retired item or material
      */
     @NotNull
     Entry forBookIn() {
-      return retired() ? skip(ExchangeOps.REJECTED, ITEM_RETIRED) : this;
+      String reason = retiredReason();
+      return reason == null ? this : skip(ExchangeOps.REJECTED, reason);
     }
   }
 }

@@ -156,6 +156,7 @@ steps; the first that fails ends it:
 | The lot's stock is locked; its quantity must equal `expectedQuantity` | `rejected` `VERSION_CONFLICT`, with the `patchChange` when the lot's last change was a patch change's ([patch change](patch-change.md#pushing-against-what-a-patch-change-removed)) |
 | A lot already at `quantity` | `unchanged` |
 | A rise of an item no longer in the game, beyond what the batch's falls of that item still cover | `rejected` `ITEM_RETIRED` |
+| A rise of a material no longer in the game or hidden, beyond what the batch's falls of that material still cover | `rejected` `MATERIAL_RETIRED` |
 | An empty lot whose last change came from the web, the app, the system, another client or another installation | `rejected` `REMOVED_ELSEWHERE` |
 | A fall larger than the lot's stock not reserved for a job order or mission | `rejected` `STOCK_EARMARKED` |
 
@@ -289,9 +290,11 @@ fall counts as a move, not as a removal for the mass-change guard, when the batc
 material or item cover all of it, falls taken in the batch's order. Sent in two batches, the fall
 counts as a removal.
 
-**Items no longer in the game.** An item the game no longer has, or one the Basetool hid, cannot be
-booked in: a rise of its lot is refused `ITEM_RETIRED`. A fall still applies, and so does a rise
-the same batch's falls of that item cover, so the member can still move or mark stock they hold:
+**Items and materials no longer in the game.** An item the game no longer has, or one the Basetool
+hid, cannot be booked in: a rise of its lot is refused `ITEM_RETIRED`. A material the game no longer
+has, or one the Basetool hid, such as a commodity no game source knows, cannot be booked in either:
+a rise of its lot is refused `MATERIAL_RETIRED`. A fall still applies, and so does a rise the same
+batch's falls of that item or material cover, so the member can still move or mark stock they hold:
 every fall of the batch counts, whether it comes before or after the rise, and a fall the server
 refuses covers no rise after it. Shares and unshares are not affected.
 

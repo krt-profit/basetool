@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableMaterials;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -103,7 +104,7 @@ class InventoryItemServiceAllocationTest {
             orderWrites,
             inventoryItemRepository,
             userRepository,
-            materialRepository,
+            new SelectableMaterials(materialRepository),
             null,
             null,
             locationRepository,

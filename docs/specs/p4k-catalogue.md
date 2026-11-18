@@ -430,6 +430,9 @@ prices and terminals.
   it edits, is refused with `400` and code `CATALOGUE_BLUEPRINT_RETIRED`.
 - [x] An exchange write that would book a retired game item in is refused per op as `rejected`
   `ITEM_RETIRED`; a fall, and a move the batch's falls cover, still apply.
+- [x] A Lager book-in of a material the material pickers do not offer is refused with `400` and
+  code `CATALOGUE_MATERIAL_RETIRED`; an exchange write that would book one in is refused per op as
+  `rejected` `MATERIAL_RETIRED`, while a fall and a covered move still apply.
 
 A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, REQ-P4K-016) is
 set. The pickers that filter it: the Lager, Materialbörse and item-order item pickers
@@ -473,6 +476,18 @@ move or stolen marking of held stock still applies. Falls, shares, unshares and 
 existing org-stock entry stay open. Both resolve the lot through `ExchangeLotCatalogue`, whose entry
 reports the retirement.
 
+**Stock of a material the pickers do not offer is not booked in either.** A material is selectable
+while `Material#isSelectable()` holds, the Java form of `SelectableMaterialJpql.SELECTABLE_MATERIAL`:
+it is visible, neither swept nor hidden through a review case, and not hidden as a commodity no game
+source knows (REQ-P4K-075). A Lager book-in of another material (REQ-INV-029) resolves it through
+`SelectableMaterials` in `catalogue.api` and answers `400` with code `CATALOGUE_MATERIAL_RETIRED` and
+the property `materialId`, writing nothing; the frontend shows `error.catalogue.materialRetired`
+through the same `krtFetch.catalogueRetiredMessage`. The exchange refuses a rise of such a material's
+lot and an org-stock `book-in` of it as `rejected` `MATERIAL_RETIRED`, by the same rules and the same
+cover as a retired item (`ExchangeRetiredStockCover`); falls, moves, shares and unshares stay open.
+The other writes that name a material (needs, donations, stock levels, trade deals, the
+Materialbörse, job orders and refinery stores) do not check it.
+
 **The backend refuses a retired blueprint the same way.** The one write that names a blueprint by
 its id, an item-order line added or edited (REQ-ORDERS-032), resolves it through
 `SelectableBlueprints` in `catalogue.api` and answers `400` with code `CATALOGUE_BLUEPRINT_RETIRED`
@@ -483,7 +498,7 @@ exchange's blueprint changes) already resolve only offerable products, so a prod
 are all retired answers as unknown there.
 
 **Enforced by:** `P4kStampedRowVisibilityTest`, `JobOrderItemDetailRenderTest`,
-`SelectableGameItemsTest`, `SelectableBlueprintsTest`, `StockLevelIntegrationTest`, `SupplyNeedServiceTest`,
+`SelectableGameItemsTest`, `SelectableMaterialsTest`, `SelectableBlueprintsTest`, `StockLevelIntegrationTest`, `SupplyNeedServiceTest`,
 `SupplyDonationServiceTest`, `JobOrderItemServiceTest`, `InventoryItemServiceTest`,
 `PurchasingDealServiceTest`, `MaterialExchangeServiceTest`, `GlobalExceptionHandlerTest` (frontend),
 `krt-fetch-read.test.mjs`, `ExchangeStockWriteControllerTest`, `ExchangeOrgStockWriteControllerTest`,
@@ -1361,7 +1376,8 @@ reference from a catalogue row's.
 A marked material leaves every list and picker (`SelectableMaterialJpql.SELECTABLE_MATERIAL`,
 `Material#isSourcelessHidden()`) only while it stays without a game source and without a price, so
 a Wiki UUID, a P4K match or a UEX price brings it back at once; the next APPLY lifts the mark of a
-material that no longer qualifies. Its references stay readable. The report logs `CHANGED
+material that no longer qualifies. Its references stay readable; while it is marked it takes no new
+stock, in the Lager nor through the exchange (REQ-P4K-013). The report logs `CHANGED
 sourceless_hidden_at`; a preview reports what the APPLY would do. Every mark and every lift is an
 audit event `CATALOGUE_MATERIAL_SOURCELESS_VISIBILITY_CHANGED` (`hidden`, `run`; REQ-AUDIT-001).
 On the LIVE 4.10.197 rows this hides 26 materials (Boron, Xenon, Coal, …); the priced "Ship

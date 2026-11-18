@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableMaterials;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
@@ -117,7 +118,7 @@ class InventoryItemServiceVersionFlushTest {
             orderWrites,
             inventoryItemRepository,
             userRepository,
-            materialRepository,
+            new SelectableMaterials(materialRepository),
             null,
             null,
             locationRepository,

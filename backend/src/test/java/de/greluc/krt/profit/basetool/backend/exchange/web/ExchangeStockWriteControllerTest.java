@@ -832,6 +832,44 @@ class ExchangeStockWriteControllerTest {
   }
 
   @Test
+  void aRiseOfAMaterialHiddenAsSourcelessIsRefusedWhileAFallStillApplies() throws Exception {
+    UUID boron = sourcelessHidden(material("SCU", null));
+    UUID orison = location(null);
+    String place = locationName(orison);
+    row(boron, orison, 0, 3, null);
+
+    set(boron, place, 0, "5", "3", "SCU")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].result").value("rejected"))
+        .andExpect(jsonPath("$.results[0].reason").value("MATERIAL_RETIRED"));
+    set(boron, locationName(location(null)), 0, "2", "0", "SCU")
+        .andExpect(jsonPath("$.results[0].reason").value("MATERIAL_RETIRED"));
+    assertThat(total(boron)).isEqualTo(3.0);
+
+    set(boron, place, 0, "1", "3", "SCU").andExpect(jsonPath("$.applied").value(1));
+    assertThat(total(boron)).isEqualTo(1.0);
+  }
+
+  @Test
+  void aMoveOfAMaterialHiddenAsSourcelessApplies() throws Exception {
+    UUID boron = sourcelessHidden(material("SCU", null));
+    UUID orison = location(null);
+    UUID area18 = location(null);
+    row(boron, orison, 0, 3, null);
+
+    change(
+            "{\"ops\":["
+                + op(boron, locationName(area18), 0, "2", "0", "SCU")
+                + ","
+                + op(boron, locationName(orison), 0, "1", "3", "SCU")
+                + "]}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2));
+    assertThat(total(boron)).isEqualTo(3.0);
+  }
+
+  @Test
   void repeatedCutsCountOnlyOnceTheyReachNinetyPercentOfTheWindowStart() throws Exception {
     UUID laranite = material("SCU", null);
     List<String> places = new ArrayList<>();
@@ -1223,6 +1261,17 @@ class ExchangeStockWriteControllerTest {
   private @NotNull UUID retired(@NotNull UUID item) {
     jdbc.update("UPDATE game_item SET p4k_deleted_at = now() WHERE id = ?", item);
     return item;
+  }
+
+  /**
+   * Stamps a material as hidden for being a commodity no game source knows, as REQ-P4K-075 does.
+   *
+   * @param material the material, without a game source and without a price
+   * @return {@code material}
+   */
+  private @NotNull UUID sourcelessHidden(@NotNull UUID material) {
+    jdbc.update("UPDATE material SET sourceless_hidden_at = now() WHERE id = ?", material);
+    return material;
   }
 
   /**

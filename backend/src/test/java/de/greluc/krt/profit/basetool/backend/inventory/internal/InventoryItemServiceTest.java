@@ -35,7 +35,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredMaterialException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableMaterials;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -163,7 +165,7 @@ class InventoryItemServiceTest {
             orderWrites,
             inventoryItemRepository,
             userRepository,
-            materialRepository,
+            new SelectableMaterials(materialRepository),
             gameItemRepository,
             new SelectableGameItems(gameItemRepository),
             locationRepository,
@@ -732,7 +734,7 @@ class InventoryItemServiceTest {
             orderWrites,
             inventoryItemRepository,
             userRepository,
-            materialRepository,
+            new SelectableMaterials(materialRepository),
             gameItemRepository,
             new SelectableGameItems(gameItemRepository),
             locationRepository,
@@ -1650,6 +1652,76 @@ class InventoryItemServiceTest {
             BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     assertEquals("Material stock requires a quality", ex.getMessage());
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  @Test
+  void createInventoryItem_materialHiddenAsSourceless_throwsRetired() {
+    UUID userId = holder();
+    Material boron = new Material();
+    boron.setId(UUID.randomUUID());
+    boron.setSourcelessHiddenAt(Instant.now());
+    when(materialRepository.findById(boron.getId())).thenReturn(Optional.of(boron));
+
+    RetiredMaterialException ex =
+        assertThrows(
+            RetiredMaterialException.class,
+            () ->
+                inventoryItemService.createInventoryItem(materialCreateDto(userId, boron), userId));
+    assertEquals("CATALOGUE_MATERIAL_RETIRED", ex.code());
+    assertEquals(boron.getId(), ex.getMaterialId());
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  @Test
+  void createInventoryItem_materialAnAdminHid_throwsRetired() {
+    UUID userId = holder();
+    Material hidden = new Material();
+    hidden.setId(UUID.randomUUID());
+    hidden.setP4kUuid(UUID.randomUUID());
+    hidden.setP4kHiddenAt(Instant.now());
+    when(materialRepository.findById(hidden.getId())).thenReturn(Optional.of(hidden));
+
+    assertThrows(
+        RetiredMaterialException.class,
+        () -> inventoryItemService.createInventoryItem(materialCreateDto(userId, hidden), userId));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  /**
+   * Registers a member the user repository finds.
+   *
+   * @return the member's id
+   */
+  private UUID holder() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+    return user.getId();
+  }
+
+  /**
+   * Builds a book-in of five SCU of a material at quality 500 at a fresh location.
+   *
+   * @param userId the holder
+   * @param material the material
+   * @return the create request
+   */
+  private static InventoryItemCreateDto materialCreateDto(UUID userId, Material material) {
+    return new InventoryItemCreateDto(
+        userId,
+        material.getId(),
+        null,
+        UUID.randomUUID(),
+        500,
+        5.0,
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   @Test

@@ -26,22 +26,22 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The falls of P4K-retired items a stock change set offers to cover its rises of the same items: a
- * rise they cover is a move between lots and applies, any other rise of a retired item is refused
- * {@code ITEM_RETIRED} (REQ-P4K-013, REQ-XCH-016).
+ * The falls of retired items and materials a stock change set offers to cover its rises of the same
+ * entry: a rise they cover is a move between lots and applies, any other rise is refused {@code
+ * ITEM_RETIRED} or {@code MATERIAL_RETIRED} (REQ-P4K-013, REQ-XCH-016).
  *
  * <p>Every fall of a batch counts from the start, whatever its position, so a move works in either
  * order; a fall the plan then refuses gives its amount back, and a rise the plan applies uses its
- * amount up.
+ * amount up. Each entry is keyed by its material or item id.
  */
-final class ExchangeRetiredItemCover {
+final class ExchangeRetiredStockCover {
 
   private final Map<UUID, BigDecimal> left = new HashMap<>();
 
   /**
    * Counts the fall an op claims, its expected quantity above its target; a rise claims none.
    *
-   * @param item the retired item
+   * @param item the id of the retired item or material
    * @param expected the op's rounded expected quantity
    * @param target the op's rounded target quantity
    */
@@ -55,7 +55,7 @@ final class ExchangeRetiredItemCover {
   /**
    * Whether the falls still unused cover a rise.
    *
-   * @param item the retired item
+   * @param item the id of the retired item or material
    * @param rise the amount the rise books in
    * @return {@code true} when the rise is a move and may apply
    */
@@ -67,7 +67,7 @@ final class ExchangeRetiredItemCover {
    * Books a decided op against the cover: an applied rise uses its amount up, a refused fall gives
    * its claimed amount back. An applied op found its lot at {@code expected}.
    *
-   * @param item the retired item
+   * @param item the id of the retired item or material
    * @param applied whether the plan writes the op
    * @param expected the op's rounded expected quantity
    * @param target the op's rounded target quantity

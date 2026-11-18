@@ -27,10 +27,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredMaterialException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableMaterials;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
@@ -88,7 +89,7 @@ public class InventoryItemService {
   private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
-  private final MaterialRepository materialRepository;
+  private final SelectableMaterials selectableMaterials;
   private final GameItemRepository gameItemRepository;
   private final SelectableGameItems selectableGameItems;
   private final LocationRepository locationRepository;
@@ -344,6 +345,7 @@ public class InventoryItemService {
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the job-order
    *     requirement, catalog-kind or quality rules are violated, or a game-item row names a mission
    * @throws RetiredGameItemException when the game item is retired or unobtainable
+   * @throws RetiredMaterialException when the material is not selectable (REQ-P4K-013)
    */
   @Transactional
   public InventoryItemDto createInventoryItem(
@@ -397,9 +399,7 @@ public class InventoryItemService {
       @Nullable String note) {
     final User user = Entities.require(userRepository.findById(targetUserId), "User not found");
     final Material material =
-        dto.materialId() != null
-            ? Entities.require(materialRepository.findById(dto.materialId()), "Material not found")
-            : null;
+        dto.materialId() != null ? selectableMaterials.require(dto.materialId()) : null;
     final Location location =
         OfferedLocations.require(
             locationRepository.findById(dto.locationId()), "Location not found");
