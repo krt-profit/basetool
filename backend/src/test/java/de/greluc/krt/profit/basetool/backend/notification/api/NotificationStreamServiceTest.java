@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
@@ -108,6 +109,21 @@ class NotificationStreamServiceTest {
     return sb.toString();
   }
 
+  /**
+   * Whether the rendered event has a line carrying the field with exactly this value, read the way
+   * an SSE parser reads it: one space after the colon is dropped (WHATWG HTML §9.2.6).
+   *
+   * @param wire the rendered event
+   * @param field the field name, {@code event} or {@code data}
+   * @param value the value the client receives
+   * @return {@code true} when such a line exists
+   */
+  private static boolean hasField(String wire, String field, String value) {
+    return Pattern.compile("(?m)^" + field + ": ?" + Pattern.quote(value) + "$")
+        .matcher(wire)
+        .find();
+  }
+
   @Test
   void heartbeat_sendsNamedHeartbeatEvent_notAComment() throws Exception {
     CapturingStreamService service = new CapturingStreamService();
@@ -121,10 +137,10 @@ class NotificationStreamServiceTest {
     verify(service.emitter).send(captor.capture());
     String wire = render(captor.getValue());
     assertTrue(
-        wire.contains("event:heartbeat"),
+        hasField(wire, "event", "heartbeat"),
         "heartbeat must be a named event so the browser EventSource can observe it: " + wire);
     assertTrue(
-        wire.contains("data:ok"),
+        hasField(wire, "data", "ok"),
         "a named SSE event must carry a data field or EventSource discards it without dispatching, "
             + "defeating the liveness signal: "
             + wire);
@@ -141,7 +157,7 @@ class NotificationStreamServiceTest {
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
-    assertTrue(render(captor.getValue()).contains("event:connected"));
+    assertTrue(hasField(render(captor.getValue()), "event", "connected"));
   }
 
   @Test
@@ -156,7 +172,7 @@ class NotificationStreamServiceTest {
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
-    assertTrue(render(captor.getValue()).contains("event:notification"));
+    assertTrue(hasField(render(captor.getValue()), "event", "notification"));
   }
 
   @Test
@@ -171,7 +187,7 @@ class NotificationStreamServiceTest {
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
-    assertTrue(render(captor.getValue()).contains("data:new"));
+    assertTrue(hasField(render(captor.getValue()), "data", "new"));
   }
 
   @Test
@@ -187,8 +203,8 @@ class NotificationStreamServiceTest {
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
     String rendered = render(captor.getValue());
-    assertTrue(rendered.contains("event:notification"));
-    assertTrue(rendered.contains("data:new"));
+    assertTrue(hasField(rendered, "event", "notification"));
+    assertTrue(hasField(rendered, "data", "new"));
     assertFalse(
         rendered.contains("DISCORD_REGISTRATION_PENDING"),
         "the event is a bare 'something changed' marker (ADR-0273)");
