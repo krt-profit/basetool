@@ -2686,7 +2686,7 @@ that has no entry at all, before it is used.
   uv's header, from which Dependabot's `uv` entry takes `--universal` and the Python version when
   it recompiles the file; Dependabot's npm entry covers the markdownlint lockfile. The pins it
   cannot see (tool binaries in workflow `env`, the Redoc bundle, cosign's installer default, the
-  cortex-tools image, the collections) are listed in [`dependency-pins.md`](../dependency-pins.md)
+  lokitool archive and its runner image, the collections) are listed in [`dependency-pins.md`](../dependency-pins.md)
   with how each one moves.
 - **`-sources.jar`, `-javadoc.jar` and the Gradle distribution's `gradle-<version>-src.zip` are
   trusted** by pattern: IDE downloads, never on a build classpath.
