@@ -24,8 +24,13 @@ import time
 import urllib.parse
 import uuid
 
-from dpop_reference import delete_installation_key, open_installation_key
-from sandbox_client import DEFAULT_CA, ROOT, SandboxSession
+from sandbox_client import (
+    DEFAULT_CA,
+    ROOT,
+    SandboxSession,
+    delete_installation_key,
+    open_installation_key,
+)
 
 
 class Smoke:

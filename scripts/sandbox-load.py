@@ -40,8 +40,7 @@ import urllib.parse
 import uuid
 from collections import Counter, defaultdict
 
-from dpop_reference.openssl import OpenSslKey
-from sandbox_client import DEFAULT_CA, ROOT, Answer, SandboxSession
+from sandbox_client import DEFAULT_CA, ROOT, Answer, OpenSslKey, SandboxSession
 
 CLIENT = "sandbox-client"
 STATION = "Sandbox Station Storage"

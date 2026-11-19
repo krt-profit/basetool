@@ -4,7 +4,9 @@
 through the device grant of a third-party client exactly as a member would in a browser, keeps the
 DPoP-bound token, and calls the gateway over one kept-alive TLS connection with a fresh proof per
 request, retrying once on a nonce challenge. It signs with the DPoP reference in
-`docs/exchange/dpop-reference`, standard library only.
+`docs/exchange/dpop-reference`, standard library only, and is the scripts' only way to that
+reference: it puts the reference on `sys.path` and hands out its keys, so a script imports the keys
+from here and never `dpop_reference` itself.
 """
 
 from __future__ import annotations
@@ -37,7 +39,20 @@ from dpop_reference import (
     asks_for_nonce,
     authorization_header,
     build_proof,
+    delete_installation_key,
+    open_installation_key,
 )
+from dpop_reference.openssl import OpenSslKey
+
+__all__ = [
+    "DEFAULT_CA",
+    "ROOT",
+    "Answer",
+    "OpenSslKey",
+    "SandboxSession",
+    "delete_installation_key",
+    "open_installation_key",
+]
 
 PUBLIC_KEYCLOAK = "http://host.docker.internal:18080"
 REALM = "/auth/realms/basetool"
