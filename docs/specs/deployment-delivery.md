@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-24.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md), [ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0397](../adr/0397-the-edge-restarts-outside-the-applications-restart-window.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md), [ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)
 
 # Deployment delivery & promotion
 
@@ -321,8 +321,8 @@ reloaded or started, so no container is left running without the unit that manag
 the old instance on its data directory beside the new one. A retired `.network` or `.volume` file is
 removed at the install, as before: it reaches nothing until the reload. **The stack is the units the
 host has**: the services the gated apply stops, starts and waits for are the installed `.container`
-units of the known stack order (`RT_STACK_ORDER`: `db-backend db-keycloak redis redis-session
-redis-shared keycloak edge backend ingest frontend acme`; `redis` is the single instance a rollback to
+units of the known stack order (`RT_STACK_ORDER`: `edge db-backend db-keycloak redis redis-session
+redis-shared keycloak backend ingest frontend acme`, the edge first by REQ-OPS-061; `redis` is the single instance a rollback to
 a release before ADR-0388 brings back, and both Redis instances start before the backend that uses
 `redis-shared` without `Requires=`), with any installed unit a stack unit `Requires=` placed before the first unit
 that requires it; every other installed unit is a monitoring unit. The list is derived again after a
@@ -487,17 +487,21 @@ the owner's decision of 2026-09-25). When the promoted `keycloak-spi` digest mov
 2. after the config delivery, the pin and the pull, as the **last step before the apply**, snapshots
    the live `keycloak/providers/keycloak-spi.jar` (`keycloak-spi-previous.jar`), installs the new one
    and marks keycloak as re-defined;
-3. applies the release **once**: one `systemctl --user stop` takes down every re-defined unit —
-   keycloak, the re-pinned app services, the units the config replaced — and, through `Requires=`,
-   what requires them; then every stack unit is **started** in dependency order and waited for
-   (`Notify=healthy`). Keycloak's start re-runs the provider build on the new JAR before backend
-   starts. **The edge starts right after keycloak, before backend, ingest and frontend**
-   (`db-backend db-keycloak redis-session redis-shared keycloak edge backend ingest frontend acme`): the applications
-   fetch the issuer's discovery document through the public name, which the host alias routes
-   through haproxy to the edge, so an edge that the same window stopped and starts last fails every
+3. applies the release **once**: one `systemctl --user stop` takes down every re-defined unit but
+   the edge — keycloak, the re-pinned app services, the units the config replaced — and, through
+   `Requires=`, what requires them; then every stack unit is **started** in dependency order and
+   waited for (`Notify=healthy`). Keycloak's start re-runs the provider build on the new JAR before
+   backend starts. **The edge starts first and the window never stops it** (`edge db-backend
+   db-keycloak redis-session redis-shared keycloak backend ingest frontend acme`; a re-defined edge is
+   restarted on its own before the stop, REQ-OPS-061): it serves the maintenance page while the
+   window is open, and the applications fetch the issuer's discovery document through the public
+   name, which the host alias routes through haproxy to the edge, so an edge that is down fails every
    application start with `Remote host terminated the handshake`. *(Corrected 2026-10-03: the edge
-   started last, which broke the testing host's jump from 1.10.0 to 1.13.6 twice.)* **One health gate** covers the app images, the units and the JAR, and the run records
-   success only when every stack unit is healthy.
+   started last, which broke the testing host's jump from 1.10.0 to 1.13.6 twice.)* *(Corrected
+   2026-11-19: the edge started right after keycloak and a re-defined edge was stopped inside the
+   window, so the public endpoint gave no answer at all until keycloak was healthy — 72 s on
+   production for v1.26.3, ADR-0397.)* **One health gate** covers the app images, the units and the
+   JAR, and the run records success only when every stack unit is healthy.
 
 If the gate fails, **everything the release changed is rolled back together** — the digest pin
 (record and drop-ins), the config tree and units, and the previous JAR — and applied the same way; the
@@ -3880,6 +3884,49 @@ build, not a later run of the script.
 
 **Enforced by:** `basetool.repository-format-conventions` (`ruffLint`, `registerNativeLinter`) ·
 `.github/workflows/ci.yml` · **Related:** REQ-OPS-034, REQ-OPS-058, REQ-OPS-059
+
+### REQ-OPS-061 — The maintenance page answers through every restart but the edge's own
+
+While the applications are down for a release, a re-apply or a heal, every request gets an answer:
+the edge maps an unreachable upstream (502, 503, 504) to the maintenance page, HTML or problem+json
+by `Accept` (`docker/edge/include/maintenance.conf`). A request goes unanswered only while the edge
+itself restarts, or the host or haproxy does.
+
+- **The edge is never stopped inside a restart window.** It is the first unit of `RT_STACK_ORDER`,
+  so every start in order brings the maintenance page up before the databases, keycloak and the
+  applications. A release or re-apply that re-defines the edge (its unit, its image pin, its
+  `edge.env`) restarts it **on its own**, after the unit reload and before the window's one stop;
+  the stop never names it. A sick edge is healed the same way, without stopping anything else. The
+  log says so (`the edge is re-defined: restarted on its own before the restart window opens, so the
+  maintenance page answers throughout`), and `one restart window: stopping […]` names the units
+  without the edge.
+- **An edge that does not come back fails the apply before anything else is stopped.** The run
+  names it (`did not come up, in start order: [edge]`) and the release is rolled back as any failed
+  gate (REQ-OPS-003); the window has not stopped the applications for it.
+- **The edge's own restart is short.** A graceful nginx stop closes the listeners at once and then
+  waits on open connections; `worker_shutdown_timeout 2s` in `docker/edge/nginx.conf` bounds that
+  wait, so an edge restart leaves the public ports without an answer for about two to three
+  seconds instead of the ten of Podman's stop timeout. A request or stream still open on the old
+  edge is closed after the two seconds.
+- **haproxy cannot bridge the edge's own restart.** It forwards TCP and the TLS ends at the edge, so
+  it has no page of its own to send, and the rootless port forwarder accepts a connection even while
+  nginx does not listen, so haproxy's connect retries do not apply. The exceptions above stay.
+
+**Acceptance**
+
+- [x] A release that re-defines the edge and an application restarts the edge before the window's
+  stop, never stops it, restarts it once, and logs both lines.
+- [x] A re-defined edge whose restart fails fails the apply with `[edge]` named and nothing stopped.
+- [x] A sick edge is healed with one restart of the edge and no stop.
+- [x] `RT_STACK_ORDER` starts with `edge`.
+- [ ] On production, the next release that re-defines the edge shows haproxy refused or empty
+  connections (`SC`, `SD`) for about three seconds at most, not for the length of the window.
+
+**Enforced by:** `scripts/lib/container-runtime.sh` (`RT_EDGE_SERVICE`, `RT_STACK_ORDER`,
+`rt_apply_stack`, `rt_window_services`) · `scripts/deploy.sh` · `docker/edge/nginx.conf` ·
+`scripts/container-runtime.test.sh` · `scripts/deploy.test.sh`
+(`scenario_podman_redefined_edge_restarts_alone_before_the_window`) · **Related:** REQ-OPS-003,
+REQ-OPS-007, ADR-0397, ADR-0083, ADR-0162
 
 ## Open questions
 

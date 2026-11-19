@@ -716,7 +716,13 @@ if [[ "${HEALTH_DRIFT}" == "true" ]]; then
 
   cd "${COMPOSE_DIR}"
   log "health drift: restarting unhealthy service(s) [${UNHEALTHY_SVCS}] (targeted; no pull, no signature re-verify, no release rollback)"
-  log "health drift: one restart window — stopping [${UNHEALTHY_SVCS}] and what requires them, then starting the stack in order"
+  if [[ " ${UNHEALTHY_SVCS} " == *" ${RT_EDGE_SERVICE} "* ]]; then
+    log "health drift: the edge is restarted on its own first, so the maintenance page answers throughout"
+  fi
+  HEAL_WINDOW="$(RT_CHANGED_SERVICES="${UNHEALTHY_SVCS}" rt_window_services)"
+  if [[ -n "${HEAL_WINDOW}" ]]; then
+    log "health drift: one restart window — stopping [${HEAL_WINDOW}] and what requires them, then starting the stack in order"
+  fi
   HR_RC=0
   # shellcheck disable=SC2086
   rt_heal_stack ${UNHEALTHY_SVCS} || HR_RC=1
@@ -933,8 +939,12 @@ log "release parts: $(release_parts)"
 if [[ -n "${RT_RETIRED_SERVICES}" ]]; then
   log "one restart window: retiring [${RT_RETIRED_SERVICES}] first — each is stopped, and its unit file removed once it is down"
 fi
-if [[ -n "${RT_CHANGED_SERVICES}" ]]; then
-  log "one restart window: stopping [${RT_CHANGED_SERVICES}] and what requires them, then starting the stack in order"
+if rt_edge_redefined; then
+  log "the edge is re-defined: restarted on its own before the restart window opens, so the maintenance page answers throughout"
+fi
+WINDOW_SERVICES="$(rt_window_services)"
+if [[ -n "${WINDOW_SERVICES}" ]]; then
+  log "one restart window: stopping [${WINDOW_SERVICES}] and what requires them, then starting the stack in order"
 fi
 
 PRE_GATE_GUARD=false

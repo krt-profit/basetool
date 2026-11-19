@@ -2030,7 +2030,7 @@ ENV_D_BUNDLE_UNITS=("${STACK_UNITS[@]}" grafana loki)
 # The mirror's rsync quick check compares size and mtime, so a changed value must change the
 # template's length when the bundle is rewritten within the same second.
 write_env_d_bundle() {
-  local b="$1" backend="$2" grafana="$3" svc
+  local b="$1" backend="$2" grafana="$3" edge="${4:-same}" svc
   rm -rf "${b}"
   mkdir -p "${b}/quadlet/systemd" "${b}/quadlet/env.d"
   echo "# promoted compose" >"${b}/docker-compose.yml"
@@ -2038,6 +2038,7 @@ write_env_d_bundle() {
     cp "${T_UNIT_DIR}/${svc}.container" "${b}/quadlet/systemd/${svc}.container"
   done
   printf 'BACKEND_SETTING=%s\n' "${backend}" >"${b}/quadlet/env.d/backend.env.tmpl"
+  printf 'EDGE_SETTING=%s\n' "${edge}" >"${b}/quadlet/env.d/edge.env.tmpl"
   printf 'FRONTEND_SETTING=same\n' >"${b}/quadlet/env.d/frontend.env.tmpl"
   printf 'INGEST_SETTING=same\n' >"${b}/quadlet/env.d/ingest.env.tmpl"
   printf 'GF_ROLE_PATH=%s\n' "${grafana}" >"${b}/quadlet/env.d/grafana.env.tmpl"
@@ -2100,6 +2101,26 @@ scenario_podman_env_d_only_change_restarts_the_unit() {
   assert_no_docker "stop frontend.service" "env.d: a unit whose env file did not change is not stopped"
   assert_count '^systemctl --user restart grafana\.service$' 1 "env.d: the monitoring unit is restarted once by the monitoring apply"
   assert_no_docker "restart loki.service" "env.d: an unchanged monitoring unit is only started"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_redefined_edge_restarts_alone_before_the_window() {
+  echo "Scenario: a release that re-defines the edge restarts it alone, before the restart window opens"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  env_d_host "${tmp}"
+  write_env_d_bundle "${ENV_D_BUNDLE}" updated old updated
+  run_deploy -- "${ENV_D_RUN[@]}" "FAKE_REMOTE_CONFIG=$(hexdig c0ff3)" || rc=$?
+  assert_exit 0 "$rc" "edge: the release deploys"
+  assert_contains "unit definitions [backend edge]" "edge: the edge counts as re-defined"
+  assert_contains "the edge is re-defined: restarted on its own before the restart window opens" \
+    "edge: the log says the edge restarts alone"
+  assert_contains "one restart window: stopping [backend] and what requires them" \
+    "edge: the window names the app unit, not the edge"
+  assert_before "systemctl --user restart edge.service" "systemctl --user stop backend.service" \
+    "edge: the edge is restarted before the window's stop"
+  assert_count '^systemctl --user stop .*edge\.service' 0 "edge: the window never stops the edge"
+  assert_count '^systemctl --user restart edge\.service$' 1 "edge: the edge is restarted exactly once"
   rm -rf "${tmp}"
 }
 
@@ -3884,7 +3905,7 @@ scenario_rename_retires_the_old_unit_inside_the_restart_window() {
   assert_unit_gone redis-exporter "rename: a retired unit that is not loaded is removed without a stop"
   assert_no_docker "stop redis-exporter.service" "rename: ...which is not attempted"
   assert_unit_installed redis-session "rename: the new unit is installed"
-  assert_contains "stack units, from the installed units: [db-backend db-keycloak redis-session keycloak edge backend ingest frontend acme]" \
+  assert_contains "stack units, from the installed units: [edge db-backend db-keycloak redis-session keycloak backend ingest frontend acme]" \
     "rename: the stack is the installed units, the new one before the first unit that requires it"
   assert_before "systemctl --user start redis-session.service" "systemctl --user start ingest.service" \
     "rename: the new unit starts before what requires it"
@@ -3948,7 +3969,7 @@ scenario_rollback_after_a_rename_starts_the_restored_units() {
   run_deploy -- "${RENAME_RUN[@]}" "FAKE_START_FAIL_UNITS=redis-session" || rc=$?
   assert_exit 1 "$rc" "rollback: the failed release exits non-zero"
   assert_contains "the first unit that did not come up is redis-session" "rollback: the gate names the new unit"
-  assert_contains "rollback: stack units, from the installed units: [db-backend db-keycloak redis keycloak edge backend ingest frontend acme]" \
+  assert_contains "rollback: stack units, from the installed units: [edge db-backend db-keycloak redis keycloak backend ingest frontend acme]" \
     "rollback: the stack is derived from the restored units"
   assert_contains "rolled back to previous digest pin successfully" "rollback: the rollback reaches health (no 'Unit not found')"
   assert_excludes "rollback ALSO failed" "rollback: ...and does not report failure"
@@ -4004,6 +4025,7 @@ scenario_rename_with_a_failed_pull_leaves_the_previous_stack_running
 scenario_retired_unit_that_cannot_be_stopped_fails_the_release
 scenario_rollback_after_a_rename_starts_the_restored_units
 scenario_missing_mount_source_of_a_new_unit_refuses_before_anything_changes
+scenario_podman_redefined_edge_restarts_alone_before_the_window
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then
