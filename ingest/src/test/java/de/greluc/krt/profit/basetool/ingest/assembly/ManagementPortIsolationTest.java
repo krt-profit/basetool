@@ -127,6 +127,15 @@ class ManagementPortIsolationTest {
   }
 
   @Test
+  void theInFlightRequestGaugeTheDashboardReadsIsExported() throws Exception {
+    get(appPort, "/exchange/v1/bank/queue");
+
+    assertThat(getAs("/actuator/prometheus", SCRAPE_USER, SCRAPE_PASSWORD).body())
+        .as("management.metrics.observations.include-active-long-task-timer feeds this series")
+        .contains("http_server_requests_active_seconds_count{");
+  }
+
+  @Test
   void actuatorPrometheusRefusesAnUnauthenticatedCallerOnTheManagementPort() throws Exception {
     assertThat(get(managementPort, "/actuator/prometheus").statusCode())
         .as("a neighbour on a shared network must not read the metrics without the credential")

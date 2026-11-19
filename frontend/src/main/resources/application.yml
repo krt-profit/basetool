@@ -5,6 +5,8 @@ server:
     accept-count: 200
     max-connections: 10000
     max-part-count: 1000
+    servlet:
+      use-relative-redirects: true
   max-http-request-header-size: 65536
   http2:
     enabled: true
@@ -140,6 +142,8 @@ management:
         readiness:
           include: readinessState, backend, redis, diskSpace, ssl
   metrics:
+    observations:
+      include-active-long-task-timer: true
     tags:
       application: basetool-frontend
     web:

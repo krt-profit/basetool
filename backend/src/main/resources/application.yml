@@ -4,6 +4,8 @@ server:
     relaxed-path-chars: "{,},[,]"
     accept-count: 200
     max-connections: 10000
+    servlet:
+      use-relative-redirects: true
   forward-headers-strategy: none
   max-http-request-header-size: 65536
   http2:
@@ -252,6 +254,8 @@ management:
         readiness:
           include: readinessState, db, diskSpace, ssl
   metrics:
+    observations:
+      include-active-long-task-timer: true
     tags:
       application: basetool-backend
     web:

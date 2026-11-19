@@ -14,7 +14,7 @@ openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenera
 [versions]
 
 openapiGenerator = "7.27.0"
-springBoot = "4.1.2"
+springBoot = "4.2.0-RC2"
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.6.1"
 licensee = "1.14.1"
@@ -26,7 +26,7 @@ bucket4j = "8.22.0"
 semver4j = "6.0.0"
 logstashLogback = "9.0"
 archunit = "1.5.1"
-springModulith = "2.1.2"
+springModulith = "2.2.0-RC1"
 jsonSchemaValidator = "3.0.9"
 springdocOpenapi = "3.2.0"
 okhttp3 = "5.5.1"

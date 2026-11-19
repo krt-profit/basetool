@@ -1,6 +1,12 @@
 server:
   port: 11262
   forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      remote-ip-header: X-Forwarded-For
+      protocol-header: X-Forwarded-Proto
+    servlet:
+      use-relative-redirects: true
   max-http-request-header-size: 65536
   shutdown: graceful
   ssl:
@@ -113,6 +119,8 @@ management:
       probes:
         enabled: true
   metrics:
+    observations:
+      include-active-long-task-timer: true
     tags:
       application: basetool-ingest
     distribution:

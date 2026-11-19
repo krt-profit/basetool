@@ -21,19 +21,83 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.core.Ordered;
+import org.springframework.mock.web.MockFilterChain;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
 /**
  * Verifies that {@link ForwardedHeaderFilter} runs strictly after {@link ClientIpContextFilter}, so
- * the latter still sees the raw {@code X-Forwarded-For} chain.
+ * the latter still sees the raw {@code X-Forwarded-For} chain, and that it applies only the {@code
+ * X-Forwarded-*} family the edge sends.
  */
 class ForwardedHeaderConfigTest {
 
   private final ForwardedHeaderConfig config = new ForwardedHeaderConfig();
+
+  /**
+   * Runs the registered filter over a request to {@code /missions} and returns the request the
+   * chain behind it sees.
+   *
+   * @param request the incoming request
+   * @return the request as the application sees it
+   * @throws Exception if the filter fails
+   */
+  private HttpServletRequest filtered(MockHttpServletRequest request) throws Exception {
+    MockFilterChain chain = new MockFilterChain();
+    config
+        .forwardedHeaderFilter()
+        .getFilter()
+        .doFilter(request, new MockHttpServletResponse(), chain);
+    ServletRequest seen = chain.getRequest();
+    assertThat(seen).isInstanceOf(HttpServletRequest.class);
+    return (HttpServletRequest) seen;
+  }
+
+  @Test
+  void aStandardForwardedHeaderIsHiddenAndNeverApplied() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+    request.addHeader("Forwarded", "for=203.0.113.7;proto=https;host=spoofed.example");
+
+    HttpServletRequest seen = filtered(request);
+
+    assertThat(seen.getServerName()).as("host from Forwarded").isEqualTo("localhost");
+    assertThat(seen.getScheme()).as("proto from Forwarded").isEqualTo("http");
+    assertThat(seen.getRemoteAddr()).as("for from Forwarded").isEqualTo("127.0.0.1");
+    assertThat(seen.getHeader("Forwarded")).as("the header is hidden from the app").isNull();
+  }
+
+  @Test
+  void theXForwardedFamilyTheEdgeSendsIsApplied() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+    request.addHeader("X-Forwarded-Host", "basetool.example");
+    request.addHeader("X-Forwarded-Proto", "https");
+    request.addHeader("X-Forwarded-For", "203.0.113.7");
+
+    HttpServletRequest seen = filtered(request);
+
+    assertThat(seen.getServerName()).isEqualTo("basetool.example");
+    assertThat(seen.getScheme()).isEqualTo("https");
+    assertThat(seen.getRemoteAddr()).isEqualTo("203.0.113.7");
+  }
+
+  @Test
+  void anXForwardedPrefixIsNeverApplied() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+    request.addHeader("X-Forwarded-Host", "basetool.example");
+    request.addHeader("X-Forwarded-Prefix", "/spoofed");
+
+    HttpServletRequest seen = filtered(request);
+
+    assertThat(seen.getContextPath()).isEmpty();
+    assertThat(seen.getRequestURI()).isEqualTo("/missions");
+  }
 
   @Test
   void forwardedHeaderFilter_runsExactlyOneSlotAfterClientIpContextFilter() {

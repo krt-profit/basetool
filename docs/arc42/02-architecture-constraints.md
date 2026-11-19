@@ -17,7 +17,7 @@ so a later reader does not mistake a constraint for a preference and "improve" i
 
 | Constraint | Detail |
 | --- | --- |
-| **Java 25, Spring Boot 4.1** | Long-support Java; Boot 4 sets the servlet, security and observability idioms the modules follow. Only final language and library features: no `--enable-preview`, no incubator modules, no `import module` (ADR-0223). |
+| **Java 25, Spring Boot 4.2** | Long-support Java; Boot 4 sets the servlet, security and observability idioms the modules follow. Only final language and library features: no `--enable-preview`, no incubator modules, no `import module` (ADR-0223). |
 | **PostgreSQL 18**, schema owned by **Flyway** | Hibernate runs `ddl-auto=validate` everywhere. Nothing but a migration changes the schema — including in tests. |
 | **Keycloak 26** as the only identity provider | The applications never manage credentials. Authorisation is carried in the JWT and enforced with `@PreAuthorize`. |
 | **Redis** as the session store | Sessions must survive a frontend restart and be shared across replicas; the same Redis carries the live-sync pub/sub fanout. |

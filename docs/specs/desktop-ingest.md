@@ -459,7 +459,9 @@ it keys on the unforgeable JWT subject. The per-IP limit (`RateLimitingFilter`) 
 pre-auth front line; the source IP is resolved through Tomcat's `RemoteIpValve`
 (`forward-headers-strategy: native`), which honours `X-Forwarded-For` only from a trusted
 internal proxy, so an external client cannot trivially mint a fresh budget by spoofing the
-header. Both bucket maps are bounded (LRU, capped key count) so neither grows without limit
+header. The valve reads the `X-Forwarded-*` family the edge sends, named explicitly in
+`server.tomcat.remoteip.remote-ip-header` / `protocol-header`; a standard `Forwarded` header never
+changes the key. Both bucket maps are bounded (LRU, capped key count) so neither grows without limit
 under key churn. The two keys have **separate budgets**: the per-`sub` bucket is
 `app.rate-limit.capacity` / `refill-tokens` (30 per minute), the per-IP bucket its own, looser
 `app.rate-limit.ip-capacity` / `ip-refill-tokens` (120 per minute, `BASETOOL_INGEST_RATE_LIMIT_IP_CAPACITY`
@@ -478,10 +480,13 @@ them.
 - [x] A burst of calls from one source IP is throttled with a `Retry-After`; the per-member limit
   is the exchange's own (REQ-XCH-023). *(Amended 2026-09-28: this said a per-`sub` limit throttled
   the `/v1` routes.)*
+- [x] The running connector resolves the client address from `X-Forwarded-For` /
+  `X-Forwarded-Proto` through one `RemoteIpValve`; a standard `Forwarded` header never changes it.
 
 **Enforced by:** `FiltersTest`, `IngestPropertiesTest` (the IP budget's own defaults and property
 names), `FilterOrderTest` (rate limit before the payload cap), `ExchangeLimitFilterTest` (the
-per-client and per-member limits) · **Code:** `PayloadSizeLimitFilter`, `RateLimitingFilter`,
+per-client and per-member limits), `SecurityFilterChainProductionShapeTest` (the connector's one
+`RemoteIpValve` and its headers) · **Code:** `PayloadSizeLimitFilter`, `RateLimitingFilter`,
 `RateLimitBuckets`, `RateLimitProperties` · **Issues:** #642, #2092, security audit INGEST-DOS-1 /
 INGEST-RATELIMIT-1
 
