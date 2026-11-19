@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:adf4331c-02a0-4db6-97ec-f83e498878ea",
+  "serialNumber" : "urn:uuid:5b00fdd0-31ea-4be7-9663-95ac238249fd",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-11-19T06:10:23Z",
+    "timestamp" : "2026-11-19T09:09:59Z",
     "tools" : {
       "components" : [
         {
@@ -17,16 +17,16 @@
     },
     "component" : {
       "type" : "application",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.26.2?project_path=%3Afrontend",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.26.3?project_path=%3Afrontend",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "frontend",
-      "version" : "1.26.2",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.26.2?project_path=%3Afrontend",
+      "version" : "1.26.3",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.26.3?project_path=%3Afrontend",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/44469930617"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/44493637248"
         },
         {
           "type" : "vcs",
@@ -218,223 +218,6 @@
         {
           "type" : "vcs",
           "url" : "https://github.com/FasterXML/jackson-annotations"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
-      "group" : "com.fasterxml.jackson.core",
-      "name" : "jackson-core",
-      "version" : "2.23.0",
-      "description" : "Core Jackson processing abstractions (aka Streaming API), implementation for JSON",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "ac1ed6dcfa08b8e12969badbba07132f"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "a9094d2712ae45481ea9152160a4fbdfdea20659"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "449798beb4c4ec26de9cc25b39ca2198036883fb905ca968cbef7136d19a25d9"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "1e47c2fa0cce27452162836f32d0abf69e21667c1c89c12ae2197f5dcfd826355fc7a3dad238dd8a062b1cf719a0803a56612e32e390a20dad30c5d393758ab2"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "ed01872fb1854941d09595599aebe8f409afd3483e5ebfffc27b2227c50872d8"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "105b8d6aea5e0cad7a984707877915d505102e4b1fb1efa14eb21341b81e01eb18ca6cecdf638ae97494d76976628c99dac0471380655f25eaf8c888d2cd0570"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "7fd184c39e648599c653a14230137215305cd9545d394f856cf7743e49e9abccc723d5ee9cc8a0635d674cff405c5ab9"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "a9fcd5202f23d260dfe48658d54caea5ce99b87cf37659632b5ba79399cd34d83337a901d91cae6f1b9edc2aeaa52ce2"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/FasterXML/jackson-core"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
-      "group" : "com.fasterxml.jackson.core",
-      "name" : "jackson-databind",
-      "version" : "2.23.0",
-      "description" : "General data-binding functionality for Jackson: works on core streaming API",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "23bcc15788a045368dfa1b68230313d0"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "01f6b378f93126e1212a9344717740e4fd21b28f"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "abd1edd2736c764da03fe6cb7a9de70d48dd0a198aed131604c564bff62f9cc1"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "3369b5cf5693f19f885b96f4f02d26fe7640096809ca909886aa1ef8f5e9a0dba0cac53372129d813890d910701545e673692f5601b839988159099a619fce10"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "8a211a216f6eec5708741bbabe572d369aad6d9398522e13eb1785e21e201323"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "bd0b7dc2f81cfb1f98996af0e3a5580adeba50a536b319478aa11af04141ab3a1946c9cbdfafa9d2e745aa96a26215f195de16a0bd61c367c1a9a1499bd5a670"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "2e61d1e8072fcdb71474fd9a0752d6c00c1cb964353a95adb82853c8aefb9c96f452bbd211a3cde8cd5c921a89069854"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "63da5ef9734f5608c4f8d3c42f095158651156c90246519ccf2fb7a9f6ceee30dd356c72ae6bf40a9df2031fa4240d19"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/FasterXML/jackson-databind"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.23.0?type=jar",
-      "group" : "com.fasterxml.jackson.datatype",
-      "name" : "jackson-datatype-jsr310",
-      "version" : "2.23.0",
-      "description" : "Add-on module to support JSR-310 (Java 8 Date & Time API) data types.",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "b62ba38693a0a11dc89a467bff26a821"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "f133f886c8b0794496ef666f3f505d0b77c9c1e0"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "f348f4de49644afa0ccbff6b018709a5f0f1468c76852e4217051890a0b8528c"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "c8cf2eb512a6d48593969ff3479531b5cfc5e4308a97e033df81ffd8a0e2157dab735935ccca2cd9d2d121102952dbf028f130ac022959cc105721ea676a08ef"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "2962e33c37f994472b3d941b9f7a8ed8079e455f07aee5d56809af4de3849c68"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "e17fd2a72ce8cda65226225cefd41860c4b2a93fd4fa9ff79340a19d1c0edc42b857d504fadba30025efeaf4568710960b973d66c9d33605761786973d803bc0"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "b6d249eb8847f295292a088c6a0733d464c588ebb276d07c60d607e92fb2f32e65aa6429fffcba994ed9f271eb71521a"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "7e6e73a9aa16f349d0bf81409038db1f2e4a7596423d2d1d61ae649efc455312503999538cfc0c8558117ea2c0dcb89e"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.23.0?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom",
-      "publisher" : "FasterXML",
-      "group" : "com.fasterxml.jackson",
-      "name" : "jackson-bom",
-      "version" : "2.23.0",
-      "description" : "Bill of Materials pom for getting full, complete set of compatible versions of Jackson components maintained by FasterXML.com",
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "http://fasterxml.com/"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/FasterXML/jackson-bom"
         }
       ],
       "properties" : [
@@ -1244,11 +1027,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.2?project_path=%3Alogging-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.3?project_path=%3Alogging-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "logging-support",
-      "version" : "1.26.2",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.2?project_path=%3Alogging-support",
+      "version" : "1.26.3",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.3?project_path=%3Alogging-support",
       "modified" : false,
       "properties" : [
         {
@@ -1259,11 +1042,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.2?project_path=%3Atechnical-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.3?project_path=%3Atechnical-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "technical-support",
-      "version" : "1.26.2",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.2?project_path=%3Atechnical-support",
+      "version" : "1.26.3",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.3?project_path=%3Atechnical-support",
       "modified" : false,
       "properties" : [
         {
@@ -6005,44 +5788,44 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.attoparser/attoparser@2.0.7.RELEASE?type=jar",
-      "publisher" : "The ATTOPARSER team",
+      "bom-ref" : "pkg:maven/org.attoparser/attoparser@2.0.10.RELEASE?type=jar",
+      "publisher" : "Attoparser",
       "group" : "org.attoparser",
       "name" : "attoparser",
-      "version" : "2.0.7.RELEASE",
+      "version" : "2.0.10.RELEASE",
       "description" : "Powerful, fast and easy to use HTML and XML parser for Java",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "fd09ceba7061e05460e74e0e1e64f233"
+          "content" : "12fe46005fc29cd7b4b0d0488ac8909f"
         },
         {
           "alg" : "SHA-1",
-          "content" : "e5d0e988d9124139d645bb5872b24dfa23e283cc"
+          "content" : "acf77e51742a6e15f89fb511322f42041565e6f4"
         },
         {
           "alg" : "SHA-256",
-          "content" : "75dd1c045492bff8e1963aabb28bfe903c2064e11e27fe2f0f0aff1ad3d84476"
+          "content" : "8e85ebd7cd6a3e894c8745fe30779943c1d0a6214201f9a053238fc82e9893fa"
         },
         {
           "alg" : "SHA-512",
-          "content" : "010a118a86e72ef9018cca65655e93be778039277d0a2aea5676eda4483b0a189d65b3fa944a9af2105dda502c3aebc3c1ab9b64c1a3207aa140c4d2fd054a8b"
+          "content" : "56f3dbd6bf060c54992e0d00b88e812af29a32c972880720da16754ad1b4bad5d40c0683703fadfec5d1a1d44a467dae7985a237bbb2fd63956d5b8965f4c05a"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "e3f91ced9dd24f9babae34b35db9a42511d6fb22ea1e60ab5456954ad8fa5c4a"
+          "content" : "cf636c5bcf3e7bbd44212b6dd0a76f2b5010e93a39ac47d4601cc3cd6148af78"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "aa55fb1d0275582cfb972b0efdd9a8d16f111f3d363315555c3b1cccb5050c993dfaac55b910adaaec6a325ff6703875dc91d03eb05e907faa1a8f2e330b2bd5"
+          "content" : "0b679c9da19fd798d99fb83b29ecd050d456c59ce9d71d0a7a3c3c25f1f82a28b391f964360b4afdd5755c914d02d1a8fc44dff41fabbb57e9e01bef8bdd20ba"
         },
         {
           "alg" : "SHA-384",
-          "content" : "62c6b9b08e9a2b853095d8b111dda1c5fc4342bc87020e3dab0ac53e897127653f2e0197d8d4d75e8b241883de43f65a"
+          "content" : "f0063e9c568c3748c2c30b6165345ba9d1a27eb45cb87521a7306b2fb60f722dd0ba6934811df0ad29c56fc40444e62f"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "a3bdffc2e9dc90b04a5c6dc1937debd7ce3d7ccfab9bbac4dba4d95efab928d20ab8a94d481214c9b304430fac3451d4"
+          "content" : "1895edbabcbc7b5f6b439a3eade7e40020bb9e339a442b86cbe94b1f093be751aa66f9bcbf0722e3590deacf5e6baa5e"
         }
       ],
       "licenses" : [
@@ -6052,7 +5835,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.attoparser/attoparser@2.0.7.RELEASE?type=jar",
+      "purl" : "pkg:maven/org.attoparser/attoparser@2.0.10.RELEASE?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -6060,12 +5843,8 @@
           "url" : "https://www.attoparser.org"
         },
         {
-          "type" : "distribution",
-          "url" : "https://oss.sonatype.org/service/local/staging/deploy/maven2"
-        },
-        {
           "type" : "vcs",
-          "url" : "scm:git:git@github.com:attoparser/attoparser.git"
+          "url" : "https://github.com/attoparser/attoparser"
         }
       ],
       "properties" : [
@@ -12155,42 +11934,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.5.RELEASE?type=jar",
+      "bom-ref" : "pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.7.RELEASE?type=jar",
       "group" : "org.thymeleaf.extras",
       "name" : "thymeleaf-extras-springsecurity6",
-      "version" : "3.1.5.RELEASE",
+      "version" : "3.1.7.RELEASE",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "23089bb54b0ef5d36c5783ff4f264ddd"
+          "content" : "1ee3c81b2baba0a7a252bec3c2f93ca3"
         },
         {
           "alg" : "SHA-1",
-          "content" : "577c4a639e0d243b9004a09ba17ea819385cddee"
+          "content" : "7e4b46338a976252641807fc4fc4a89940c45f1d"
         },
         {
           "alg" : "SHA-256",
-          "content" : "f354623821cb0a0bd2abc646b63a7c817b9057e33290290dc97a61682d8ecfe4"
+          "content" : "ec7f08fc10a696b5975c0104641d97a78f146430c1039287e34ee3d5473c1230"
         },
         {
           "alg" : "SHA-512",
-          "content" : "8d12595084b60eef53ff49c14e7e295d23c271fb3f4a8d179725282c72bb417fa613ee686a6db4562ac9841424fe24c99a2c9812ca8ebb7802248580e1b3f8a4"
+          "content" : "af46da35615174bb877da57949229d6903e440719ddad9b2fd7fda377ab0d35f881530ecbcdd7be3f442f37cbf18547fa34dc3e2627ff6568f521bbb0d49cc79"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "8cf66a3c7f7ea95a9e9895778dda9d2b635f16a54d643f76dbe03ac82f0c6b70"
+          "content" : "20beef62ea6a0cc5556280c07872c9a2d81adf2ecc360f7c1a2192853c44b7a6"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "1d3796b8cdfe8e70b03e7135ae20c6ed8f6ad8de95b712f7d2405c1d0bb932124981ebc98a25711c009e7f32bdd15cb05f4556e3ce71a558758432b8ba24c387"
+          "content" : "c830b6223b3aed4bdf5f1d6b8f56bfeeb1480629c63d0bd14464ae8f189650d56cd914f44ffe671179d72e006bd77f0cd53ebc4612dd9da453603825170896b8"
         },
         {
           "alg" : "SHA-384",
-          "content" : "bc2e2ca847dde9be53774912790c95accb7fbc2134277595fcd192423127ebab45bd353eb301c67ca6e72a55a345da29"
+          "content" : "6bbdcaa04428f155945f3e927430dde40935807e6e441c84703495ce0e56d459980717258d32be38e5998cca19ef7405"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "8885f1a2cb94ad653c32be0128e7633c92c1f7431c9bae403ea151d19aeb5139d75071863334f7ac1752eee698775ec2"
+          "content" : "39613df6a2aefab65312aa664348ae1a40d0140c8e790b4e142d1e5111f09c1c3bf7926c8b4a0c6babda367995d0dd3d"
         }
       ],
       "licenses" : [
@@ -12200,7 +11979,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.5.RELEASE?type=jar",
+      "purl" : "pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.7.RELEASE?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -12211,42 +11990,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.5.RELEASE?type=jar",
+      "bom-ref" : "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.7.RELEASE?type=jar",
       "group" : "org.thymeleaf",
       "name" : "thymeleaf-spring6",
-      "version" : "3.1.5.RELEASE",
+      "version" : "3.1.7.RELEASE",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "ba6d76a7c1c81ffbed318b165a72cc3a"
+          "content" : "2296f6c133af36329f084dd24593eadf"
         },
         {
           "alg" : "SHA-1",
-          "content" : "d9dcb89be976a321df29518cc634d89a83973800"
+          "content" : "0690ddff66ac54067002dbf72dd93b1c05cd4d83"
         },
         {
           "alg" : "SHA-256",
-          "content" : "fd5d306052d7aa6769a8ec77778d328e6f7c83af5ac074df38035bbb1e9cd72b"
+          "content" : "97e5a6608549755ace566ced0e7ad8995f3753e7fc54da6d8e004af4e1b4a0fb"
         },
         {
           "alg" : "SHA-512",
-          "content" : "c8eef2951afd575d4c4d7b7f2e08845b8fe4838f4a97b39a115d5416e0b26edca40623a34cf61e5dbc78f13305f6f5d5f2b4cc8cf004497e874b098d401cae22"
+          "content" : "098f2d32bf864d50c45e442b7d4c39ac4e3e8a0ed05d0aee42c238bac664a95837706fd0e48a2730b77d64e1daed69888f2e73c209c9f9eb44c82b1922f5a7e4"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "57663d85c7efa9dc7a15224b30308426f3a79a61b9ac513289e38044153582ed"
+          "content" : "a70bd0581478b9d5e9ab374e3dd647206548281d325488a0652e0522ba13acec"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "f78423b905dadeb4e2a8b6a67202bc2ab722423aa5689fbd414e558b904ba5cd8e971eb5002a2e8d08ecaa3837eb56f92ce3ce4610003e97c45e3e54e94e99e0"
+          "content" : "50d847f11c4e81abb3b997635f6aa659bb9d938c077fa3ceee1861bcb2933e7fd86751d27a1e6903e6364af70f099a34ed5c8c0d901f095f2f9f84f3ef019c34"
         },
         {
           "alg" : "SHA-384",
-          "content" : "90385cda4c91d04ae253bf09022681d5673148bc8f1883d7bef3946624601ec9e15e3e574f411d299b753d0e50ce975f"
+          "content" : "d2186cdf8e75f35b296aa8f34337e7b0f59f44034cb67ae71be800694195f2e895eebf25678cd5a8aa78cd6d4a9caa7f"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "e2732ca5b7ac9cdd56a71cc884d9de2a0a1a91fd5d79aaa4f505182c409ebd63d4e9060735a83196bc0d58e90b606fac"
+          "content" : "1c2bbe3f8e132d830436bb0e851e0f4fb1a663fc062250935e5a74f9c00117b8dd6c0a704267d0048673ff575b75b494"
         }
       ],
       "licenses" : [
@@ -12256,7 +12035,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.5.RELEASE?type=jar",
+      "purl" : "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.7.RELEASE?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -12267,42 +12046,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.thymeleaf/thymeleaf@3.1.5.RELEASE?type=jar",
+      "bom-ref" : "pkg:maven/org.thymeleaf/thymeleaf@3.1.7.RELEASE?type=jar",
       "group" : "org.thymeleaf",
       "name" : "thymeleaf",
-      "version" : "3.1.5.RELEASE",
+      "version" : "3.1.7.RELEASE",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "a98ce31b33c80805b77e26f24e531aad"
+          "content" : "82c1b3a2029d6b792123be07b728441b"
         },
         {
           "alg" : "SHA-1",
-          "content" : "8986b45086f74f7773c440055a2f473817dd3fa8"
+          "content" : "ebfcf4dd941a02e95aeb6e2db1aec663ef24d4a1"
         },
         {
           "alg" : "SHA-256",
-          "content" : "4011795f8494dd69e764b7709443dd13d3068ba8ac37624f61d7084f4429cbe2"
+          "content" : "3b10820d4b81f227c26a77426b376197fe2d2572dbae8007a7c48227a3cb5c02"
         },
         {
           "alg" : "SHA-512",
-          "content" : "30fa6e8a821183f5b2b981e1f972d2b4ade00de35e0172dbd4a6680df69b5cfafce251e2e288d3e9b95399443aa2a1f88760715a5ba74afdf5f61ea6b6630c5d"
+          "content" : "3d1ac8ef69a631608d055010f334c45140cc08daca0410eff22da13e9132e38c6e9c8a4544ae6318478c2fc6f32ff9a7b62324d4983c63dc5827d2afc2fa5fa3"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "830c996116e906cc1135fd8c5038190a23846dbbc1f43bfce738415c146b5d5d"
+          "content" : "e2d8348e85d5a8f651c9b29c48ff244f87c841cd488c98ff778380da270b65cf"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "2f8cddd9ab822d54728b1e8ef8eea89f3ccbf8ec022c2087bbc1fd843a370d941d0bed50fe4ad90c84cce64f0252d64628c3c245fdbd5b46c541b02aa779f25c"
+          "content" : "efd27668ba6c6212e2f93d87ec68ce930f21517e6897db077755706917a3ebd104921f3bc45a52091f58deff6fcdd8f147fe14ac5e8ff1df00c3c764d832379e"
         },
         {
           "alg" : "SHA-384",
-          "content" : "b35de36758814468d3f0309257ea8d08149307bfe497da006d9fecb5b74efab1b7c6d2e0407f84f5a8434a9f09a7f1f2"
+          "content" : "2470ff11b9a9de63aad111e8dd3be151ee9e7b928d3a574ddc043d56b16abedd099ac927fb4d89b02a05abcba123add3"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "2823426d5c615c6f0c119a59e3728607fc2a2792414a4769191939e494d50d7e7afe9d898be88c767e945a744f04df8b"
+          "content" : "e3d5c660d68da2bfd5b646bb8a6ef9975fa303eceb7970c2c1d7a4169fe57f937a4fad8f9fd4a26cdc78d9f4fc1bbaba"
         }
       ],
       "licenses" : [
@@ -12312,7 +12091,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.thymeleaf/thymeleaf@3.1.5.RELEASE?type=jar",
+      "purl" : "pkg:maven/org.thymeleaf/thymeleaf@3.1.7.RELEASE?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -12323,44 +12102,44 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.unbescape/unbescape@1.1.6.RELEASE?type=jar",
-      "publisher" : "The UNBESCAPE team",
+      "bom-ref" : "pkg:maven/org.unbescape/unbescape@1.1.8.RELEASE?type=jar",
+      "publisher" : "Unbescape",
       "group" : "org.unbescape",
       "name" : "unbescape",
-      "version" : "1.1.6.RELEASE",
+      "version" : "1.1.8.RELEASE",
       "description" : "Advanced yet easy-to-use escape/unescape library for Java",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "d95ed94e1624e307a1958ee105ccbf39"
+          "content" : "c5fdc1d90f3ffecc5016713f13116285"
         },
         {
           "alg" : "SHA-1",
-          "content" : "7b90360afb2b860e09e8347112800d12c12b2a13"
+          "content" : "24ff8ddd9eabd20d15f753f01bc0a44458db85c0"
         },
         {
           "alg" : "SHA-256",
-          "content" : "597cf87d5b1a4f385b9d1cec974b7b483abb3ee85fc5b3f8b62af8e4bec95c2c"
+          "content" : "b02195dca9c3b83dcc74234f25ed7eedceacf8f75904f984bc54fc4bb0e926d0"
         },
         {
           "alg" : "SHA-512",
-          "content" : "6918e9579b06721942fdcd91e401f5b996fb4eac13056dbafdf594661f355a34874eb5266784bc2c4f82df9fdd9e219d71a96f52945a354f01665f85f8166bb3"
+          "content" : "0d5f1a5fdd7d9bd3bf8237e7ed2490c8e7003d0517453f7da031c1155a63dab39ad4b9e5137b30bdcea626c1b70bf6e76c0f13e6a348364d0538f29dcc3eb5e9"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "a190c9bedccff959d08db12fe7080437fb4e98f05516b39d6540be718e151cc6"
+          "content" : "fafa206526ba1670d742b78f0865f07fddc6bc35a87c5c082707f8dda72e59e0"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "5d7b5edc0c2a0d47c9625936c14b4122330b96cdf54260fe2a6468289c2f4cbc4ee19770c1144acfa702f2f058a81544b4aea9258fe0e15166a1a331736d7b77"
+          "content" : "2bd2931fc883ad22dd24be12187ff29723eb8983cbf19e02979d2384ada3ed98259d6048cbe7e2f0cee84dfe4a1df5e949c5e8a3be530d8325c22c7529c4ea24"
         },
         {
           "alg" : "SHA-384",
-          "content" : "1b808b67c784b69afea64364ba4c0d433c7f042c512f5c18f07d5388fe7ac4741913f696424bd8fbde147383cfb3d8f9"
+          "content" : "a0a41f13f83407896f8bdb2acff7e2d6ff350c3edaf553faf922051b0ab94cc9cc1ec4c71321ba39ad785f5b97694020"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "6525bd20a12ff43a0089c0d59369574ae6c01e2b4b1aacf466847d4433ae403db08404a9b59be397c3034f972bcd6b06"
+          "content" : "a07903512667ba99591cdbfe398d53d1513e2beb584e7019777853f2a132762a5c618179e6224ee5a66906e032d5cfa7"
         }
       ],
       "licenses" : [
@@ -12370,20 +12149,16 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.unbescape/unbescape@1.1.6.RELEASE?type=jar",
+      "purl" : "pkg:maven/org.unbescape/unbescape@1.1.8.RELEASE?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "website",
-          "url" : "http://www.unbescape.org"
-        },
-        {
-          "type" : "distribution",
-          "url" : "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+          "url" : "https://www.unbescape.org"
         },
         {
           "type" : "vcs",
-          "url" : "scm:git:git@github.com:unbescape/unbescape.git"
+          "url" : "https://github.com/unbescape/unbescape"
         }
       ],
       "properties" : [
@@ -12775,33 +12550,6 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar",
-        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
-        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.23.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar",
-        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
-        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
-        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/com.fasterxml/classmate@1.7.3?type=jar",
       "dependsOn" : [ ]
     },
@@ -12872,13 +12620,11 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.26.2?project_path=%3Afrontend",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/frontend@1.26.3?project_path=%3Afrontend",
       "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
-        "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.23.0?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
-        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.2?project_path=%3Alogging-support",
-        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.2?project_path=%3Atechnical-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.3?project_path=%3Alogging-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.3?project_path=%3Atechnical-support",
         "pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar",
         "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
         "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
@@ -12897,19 +12643,19 @@
         "pkg:maven/org.springframework.boot/spring-boot-starter-webflux@4.1.2?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-websocket@4.1.2?type=jar",
         "pkg:maven/org.springframework.session/spring-session-data-redis@4.1.1?type=jar",
-        "pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.5.RELEASE?type=jar",
+        "pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.7.RELEASE?type=jar",
         "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.3.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.2?project_path=%3Alogging-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.3?project_path=%3Alogging-support",
       "dependsOn" : [
         "pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.2?project_path=%3Atechnical-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.3?project_path=%3Atechnical-support",
       "dependsOn" : [
         "pkg:maven/io.micrometer/micrometer-observation@1.17.2?type=jar"
       ]
@@ -13518,7 +13264,7 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.attoparser/attoparser@2.0.7.RELEASE?type=jar",
+      "ref" : "pkg:maven/org.attoparser/attoparser@2.0.10.RELEASE?type=jar",
       "dependsOn" : [ ]
     },
     {
@@ -13907,7 +13653,7 @@
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot@4.1.2?type=jar",
         "pkg:maven/org.springframework/spring-web@7.0.10?type=jar",
-        "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.5.RELEASE?type=jar"
+        "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.7.RELEASE?type=jar"
       ]
     },
     {
@@ -14183,29 +13929,29 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.5.RELEASE?type=jar",
+      "ref" : "pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.7.RELEASE?type=jar",
       "dependsOn" : [
         "pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar",
-        "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.5.RELEASE?type=jar"
+        "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.7.RELEASE?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.5.RELEASE?type=jar",
+      "ref" : "pkg:maven/org.thymeleaf/thymeleaf-spring6@3.1.7.RELEASE?type=jar",
       "dependsOn" : [
         "pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar",
-        "pkg:maven/org.thymeleaf/thymeleaf@3.1.5.RELEASE?type=jar"
+        "pkg:maven/org.thymeleaf/thymeleaf@3.1.7.RELEASE?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.thymeleaf/thymeleaf@3.1.5.RELEASE?type=jar",
+      "ref" : "pkg:maven/org.thymeleaf/thymeleaf@3.1.7.RELEASE?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.attoparser/attoparser@2.0.7.RELEASE?type=jar",
+        "pkg:maven/org.attoparser/attoparser@2.0.10.RELEASE?type=jar",
         "pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar",
-        "pkg:maven/org.unbescape/unbescape@1.1.6.RELEASE?type=jar"
+        "pkg:maven/org.unbescape/unbescape@1.1.8.RELEASE?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.unbescape/unbescape@1.1.6.RELEASE?type=jar",
+      "ref" : "pkg:maven/org.unbescape/unbescape@1.1.8.RELEASE?type=jar",
       "dependsOn" : [ ]
     },
     {

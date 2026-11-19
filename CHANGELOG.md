@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [v1.26.3](https://github.com/krt-profit/basetool/releases/tag/v1.26.3) - 2026-11-19
+
+### Changed
+
+- **Abhängigkeiten.** Neu gebaute PostgreSQL- und Redis-Images, postgres-exporter 0.21.1 und kleinere
+  Updates der Build- und CI-Werkzeuge. Für Mitglieder ändert sich nichts.
+
+### Security
+
+- **Webserver.** Der vorgeschaltete nginx-Webserver läuft auf 1.31.9 und schließt damit zehn Lücken.
+  Drei davon betreffen unsere Konfiguration: Sie erlaubten es, den Server über HTTP/2 oder TLS-Anfragen
+  ohne Anmeldung lahmzulegen. Für Mitglieder ändert sich sonst nichts.
+
+- **Seitenvorlagen.** Die Vorlagen-Engine Thymeleaf läuft auf 3.1.7 und schließt damit neun Lücken,
+  darunter eine kritische und zwei hohe in der Absicherung von Vorlagenausdrücken. Werte, die eine
+  Seite an ihre Skripte übergibt, werden strenger maskiert. Für Mitglieder ändert sich sonst nichts.
+
 ## [v1.26.2](https://github.com/krt-profit/basetool/releases/tag/v1.26.2) - 2026-11-19
 
 ### Fixed
