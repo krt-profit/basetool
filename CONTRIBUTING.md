@@ -452,8 +452,8 @@ Tools a workflow installs outside Gradle are pinned by hash too: Python
 packages come from `--require-hashes` requirement files in
 [`.github/requirements/`](.github/requirements/) (zizmor, PyYAML,
 ansible-core with ansible-lint), each compiled from the `<name>.in` beside it
-(the top-level pins, such as `ansible-core==2.21.6` plus `ansible-lint==26.11.0`) with
-`uv pip compile .github/requirements/<name>.in --universal --generate-hashes --python-version 3.12 --no-annotate -o .github/requirements/<name>.txt`.
+(the top-level pins, such as `ansible-core==2.22.0` plus `ansible-lint==26.11.0`) with
+`uv pip compile .github/requirements/<name>.in --universal --generate-hashes --python-version 3.14 --no-annotate -o .github/requirements/<name>.txt`.
 Keep the header uv writes: Dependabot's `uv` entry recompiles a `.txt` from its
 `.in` and reads `--universal` and `--python-version` from that header, so a file
 without it would be recompiled for another Python. markdownlint-cli comes from
