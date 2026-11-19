@@ -117,7 +117,7 @@ jobs:
           - arch: amd64
             runner: ubuntu-latest
           - arch: arm64
-            runner: ubuntu-26.04-arm
+            runner: ubuntu-24.04-arm
     env:
       IMAGE: ${{ matrix.image }}
       ARCH: ${{ matrix.arch }}

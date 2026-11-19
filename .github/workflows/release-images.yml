@@ -121,7 +121,7 @@ jobs:
             matrix=$(jq -cn --argjson r "$reused" --arg all "$MODULES" '
               [($all | split(" "))[] | select(. as $m | $r | index($m) | not)
                | {module: ., platform: "linux/amd64", "runs-on": "ubuntu-latest"},
-                 {module: ., platform: "linux/arm64", "runs-on": "ubuntu-26.04-arm"}]')
+                 {module: ., platform: "linux/arm64", "runs-on": "ubuntu-24.04-arm"}]')
             {
               printf 'reused_modules=%s\n' "$reused"
               printf 'digests=%s\n' "$2"
