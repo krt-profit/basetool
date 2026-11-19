@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<p id="before">BEFORE</p>
+<script th:inline="javascript">
+    const v = {};
+    v.hostileText = /*[[${hostileText}]]*/ null;
+    v.nonAsciiText = /*[[${nonAsciiText}]]*/ null;
+    v.lineSeparators = /*[[${lineSeparators}]]*/ null;
+    v.templateLiteral = /*[[${templateLiteral}]]*/ null;
+    v.controlChars = /*[[${controlChars}]]*/ null;
+    v.message = /*[[#{info.delete}]]*/ null;
+    v.integerValue = /*[[${integerValue}]]*/ null;
+    v.decimalValue = /*[[${decimalValue}]]*/ null;
+    v.doubleValue = /*[[${doubleValue}]]*/ null;
+    v.flag = /*[[${flag}]]*/ null;
+    v.nothing = /*[[${nothing}]]*/ 'fallback';
+    v.character = /*[[${character}]]*/ null;
+    v.enumValue = /*[[${enumValue}]]*/ null;
+    v.uuid = /*[[${uuid}]]*/ null;
+    v.instant = /*[[${instant}]]*/ null;
+    v.localDate = /*[[${localDate}]]*/ null;
+    v.localDateTime = /*[[${localDateTime}]]*/ null;
+    v.offsetDateTime = /*[[${offsetDateTime}]]*/ null;
+    v.duration = /*[[${duration}]]*/ null;
+    v.record = /*[[${record}]]*/ null;
+    v.recordMap = /*[[${recordMap}]]*/ {};
+    v.lineList = /*[[${lineList}]]*/ [];
+    v.end = 'END';
+</script>
+<p id="after">AFTER</p>
+</body>
+</html>

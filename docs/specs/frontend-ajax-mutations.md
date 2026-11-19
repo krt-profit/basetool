@@ -319,11 +319,19 @@ the source file's URL leaves the browser.
   JavaScript string literal (`/*[[#{key}]]*/ ""`), never as `"[[#{key}]]"` in a plain script, where
   Thymeleaf HTML-escapes it (`'` arrives as `&#39;`). `MembersPageMessagesRenderTest` renders
   `/members` in DE and EN with a quote- and ampersand-laden translation.
+- [x] A server value an inline script receives through `/*[[${…}]]*/` is written by Thymeleaf's
+  own JavaScript serializer, which the frontend runs on Jackson 3 (no Jackson 2 on its classpath,
+  no serializer of its own). Every string arrives unchanged; no literal carries `<`, `>`, `&`, a
+  backtick, `${` or a non-ASCII character (`U+2028` / `U+2029` included), and `/` arrives as `\/`,
+  so no value ends the `<script>` element, opens an HTML comment or ends a template literal;
+  `java.time` values arrive as ISO-8601 strings, an enum as its `toString()`; records, maps and
+  lists keep every property and maps their entry order. `JavaScriptInliningRenderTest` renders it
+  through the application's template engine.
 
 **Enforced by:** `:frontend:lintJs` (`no-unsanitized/method`, `no-unsanitized/property`),
-`MembersPageMessagesRenderTest`, `:frontend:testClientErrorCspJs` + review of
-the trusted-helper call sites · **Code:** `escape-html.js`, `krt-fetch.js` (`setTrustedHtml`,
-`replaceWithTrustedHtml`, `swap`), `krt-client-error.js` (`violationMessage`, `codeOriginOf`),
+`MembersPageMessagesRenderTest`, `JavaScriptInliningRenderTest`,
+`:frontend:testClientErrorCspJs` + review of the trusted-helper call sites · **Code:**
+`escape-html.js`, `krt-fetch.js` (`setTrustedHtml`, `replaceWithTrustedHtml`, `swap`), `krt-client-error.js` (`violationMessage`, `codeOriginOf`),
 `eslint.config.mjs`
 
 ### REQ-FE-003 — `syncVersion` propagates the optimistic-lock version
