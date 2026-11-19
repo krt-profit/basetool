@@ -660,6 +660,29 @@ expect_out "...and cleared by the next wait" podman \
   'failed=[]'
 
 say ""
+say "== the edge serves the maintenance page: a re-defined edge restarts alone, before the window opens =="
+stackE='RT_STACK_SERVICES="edge db-backend keycloak backend ingest frontend"'
+expect_call "a re-defined edge is restarted on its own" podman \
+  "RT_CHANGED_SERVICES='edge backend'; ${stackE} rt_apply_stack" 'systemctl --user restart edge.service'
+expect_out "...before the window's stop, and the stack then starts in order with the edge already up" podman \
+  "RT_CHANGED_SERVICES='backend edge'; ${stackE} rt_apply_stack; grep -oE '(restart|stop|start) [a-z-]+' \"\${LOG}\" | tr '\n' ' '" \
+  'restart edge stop backend start edge start db-backend start keycloak start backend start ingest start frontend '
+expect_out "...and the window's stop never names it" podman \
+  "RT_CHANGED_SERVICES='edge keycloak backend'; ${stackE} rt_apply_stack; grep ' stop ' \"\${LOG}\" | sed 's/.* stop \(.*\)$/stopped=[\1]/'" \
+  'stopped=[keycloak.service backend.service]'
+expect_no_call "an edge alone opens no window at all" podman \
+  "RT_CHANGED_SERVICES='edge'; ${stackE} rt_apply_stack" ' stop '
+expect_out "an edge that does not come back fails the apply, and is named" podman \
+  "export STUB_FAIL='restart_edge.service'; RT_CHANGED_SERVICES='edge backend'; ${stackE} rt_apply_stack; echo \"rc=\$?; failed=[\${RT_FAILED_SERVICES}]\"" \
+  'rc=1; failed=[edge]'
+expect_no_call "...before anything else is stopped" podman \
+  "export STUB_FAIL='restart_edge.service'; RT_CHANGED_SERVICES='edge backend'; ${stackE} rt_apply_stack" ' stop '
+expect_out "the window's services are the re-defined ones without the edge" podman \
+  "RT_CHANGED_SERVICES='keycloak edge backend'; echo \"window=[\$(rt_window_services)]\"" 'window=[keycloak backend]'
+expect_out "a sick edge is healed alone too: restarted, nothing stopped" podman \
+  "${stackE} rt_heal_stack edge; grep -oE '(restart|stop) [a-z-]+' \"\${LOG}\" | tr '\n' ' '" 'restart edge '
+
+say ""
 say "== the runtime-health heal is the same window: one stop of the sick units, then the stack in order =="
 expect_call "the sick units go down in one stop" podman \
   "${stack5} rt_heal_stack backend frontend" 'systemctl --user stop backend.service frontend.service'
@@ -738,8 +761,8 @@ expect_out "an empty unit directory is 'not configured', not an error" podman \
 say ""
 say "== the stack is the installed units, in the known order =="
 # shellcheck disable=SC2016
-expect_out "the known order starts the edge right after keycloak, before the applications" podman \
-  'echo "[${RT_STACK_ORDER}]"' '[db-backend db-keycloak redis redis-session redis-shared keycloak edge backend ingest frontend acme]'
+expect_out "the known order starts the edge first, so the maintenance page is up before the slow units" podman \
+  'echo "[${RT_STACK_ORDER}]"' '[edge db-backend db-keycloak redis redis-session redis-shared keycloak backend ingest frontend acme]'
 STACKDIR="${WORK}/stack-units"
 mkdir -p "$STACKDIR"
 for u in db-backend keycloak backend legacy prometheus; do printf '[Container]\n' >"${STACKDIR}/${u}.container"; done

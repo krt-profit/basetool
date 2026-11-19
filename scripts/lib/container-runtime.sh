@@ -28,7 +28,10 @@ RT_CHANGED_SERVICES="${RT_CHANGED_SERVICES:-}"
 
 RT_FAILED_SERVICES=""
 
-RT_STACK_ORDER="${RT_STACK_ORDER:-db-backend db-keycloak redis redis-session redis-shared keycloak edge backend ingest frontend acme}"
+# The edge serves the maintenance page: it starts first and is never stopped inside a restart window.
+RT_EDGE_SERVICE="${RT_EDGE_SERVICE:-edge}"
+
+RT_STACK_ORDER="${RT_STACK_ORDER:-edge db-backend db-keycloak redis redis-session redis-shared keycloak backend ingest frontend acme}"
 
 RT_RETIRED_SERVICES="${RT_RETIRED_SERVICES:-}"
 
@@ -285,6 +288,23 @@ rt_retire_services() {
   return "${rc}"
 }
 
+rt_edge_redefined() {
+  case " ${RT_CHANGED_SERVICES} " in
+    *" ${RT_EDGE_SERVICE} "*) return 0 ;;
+  esac
+  return 1
+}
+
+rt_window_services() {
+  local svc out=""
+  for svc in ${RT_CHANGED_SERVICES}; do
+    [[ "${svc}" == "${RT_EDGE_SERVICE}" ]] || out="${out}${out:+ }${svc}"
+  done
+  printf '%s\n' "${out}"
+}
+
+# A re-defined edge is restarted alone before the window opens, so the maintenance page answers while
+# it is open; an edge that does not come back fails the apply before anything else is stopped.
 rt_apply_stack() {
   RT_FAILED_SERVICES=""
   rt_retire_services || return 1
@@ -298,8 +318,15 @@ rt_apply_stack() {
   local -a redefined=()
   for svc in "$@"; do
     case " ${RT_CHANGED_SERVICES} " in
-      *" ${svc} "*) redefined+=("${svc}.service") ;;
+      *" ${svc} "*) ;;
+      *) continue ;;
     esac
+    if [[ "${svc}" != "${RT_EDGE_SERVICE}" ]]; then
+      redefined+=("${svc}.service")
+    elif ! ${RT_SYSTEMCTL} restart "${svc}.service"; then
+      RT_FAILED_SERVICES="${svc}"
+      return 1
+    fi
   done
   if ((${#redefined[@]} > 0)); then
     ${RT_SYSTEMCTL} stop "${redefined[@]}" || rc=1

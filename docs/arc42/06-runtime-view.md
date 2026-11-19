@@ -127,7 +127,9 @@ itself changes only through the Ansible role, which never delivers):
    with the app images. The apply takes every re-defined unit down in **one** `systemctl stop` —
    `Requires=` takes what depends on them along — and then starts the stack in dependency order, so
    a release is one restart window in which each unit restarts once, and one gate covers images,
-   units and JAR. A unit the release retires is stopped inside that window, never before the pull,
+   units and JAR. The edge is the exception: it starts first, and a re-defined edge is restarted on
+   its own before the stop, so the maintenance page answers through the whole window
+   (`REQ-OPS-061`, ADR-0397). A unit the release retires is stopped inside that window, never before the pull,
    and the stack it starts is the units the host has, so a renamed unit rolls forward and back by
    name (`REQ-OPS-004`). A failed gate rolls all of them back together; the log names what the release
    changed and what did not come up, because a single gate cannot tell a bad JAR from a bad image.

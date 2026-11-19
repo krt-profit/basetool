@@ -916,12 +916,17 @@ Within about five minutes the timer fires `deploy.sh`, which:
    removed once it is down (one already inactive or not loaded just loses its file; one that cannot
    be stopped keeps it and fails the release: `health gate: the retired unit(s) […] could not be
    stopped`, nothing of the release is reloaded or started, and step 7 rolls back); then the units
-   are reloaded, one `systemctl --user stop` takes down every unit it re-defined — re-pinned app services, units
+   are reloaded; a re-defined **edge** is restarted on its own (`the edge is re-defined: restarted on
+   its own before the restart window opens, so the maintenance page answers throughout`) — an edge
+   that does not come back fails the release here, with nothing else stopped; then one
+   `systemctl --user stop` takes down every other unit it re-defined — re-pinned app services, units
    the config replaced or whose `env.d` file changed, keycloak for a moved JAR — which takes what
    `Requires=` them down with them,
-   then a `start` of every stack unit in dependency order, each waited for until healthy. The stack
+   then a `start` of every stack unit in dependency order, each waited for until healthy. The edge is
+   never in that stop, so the maintenance page answers for the whole window (REQ-OPS-061,
+   ADR-0397). The stack
    units are the **installed** ones (`config applied — stack units, from the installed units: […]`):
-   `db-backend db-keycloak redis redis-session redis-shared keycloak edge backend ingest frontend
+   `edge db-backend db-keycloak redis redis-session redis-shared keycloak backend ingest frontend
    acme` as far as the host has them (`redis` is the single instance a rollback to a release before
    ADR-0388 brings back), and an installed unit one of them `Requires=` right before
    the first unit that requires it; every other installed unit is a monitoring unit. Keycloak
@@ -2890,6 +2895,7 @@ goes.
 | `health gate: the retired unit(s) […] could not be stopped — their unit files are kept`; `DeployRolledBack` fires | `${UCTL} status <unit>.service`, `${UPOD} ps --filter label=PODMAN_SYSTEMD_UNIT=<unit>.service` | the release retires a unit whose `stop` failed (a stop job cancelled or timed out). Its file was kept so its container is not left running unmanaged, nothing of the release was started, and the release was rolled back. Find out why the unit does not stop and stop it (`${UCTL} stop <unit>.service`), then `--force` |
 | A promoted unit change is ignored | `ls ~basetool/.config/containers/systemd/` | a hand-placed unit of the same name shadows the delivered one |
 | Monitoring config changes never load | the deploy log (`BASETOOL_MONITORING_ENABLED != 'true'`) | set `BASETOOL_MONITORING_ENABLED=true` in `basetool.env`; `MonitoringReconcileDisabled` fires meanwhile |
+| Users get no answer at all during a deploy, not even the maintenance page | haproxy's journal (`journalctl -t haproxy --since …`, termination state `SC` = refused, `SD` with 0 bytes = closed empty), the deploy log's `the edge is re-defined` line, `journalctl CONTAINER_NAME=edge --since -10m` | the edge restarting — about two to three seconds when the release re-defines it (REQ-OPS-061); a longer gap is an edge that did not come back, which fails the release with `[edge]` named. The applications' restart window never stops the edge |
 
 ---
 
