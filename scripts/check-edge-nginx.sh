@@ -5,7 +5,7 @@ export MSYS2_ARG_CONV_EXCL='/CN='
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EDGE_DIR="${REPO_ROOT}/docker/edge"
-IMAGE="$(sed -n 's/^[[:space:]]*image:[[:space:]]*\(nginxinc\/nginx-unprivileged:[^[:space:]]*\).*/\1/p' "${REPO_ROOT}/docker-compose.yml" | head -1)"
+IMAGE="$(sed -n 's/^[[:space:]]*image:[[:space:]]*\(nginx\/nginx-unprivileged:[^[:space:]]*\).*/\1/p' "${REPO_ROOT}/docker-compose.yml" | head -1)"
 [[ -n "${IMAGE}" ]] \
   || {
     echo "FAIL: no nginx-unprivileged image in docker-compose.yml - the edge service changed"
