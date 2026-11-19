@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [v1.26.2](https://github.com/krt-profit/basetool/releases/tag/v1.26.2) - 2026-11-19
+
+### Fixed
+
+- **Exchange-API, Materialien.** Eine verbundene Anwendung, die noch die ID eines zusammengeführten
+  Materials schickt (etwa „Party Favors“), landet wieder bei dem Material, das bleibt („Fireworks“),
+  statt die Buchung als unbekannt abzulehnen.
+
+- **Lager und Exchange-API, Rohstoffe.** Ausgeblendete Materialien (etwa Boron, Xenon, Coal) lassen
+  sich nicht mehr einbuchen, auch nicht über eine verbundene Anwendung. Vorhandene Bestände lassen
+  sich weiter ausbuchen und umlagern.
+
+- **Exchange-Sandbox, Testskripte.** `scripts/sandbox-smoke.py` und `scripts/sandbox-load.py`
+  starten wieder, statt sofort mit `No module named 'dpop_reference'` abzubrechen.
+
 ## [v1.26.1](https://github.com/krt-profit/basetool/releases/tag/v1.26.1) - 2026-11-18
 
 ### Fixed
