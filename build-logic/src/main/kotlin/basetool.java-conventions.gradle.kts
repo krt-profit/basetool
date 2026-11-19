@@ -10,7 +10,7 @@ plugins { java }
 val basetool = extensions.create<BasetoolExtension>("basetool")
 val catalog = project.catalog()
 
-java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+java { toolchain { languageVersion = JavaLanguageVersion.of(27) } }
 
 listOf("compileOnly", "annotationProcessor", "testCompileOnly", "testAnnotationProcessor").forEach {
   dependencies.addProvider(it, lombokNotation())
@@ -69,7 +69,11 @@ val testMaxHeap = moduleBuildSettings().testMaxHeap
 
 tasks.withType<Test>().configureEach {
   useJUnitPlatform()
-  jvmArgs("--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow")
+  jvmArgs(
+    "--enable-native-access=ALL-UNNAMED",
+    "--sun-misc-unsafe-memory-access=allow",
+    "--illegal-final-field-mutation=deny",
+  )
   maxHeapSize = testMaxHeap
   systemProperty("spring.profiles.active", "test")
 }

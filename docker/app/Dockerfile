@@ -1,6 +1,6 @@
 ARG MODULE
 
-FROM eclipse-temurin:25-jdk-alpine@sha256:c7c3d0bdf7f2bbc5a05a6712ed334d198360105634ea9adf76fca94f381b1e3f AS build
+FROM eclipse-temurin:27-jdk-alpine@sha256:a63e42ef2a577cdb0802b73bb6f8fa2c3b0ebf1b4f00f29eb22e7f4d83b234f7 AS build
 ARG MODULE
 ARG APP_VERSION=
 WORKDIR /app
@@ -53,7 +53,7 @@ RUN if [ "$MODULE" = backend ]; then \
     fi
 RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
 
-FROM eclipse-temurin:25-jre-alpine@sha256:e1898fd6a11fc965a994d8ace186fd3585aeb636cf8f05f47a723fcfee0b0918 AS runtime
+FROM eclipse-temurin:27-jre-alpine@sha256:a0f3b523fd89e242ce302715ce367f68e9073c59274e65746d0791c750f38de3 AS runtime
 WORKDIR /app
 ENV JDK_JAVA_OPTIONS="-XX:-UseBASE64Intrinsics"
 

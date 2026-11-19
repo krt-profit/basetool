@@ -2318,9 +2318,11 @@ generated one is a silent-drift machine — did not stop at the artifacts themse
 ### REQ-OPS-030 — The object layout is set once and matched by the baked startup cache
 
 All three application JVMs run **`-XX:+UseCompactObjectHeaders`** (64-bit object headers instead of
-96-bit), a product option since JDK 25 (JEP 519) and the default from JDK 27 (JEP 534). It is taken
-on the LTS the stack already runs rather than waited for, because the stack is memory-constrained:
-14 160 MiB of declared limits against a 15.24 GiB host, inside ADR-0085's ~14 GB review trigger.
+96-bit), a product option since JDK 25 (JEP 519) and the default from JDK 27 (JEP 534), the JDK the
+stack runs (ADR-0398). It was taken on the 25 LTS ahead of that default because the stack is
+memory-constrained: 14 160 MiB of declared limits against a 15.24 GiB host, inside ADR-0085's ~14 GB
+review trigger. On JDK 27 the flag stays explicit in both places below, so the parity of the cache
+and the runtime never rests on a JDK default.
 
 **The flag is set in two places and both are mandatory:**
 
@@ -2329,7 +2331,7 @@ on the LTS the stack already runs rather than waited for, because the stack is m
 | `docker-compose.yml` / `quadlet/env.d` → each `JAVA_TOOL_OPTIONS` | The runtime layout; beside the collector flag of REQ-OPS-028     |
 | `docker/app/Dockerfile` → `layout=` in the AOT-cache training run | The image build's training run, which cannot see `JAVA_TOOL_OPTIONS` |
 
-Each image carries a startup cache created during its build — since 2026-09-23 the Java 25 **AOT
+Each image carries a startup cache created during its build — since 2026-09-23 the Java **AOT
 cache** `/app/app.aot` (ADR-0209), before that a dynamic AppCDS archive `/app/application.jsa`. The
 cache records the object layout it was created with and the JVM validates it at startup, so the two
 settings must agree. They cannot be kept in step by accident: the training run happens during the
@@ -3273,7 +3275,7 @@ from the module scripts. The root `build.gradle.kts` carries no `subprojects {}`
 configuration of the modules (its `allprojects {}` sets the group and version only), so Gradle's
 isolated projects have nothing to reject and a module added later inherits no default (ADR-0248).
 
-- **One plugin per concern**, each applying what it needs: `basetool.java-conventions` (toolchain 25,
+- **One plugin per concern**, each applying what it needs: `basetool.java-conventions` (toolchain 27,
   Lombok and JetBrains annotations on `compileOnly`/`annotationProcessor` of `main` and `test`,
   `mockitoAgent`, the SEC-17 jar guard, the `Test` and `JavaCompile` conventions, the `basetool { }`
   extension), `basetool.checkstyle-conventions`, `basetool.spotless-conventions`,

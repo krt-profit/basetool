@@ -8,9 +8,11 @@ plugins {
 }
 
 val mutationSettings = moduleBuildSettings()
+val pitestCoreVersion = project.catalog().requiredVersion("pitestCore")
 val pitestJunit5Version = project.catalog().requiredVersion("pitestJunit5")
 
 pitest {
+  pitestVersion.set(pitestCoreVersion)
   junit5PluginVersion.set(pitestJunit5Version)
   addJUnitPlatformLauncher.set(false)
   targetClasses.set(mutationSettings.mutationTargetClasses)

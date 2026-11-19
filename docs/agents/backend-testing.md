@@ -29,11 +29,9 @@ Mechanics:
 - A constructor change now breaks the fixture at **compile time** rather than leaving a silent
   `null` — that is the point, not a regression.
 
-Nothing enforces this today: `--illegal-final-field-mutation` does not exist on JDK 25, so it cannot
-be passed to the test JVM yet and an unexercisable flag is not worth adding. **When the toolchain
-moves to JDK 26 or later, arm it** — `jvmArgs("--illegal-final-field-mutation=deny")` on the `Test`
-tasks turns this rule into a gate, and doing it as part of that bump is how the conversion above
-stays done.
+**The test JVM enforces it:** every `Test` task runs with `--illegal-final-field-mutation=deny`
+(`basetool.java-conventions`), so a reflective write to a final field fails the test that makes it
+instead of printing a warning.
 
 ## Spring test contexts — reuse one, do not open one (REQ-OPS-041)
 

@@ -709,7 +709,7 @@ collector otherwise reports the **old** CA's expiry until the next 03:40.
 `JvmNativeThreadExhaustion` (`loki/rules/fake/basetool-log-alerts.yml`) matches
 `pthread_create failed|unable to create native thread` in the `<svc>-stdout` streams. That wording is
 written by HotSpot and glibc outside logback and is **JVM-version-dependent**, so every bump of the
-`eclipse-temurin:25-jre-alpine` runtime digest in `docker/app/Dockerfile` owes a re-check — otherwise
+`eclipse-temurin:27-jre-alpine` runtime digest in `docker/app/Dockerfile` owes a re-check — otherwise
 the rule keeps parsing, keeps deploying and can never fire again. It was verified on
 `…@sha256:28db6fdf…` (2026-08-29), **re-verified on `…@sha256:3137541d…` (Temurin 25.0.4+7) on
 2026-09-22** (steps 1–3 below, plus the stream check on production:
@@ -723,7 +723,7 @@ On a workstation, never on production:
 
 1. Reproduce the line on the **new** digest under a pids cap well below what a thread-spawning class
    needs — for example a class that starts threads in a loop, run with
-   `docker run --rm --pids-limit 60 eclipse-temurin:25-jre-alpine@sha256:<new> java Spawn.java`.
+   `docker run --rm --pids-limit 60 eclipse-temurin:27-jre-alpine@sha256:<new> java Spawn.java`.
 2. Compare what it prints with the filter and with the verbatim lines recorded in
    `scripts/check-loki-rule-signatures.py`. If the wording changed, widen the filter so it matches
    both, and replace the recorded lines.
