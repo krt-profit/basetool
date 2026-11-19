@@ -106,6 +106,10 @@ case "${1:-}" in
     exit 0
     ;;
   exec)
+    if [[ "$*" == *reload.sh* ]]; then
+      if [[ "${FAKE_EDGE_RELOAD_RC:-0}" != 0 ]]; then echo "nginx: [emerg] fake refusal" >&2; fi
+      exit "${FAKE_EDGE_RELOAD_RC:-0}"
+    fi
     if [[ -n "${FAKE_EDGE_CERT_LINES:-}" ]]; then printf '%s\n' "${FAKE_EDGE_CERT_LINES}"; fi
     exit "${FAKE_EDGE_EXEC_RC:-0}"
     ;;
@@ -1550,7 +1554,7 @@ scenario_infra_digest_refresh_is_not_gated() {
 }
 
 scenario_edge_reloads_a_renewed_certificate() {
-  echo "Scenario: a renewed certificate recreates the edge, an unchanged one does not"
+  echo "Scenario: a renewed certificate reloads the edge in place, an unchanged one does not"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
@@ -1568,7 +1572,9 @@ scenario_edge_reloads_a_renewed_certificate() {
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "a converged tick with unseen certificates succeeds"
   assert_contains "certificates differs" "the certificate drift is named in the log"
-  assert_docker "systemctl --user restart edge.service" "the edge is recreated to load them"
+  assert_docker "podman exec edge sh /etc/nginx/edge/reload.sh" "the edge reloads nginx in place to load them"
+  assert_no_docker "systemctl --user restart edge.service" "...without a restart"
+  assert_edge_config_stale 0 "the loaded certificates leave the stale gauge at 0"
   if [[ -s "${T_STATE_DIR}/edge/certs.sha256" ]]; then
     record 1 "the fingerprint is persisted for the next tick"
   else
@@ -1579,19 +1585,86 @@ scenario_edge_reloads_a_renewed_certificate() {
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "an unchanged tick succeeds"
-  assert_no_docker "systemctl --user restart edge.service" "an unchanged certificate recreates nothing"
+  assert_no_docker "reload.sh" "an unchanged certificate reloads nothing"
+  assert_no_docker "systemctl --user restart edge.service" "...and recreates nothing"
+  assert_edge_config_stale 0 "an unchanged tick keeps the stale gauge at 0"
 
   : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${renewed}" || rc=$?
   assert_exit 0 "$rc" "the renewal tick succeeds"
-  assert_docker "systemctl --user restart edge.service" "a renewed certificate is loaded"
+  assert_docker "podman exec edge sh /etc/nginx/edge/reload.sh" "a renewed certificate is loaded in place"
 
   : >"${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_EXEC_RC=1" || rc=$?
   assert_exit 0 "$rc" "a tick whose certificate read fails still succeeds"
-  assert_no_docker "systemctl --user restart edge.service" "an unreadable certificate recreates nothing"
+  assert_no_docker "reload.sh" "an unreadable certificate reloads nothing"
+  assert_no_docker "systemctl --user restart edge.service" "...and recreates nothing"
+
+  rm -rf "${tmp}"
+}
+
+assert_edge_config_stale() {
+  local want="$1" desc="$2" line
+  line="$(grep '^basetool_edge_config_stale' "${T_STATE_DIR}/textfile/edge-config.prom" 2>/dev/null || true)"
+  if [[ "${line}" == "basetool_edge_config_stale{component=\"edge\"} ${want}" ]]; then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} (gauge: '${line:-<absent>}')"
+  fi
+}
+
+scenario_edge_config_change_reloads_in_place() {
+  echo "Scenario: an edge config change reloads nginx in place; a refused one keeps the running edge"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  mkdir -p "${T_COMPOSE_DIR}/docker/edge/conf.d"
+  echo "worker_processes auto;" >"${T_COMPOSE_DIR}/docker/edge/nginx.conf"
+  echo "# vhost" >"${T_COMPOSE_DIR}/docker/edge/conf.d/10-frontend.conf"
+  mkdir -p "${T_STATE_DIR}/edge"
+  cp -R "${T_COMPOSE_DIR}/docker/edge" "${T_STATE_DIR}/edge/config"
+  echo "worker_shutdown_timeout 2s;" >>"${T_COMPOSE_DIR}/docker/edge/nginx.conf"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+
+  : >"${T_DOCKER_LOG}"
+  run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_RELOAD_RC=4" || rc=$?
+  assert_exit 0 "$rc" "edge config: a refused configuration does not fail the tick"
+  assert_contains "nginx refused the new configuration" "edge config: the refusal is a WARN in the log"
+  assert_contains "edge: nginx: nginx: [emerg] fake refusal" "edge config: ...quoting nginx"
+  assert_no_docker "systemctl --user restart edge.service" "edge config: a refused configuration is never recreated into a dead edge"
+  assert_edge_config_stale 1 "edge config: the stale gauge reports the configuration the edge has not loaded"
+
+  : >"${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" || rc=$?
+  assert_exit 0 "$rc" "edge config: the next tick succeeds"
+  assert_docker "podman exec edge sh /etc/nginx/edge/reload.sh" "edge config: ...retries the reload"
+  assert_contains "nginx reloaded in place" "edge config: ...which loads it"
+  assert_no_docker "systemctl --user restart edge.service" "edge config: ...without a restart"
+  assert_edge_config_stale 0 "edge config: ...and clears the stale gauge"
+
+  : >"${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" || rc=$?
+  assert_no_docker "reload.sh" "edge config: a loaded configuration is not reloaded again"
+
+  echo "# vhost changed" >"${T_COMPOSE_DIR}/docker/edge/conf.d/10-frontend.conf"
+  : >"${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_RELOAD_RC=3" || rc=$?
+  assert_contains "the in-place reload failed (exit 3)" "edge config: a reload that fails otherwise is named"
+  assert_docker "systemctl --user restart edge.service" "edge config: ...and falls back to recreating the edge"
+  assert_edge_config_stale 0 "edge config: ...after which the gauge is 0"
+
+  echo "# vhost changed again" >"${T_COMPOSE_DIR}/docker/edge/conf.d/10-frontend.conf"
+  : >"${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_contains "the edge is not running -> recreating edge" "edge config: an edge that is not running is recreated"
+  assert_no_docker "reload.sh" "edge config: ...without a reload attempt"
 
   rm -rf "${tmp}"
 }
@@ -1620,6 +1693,7 @@ scenario_check_only_verify_fail() {
 scenario_config_mirrors_edge
 scenario_config_mirror_ignores_caller_umask
 scenario_edge_reloads_a_renewed_certificate
+scenario_edge_config_change_reloads_in_place
 scenario_infra_digest_refresh_is_not_gated
 scenario_token_expiry_metric
 scenario_token_expiry_removed_clears_the_gauge

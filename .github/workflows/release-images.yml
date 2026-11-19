@@ -644,7 +644,7 @@ jobs:
             test -d "/tmp/config-bundle/${d}" \
               || { echo "::error::config bundle is missing directory: ${d}" >&2; missing=1; }
           done
-          for f in docker/edge/nginx.conf docker/edge/include/maintenance.conf docker/acme/publish-loop.sh host-scripts.sha256; do
+          for f in docker/edge/nginx.conf docker/edge/include/maintenance.conf docker/edge/reload.sh docker/acme/publish-loop.sh host-scripts.sha256; do
             test -s "/tmp/config-bundle/${f}" \
               || { echo "::error::config bundle is missing or has an empty: ${f}" >&2; missing=1; }
           done

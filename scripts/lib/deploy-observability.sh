@@ -66,23 +66,67 @@ reconcile_edge() {
     fi
   fi
 
-  [[ -n "${drift}" ]] || return 0
-
-  log "  edge: ${drift} differs from the last applied state -> recreating edge (re-resolves the bind-mount inode and re-reads the certificates)"
-  if rt_recreate edge >/dev/null 2>&1; then
-    install -d -m 0755 "${EDGE_STATE_DIR}" 2>/dev/null || true
-    rm -rf "${snap}"
-    if cp -R "${src}" "${snap}" 2>/dev/null; then
-      date +%s >"${EDGE_STATE_DIR}/applied" 2>/dev/null || true
-    else
-      log "  edge: WARN could not snapshot the config baseline (will re-apply next tick)"
-    fi
-    if [[ -n "${fp_now}" ]]; then
-      printf '%s\n' "${fp_now}" >"${fp_file}" 2>/dev/null || true
-    fi
-  else
-    log "  edge: WARN recreate failed (non-gating) — will retry next tick"
+  if [[ -z "${drift}" ]]; then
+    write_edge_config_stale_metric 0
+    return 0
   fi
+
+  if load_edge_state "${drift}"; then
+    record_edge_applied "${src}" "${snap}" "${fp_file}" "${fp_now}"
+  else
+    write_edge_config_stale_metric 1
+  fi
+}
+
+# A configuration nginx refuses is never recreated: a new edge would not start on it, while the
+# running one still serves the configuration it has loaded.
+load_edge_state() {
+  local drift="$1" out="" rc=0 line
+  if rt_is_running edge; then
+    out="$(rt_exec edge sh "${EDGE_RELOAD_SCRIPT}" 2>&1)" || rc=$?
+    if ((rc == 0)); then
+      log "  edge: ${drift} differs from the last applied state -> nginx reloaded in place (no restart, the maintenance page stays up)"
+      return 0
+    fi
+    if ((rc == EDGE_RELOAD_REFUSED)); then
+      log "  edge: WARN ${drift} differs, but nginx refused the new configuration — the edge keeps serving the one it has loaded; retries next tick"
+      while IFS= read -r line; do
+        log "  edge: nginx: ${line}"
+      done < <(printf '%s\n' "${out}" | head -n 5)
+      return 1
+    fi
+    log "  edge: ${drift} differs and the in-place reload failed (exit ${rc}) -> recreating edge"
+  else
+    log "  edge: ${drift} differs and the edge is not running -> recreating edge"
+  fi
+  if rt_recreate edge >/dev/null 2>&1; then
+    return 0
+  fi
+  log "  edge: WARN recreate failed (non-gating) — will retry next tick"
+  return 1
+}
+
+record_edge_applied() {
+  local src="$1" snap="$2" fp_file="$3" fp_now="$4"
+  install -d -m 0755 "${EDGE_STATE_DIR}" 2>/dev/null || true
+  rm -rf "${snap}"
+  if cp -R "${src}" "${snap}" 2>/dev/null; then
+    date +%s >"${EDGE_STATE_DIR}/applied" 2>/dev/null || true
+  else
+    log "  edge: WARN could not snapshot the config baseline (will re-apply next tick)"
+  fi
+  if [[ -n "${fp_now}" ]]; then
+    printf '%s\n' "${fp_now}" >"${fp_file}" 2>/dev/null || true
+  fi
+  write_edge_config_stale_metric 0
+}
+
+write_edge_config_stale_metric() {
+  {
+    echo "# HELP basetool_edge_config_stale 1 when the edge configuration or certificates on disk differ from what the running edge has loaded and deploy.sh could not load them; 0 once they are loaded."
+    echo "# TYPE basetool_edge_config_stale gauge"
+    echo "basetool_edge_config_stale{component=\"edge\"} ${1}"
+  } | write_textfile edge-config.prom || true
 }
 
 reconcile_monitoring_reloads() {

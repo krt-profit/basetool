@@ -53,21 +53,33 @@ The edge is never stopped inside the applications' restart window, and its own r
   previous release as for any failed gate.
 - **A bounded stop.** `worker_shutdown_timeout 2s` in `docker/edge/nginx.conf` caps the graceful
   stop's wait on open connections at two seconds.
+- **A reload, not a restart, for configuration and certificates.** When `reconcile_edge` finds the
+  on-disk edge configuration or a certificate changed, it runs `docker/edge/reload.sh` in the
+  running edge: render the vhosts again, `nginx -t`, `nginx -s reload`. New workers take over
+  without a gap. A configuration nginx refuses is left unloaded and the edge is **not** recreated,
+  because a new edge would not start on it while the running one still serves the configuration it
+  has; `basetool_edge_config_stale` reports it and `EdgeConfigNotLoaded` alerts. Any other reload
+  failure, and an edge that is not running, falls back to the recreate. The deploy host has rsync,
+  so the mirror rewrites the files inside the bind-mounted directories and the edge sees them
+  without being recreated.
 
 ## Consequences
 
 - **Easier:** an application release, a re-apply and a heal of an application keep the maintenance
   page up from start to end. A release that re-defines the edge costs one edge restart of about two
   to three seconds instead of the whole window, and any edge restart drops from about ten seconds to
-  about two to three.
+  about two to three. An edge configuration change and a renewed certificate cost no gap at all, and
+  a configuration nginx refuses no longer takes the edge down: the recreate it used to trigger would
+  have left no edge running.
 - **Harder / costs accepted:** a request or stream still open when the edge stops is closed after two
   seconds — an upload in progress included — where it was closed after ten. The edge's own restart,
   a host restart and a haproxy restart still leave the public ports without an answer; the owner
   accepted those as the exceptions (2026-11-19). A unit the release retires is still stopped before
   the edge restarts, because the edge can only pick up its new definition after the unit reload
-  that has to follow the retirement.
-- **Follow-up:** the config- and certificate-drift path of `reconcile_edge` still recreates the edge
-  instead of reloading nginx; a reload would make that change gapless.
+  that has to follow the retirement. A reload renders into the live directory before `nginx -t`
+  checks it, so a refused configuration stays on the edge's tmpfs until the next successful reload
+  or restart; nginx keeps the loaded one in memory, and a restart renders from scratch. A reload also
+  ends the old workers' live-update streams after two seconds; the clients reconnect.
 
 ## Alternatives considered
 
@@ -86,3 +98,9 @@ The edge is never stopped inside the applications' restart window, and its own r
   proportion to two or three seconds the owner accepts.
 - **`SIGTERM` as the edge's stop signal.** nginx's fast stop would end every request at once; the
   bounded graceful stop lets short requests finish.
+- **Recreate on a refused configuration too.** That is what `reconcile_edge` did. It turns a bad
+  configuration into an edge that does not start, the one failure the maintenance page cannot
+  cover.
+- **Render into a staging directory and test that.** It would keep a refused configuration off the
+  live directory, but `nginx.conf` includes the rendered vhosts from one fixed path, so testing a
+  staged copy needs a second `nginx.conf`; the live render is only read on a reload or a restart.

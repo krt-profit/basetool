@@ -2102,9 +2102,10 @@ Three properties make the handover correct, and each of them has failed in produ
   process so it can still replace the files on the next pass.
 - **A certificate is replaced atomically.** The edge opens these files on every reload; a
   half-written one is a container that does not start, not a retry.
-- **The running edge is made to load it.** nginx reads its certificates at startup, so a new file in
-  the volume changes nothing on its own. `reconcile_edge` fingerprints them every tick and
-  force-recreates the edge when they move — and it has to read them in a way the **deploy user**
+- **The running edge is made to load it.** nginx reads its certificates at startup and on a reload,
+  so a new file in the volume changes nothing on its own. `reconcile_edge` fingerprints them every
+  tick and reloads the edge in place when they move (REQ-OPS-061; a recreate only when the reload
+  fails for another reason than nginx refusing it) — and it has to read them in a way the **deploy user**
   can. The volume's host path is not readable to that user — under `/var/lib/docker`
   (`0710 root:root`) on a Docker host, inside the service user's own container store under rootless
   Podman — so the fingerprint is taken through the edge (`exec` into it), which already mounts them
@@ -3908,6 +3909,16 @@ itself restarts, or the host or haproxy does.
   wait, so an edge restart leaves the public ports without an answer for about two to three
   seconds instead of the ten of Podman's stop timeout. A request or stream still open on the old
   edge is closed after the two seconds.
+- **A configuration or certificate change reloads the edge in place.** When the edge configuration
+  on disk (`docker/edge`) or a certificate in `edge-certs` differs from the last applied state,
+  `deploy.sh` runs `docker/edge/reload.sh` inside the running edge: it renders the vhosts again,
+  checks them with `nginx -t` and sends `nginx -s reload`, so new workers take over without a gap
+  (`nginx reloaded in place`). Old workers close their open streams after the two seconds above,
+  and the live-update clients reconnect. A configuration nginx refuses is **never recreated** — a
+  new edge would not start on it — so the running edge keeps serving what it has loaded; the tick
+  logs a WARN quoting nginx, sets `basetool_edge_config_stale{component="edge"}` to `1`
+  (`EdgeConfigNotLoaded`, warning after 30 minutes) and retries next tick. Any other reload failure,
+  and an edge that is not running, falls back to recreating the edge, the short restart above.
 - **haproxy cannot bridge the edge's own restart.** It forwards TCP and the TLS ends at the edge, so
   it has no page of its own to send, and the rootless port forwarder accepts a connection even while
   nginx does not listen, so haproxy's connect retries do not apply. The exceptions above stay.
@@ -3919,14 +3930,24 @@ itself restarts, or the host or haproxy does.
 - [x] A re-defined edge whose restart fails fails the apply with `[edge]` named and nothing stopped.
 - [x] A sick edge is healed with one restart of the edge and no stop.
 - [x] `RT_STACK_ORDER` starts with `edge`.
+- [x] A changed edge configuration or certificate reloads nginx in place without a restart; a
+  refused one keeps the running edge, logs nginx's refusal and sets the gauge to `1` until a reload
+  succeeds; any other reload failure and a stopped edge fall back to a recreate.
+- [x] `scripts/check-edge-nginx.sh` reloads the started edge with `reload.sh` in every shape.
+- [x] `EdgeConfigNotLoaded` fires after 30 minutes of a gauge at `1` and stays silent at `0` and
+  without the series.
 - [ ] On production, the next release that re-defines the edge shows haproxy refused or empty
   connections (`SC`, `SD`) for about three seconds at most, not for the length of the window.
 
 **Enforced by:** `scripts/lib/container-runtime.sh` (`RT_EDGE_SERVICE`, `RT_STACK_ORDER`,
-`rt_apply_stack`, `rt_window_services`) · `scripts/deploy.sh` · `docker/edge/nginx.conf` ·
+`rt_apply_stack`, `rt_window_services`) · `scripts/deploy.sh` · `scripts/lib/deploy-observability.sh`
+(`reconcile_edge`, `load_edge_state`) · `docker/edge/nginx.conf` · `docker/edge/reload.sh` ·
+`scripts/check-edge-nginx.sh` · `monitoring/prometheus/alerts/ops-automation.yml`
+(`EdgeConfigNotLoaded`) · `monitoring/prometheus/tests/edge_config_not_loaded_test.yml` ·
 `scripts/container-runtime.test.sh` · `scripts/deploy.test.sh`
-(`scenario_podman_redefined_edge_restarts_alone_before_the_window`) · **Related:** REQ-OPS-003,
-REQ-OPS-007, ADR-0397, ADR-0083, ADR-0162
+(`scenario_podman_redefined_edge_restarts_alone_before_the_window`,
+`scenario_edge_reloads_a_renewed_certificate`, `scenario_edge_config_change_reloads_in_place`) ·
+**Related:** REQ-OPS-003, REQ-OPS-007, REQ-OPS-026, ADR-0397, ADR-0083, ADR-0162
 
 ## Open questions
 
