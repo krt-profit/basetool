@@ -37,7 +37,7 @@ public final class TestImages {
    * digest for the reader; the digest is what Docker resolves.
    */
   public static final String REDIS =
-      "redis:8-alpine@sha256:71885d8cc6e42f2bc0aa2eb853bfc4be200b5108a46ac50e117ae1df0531fb80";
+      "redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3";
 
   /**
    * The production PostgreSQL image: the {@code 18-alpine} tag pinned to its multi-arch index
@@ -46,5 +46,5 @@ public final class TestImages {
    * substitutor maps the URL's {@code postgres:18-alpine} onto this reference.
    */
   public static final String POSTGRES =
-      "postgres:18-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015";
+      "postgres:18-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff";
 }

@@ -103,9 +103,6 @@ updates:
       ci-python-tools:
         patterns:
           - "*"
-    ignore:
-      - dependency-name: "ansible-core"
-        versions: [">= 2.22"]
     labels:
       - dependencies
     commit-message:

@@ -5,7 +5,7 @@ x-logging: &default-logging
     max-file: "5"
 
 x-db-backend: &db-backend-template
-  image: postgres:18-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
+  image: postgres:18-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff
   restart: unless-stopped
   logging: *default-logging
   security_opt:
@@ -52,7 +52,7 @@ x-db-backend: &db-backend-template
     - /var/lib/basetool/db-backend:/var/lib/postgresql/data
 
 x-db-keycloak: &db-keycloak-template
-  image: postgres:18-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
+  image: postgres:18-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff
   restart: unless-stopped
   logging: *default-logging
   security_opt:
@@ -245,7 +245,7 @@ x-backend: &backend-template
     - ${BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
 
 x-redis: &redis-template
-  image: redis:8-alpine@sha256:71885d8cc6e42f2bc0aa2eb853bfc4be200b5108a46ac50e117ae1df0531fb80
+  image: redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
   command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
   restart: unless-stopped
   logging: *default-logging
