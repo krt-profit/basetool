@@ -195,6 +195,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/build-sandbox-realm.py --check
 
+      - name: sandbox-scripts / Load the sandbox smoke and load scripts
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          python3 scripts/sandbox-smoke.py --help >/dev/null
+          python3 scripts/sandbox-load.py --help >/dev/null
+
       - name: briefing-seed / Self-test the testing-system seed
         if: ${{ !cancelled() }}
         run: python3 scripts/seed-briefing.py --selftest
