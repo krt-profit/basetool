@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.notification.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +30,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The areas of the profile's notification card (REQ-NOTIF-027): every notification type the backend
@@ -135,14 +135,14 @@ class NotificationPreferenceGroupsTest {
             .findFirst()
             .orElseThrow(() -> new IOException("openapi.json not found"));
     JsonNode schemas =
-        new ObjectMapper().readTree(openApi.toFile()).path("components").path("schemas");
+        JsonMapper.builder().build().readTree(openApi.toFile()).path("components").path("schemas");
     List<String> types = new ArrayList<>();
     schemas
         .path("NotificationPreferenceDto")
         .path("properties")
         .path("type")
         .path("enum")
-        .forEach(node -> types.add(node.asText()));
+        .forEach(node -> types.add(node.asString()));
     return types;
   }
 

@@ -23,12 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintCatalogueMetadata;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
-import java.io.IOException;
 import java.lang.reflect.RecordComponent;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +36,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Contract test diffing every hand-mirrored frontend {@link DtoMirror} record against the
@@ -57,7 +56,7 @@ import org.junit.jupiter.api.Test;
  */
 class FrontendDtoContractTest {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
   /** Candidate locations of the committed OpenAPI document, relative to the test working dir. */
   private static final List<Path> OPENAPI_CANDIDATES =
@@ -66,7 +65,7 @@ class FrontendDtoContractTest {
           Path.of("backend", "src", "main", "resources", "api", "openapi.json"));
 
   @Test
-  void frontendDtosMatchTheOpenApiContract() throws IOException {
+  void frontendDtosMatchTheOpenApiContract() {
     JsonNode schemas = loadOpenApiSchemas();
     List<Class<?>> records = frontendDtoRecords();
     assertThat(records)
@@ -157,7 +156,7 @@ class FrontendDtoContractTest {
     } else if (type.isEnum()) {
       Set<String> frontendValues = new LinkedHashSet<>();
       for (Object constant : type.getEnumConstants()) {
-        frontendValues.add(MAPPER.valueToTree(constant).asText());
+        frontendValues.add(MAPPER.valueToTree(constant).asString());
       }
       Set<String> missing = new TreeSet<>(enumValueSet(property));
       missing.removeAll(frontendValues);
@@ -193,9 +192,8 @@ class FrontendDtoContractTest {
    * path so the test works whether Gradle runs it from the module dir or the repo root.
    *
    * @return the {@code components.schemas} node keyed by backend DTO simple name
-   * @throws IOException when the document cannot be read
    */
-  private JsonNode loadOpenApiSchemas() throws IOException {
+  private JsonNode loadOpenApiSchemas() {
     Path path =
         OPENAPI_CANDIDATES.stream()
             .filter(Files::isRegularFile)
@@ -218,7 +216,7 @@ class FrontendDtoContractTest {
    */
   private Set<String> enumValueSet(JsonNode property) {
     Set<String> values = new LinkedHashSet<>();
-    property.get("enum").forEach(node -> values.add(node.asText()));
+    property.get("enum").forEach(node -> values.add(node.asString()));
     return values;
   }
 
@@ -233,7 +231,7 @@ class FrontendDtoContractTest {
   }
 
   @Test
-  void annotatedEnumWireValuesMatchTheirSchemaInsteadOfTheirJavaNames() throws IOException {
+  void annotatedEnumWireValuesMatchTheirSchemaInsteadOfTheirJavaNames() {
     JsonNode properties =
         MAPPER.readTree(
             """
@@ -258,7 +256,7 @@ class FrontendDtoContractTest {
   }
 
   @Test
-  void anAnnotatedEnumStillRejectsAnUnrepresentedBackendWireValue() throws IOException {
+  void anAnnotatedEnumStillRejectsAnUnrepresentedBackendWireValue() {
     JsonNode properties =
         MAPPER.readTree(
             """
@@ -277,14 +275,14 @@ class FrontendDtoContractTest {
   }
 
   @Test
-  void blueprintRequirementKindsRoundTripTheirLowercaseWireValues() throws IOException {
+  void blueprintRequirementKindsRoundTripTheirLowercaseWireValues() {
     Set<String> wireValues = new LinkedHashSet<>();
     for (BlueprintCatalogueMetadata.RequirementKind kind :
         BlueprintCatalogueMetadata.RequirementKind.values()) {
       String wire = MAPPER.writeValueAsString(kind);
       assertThat(MAPPER.readValue(wire, BlueprintCatalogueMetadata.RequirementKind.class))
           .isEqualTo(kind);
-      wireValues.add(MAPPER.readTree(wire).asText());
+      wireValues.add(MAPPER.readTree(wire).asString());
     }
     assertThat(wireValues).containsExactlyInAnyOrder("root", "group", "resource", "item");
   }

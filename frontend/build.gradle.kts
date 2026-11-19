@@ -56,6 +56,7 @@ openApiGenerate {
     mapOf(
       "library" to "native",
       "serializationLibrary" to "jackson",
+      "useJackson3" to "true",
       "useJakartaEe" to "true",
       "openApiNullable" to "false",
       "hideGenerationTimestamp" to "true",
@@ -148,8 +149,6 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
   implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
-  implementation("com.fasterxml.jackson.core:jackson-databind")
-  implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
   implementation("org.springframework.boot:spring-boot-starter-security")
   implementation("org.springframework.boot:spring-boot-starter-oauth2-client")

@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.notification.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Pins the option lists of {@link AdminNotificationRulePageController} against the backend enums in
@@ -55,11 +55,9 @@ class AdminNotificationRuleOptionListsTest {
   /**
    * Each enum-backed list equals the enum values the backend publishes in {@code openapi.json}, in
    * the same order — so the editor offers every value, and in the backend's declaration order.
-   *
-   * @throws IOException when {@code openapi.json} cannot be read
    */
   @Test
-  void enumListsMatchTheBackendEnumsInDeclarationOrder() throws IOException {
+  void enumListsMatchTheBackendEnumsInDeclarationOrder() {
     JsonNode schemas = loadOpenApiSchemas();
 
     assertThat(AdminNotificationRulePageController.EVENT_TYPES)
@@ -160,7 +158,7 @@ class AdminNotificationRuleOptionListsTest {
         .as("openapi.json types %s.%s as an enum", schema, property)
         .isTrue();
     List<String> result = new ArrayList<>();
-    values.forEach(value -> result.add(value.asText()));
+    values.forEach(value -> result.add(value.asString()));
     return result;
   }
 
@@ -170,9 +168,8 @@ class AdminNotificationRuleOptionListsTest {
    * directory.
    *
    * @return the schemas node
-   * @throws IOException when the document cannot be read
    */
-  private static JsonNode loadOpenApiSchemas() throws IOException {
+  private static JsonNode loadOpenApiSchemas() {
     Path path =
         OPENAPI_CANDIDATES.stream()
             .filter(Files::isRegularFile)
@@ -180,7 +177,7 @@ class AdminNotificationRuleOptionListsTest {
             .orElseThrow(() ->
                 new IllegalStateException(
                     "openapi.json not found; looked at " + OPENAPI_CANDIDATES));
-    return new ObjectMapper().readTree(path.toFile()).path("components").path("schemas");
+    return JsonMapper.builder().build().readTree(path.toFile()).path("components").path("schemas");
   }
 
   /**
