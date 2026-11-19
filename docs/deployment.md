@@ -935,7 +935,9 @@ Within about five minutes the timer fires `deploy.sh`, which:
    took the app down a second time; see [Keycloak provider JAR](#keycloak-provider-jar));
 6. on success writes the marker, clears the failure records, reconciles the monitoring units —
    a `restart` of each monitoring unit the release re-defined, its `env.d` file included, and a
-   `start` of the others — and the edge (config drift or renewed certificates → edge recreate), and prunes dangling images older
+   `start` of the others — and the edge (config drift or renewed certificates → `nginx reloaded in
+   place` through `docker/edge/reload.sh`; a configuration nginx refuses keeps the running edge and
+   raises `EdgeConfigNotLoaded`, any other reload failure recreates it), and prunes dangling images older
    than 30 days;
 7. on a health failure logs which units did not come up and what the release changed, restores the
    previous config tree, the previous units, the previous `env.d/` (rendered again from the previous
@@ -2096,7 +2098,10 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
   ```
 
 - **Changes** are made in the repository and arrive with a promotion; `deploy.sh`'s `reconcile_edge`
-  recreates the edge whenever its on-disk config differs from the last applied snapshot. Validate
+  reloads the running edge in place (`docker/edge/reload.sh`: render, `nginx -t`, `nginx -s reload`)
+  whenever its on-disk config differs from the last applied snapshot, without a gap. A configuration
+  nginx refuses is not loaded and not recreated — the edge keeps serving the one it has, and
+  `EdgeConfigNotLoaded` fires after 30 minutes (REQ-OPS-061). Validate
   locally before merging with `scripts/check-edge-nginx.sh` (renders every vhost through
   `render-and-run.sh` and runs `nginx -t`; CI runs it in `repo-lint.yml`).
 - **Compression happens at the edge only.** `nginx.conf` strips `Accept-Encoding` towards the

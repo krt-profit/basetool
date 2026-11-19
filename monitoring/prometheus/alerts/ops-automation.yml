@@ -138,3 +138,12 @@ groups:
         annotations:
           summary: "Host scripts have not been compared with a release manifest for over 12h, or never"
           description: "No deploy tick has compared the host scripts with a release manifest for 12 hours, or the metric is absent. Absent on a host with a deployed release means its deploy.sh predates the check (ADR-0247) and is stale: run the role from the release tag with `--tags deploy,scripts`. It is also absent while the deployed release carries no host-scripts.sha256 (the first release that ships one starts the check), and stale while the deploy timer is stopped (DeployHeartbeatStale names that) or a failed target sits in its backoff. `{app=\"ops-deploy\"} |~ \"host scripts:\"` in Grafana -> Explore -> Loki shows the last comparison."
+
+      - alert: EdgeConfigNotLoaded
+        expr: basetool_edge_config_stale{component="edge"} == 1
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The edge has not loaded its configuration or certificates on disk"
+          description: "deploy.sh saw the edge configuration under /opt/basetool/docker/edge or a certificate in the edge-certs volume change and could not load it: nginx refused the rendered configuration, so the edge keeps serving the one it has loaded, or the fallback recreate of an edge whose reload failed for another reason did not succeed. Until this clears the edge runs on its old configuration or certificate; every deploy tick retries. `{app=\"ops-deploy\"} |~ \"edge:\"` in Grafana -> Explore -> Loki quotes nginx's refusal. Fix the configuration in the repository and promote the fix; do not recreate the edge by hand while nginx refuses the configuration, because a new edge would not start on it (REQ-OPS-061)."

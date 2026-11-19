@@ -260,6 +260,9 @@ CONFIG_STAGE_DIR="${STATE_DIR}/config-stage"
 CONFIG_PREVIOUS_DIR="${STATE_DIR}/config-previous"
 MON_RELOAD_STATE_DIR="${STATE_DIR}/monitoring-reload"
 EDGE_STATE_DIR="${STATE_DIR}/edge"
+# docker/edge/reload.sh: its path inside the edge, and its exit code for a configuration nginx refuses.
+EDGE_RELOAD_SCRIPT="/etc/nginx/edge/reload.sh"
+EDGE_RELOAD_REFUSED=4
 CONFIG_BLOCKED_FILE="${STATE_DIR}/config-blocked.marker"
 CONFIG_APPLY_INCOMPLETE_FILE="${STATE_DIR}/config-apply.incomplete"
 KEYCLOAK_SPI_JAR="${COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"

@@ -1412,6 +1412,18 @@ exists **only while it holds**: in sync there is none, which is why the timestam
 and `absent()` on it is the alarm for a host whose `deploy.sh` predates the check. A deployed release
 with no manifest, or a malformed one, removes the file rather than writing zeros.
 
+##### `basetool_edge_config_stale` — whether the edge runs on the configuration and certificates on disk
+
+Written by `deploy.sh` into the same textfile directory (`edge-config.prom`) on every tick that
+reaches the edge reconcile: the converged tick and the end of a successful apply (REQ-OPS-061).
+
+| series | type | source | why |
+|---|---|---|---|
+| `basetool_edge_config_stale{component="edge"}` | gauge | the edge reconcile | `1` while the configuration under `/opt/basetool/docker/edge` or a certificate changed and could not be loaded — nginx refused it, or the fallback recreate failed; `0` once loaded or unchanged; `EdgeConfigNotLoaded` (warning, 30m) |
+
+**Labels:** `component` has the single value `edge`. A tick that finds no `docker/edge` tree writes
+nothing, so the alert stays silent on a host without one.
+
 > [!important] `basetool_scheduled_job_enabled` exists so `absent()` can tell "off" from "wedged"
 > Added 2026-09-17. The last-success gauge is registered **lazily, on a job's first
 > success**, so `absent(last_success)` means "has never succeeded" — which covers two very

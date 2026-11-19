@@ -117,6 +117,8 @@ check_mode() {
   nginx -g "daemon off;" -c /etc/nginx/edge/nginx.conf > /tmp/runtime.log 2>&1 &
   npid=$!
   sleep 2
+  if sh /etc/nginx/edge/reload.sh; then echo "@@@RELOAD-OK@@@"; else echo "@@@RELOAD-FAILED@@@"; fi
+  sleep 1
   kill "$npid" 2>/dev/null || true
   wait "$npid" 2>/dev/null || true
   cat /tmp/runtime.log
@@ -142,6 +144,11 @@ check_mode() {
     grep -E '\[(warn|alert|emerg)\]' "${CERT_DIR}/${mode}-runtime.out" | sed 's/^/  /'
     exit 1
   fi
+  grep -qF '@@@RELOAD-OK@@@' "${CERT_DIR}/${mode}-runtime.out" \
+    || {
+      echo "FAIL: ${mode}: reload.sh did not reload the running edge in place"
+      exit 1
+    }
 
   local dump="${CERT_DIR}/${mode}-directives"
   grep -vE '^[[:space:]]*#' "${out}" >"${dump}"
