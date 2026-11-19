@@ -27,8 +27,8 @@ RULES = REPO / "monitoring" / "loki" / "rules" / "fake" / "basetool-log-alerts.y
 SIGNATURES: dict[str, tuple[list[str], list[str]]] = {
     "JvmStartupCacheRejected": (
         [
-            "[0.005s][warning][aot] Unable to use AOT cache.",
-            "[0.005s][error  ][aot] Loading static archive failed.",
+            "[0.014s][warning][aot] Unable to use AOT cache.",
+            "[0.014s][error  ][aot] Loading static archive failed.",
             "[warning][cds] Unable to use shared archive file.",
             "[error  ][cds] Loading dynamic archive failed.",
         ],
@@ -40,11 +40,11 @@ SIGNATURES: dict[str, tuple[list[str], list[str]]] = {
     ),
     "JvmNativeThreadExhaustion": (
         [
-            '[0.053s][warning][os,thread] Failed to start thread "Unknown thread" - pthread_create failed (EAGAIN) for attributes: stacksize: 1024k, guardsize: 0k, detached.',
+            '[0.031s][warning][os,thread] Failed to start thread "Unknown thread" - pthread_create failed (EAGAIN) for attributes: stacksize: 1024k, guardsize: 4k, detached.',
             'Exception in thread "main" java.lang.OutOfMemoryError: unable to create native thread: possibly out of memory or process/resource limits reached',
         ],
         [
-            '[0.055s][warning][os,thread] Failed to start the native thread for java.lang.Thread "Thread-47"',
+            '[0.031s][warning][os,thread] Failed to start the native thread for java.lang.Thread "Thread-42"',
         ],
     ),
     "KeycloakBackendTruststoreUnreadable": (

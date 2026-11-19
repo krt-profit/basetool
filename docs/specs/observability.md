@@ -802,7 +802,8 @@ rule — no blanket "everything is masked" claim:
   is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate them. The
   re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* was done
   on `…@sha256:3137541d…` (2026-09-22) and on `…@sha256:2ca9adf4…` (2026-09-25) and on
-  `…@sha256:3c0a9084…` (Temurin 25.0.4.1+1, 2026-10-04), the digest `docker/app/Dockerfile` pins now;
+  `…@sha256:3c0a9084…` (Temurin 25.0.4.1+1, 2026-10-04) and on `…@sha256:a0f3b523…` (Temurin
+  27.0.1.0.2+1, 2026-11-19), the digest `docker/app/Dockerfile` pins now;
   every further bump owes it again. A second rule consumes the same stream since 2026-09-23: **`JvmStartupCacheRejected`**
   (warning) fires on the JVM's own `Unable to use AOT cache` / `Loading static archive failed` (and
   the AppCDS equivalents), which a JVM prints when its `JAVA_TOOL_OPTIONS` layout differs from the
