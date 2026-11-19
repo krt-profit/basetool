@@ -125,7 +125,7 @@ leftover=\"\$(find /certs -name '*.new' -print)\"
 exit \$rc
 "
 
-EDGE_IMAGE="$(sed -n 's/^[[:space:]]*image:[[:space:]]*\(nginxinc\/nginx-unprivileged:[^[:space:]@]*\).*/\1/p' "${COMPOSE_FILE}" | head -1)"
+EDGE_IMAGE="$(sed -n 's/^[[:space:]]*image:[[:space:]]*\(nginx\/nginx-unprivileged:[^[:space:]@]*\).*/\1/p' "${COMPOSE_FILE}" | head -1)"
 [[ -n "${EDGE_IMAGE}" ]] \
   || {
     echo "FAIL: no nginx-unprivileged image in docker-compose.yml — the edge service changed"
