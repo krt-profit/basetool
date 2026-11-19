@@ -84,18 +84,15 @@ class SecurityFilterChainProductionShapeTest {
    */
   @Test
   void theConnectorTakesTheClientAddressFromXForwardedForOnly() {
-    List<RemoteIpValve> valves =
-        Arrays.stream(
-                ((TomcatWebServer) webServerContext.getWebServer())
-                    .getTomcat()
-                    .getEngine()
-                    .getPipeline()
-                    .getValves())
-            .filter(RemoteIpValve.class::isInstance)
-            .map(RemoteIpValve.class::cast)
-            .toList();
-
-    assertThat(valves)
+    assertThat(
+            Arrays.stream(
+                    ((TomcatWebServer) webServerContext.getWebServer())
+                        .getTomcat()
+                        .getEngine()
+                        .getPipeline()
+                        .getValves())
+                .filter(RemoteIpValve.class::isInstance)
+                .map(RemoteIpValve.class::cast))
         .singleElement()
         .satisfies(valve -> {
           assertThat(valve.getRemoteIpHeader()).isEqualTo("X-Forwarded-For");
