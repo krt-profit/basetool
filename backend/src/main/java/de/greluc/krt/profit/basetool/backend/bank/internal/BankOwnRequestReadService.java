@@ -105,7 +105,9 @@ public class BankOwnRequestReadService implements BankOwnRequestReads {
             account.getAccountNo(),
             account.getName(),
             owner == null ? null : owner.getShorthand()),
-        target == null ? null : new TargetAccount(target.getId(), target.getAccountNo()),
+        target == null
+            ? null
+            : new TargetAccount(target.getId(), target.getAccountNo(), target.getName()),
         request.isRequiresOwnerApproval(),
         request.getRequiredApprover(),
         request.isOwnerApprovalGranted(),

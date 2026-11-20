@@ -169,12 +169,13 @@ it — the web's requests too — as a snapshot followed by the change feed of R
   state, and a request that no longer exists as a tombstone in `removed`. A cursor past the horizon
   or not issued by the server answers `410 CURSOR_EXPIRED`.
 - **Allow-list.** `id`, `version`, `status`, `createdAt`, `decidedAt`, `type`, `amount`, `note`,
-  `justification`, `account { id, no, name, orgUnitShorthand }`, `targetAccount { id, no }`,
+  `justification`, `account { id, no, name, orgUnitShorthand }`, `targetAccount { id, no, name }`,
   `requiresOwnerApproval`, `requiredApprover`, `ownerApprovalGranted`, `rejectReason`, `client`
   (the registry id of the application that raised it, `null` for the Basetool), `splitEnabled`,
   `splitPercent`, each `null` where it does not apply. Money and the split percent
   are JSON integers. No staff note, no staff identities (requester, decider or approver handles), no
-  counterparty, no purpose and no `callerMayConfirm`.
+  counterparty, no purpose and no `callerMayConfirm`. The destination's `name` is additive and not
+  required by the schema; the server always sends it.
 - **Patch change.** A request a patch change's currency wipe cancelled also carries
   `cancelledByPatch: {id, label}`, the patch change with its current label, read once per page;
   every other request leaves the field out, so the item keeps its allow-list
@@ -338,11 +339,12 @@ issue answers `410 CURSOR_EXPIRED`. `hasMore` is true while either section conti
 **The answer.** `oldestOpenAt` (the oldest request in either whole section, or `null`),
 `oldestOverdue` (true from 48 hours on, the threshold of `BankBookingApprovalOverdue`), `open`,
 `toApprove`, `nextCursor`, `hasMore`. Each item carries `id`, `type`, `amount`, `createdAt`,
-`ageHours`, `account { id, no, name, orgUnitShorthand }`, `targetAccount { id, no }` or `null`,
+`ageHours`, `account { id, no, name, orgUnitShorthand }`, `targetAccount { id, no, name }` or `null`,
 `requesterHandle`, `justification` and `note` as plain text, `requiresOwnerApproval`,
 `requiredApprover` or `null`, `ownerApprovalGranted`, `mayConfirm`, `accountBalance`, `client` and
 `link`:
 
+- the destination's `name` is additive and not required by the schema; the server always sends it;
 - `requesterHandle` is `null` when the requester withholds their name (REQ-XCH-044);
 - `accountBalance` is set for the Bankleitung on every account and for an employee on a granted
   account only, otherwise `null`;

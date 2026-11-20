@@ -131,8 +131,9 @@ public interface BankOwnRequestReads {
    *
    * @param id the account
    * @param no its {@code KB-<n>} number
+   * @param name its display name
    */
-  record TargetAccount(@NotNull UUID id, @NotNull String no) {}
+  record TargetAccount(@NotNull UUID id, @NotNull String no, @NotNull String name) {}
 
   /**
    * One page of the member's requests.

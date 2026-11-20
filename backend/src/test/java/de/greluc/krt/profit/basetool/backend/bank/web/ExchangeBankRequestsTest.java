@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Account;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Actor;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Request;
@@ -131,9 +132,11 @@ class ExchangeBankRequestsTest {
     assertThat(account.path("no").asString()).startsWith("KB-");
     assertThat(account.path("orgUnitShorthand").isString()).isTrue();
     assertThat(new TreeSet<>(transfer.path("targetAccount").propertyNames()))
-        .containsExactly("id", "no");
+        .containsExactly("id", "name", "no");
     assertThat(transfer.path("targetAccount").path("id").asString())
         .isEqualTo(world.account(Account.CARTEL).toString());
+    assertThat(transfer.path("targetAccount").path("name").asString())
+        .isEqualTo(entityManager.find(BankAccount.class, world.account(Account.CARTEL)).getName());
   }
 
   @Test

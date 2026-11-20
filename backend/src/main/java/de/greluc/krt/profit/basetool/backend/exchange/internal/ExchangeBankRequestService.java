@@ -194,7 +194,9 @@ public class ExchangeBankRequestService {
         request.justification(),
         new ExchangeBankRequestAccountDto(
             account.id(), account.no(), account.name(), account.orgUnitShorthand()),
-        target == null ? null : new ExchangeBankRequestTargetDto(target.id(), target.no()),
+        target == null
+            ? null
+            : new ExchangeBankRequestTargetDto(target.id(), target.no(), target.name()),
         request.requiresOwnerApproval(),
         approver == null ? null : approver.name(),
         request.ownerApprovalGranted(),

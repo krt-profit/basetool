@@ -42,7 +42,8 @@
       },
       "targetAccount": {
         "id": "5d0e9c1a-2b3f-4a6d-8e71-9c0b1a2d3e4f",
-        "no": "KB-0007"
+        "no": "KB-0007",
+        "name": "Staffel Nord"
       },
       "requesterHandle": null,
       "justification": "Hangar refit",

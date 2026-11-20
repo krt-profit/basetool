@@ -170,7 +170,7 @@ Each item is a [`bank-request`](../schemas/):
 - `status` is `PENDING`, `CONFIRMED`, `REJECTED` or `CANCELLED`; `type` is `DEPOSIT`, `WITHDRAWAL`
   or `TRANSFER`. Treat a value you do not know as unknown ([versioning](../versioning.md)).
 - `account` is the deposit's target or the withdrawal's or transfer's source; `targetAccount` is the
-  destination of a transfer, or `null`.
+  destination of a transfer with its `id`, `no` and `name`, or `null`.
 - `requiresOwnerApproval` tells whether the amount exceeded the member's limit; `requiredApprover`
   (`RESPONSIBLE_HOLDER`, `BANK_MANAGEMENT` or `ORGANISATIONSLEITUNG`) is who must sign off before
   the bank confirms, and `ownerApprovalGranted` whether they did.
@@ -307,6 +307,7 @@ of either section was raised, `oldestOverdue` is true once it is 48 hours old.
 }
 ```
 
+- `targetAccount` is the destination of a transfer with its `id`, `no` and `name`, or `null`.
 - `requesterHandle` is `null` when the requester withholds their name from connected applications.
 - `accountBalance` is the account's balance for the Bankleitung, and for an employee on an account
   they hold a grant on; otherwise `null`.

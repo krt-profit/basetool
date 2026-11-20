@@ -86,6 +86,7 @@ public record ExchangeBankQueueItemDto(
    *
    * @param id the account
    * @param no the {@code KB-<n>} account number
+   * @param name the display name
    */
-  public record Target(@NotNull UUID id, @NotNull String no) {}
+  public record Target(@NotNull UUID id, @NotNull String no, @NotNull String name) {}
 }
