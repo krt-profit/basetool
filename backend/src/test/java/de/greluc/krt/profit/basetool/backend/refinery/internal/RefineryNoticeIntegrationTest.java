@@ -207,6 +207,8 @@ class RefineryNoticeIntegrationTest {
         order(Instant.now().minus(3, ChronoUnit.HOURS), 60, RefineryOrderStatus.OPEN);
     assertThat(producer.produce(Instant.now(), 100)).isEqualTo(1);
 
+    // markReadyNotified is a bulk UPDATE, which leaves the managed copy stale (JPA §4.10).
+    entityManager.refresh(due);
     due.setReadyNotifiedAt(null);
     refineryOrderRepository.saveAndFlush(due);
 
