@@ -871,7 +871,8 @@ class OrgUnitMembershipServiceTest {
         areaMembership(bereichId, userId, MembershipRole.BEREICHSKOORDINATOR);
     OrgUnitMembership after = areaMembership(bereichId, userId, MembershipRole.BEREICHSLEITER);
     when(membershipRepository.findById(before.getId()))
-        .thenReturn(Optional.of(before), Optional.of(after));
+        .thenReturn(Optional.of(before))
+        .thenReturn(Optional.of(after));
   }
 
   private static OrgUnitMembership areaMembership(
