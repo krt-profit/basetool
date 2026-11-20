@@ -19,15 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -40,7 +39,8 @@ import org.jetbrains.annotations.Unmodifiable;
  *
  * <p>An option group covers better when the stock allows more crafts of it alone, then when its
  * shortfall for one craft is smaller; a group without an evaluable line covers nothing, and equal
- * groups keep recipe order.
+ * groups keep recipe order. A line belongs to the group its requirement group equals as an entity,
+ * so a lazy proxy of the group matches it.
  */
 public final class RecipeGroupSelection {
 
@@ -72,13 +72,13 @@ public final class RecipeGroupSelection {
     if (choose == null || choose >= options.size()) {
       return mandatory;
     }
-    Set<BlueprintRequirementGroup> chosen = Collections.newSetFromMap(new IdentityHashMap<>());
-    options.stream()
-        .sorted(
-            Comparator.comparing(
-                (BlueprintRequirementGroup g) -> coverage(linesOf(mandatory, g), demandOf, stock)))
-        .limit(Math.max(choose, 0))
-        .forEach(chosen::add);
+    Set<BlueprintRequirementGroup> chosen =
+        options.stream()
+            .sorted(
+                Comparator.comparing((BlueprintRequirementGroup g) ->
+                    coverage(linesOf(mandatory, g), demandOf, stock)))
+            .limit(Math.max(choose, 0))
+            .collect(Collectors.toSet());
     return mandatory.stream()
         .filter(line ->
             line.getRequirementGroup() == null || chosen.contains(line.getRequirementGroup()))
@@ -106,7 +106,7 @@ public final class RecipeGroupSelection {
   @NotNull
   private static List<BlueprintIngredient> linesOf(
       @NotNull List<BlueprintIngredient> lines, @NotNull BlueprintRequirementGroup group) {
-    return lines.stream().filter(line -> line.getRequirementGroup() == group).toList();
+    return lines.stream().filter(line -> group.equals(line.getRequirementGroup())).toList();
   }
 
   /**
