@@ -1133,6 +1133,9 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
 - [x] The queue's account column leads with the account's display name (`accountName`) for
   readability, with the account number shown small underneath; the org-unit shorthand is dropped
   from this column (frontend `BankRequestQueuePageControllerMvcTest`).
+- [x] The queue's requester column names the requester alone: the shorthand of the org unit that
+  owns the account never stands beside the name, because it says nothing about the requester's own
+  unit (frontend `BankRequestsPatternRenderTest`).
 - [x] The queue is one table under the status segment „Ausstehend · Bestätigt · Abgelehnt · Alle"
   (default Ausstehend, counts on the first three, legacy `status` lists mapped onto a segment), the
   choice saved per user; the Begründung stands in the row, Notiz + Notiz Bankmitarbeiter expand
