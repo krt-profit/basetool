@@ -497,6 +497,28 @@ case "$cmd" in
       *)                     printf 'upgrade_type = security\napply_updates = yes\nexclude = %s\n' "$runtime" ;;
     esac
     ;;
+  *"python3 -c"*"detect_releasevers"*)
+    metalink='https://mirrors.fedoraproject.org/metalink?arch=x86_64&repo'
+    case "$scenario" in
+      epel-no-minor) printf 'VERSION_ID\t10\n' ;;
+      *)             printf 'VERSION_ID\t10.3\n' ;;
+    esac
+    printf 'REPO\tbaseos\t1\t\thttps://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-10\n'
+    case "$scenario" in
+      epel-stream)  printf 'REPO\tepel\t1\t%s=epel-10s\t\n' "$metalink" ;;
+      epel-moving)  printf 'REPO\tepel\t1\t%s=epel-10\t\n' "$metalink" ;;
+      epel-absent)  printf 'REPO\tepel\t0\t%s=epel-10.3\t\n' "$metalink" ;;
+      epel-baseurl) printf 'REPO\tepel\t1\t\t\thttps://mirror.example.test/pub/epel/10.3/Everything/x86_64/\n' ;;
+      *)            printf 'REPO\tepel\t1\t%s=epel-10.3\t\n' "$metalink" ;;
+    esac
+    printf 'REPO\tepel-testing\t0\t%s=epel-testing-10s\t\n' "$metalink"
+    printf 'PKG\tnode-exporter-1.12.1-1.el10_3.x86_64\tepel\n'
+    printf 'PKG\tfail2ban-server-1.1.0-6.el10_0.noarch\tepel\n'
+    printf 'PKG\tkernel-6.12.0-264.16.1.el10_4.x86_64\tbaseos\n'
+    case "$scenario" in
+      epel-later-package) printf 'PKG\tprometheus-podman-exporter-2.0.0-1.el10_4.x86_64\tepel\n' ;;
+    esac
+    ;;
   *)
     echo "hoststub: unhandled command: $cmd" >&2
     exit 1
@@ -880,6 +902,28 @@ STUB_SCENARIO=updates-runtime assert_status \
 STUB_SCENARIO=updates-no-skopeo assert_status \
   "security-updates-enabled fails when skopeo moves unattended while the rest of the runtime is held" \
   security-updates-enabled fail "(skopeo)" -- "${STUB_ARGS[@]}"
+
+STUB_SCENARIO=healthy assert_status \
+  "epel-branch passes when EPEL resolves to the host's minor and a later base package is not counted" \
+  epel-branch pass "EPEL resolves to 10.3, the host's own minor (epel)" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=epel-baseurl assert_status \
+  "epel-branch reads the branch out of a base URL too" \
+  epel-branch pass "EPEL resolves to 10.3" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=epel-stream assert_status \
+  "epel-branch fails when EPEL resolves to the CentOS Stream branch" \
+  epel-branch fail "epel resolves to EPEL 10s, the host is 10.3" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=epel-moving assert_status \
+  "epel-branch fails when EPEL resolves to the moving epel-10 alias" \
+  epel-branch fail "epel resolves to EPEL 10, the host is 10.3" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=epel-later-package assert_status \
+  "epel-branch fails when a package from a later EPEL branch is installed" \
+  epel-branch fail "prometheus-podman-exporter-2.0.0-1.el10_4.x86_64" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=epel-absent assert_status \
+  "epel-branch fails, rather than passes, when no EPEL repository is enabled" \
+  epel-branch fail "no enabled EPEL repository" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=epel-no-minor assert_status \
+  "epel-branch fails when the host's release names no minor" \
+  epel-branch fail "which names no minor" -- "${STUB_ARGS[@]}"
 
 STUB_SCENARIO=healthy assert_status \
   "pasta-maps-host-aliases passes under Podman 6 with host-gateway mapped and the v6 alias on the host's own address" \

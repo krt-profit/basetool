@@ -106,13 +106,25 @@
     immediate: true
   when: basetool_host_manage_firewall | bool
 
-- name: Install fail2ban
+- name: Install fail2ban, without the mail actions that need an MTA
   ansible.builtin.dnf:
     name:
-      - fail2ban
+      - fail2ban-server
       - fail2ban-firewalld
       - fail2ban-systemd
     state: present
+  when:
+    - basetool_host_fail2ban_enabled | bool
+    - basetool_host_manage_firewall | bool
+
+- name: Remove the meta package, its mail actions and the MTA they pulled in
+  ansible.builtin.dnf:
+    name:
+      - fail2ban
+      - fail2ban-sendmail
+      - exim
+    state: absent
+    autoremove: false
   when:
     - basetool_host_fail2ban_enabled | bool
     - basetool_host_manage_firewall | bool

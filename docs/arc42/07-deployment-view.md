@@ -14,7 +14,8 @@ same role and fed by its own `:testing` channel (`REQ-OPS-022`), and the **retir
 shut down on cutover day but not yet decommissioned (§7.7). Addresses are deliberately not recorded here.
 
 The host is provisioned by the Ansible role in [`ansible/`](../../ansible/README.md) (ADR-0188):
-packages, the accounts below and the subuid range, directory ownership, SELinux contexts,
+packages (EPEL fixed to the host's own minor release, `REQ-OPS-062`), the accounts below and the
+subuid range, directory ownership, SELinux contexts,
 `containers.conf`, the CIS level-1 scan, firewalld and fail2ban, haproxy, the host half of the
 monitoring plane, and unattended **security** updates (`dnf-automatic`, the container runtime
 excluded, never rebooting — `REQ-OPS-032`, since 2026-09-22). It provisions and never delivers — nothing it does ships a unit, an image or a

@@ -3,6 +3,10 @@
   ansible.builtin.import_tasks: 00-preflight.yml
   tags: [preflight]
 
+- name: EPEL, fixed to the host's own minor release
+  ansible.builtin.import_tasks: 05-epel.yml
+  tags: [packages, epel]
+
 - name: Packages, and the two versions the migration depends on
   ansible.builtin.import_tasks: 10-packages.yml
   tags: [packages]
