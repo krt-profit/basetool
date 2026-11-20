@@ -94,15 +94,15 @@ public class P4kImportJobService {
     job.setKind(P4kImportJobKind.PREVIEW);
     job.setStatus(P4kImportJobStatus.PENDING);
     job.setSourceFilename(trimFilename(filename));
-    job.setFileSizeBytes(upload.uploadedBytes());
+    job.setFileSizeBytes(upload.getUploadedBytes());
     job.setCreatedBy(createdBy);
     jobRepository.save(job);
 
     P4kImportJobPayload payload = new P4kImportJobPayload();
     payload.setJobId(job.getId());
-    payload.setContent(upload.storedPayload());
+    payload.setContent(upload.getStoredPayload());
     payloadRepository.save(payload);
-    P4kBuild build = upload.build();
+    P4kBuild build = upload.getBuild();
     auditRecorder.record(
         AuditEventType.CATALOGUE_P4K_PREVIEW_ENQUEUED,
         job.getId(),

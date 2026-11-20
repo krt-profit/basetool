@@ -20,14 +20,24 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBuild;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * An upload the gate accepted.
- *
- * @param storedPayload the bytes the job stores, always compressed (REQ-P4K-002)
- * @param uploadedBytes the size of the file as uploaded
- * @param build the Build the catalogue names, which the gate requires
+ * An upload the gate accepted, handed from the gate to the import job. It carries the payload array
+ * itself without copying it and has no value equality.
  */
-public record P4kAcceptedUpload(
-    byte @NotNull [] storedPayload, long uploadedBytes, @NotNull P4kBuild build) {}
+@Getter
+@RequiredArgsConstructor
+public final class P4kAcceptedUpload {
+
+  /** The bytes the job stores, always compressed (REQ-P4K-002). */
+  private final byte @NotNull [] storedPayload;
+
+  /** The size of the file as uploaded. */
+  private final long uploadedBytes;
+
+  /** The Build the catalogue names, which the gate requires. */
+  @NotNull private final P4kBuild build;
+}

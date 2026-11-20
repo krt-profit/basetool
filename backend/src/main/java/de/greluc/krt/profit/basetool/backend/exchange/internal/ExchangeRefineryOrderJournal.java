@@ -93,7 +93,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
             .filter(entry -> entry.getAction() == ExchangeJournalAction.REFINERY_DELETE)
             .findFirst()
             .orElse(null);
-    List<Step> steps = steps(group.stream().filter(entry -> entry != removal).toList());
+    List<Step> steps = steps(group.stream().filter(entry -> !entry.equals(removal)).toList());
     if (orderId == null || steps == null) {
       return ExchangeUndoService.GONE;
     }

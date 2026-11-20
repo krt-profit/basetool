@@ -23,8 +23,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeNotices;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.function.Predicate;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -39,38 +37,18 @@ enum ExchangeSwitch {
 
   /** The global switch, guarded by the row's version. */
   GLOBAL(
-      ExchangeSettings::isEnabled,
-      ExchangeSettings::getVersion,
       AuditEventType.EXCHANGE_SWITCH_CHANGED,
-      ExchangeNotices::switchedOn,
-      ExchangeNotices::switchedOff,
       ExchangeRegistryAction.SWITCH_ON,
       ExchangeRegistryAction.SWITCH_OFF),
 
   /** The bank switch, guarded by its own {@code bankVersion}. */
   BANK(
-      ExchangeSettings::isBankEnabled,
-      ExchangeSettings::getBankVersion,
       AuditEventType.BANK_EXCHANGE_SWITCH_CHANGED,
-      ExchangeNotices::bankSwitchedOn,
-      ExchangeNotices::bankSwitchedOff,
       ExchangeRegistryAction.BANK_SWITCH_ON,
       ExchangeRegistryAction.BANK_SWITCH_OFF);
 
-  /** Reads whether the switch is on. */
-  @NotNull private final Predicate<ExchangeSettings> state;
-
-  /** Reads the switch's optimistic-lock counter. */
-  @NotNull private final Function<ExchangeSettings, Long> version;
-
   /** The audit event every flip writes, with {@code {enabled}}. */
   @Getter @NotNull private final AuditEventType auditType;
-
-  /** Builds the notice of switching on for the acting admin. */
-  @NotNull private final Function<UUID, NoticeEvent> switchedOn;
-
-  /** Builds the notice of switching off for the acting admin. */
-  @NotNull private final Function<UUID, NoticeEvent> switchedOff;
 
   /** The metric action of switching on. */
   @NotNull private final ExchangeRegistryAction onAction;
@@ -85,7 +63,10 @@ enum ExchangeSwitch {
    * @return the switch's state
    */
   boolean isOn(@NotNull ExchangeSettings settings) {
-    return state.test(settings);
+    return switch (this) {
+      case GLOBAL -> settings.isEnabled();
+      case BANK -> settings.isBankEnabled();
+    };
   }
 
   /**
@@ -96,11 +77,14 @@ enum ExchangeSwitch {
    */
   @NotNull
   Long versionOf(@NotNull ExchangeSettings settings) {
-    return version.apply(settings);
+    return switch (this) {
+      case GLOBAL -> settings.getVersion();
+      case BANK -> settings.getBankVersion();
+    };
   }
 
   /**
-   * Builds the notice of a flip.
+   * Builds the notice of a flip for the acting admin.
    *
    * @param enabled the new state
    * @param actor the acting admin, or {@code null}
@@ -108,7 +92,12 @@ enum ExchangeSwitch {
    */
   @NotNull
   NoticeEvent notice(boolean enabled, @Nullable UUID actor) {
-    return (enabled ? switchedOn : switchedOff).apply(actor);
+    return switch (this) {
+      case GLOBAL ->
+          enabled ? ExchangeNotices.switchedOn(actor) : ExchangeNotices.switchedOff(actor);
+      case BANK ->
+          enabled ? ExchangeNotices.bankSwitchedOn(actor) : ExchangeNotices.bankSwitchedOff(actor);
+    };
   }
 
   /**

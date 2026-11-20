@@ -113,7 +113,6 @@ class InventoryItemServiceAllocationTest {
             null,
             null,
             null,
-            null,
             new JobOrderEarmarkTargets(
                 jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy),
             auditService,

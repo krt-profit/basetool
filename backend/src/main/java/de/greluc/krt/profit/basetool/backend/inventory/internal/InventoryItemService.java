@@ -97,7 +97,6 @@ public class InventoryItemService {
   private final InventoryItemMapper inventoryItemMapper;
   private final RequestScopeResolver requestScopeResolver;
   private final OrgUnitStampingService orgUnitStampingService;
-  private final InventoryAccessPolicy inventoryAccessPolicy;
   private final StockCommands stockCommands;
   private final EarmarkTargets.JobOrders jobOrders;
   private final AuditRecorder auditRecorder;

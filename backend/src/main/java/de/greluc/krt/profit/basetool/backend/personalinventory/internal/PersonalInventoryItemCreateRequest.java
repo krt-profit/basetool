@@ -27,7 +27,8 @@ import java.util.UUID;
 
 /**
  * Write DTO for creating a personal inventory entry. The location display name is NOT accepted from
- * the client; the server takes it from the referenced {@code location} row and persists a snapshot.
+ * the client; the server takes it from the location row {@code locationId} references and persists
+ * a snapshot.
  *
  * @param name the item name
  * @param note an optional free-text note

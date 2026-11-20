@@ -96,7 +96,8 @@ final class P4kManufacturerFamilies {
               ? owner
               : shared.stream()
                   .min(
-                      Comparator.comparing((P4kManufacturerDto r) -> fold(r.className()).length())
+                      Comparator.comparingInt(
+                              (P4kManufacturerDto r) -> fold(r.className()).length())
                           .thenComparing(r -> fold(r.className())))
                   .orElseThrow();
       UUID primaryGuid = Objects.requireNonNull(primary.parsedGuid());

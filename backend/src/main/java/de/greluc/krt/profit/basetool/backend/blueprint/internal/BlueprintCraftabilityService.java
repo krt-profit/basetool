@@ -122,6 +122,7 @@ public class BlueprintCraftabilityService {
               recipes.get(blueprint.productKey()),
               inventory,
               withRefinery,
+              includeRefinery,
               itemBridges));
     }
     return out;
@@ -195,6 +196,8 @@ public class BlueprintCraftabilityService {
    * @param recipe the representative recipe, or {@code null} when none resolved
    * @param inventory stock pooled per material, inventory only
    * @param withRefinery stock pooled per material, inventory plus open refinery yield
+   * @param includeRefinery whether {@code withRefinery} folds in open refinery yield; when {@code
+   *     false} it holds the inventory alone and the inventory-only selection is reused
    * @param itemBridges resolved ITEM-ingredient bridges ({@code game_item} id → {@link Material}),
    *     from {@link #resolveItemBridges(Collection)}
    * @return the craftability entry
@@ -205,6 +208,7 @@ public class BlueprintCraftabilityService {
       @Nullable Blueprint recipe,
       @NotNull Map<UUID, List<CraftabilitySlice>> inventory,
       @NotNull Map<UUID, List<CraftabilitySlice>> withRefinery,
+      boolean includeRefinery,
       @NotNull Map<UUID, Material> itemBridges) {
     if (recipe == null) {
       return new BlueprintCraftabilityDto(
@@ -213,9 +217,9 @@ public class BlueprintCraftabilityService {
 
     Requirements counted = requirements(countedLines(recipe, inventory, itemBridges), itemBridges);
     Requirements countedWithRefinery =
-        withRefinery == inventory
-            ? counted
-            : requirements(countedLines(recipe, withRefinery, itemBridges), itemBridges);
+        includeRefinery
+            ? requirements(countedLines(recipe, withRefinery, itemBridges), itemBridges)
+            : counted;
     boolean hasUnevaluatedItem = counted.unevaluatedItem() || countedWithRefinery.unevaluatedItem();
 
     if (counted.byMaterial().isEmpty() && countedWithRefinery.byMaterial().isEmpty()) {

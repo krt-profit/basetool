@@ -126,7 +126,6 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemMapper,
             requestScopeResolver,
             orgUnitStampingService,
-            null,
             new InventoryStockCommands(
                 new InventoryOrderWrites(
                     org.mockito.Mockito.mock(
