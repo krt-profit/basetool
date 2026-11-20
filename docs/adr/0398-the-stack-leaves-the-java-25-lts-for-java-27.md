@@ -16,9 +16,9 @@ its GA: no Temurin build, Gradle refusing JDK 27, Spring Boot 4.1 supporting Jav
 and JaCoCo without class-file 71 support, and 27 not being an LTS. All but the last are gone:
 
 - Temurin 27 builds and the `eclipse-temurin:27-jdk-alpine` / `27-jre-alpine` images exist.
-- Gradle runs on and compiles for JDK 27 since 9.8.0; the wrapper is on 9.9.0.
+- Gradle runs on and compiles for JDK 27 since 9.8.0; the wrapper is on 9.9.2.
 - Spring Boot 4.2 is "compatible with versions up to and including Java 27"; the stack runs
-  4.2.0-RC2 until 4.2.0 GA is released.
+  4.2.0.
 - Lombok 1.18.48 (the version Boot 4.2 manages) supports JDK 27; JaCoCo 0.8.16 reads class-file 71
   without the experimental path of 0.8.15; PIT reads it from 1.25.6 on (ASM 9.10.1).
 
@@ -70,8 +70,6 @@ alike, so it is no reason for either line; `-XX:-UseBASE64Intrinsics` mitigates 
 
 - **Stay on Java 25 (LTS) until Java 29.** One move instead of three, and 25.0.5.1 carries the
   CVE-2026-114938 fix. Rejected by the owner's preference for the newest stable releases.
-- **Wait for Spring Boot 4.2.0 GA.** Rejected by the owner: the stack takes 4.2.0-RC2 now and 4.2.0
-  GA as soon as it is released.
 - **Java 26.** Out of support since 27 shipped in September 2026.
 - **Drop `-XX:+UseCompactObjectHeaders` now that it is the default.** Possible, but it has to go
   from both places in one change, and the parity check would then compare a JDK default. Keeping it
