@@ -139,7 +139,6 @@ x-keycloak: &keycloak-template
     KC_EVENT_METRICS_USER_TAGS: ${KC_EVENT_METRICS_USER_TAGS:-realm,idp,clientId}
     KC_TRACING_ENABLED: ${KC_TRACING_ENABLED:-false}
     KC_TRACING_ENDPOINT: ${KC_TRACING_ENDPOINT:-http://alloy:4317}
-    JAVA_OPTS_APPEND: -XX:-UseBASE64Intrinsics
   healthcheck:
     test:
       - CMD-SHELL
