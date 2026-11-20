@@ -31,6 +31,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
+import java.io.IOException;
 import java.security.KeyStore;
 import java.time.Duration;
 import java.util.List;
@@ -49,8 +50,10 @@ import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.ReactorClientHttpRequestFactory;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.http.converter.FormHttpMessageConverter;
@@ -105,6 +108,10 @@ public class WebClientConfig {
    * is what pushed the old pair's effective retention from 20&nbsp;s out to 30.
    */
   private static final Duration BACKEND_POOL_EVICT_INTERVAL = Duration.ofSeconds(5);
+
+  /** Spring Security's stateless mapping of a token-endpoint error response to an exception. */
+  private static final OAuth2ErrorResponseErrorHandler OAUTH2_ERROR_RESPONSES =
+      new OAuth2ErrorResponseErrorHandler();
 
   /**
    * Context-attributes mapper for the {@link DefaultOAuth2AuthorizedClientManager} that yields an
@@ -329,19 +336,28 @@ public class WebClientConfig {
                     .addHandlerLast(
                         new WriteTimeoutHandler(
                             httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
-    OAuth2ErrorResponseErrorHandler oauth2Errors = new OAuth2ErrorResponseErrorHandler();
     return RestClient.builder()
         .configureMessageConverters(converters ->
             converters
                 .disableDefaults()
                 .addCustomConverter(new FormHttpMessageConverter())
                 .addCustomConverter(new OAuth2AccessTokenResponseHttpMessageConverter()))
-        .defaultStatusHandler(
-            HttpStatusCode::isError,
-            (request, response) ->
-                oauth2Errors.handleError(request.getURI(), request.getMethod(), response))
+        .defaultStatusHandler(HttpStatusCode::isError, WebClientConfig::rejectTokenError)
         .requestFactory(new ReactorClientHttpRequestFactory(httpClient))
         .build();
+  }
+
+  /**
+   * Fails a 4xx or 5xx token-endpoint response through Spring Security's OAuth2 error mapping, so
+   * an OAuth2 error body surfaces as an {@code OAuth2AuthorizationException}.
+   *
+   * @param request the token request the response answers
+   * @param response the error response
+   * @throws IOException if the response cannot be read
+   */
+  private static void rejectTokenError(
+      @NotNull HttpRequest request, @NotNull ClientHttpResponse response) throws IOException {
+    OAUTH2_ERROR_RESPONSES.handleError(request.getURI(), request.getMethod(), response);
   }
 
   /**
