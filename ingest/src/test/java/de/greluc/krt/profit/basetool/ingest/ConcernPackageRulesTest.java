@@ -46,9 +46,10 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestOperations;
 
 /**
  * Structural rules of the gateway's concern packages (REQ-INGEST-013, REQ-INGEST-014): every class
@@ -116,14 +117,20 @@ class ConcernPackageRulesTest {
    */
   private static final String REST_TEMPLATE = "org.springframework.web.client.RestTemplate";
 
+  /**
+   * Spring's {@code RestOperations}, named rather than imported for the same reason as {@link
+   * #REST_TEMPLATE}.
+   */
+  private static final String REST_OPERATIONS = "org.springframework.web.client.RestOperations";
+
   /** An outbound HTTP client type: anything that can open a connection to another host. */
   private static final DescribedPredicate<JavaClass> OUTBOUND_HTTP =
       resideInAnyPackage(
               "java.net.http..",
               "org.springframework.http.client..",
               "org.springframework.web.reactive.function.client..")
-          .or(belongToAnyOf(RestClient.class, RestOperations.class))
-          .or(belongTo(name(REST_TEMPLATE)))
+          .or(belongToAnyOf(RestClient.class))
+          .or(belongTo(name(REST_TEMPLATE).or(name(REST_OPERATIONS))))
           .or(assignableTo(URLConnection.class))
           .as("an outbound HTTP client type");
 
@@ -207,16 +214,15 @@ class ConcernPackageRulesTest {
         .hasMessageContaining(PlantedOutboundCaller.class.getSimpleName());
   }
 
-  @Test
-  void theOutboundRuleSelectsRestTemplateByItsName() {
-    JavaClass restTemplate =
+  @ParameterizedTest
+  @ValueSource(strings = {REST_TEMPLATE, REST_OPERATIONS})
+  void theOutboundRuleSelectsTheDeprecatedClientTypesByTheirName(String typeName) {
+    JavaClass type =
         new ClassFileImporter()
-            .importPackages(REST_TEMPLATE.substring(0, REST_TEMPLATE.lastIndexOf('.')))
-            .get(REST_TEMPLATE);
+            .importPackages(typeName.substring(0, typeName.lastIndexOf('.')))
+            .get(typeName);
 
-    assertThat(OUTBOUND_HTTP.test(restTemplate))
-        .as("the outbound rule selects " + REST_TEMPLATE)
-        .isTrue();
+    assertThat(OUTBOUND_HTTP.test(type)).as("the outbound rule selects " + typeName).isTrue();
   }
 
   @Test

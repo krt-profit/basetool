@@ -663,7 +663,10 @@ class ScWikiClientTest {
     ObservationRegistry observationRegistry = ObservationRegistry.create();
     observationRegistry
         .observationConfig()
-        .observationHandler(new DefaultMeterObservationHandler(observed));
+        .observationHandler(
+            DefaultMeterObservationHandler.builder(observed)
+                .includeActiveObservationLongTaskTimer(true)
+                .build());
     ScWikiClient observedClient =
         new ScWikiClient(
             new RestClientConfig().restClientBuilder(observationRegistry),

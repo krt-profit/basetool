@@ -98,7 +98,10 @@ class UexClientTest {
     ObservationRegistry observationRegistry = ObservationRegistry.create();
     observationRegistry
         .observationConfig()
-        .observationHandler(new DefaultMeterObservationHandler(observed));
+        .observationHandler(
+            DefaultMeterObservationHandler.builder(observed)
+                .includeActiveObservationLongTaskTimer(true)
+                .build());
     UexClient observedClient =
         new UexClient(
             new RestClientConfig().restClientBuilder(observationRegistry),

@@ -178,6 +178,48 @@ class ScWikiRequestExecutorTest {
   }
 
   @Test
+  void exhaustedServerErrorKeepsItsResponseDiagnostics() throws Exception {
+    try (MockWebServer server = new MockWebServer()) {
+      server.start();
+      for (int i = 0; i < 2; i++) {
+        server.enqueue(
+            new MockResponse()
+                .setResponseCode(503)
+                .setHeader("Content-Type", "text/plain;charset=UTF-8")
+                .setHeader("ETag", "\"outage\"")
+                .setBody("upstream maintenance"));
+      }
+      ScWikiRequestExecutor requests =
+          executor(server, Map.of("max-attempts", 2, "retry-delay-millis", 1));
+
+      RestClientResponseException failure =
+          assertThrows(RestClientResponseException.class, () -> requests.getResult("/api/items"));
+
+      assertEquals(503, failure.getStatusCode().value());
+      assertEquals("upstream maintenance", failure.getResponseBodyAsString());
+      assertNotNull(failure.getResponseHeaders());
+      assertEquals("\"outage\"", failure.getResponseHeaders().getETag());
+      assertEquals(2, server.getRequestCount());
+    }
+  }
+
+  @Test
+  void clientErrorOtherThanMissingFailsAtOnceWithItsDiagnostics() throws Exception {
+    try (MockWebServer server = new MockWebServer()) {
+      server.start();
+      server.enqueue(new MockResponse().setResponseCode(403).setBody("forbidden source"));
+      ScWikiRequestExecutor requests = executor(server, Map.of("max-attempts", 3));
+
+      RestClientResponseException failure =
+          assertThrows(RestClientResponseException.class, () -> requests.getResult("/api/items"));
+
+      assertEquals(403, failure.getStatusCode().value());
+      assertEquals("forbidden source", failure.getResponseBodyAsString());
+      assertEquals(1, server.getRequestCount());
+    }
+  }
+
+  @Test
   void concurrentCallersShareOneRequestStartBudget() throws Exception {
     try (MockWebServer server = new MockWebServer()) {
       ConcurrentLinkedQueue<Long> arrivals = new ConcurrentLinkedQueue<>();

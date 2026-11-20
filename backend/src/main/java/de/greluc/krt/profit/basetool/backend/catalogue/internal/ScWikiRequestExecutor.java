@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -30,11 +31,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.DefaultResponseErrorHandler;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.UnknownHttpStatusCodeException;
 
 /** Serializes SC Wiki request starts and retries bounded transient read failures. */
 @RequiredArgsConstructor
@@ -45,10 +48,6 @@ final class ScWikiRequestExecutor {
 
   /** Largest exponential shift allowed by the bounded attempt configuration. */
   private static final int MAX_BACKOFF_SHIFT = 4;
-
-  /** Shared response policy for version, list and detail requests. */
-  private static final NonSuccessStatusHandler NON_SUCCESS_STATUS_HANDLER =
-      new NonSuccessStatusHandler();
 
   /** Client whose request factory owns the connection and read timeouts. */
   private final RestClient client;
@@ -91,7 +90,9 @@ final class ScWikiRequestExecutor {
                 .get()
                 .uri(uriTemplate, variables)
                 .retrieve()
-                .onStatus(NON_SUCCESS_STATUS_HANDLER)
+                .onStatus(
+                    ScWikiRequestExecutor::isNeitherSuccessNorError,
+                    (_, nonSuccess) -> rejectNonSuccess(nonSuccess))
                 .toEntity(String.class);
         return new Response(false, response.getBody());
       } catch (RestClientResponseException e) {
@@ -208,19 +209,34 @@ final class ScWikiRequestExecutor {
     return status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
   }
 
-  /** Classifies non-2xx responses as errors while retaining the source response diagnostics. */
-  private static final class NonSuccessStatusHandler extends DefaultResponseErrorHandler {
+  /**
+   * Selects the statuses that carry no successful representation and that RestClient's default
+   * handler accepts; it fails 4xx and 5xx itself.
+   *
+   * @param status source HTTP status
+   * @return whether the status is an informational or redirect one
+   */
+  private static boolean isNeitherSuccessNorError(@NotNull HttpStatusCode status) {
+    return !status.is2xxSuccessful() && !status.isError();
+  }
 
-    /**
-     * Classifies responses without a successful representation as errors.
-     *
-     * @param statusCode source HTTP status
-     * @return whether the response is outside the 2xx range
-     */
-    @Override
-    protected boolean hasError(@NotNull HttpStatusCode statusCode) {
-      return !statusCode.is2xxSuccessful();
-    }
+  /**
+   * Rejects an informational or redirect response while retaining its diagnostics.
+   *
+   * @param response source response
+   * @throws IOException if the reason or the body cannot be read
+   * @throws UnknownHttpStatusCodeException always, carrying the status, reason, headers, original
+   *     body bytes and declared charset
+   */
+  private static void rejectNonSuccess(@NotNull ClientHttpResponse response) throws IOException {
+    HttpHeaders headers = response.getHeaders();
+    MediaType contentType = headers.getContentType();
+    throw new UnknownHttpStatusCodeException(
+        response.getStatusCode().value(),
+        response.getStatusText(),
+        headers,
+        response.getBody().readAllBytes(),
+        contentType == null ? null : contentType.getCharset());
   }
 
   /**

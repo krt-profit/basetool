@@ -346,7 +346,10 @@ class RestClientConfigTest {
       ObservationRegistry observationRegistry = ObservationRegistry.create();
       observationRegistry
           .observationConfig()
-          .observationHandler(new DefaultMeterObservationHandler(meterRegistry))
+          .observationHandler(
+              DefaultMeterObservationHandler.builder(meterRegistry)
+                  .includeActiveObservationLongTaskTimer(true)
+                  .build())
           .observationFilter(new ObservationPrivacyFilter());
       MockEnvironment environment = new MockEnvironment();
       environment.setActiveProfiles("test");

@@ -77,7 +77,10 @@ class KeycloakServiceTest {
   {
     observationRegistry
         .observationConfig()
-        .observationHandler(new DefaultMeterObservationHandler(meterRegistry));
+        .observationHandler(
+            DefaultMeterObservationHandler.builder(meterRegistry)
+                .includeActiveObservationLongTaskTimer(true)
+                .build());
   }
 
   /**

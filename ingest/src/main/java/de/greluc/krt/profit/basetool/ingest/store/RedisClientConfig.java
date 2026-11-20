@@ -23,16 +23,21 @@ import io.lettuce.core.ClientOptions;
 import io.lettuce.core.SocketOptions;
 import io.lettuce.core.TimeoutOptions;
 import io.lettuce.core.api.StatefulConnection;
+import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.resource.ClientResources;
 import java.time.Duration;
 import java.util.Objects;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnection;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionProvider;
 import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.util.StringUtils;
 
@@ -43,8 +48,9 @@ import org.springframework.util.StringUtils;
  * <p>Lettuce's defaults reconnect a dropped connection and replay what it had not answered, which
  * would run the queued writes of an optimistic transaction outside it and twice. Here a dropped
  * connection stays closed and fails its commands; the pool tests each connection it lends and
- * replaces a closed one; and no connection is shared, so a step's reads, watch and writes all run
- * on the connection it borrowed.
+ * replaces a closed one; no connection is shared, so a step's reads, watch and writes all run on
+ * the connection it borrowed; and every connection is a {@link DiscardableConnection}, so a failed
+ * step can close the connection it borrowed before the pool lends it again.
  */
 @Configuration(proxyBeanMethods = false)
 public class RedisClientConfig {
@@ -101,7 +107,7 @@ public class RedisClientConfig {
             .clientOptions(options)
             .commandTimeout(commandTimeout)
             .build();
-    LettuceConnectionFactory factory = new LettuceConnectionFactory(server, client);
+    LettuceConnectionFactory factory = new DiscardableConnectionFactory(server, client);
     factory.setShareNativeConnection(false);
     return factory;
   }
@@ -123,5 +129,46 @@ public class RedisClientConfig {
     }
     config.setTestOnBorrow(true);
     return config;
+  }
+
+  /**
+   * A {@link LettuceConnectionFactory} whose connections are {@link DiscardableConnection
+   * discardable}. They keep {@link LettuceConnection}'s default pipelining flush policy; the
+   * gateway does not pipeline.
+   */
+  static final class DiscardableConnectionFactory extends LettuceConnectionFactory {
+
+    /**
+     * Creates the factory.
+     *
+     * @param server the standalone server
+     * @param client the client configuration
+     */
+    DiscardableConnectionFactory(
+        RedisStandaloneConfiguration server, LettuceClientConfiguration client) {
+      super(server, client);
+    }
+
+    /**
+     * Creates a connection that borrows its native connections through a tracking provider.
+     *
+     * @param sharedConnection the shared native connection, {@code null} when none is shared
+     * @param connectionProvider the pooled provider the native connections come from
+     * @param timeout the command timeout in milliseconds
+     * @param database the database index
+     * @return the discardable connection
+     */
+    @Override
+    protected @NotNull LettuceConnection doCreateLettuceConnection(
+        @Nullable StatefulRedisConnection<byte[], byte[]> sharedConnection,
+        @NotNull LettuceConnectionProvider connectionProvider,
+        long timeout,
+        int database) {
+      return new DiscardableLettuceConnection(
+          sharedConnection,
+          new DiscardableLettuceConnection.TrackingConnectionProvider(connectionProvider),
+          timeout,
+          database);
+    }
   }
 }

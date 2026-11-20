@@ -29,11 +29,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionProvider;
 import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 
 /**
  * The gateway's connection factory runs every command at most once (ADR-0389): it never reconnects
- * or replays, shares no connection, and its pool tests what it lends.
+ * or replays, shares no connection, its pool tests what it lends, and each connection can close the
+ * native connection it borrowed.
  */
 class RedisClientConfigTest {
 
@@ -69,6 +71,21 @@ class RedisClientConfigTest {
               assertThat(pooling.getPoolConfig().getMaxWaitDuration())
                   .isEqualTo(Duration.ofSeconds(2));
             });
+  }
+
+  @Test
+  void everyConnectionCanCloseTheNativeConnectionItBorrowed() {
+    LettuceConnectionFactory factory =
+        RedisClientConfig.connectionFactory(new DataRedisProperties(), clientResources);
+
+    assertThat(factory)
+        .isInstanceOfSatisfying(
+            RedisClientConfig.DiscardableConnectionFactory.class,
+            discardable ->
+                assertThat(
+                        discardable.doCreateLettuceConnection(
+                            null, mock(LettuceConnectionProvider.class), 2_000L, 0))
+                    .isInstanceOf(DiscardableConnection.class));
   }
 
   @Test

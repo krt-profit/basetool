@@ -47,6 +47,7 @@ import org.springframework.test.context.BootstrapUtils;
 import org.springframework.test.context.ContextCustomizer;
 import org.springframework.test.context.MergedContextConfiguration;
 import org.springframework.test.context.bean.override.BeanOverrideHandler;
+import org.springframework.test.context.bean.override.BeanOverrideUtils;
 
 /**
  * Computes the keys under which Spring's test-context cache stores the application contexts of a
@@ -202,7 +203,7 @@ public final class TestContextKeys {
   private static List<String> overrides(@NotNull Class<?> testClass) {
     TreeSet<String> entries = new TreeSet<>();
     for (Class<?> c = testClass; c != null; c = c.getEnclosingClass()) {
-      for (BeanOverrideHandler handler : BeanOverrideHandler.forTestClass(c)) {
+      for (BeanOverrideHandler handler : BeanOverrideUtils.findHandlersForFields(c)) {
         String kind = handler.getClass().getSimpleName().replace("OverrideHandler", "");
         String type = handler.getBeanType().toClass().getSimpleName();
         String field = handler.getField() == null ? "-" : handler.getField().getName();
