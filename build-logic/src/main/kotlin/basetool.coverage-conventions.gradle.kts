@@ -1,4 +1,6 @@
+import de.greluc.krt.profit.basetool.conventions.catalog
 import de.greluc.krt.profit.basetool.conventions.moduleBuildSettings
+import de.greluc.krt.profit.basetool.conventions.requiredVersion
 import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.attributes.AttributeContainer
 import org.gradle.api.attributes.Category
@@ -11,6 +13,8 @@ plugins {
   id("basetool.java-conventions")
   jacoco
 }
+
+jacoco { toolVersion = project.catalog().requiredVersion("jacoco") }
 
 tasks.withType<Test>().configureEach { finalizedBy(tasks.named("jacocoTestReport")) }
 

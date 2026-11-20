@@ -695,7 +695,7 @@ final class BackendCallScanner {
   }
 
   private String location(CompilationUnitTree unit, Tree node) {
-    long line = unit.getLineMap().getLineNumber(positions.getStartPosition(unit, node));
+    long line = unit.getLineMap().getLineNumber(positions.getStartPosition(node));
     String name = unit.getSourceFile().getName().replace('\\', '/');
     String file = name.substring(name.lastIndexOf('/') + 1);
     return file + ":" + line;

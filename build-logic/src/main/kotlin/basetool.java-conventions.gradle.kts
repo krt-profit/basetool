@@ -10,7 +10,7 @@ plugins { java }
 val basetool = extensions.create<BasetoolExtension>("basetool")
 val catalog = project.catalog()
 
-java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+java { toolchain { languageVersion = JavaLanguageVersion.of(27) } }
 
 listOf("compileOnly", "annotationProcessor", "testCompileOnly", "testAnnotationProcessor").forEach {
   dependencies.addProvider(it, lombokNotation())

@@ -88,7 +88,7 @@ The drawing shows the request path. Beside it, the frontend, backend and ingest 
 
 - **Edge** — a host-level haproxy forwards TCP to the rootless nginx `edge` with a PROXY v2 header (ADR-0187). nginx terminates TLS for `profit-base.online` (with Keycloak under `/auth`), `ingest.` and `grafana.profit-base.online`, and applies per-vhost rate limits and deny-by-default rules. There is no `api.` vhost: the backend is internal-only (ADR-0268). An `acme` (lego) container renews the certificates.
 - **Frontend** — the Thymeleaf-rendered UI. It calls the backend via a centrally-configured, Resilience4j-wrapped WebClient with the member's bearer token and keeps its sessions in Redis. Live updates reach the browser over `/ws/sync` and an SSE stream. No business logic of its own, and no direct database or Keycloak Admin API access.
-- **Backend** — REST API only (`/api/v1/...`), Spring Boot on Java 25, JPA / Flyway / PostgreSQL. It never serves HTML and is the only component with the domain database. It fetches game data from [UEX](https://uexcorp.space/) and the Star Citizen wiki. **It has no internet path**: the frontend, the ingest gateway and the Keycloak SPI reach it over container networks, and nothing else does (ADR-0268). The ingest gateway is the system's single public API entry point. The existing admin module owns the shared transfer-fee parser and immutable rate snapshots ([ADR-0358](docs/adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md)); Bank keeps its own payer and fee-mode rules.
+- **Backend** — REST API only (`/api/v1/...`), Spring Boot on Java 27, JPA / Flyway / PostgreSQL. It never serves HTML and is the only component with the domain database. It fetches game data from [UEX](https://uexcorp.space/) and the Star Citizen wiki. **It has no internet path**: the frontend, the ingest gateway and the Keycloak SPI reach it over container networks, and nothing else does (ADR-0268). The ingest gateway is the system's single public API entry point. The existing admin module owns the shared transfer-fee parser and immutable rate snapshots ([ADR-0358](docs/adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md)); Bank keeps its own payer and fee-mode rules.
 - **Ingest** — the internet-facing gateway for approved client software, the SC Extractor included: the exchange API `/exchange/v1/**` with reads, writes and drafts ([`docs/specs/external-exchange.md`](docs/specs/external-exchange.md)). The extractor's former `/v1` routes were removed on 2026-09-28. The gateway owns no database. It relays token-authenticated requests to the backend over the internal network under its own service identity, so no client ever reaches the backend itself. **Restricted interface:** only client software explicitly approved by the basetool developer (@greluc) may use it. This is enforced technically through the client registry at the gateway (`REQ-XCH-002/-003`) and binds users through section 4 of the Terms of Use (`REQ-SEC-027`, [`docs/specs/security-and-access.md`](docs/specs/security-and-access.md)). The approved clients are listed in [`docs/legal/approved-clients.md`](docs/legal/approved-clients.md).
 - **Keycloak** — the OAuth2 / OIDC identity provider, with its own PostgreSQL, the KRT theme and a `keycloak-spi` provider JAR. The SPI provides the Discord login and its guild/role gate, the `basetool-exchange` admin extension that ends one client inside shared sessions (ADR-0226), and the `krt-freemarker` login forms that show the device code on the consent page (ADR-0228). Exchange clients sign in with the device grant, per-capability consent and DPoP-bound tokens.
 - **Redis** — Spring Session store (sessions survive frontend restarts), the live-sync and notification pub/sub, the ingest handoffs, the exchange registry mirror and the gateway's byte-bounded exchange partition (ADR-0221). Two instances, cut along who reaches them (ADR-0388): `redis-session` holds only the sessions and is reached by the frontend alone; `redis-shared` holds the rest for frontend, backend and ingest. Every service has its own ACL user on each instance it reaches.
@@ -158,7 +158,7 @@ On phones with the tab bar, those links are at the end of the menu.
 
 ### Prerequisites
 
-- [Java 25](https://adoptium.net/) — required for local Gradle builds.
+- [Java 27](https://adoptium.net/) — required for local Gradle builds.
 - [Docker](https://www.docker.com/) and Docker Compose — for the dependency stack and the dev/test stacks.
 - Access to a Keycloak server — the Docker Compose stack ships one.
 
@@ -345,7 +345,7 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 
 ### Tech stack
 
-- **Language / framework** — Java 25, Spring Boot 4.2
+- **Language / framework** — Java 27, Spring Boot 4.2
 - **Build** — Gradle 9 (Kotlin DSL), versions in the `gradle/libs.versions.toml` catalog, updates surfaced by refreshVersions and, for Ruff, shfmt and Node.js, proposed weekly by `native-tool-updates.yml`
 - **Database** — PostgreSQL 18, schema owned by Flyway (Hibernate `ddl-auto=validate`)
 - **Session store** — Redis 8 (`spring-session-data-redis`)

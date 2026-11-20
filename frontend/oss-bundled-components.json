@@ -21,7 +21,7 @@
     },
     {
       "name": "Eclipse Temurin JRE",
-      "version": "25 (eclipse-temurin:25-jre-alpine)",
+      "version": "27 (eclipse-temurin:27-jre-alpine)",
       "title": "Java runtime of the backend, frontend and ingest container images",
       "url": "https://github.com/adoptium/temurin-build",
       "modules": [
@@ -39,7 +39,7 @@
     },
     {
       "name": "Alpine Linux",
-      "version": "base layer of eclipse-temurin:25-jre-alpine",
+      "version": "base layer of eclipse-temurin:27-jre-alpine",
       "title": "Operating-system layer of the backend, frontend and ingest container images; the licence of each package and its source are listed by Alpine",
       "url": "https://gitlab.alpinelinux.org/alpine/aports",
       "modules": [

@@ -1,4 +1,4 @@
-FROM eclipse-temurin:25-jdk-alpine@sha256:c7c3d0bdf7f2bbc5a05a6712ed334d198360105634ea9adf76fca94f381b1e3f AS spi
+FROM eclipse-temurin:27-jdk-alpine@sha256:a63e42ef2a577cdb0802b73bb6f8fa2c3b0ebf1b4f00f29eb22e7f4d83b234f7 AS spi
 WORKDIR /app
 COPY --chmod=755 gradlew .
 COPY gradle/ gradle/

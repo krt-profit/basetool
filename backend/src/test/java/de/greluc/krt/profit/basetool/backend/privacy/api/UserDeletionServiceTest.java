@@ -92,7 +92,7 @@ class UserDeletionServiceTest {
    * exercise the member path (ADR-0129).
    */
   @Spy
-  private final ClientDirectory clientDirectory =
+  private ClientDirectory clientDirectory =
       new ExchangeClientDirectory(
           new IngestGatewayProperties(gatewayClientIds), Mockito.mock(KnownExchangeClients.class));
 

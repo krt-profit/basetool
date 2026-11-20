@@ -714,7 +714,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 25 and Gradle
+      - name: Set up JDK 27 and Gradle
         uses: ./.github/actions/setup-jdk-gradle
         with:
           cache-disabled: 'true'

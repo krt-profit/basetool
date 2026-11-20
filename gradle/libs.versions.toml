@@ -38,7 +38,9 @@ openpdf = "3.0.5"
 zstdJni = "1.5.7-28"
 commonmark = "0.32.0"
 spotbugs = "6.5.13"
+jacoco = "0.8.16"
 pitest = "1.19.0"
+pitestCore = "1.30.2"
 pitestJunit5 = "1.2.3"
 nodeGradle = "7.1.0"
 spotless = "8.11.0"
@@ -96,11 +98,13 @@ openpdf-core = { module = "com.github.librepdf:openpdf", version.ref = "openpdf"
 zstd-jni = { module = "com.github.luben:zstd-jni", version.ref = "zstdJni" }
 commonmark-core = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
 findsecbugs-plugin = { module = "com.h3xstream.findsecbugs:findsecbugs-plugin", version.ref = "findsecbugs" }
+jacoco-agent = { module = "org.jacoco:org.jacoco.agent", version.ref = "jacoco" }
 errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
 errorprone-annotations = { module = "com.google.errorprone:error_prone_annotations", version.ref = "errorprone" }
 nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 checkstyle = { module = "com.puppycrawl.tools:checkstyle", version.ref = "checkstyle" }
 google-java-format = { module = "com.google.googlejavaformat:google-java-format", version.ref = "googleJavaFormat" }
+pitest-core = { module = "org.pitest:pitest", version.ref = "pitestCore" }
 pitest-junit5-plugin = { module = "org.pitest:pitest-junit5-plugin", version.ref = "pitestJunit5" }
 keycloak-server-spi = { module = "org.keycloak:keycloak-server-spi", version.ref = "keycloak" }
 keycloak-server-spi-private = { module = "org.keycloak:keycloak-server-spi-private", version.ref = "keycloak" }

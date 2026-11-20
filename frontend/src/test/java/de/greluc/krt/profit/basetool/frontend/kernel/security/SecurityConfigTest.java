@@ -34,7 +34,9 @@ class SecurityConfigTest {
 
   @Test
   void theSecurityConfigurationDeclaresNoTokenAuthoritiesMapper() {
-    assertThat(Arrays.stream(SecurityConfig.class.getDeclaredMethods()).map(Method::getReturnType))
+    assertThat(
+            Arrays.stream(SecurityConfig.class.getDeclaredMethods())
+                .<Class<?>>map(Method::getReturnType))
         .doesNotContain(GrantedAuthoritiesMapper.class);
   }
 }

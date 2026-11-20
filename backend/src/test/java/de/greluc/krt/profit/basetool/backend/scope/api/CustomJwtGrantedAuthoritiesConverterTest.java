@@ -96,7 +96,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    * carve-out only fires where a test sets one (ADR-0129).
    */
   @Spy
-  private final ClientDirectory clientDirectory =
+  private ClientDirectory clientDirectory =
       new ExchangeClientDirectory(
           new IngestGatewayProperties(gatewayClientIds), Mockito.mock(KnownExchangeClients.class));
 
@@ -107,14 +107,14 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    * production value, so every case below exercises the shipped configuration.
    */
   @Spy
-  private final AuthoritiesCacheProperties authoritiesCacheProperties =
+  private AuthoritiesCacheProperties authoritiesCacheProperties =
       BoundProperties.defaults(AuthoritiesCacheProperties.class);
 
   /**
    * A real registry, not a mock: the converter binds its cache meters in the constructor, and the
    * hit / miss counts are asserted below.
    */
-  @Spy private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+  @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private CustomJwtGrantedAuthoritiesConverter converter;
 

@@ -215,7 +215,7 @@ something well-scoped before you invest time.
 
 The README is the canonical place. The relevant sections:
 
-- [Prerequisites](README.md#prerequisites) — Java 25 + Docker + Compose.
+- [Prerequisites](README.md#prerequisites) — Java 27 + Docker + Compose.
 - [Local development (apps from Gradle)](README.md#local-development-apps-from-gradle) — recommended for active development (apps on the host JVM, dependencies in containers).
 - [Full stack via Docker Compose](README.md#full-stack-via-docker-compose) — when you need the whole thing in containers.
 - [Running the local test stack](README.md#running-the-local-test-stack) — when you need an isolated stack with throwaway credentials. **Use this every time you spin up a stack from a worktree.** Never re-use the production `.env`, the production `keystore.p12`, or the shared `realm-export.json` — see [AGENTS.md → Testing](AGENTS.md) for the rationale.
