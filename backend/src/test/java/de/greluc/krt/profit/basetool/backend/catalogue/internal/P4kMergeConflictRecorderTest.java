@@ -94,7 +94,8 @@ class P4kMergeConflictRecorderTest {
     P4kReviewCase closedByRun = closed(P4kReviewResolution.RESOLVED);
     P4kReviewCase kept = closed(P4kReviewResolution.KEEP);
     when(reviewCases.findByKindAndGuidAndReason(any(), any(), any()))
-        .thenReturn(Optional.of(closedByRun), Optional.of(kept));
+        .thenReturn(Optional.of(closedByRun))
+        .thenReturn(Optional.of(kept));
 
     record(row(UUID.randomUUID()), row(UUID.randomUUID()));
 

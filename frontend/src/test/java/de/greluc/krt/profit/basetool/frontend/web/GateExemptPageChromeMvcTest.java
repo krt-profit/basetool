@@ -20,8 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.web;
 
 import static org.hamcrest.Matchers.nullValue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.CapabilityFlagsAdvice;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutMiscAdvice;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.OrgUnitContextAdvice;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
@@ -148,7 +147,7 @@ class GateExemptPageChromeMvcTest {
         .andExpect(model().attribute("purchasingEnabled", false))
         .andExpect(model().attribute("sessionGatePage", true));
 
-    verify(backendApiClient).get(eq(LAYOUT_PATH), any(Class.class));
+    verify(backendApiClient).get(LAYOUT_PATH, MeLayoutResponse.class);
     verify(navigationClient).preferences();
     verify(supplyClient).state();
     verify(purchasingClient).state();

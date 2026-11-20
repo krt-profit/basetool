@@ -68,7 +68,7 @@ class HangarRelocationGuardTest {
 
   @Test
   void lockedForLocksNothingWhileNoPhaseIsOpenOrNobodyIsRefused() {
-    when(lock.writeCutoff()).thenReturn(Optional.empty(), Optional.of(LIVE_AT));
+    when(lock.writeCutoff()).thenReturn(Optional.empty()).thenReturn(Optional.of(LIVE_AT));
     when(lock.refusedAmong(List.of(free))).thenReturn(Set.of());
 
     assertThat(guard.lockedFor(List.of(free))).isSameAs(LockedShips.NONE);
