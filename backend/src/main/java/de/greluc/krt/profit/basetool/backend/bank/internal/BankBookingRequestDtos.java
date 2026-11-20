@@ -101,6 +101,7 @@ final class BankBookingRequestDtos {
         request.getCreatedAt(),
         target == null ? null : target.getId(),
         target == null ? null : target.getAccountNo(),
+        target == null ? null : target.getName(),
         request.isRequiresOwnerApproval(),
         request.getApplicableLimit(),
         request.getRequiredApprover() == null ? null : request.getRequiredApprover().name(),

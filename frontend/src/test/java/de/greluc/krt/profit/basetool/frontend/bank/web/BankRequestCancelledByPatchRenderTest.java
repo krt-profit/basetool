@@ -125,6 +125,7 @@ class BankRequestCancelledByPatchRenderTest {
         Instant.parse("2026-11-06T09:30:00Z"),
         null,
         null,
+        null,
         false,
         null,
         null,

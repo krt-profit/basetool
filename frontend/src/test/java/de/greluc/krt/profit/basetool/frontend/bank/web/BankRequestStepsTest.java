@@ -75,6 +75,7 @@ class BankRequestStepsTest {
         Instant.parse(createdAt),
         null,
         null,
+        null,
         requiresApproval,
         null,
         approver,

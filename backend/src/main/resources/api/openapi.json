@@ -90459,6 +90459,9 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "targetAccountName" : {
+            "type" : "string"
+          },
           "targetAccountNo" : {
             "type" : "string"
           },

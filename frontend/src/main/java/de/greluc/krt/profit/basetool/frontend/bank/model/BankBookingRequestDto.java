@@ -57,6 +57,8 @@ import org.jetbrains.annotations.Nullable;
  * @param createdAt when the request was raised
  * @param targetAccountId the destination account id for a {@code TRANSFER}, or {@code null}
  * @param targetAccountNo the destination account's number for a {@code TRANSFER}, or {@code null}
+ * @param targetAccountName the destination account's display name for a {@code TRANSFER}, or {@code
+ *     null}
  * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
  *     (REQ-BANK-041)
  * @param applicableLimit the requester's resolved approval limit, or {@code null} = unlimited
@@ -112,6 +114,7 @@ public record BankBookingRequestDto(
     Instant createdAt,
     @Nullable UUID targetAccountId,
     @Nullable String targetAccountNo,
+    @Nullable String targetAccountName,
     boolean requiresOwnerApproval,
     @Nullable BigDecimal applicableLimit,
     @Nullable String requiredApprover,

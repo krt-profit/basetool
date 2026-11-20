@@ -86,6 +86,7 @@ class BankRequestQueueSegmentTest {
         Instant.EPOCH,
         null,
         null,
+        null,
         requiresApproval,
         null,
         requiresApproval ? "RESPONSIBLE_HOLDER" : null,

@@ -182,6 +182,7 @@ class BankRequestsPatternRenderTest {
         Instant.parse("2026-10-01T12:00:00Z"),
         null,
         "TRANSFER".equals(type) ? "KB-0001" : null,
+        "TRANSFER".equals(type) ? "ALP Rücklage" : null,
         requiresApproval,
         null,
         approver,
@@ -319,7 +320,8 @@ class BankRequestsPatternRenderTest {
         .contains(">Ausstehend<")
         .doesNotContain(">PENDING<")
         .contains("Quartalsabgabe Q3")
-        .contains("ALP Betriebskonto → KB-0001");
+        .contains("ALP Betriebskonto → ALP Rücklage")
+        .contains(">KB-0007 → KB-0001<");
     assertThat(html.split("btn btn-success btn-xs", -1)).hasSize(3);
     assertThat(html)
         .containsPattern("class=\"chip chip--warning bank-req-route\"[^>]*>→ Bankleitung<")
