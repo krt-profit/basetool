@@ -29,9 +29,14 @@ Mechanics:
 - A constructor change now breaks the fixture at **compile time** rather than leaving a silent
   `null` — that is the point, not a regression.
 
-**The test JVM enforces it:** every `Test` task runs with `--illegal-final-field-mutation=deny`
-(`basetool.java-conventions`), so a reflective write to a final field fails the test that makes it
-instead of printing a warning.
+A Mockito `@Spy` field is not `final` either: Mockito replaces the field's value with the spy, which
+is the same reflective write.
+
+**Nothing enforces this yet.** JDK 27 has `--illegal-final-field-mutation=deny`, but Spring Security
+Test writes a final field of `SecurityContextHolderFilter` through `ReflectionTestUtils`
+(`WebTestUtils.setSecurityContextRepository`) on every MockMvc request with `jwt()` or `user()`, so
+`deny` fails about 1 500 tests in code we do not own. Arm it on the `Test` tasks once Spring Security
+Test no longer does that.
 
 ## Spring test contexts — reuse one, do not open one (REQ-OPS-041)
 

@@ -69,11 +69,7 @@ val testMaxHeap = moduleBuildSettings().testMaxHeap
 
 tasks.withType<Test>().configureEach {
   useJUnitPlatform()
-  jvmArgs(
-    "--enable-native-access=ALL-UNNAMED",
-    "--sun-misc-unsafe-memory-access=allow",
-    "--illegal-final-field-mutation=deny",
-  )
+  jvmArgs("--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow")
   maxHeapSize = testMaxHeap
   systemProperty("spring.profiles.active", "test")
 }

@@ -47,9 +47,10 @@ alike, so it is no reason for either line; `-XX:-UseBASE64Intrinsics` mitigates 
   a JDK default.
 - **`-XX:-UseBASE64Intrinsics` stays** until the pinned images run Temurin ≥ 27.0.1.1 and Keycloak's
   image a JDK ≥ 21.0.13.1.
-- **The test JVM refuses final-field mutation** (`--illegal-final-field-mutation=deny`, JEP 500),
-  which JDK 25 could not express: the conversion `docs/agents/backend-testing.md` describes becomes
-  a gate.
+- **Final-field mutation stays a warning in tests for now.** JDK 27 offers
+  `--illegal-final-field-mutation=deny` (JEP 500), but Spring Security Test writes a final field of
+  `SecurityContextHolderFilter` on every MockMvc request with `jwt()` or `user()`, so the gate
+  `docs/agents/backend-testing.md` asks for waits for that library.
 - **Every following JDK feature release is taken within its support window**, as soon as a Spring
   Boot release supports it, until the stack reaches Java 29 (LTS). `docs/dependency-pins.md` holds
   that row.
@@ -61,8 +62,8 @@ alike, so it is no reason for either line; `-XX:-UseBASE64Intrinsics` mitigates 
 - Two JVM flags stay that a patched JDK 27 alone would not need: compact headers are its default,
   and the Base64 intrinsic switch-off goes once the images run 27.0.1.1. Both are recorded where
   they are set and checked by the existing gates.
-- A reflective write to a final field in test code, or in a library a test exercises, now fails
-  that test. Production keeps JDK 27's default `warn`.
+- A reflective write to a final field prints JDK 27's warning, in tests and in production; nothing
+  fails on it until Spring Security Test lets the test JVM run with `deny`.
 - Tool versions that follow the JDK are pinned explicitly instead of taken from plugin defaults:
   `jacoco` (0.8.16) and `pitestCore` (1.30.2) in the catalog.
 
