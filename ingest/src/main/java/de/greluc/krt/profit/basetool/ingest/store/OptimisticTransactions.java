@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.ingest.store;
 
 import de.greluc.krt.profit.basetool.ingest.observability.MetricNames;
-import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
@@ -46,7 +45,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>An attempt that fails for any other reason closes its connection before the connection goes
  * back to the pool, so no watch, open transaction or unanswered command reaches the next borrower;
- * {@link RedisClientConfig} makes the pool test each connection it hands out.
+ * {@link RedisClientConfig} makes every connection a {@link DiscardableConnection} and the pool
+ * test each connection it hands out.
  */
 @Component
 @RequiredArgsConstructor
@@ -72,6 +72,13 @@ public class OptimisticTransactions {
 
   /** {@code EXEC} as the connection answers it: {@code null} when Redis discarded the writes. */
   private static final RedisCallback<List<Object>> EXEC = connection -> connection.exec();
+
+  /** Closes the native connection the session borrowed, so the pool does not lend it again. */
+  private static final RedisCallback<Void> DISCARD =
+      connection -> {
+        DiscardableConnection.behind(connection).discard();
+        return null;
+      };
 
   /** The Redis access the steps read and write through, on the gateway's pooled connections. */
   private final @NotNull StringRedisTemplate template;
@@ -254,14 +261,7 @@ public class OptimisticTransactions {
      */
     private void abandon(@NotNull Throwable failure) {
       try {
-        RedisCallback<Void> close =
-            connection -> {
-              if (connection.getNativeConnection() instanceof RedisAsyncCommands<?, ?> commands) {
-                commands.getStatefulConnection().close();
-              }
-              return null;
-            };
-        template.execute(close);
+        template.execute(DISCARD);
       } catch (RuntimeException closing) {
         failure.addSuppressed(closing);
       }

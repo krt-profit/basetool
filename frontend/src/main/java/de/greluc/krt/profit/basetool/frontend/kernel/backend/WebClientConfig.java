@@ -49,6 +49,7 @@ import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ReactorClientHttpRequestFactory;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -328,13 +329,17 @@ public class WebClientConfig {
                     .addHandlerLast(
                         new WriteTimeoutHandler(
                             httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
+    OAuth2ErrorResponseErrorHandler oauth2Errors = new OAuth2ErrorResponseErrorHandler();
     return RestClient.builder()
         .configureMessageConverters(converters ->
             converters
                 .disableDefaults()
                 .addCustomConverter(new FormHttpMessageConverter())
                 .addCustomConverter(new OAuth2AccessTokenResponseHttpMessageConverter()))
-        .defaultStatusHandler(new OAuth2ErrorResponseErrorHandler())
+        .defaultStatusHandler(
+            HttpStatusCode::isError,
+            (request, response) ->
+                oauth2Errors.handleError(request.getURI(), request.getMethod(), response))
         .requestFactory(new ReactorClientHttpRequestFactory(httpClient))
         .build();
   }
