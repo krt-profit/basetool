@@ -302,6 +302,7 @@ basetool_host_updates_exclude:
   - containers-common-*
   - passt
   - passt-*
+  - skopeo
 
 basetool_host_updates_on_calendar: "*-*-* 07:00:00"
 basetool_host_updates_randomized_delay: "15min"
