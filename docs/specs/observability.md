@@ -3470,6 +3470,10 @@ therefore alerts on:
   guard it: **`ContainerStartTimeMissing`** (critical, fewer than 10 containers or `absent()`, 10 m)
   does, and the conformance `container-metrics` check lists the series too
   (`tests/containerstarttimemissing_test.yml`).
+  The rule keeps only `podman_container_started_seconds > 0`: the exporter reports `-1` for a
+  container that has never started, which would otherwise be recorded as that name's start time,
+  count towards the `< 10` floor, and turn a recreate seen before its start into two changes
+  (`tests/container_start_time_never_started_test.yml`, which fails against the unfiltered rule).
   It read cAdvisor's `container_start_time_seconds` until 2026-09-22 — recorded that morning as a
   known gap, because with cAdvisor removed the series had no producer and the rule could not fire:
   the dead-alert shape this requirement exists for. Its test was rewritten on the Podman shape in
@@ -3666,9 +3670,9 @@ and bulkhead meters, which had no series at all until then; `Resilience4jMetrics
 groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/infrastructure.yml`
 (container guards, incl. `ContainerPidsHigh` + the `changes()`-based `ContainerRestartLoop`) ·
 `monitoring/alertmanager/alertmanager.yml.tmpl` (route grouping + the five root-cause `inhibit_rules`) ·
-`monitoring/prometheus/tests/` (`promtool test rules` units, incl. `monitoring_reconcile_disabled_test.yml`
-and `containerrestartloop_changes_test.yml`) · `scripts/check-loki-rules.sh` (every Loki rule
-file parses and every LogQL expression is valid — a group the ruler skips alerts on nothing) ·
+`monitoring/prometheus/tests/` (`promtool test rules` units, incl. `monitoring_reconcile_disabled_test.yml`,
+`containerrestartloop_changes_test.yml` and `container_start_time_never_started_test.yml`) ·
+`scripts/check-loki-rules.sh` (every Loki rule file parses and every LogQL expression is valid — a group the ruler skips alerts on nothing) ·
 `scripts/check-monitoring-configs.sh` + `.test.sh` (repo-lint `Container checks`: the Prometheus,
 Alertmanager, Alloy and Loki configuration files, each validated by its own tool in the pinned image) ·
 `monitoring/prometheus/alerts/containers-runtime.yml` (the `basetool:container:*` normalisation and

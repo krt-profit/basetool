@@ -50,10 +50,11 @@ groups:
         expr: >-
           max by (name) (basetool_container_oom_kills_total)
 
+      # The exporter reports -1 for a container that has never started.
       - record: basetool:container:start_time_seconds
         expr: >-
           max by (name) (
-            podman_container_started_seconds * on (id) group_left(name) podman_container_info
+            (podman_container_started_seconds > 0) * on (id) group_left(name) podman_container_info
           )
 
       - record: basetool:container:network_receive_bytes_total
