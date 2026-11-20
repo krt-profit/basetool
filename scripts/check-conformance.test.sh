@@ -488,11 +488,13 @@ case "$cmd" in
     case "$scenario" in updates-disabled) echo "inactive" ;; *) echo "active" ;; esac
     ;;
   *"/etc/dnf/automatic.conf"*)
+    runtime='podman podman-* crun conmon netavark aardvark-dns containers-common containers-common-* passt passt-* skopeo'
     case "$scenario" in
-      updates-download-only) printf 'upgrade_type = security\napply_updates = no\nexclude = podman crun\n' ;;
-      updates-everything)    printf 'upgrade_type = default\napply_updates = yes\nexclude = podman crun\n' ;;
+      updates-download-only) printf 'upgrade_type = security\napply_updates = no\nexclude = %s\n' "$runtime" ;;
+      updates-everything)    printf 'upgrade_type = default\napply_updates = yes\nexclude = %s\n' "$runtime" ;;
       updates-runtime)       printf 'upgrade_type = security\napply_updates = yes\n' ;;
-      *)                     printf 'upgrade_type = security\napply_updates = yes\nexclude = podman podman-* crun conmon netavark aardvark-dns containers-common containers-common-* passt passt-*\n' ;;
+      updates-no-skopeo)     printf 'upgrade_type = security\napply_updates = yes\nexclude = %s\n' "${runtime% skopeo}" ;;
+      *)                     printf 'upgrade_type = security\napply_updates = yes\nexclude = %s\n' "$runtime" ;;
     esac
     ;;
   *"python3 -c"*"detect_releasevers"*)
@@ -897,6 +899,9 @@ STUB_SCENARIO=updates-everything assert_status \
 STUB_SCENARIO=updates-runtime assert_status \
   "security-updates-enabled fails when the container runtime is not excluded" \
   security-updates-enabled fail "runtime is not excluded" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=updates-no-skopeo assert_status \
+  "security-updates-enabled fails when skopeo moves unattended while the rest of the runtime is held" \
+  security-updates-enabled fail "(skopeo)" -- "${STUB_ARGS[@]}"
 
 STUB_SCENARIO=healthy assert_status \
   "epel-branch passes when EPEL resolves to the host's minor and a later base package is not counted" \

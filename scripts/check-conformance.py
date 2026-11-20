@@ -1720,6 +1720,21 @@ def check_host_exporter_versions(ctx: Context) -> str:
     return "host packages match the compose pins: " + ", ".join(good)
 
 
+UPDATE_EXCLUDED_RUNTIME = (
+    "podman",
+    "podman-*",
+    "crun",
+    "conmon",
+    "netavark",
+    "aardvark-dns",
+    "containers-common",
+    "containers-common-*",
+    "passt",
+    "passt-*",
+    "skopeo",
+)
+
+
 def check_security_updates_enabled(ctx: Context) -> str:
     """The host applies security updates unattended, and only security updates.
 
@@ -1734,8 +1749,8 @@ def check_security_updates_enabled(ctx: Context) -> str:
     Raises:
         Skip: when no host access is configured.
         CheckFailed: when the timer is not enabled and active, when the configuration does not say
-            ``upgrade_type = security`` and ``apply_updates = yes``, or when the container runtime is
-            not excluded (REQ-OPS-032).
+            ``upgrade_type = security`` and ``apply_updates = yes``, or when a name of
+            ``UPDATE_EXCLUDED_RUNTIME`` is missing from its ``exclude`` (REQ-OPS-032).
     """
     enabled = ctx.runner.run("systemctl is-enabled dnf-automatic.timer 2>/dev/null || true").strip()
     active = ctx.runner.run("systemctl is-active dnf-automatic.timer 2>/dev/null || true").strip()
@@ -1765,11 +1780,12 @@ def check_security_updates_enabled(ctx: Context) -> str:
             f"apply_updates is {settings.get('apply_updates') or 'unset'} -- updates would be "
             "downloaded and never installed"
         )
-    excluded = settings.get("exclude", "").split()
-    if "podman" not in excluded:
+    excluded = set(settings.get("exclude", "").split())
+    missing = [name for name in UPDATE_EXCLUDED_RUNTIME if name not in excluded]
+    if missing:
         problems.append(
-            "the container runtime is not excluded -- podman and its companions must move on a "
-            "tested maintenance, not unattended"
+            f"the container runtime is not excluded ({', '.join(missing)}) -- podman and its "
+            "companions must move on a tested maintenance, not unattended"
         )
     if problems:
         raise CheckFailed("; ".join(problems))

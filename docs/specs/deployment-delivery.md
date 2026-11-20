@@ -2480,8 +2480,10 @@ haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only w
   as a whole file by the bootstrap role (`tasks/45-updates.yml`). A feature update is never applied
   unattended.
 - **The container runtime is excluded** — `podman`, `crun`, `conmon`, `netavark`, `aardvark-dns`,
-  `containers-common` and `passt` (pasta) — by the owner's decision of 2026-09-22: they change how
-  every container starts, and they move on a tested maintenance, testing host first.
+  `containers-common`, `passt` (pasta) and `skopeo` — by the owner's decisions of 2026-09-22 and, for
+  `skopeo`, 2026-11-20: they change how every container starts, and they move on a tested maintenance,
+  testing host first. `skopeo` is part of the set because Podman 6's `containers-common` sets a skopeo floor that no package relation enforces
+  on EL, and because `deploy.sh` resolves and logs in with it (ADR-0199 Amendment 1).
 - **The window is 07:00 host-local plus up to 15 minutes**, clear of the backup (04:15, up to an hour),
   the restore drill (Sunday 05:30), the weekly cleanup (Saturday 02:00 UTC) and the certificate
   collector (03:40).
@@ -2502,7 +2504,8 @@ haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only w
 - [ ] `check-conformance.py --only host-exporter-versions` passes against the host: the running
   `alloy_build_info` and `node_exporter_build_info` versions equal the compose pins.
 - [ ] `check-conformance.py --only security-updates-enabled` passes against the host: the timer is
-  enabled and active, the configuration is security-only and applies, and `podman` is excluded.
+  enabled and active, the configuration is security-only and applies, and every package of the
+  runtime set above is excluded.
 - [ ] `host-updates-metrics.test.sh` passes: a run is recorded by the run, a boot refresh keeps it,
   and a reboot state that cannot be read is left out rather than written as `0`.
 - [ ] `ops_audit_2026_09_alerts_*_test.yml` pass: each of the three alerts fires and stays silent where
@@ -3993,7 +3996,7 @@ host that resolves another branch also stops rehearsing the other's package set.
 **Enforced by:** `ansible/roles/basetool_host/tasks/05-epel.yml` · `scripts/check-conformance.py`
 (`epel-branch`) · `scripts/check-conformance.test.sh` · **Decision:**
 [ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
-Amendment 1 · **Related:** REQ-OPS-032, REQ-OPS-053, ADR-0163
+Amendment 2 · **Related:** REQ-OPS-032, REQ-OPS-053, ADR-0163
 
 ## Open questions
 

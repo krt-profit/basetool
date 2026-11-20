@@ -2037,8 +2037,9 @@ ansible-playbook site.yml --limit production --tags epel            # EPEL's bra
 (+ up to 15 minutes), the container runtime excluded, **never a reboot** (ADR-0199). A due reboot
 raises `HostRebootRequired`; take it as a maintenance — the stack comes back on its own, because the
 units are `WantedBy=default.target` and `basetool` lingers. The runtime (podman, crun, conmon, netavark,
-aardvark-dns, containers-common, passt) is updated by hand, testing host first:
-`dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt`.
+aardvark-dns, containers-common, passt, skopeo) is updated by hand, testing host first:
+`dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt skopeo`.
+Name skopeo every time: no package relation on EL pulls it along with podman (ADR-0199 Amendment 1).
 
 **EPEL serves the host's own minor release** (`REQ-OPS-062`): the role writes
 `/etc/yum.repos.d/epel.repo` with `epel-<VERSION_ID>`, so neither the packaged template nor a dnf

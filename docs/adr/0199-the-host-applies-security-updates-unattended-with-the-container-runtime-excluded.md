@@ -46,7 +46,41 @@ excluded, and never reboots — and the host reports every run and every pending
    `HostRebootRequired` read them, and `check-conformance.py`'s `security-updates-enabled` asserts
    the configuration on the running host.
 
-## Amendment 1 — EPEL comes from the host's own minor release — 2026-11-20
+## Consequences
+
+- The host is patched again, on the day an advisory ships rather than when someone looks.
+- **The runtime can fall behind.** A podman CVE is not fixed by this; it needs the maintenance the
+  exclusion exists for. That is the trade the owner took: an untested runtime change on production is
+  the larger risk on a single host with measured behaviour.
+- **A reboot is still manual**, but no longer silent: `HostRebootRequired` warns after a day.
+- A security update of `node_exporter` or `alloy` moves the host package away from the compose pin;
+  `check-conformance.py --only host-exporter-versions` reports that, and the pin is moved in a
+  reviewed commit.
+
+**Rejected:** all updates unattended (feature updates and the runtime on an unattended schedule),
+`reboot = when-needed` (an automatic outage of the only host, at a time nobody chose), pinning every
+package in the role (blocks the security fixes this exists to apply), and leaving patching manual (the
+status quo that nobody had decided).
+
+## Amendment 1 — skopeo moves with the runtime — 2026-11-20
+
+Rocky Linux 10.3's `containers-common-6:6.1` (Podman 6) declares `Conflicts: skopeo < 1:1.23`, so
+upstream treats skopeo as part of the runtime set. On EL that conflict never applies: skopeo's
+epoch is 2 on 10.2 and 3 on 10.3, and `2:1.22.2` compares above `1:1.23`. dnf would have left skopeo
+1.22.2 next to containers-common 6.1, the pairing upstream forbids. skopeo also requires
+`containers-common` and `podman-sequoia`, both already excluded (`podman-*`). With `best=True`, a
+skopeo advisory that needs a newer version of either would leave the whole unattended run unresolved.
+And `deploy.sh` resolves digests, reads labels and logs in with skopeo, so a skopeo change is a change
+to the promotion path that the testing host should rehearse first.
+
+**The decision (the owner's, in chat).** `skopeo` joins the exclusion list of item 2 and moves on the
+same deliberate maintenance as the runtime, testing host first; the manual runtime update names it,
+because no package relation pulls it along. `check-conformance.py`'s `security-updates-enabled` now
+requires every name of the list in `exclude`, not only `podman`.
+
+**Carried:** a skopeo security fix waits for that maintenance, the same trade as for podman.
+
+## Amendment 2 — EPEL comes from the host's own minor release — 2026-11-20
 
 `dnf-automatic` installs from every enabled repository, so the branch EPEL resolves to decides what
 an unattended run puts on the host. The packaged `epel.repo` leaves that branch to dnf's variables:
@@ -70,19 +104,3 @@ removes the meta package, the mail actions and the MTA (`REQ-OPS-053`).
 upgrade by itself but leaves the branch to whatever the release package provides, as the `stream`
 variable did; overriding Rocky's own dnf variables, which other repositories read; keeping the
 packaged file, whose `epel-10` follows RHEL's newest minor rather than the host's.
-
-## Consequences
-
-- The host is patched again, on the day an advisory ships rather than when someone looks.
-- **The runtime can fall behind.** A podman CVE is not fixed by this; it needs the maintenance the
-  exclusion exists for. That is the trade the owner took: an untested runtime change on production is
-  the larger risk on a single host with measured behaviour.
-- **A reboot is still manual**, but no longer silent: `HostRebootRequired` warns after a day.
-- A security update of `node_exporter` or `alloy` moves the host package away from the compose pin;
-  `check-conformance.py --only host-exporter-versions` reports that, and the pin is moved in a
-  reviewed commit.
-
-**Rejected:** all updates unattended (feature updates and the runtime on an unattended schedule),
-`reboot = when-needed` (an automatic outage of the only host, at a time nobody chose), pinning every
-package in the role (blocks the security fixes this exists to apply), and leaving patching manual (the
-status quo that nobody had decided).
