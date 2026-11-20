@@ -22,10 +22,14 @@ package de.greluc.krt.profit.basetool.ingest.assembly;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
+import java.util.Arrays;
 import java.util.List;
+import org.apache.catalina.valves.RemoteIpValve;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.tomcat.TomcatWebServer;
+import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -33,7 +37,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 /**
  * Pins the gateway's security filter chains through {@link FilterChainProxy} in the shape
  * production runs them (REQ-XCH-036): the basic-auth management-port chain first, the basic-auth
- * scrape chain second, the main chain with the exchange gates last.
+ * scrape chain second, the main chain with the exchange gates last. Also pins the one forwarded
+ * header family the running connector trusts for the client address (REQ-INGEST-005).
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -61,6 +66,8 @@ class SecurityFilterChainProductionShapeTest {
 
   @Autowired private FilterChainProxy filterChainProxy;
 
+  @Autowired private ServletWebServerApplicationContext webServerContext;
+
   @MockitoBean private JwtDecoder jwtDecoder;
   @MockitoBean private HandoffStagingService handoffStagingService;
 
@@ -68,5 +75,28 @@ class SecurityFilterChainProductionShapeTest {
   void everyChainHoldsExactlyTheExpectedFiltersInOrder() {
     assertThat(SecurityFilterChainOrderTest.describe(filterChainProxy.getFilterChains()))
         .isEqualTo(EXPECTED);
+  }
+
+  /**
+   * The connector resolves the client address, which the per-IP rate limiter keys on, through one
+   * {@link RemoteIpValve} reading the {@code X-Forwarded-*} family the edge sends; Tomcat's valve
+   * never reads a standard {@code Forwarded} header.
+   */
+  @Test
+  void theConnectorTakesTheClientAddressFromXForwardedForOnly() {
+    assertThat(
+            Arrays.stream(
+                    ((TomcatWebServer) webServerContext.getWebServer())
+                        .getTomcat()
+                        .getEngine()
+                        .getPipeline()
+                        .getValves())
+                .filter(RemoteIpValve.class::isInstance)
+                .map(RemoteIpValve.class::cast))
+        .singleElement()
+        .satisfies(valve -> {
+          assertThat(valve.getRemoteIpHeader()).isEqualTo("X-Forwarded-For");
+          assertThat(valve.getProtocolHeader()).isEqualTo("X-Forwarded-Proto");
+        });
   }
 }

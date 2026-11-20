@@ -55,6 +55,7 @@ class SecurityFilterChainOrderTest {
           "DisableEncodeUrlFilter",
           "WebAsyncManagerIntegrationFilter",
           "SecurityContextHolderFilter",
+          "ContentSecurityPolicyNonceGeneratingFilter",
           "HeaderWriterFilter",
           "CorsFilter",
           "CsrfFilter",

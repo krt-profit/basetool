@@ -61,6 +61,13 @@ Beyond roles there are three mechanisms that are easy to miss:
   `INTERNAL_TLS_VERIFY_HOSTNAME` and fallback mounts; the committed test material already has the
   shape (ADR-0139 amendment 1). Production completed the rollout on 2026-09-25: each service on
   its own leaf since v1.12.0, every anchor the CA alone since step 4 the same evening.
+- **Forwarded headers are one family** — the edge sends `X-Forwarded-*`, and only that family is
+  read: by the frontend's `ForwardedHeaderFilter` and the ingest's `RemoteIpValve`, each set to it
+  explicitly; a standard `Forwarded` header and `X-Forwarded-Prefix` are never applied, and the
+  backend reads none (REQ-SEC-011, REQ-INGEST-005, ADR-0272). A `Location` Tomcat writes stays
+  relative (`server.tomcat.servlet.use-relative-redirects: true` in all three apps, the Spring Boot
+  4.2 default, chosen deliberately); behind the edge the frontend's filter resolves it against the
+  public origin first.
 
 - **Approved external clients act with less than the member** — a client reaches only
   `/exchange/v1/**` on the ingest gateway, with consent per capability and DPoP-bound tokens;

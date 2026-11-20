@@ -40,11 +40,7 @@ object OssLicensePolicy {
     )
 
   /** Coordinates whose POM names no usable licence, as `group:artifact` to `(version, SPDX id)`. */
-  val coordinateOverrides =
-    mapOf(
-      "org.springframework.session:spring-session-core" to ("4.1.1" to "Apache-2.0"),
-      "org.springframework.session:spring-session-data-redis" to ("4.1.1" to "Apache-2.0"),
-    )
+  val coordinateOverrides: Map<String, Pair<String, String>> = emptyMap()
 
   /** [coordinateOverrides] reduced to `group:artifact` to SPDX identifier. */
   val overrideLicenses: Map<String, String> = coordinateOverrides.mapValues { (_, versionAndId) ->

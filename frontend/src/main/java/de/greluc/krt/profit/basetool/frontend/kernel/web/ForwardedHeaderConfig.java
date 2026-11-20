@@ -31,24 +31,28 @@ import org.springframework.web.filter.ForwardedHeaderFilter;
  * Registers Spring's {@link ForwardedHeaderFilter} at {@link Ordered#HIGHEST_PRECEDENCE} + 1, so
  * {@code ClientIpContextFilter} reads the raw forwarded headers first.
  *
- * <p>Requires {@code server.forward-headers-strategy: none}; the registration otherwise mirrors
- * Spring Boot's own.
+ * <p>Requires {@code server.forward-headers-strategy: none}. The filter reads the {@code
+ * X-Forwarded-*} family the edge sends; a standard {@code Forwarded} header and {@code
+ * X-Forwarded-Prefix} are hidden from the application and never applied.
  */
 @Configuration
 public class ForwardedHeaderConfig {
+
+  /** Selects {@code X-Forwarded-*} over the standard RFC 7239 {@code Forwarded} header. */
+  private static final boolean USE_STANDARD_FORWARDED_HEADER = false;
 
   /**
    * Registers {@link ForwardedHeaderFilter} at {@link Ordered#HIGHEST_PRECEDENCE} {@code + 1} — as
    * early as Spring Boot's default, but one slot behind {@code ClientIpContextFilter} so the raw
    * {@code X-Forwarded-For} chain is still visible to the client-IP attribution.
    *
-   * @return the filter registration for the forwarded-header filter
+   * @return the filter registration for the {@code X-Forwarded-*} header filter
    */
   @NotNull
   @Bean
   public FilterRegistrationBean<ForwardedHeaderFilter> forwardedHeaderFilter() {
     FilterRegistrationBean<ForwardedHeaderFilter> registration =
-        new FilterRegistrationBean<>(new ForwardedHeaderFilter());
+        new FilterRegistrationBean<>(new ForwardedHeaderFilter(USE_STANDARD_FORWARDED_HEADER));
     registration.setDispatcherTypes(
         DispatcherType.REQUEST, DispatcherType.ASYNC, DispatcherType.ERROR);
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);

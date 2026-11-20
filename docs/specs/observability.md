@@ -1807,13 +1807,15 @@ nothing, so the alert stays silent on a host without one.
   per-app CPU.
 - Request concurrency (FE-PERF-07, 2026-09-22): the `03-spring-apps.json` "In-flight Requests"
   panel plots `sum by (application) (http_server_requests_active_seconds_count)` — the active count
-  of Spring MVC's `http.server.requests` long-task timer. It replaced "Tomcat Busy Threads": all
+  of Spring MVC's `http.server.requests` long-task timer, which Spring Boot creates only with
+  `management.metrics.observations.include-active-long-task-timer: true` (set in all three apps;
+  without it the panel goes empty with no error). It replaced "Tomcat Busy Threads": all
   three apps run Tomcat on virtual threads (`spring.threads.virtual.enabled`), which gives the
   connector an external `VirtualThreadExecutor`, so `tomcat_threads_*` read a constant `-1` and
   `server.tomcat.threads.max` / `min-spare` had no effect. Those keys and the Tomcat MBean registry
   (`server.tomcat.mbeanregistry.enabled`, enabled only to feed that panel) are gone;
   `accept-count` / `max-connections` act before the executor and stay. `ManagementPortIsolationTest`
-  (backend and frontend) pins the executor type and the gauge's presence.
+  pins the executor type (backend and frontend) and the gauge's presence (all three apps).
   **No histogram on the in-flight timers** (owner decision 2026-09-23): the
   `percentiles-histogram[http.server.requests]` key matched the derived `.active` long-task timer
   by prefix and exported about fifty `_bucket` series per label set that nothing read. A

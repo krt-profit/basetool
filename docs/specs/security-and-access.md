@@ -771,7 +771,12 @@ implementation of the walk rather than one per consumer.
 trustworthy as the IP the frontend *resolves*. The frontend keeps `server.forward-headers-strategy:
 none` and registers `ForwardedHeaderFilter` explicitly (`ForwardedHeaderConfig`, ordered one slot
 after `ClientIpContextFilter`) so scheme/host are still rebuilt for the OAuth2 redirect URI and HSTS,
-**but** the client IP is resolved on the *raw* headers before that filter runs. `ClientIpContextFilter`
+**but** the client IP is resolved on the *raw* headers before that filter runs. The filter reads only
+the `X-Forwarded-*` family the edge sends: a standard `Forwarded` header and `X-Forwarded-Prefix`
+are hidden from the application and never applied, so neither can move host, scheme, address or
+context path (`ForwardedHeaderConfigTest`). A redirect without forwarded headers keeps a relative
+`Location` (`server.tomcat.servlet.use-relative-redirects: true`); behind the edge the filter resolves
+it against the public origin (`TomcatRedirectLocationTest`). `ClientIpContextFilter`
 (at `HIGHEST_PRECEDENCE`) honours `X-Forwarded-For` only when the immediate TCP peer matches
 `app.client-ip.trusted-proxies` (prod: `172.28.0.0/16`, the range every pinned container network is
 carved from — the edge sits on `net-proxy-frontend`) and then walks the chain right-to-left, skipping
@@ -810,9 +815,12 @@ DOS-1 collapse re-introduced on a code path the request-scoped filters do not re
   `/api/v1/orders` alone does not cover the `/items` child. Both required a login since ADR-0149;
   the per-IP budget is kept rather than deferred to the subject bucket, because an authenticated
   caller still arrives from an IP and the endpoint's cost is what the tight budget is about.
+- [x] The frontend's `ForwardedHeaderFilter` applies only `X-Forwarded-*`; a standard `Forwarded`
+  header and `X-Forwarded-Prefix` change nothing the application sees.
 
 **Enforced by:** `ClientIpRelayFilterTest`, `ClientIpContextFilterTest`, `ParallelPageLoaderTest`,
-`RateLimitingFilterTest` (`order-create` rule covers the `/orders/items` child path)
+`RateLimitingFilterTest` (`order-create` rule covers the `/orders/items` child path),
+`ForwardedHeaderConfigTest`, `TomcatRedirectLocationTest`
 · **Code:** `ClientIpRelayFilter` / `ClientIpContextFilter` / `ClientIpProperties` /
 `ForwardedHeaderConfig` / `RateLimitingFilter.resolveClientIp` / `ParallelPageLoader` /
 `WebClientConfig.sseWebClient` · **Issues:** security audit DOS-1, SEC-02, #1130, #1110
