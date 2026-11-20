@@ -67,11 +67,11 @@
                             <th:block th:case="'HOLDER_TRANSFER'">
                                 <th:block th:replace="~{bank/fragments/bank-request-linked :: holderRoute(${r})}"></th:block>
                             </th:block>
-                            <th:block th:case="*"><th:block th:text="${r.accountName()}">Staffel ALPHA</th:block><th:block th:if="${r.targetAccountNo() != null}" th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</th:block></th:block>
+                            <th:block th:case="*"><th:block th:text="${r.accountName()}">Staffel ALPHA</th:block><th:block th:if="${r.targetAccountName() != null}" th:text="' &#8594; ' + ${r.targetAccountName()}"> &#8594; Staffel BRAVO</th:block></th:block>
                         </span>
                     </div>
                     <span class="cell-sub">
-                        <span th:if="${r.accountNo() != null}" th:text="${r.accountNo()}">KB-0001</span>
+                        <span th:if="${r.accountNo() != null}" th:text="${r.accountNo()} + (${r.targetAccountNo() != null} ? ' &#8594; ' + ${r.targetAccountNo()} : '')">KB-0001 &#8594; KB-0002</span>
                         <th:block th:if="${!#strings.isEmpty(r.justification())}">
                             <span th:if="${r.accountNo() != null}" aria-hidden="true">&middot;</span>
                             <span class="bank-req-justification" data-testid="bank-request-justification"

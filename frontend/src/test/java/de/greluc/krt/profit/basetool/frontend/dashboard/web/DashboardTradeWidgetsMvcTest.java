@@ -231,6 +231,7 @@ class DashboardTradeWidgetsMvcTest {
         Instant.parse("2026-10-01T10:00:00Z"),
         null,
         null,
+        null,
         false,
         null,
         null,

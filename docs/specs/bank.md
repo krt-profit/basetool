@@ -1108,6 +1108,12 @@ shows the status alone
 > only „Ablehnen" in its ⋯ menu (rejection still needs visibility alone), loses the accent edge, and
 > no longer counts toward „n warten auf dich" (`BankRequestQueuePageController#awaitsTheCaller`). The
 > confirm endpoint itself is unchanged and still answers 403 when the capability is missing.
+>
+> **Amended 2026-11-20 — a transfer names its destination account:** the title of a transfer row
+> reads „Konto → Zielkonto" with the **display names** of both accounts, and its sub-line carries
+> both account numbers, „KB-0003 → KB-0018", ahead of the Begründung. `BankBookingRequestDto` gains
+> `targetAccountName` beside `targetAccountNo` for it, `null` wherever a request has no destination
+> account.
 
 A **bank employee** confirms or rejects a `PENDING` request under
 `/api/v1/bank/requests/**` (`BANK_EMPLOYEE` URL+method gate). **Confirmation** records the
@@ -1150,6 +1156,9 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
   opens the shared unified movement modal with a source-account selector and books directly via the
   existing endpoints — no new endpoint/audit/metric (frontend
   `BankRequestQueuePageControllerMvcTest`).
+- [x] A transfer row names its destination account by display name in the title and by number in
+  the sub-line beside the source account's number (`BankBookingRequestDtosTest`, frontend
+  `BankRequestsPatternRenderTest`).
 
 **Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest`, frontend `BankRequestQueuePageControllerMvcTest` · **Code:** `bank/internal/BankBookingRequestService`, `bank/web/BankRequestController`, frontend `bank/web/BankRequestQueuePageController`, `bank/web/BankProxyController`, `templates/bank/bank-requests.html`, `templates/bank/fragments/bank-movement-modal.html` · **Issues:** #666, #671, #672, #997
 
