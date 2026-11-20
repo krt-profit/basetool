@@ -25,7 +25,7 @@ RUN set -eu; \
     [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "Expected exactly one keycloak-spi-*.jar, got $#: '$*'" >&2; exit 1; }; \
     cp "$1" /app/keycloak-spi.jar
 
-FROM quay.io/keycloak/keycloak:26.8@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+FROM quay.io/keycloak/keycloak:26.8@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3
 COPY --from=spi /app/keycloak-spi.jar /opt/keycloak/providers/keycloak-spi.jar
 COPY keycloak-theme/krt-theme/ /opt/keycloak/themes/krt-theme/
 COPY docker/sandbox/keycloak/realm-basetool.json /opt/keycloak/data/import/realm-basetool.json

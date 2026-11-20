@@ -5,7 +5,7 @@ Requires=db-keycloak.service
 StartLimitIntervalSec=0
 
 [Container]
-Image=quay.io/keycloak/keycloak:26.8@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+Image=quay.io/keycloak/keycloak:26.8@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3
 ContainerName=keycloak
 LogDriver=journald
 ReadOnly=true
