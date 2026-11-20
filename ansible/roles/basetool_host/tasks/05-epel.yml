@@ -1,0 +1,44 @@
+---
+- name: Name the minor release EPEL is fixed to
+  ansible.builtin.set_fact:
+    basetool_host_epel_branch: "{{ ansible_facts['distribution_version'] }}"
+
+- name: Refuse a release that names no minor
+  ansible.builtin.assert:
+    that: basetool_host_epel_branch is match('^[0-9]+[.][0-9]+$')
+    fail_msg: >-
+      This host reports release '{{ basetool_host_epel_branch }}', which names no minor. EPEL keeps
+      a branch per minor release, and without one the choice falls back to dnf's variables, which
+      sent production to the CentOS Stream branch (REQ-OPS-062).
+    success_msg: "EPEL is fixed to {{ basetool_host_epel_branch }}"
+
+- name: Install the EPEL release package, for its signing key
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
+- name: Fix EPEL to the host's own minor release
+  ansible.builtin.copy:
+    dest: /etc/yum.repos.d/epel.repo
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [epel]
+      name=Extra Packages for Enterprise Linux {{ basetool_host_epel_branch }} - $basearch
+      metalink=https://mirrors.fedoraproject.org/metalink?repo=epel-{{ basetool_host_epel_branch }}&arch=$basearch
+      gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-{{ ansible_facts['distribution_major_version'] }}
+      gpgcheck=1
+      repo_gpgcheck=0
+      metadata_expire=24h
+      countme=1
+      enabled=1
+
+- name: Say what EPEL now serves this host
+  ansible.builtin.debug:
+    msg: >-
+      EPEL serves branch {{ basetool_host_epel_branch }}, this host's own minor, from a repo file
+      the role owns, so neither the packaged template nor a dnf variable decides it. A package
+      installed from a later branch stays until it is synced back: `check-conformance.py --only
+      epel-branch` names it, and `dnf distro-sync <name>` returns it to this branch's build. After
+      a minor upgrade of the host, run `--tags epel` again.

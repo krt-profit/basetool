@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-24.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0397](../adr/0397-the-edge-restarts-outside-the-applications-restart-window.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md), [ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0397](../adr/0397-the-edge-restarts-outside-the-applications-restart-window.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md), [ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)
 
 # Deployment delivery & promotion
 
@@ -1144,6 +1144,9 @@ firewall, and its kernel takes no routing advice from the network.
 - **fail2ban.** The `sshd` jail bans after 5 failures in 10 minutes for 1 hour, doubling per
   repeat up to a week, and keeps each ban for 8 days so the doubling has something to count.
   The `recidive` jail bans a source that was banned 3 times in a day on every port for a week.
+  The host carries `fail2ban-server`, `fail2ban-firewalld` and `fail2ban-systemd` and nothing else
+  of it: the `fail2ban` meta package's mail actions need an MTA (`exim` from EPEL), and the jails
+  ban through firewalld and mail nobody.
 
 **Acceptance**
 
@@ -1154,6 +1157,7 @@ firewall, and its kernel takes no routing advice from the network.
 - [ ] `check-conformance.py --only network-sysctls` passes: no redirect accepted or sent on `all`
   or any `eth*`/`en*` interface, `rp_filter` and `log_martians` on.
 - [ ] `fail2ban-client status sshd` and `fail2ban-client status recidive` both answer.
+- [ ] `rpm -q fail2ban fail2ban-sendmail exim` reports all three as not installed.
 
 **Enforced by:** `ansible/roles/basetool_host/tasks/65-firewall.yml` ·
 `ansible/roles/basetool_host/templates/basetool-network.sysctl.conf.j2` ·
@@ -3950,6 +3954,46 @@ itself restarts, or the host or haproxy does.
 (`scenario_podman_redefined_edge_restarts_alone_before_the_window`,
 `scenario_edge_reloads_a_renewed_certificate`, `scenario_edge_config_change_reloads_in_place`) ·
 **Related:** REQ-OPS-003, REQ-OPS-007, REQ-OPS-026, ADR-0397, ADR-0083, ADR-0162
+
+### REQ-OPS-062 — The host takes EPEL from its own minor release
+
+**Status:** Accepted
+
+EPEL keeps one branch per RHEL minor release, plus `10s` for CentOS Stream, one minor ahead, and
+the moving `epel-10`, which follows the newest RHEL minor. Its packaged repo file leaves the choice
+to dnf's variables, which resolved production to `10s` while the testing host was on `10` (#3517).
+On 2026-11-14 `dnf-automatic` installed `el10_4` builds of `exim`, `prometheus-podman-exporter` and
+`rclone` on a 10.3 host. Since Rocky's release package stopped shipping the `stream` variable
+(2026-11-18) both hosts resolve `epel-10`, which leaves their minor when RHEL publishes the next. A build for a later minor either fails to resolve against the host's
+libraries, and with `best=True` fails the whole run, or installs one nobody tested on this minor. A
+host that resolves another branch also stops rehearsing the other's package set.
+
+- **The role owns `/etc/yum.repos.d/epel.repo`** (`tasks/05-epel.yml`, tags `packages`, `epel`):
+  one enabled `[epel]` whose metalink names `epel-<VERSION_ID>`, the minor read from the host's own
+  facts at run time, never a dnf variable. `epel-release` stays installed for its signing key;
+  `rpm -V epel-release` reports `epel.repo` as a changed config file, and an update of the package
+  leaves it alone (`%config(noreplace)`).
+- **A release without a minor stops the run.** The role refuses to choose a branch it cannot name.
+- **A minor upgrade of the host is followed by `--tags epel`**, testing host first, so EPEL moves
+  with the release it serves.
+- **A package from a later branch is synced back by hand.** Fixing the branch does not downgrade
+  what is installed; `dnf distro-sync <name>` returns it to the host's branch, as a deliberate host
+  change.
+
+**Acceptance**
+
+- [x] `check-conformance.py --only epel-branch` asks the host's dnf for its repositories with the
+  variables resolved and fails when the release names no minor, no EPEL repository is enabled, an
+  enabled one resolves to another branch, or a package dnf took from EPEL carries a later minor's
+  dist tag (`check-conformance.test.sh`).
+- [x] On a Rocky 10.3 container the role's task file pins `epel-10.3`, a second run reports
+  `changed=0`, dnf fetches from `/epel/10.3/` and `epel-branch` passes.
+- [ ] `check-conformance.py --only epel-branch` passes against both hosts.
+
+**Enforced by:** `ansible/roles/basetool_host/tasks/05-epel.yml` · `scripts/check-conformance.py`
+(`epel-branch`) · `scripts/check-conformance.test.sh` · **Decision:**
+[ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
+Amendment 1 · **Related:** REQ-OPS-032, REQ-OPS-053, ADR-0163
 
 ## Open questions
 

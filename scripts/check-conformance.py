@@ -1776,6 +1776,130 @@ def check_security_updates_enabled(ctx: Context) -> str:
     return f"dnf-automatic.timer {enabled}/{active}, security-only, runtime excluded"
 
 
+# Runs on the host as the login account. Sets releasever, releasever_major and releasever_minor the
+# way dnf's own CLI does (dnf/cli/cli.py, _read_conf_file), so the repositories print resolved.
+EPEL_PROBE = """
+import platform
+import dnf
+import dnf.rpm
+
+base = dnf.Base()
+conf = base.conf
+releasever, major, minor = dnf.rpm.detect_releasevers(conf.installroot)
+conf.releasever = releasever
+if major is not None:
+    conf.releasever_major = major
+if minor is not None:
+    conf.releasever_minor = minor
+conf.substitutions.update_from_etc(conf.installroot, tuple(conf.varsdir))
+base.read_all_repos()
+print("VERSION_ID\\t" + platform.freedesktop_os_release().get("VERSION_ID", ""))
+for repo in base.repos.values():
+    urls = [repo.metalink or "", repo.mirrorlist or ""] + list(repo.baseurl)
+    print("\\t".join(["REPO", repo.id, str(int(repo.enabled))] + urls))
+base.fill_sack(load_system_repo=True, load_available_repos=False)
+for pkg in base.sack.query().installed():
+    print("\\t".join(["PKG", str(pkg), base.history.repo(pkg) or ""]))
+"""
+
+EPEL_DIST_TAG = re.compile(r"\.el(\d+)_(\d+)(?:\.|$)")
+
+
+def _epel_branch(url: str) -> str | None:
+    """Name the EPEL branch one repository URL points at.
+
+    A metalink or mirrorlist names it in its ``repo`` parameter (``epel-10.3``, ``epel-z-10.3``,
+    ``epel-10s``), a base URL in the path segment after ``/epel/``.
+
+    Args:
+        url: a metalink, mirrorlist or base URL with dnf's variables already resolved.
+
+    Returns:
+        The branch (``10.3``, ``10s``, ``10``), or ``None`` for a URL that is not EPEL's.
+    """
+    repo = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query).get("repo", [""])[0]
+    if repo.startswith("epel"):
+        return repo.rsplit("-", 1)[-1]
+    match = re.search(r"/epel/([^/]+)/", url)
+    return match.group(1) if match else None
+
+
+def check_epel_branch(ctx: Context) -> str:
+    """EPEL resolves to the host's own minor release, and nothing from a later one is installed.
+
+    Asks the host's dnf for its repositories with the variables resolved and compares every enabled
+    EPEL repository's branch with ``VERSION_ID``; then reads the dist tag of every installed package
+    dnf took from an EPEL repository. Runs without root; dnf reuses, or on a first run creates,
+    the login account's own cache directory under ``/var/tmp``.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming the branch and the repositories that resolve to it.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when the release names no minor, no EPEL repository is enabled, one resolves to
+            another branch, or a package from a later minor's branch is installed (REQ-OPS-062).
+    """
+    out = ctx.runner.run(f"python3 -c {shlex.quote(EPEL_PROBE)}", privileged=False)
+    version, resolved, from_epel = "", [], []
+    for line in out.splitlines():
+        fields = line.split("\t")
+        if fields[0] == "VERSION_ID" and len(fields) == 2:
+            version = fields[1].strip()
+        elif fields[0] == "REPO" and len(fields) >= 3 and fields[2] == "1":
+            branches = {b for b in map(_epel_branch, fields[3:]) if b}
+            resolved += [(fields[1], branch) for branch in sorted(branches)]
+        elif fields[0] == "PKG" and len(fields) == 3 and fields[2].startswith("epel"):
+            from_epel.append(fields[1])
+
+    host = re.fullmatch(r"(\d+)\.(\d+)", version)
+    if not host:
+        raise CheckFailed(
+            f"the host reports release {version or 'nothing'!r}, which names no minor -- EPEL "
+            "keeps a branch per minor, so there is no branch to fix it to"
+        )
+    if not resolved:
+        raise CheckFailed(
+            "no enabled EPEL repository -- node_exporter, the podman exporter, fail2ban, restic "
+            "and rclone come from EPEL and have no update source; run the role with --tags epel"
+        )
+
+    major, minor = int(host.group(1)), int(host.group(2))
+    wrong = [
+        f"{repo_id} resolves to EPEL {branch}, the host is {version}"
+        for repo_id, branch in resolved
+        if branch != version
+    ]
+    ahead = sorted(
+        nevra
+        for nevra in from_epel
+        if (tag := EPEL_DIST_TAG.search(nevra))
+        and int(tag.group(1)) == major
+        and int(tag.group(2)) > minor
+    )
+    problems = []
+    if wrong:
+        problems.append(
+            "; ".join(wrong) + " -- a build for another minor either fails to resolve against this "
+            "host's libraries or installs one nobody tested here; the role writes epel.repo for "
+            "the host's own minor (--tags epel)"
+        )
+    if ahead:
+        problems.append(
+            f"installed from a later EPEL branch than {version}: {', '.join(ahead)} -- "
+            "`dnf distro-sync <name>` returns each to this branch's build"
+        )
+    if problems:
+        raise CheckFailed("; ".join(problems))
+    repos = ", ".join(sorted({repo_id for repo_id, _ in resolved}))
+    return (
+        f"EPEL resolves to {version}, the host's own minor ({repos}); nothing from a later branch"
+    )
+
+
 def check_ssh_root_login_refused(ctx: Context) -> str:
     """sshd refuses root, admits only the named admin account, and only by key.
 
@@ -1907,6 +2031,7 @@ CHECKS: tuple[Check, ...] = (
     Check("containers-read-only", "REQ-OPS-014 / ADR-0190", True, check_containers_read_only),
     Check("host-exporter-versions", "REQ-OBS-005 / OPS-SEC-06", True, check_host_exporter_versions),
     Check("security-updates-enabled", "REQ-OPS-032", True, check_security_updates_enabled),
+    Check("epel-branch", "REQ-OPS-062", True, check_epel_branch),
     Check("ssh-root-login-refused", "REQ-OPS-052", True, check_ssh_root_login_refused),
     Check("network-sysctls", "REQ-OPS-053", True, check_network_sysctls),
 )
