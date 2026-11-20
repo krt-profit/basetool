@@ -61,3 +61,21 @@ excluded, and never reboots — and the host reports every run and every pending
 `reboot = when-needed` (an automatic outage of the only host, at a time nobody chose), pinning every
 package in the role (blocks the security fixes this exists to apply), and leaving patching manual (the
 status quo that nobody had decided).
+
+## Amendment 1 — skopeo moves with the runtime — 2026-11-20
+
+Rocky Linux 10.3's `containers-common-6:6.1` (Podman 6) declares `Conflicts: skopeo < 1:1.23`, so
+upstream treats skopeo as part of the runtime set. On EL that conflict never applies: skopeo's
+epoch is 2 on 10.2 and 3 on 10.3, and `2:1.22.2` compares above `1:1.23`. dnf would have left skopeo
+1.22.2 next to containers-common 6.1, the pairing upstream forbids. skopeo also requires
+`containers-common` and `podman-sequoia`, both already excluded (`podman-*`). With `best=True`, a
+skopeo advisory that needs a newer version of either would leave the whole unattended run unresolved.
+And `deploy.sh` resolves digests, reads labels and logs in with skopeo, so a skopeo change is a change
+to the promotion path that the testing host should rehearse first.
+
+**The decision (the owner's, in chat).** `skopeo` joins the exclusion list of item 2 and moves on the
+same deliberate maintenance as the runtime, testing host first; the manual runtime update names it,
+because no package relation pulls it along. `check-conformance.py`'s `security-updates-enabled` now
+requires every name of the list in `exclude`, not only `podman`.
+
+**Carried:** a skopeo security fix waits for that maintenance, the same trade as for podman.

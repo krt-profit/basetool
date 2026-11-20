@@ -2036,8 +2036,9 @@ ansible-playbook site.yml --limit production --tags updates         # dnf-automa
 (+ up to 15 minutes), the container runtime excluded, **never a reboot** (ADR-0199). A due reboot
 raises `HostRebootRequired`; take it as a maintenance — the stack comes back on its own, because the
 units are `WantedBy=default.target` and `basetool` lingers. The runtime (podman, crun, conmon, netavark,
-aardvark-dns, containers-common, passt) is updated by hand, testing host first:
-`dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt`.
+aardvark-dns, containers-common, passt, skopeo) is updated by hand, testing host first:
+`dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt skopeo`.
+Name skopeo every time: no package relation on EL pulls it along with podman (ADR-0199 Amendment 1).
 
 > [!success] Fixed by #2069 (2026-09-25): four failed `basetool-*` units after a reboot
 > Production was rebooted for kernel 6.12.0-211.58.1 on 2026-09-25 at 15:56 UTC; all 18 containers
