@@ -75,8 +75,8 @@ class P4kUploadGateTest {
     for (byte[] upload :
         new byte[][] {plain, P4kTestCatalogues.gzip(plain), P4kTestCatalogues.zstd(plain)}) {
       P4kAcceptedUpload accepted = gate().check(upload);
-      assertThat(accepted.uploadedBytes()).isEqualTo(upload.length);
-      assertThat(P4kCompression.detect(accepted.storedPayload()))
+      assertThat(accepted.getUploadedBytes()).isEqualTo(upload.length);
+      assertThat(P4kCompression.detect(accepted.getStoredPayload()))
           .isNotEqualTo(P4kCompression.PLAIN);
     }
     assertThat(meters.find(CatalogueMetricNames.P4K_IMPORT_REJECTED).counters()).isEmpty();
@@ -87,7 +87,7 @@ class P4kUploadGateTest {
     byte[] zstd = P4kTestCatalogues.zstd(P4kTestCatalogues.fixtureBytes());
 
     assertThat(windowLog(zstd)).isEqualTo(27);
-    assertThat(gate().check(zstd).storedPayload()).isEqualTo(zstd);
+    assertThat(gate().check(zstd).getStoredPayload()).isEqualTo(zstd);
   }
 
   @Test
@@ -198,6 +198,6 @@ class P4kUploadGateTest {
     P4kAcceptedUpload accepted =
         gate(1_000_000_000L, fixture.length).check(P4kTestCatalogues.bytes(root));
 
-    assertThat(accepted.uploadedBytes()).isGreaterThan(tailLength);
+    assertThat(accepted.getUploadedBytes()).isGreaterThan(tailLength);
   }
 }

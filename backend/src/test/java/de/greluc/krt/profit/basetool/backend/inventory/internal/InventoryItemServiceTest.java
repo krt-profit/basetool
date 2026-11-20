@@ -173,7 +173,6 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             requestScopeResolver,
             orgUnitStampingService,
-            inventoryAccessPolicy,
             new InventoryStockCommands(
                 new InventoryOrderWrites(
                     org.mockito.Mockito.mock(
@@ -742,7 +741,6 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             requestScopeResolver,
             orgUnitStampingService,
-            inventoryAccessPolicy,
             new InventoryStockCommands(
                 new InventoryOrderWrites(
                     org.mockito.Mockito.mock(

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import com.google.common.collect.ImmutableSet;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import java.util.Arrays;
@@ -41,47 +42,49 @@ import org.jetbrains.annotations.Unmodifiable;
 enum StockableItemGroup {
 
   /** Hand-held weapons, knives and gadgets such as multi-tools; grenades and flares are used up. */
-  FPS_WEAPONS(Set.of("WeaponPersonal"), Set.of("Grenade")),
+  FPS_WEAPONS(ImmutableSet.of("WeaponPersonal"), ImmutableSet.of("Grenade")),
 
   /**
    * Optics, barrels, underbarrel and utility attachments; magazines and missiles are ammunition.
    */
-  WEAPON_ATTACHMENTS(Set.of("WeaponAttachment"), Set.of("Magazine", "Missile")),
+  WEAPON_ATTACHMENTS(ImmutableSet.of("WeaponAttachment"), ImmutableSet.of("Magazine", "Missile")),
 
   /** Helmets, torso, arm and leg armour, backpacks and undersuits. */
   ARMOUR(
-      Set.of(
+      ImmutableSet.of(
           "Char_Armor_Helmet",
           "Char_Armor_Torso",
           "Char_Armor_Arms",
           "Char_Armor_Legs",
           "Char_Armor_Backpack",
           "Char_Armor_Undersuit"),
-      Set.of()),
+      ImmutableSet.of()),
 
   /** Jetpacks. */
-  JETPACKS(Set.of("Suit"), Set.of()),
+  JETPACKS(ImmutableSet.of("Suit"), ImmutableSet.of()),
 
   /**
    * Every ship component and ship weapon the Lager labels as a component (REQ-INV-061) except
    * turrets, which are fixed parts of their ship, plus ground-vehicle missile launchers.
    */
-  SHIP_COMPONENTS(shipComponentTypesWithoutTurrets("GroundVehicleMissileLauncher"), Set.of()),
+  SHIP_COMPONENTS(
+      shipComponentTypesWithoutTurrets("GroundVehicleMissileLauncher"), ImmutableSet.of()),
 
   /** Mining modules, mining gadgets and salvage modifiers. */
-  MINING_AND_SALVAGE_MODULES(Set.of("MiningModifier", "Gadget", "SalvageModifier"), Set.of()),
+  MINING_AND_SALVAGE_MODULES(
+      ImmutableSet.of("MiningModifier", "Gadget", "SalvageModifier"), ImmutableSet.of()),
 
   /** Self-storage containers such as the Stor*All boxes. */
-  STORAGE_CONTAINERS(Set.of("InventoryContainer"), Set.of()),
+  STORAGE_CONTAINERS(ImmutableSet.of("InventoryContainer"), ImmutableSet.of()),
 
   /** Comp-boards, server blades, passcode disks, keycards, access cards and data drives. */
-  ACCESS_CHIPS(Set.of("RemovableChip"), Set.of()),
+  ACCESS_CHIPS(ImmutableSet.of("RemovableChip"), ImmutableSet.of()),
 
   /**
    * Loot and collectibles such as artifacts, medals, ingots and creature parts; mineable gems are
    * materials and food is used up.
    */
-  LOOT(Set.of("Misc"), Set.of("Mineable", "Consumable"));
+  LOOT(ImmutableSet.of("Misc"), ImmutableSet.of("Mineable", "Consumable"));
 
   /** Every item type a group books, for {@link GameItemRepository#findStockable}. */
   @Unmodifiable
@@ -101,10 +104,10 @@ enum StockableItemGroup {
           .collect(Collectors.toUnmodifiableSet());
 
   /** The P4K item types of the group. */
-  @Unmodifiable private final Set<String> types;
+  @Unmodifiable private final ImmutableSet<String> types;
 
   /** The sub-types of the group's types that stay out of the Lager. */
-  @Unmodifiable private final Set<String> excludedSubTypes;
+  @Unmodifiable private final ImmutableSet<String> excludedSubTypes;
 
   /**
    * Tells whether a group covers an item of this type and sub-type, the single-item form of the
@@ -142,12 +145,13 @@ enum StockableItemGroup {
    */
   @NotNull
   @Unmodifiable
-  private static Set<String> shipComponentTypesWithoutTurrets(@NotNull String... furtherTypes) {
+  private static ImmutableSet<String> shipComponentTypesWithoutTurrets(
+      @NotNull String... furtherTypes) {
     return Stream.concat(
             Arrays.stream(ShipComponentType.values())
                 .filter(type -> type != ShipComponentType.TURRET)
                 .map(ShipComponentType::getWikiType),
             Arrays.stream(furtherTypes))
-        .collect(Collectors.toUnmodifiableSet());
+        .collect(ImmutableSet.toImmutableSet());
   }
 }

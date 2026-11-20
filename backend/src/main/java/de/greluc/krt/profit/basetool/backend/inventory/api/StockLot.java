@@ -45,7 +45,8 @@ public record StockLot(
     boolean stolen) {
 
   /**
-   * Returns the lot's key as {@link StockCommands#lockLots} and the change feed know it.
+   * Returns the lot's key as the lot locks of {@link StockCommands#prepareWrites} and {@link
+   * PoolEntryCommands#lockLots} and the change feed know it.
    *
    * @return the key: the catalogue id, location, quality and stolen marker
    */
