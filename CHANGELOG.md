@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+## [v1.26.4](https://github.com/krt-profit/basetool/releases/tag/v1.26.4) - 2026-11-20
+
+### Changed
+
+- **Plattform.** Die drei Anwendungen laufen auf Spring Boot 4.2. Der Standard-Header `Forwarded` wird
+  jetzt ignoriert; ausgewertet werden nur die `X-Forwarded-*`-Header des Proxys.
+
+- **Plattform.** Die drei Anwendungen laufen auf Java 27 statt auf Java 25.
+
+- **Bank-Anträge.** Eine Umbuchung nennt in der Antragsliste der Bankmitarbeiter das Zielkonto beim
+  Namen statt bei der Nummer. Die Nummern beider Konten stehen klein darunter.
+
+- **Verbundene Anwendungen.** Bei einer Umbuchung erhalten verbundene Anwendungen neben der Nummer
+  des Zielkontos auch dessen Namen, in den eigenen Bankanträgen und in der Antragsliste der
+  Bankmitarbeiter.
+
+### Fixed
+
+- **Updates.** Während eines Updates erscheint jetzt durchgehend die Wartungsseite statt einer
+  leeren Antwort. Nur wenn der Proxy selbst neu startet, gibt es noch zwei bis drei Sekunden ohne
+  Antwort.
+
+- **Zertifikate und Proxy.** Ein erneuertes Zertifikat oder eine geänderte Proxy-Konfiguration wird
+  jetzt ohne Unterbrechung geladen, statt den Proxy neu zu starten.
+
+- **Bank-Anträge.** In der Antragsliste der Bankmitarbeiter steht hinter dem Antragsteller nicht
+  mehr das Kürzel der Einheit, der das Konto gehört. Es sah aus wie die Einheit des Antragstellers.
+
+### Security
+
+- **Anmeldedienst.** Keycloak läuft auf dem neu gebauten Image 26.8.2-3 mit OpenJDK 21.0.13.1, das die
+  Java-Lücke CVE-2026-114938 („Java4Shell“) schließt. Keycloak startet beim nächsten Deploy einmal neu.
+
 ## [v1.26.3](https://github.com/krt-profit/basetool/releases/tag/v1.26.3) - 2026-11-19
 
 ### Changed
