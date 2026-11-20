@@ -1,4 +1,4 @@
-FROM eclipse-temurin:27-jdk-alpine@sha256:a63e42ef2a577cdb0802b73bb6f8fa2c3b0ebf1b4f00f29eb22e7f4d83b234f7 AS spi
+FROM eclipse-temurin:27-jdk-alpine@sha256:3ce6707ba035480069ff65d12265a8806d74fe9fd761987d183dd86362def451 AS spi
 WORKDIR /app
 COPY --chmod=755 gradlew .
 COPY gradle/ gradle/
@@ -30,6 +30,5 @@ COPY --from=spi /app/keycloak-spi.jar /opt/keycloak/providers/keycloak-spi.jar
 COPY keycloak-theme/krt-theme/ /opt/keycloak/themes/krt-theme/
 COPY docker/sandbox/keycloak/realm-basetool.json /opt/keycloak/data/import/realm-basetool.json
 COPY --chmod=755 docker/sandbox/keycloak/entrypoint.sh /opt/keycloak/bin/sandbox-entrypoint.sh
-ENV JAVA_OPTS_APPEND="-XX:-UseBASE64Intrinsics"
 ENTRYPOINT ["/opt/keycloak/bin/sandbox-entrypoint.sh"]
 CMD ["start-dev", "--import-realm", "--cache=local"]

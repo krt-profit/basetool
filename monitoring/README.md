@@ -717,9 +717,10 @@ the rule keeps parsing, keeps deploying and can never fire again. It was verifie
 **again on `…@sha256:2ca9adf4…` on 2026-09-25**, the digest `docker/app/Dockerfile` pins since #2035
 (steps 1–5; the #2035 bump itself had skipped it) and **again on `…@sha256:3c0a9084…` (Temurin
 25.0.4.1+1) on 2026-10-04** (steps 1–3 and 5; wording unchanged) and **again on
-`…@sha256:a0f3b523…` (Temurin 27.0.1.0.2+1) on 2026-11-19**, the digest `docker/app/Dockerfile` pins
-now (steps 1–3 and 5; wording unchanged, the recorded lines re-recorded from it). The next digest
-bump owes it again.
+`…@sha256:a0f3b523…` (Temurin 27.0.1.0.2+1) on 2026-11-19** (steps 1–3 and 5; wording unchanged, the
+recorded lines re-recorded from it) and **again on `…@sha256:51f686a5…` (Temurin 27.0.1.1+4) on
+2026-11-20**, the digest `docker/app/Dockerfile` pins now (steps 1–3 and 5; wording unchanged). The
+next digest bump owes it again.
 
 On a workstation, never on production:
 

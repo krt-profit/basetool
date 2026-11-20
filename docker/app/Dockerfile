@@ -1,6 +1,6 @@
 ARG MODULE
 
-FROM eclipse-temurin:27-jdk-alpine@sha256:a63e42ef2a577cdb0802b73bb6f8fa2c3b0ebf1b4f00f29eb22e7f4d83b234f7 AS build
+FROM eclipse-temurin:27-jdk-alpine@sha256:3ce6707ba035480069ff65d12265a8806d74fe9fd761987d183dd86362def451 AS build
 ARG MODULE
 ARG APP_VERSION=
 WORKDIR /app
@@ -53,9 +53,8 @@ RUN if [ "$MODULE" = backend ]; then \
     fi
 RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
 
-FROM eclipse-temurin:27-jre-alpine@sha256:a0f3b523fd89e242ce302715ce367f68e9073c59274e65746d0791c750f38de3 AS runtime
+FROM eclipse-temurin:27-jre-alpine@sha256:51f686a5322c0b762dff27e8e94b4b6582d7e71321d3a23b1f3c53b4078aabc5 AS runtime
 WORKDIR /app
-ENV JDK_JAVA_OPTIONS="-XX:-UseBASE64Intrinsics"
 
 RUN apk upgrade --no-cache \
     && addgroup -S -g 10001 app \
