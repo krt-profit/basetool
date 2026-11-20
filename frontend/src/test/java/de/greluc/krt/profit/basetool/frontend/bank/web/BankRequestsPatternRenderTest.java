@@ -329,6 +329,27 @@ class BankRequestsPatternRenderTest {
   }
 
   /**
+   * REQ-BANK-023: the requester column names the requester alone; the shorthand of the org unit
+   * that owns the account does not stand beside the name.
+   */
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void namesTheRequesterWithoutTheAccountsOrgUnit() throws Exception {
+    PageResponse<BankBookingRequestDto> page =
+        new PageResponse<>(
+            List.of(request(OPEN_ID, "WITHDRAWAL", false, false, null, null)),
+            0,
+            200,
+            1L,
+            1,
+            List.of());
+
+    assertThat(render(page, ""))
+        .containsPattern("data-testid=\"bank-request-requester\"[^>]*>talon<")
+        .doesNotContain("(ALP)");
+  }
+
+  /**
    * REQ-BANK-065: a pending deposit shows what the depositor transfers with the in-game fee, a
    * withdrawal does not.
    */
