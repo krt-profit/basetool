@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Actor;
@@ -204,9 +205,14 @@ class ExchangeBankQueueTest {
     assertThat(new TreeSet<>(transfer.path("account").propertyNames()))
         .containsExactly("id", "name", "no", "orgUnitShorthand");
     assertThat(new TreeSet<>(transfer.path("targetAccount").propertyNames()))
-        .containsExactly("id", "no");
+        .containsExactly("id", "name", "no");
     assertThat(transfer.path("targetAccount").path("id").asString())
         .isEqualTo(world.account(BankAccessMatrix.Account.CARTEL).toString());
+    assertThat(transfer.path("targetAccount").path("name").asString())
+        .isEqualTo(
+            entityManager
+                .find(BankAccount.class, world.account(BankAccessMatrix.Account.CARTEL))
+                .getName());
     assertThat(
             seeded(queue.path("open"))
                 .get(Request.CONFIRM_DEPOSIT_OWN)

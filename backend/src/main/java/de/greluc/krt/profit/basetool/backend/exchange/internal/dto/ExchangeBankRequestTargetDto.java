@@ -23,9 +23,11 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The destination account of a member's transfer request, by id and number only (REQ-BXCH-003).
+ * The destination account of a member's transfer request (REQ-BXCH-003).
  *
  * @param id the account's id, opaque to the client
  * @param no the {@code KB-<n>} account number
+ * @param name the account's display name
  */
-public record ExchangeBankRequestTargetDto(@NotNull UUID id, @NotNull String no) {}
+public record ExchangeBankRequestTargetDto(
+    @NotNull UUID id, @NotNull String no, @NotNull String name) {}

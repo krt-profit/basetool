@@ -79,8 +79,9 @@ public interface BankStaffQueueReads {
    *
    * @param id the account
    * @param no the {@code KB-<n>} account number
+   * @param name the display name
    */
-  record TargetRef(@NotNull UUID id, @NotNull String no) {}
+  record TargetRef(@NotNull UUID id, @NotNull String no, @NotNull String name) {}
 
   /**
    * One pending request, without the staff note, holder fields and every handle but the

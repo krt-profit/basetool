@@ -172,7 +172,9 @@ public class ExchangeBankQueueService {
         Math.max(0, Duration.between(item.createdAt(), now).toHours()),
         new ExchangeBankQueueItemDto.Account(
             account.id(), account.no(), account.name(), account.orgUnitShorthand()),
-        target == null ? null : new ExchangeBankQueueItemDto.Target(target.id(), target.no()),
+        target == null
+            ? null
+            : new ExchangeBankQueueItemDto.Target(target.id(), target.no(), target.name()),
         hidden ? null : item.requesterHandle(),
         item.justification(),
         item.note(),

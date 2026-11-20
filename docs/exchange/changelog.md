@@ -3,6 +3,13 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-20
+
+- **New: `name` on a transfer's `targetAccount`.** The destination account of a transfer carries its
+  display `name` beside `id` and `no`, in the member's own requests and in the staff queue, as the
+  request's `account` already did ([bank](resources/bank.md#own-requests)). New in
+  `bank-request.schema.json` and `bank-queue.schema.json`: the optional `targetAccount.name`.
+
 ## 2026-11-18
 
 - **Fixed: a merged material's id resolves again.** The `bt` of a material the Basetool merged into

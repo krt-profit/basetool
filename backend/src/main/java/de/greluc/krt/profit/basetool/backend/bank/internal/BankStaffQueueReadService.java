@@ -248,7 +248,9 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
             account.getAccountNo(),
             account.getName(),
             orgUnit == null ? null : orgUnit.getShorthand()),
-        target == null ? null : new TargetRef(target.getId(), target.getAccountNo()),
+        target == null
+            ? null
+            : new TargetRef(target.getId(), target.getAccountNo(), target.getName()),
         request.getRequestedBy(),
         request.getRequesterHandle(),
         request.getJustification(),

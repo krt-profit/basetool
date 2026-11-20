@@ -108,6 +108,7 @@ class ExchangeBankRequestRouteTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].status").value("PENDING"))
         .andExpect(jsonPath("$.items[1].targetAccount.no").value("KB-0001"))
+        .andExpect(jsonPath("$.items[1].targetAccount.name").value("KRT"))
         .andExpect(jsonPath("$.hasMore").value(true));
   }
 

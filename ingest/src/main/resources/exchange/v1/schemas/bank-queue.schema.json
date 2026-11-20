@@ -133,6 +133,11 @@
                 "no": {
                   "type": "string",
                   "maxLength": 32
+                },
+                "name": {
+                  "type": "string",
+                  "maxLength": 255,
+                  "description": "The destination account's display name."
                 }
               },
               "required": [

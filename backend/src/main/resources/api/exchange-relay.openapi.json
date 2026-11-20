@@ -4852,6 +4852,9 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "name" : {
+            "type" : "string"
+          },
           "no" : {
             "type" : "string"
           }
@@ -7774,6 +7777,9 @@
           "id" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
           },
           "no" : {
             "type" : "string"
