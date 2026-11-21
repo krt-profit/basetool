@@ -189,10 +189,10 @@ basetool_host_network_sysctls:
   net.ipv4.conf.all.log_martians: 1
   net.ipv4.conf.default.log_martians: 1
 basetool_host_network_interface_sysctls:
-  - net.ipv4.conf.{iface}.accept_redirects
-  - net.ipv4.conf.{iface}.secure_redirects
-  - net.ipv4.conf.{iface}.send_redirects
-  - net.ipv6.conf.{iface}.accept_redirects
+  net.ipv4.conf.{iface}.accept_redirects: 0
+  net.ipv4.conf.{iface}.secure_redirects: 0
+  net.ipv4.conf.{iface}.send_redirects: 0
+  net.ipv6.conf.{iface}.accept_redirects: 0
 basetool_host_network_interface_pattern: "^(eth|en)[0-9a-z]+$"
 
 basetool_host_fail2ban_enabled: true

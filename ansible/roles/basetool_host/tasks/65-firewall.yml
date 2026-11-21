@@ -49,19 +49,7 @@
     - basetool_host_manage_firewall | bool
     - item.rc | default(1) == 0
 
-- name: Start from the host-wide network sysctls
-  ansible.builtin.set_fact:
-    basetool_host_network_wanted: "{{ basetool_host_network_sysctls }}"
-
-- name: Add the per-interface ones, because redirects stay on while either the interface or all allows them
-  ansible.builtin.set_fact:
-    basetool_host_network_wanted: >-
-      {{ basetool_host_network_wanted
-         | combine(dict(basetool_host_network_interface_sysctls | map('replace', '{iface}', item)
-                        | zip_longest([], fillvalue=0))) }}
-  loop: "{{ ansible_facts.interfaces | select('match', basetool_host_network_interface_pattern) | sort }}"
-
-- name: Refuse redirects and spoofed sources in the kernel
+- name: Refuse redirects and spoofed sources in the kernel, on every interface whatever its name at boot
   ansible.builtin.template:
     src: basetool-network.sysctl.conf.j2
     dest: "{{ basetool_host_network_sysctl_file }}"
@@ -76,6 +64,18 @@
   when:
     - not ansible_check_mode
     - basetool_host_network_sysctl is changed
+
+- name: Start the read-back from the host-wide network sysctls
+  ansible.builtin.set_fact:
+    basetool_host_network_wanted: "{{ basetool_host_network_sysctls }}"
+
+- name: Add each physical interface's own, because redirects stay on while either the interface or all allows them
+  ansible.builtin.set_fact:
+    basetool_host_network_wanted: >-
+      {{ basetool_host_network_wanted
+         | combine(dict(basetool_host_network_interface_sysctls.keys() | map('replace', '{iface}', item)
+                        | zip(basetool_host_network_interface_sysctls.values()))) }}
+  loop: "{{ ansible_facts.interfaces | select('match', basetool_host_network_interface_pattern) | sort }}"
 
 - name: Read what the kernel actually runs with
   ansible.builtin.command:
@@ -93,8 +93,9 @@
     fail_msg: >-
       The kernel runs with
       {{ dict(basetool_host_network_wanted.keys() | zip(basetool_host_network_effective.stdout_lines)) }},
-      expected {{ basetool_host_network_wanted }}. A file later in /etc/sysctl.d sets one of them back:
-      sysctl.d reads in lexical order and the last value wins.
+      expected {{ basetool_host_network_wanted }}. Another sysctl.d file sets one of them back: the
+      last file in lexical order wins, and a key that names the interface beats this file's glob,
+      whichever file holds it.
   when: basetool_host_network_effective is not skipped
 
 - name: Put loopback in the trusted zone

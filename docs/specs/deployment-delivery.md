@@ -1166,10 +1166,14 @@ firewall, and its kernel takes no routing advice from the network.
   routes nothing. `LogDenied` stays `off`: the internet's background noise would put client
   addresses into the journal and Loki for 31 days without telling anyone anything new.
 - **Kernel.** `/etc/sysctl.d/90-basetool-network.conf` refuses ICMP redirects and sends none
-  (`all`, `default` **and** every physical interface — with forwarding off the kernel honours a
-  redirect when either `all` or the interface allows it, and IPv6 reads the interface value),
-  turns on strict reverse-path filtering and logs martians. The role reads the running values
-  back and refuses a run whose kernel does not run with them.
+  (`all`, `default` **and** every interface — with forwarding off the kernel honours a redirect
+  when either `all` or the interface allows it, and IPv6 reads the interface value), turns on
+  strict reverse-path filtering and logs martians. The per-interface keys are globs
+  (`net.ipv6.conf.*.accept_redirects`), so they reach an interface whatever it is called when
+  `systemd-sysctl` runs and stay with it through a later rename (ADR-0402). The role reads the
+  running values of every physical interface back and refuses a run whose kernel does not run
+  with them. It applies the file only when the file changed, so a boot that misses a key fails
+  the next run rather than being healed without a trace.
 - **fail2ban.** The `sshd` jail bans after 5 failures in 10 minutes for 1 hour, doubling per
   repeat up to a week, and keeps each ban for 8 days so the doubling has something to count.
   The `recidive` jail bans a source that was banned 3 times in a day on every port for a week.
@@ -1185,13 +1189,16 @@ firewall, and its kernel takes no routing advice from the network.
   `ports: 80/tcp 443/tcp`, with `forward: no`.
 - [ ] `check-conformance.py --only network-sysctls` passes: no redirect accepted or sent on `all`
   or any `eth*`/`en*` interface, `rp_filter` and `log_martians` on.
+- [ ] It still passes after a reboot of the testing host, whose NICs are renamed after
+  `systemd-sysctl` ran, and so does the role's read-back in a `--check --tags firewall` run.
 - [ ] `fail2ban-client status sshd` and `fail2ban-client status recidive` both answer.
 - [ ] `rpm -q fail2ban fail2ban-sendmail exim` reports all three as not installed.
 
 **Enforced by:** `ansible/roles/basetool_host/tasks/65-firewall.yml` ·
 `ansible/roles/basetool_host/templates/basetool-network.sysctl.conf.j2` ·
 `ansible/roles/basetool_host/templates/fail2ban-jail.local.j2` · `scripts/check-conformance.py`
-(`network-sysctls`) · **Runbook:** `docs/deployment.md` → *Management access*
+(`network-sysctls`) · **Decision:** ADR-0402 · **Runbook:** `docs/deployment.md` → *Management
+access*
 
 ### REQ-OPS-018 — Redis session store: durable persistence and a session-safe memory ceiling
 
