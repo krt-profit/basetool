@@ -403,6 +403,11 @@ repository password and the WebDAV app-password in `/etc/basetool/deploy/backup.
 only. Deliberately a different provider account from the host, so that losing one does not lose
 both. Procedure: [`docs/backup.md`](../backup.md).
 
+A PostgreSQL major moves through the same dump: each cluster is restored into a fresh cluster of the
+new major beside its old data directory, which stays untouched until the new one is verified, backed
+up and drilled (REQ-OPS-063, ADR-0399). Procedure:
+[`docs/postgres-major-upgrade.md`](../postgres-major-upgrade.md).
+
 ## 7.7 The retired Docker host
 
 The Docker Compose host that served production until 2026-09-22 is **shut down, not
