@@ -88,7 +88,7 @@ components in `krt-components.css`.
   | Token | Value | Used by |
   | --- | --- | --- |
   | `--z-popover` | 50 | overflow-menu and filter-popover panels |
-  | `--z-popover-raised` | 60 | the inventory allocation popover; an open row overflow menu on the bank pages |
+  | `--z-popover-raised` | 60 | the inventory allocation popover; a list-table row control whose popup is open (`aria-expanded="true"`) |
   | `--z-dropdown` | 99 | autocomplete list, searchable-select listbox |
   | `--z-sticky-head` | 900 | the mission detail's sticky head |
   | `--z-footer` | 999 | footer |
@@ -2093,7 +2093,12 @@ krt-profit/design-system#6), and every work page follows one of three patterns.
    clickable), numbers `.num`, status `.cell-status`, actions `.cell-actions`, a `.row-chevron` at
    the end — no column holding only an „Öffnen" button. Below 768 px a row stacks: title and status
    on the first line, the other cells as one meta line (a `data-label` prefixes its cell), a lone
-   chevron centred on the right; nothing scrolls sideways.
+   chevron centred on the right; nothing scrolls sideways. **Every point of a row opens its link**
+   on every width — meta cells, status and the chevron included; only the controls in
+   `.cell-actions` (and a control a page lifts the same way) catch a click themselves, and a
+   control whose popup is open stacks above the following rows. The chevron is Grau 1 at rest; on
+   row hover outside a control and on keyboard focus of the row link it turns house orange and the
+   `.cell-title` is underlined in house orange.
 7. **Filters** sit in a `.toolbar` (DS-5): the search always visible, a `.krt-segmented` control for two
    to four exclusive options (DS-6, REQ-UI-028), further filters behind „Filter" with a square `.filter-count`, active
    filters as `.filter-chips` with „Alle zurücksetzen". Filters apply live through `krtFetch`, never
@@ -2155,6 +2160,9 @@ pattern carries the same ids as its fragment — the bank's account filter is th
 
 *Amended 2026-10-04 (phase 5): `row-link` added; the ids pinned per pattern by
 `PagePatternTestIdsRenderTest`.*
+
+*Amended 2026-11-21: rule 6 pins the row link's hit area and its hover and focus cue
+(krt-profit/design-system List table); `RowLinkHitAreaE2eTest` checks both at 375 and 1280 px.*
 
 **Rollout.** Phase 0 (this requirement's foundation) ships the design-system update, the fragments,
 the scripts and the breakpoint gate; the list pages, the home page and the forms, the areas of the
