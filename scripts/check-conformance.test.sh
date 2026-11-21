@@ -203,6 +203,7 @@ esac
 
 emit_prom() { printf '{"status":"success","data":{"resultType":"vector","result":[%s]}}\n' "$1"; }
 sample() { printf '{"metric":{%s},"value":[0,"%s"]}' "$1" "$2"; }
+image_info() { printf 'podman_image_info{digest="sha256:00",id="%s",parent_id="",repository="ghcr.io/example/%s",tag="<none>"} 1\n' "$1" "$2"; }
 
 case "$cmd" in
   *"command -v podman"*)
@@ -398,6 +399,24 @@ case "$cmd" in
       session-net-intruder) printf 'redis-session\nfrontend\nredis-session-exporter\ningest\n' ;;
       session-net-empty)    : ;;
       *)                    printf 'redis-session\nfrontend\nredis-session-exporter\n' ;;
+    esac
+    ;;
+  *"ps --format '{{.ImageID}}'"*)
+    case "$scenario" in
+      no-containers) : ;;
+      *) printf '1a2b3c4d5e6f\nabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789\n1a2b3c4d5e6f\n' ;;
+    esac
+    ;;
+  *"podman_image_info"*)
+    case "$scenario" in
+      exporter-images-none) : ;;
+      exporter-images-stale)
+        image_info 1a2b3c4d5e6f backend
+        image_info 0f0f0f0f0f0f frontend ;;
+      *)
+        image_info 1a2b3c4d5e6f backend
+        image_info abcdef012345 frontend
+        image_info 0f0f0f0f0f0f ingest ;;
     esac
     ;;
   *"podman ps -a"*)
@@ -883,6 +902,20 @@ STUB_SCENARIO=exporter-drift assert_status \
 STUB_SCENARIO=exporter-down assert_status \
   "host-exporter-versions fails, rather than passes, when the version cannot be read" \
   host-exporter-versions fail "not readable" -- "${STUB_ARGS[@]}"
+
+STUB_SCENARIO=healthy assert_status \
+  "podman-exporter-images-current passes when every image in use is exported, a full id shortened" \
+  podman-exporter-images-current pass "reports all 2 image(s) in use" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=exporter-images-stale assert_status \
+  "podman-exporter-images-current fails when the exporter misses an image a container runs" \
+  podman-exporter-images-current fail "1 of 2 image(s) in use are not in the exporter's image list: abcdef012345" \
+  -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=exporter-images-none assert_status \
+  "podman-exporter-images-current fails, rather than passes, when the exporter reports no image" \
+  podman-exporter-images-current fail "reports no images" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=no-containers assert_status \
+  "podman-exporter-images-current skips when no container runs" \
+  podman-exporter-images-current skip "no container runs" -- "${STUB_ARGS[@]}"
 
 STUB_SCENARIO=healthy assert_status \
   "security-updates-enabled passes on an enabled, security-only, runtime-excluding setup" \
