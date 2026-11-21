@@ -1,3 +1,7 @@
-{% for key, value in basetool_host_network_wanted.items() %}
+{% for key, value in basetool_host_network_sysctls.items() %}
 {{ key }} = {{ value }}
+{% endfor %}
+{# A glob, not interface names: the value stays with an interface renamed after systemd-sysctl ran (REQ-OPS-053). #}
+{% for key, value in basetool_host_network_interface_sysctls.items() %}
+{{ key | replace('{iface}', '*') }} = {{ value }}
 {% endfor %}
