@@ -214,6 +214,8 @@ class JobOrderReferenceNeedsTest {
                     "NONE",
                     QualityTierFixtures.noneDto(),
                     120.0,
+                    120.0,
+                    0.0,
                     null,
                     List.of(),
                     null)));

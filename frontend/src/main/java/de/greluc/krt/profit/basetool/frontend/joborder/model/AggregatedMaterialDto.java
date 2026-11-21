@@ -31,9 +31,13 @@ import java.util.List;
  * @param material the aggregated material (carries {@code quantityType} for unit-aware display)
  * @param qualityRequirement the code of the bucket's quality tier
  * @param qualityTier the bucket's quality tier, with its labels and floor
- * @param totalQuantity the summed required quantity for this material+quality
- * @param currentStock the stock linked to the order for this material at or above the bucket's
- *     quality floor
+ * @param totalQuantity the outstanding required quantity for units not yet manufactured
+ * @param orderedQuantity the required quantity across every ordered unit, never reduced by
+ *     production or delivery
+ * @param manufacturedQuantity the share of {@code orderedQuantity} built into manufactured units,
+ *     delivered units included
+ * @param currentStock the stock linked to the order that counts toward this bucket's outstanding
+ *     demand
  * @param claims the per-squadron claims on this bucket; empty when no squadron has claimed
  * @param openAmount the uncovered outstanding demand less the claims, floored at 0
  */
@@ -43,6 +47,28 @@ public record AggregatedMaterialDto(
     String qualityRequirement,
     QualityTierDto qualityTier,
     Double totalQuantity,
+    Double orderedQuantity,
+    Double manufacturedQuantity,
     Double currentStock,
     List<ClaimDto> claims,
-    Double openAmount) {}
+    Double openAmount) {
+
+  /** A complete collection, in percent. */
+  private static final double COMPLETE_PERCENT = 100.0;
+
+  /**
+   * Returns the overview's collection progress (REQ-ORDERS-017): the linked stock plus the material
+   * built into manufactured units, as a share of the ordered quantity.
+   *
+   * @return the progress in percent, clamped to 0–100; {@code 0} when nothing is ordered
+   */
+  public double collectionProgressPercent() {
+    double ordered = orderedQuantity == null ? 0.0 : orderedQuantity;
+    if (ordered <= 0.0) {
+      return 0.0;
+    }
+    double stock = currentStock == null ? 0.0 : currentStock;
+    double built = manufacturedQuantity == null ? 0.0 : manufacturedQuantity;
+    return Math.clamp((stock + built) * COMPLETE_PERCENT / ordered, 0.0, COMPLETE_PERCENT);
+  }
+}

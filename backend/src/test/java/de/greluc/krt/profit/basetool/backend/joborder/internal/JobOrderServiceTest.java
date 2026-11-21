@@ -2019,6 +2019,8 @@ class JobOrderServiceTest {
                       "GOOD",
                       QualityTierFixtures.goodDto(),
                       10.0,
+                      15.0,
+                      5.0,
                       null,
                       List.of(),
                       null)));
@@ -2034,6 +2036,8 @@ class JobOrderServiceTest {
           4.0,
           result.aggregatedMaterials().get(0).currentStock(),
           "GOOD bucket sums order-linked inventory at the 650 floor as collection progress");
+      assertEquals(15.0, result.aggregatedMaterials().get(0).orderedQuantity());
+      assertEquals(5.0, result.aggregatedMaterials().get(0).manufacturedQuantity());
     }
   }
 

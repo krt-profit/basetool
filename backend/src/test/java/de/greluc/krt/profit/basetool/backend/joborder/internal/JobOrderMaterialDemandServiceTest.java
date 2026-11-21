@@ -263,6 +263,8 @@ class JobOrderMaterialDemandServiceTest {
                     "GOOD",
                     QualityTierFixtures.goodDto(),
                     600.0,
+                    600.0,
+                    0.0,
                     null,
                     List.of(),
                     null)));
