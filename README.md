@@ -358,12 +358,13 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 
 ### Project structure
 
-- **`backend`** — REST API only. Layered `controller` → `service` → `repository` → `model`, with `dto` records, MapStruct `mapper`s, `config`, `integration` (UEX), `task` (scheduled jobs), `filter`/`interceptor`.
+- **`backend`** — REST API only. A modular monolith: one package per domain (`mission`, `inventory`, `bank`, …) with `api` (what other modules use), `internal` and `web` (controllers), layered `web` → `internal` services → repositories → JPA entities, with `dto` records and MapStruct mappers ([`docs/specs/module-boundaries.md`](docs/specs/module-boundaries.md)).
 - **`frontend`** — Thymeleaf UI. `kernel.backend.BackendApiClient` is the single seam to the backend; Redis holds persistent session state.
 - **`ingest`** — internet-facing gateway (approved exchange clients, the SC Extractor included → basetool); owns no database, relays to the backend internally. The exchange API (`/exchange/v1`, `REQ-XCH-*`) is a published contract for clients approved one by one, not an open integration API — the interface is **restricted to approved clients** (`REQ-XCH-002`), and unapproved callers are refused `403 CLIENT_NOT_ALLOWED`.
 - **`keycloak-spi`** — Keycloak provider JAR: the Discord identity provider, the guild/role login gate, the `basetool-exchange` admin extension that ends one client inside shared sessions (ADR-0226) and the `krt-freemarker` login forms that show the device code on the consent page (ADR-0228).
 - **`keycloak-theme/krt-theme`** — custom Keycloak login + account UI theme.
 - **`logging-support`** — the one `LogSafe` and PII-masking layout/encoder all three applications ship and log through (ADR-0205).
+- **`technical-support`** — the shared normalization and observation-privacy algorithms the applications ship (ADR-0366).
 - **`test-support`** — test-only helper library shared by the backend and frontend anonymous-surface sweeps; never shipped.
 - **`scripts`** — server-side operations layer (deploy, env rendering, Quadlet generation, backup and restore drill, cleanup, host metrics) plus their systemd/logrotate units, and the CI gate scripts (`check-*`) with their self-tests.
 - **`quadlet`** — the generated Quadlet units (`systemd/`) and per-service env templates (`env.d/`); regenerate with `scripts/generate-quadlet.py`, never edit by hand.

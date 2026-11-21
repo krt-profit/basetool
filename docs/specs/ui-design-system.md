@@ -1009,16 +1009,12 @@ review for the rest · **Code:** `static/css/kernel/styles.css` (`.btn`, `.btn.b
 > and the touch block's selector list enumerates classes, so a control that opts out of `.btn` opted
 > out of the floor with it.
 >
-> **Corrected 2026-09-13: "every modal on the page" was true of one shape out of three.** The sweep
-> selected `.krt-modal-overlay` only — 42 roots — while 54 more lived in the two legacy shapes, so the
-> sweep was widened to all 96. The selector is declared once (`TouchClassLayoutE2eTest.MODAL_SHAPES`)
-> and used at all four sites that have to agree — the count, the probe's measurement loop, and the
-> un-hide and restore around the screenshot — because a modal the probe measures but the un-hide
-> never reveals is still `display: none`, returns 0×0 rects and is silently skipped.
->
-> *Updated 2026-09-22:* #1891 (ADR-0177) then ported all 54 onto the canonical shell and deleted both
-> legacy shapes, so `MODAL_SHAPES` now holds one entry. A **new** shape is detected at `check` time
-> by `SingleModalShapeTest` (REQ-UI-013), not by this hand-maintained list.
+> The modal selector is declared once (`TouchClassLayoutE2eTest.MODAL_SHAPES`, one entry since
+> ADR-0177) and used at all four sites that have to agree — the count, the probe's measurement loop,
+> and the un-hide and restore around the screenshot — because a modal the probe measures but the
+> un-hide never reveals is still `display: none`, returns 0×0 rects and is silently skipped. A
+> **new** shape is detected at `check` time by `SingleModalShapeTest` (REQ-UI-013), not by this
+> hand-maintained list.
 
 ### REQ-UI-022 — Standard action-button icons
 
@@ -1593,9 +1589,9 @@ in this order at the top of every file:
 @layer base, components, page, utilities;
 ```
 
-*Amended 2026-10-04 (REQ-UI-027 phase 4): the `migration` layer is gone with `inline-migration.css`,
-and the two state classes, renamed `is-hidden` and `is-open`, moved into a `utilities` block at the
-end of `styles.css`. The statements below about migrated classes describe 2026-09-23 to 2026-10-04.*
+There is no `migration` layer and no `inline-migration.css` (REQ-UI-027); the two state classes
+`is-hidden` and `is-open` sit in a `utilities` block at the end of `styles.css`. The statements below
+about migrated inline styles describe that former layer.
 
 | Layer | Holds |
 | --- | --- |
@@ -1611,8 +1607,8 @@ decide as before. So:
   (`main .form-group select`, `div.page-wrapper`, `.btn.btn-xs2`) and no `!important`: 27 page
   `!important`s existed only to win against `styles.css` and were removed.
 - **A design-system declaration that has to keep beating page CSS goes into the page-layer block at
-  the end of `styles.css`**, and into the table below with what it beats (amended 2026-09-25,
-  ADR-0214: this used to be a comment beside the rule). Inside that layer, specificity
+  the end of `styles.css`**, and into the table below with what it beats (ADR-0214), not into a
+  comment beside the rule. Inside that layer, specificity
   against the page stylesheets decides exactly as it did under load order. It does not go into
   `utilities`: that would also let it beat the page rules that deliberately out-specify it
   (`.krt-personal-inventory .form-group select`).
@@ -2158,11 +2154,8 @@ because an element has one `data-testid` and the smoke tests address the old one
 pattern carries the same ids as its fragment — the bank's account filter is the page's
 `toolbar-search`.
 
-*Amended 2026-10-04 (phase 5): `row-link` added; the ids pinned per pattern by
-`PagePatternTestIdsRenderTest`.*
-
-*Amended 2026-11-21: rule 6 pins the row link's hit area and its hover and focus cue
-(krt-profit/design-system List table); `RowLinkHitAreaE2eTest` checks both at 375 and 1280 px.*
+Rule 6 pins the row link's hit area and its hover and focus cue (krt-profit/design-system List
+table); `RowLinkHitAreaE2eTest` checks both at 375 and 1280 px.
 
 **Rollout.** Phase 0 (this requirement's foundation) ships the design-system update, the fragments,
 the scripts and the breakpoint gate; the list pages, the home page and the forms, the areas of the
@@ -2252,14 +2245,10 @@ request's approval path, the staff request queue filters by the status segment �
 Bestätigt · Abgelehnt · Alle" with „n warten auf dich", and the KRT approval thresholds are drawn as
 a tier bar (REQ-BANK-023, REQ-BANK-047).
 
-*Amended 2026-10-04: the terminal's location stands in the route line in brackets (it was a tooltip,
-invisible on touch screens; owner decision of the same day).*
-
-*Amended 2026-10-04: the profit calculation's route names its terminals.
 `GET /api/v1/materials/profit-calculation` answers each row with `buyTerminalName`,
 `buyTerminalLocation`, `sellTerminalName` and `sellTerminalLocation` — the terminals of the chosen
 lowest purchase and highest sale price, the first by name on a price tie, a location `null` when the
-terminal names no place.*
+terminal names no place.
 
 **Clean-up (phase 4, 2026-10-04):** `inline-migration.css` and its `<link>` in `kernel/fragments/head.html`
 are deleted. The last six one-off classes went to the design system or a page rule (the admin bank
@@ -2390,7 +2379,7 @@ descending; Verkauf starts descending, the others ascending; ties by terminal na
 material-demand page keeps its own three-step cycle (REQ-ORDERS-034)
 until it moves onto the helper.
 
-**Enforced by:** `:frontend:testTableSort` (`scripts/krt-table-sort.test.mjs`),
+**Enforced by:** `:frontend:testTableSort` (`frontend/scripts/krt-table-sort.test.mjs`),
 `MaterialsProfitCalculationRendersE2eTest`, `MaterialDetailPriceSortE2eTest` ·
 **Code:** `static/js/kernel/krt-table-sort.js`, `static/css/kernel/styles.css` (`.sort-header`),
 `templates/catalogue/materials-profit-calculation.html`,
@@ -2429,7 +2418,7 @@ and mission template forms also use the helper for their ordered draft rows. Eac
 the form locally and announces the new position. The final form submission persists the draft
 order (REQ-MISSION-015, REQ-MISSION-035, REQ-MISSION-037).
 
-**Enforced by:** `:frontend:testReorderJs` (`scripts/krt-reorder.test.mjs`),
+**Enforced by:** `:frontend:testReorderJs` (`frontend/scripts/krt-reorder.test.mjs`),
 `OrdersQueueReorderWithoutDragE2eTest`, `AdminFrequencyTypeReorderWithoutDragE2eTest` ·
 **Code:** `static/js/kernel/krt-reorder.js`, `templates/kernel/fragments/components.html`
 (`reorderControls`, `reorderLive`), `static/css/kernel/styles.css` (`.krt-reorder`),

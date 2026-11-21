@@ -7,7 +7,7 @@ them.
 
 The **backend** serves `/api/v1/...` and never HTML. The **frontend** renders Thymeleaf and holds
 no business logic; it reaches the backend through `kernel.backend.BackendApiClient` and the `webClient`
-bean beneath it (`config.WebClientConfig`): one filter chain with the OAuth2 bearer relay, the
+bean beneath it (`kernel.backend.WebClientConfig`): one filter chain with the OAuth2 bearer relay, the
 correlation, org-unit, locale and client-IP relays and the Resilience4j chain (ADR-0032), and on
 top of it the error mapping and the catalogue cache. Three further client beans do what that chain
 cannot: the anonymous terms client (same resilience chain, no bearer), the notification SSE relay
@@ -19,19 +19,13 @@ consumer, and that timeouts,
 retries, circuit breaking and bulkheads are configured in one place. ArchUnit tests enforce the
 direction: the frontend holds no JPA and no JDBC.
 
-*Corrected 2026-09-29:* this section said the frontend reaches the backend "through exactly one
-class" and that ArchUnit keeps the seam from growing a second one. Eleven controllers (byte
-downloads, multipart uploads, bulk deletes, one `Flux` listing) injected the `webClient` bean
-directly and lost `BackendApiClient`'s error mapping: an expired refresh token answered `500`
-instead of the re-authentication flow, and the failure was not counted. Since 2026-10-01 they call
-`BackendApiClient#execute` (same bean, same request shapes), and
-`ArchitectureTest#noControllerHoldsARawWebClient` keeps controllers off the raw client; the
-notification page's SSE relay is the one exception. Since 2026-10-03 `WebClientConfinementTest`
-extends that to every class — only `WebClientConfig` builds a client — and every backend client
-refuses any origin but the backend's before the bearer is attached (REQ-FE-029, §8.7). Since
-2026-10-04 (plan F1) only the kernel holds a client: the SSE relay and the live-sync probe reach
-theirs through `BackendSideChannels`, and every failure of a `BackendApiClient` call is mapped once,
-by `BackendErrorMapper`.
+Byte downloads, multipart uploads, bulk deletes and streamed listings go through
+`BackendApiClient#execute` too, so they keep its error mapping; `ArchitectureTest#noControllerHoldsARawWebClient`
+keeps controllers off the raw client, and `WebClientConfinementTest` extends that to every class —
+only `WebClientConfig` builds a client, and every backend client refuses any origin but the
+backend's before the bearer is attached (REQ-FE-029, §8.7). Only the kernel holds a client: the SSE
+relay and the live-sync probe reach theirs through `BackendSideChannels`, and every failure of a
+`BackendApiClient` call is mapped once, by `BackendErrorMapper`.
 
 *Trade-off accepted:* the frontend hand-mirrors the backend's DTOs rather than sharing a module,
 so a contract change has to be made twice. Two gates watch for drift (`FrontendDtoContractTest`,
@@ -39,8 +33,8 @@ so a contract change has to be made twice. Two gates watch for drift (`FrontendD
 
 ## 4.2 Put the internet-facing gateway in its own module
 
-**`ingest`** owns no database. It authenticates the desktop extractor, checks the client is an
-approved one, relays over the internal network to the backend under its own service identity, and
+**`ingest`** owns no database. It authenticates the desktop clients, the SC Extractor among them,
+checks the client is an approved one, relays over the internal network to the backend under its own service identity, and
 stages the returned draft in Redis for a one-time browser pickup — saving happens later, in the
 browser, through the ordinary create path. It also fronts the exchange API for approved
 third-party clients — token and DPoP gate, registry gate, limits, idempotency and the Redis budget —
@@ -51,7 +45,9 @@ rather than the module that holds every table.
 
 ## 4.3 Let Keycloak own identity, and centralise authorisation on `@PreAuthorize`
 
-The applications never see a password. Roles arrive in the JWT; every protected operation carries
+The applications never see a password. The four application roles are held in the Basetool's own
+`user_roles` table and resolved for the token's subject, never read from a token claim (ADR-0355,
+REQ-SEC-088); every protected operation carries
 an `@PreAuthorize` and authorisation lives in annotations rather than scattered `if` statements, so
 the permission model can be read off the code and diffed against
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md). Discord login is a Keycloak identity

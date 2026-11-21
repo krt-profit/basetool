@@ -164,8 +164,8 @@ something broke once.
     the `audit_event` rows of domain `PROMOTION`. The promotion objects V97, V99, V101, V105 and
     the rank-requirement-owner migration above name do not exist on a migrated schema.
 
-This timeline is curated, not exhaustive (checked against the directory on
-2026-09-27, tip V248). `ls | sort -V | tail -1` in this directory is the only reliable
+This timeline is curated, not exhaustive: it groups the files up to V249, and
+later ones appear only where a rule below needs them. `ls | sort -V | tail -1` in this directory is the only reliable
 answer to "what is the current tip?".
 
 ## Skipped version numbers
@@ -395,8 +395,8 @@ every existing database.
   `ForeignKeyIndexCoverageTest` fails the build otherwise (REQ-DATA-017).
 - [ ] If indexes were added, [`DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/profit/basetool/backend/db/DatabaseIndexMigrationTest.java)
   knows about them.
-- [ ] The change is mentioned in `CHANGELOG.md` under the right `### Added`
-  / `### Changed` / `### Removed` heading when it is user-visible.
+- [ ] A user-visible change has a `changelog.d/<name>.md` fragment headed `### Added`
+  / `### Changed` / `### Removed`; `CHANGELOG.md` itself is never edited.
 - [ ] Version numbering passes the `Commit & repo gates` CI check (no duplicate
   `V<n>`, new files numbered after the current tip on `main`, every gap listed
   under [Skipped version numbers](#skipped-version-numbers)). Run it

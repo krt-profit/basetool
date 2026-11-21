@@ -25,7 +25,7 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 | Q2 | Two members edit the same aggregate; the later write silently overwrites the earlier. | Optimistic locking → HTTP 409; the section-counter tests |
 | Q3 | Two members edit *unrelated sections* of the same aggregate and one gets a 409. | Treated as a defect: per-section counters (§8.4) |
 | Q4 | A member's name, e-mail or a token appears in a log line. | The unconditional logging rule; the Alloy masking gate (`alloy-log-masking` CI job) |
-| Q5 | The nightly backup reports success while its snapshot cannot actually be restored. | `restore-drill.sh` scores **seven** artifacts from the restored snapshot; `RestoreDrillArtifactNotRestorable` |
+| Q5 | The nightly backup reports success while its snapshot cannot actually be restored. | `restore-drill.sh` scores **eight** artifacts from the restored snapshot; `RestoreDrillArtifactNotRestorable` |
 | Q6 | A public name's certificate is within 14 days of expiry. | `CertificateExpiringSoon` on `probe_ssl_earliest_cert_expiry`; the certificate *files* are covered separately by the `basetool-cert-expiry` collector and `CertificateFileExpiringSoon` |
 | Q7 | A deploy applies an image whose signature does not verify. | `deploy.sh` Cosign-verifies every digest *before* pulling; fail-closed |
 | Q8 | A scheduled job silently stops running. | Per-timer `last_success_timestamp` metrics with staleness alerts |
@@ -39,14 +39,14 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 
 ## 10.3 What operationalises them
 
-- **223 alert rules** in six rule files — `apps`, `business`, `containers-runtime`,
-  `infrastructure`, `meta`, `ops-automation` — with `promtool` unit tests beside them, plus 14
+- **246 alert rules** in six rule files — `apps`, `business`, `containers-runtime`,
+  `infrastructure`, `meta`, `ops-automation` — with `promtool` unit tests beside them, plus 16
   LogQL alerts in the Loki ruler. The `meta`
   rules are the ones that matter most and are easiest to forget: they alert on the *monitoring
   itself* being silent, which is the failure mode that makes every other alert useless.
-- **Fourteen Grafana dashboards** — host, containers, Spring apps, PostgreSQL, Redis, Keycloak,
-  Basetool operations, edge, SSH host authentication, logs and errors, ops automation, meta
-  monitoring, tracing, exchange (per client).
+- **Fifteen Grafana dashboards** — host, containers, Spring apps, PostgreSQL, Redis, Keycloak,
+  Basetool operations, edge, SSH host authentication, logs and errors, ops automation, P4K
+  catalogue, meta monitoring, tracing, exchange (per client).
 - **A large blackbox probe fleet** — not just liveness: the deny rules, the members-only boundary,
   the public surface, HSTS, forced SSL, internal TLS, IPv6 and DNS (A and AAAA) for both public
   names.

@@ -8,14 +8,15 @@ Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-
 ## Context
 
 The Kartell bank already keeps an immutable, admin-only audit trail (REQ-BANK-012). The same
-guarantee is extended to twelve more areas — **Lagerverwaltung** (`InventoryItem`),
+guarantee is extended to the fifteen areas of `AuditDomain` — **Lagerverwaltung** (`InventoryItem`),
 **Auftragsverwaltung** (`JobOrder`), **Raffinerieverwaltung** (`RefineryOrder`), **Mein
 Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`, `MissionTemplate`), **Operationen** (`Operation`),
 **Rollen & Mitglieder** (`org_unit_membership`, epic #800), **Materialbörse** (`MaterialExchangeOffer` /
 `MaterialExchangeInterest`), **Hangar** (`Ship`), **Blueprints** (`PersonalBlueprint`,
-`DefaultBlueprint`), **Verbundene Anwendungen** (`ExchangeClient`, `ExchangeSettings`) and **Bedarf & Spenden** (`SupplyNeed`, `SupplyDonation`). Every
+`DefaultBlueprint`), **Verbundene Anwendungen** (`ExchangeClient`, `ExchangeSettings`), **Bedarf & Spenden** (`SupplyNeed`, `SupplyDonation`), **Ankauf**
+(`PURCHASING`), **Katalog** (`CATALOGUE`) and **Patchwechsel** (`PATCH_CHANGE`). Every
 activity in each area is captured into a separate, admin-only
-log; all thirteen logs (the twelve here plus the bank's) are read on one page with a tab switcher, and
+log; all sixteen logs (the fifteen here plus the bank's) are read on one page with a tab switcher, and
 each can be exported as a PDF or JSON for a chosen period.
 
 The generic areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
@@ -642,11 +643,6 @@ The types are offered by the viewer's per-area event-type list and labelled in D
 domain switches (purge marker, export marker) carry the case, and `basetool_audit_events_total{domain}`
 counts them (REQ-OBS-011).
 
-> [!note] Planned — the rest of the Katalog area (ADR-0346)
-> An admin's manual link of a P4K shop to a UEX terminal
-> ([ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md), #3028) adds its event type to
-> this domain when it is built.
-
 **Acceptance**
 
 - [x] For a representative mutation of each built activity above a test asserts exactly one
@@ -663,7 +659,7 @@ counts them (REQ-OBS-011).
   member row its owner-domain reassignment event (`MaterialMergeIntegrationTest`).
 - [x] The starmap links, the visibility overrides and the storage places on a starmap object record
   their events (`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`).
-- [ ] The shop link records its event (planned above).
+- [x] The shop link records its event (`P4kShopTerminalLinkTest`).
 
 #### The patch-change area (REQ-PATCH-009)
 

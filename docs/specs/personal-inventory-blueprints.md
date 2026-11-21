@@ -43,12 +43,6 @@ selection (listbox semantics: `role="listbox"`/`option`, `aria-selected`). Empty
 no-selection states use `.empty-state`. On viewports ≤1024px the layout collapses to list → detail
 navigation with a back button in the pane.
 
-*Amended 2026-10-03 (website overhaul phase 3):* the greeting, the facts subtitle and the add bar are
-gone — the add moved into a dialog, import and the extractor link into the page head, the delete-all
-into the ⋯ menu, and the second search (the old add bar's typeahead) into the dialog, so the page has
-one search. Corrected the same day: the collapse breakpoint read ≤900px; the code has used ≤1024px
-since before this amendment.
-
 The list loads the caller's **complete** owned set in one render — there is **no** server-side page
 cap (issue #823). The page controller pages the backend in chunks and concatenates until the last
 page, so the `.tab-count`, the segment's „Alle n" / „Craftbar n" counts and the instant client-side
@@ -80,13 +74,10 @@ band); the mock's `1 + (max−1)·q/1000` formula is explicitly NOT used. Slider
 view-only (no persistence). Blueprints without requirement groups fall back to the flat
 ingredient list with a dash. The note renders below the recipe only when present.
 
-*Amended 2026-10-03 (website overhaul phase 3):* „Erhalten am" and the „Herkunft" line became chips
-beside the name, and the craftability block sits between the head and the stat contribution.
-
 ### REQ-INV-010 — No regression of functions
 
 All previous functions stay: typeahead search + staging + batch add (in the „Blueprints
-hinzufügen" dialog since 2026-10-03); JSON import (file pick, preview modal „Import-Vorschau" with
+hinzufügen" dialog); JSON import (file pick, preview modal „Import-Vorschau" with
 „Alle auswählen" / „Auswahl aufheben" / „Anwenden", per-row search/notes); `?q=` server filter on
 load; note edit
 modal (optimistic-locking `version`, hidden `acquiredAt`, maxlength 2000); remove confirm
@@ -109,10 +100,6 @@ swaps the list in place, the list as a `.data-table` in a flush card, an empty c
 columns, per-row edit/delete icon buttons with the optimistic-locking `data-version` payload, UEX
 location typeahead, quantity sanitizing, CSRF hidden inputs, CSP nonces, and the inline re-render of
 the form modal on validation errors (`showItemModal`).
-
-*Amended 2026-10-03 (website overhaul phase 3):* the greeting with the facts subtitle („N Einträge")
-and the action bar with its „Filtern" button are gone; the page head, the toolbar search and the
-Blueprints tab count replace them.
 
 ### REQ-INV-016 — Default blueprints are auto-granted to every user and non-removable
 
@@ -271,10 +258,9 @@ and a global sharer is counted once.
   are unchanged), and the owner is exposed by display name only.
 - [ ] An owner shown only via global sharing is rendered with a discreet "not a unit member"
   marker in both the availability drill-down and the order-coverage view; a genuine member of the
-  relevant unit is not marked. *Amended 2026-10-03 (website overhaul phase 3):* on the availability
-  overview the owner is a chip, and the marker is a dashed grey chip whose tooltip carries the
-  explanation and whose screen-reader text carries „kein Einheitsmitglied" — the words are no longer
-  printed visibly there.
+  relevant unit is not marked. On the availability overview the owner is a chip, and the marker is
+  a dashed grey chip whose tooltip carries the explanation and whose screen-reader text carries
+  „kein Einheitsmitglied" — the words are not printed visibly there.
 - [ ] Given a user who never opts in, then they are counted only in their own org units
   (unchanged behaviour).
 
@@ -378,15 +364,7 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   the swapped list fragment, so its state survives an add / import / remove re-render. Both are
   remembered per browser (`localStorage` `personal_blueprints_toggles`). Follows the DAS KARTELL
   master-detail design, responsive across all four device classes, all strings via i18n (de + en +
-  fallback).
-
-  *Amended 2026-10-03 (website overhaul phase 3):* the badges `×N` / `fehlt` / `×N ⟢`, the refinery
-  checkbox and the „Nur craftbare anzeigen" checkbox are replaced by the dot + „3×", the switch and
-  the segment; the detail's counter and per-material breakdown became the key-figure block and the
-  ingredients table.
-
-  *Amended 2026-10-04 (owner decision):* the short stock cell shows the missing amount again
-  („fehlt n“, in the material's unit) beneath the available amount.
+  fallback). The missing amount of a short stock cell is in the material's unit.
 
 **Acceptance criteria:**
 
@@ -547,8 +525,7 @@ caller's **entire removable owned-blueprint set** in one action, so a user who w
   form write goes through `krtFetch.submitForm` (the form-write standard, REQ-FE-002) and the
   collection card re-renders in place (REQ-FE-001/005) with a "{n} Blueprints entfernt" toast — no
   full-page reload; the classic `POST → redirect` is the no-JS fallback. The control is the danger
-  item „Alle löschen …" in the page head's ⋯ menu (a danger button beside the add bar until
-  2026-10-03); it hides itself once nothing removable remains (it lives outside the swapped
+  item „Alle löschen …" in the page head's ⋯ menu; it hides itself once nothing removable remains (it lives outside the swapped
   fragment, so `recountAndSync` re-toggles it on every list swap).
 - **Not audited.** Personal blueprints are not part of the audited `PERSONAL_INVENTORY` area (which
   covers `PersonalInventoryItem` stock only); like the existing single remove, the bulk clear logs at
@@ -570,9 +547,6 @@ caller's **entire removable owned-blueprint set** in one action, so a user who w
 [`PersonalInventoryBlueprintsPageController#deleteAll`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints.js)
 (`submitDeleteAll`).
-
-*Amended 2026-10-03 (website overhaul phase 3):* the control is the ⋯ menu item „Alle löschen …"
-instead of a danger button in the add bar; confirm, scope and write path are unchanged.
 
 ### REQ-INV-024 — Admin "delete all users' blueprints" global purge
 
@@ -643,9 +617,6 @@ search for it.
 
 **Code links:** [`blueprint/personal-inventory-blueprints.html`](../../frontend/src/main/resources/templates/blueprint/personal-inventory-blueprints.html),
 [`PersonalInventoryBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageControllerMvcTest.java).
-
-*Amended 2026-10-03 (website overhaul phase 3):* the link moved from a ghost button in the add bar
-into the page head's ⋯ menu; label, tooltip, target and `rel` are unchanged.
 
 ### REQ-INV-051 — Every blueprint mutation is audited
 

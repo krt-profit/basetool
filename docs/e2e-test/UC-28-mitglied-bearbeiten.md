@@ -4,8 +4,8 @@
 |----------------|------------------------------------------------------------------------------------------------------------------------------------|
 | **ID**         | UC-28                                                                                                                              |
 | **Tag**        | `e2e`                                                                                                                              |
-| **Testklasse** | [`MemberEditInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MemberEditInPlaceE2eTest.java) |
-| **Spec**       | REQ-FE-007 (In-Place-Save), [`role-model.md`](../specs/role-model.md)                                                              |
+| **Testklasse** | [`MemberEditInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MemberEditInPlaceE2eTest.java) · [`MemberHangarE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MemberHangarE2eTest.java) |
+| **Spec**       | REQ-FE-007 (In-Place-Save), [`role-model.md`](../specs/role-model.md) · [`personal-hangar-overview.md`](../specs/personal-hangar-overview.md) (REQ-HANGAR-011/-012) |
 
 ## Akteur
 
@@ -30,11 +30,17 @@ Der Admin öffnet die Editseite des Mitglieds und speichert einen geänderten Ra
 
 4. Als Zielmitglied dient `test-member`, der ohne Staffel-Mitgliedschaft geseedet ist: der Button „Zweite Staffel hinzufügen" ist sichtbar, Slot 2 versteckt. Klick auf den Button.
 
+### Hangar eines Mitglieds (`MemberHangarE2eTest`, REQ-HANGAR-011/-012)
+
+5. Von der Editseite den Hangar des Mitglieds öffnen, dort ein Schiff anlegen, bearbeiten und löschen, dann die Einheit eines und mehrerer Schiffe ändern.
+
 ## Erwartetes Ergebnis
 
 Der Save landet: kein Fehler-Toast, kein Optimistic-Lock-Reload-Dialog (`.krt-confirm-overlay`), der Marker `window.__krtNoReload` überlebt, und der per Backend gelesene Rang (`GET /api/v1/users/{id}`) entspricht dem gesetzten Wert.
 
 Nach dem Klick auf „Zweite Staffel hinzufügen" ist der zweite Staffel-Slot tatsächlich sichtbar (REQ-ORG-017). Das ist ein reiner Client-Toggle ohne Schreibzugriff. Regressionsschutz für die Falle Klasse vs. Inline-Stil (ADR-0093): Slot 2 startet über die Klasse `is-hidden` (bis 2026-10-04 `krtm-hidden`) verborgen; ein früherer Versuch, das per Inline-`style.display` zu überschreiben, ließ den Button verschwinden, während der Slot versteckt blieb.
+
+Jeder Schritt im Mitglieder-Hangar läuft in place (REQ-FE-001): die Tabelle zeigt das angelegte, geänderte und gelöschte Schiff und die neue Einheit ohne Reload.
 
 ## Sonderfälle & Lehren
 

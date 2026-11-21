@@ -381,8 +381,9 @@ plan guard G-25
 
 Roles: `ADMIN`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles, which the
 matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159) and **`OFFICER` is not one of
-them since `V318`** (ADR-0300): there is no role below member, and a token that maps to none of
-these is refused with `403 NO_ROLE` (REQ-SEC-053).
+them since `V318`** (ADR-0300): there is no role below member. The roles are the ones stored for
+the account in `user_roles`; a realm-role claim in the token is ignored (REQ-SEC-088). A caller whose
+account holds none of them is refused with `403 NO_ROLE` (REQ-SEC-053).
 Hierarchy (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, and on
 the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **never**
 `MISSION_MANAGER > LOGISTICIAN`, which is why a mission manager is inside the peer-redaction tier
@@ -406,8 +407,8 @@ the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **n
 - **Membership rights rest on `KRT_MEMBER`.** The member-list URL rules and `MEMBER_OR_ABOVE` no
   longer list `OFFICER`; the oversight scope no longer adds every squadron membership of a role
   holder.
-- **The realm role is ignored, then deleted.** The role catalogue holds no `Officer` role, so
-  `UserReconciliationService` maps no `OFFICER` realm role onto a local one and
+- **The realm role is ignored, then deleted.** The role catalogue holds no `Officer` role,
+  `UserReconciliationService` maps no realm role onto a local one (REQ-SEC-088), and
   `CustomJwtGrantedAuthoritiesConverter` mints no `ROLE_OFFICER` from any source. The provisioning
   script deletes the realm role (ADR-0202 amendment 6); the test realms, the e2e realm export and
   the sandbox realm dropped it.
@@ -426,7 +427,7 @@ the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **n
   report for the OFFICER retirement*.
 
 **Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (no `ROLE_OFFICER` from a realm role or
-a seat), `UserReconciliationServiceTest` (an `Officer` realm role is not mirrored),
+a seat), `UserReconciliationServiceTest` (a realm-role claim leaves the stored roles unchanged),
 `SecurityConfigTest` (no `OFFICER` edge), `OfficerCutMigrationTest` (the
 removed role with its rows, the moved notification selectors) · **Related:** REQ-ROLE-002,
 REQ-SEC-015, REQ-SEC-047, ADR-0300
@@ -494,7 +495,7 @@ Officer reach or a contextual Mission Manager grant in that active owning unit q
 to the active pin (REQ-MISSION-035, REQ-ORG-032). A flat role alone grants no unit access.
 `isMissionManagerOrAbove` is pin-aware: the grant in the pinned unit, or in any unit when none is
 pinned (`RequestScopeResolver#canActAsMissionManagerInActiveContext()`); the frontend gates read it
-through `MissionManagerGate`. **Enforced by:** `ScopeKernelTest.MissionManagerGateTests`,
+through `MissionManagerGate`. **Enforced by:** `ScopeKernelTest.MissionManagerGrantTests`,
 `MissionAccessPolicyGateTest`, `MissionAccessPolicyPinnedAdminTest`, `OperationServiceTest`,
 `MeControllerTest`, `MissionManagerGateTest`.
 
@@ -608,11 +609,8 @@ For **every non-admin** — a plain member, a Logistician, a Mission Manager or 
 own profile — never elsewhere.) The naming convention is enforced structurally by the ArchUnit rule
 `peerReadableMissionEndpointsMustRedactPii`.
 
-> **Amended 2026-09-06 (ADR-0159).** This requirement had **two** tiers: the member-peer one above,
-> and a stricter *outsider* tier (`cleanupOutsiderMissionForGuest`) that additionally hid the
-> free-text description and each participant's payout preference and comment, for anonymous and
-> role-less `GUEST` callers. Both audiences are gone (REQ-SEC-052, REQ-SEC-053), so the tier went
-> with them and `MissionGuestRedactor` became `MissionPeerRedactor`.
+The member-peer shape is the only tier (ADR-0159): there are no anonymous or role-less `GUEST`
+callers to redact for (REQ-SEC-052, REQ-SEC-053), and `MissionPeerRedactor` applies it.
 
 **The mission's owner and managers are visible to everyone who may see the mission**, in the peer shape of
 this requirement (names and rank, no admin fields; the username only when no display name is set). They are
@@ -641,16 +639,12 @@ no longer limited to a caller who may manage the mission.
 
 ### REQ-SEC-009 — The member surface
 
-> **Approved planned JobOrder amendment (not implemented):** The approved shared JobOrder access replacement is [the approved shared JobOrder contract](orders-core.md): actual active Profit hierarchy, direct Profit-Bereich responsibility, full relevant order reads for the agreed unit/personal audiences, and contextual unit writers. Remove the independent Staffel/SK flag and requester redaction/freeze only in that planned scope. Invalid responsibility permits reading/transfer only; personal read relationships do not grant general writes, unrelated inventory, blueprint ownership, private bank data or Admin audit.
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
-
 Every caller of the tool is a **member**. There is no cohort below that: an anonymous caller reaches
 only the paths REQ-SEC-052 enumerates, and an authenticated token that maps to no application role is
 refused with `403 NO_ROLE` (REQ-SEC-053).
 
 `AuthHelperService.isMemberOrAbove()` remains the membership predicate (true for
-`ADMIN`/`OFFICER`/`MISSION_MANAGER`/`LOGISTICIAN`/`KRT_MEMBER`/`MEMBER`). It is deliberately still a
+`ADMIN`/`MISSION_MANAGER`/`LOGISTICIAN`/`KRT_MEMBER`, `Roles.MEMBER_OR_ABOVE`). It is deliberately still a
 different question from `isAuthenticated()`: the gap between the two has shrunk to the
 PENDING/REJECTED registration and to whatever authority set a future integration introduces, and the
 questions that ask about membership — the mission description (REQ-SEC-041), the live-sync rooms —
@@ -1115,11 +1109,10 @@ out) — so neither edge that reaches it is cleartext:
   JWKS decoder) speaks HTTP/1.1 and is bounded by the connect and read timeouts of
   `RestClientConfig` (5 s / 30 s), so a hung Keycloak cannot hold a request thread unbounded; the
   ingest copy uses 5 s / 10 s.
-  *(Corrected 2026-09-22, ADR-0204: this used to say the JDK `HttpClient` cannot disable hostname
-  verification per client. Its API cannot, but a trust manager can — JSSE does endpoint
-  identification inside an `X509ExtendedTrustManager` — and that is how the ingest relay, now on the
-  same JDK client, keeps its no-hostname-check `backend-trust` posture. The Keycloak admin client
-  does not use it: verifying the name here is the intent, not a limitation.)*
+  The JDK `HttpClient` API cannot disable hostname verification per client, but a trust manager
+  can — JSSE does endpoint identification inside an `X509ExtendedTrustManager` — and that is how
+  the ingest relay, on the same JDK client, keeps its no-hostname-check `backend-trust` posture
+  (ADR-0204). The Keycloak admin client does not use it: verifying the name here is the intent.
 
 The management/health interface (port 9000) is exempt: it stays HTTP via
 `--http-management-scheme=http` because the Quarkus image ships no TLS-capable CLI client for the
@@ -1661,13 +1654,11 @@ from masquerading as an application outage (the failure mode that drove the fron
   confusion). Empty (the default) preserves the auto-configured, issuer-derived decoder
   byte-for-byte — the knob is off until an operator opts in, and the `test` profile's placeholder
   issuer is unaffected.
-  *(Corrected 2026-09-23: the backend's production environment never carried the variable —
-  neither `docker-compose.yml` nor the Quadlet `env.d` template passed it — so the opt-in could not
-  be taken in production. It now reaches the backend as `KEYCLOAK_JWK_SET_URI` from the host's
+  In production the value reaches the backend as `KEYCLOAK_JWK_SET_URI` from the host's
   `BASETOOL_BACKEND_KEYCLOAK_JWK_SET_URI`, empty by default; the runbook is
   [`deployment.md` → *Internal JWKS for the backend*](../deployment.md#internal-jwks-for-the-backend).
   The ingest gateway reads the same property but sits on no network that reaches Keycloak, so it is
-  not wired.)*
+  not wired.
 - **The knob lives on `app.security.jwt.*` and MUST NOT be declared under Spring's
   `spring.security.oauth2.resourceserver.jwt.jwk-set-uri`.** The two keys look interchangeable and
   behave oppositely when blank. The application's own key is read by
@@ -1766,20 +1757,18 @@ is a weaker CSRF model than the retained server-side synchronizer token + `SameS
 ADR-0088). Runaway regression is caught by `ActiveSessionsRunaway`
 ([`observability.md`](observability.md)).
 
-**The cookie is `SameSite=Lax`, deliberately (corrected 2026-10-03).** This requirement used to
-say `SameSite=Strict`, and `application.yml` configured it — but the value never reached the
-browser. Spring Session writes the session cookie with its own `CookieSerializer`; with no such
-bean it builds one from the servlet `SessionCookieConfig`, which carries no `SameSite`, and falls
-back to `Lax`. Boot's mapping of `server.servlet.session.cookie.same-site` sits in
-`spring-boot-session`, which the frontend does not depend on. Production therefore emitted `Lax`
-for as long as it has used Spring Session. The owner chose to keep `Lax`: under `Strict` the
+**The cookie is `SameSite=Lax`, deliberately.** Spring Session writes the session cookie with its
+own `CookieSerializer`; with no such bean it builds one from the servlet `SessionCookieConfig`,
+which carries no `SameSite`, and falls back to `Lax`. Boot's mapping of
+`server.servlet.session.cookie.same-site` sits in `spring-boot-session`, which the frontend does
+not depend on. The owner chose `Lax`: under `Strict` the
 browser withholds the cookie on any top-level navigation started on another site, so the return
 from the Discord consent screen would lose the saved OAuth2 authorization request
 (`authorization_request_not_found`), and a link opened from Discord in a browser or from webmail
 would arrive without the session, start a fresh one that overwrites the member's cookie, and land
 on `/?error`. CSRF protection does not rest on the attribute: the synchronizer token
 (REQ-SEC-010) carries it, and `Lax` already withholds the cookie from cross-site `POST`s,
-subresources and frames. `SessionCookieSerializerConfig` now builds the serializer from
+subresources and frames. `SessionCookieSerializerConfig` builds the serializer from
 `server.servlet.session.cookie.*`, so every configured attribute is the emitted one.
 
 **The cookie is `__Host-SESSION` (FE-SEC-06, 2026-09-22).** The session cookie was called
@@ -1789,8 +1778,7 @@ sibling subdomain and no plain-http response can plant or overwrite the session 
 into a session-fixation). All three conditions already held; the prefix makes the browser enforce
 them. It also makes them load-bearing: a `domain:`, a non-root `path:` or `secure: false` in any
 profile would not weaken the cookie quietly — the browser would drop it and every login would fail.
-The rename drops every live session once, at the deploy that ships it — release **1.11.0**, not yet
-on production as of 2026-09-25: the old `SESSION` cookie names nothing the app reads any more, so
+The rename drops every live session once, at the deploy that ships it — release **1.11.0**: the old `SESSION` cookie names nothing the app reads any more, so
 each member signs in again exactly once (the Redis entries behind the old cookies simply age out;
 no flush). The owner approved that trade.
 
@@ -2225,12 +2213,9 @@ against `PathContainer.parsePath(...)`. It MUST NOT use `HttpServletRequest#getR
 (REQ-XCH-001): the backend's `ActingMemberFilter` list of `/api/v1/exchange/**` routes and the
 gateway's `ExchangeRoutes` table are parsed `PathPattern`s matched against a parsed path.
 
-> **Amended 2026-09-28 (#2092 step 9).** The acting-member bound used to name two more endpoints,
-> `POST /api/v1/refinery-orders/import-extract` and `POST /api/v1/personal-blueprints/import/preview`,
-> which the SC Extractor's `/v1` relay called with the member's full stored authorities. That relay
-> is removed, so `ActingMemberFilter` accepts an acting member on the exchange routes alone; the two
-> import endpoints stay for the web and refuse the header as `endpoint_not_bound`. The gateway's
-> client-identity gate, one of the four ingest-scoped filters below, went with the relay.
+`ActingMemberFilter` accepts an acting member on the exchange routes alone; the web import endpoints
+`POST /api/v1/refinery-orders/import-extract` and `POST /api/v1/personal-blueprints/import/preview`
+refuse the header as `endpoint_not_bound`.
 
 `getRequestURI()` is the **raw, still percent-encoded** URI per the servlet spec, while Spring MVC
 routes on the **decoded** path. The two therefore disagree, and the disagreement is exploitable in
@@ -3175,7 +3160,7 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 > [!note] Amended 2026-09-12 (ADR-0162) — the allow-list lives in this repository
 > Until 2026-09-12 the allow-list was a block in the rollout runbook that a human pasted into Nginx
 > Proxy Manager, where no PR and no test could read it — several statements below were written in
-> that world. It is now [`docker/edge/include/api-allowlist.conf`](../../docker/edge/include/api-allowlist.conf),
+> that world. It then became `docker/edge/include/api-allowlist.conf` (removed in #2672, see above),
 > included by `conf.d/50-api.conf.template` and applied by the deploy reconcile. Three things read
 > it in CI (since 2026-10-03 the generated map and the tests of REQ-API-021 replace the first two):
 > `ExternalContractTest`, the `probe-vs-allowlist` check in `repo-lint.yml` (the nightly
@@ -4501,10 +4486,8 @@ a method gate.
 | `/actuator/health`, `/actuator/health/**`                                       | The container health check (the image's `HEALTHCHECK`, rendered into the Quadlet `HealthCmd` in prod); in prod Actuator lives on the internal management port (ADR-0090).                                                                                                                                                     |
 | `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                                                                                                                                                                                                 |
 
-> **Amended 2026-09-22 (ADR-0197, approved by @greluc):** `/licenses` joined the table. It is the
-> third-party licence notice of REQ-UI-021 — a legal page like the three above it, with no backend
-> call and no data — and it is a `LEGAL_PAGES` entry of `PublicPaths`, so neither session gate
-> redirects a member away from it.
+`/licenses` is a `LEGAL_PAGES` entry of `PublicPaths`, like the other legal pages, so neither
+session gate redirects a member away from it.
 
 > [!note] `/auth/**` is on this origin and is **not** in the table above — it never reaches Spring
 > Since [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md) Keycloak answers at `/auth` on
@@ -4825,9 +4808,8 @@ it) · `UserRegistrationServiceTest` (the `PENDING` path passes the waiver) ·
 
 `CustomJwtGrantedAuthoritiesConverter` memoises the assembled authority collection per `(sub,
 Keycloak session, azp, claims fingerprint)` — the session is the token's `sid`, falling back to its
-`issuedAt` for a token without one (amended 2026-09-23, BE-PERF-08; until then the key was `(sub,
-token issuedAt, azp)`, so every five-minute token refresh was a miss and a TTL above the
-access-token lifespan bought nothing). That memoisation is the single control on how much load the authorization path puts
+`issuedAt` for a token without one (BE-PERF-08), so a token refresh within the same Keycloak session
+hits the cache and a TTL above the access-token lifespan pays off. That memoisation is the single control on how much load the authorization path puts
 on [`PostgreSQL`](data-persistence.md): the converter runs on **every** authenticated call, and a
 **miss** costs a write-capable `syncUser` transaction plus five to eight SELECTs — user load,
 `user_roles`, the role permissions, and the membership read.
@@ -5953,13 +5935,6 @@ template is the reference) · **Code:** `keycloak-theme/krt-theme/login/login.ft
 
 ### REQ-SEC-068 — Each service reaches Redis as its own least-privilege ACL user
 
-> [!note] Planned — rendering the exchange lines on production (epic #2078, WP 2.1, #2092)
-> The template below carries the exchange's key families (ADR-0221). Re-rendering and loading it on
-> production is a gated write that must precede the release carrying the exchange (1.13.0, planned
-> 2026-09-28): from that release on the gateway reads `exchange:registry` every 30 s as
-> `basetool-ingest`, and the old rules refuse it (`RedisAclDenials`). Earlier releases run unchanged
-> on the new rules, so the ACL stays in place on an application rollback.
-
 Redis holds the frontend's sessions — OAuth2 access **and refresh** tokens included — the live-sync
 and notification fan-out, and the ingest handoff. Backend, frontend and ingest used to reach it as
 one user, `default` (`~* &* +@all`), with one shared password, so a compromise of any one of them —
@@ -6148,7 +6123,7 @@ pattern is **PKCE + client secret**, never one instead of the other.
   secret. _(2026-09-25 16:15 UTC, owner-approved: the provisioner's `--frontend-client confidential`
   dry run planned only `publicClient: true -> false` and the secret, `--apply` succeeded and a
   second run planned nothing; no `invalid_client` since and a fresh login works —
-  [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).)_
+  [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).)_
 
 **Enforced by:** `FrontendClientAuthenticationConfigTest` (Boot's real OAuth2 client
 auto-configuration, both modes, blank secret) · `CurrentRegistrationAuthorizedClientRepositoryTest`
@@ -6158,7 +6133,7 @@ cases 9–12 · the E2E suite (`realm-export.e2e.json`, `E2eStackExtension`, `Ba
 `RedisSessionConfig#authorizedClientRepository`, `scripts/provision-keycloak-realm.py` ·
 **Monitoring:** `FrontendLoginBroken` (`basetool_login_total{reason="provider_error"}` —
 `invalid_client` at the token endpoint lands there) and `KeycloakLoginErrorSpike` catch a secret
-mismatch · **Runbook:** [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)
+mismatch · **Runbook:** [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)
 · **ADR:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md),
 [ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md)
 amendment 2 · **Related:** REQ-SEC-001, REQ-SEC-012
@@ -6221,7 +6196,7 @@ leaf and all four verify against the CA alone with the name checked; step 4 17:5
 `basetool-cert-expiry` reports the CA's expiry (2036). **Steps 0–4 are done: the target shape holds on
 production.** The documented step-4 command failed on the root-owned truststore and was redone on
 a working copy; the runbook now carries that form. A release rollback to 1.11.0 or older needs step
-4 undone first. *(Updated 2026-09-25 evening; this paragraph said steps 3 and 4 were open.)* The
+4 undone first. The
 separate SPI truststore built in step 2 is replaced by Keycloak's mount of the internal truststore
 (ADR-0051 amendment, 2026-11-13); its leftovers on the host are a one-time cleanup
 ([`deployment.md`](../deployment.md#one-time-cleanup-the-hand-built-precheck-truststore)).
@@ -6764,11 +6739,6 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 
 ### REQ-SEC-089 — The session store is a Redis only the frontend reaches
 
-> [!note] Planned — the production cut-over (#3493)
-> The two instances, their ACL files, networks, exporters and backup artifacts are in the stacks and
-> the Quadlet units. Production moves over with the owner-approved cut-over in `docs/deployment.md`
-> → *Cut-over: the session store gets its own instance*.
-
 Every member's OAuth2 access and refresh token lives in the session store. The ACL users of
 REQ-SEC-068 bound what a compromised **client** reaches, not a fault in the Redis **server**: a
 service that makes the server run its own code reads every key in the process. The internet-facing
@@ -6830,7 +6800,7 @@ and `redis-shared` services of the compose files and their Quadlet units
 - [x] With the shared Redis unreachable, the live-sync container starts unsubscribed instead of
   failing the context, and its gauge reads 0. *`LiveSyncRedisStartTest`,
   `ResilientRedisMessageListenerContainerTest`, `redis_fanout_unsubscribed_test.yml`.*
-- [ ] Production runs both instances (#3493, the owner's cut-over).
+- [x] Production runs both instances (#3493).
 
 ## Out of scope
 

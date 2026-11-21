@@ -609,12 +609,12 @@ Three rules hold for every exchange route, and each new resource or capability i
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
 ADR-0221, ADR-0224 … ADR-0228, ADR-0344; the third-party view is published from `docs/exchange/`.
 
-## 8.14 Domain modules — decided, being built
+## 8.14 Domain modules
 
-The backend is being cut into domain modules inside its one Gradle module (plan
-[`DOMAIN_MODULARISATION_PLAN.md`](../archive/DOMAIN_MODULARISATION_PLAN.md); the first classes to move
-were the module exceptions and their problem-code enums, into `backend.<module>.api`). Five
-rules hold for every module as it lands:
+The backend is cut into domain modules inside its one Gradle module (plan
+[`DOMAIN_MODULARISATION_PLAN.md`](../archive/DOMAIN_MODULARISATION_PLAN.md)); every domain class lies
+in a module package, and the domain map declares 29 modules
+([`module-boundaries.md`](../specs/module-boundaries.md)). Five rules hold for every module:
 
 - **One package per domain, with a rank.** A module depends only on lower ranks or on what its
   declaration allows; `kernel` and `platform` carry no domain meaning; inside a module, `api` is the
@@ -638,9 +638,10 @@ rules hold for every module as it lands:
   guards are green and each is proven able to fail once; a move pull request is mechanical and
   keeps the authorization matrix byte-identical (plan §6).
 
-The REST API follows the modules by hard cut with a forced app update
-([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), §8.5). Only the
-exchange and the bank later become Gradle modules of their own. The debt this closes is §11.9.
+The REST API follows the modules by hard cut
+([ADR-0234](../adr/0234-the-api-is-re-cut-by-hard-cut-with-a-forced-app-update.md), §8.5); with the
+app discontinued, a cut is an ordinary atomic deploy (ADR-0269). The Gradle extraction of the
+exchange and the bank is struck (plan §5.8). The debt this closed is §11.9.
 
 ### External source identity and evidence
 

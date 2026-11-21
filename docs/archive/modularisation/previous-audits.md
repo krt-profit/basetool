@@ -1,11 +1,15 @@
+> **Archived 2026-11-21.** Doc type: Historical appendix of the frozen domain modularisation plan.
+>
+> **Current truth:** [`module-boundaries.md`](../../specs/module-boundaries.md) and arc42 [§11](../../arc42/11-risks-and-technical-debt.md). Index of the archive: [`README.md`](../README.md).
+
 > **Doc type:** Appendix of the frozen plan
-> [Domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) — a snapshot of 2026-09-29
+> [Domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) — a snapshot of 2026-09-29
 > against `origin/main` `95e945326`; statuses change as work lands.
 
 # Previous audits re-evaluated
 
 This appendix holds the full tables behind §11 of the
-[domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md). As decided by the owner (D-06), it
+[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md). As decided by the owner (D-06), it
 re-evaluates the September 2026 improvement audit and the July 2026 modularity audit in full, and
 the earlier focused audits only for the items they deferred, rejected or left open, plus the fixes a
 domain split could put at risk. Findings about the sibling repositories are listed, not re-verified.

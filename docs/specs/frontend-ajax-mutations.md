@@ -63,16 +63,12 @@ are published by bootstraps that run after the module loads. Pages migrated to t
 refinery-orders-details) carry no local `reswap`/`refresh` helper, section map, receiver wiring
 or `dataset.version =` write. New pages with per-section writes use the module; a page still
 on hand-wired `sendChanged`/`createReceiver` is migrated with the next change that touches it
-(tracked in the follow-up issue of ADR-0289). `scripts/krt-page-sections.test.mjs`
+(tracked in the follow-up issue of ADR-0289). `frontend/scripts/krt-page-sections.test.mjs`
 (`:frontend:testPageSectionsJs`) pins the choreography over a fake DOM.
 
 ## Requirements
 
 ### REQ-FE-001 — No full-page reload on a successful mutation
-
-> **Approved planned JobOrder amendment (not implemented):** The planned central JobOrder page keeps ordinary saves and peer changes in place for all authorised unit/personal readers. Create-to-detail navigation remains the intentional exception; financial uncertainty does not justify reload/reposting. See [the approved shared JobOrder contract](orders-core.md) and [the approved aUEC contract](orders-auec.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
 
 A create / update / delete / toggle / reorder interaction must update only the changed DOM nodes and
 must not navigate the document (no `window.location.reload()`, no redirect-follow) on success. The
@@ -336,10 +332,6 @@ the source file's URL leaves the browser.
 
 ### REQ-FE-003 — `syncVersion` propagates the optimistic-lock version
 
-> **Approved planned JobOrder amendment (not implemented):** Propagate the new JobOrder scoped versions to every related action, with a version tied to the independently edited owner rather than the screen. An unrelated holder provision must not invalidate a note/target draft. Same-operation outcome recovery is distinct from a fresh versioned edit; see [the approved aUEC contract](orders-auec.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
-
 On a successful write whose response carries a `version`, `krtFetch` writes that value to the
 target container **and every descendant `[data-version]`**, so the user's next action on the same
 aggregate sends the fresh version and does not 409. When propagation cannot be made complete in
@@ -430,10 +422,6 @@ change (ADR-0012).
 `CsrfTokenController`, `krt-fetch.js` (`krtCsrf.refresh`, retry path) · **Issues:** #572
 
 ### REQ-FE-005 — Lists / filters / pagination are in-place fragment swaps
-
-> **Approved planned JobOrder amendment (not implemented):** The four JobOrder views and kind filter use the approved shared read model and retain useful view/filter return state. Supporting units and linked holder/payee relationships must be reflected in server-scoped lists and their live refresh, not only the detail page. See [the approved shared JobOrder contract](orders-core.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
 
 Filtering, sorting and paginating a list use `krtFetch.swap`, which loads the controller's
 `?fragment=results` HTML fragment into the results container and intercepts in-container pagination
@@ -1014,10 +1002,6 @@ ADR-0069, ADR-0094
 
 ### REQ-FE-011 — User-selection fields are searchable comboboxes (username + display name)
 
-> **Approved planned JobOrder amendment (not implemented):** JobOrder person selection is explicit and action-authorised, with a named unlinked route for accountless Kartell members. Raw-name equality neither silently links an account nor grants access. Reuse the established searchable-field interaction without a separate holder administration prerequisite; see [the approved aUEC contract](orders-auec.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
-
 As the member base grows, plain `<select>` dropdowns of users become unusable. **Every field that
 lets a user pick a registered user/member must be a searchable combobox** rendered by
 [`krt-searchable-select.js`](../../frontend/src/main/resources/static/js/kernel/krt-searchable-select.js),
@@ -1289,10 +1273,6 @@ snapshot + `markDirtySections`) · **Issue:** #1136
 
 ### REQ-FE-015 — Tool-wide live peer sync over topic rooms on one multiplexed WebSocket
 
-> **Approved planned JobOrder amendment (not implemented):** Extend JobOrder room/list admission to the approved requester, supporter, holder/payee and assignee read relationships. Backend publication, relay allow-lists and receiving section maps remain in parity and honour current access. Dirty relevant input is protected under REQ-FE-024; see [the approved shared JobOrder contract](orders-core.md) and [the approved aUEC contract](orders-auec.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
-
 REQ-FE-010's contract — a peer's change appears on every other viewer's screen without a manual
 reload, with only opaque section keys on the wire — applies **tool-wide**, to every surface where
 several users can see the same state. The transport is **one WebSocket per tab** (`/ws/sync`,
@@ -1420,8 +1400,7 @@ whose receivers re-fetch the viewer's *own* filter and page:
   be published by a client, and this room, like `members` and `org-structure`, is web-only and out of
   the backend's registry: every viewer whose run list shows a running run — its own start, a peer's
   start arriving through the room, or a page opened while one runs — re-reads the list every 3 s
-  until no run is running. Role-gated like `members`. *Added 2026-09-27; before, the registry section
-  had no room at all and another admin's change showed only after a reload.*
+  until no run is running. Role-gated like `members`.
 - **`org-structure`** — the admin Organisationsstruktur editor (`units` = the unit + parent-edge
   table, `forms` = its create forms, whose Bereich/OL pickers go stale when a peer adds one).
   Subscribe is authenticated-only; the admin-only fragments stay protected per fragment, and the
@@ -1960,7 +1939,7 @@ checked from its first commit, and a type error in any of them fails the build. 
 one domain (the frontend's domains of the modularisation plan §5.9, plus `kernel` for the shared
 infrastructure; subfolders of `static/js` are scanned too, `vendor/` excepted), and each script
 lives in its domain's folder. `:frontend:testTypecheckRatchet` (in `check`;
-`scripts/typecheck-ratchet.mjs`, proven on planted trees by `typecheck-ratchet.test.mjs`) fails on
+`frontend/scripts/typecheck-ratchet.mjs`, proven on planted trees by `typecheck-ratchet.test.mjs`) fails on
 a script that belongs to no domain or sits outside its domain's folder, on a suppression pragma,
 and on a `tsconfig.json` that excludes scripts or turns `strict`, `checkJs`, `noImplicitAny` or
 `useUnknownInCatchVariables` off. A script that is too large to check is split first into modules
@@ -1997,8 +1976,11 @@ helpers — and nothing newer. The type check's `lib` / `target` (`tsconfig.json
 `ecmaVersion` (`eslint.config.mjs`, browser and Node scripts) are **ES2025**. TypeScript's `ES2025`
 lib also declares `Promise.try`, `RegExp.escape` and `Float16Array`, which the floor does not ship,
 so ESLint rejects those three (`no-restricted-properties`, `no-restricted-globals`) until the floor
-moves past them. Trusted Types follow the same decision: report-only through the `csp_violation`
-beacon first, then enforced.
+moves past them. Trusted Types follow the same decision: `SecurityHeaders` sends
+`require-trusted-types-for 'script'; trusted-types krt-html krt-fragment` report-only
+(`Content-Security-Policy-Report-Only`, violations reach the `csp_violation` beacon) by default and
+in the enforced `Content-Security-Policy` with `APP_SECURITY_TRUSTED_TYPES=enforce`, as production
+runs (REQ-SEC-064).
 
 **Modern syntax is lint-enforced.** `prefer-template`, `prefer-arrow-callback`,
 `prefer-object-has-own`, `radix` and `logical-assignment-operators` are errors for the browser and
@@ -2013,8 +1995,7 @@ values, so they are introduced by hand.
 > TypeScript 7.0.2 accepts the `ES2025` lib: a planted checked file using `Set.prototype.union`
 > and an iterator helper passes `:frontend:typecheckJs` under ES2025 and fails it under ES2023
 > (TS2550, TS2339). `tsconfig.json` and `eslint.config.mjs` moved to 2025 together, and the five
-> modern-syntax rules above were enabled with their autofix applied. No Trusted Types directive is
-> sent yet.
+> modern-syntax rules above were enabled with their autofix applied.
 
 **JSDoc must be JSDoc.** `{@code …}` / `{@link …}` / `@param name {shape}` — Javadoc spellings
 this repo uses elsewhere — are parsed as type syntax and are hard errors.
@@ -2038,7 +2019,17 @@ where the code reads it.
 > (every script of `static/js` is checked) · **ADR:** ADR-0125, ADR-0130, ADR-0239 ·
 > **Issues:** —
 
-### REQ-FE-019 — The same live sync reaches the native app, in both directions
+### REQ-FE-019 — The same live sync reaches the native app, in both directions *(superseded)*
+
+> **Superseded 2026-10-17 (ADR-0274, #2673).** The native app is discontinued, and the bridge went
+> with it: `GET /api/v1/live-sync/stream`, `POST /api/v1/live-sync/changed`, `LiveSyncController`,
+> `LiveSyncStreamService`, the backend's `LiveSyncSubscriptionAuthorizer` and
+> `LiveSyncTopicAuthorizer` SPI, and the rate limiting of `LiveSyncRelayService`. Live sync is the
+> frontend's `/ws/sync` alone (REQ-FE-015). The backend only publishes into the frontend's rooms
+> after its own committed writes (`LiveSyncPublisher`, a publish-only `RedisLiveSyncFanout`), and
+> `LiveSyncTopicRegistryParityTest` keeps its publish-only registry a subset of the frontend's
+> `LiveSyncTopicClass`. `ResilientRedisMessageListenerContainer` (`technical-support`) stays
+> for the notification fan-out. The text below records the requirement as it stood.
 
 REQ-FE-010 promises that *on any surface where several users can see the same state, a peer's change
 propagates to the others without a manual reload*. REQ-FE-015 delivers that promise for browser
@@ -2089,8 +2080,7 @@ treated a failure here as a failed write would show an error for a change that i
 defeats the bound it just hit. Both refusals are standard problems (REQ-API-004): an unknown topic or a
 frame naming no known section is `400 BAD_REQUEST`, a full bucket is `429 RATE_LIMIT_EXCEEDED` with
 `Retry-After: 1`, the buckets' refill granularity. The status is the contract; the app classifies by it
-and also tolerates the body (`ApiErrorMapper`). *Corrected 2026-10-03: both answered with an empty
-body until then, although the document promised a problem.*
+and also tolerates the body (`ApiErrorMapper`).
 
 **The bounds are REQ-FE-015's, unchanged**: per-subject burst 40 / refill 20 per second, per-topic
 burst 200 / refill 100 per second, and receiver-side coalescing of 400 ms for a per-resource room
@@ -2171,13 +2161,15 @@ registry: the admin area is web-only permanently, so a room there would have no 
 
 ### REQ-FE-020 — A JSON endpoint does not build the layout model
 
-The layout `@ControllerAdvice` beans of `frontend/config` must be scoped so they run only for
+The layout `@ControllerAdvice` beans of the frontend (`kernel.layout` and the navigation advices)
+must be scoped so they run only for
 controllers that render Thymeleaf views. A `@RestController` in the `frontend` module — `/csrf` and
 the JSON proxies every `krtFetch` call goes through — must not invoke them, because its response is
 serialised by Jackson and can never read a model attribute.
 
 The scope selector is the marker annotation `UsesLayoutModel`, applied alongside `@Controller` on
-every view controller; the five layout advices declare `@ControllerAdvice(annotations =
+every view controller; the nine layout advices (six in `kernel.layout`, `NavigationAdvice`,
+`SupplyNavigationAdvice`, `PurchasingNavigationAdvice`) declare `@ControllerAdvice(annotations =
 UsesLayoutModel.class)`. The layout model is therefore **opt-in**: a controller added without the
 marker costs nothing, which is the correct default for this spec's JSON surface. See ADR-0165 for
 why the two obvious selectors — the `@Controller` stereotype, and a base package — both fail.
@@ -2194,10 +2186,10 @@ reads — four uncached, plus the cached squadron page-walk — to build a model
 in-place mutation is the app's primary interaction model (REQ-FE-001…REQ-FE-010), that sat on the
 hot path.
 
-**Amended 2026-09-23 (FE-PERF-01) — per handler, and one read.** A `@ControllerAdvice` selects per
-controller *type*, so the marker alone left the ~200 `ResponseBody` handlers that live inside view
-controllers (the in-place mutation endpoints, the unread-count poll) paying for the model. Two rules
-close that:
+**Per handler, and one read (FE-PERF-01).** A `@ControllerAdvice` selects per
+controller *type*, so the marker alone would leave the ~200 `ResponseBody` handlers that live inside
+view controllers (the in-place mutation endpoints, the unread-count poll) paying for the model. Two
+rules close that:
 
 - **A handler that cannot render does not read the layout.** `LayoutContextLoader.needsLayoutModel`
   looks at the handler the dispatcher matched: a method that writes its own body (`ResponseBody` on
@@ -2246,17 +2238,15 @@ ADR-0165
 
 ### REQ-FE-021 — A list page's filters collapse behind one toggle
 
-> **Amended 2026-10-03 (website overhaul phases 1–3).** Every list page now renders its filter block
-> as the toolbar's transient filter popover (`fragments/components :: filterPopover`, REQ-UI-027):
-> it keeps the `.filter-toggle` / `.filter-panel` contract, the count badge and the
+> **Where this note and the text below differ, this note holds.** Every list page renders its
+> filter block as the toolbar's transient filter popover (`fragments/components :: filterPopover`,
+> REQ-UI-027): it keeps the `.filter-toggle` / `.filter-panel` contract, the count badge and the
 > script-collapses-a-rendered-panel fallback below, but it **always starts closed and stores no
-> open/closed preference** — the third property below is retired. No page uses `filterToggle` any
-> more; active filters are additionally shown as `.filter-chips`.
->
-> **Amended 2026-10-04 (phase 4):** the unused `components :: filterToggle` fragment and the stored
-> preference (`krt.filterPanel.<name>` in localStorage) are removed: `krt-filter-panel.js` treats every
-> `[data-filter-panel]` as the transient popover, so `data-filter-transient` on the markup only marks
-> that contract. The text below describes the toggle as first built.
+> open/closed preference** — the third property below does not apply. There is no
+> `components :: filterToggle` fragment and no stored preference (`krt.filterPanel.<name>`):
+> `krt-filter-panel.js` treats every `[data-filter-panel]` as the transient popover, so
+> `data-filter-transient` on the markup only marks that contract. Active filters are additionally
+> shown as `.filter-chips`.
 
 Every list page whose filter block carries **more than a single control** must render that block as
 a collapsible panel: the block gets `data-filter-panel="<page>"`, and the shared
@@ -2360,10 +2350,6 @@ over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `kernel/fragments/head.html`,
 (page JavaScript in static modules), ADR-0125
 
 ### REQ-FE-024 — Only an edited data form arms the unsaved-changes guard
-
-> **Approved planned JobOrder amendment (not implemented):** For the planned JobOrder flows preserve unsent input only within the open form during relevant peer changes/conflicts; there is no durable unsubmitted-draft manager. Keep refreshed basis separate from dirty input and require deliberate conflict resolution. Submitted operation identity/result recovery survives reload independently, and never repeats a game payment or creates a second attempt merely after a lost response. See [the approved aUEC contract](orders-auec.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
 
 `unsaved-changes.js`, loaded on every page with the sidebar, warns before a link leaves a page whose
 form holds edits nobody submitted: it opens the „Ungespeicherte Änderungen" dialog instead of
@@ -2861,7 +2847,7 @@ head's first, synchronous script. The list only shrinks.
 - **A URL read from the DOM reaches a form `action` only through `safeSameOriginUrl`**, which accepts a
   same-origin absolute path and nothing else: one `/` first, no `//` or `/\` after it, no whitespace (a tab
   inside `/<tab>/host` is dropped by the URL parser and would make it `//host`), and a parsed origin equal to
-  the page's. The assignment goes through `assignFormAction`, which percent-encodes `"`, `<` and `>` (a URL parser encodes them anyway) before it sets the `action`; the replacement is also the one step CodeQL's `js/xss-through-dom` models as a sanitizer (`scripts/safe-url.test.mjs`, `:frontend:testSafeUrl`).
+  the page's. The assignment goes through `assignFormAction`, which percent-encodes `"`, `<` and `>` (a URL parser encodes them anyway) before it sets the `action`; the replacement is also the one step CodeQL's `js/xss-through-dom` models as a sanitizer (`frontend/scripts/safe-url.test.mjs`, `:frontend:testSafeUrl`).
 - **A script under its plain URL is revalidated.** `/js/**` answers `Cache-Control: no-cache`; only a
   content-hashed name answers `max-age=31536000, public, immutable`, so a module the scan missed is
   never held stale for a year.

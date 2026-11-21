@@ -2,7 +2,7 @@
 > modularisation audit of 2026-09-29, frozen and no longer updated.
 >
 > **Current truth:** [the domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) and its
-> appendices in [`docs/modularisation/`](../../modularisation/). Index of the archive:
+> appendices in [`docs/archive/modularisation/`](../modularisation/). Index of the archive:
 > [`README.md`](../README.md).
 
 # Domain modularisation audit — raw evidence (2026-09-29)

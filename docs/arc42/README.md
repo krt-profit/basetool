@@ -1,7 +1,7 @@
 # Architecture documentation (arc42)
 
-**Doc type:** living spec · **Baseline:** production **as it has run since the Podman cutover of
-2026-09-22** · **Last reviewed:** 2026-09-22
+**Doc type:** living spec · **Baseline:** production **as it runs since release 1.26.0
+(2026-11-18)**, on the Podman runtime of the cutover of 2026-09-22 · **Last reviewed:** 2026-11-21
 
 This folder documents the architecture of the **Profit Basetool** along the
 [arc42](https://arc42.org) template. It is the map, not the territory: where a subject already has
@@ -34,8 +34,9 @@ and the reader cannot tell which one is current.
 
 ## Why the baseline is stated at the top
 
-This documentation describes the system **as it runs today**: rootless Podman with Quadlet units on
-Rocky Linux 10, bootstrapped by the Ansible role (ADR-0188); a host-level haproxy handing the client
+This documentation describes the system **as it runs today**: rootless Podman 6 with Quadlet units on
+Rocky Linux 10.3, bootstrapped by the Ansible role (ADR-0188); the sessions in a Redis of their own
+beside the shared one (ADR-0388); a host-level haproxy handing the client
 address to an nginx edge over PROXY protocol (ADR-0187); an ACME client of its own; three
 observability components on the host instead of in containers; and cAdvisor gone. Production moved
 onto that host on 2026-09-22; the Docker host it replaced is shut down but not yet decommissioned

@@ -33,15 +33,12 @@ sub-issue that implements it.
 
 > [!note] Each requirement's own status line is authoritative
 > Each requirement carries its work package; its status line says what is built and what remains,
-> and moves in the PR that lands the change, together with its **Enforced by** test. What remains
-> is chiefly the clients' migrations (WP 5.1, #2088; WP 5.2, #2089), the app (#2097) and the go-live
-> (WP 6, #2092). Requirements of other specs that this one changes state it in their own text; a
-> callout there marks only what is still planned. *Corrected 2026-09-27: this note said nothing was
-> built yet, long after most of the requirements had landed.* *Corrected 2026-09-28: it still named
-> the sandbox (WP 2.3, #2099) as open after #2099 had closed; the end-to-end runs the requirements
-> had deferred to it — an installation revoke, a reconnect, a departure, the account check, the
-> corpus round trip, a confirmed mass change and an admin suspension — are now built on the E2E
-> stack (`ExchangeConnectionsE2eTest`, `ExchangeSyncE2eTest`, `ExchangeDepartureE2eTest`).*
+> and moves in the PR that lands the change, together with its **Enforced by** test. The exchange
+> is live since 2026-09-28 (WP 6, #2092). Requirements of other specs that this one changes state it
+> in their own text; a callout there marks only what is still planned. The end-to-end runs — an
+> installation revoke, a reconnect, a departure, the account check, the corpus round trip, a
+> confirmed mass change and an admin suspension — run on the E2E stack
+> (`ExchangeConnectionsE2eTest`, `ExchangeSyncE2eTest`, `ExchangeDepartureE2eTest`).
 
 ## Requirements
 
@@ -412,9 +409,7 @@ accepted. The provisioner applied this on production only **after** the legacy s
   client in the former production shape to it. Applied on production with the go-live's provisioner
   run after the legacy switch-off (S15, #2092, 2026-09-28).*
 - [x] The theme renders the device page with the phishing warning
-  (`login-oauth2-device-verify-user-code.ftl`). *Corrected 2026-09-27:* this item said „both pages",
-  but `login-oauth-grant.ftl` carries no warning, and a `verification_uri_complete` link goes
-  straight to it (security review 2 of #2092, M1).
+  (`login-oauth2-device-verify-user-code.ftl`).
 - [x] The success page of a device login offers „Zum Basetool" (`krtHomeUrl`, `/`) and „Tab
   schließen" (`info.ftl`, `js/krt-close-tab.js`, no inline handler); the button stays hidden without
   script, and the hand-close hint appears only when the tab is still open after the click. The E2E
@@ -463,15 +458,13 @@ bot filter's, the per-IP `429 RATE_LIMITED`, `413 PAYLOAD_TOO_LARGE` and the ide
 `503` — and the anonymous contract documents carry none. The nonce check runs after Spring's proof
 decoder has parsed the proof and verified its header and signature, and before every claim check: a
 proof with a wrong `typ`, an unsupported `alg`, a missing or private `jwk` or a bad signature is
-`invalid_dpop_proof` without a challenge. *Corrected 2026-09-28: this paragraph said every exchange
-response carried the nonce, and the developer docs said the challenge came before every proof check;
-the code has behaved as described here since the nonce was built.* A nonce is stateless — a
+`invalid_dpop_proof` without a challenge. A nonce is stateless — a
 five-minute window and its HMAC under a key drawn at startup — and holds for its window and the
 next; a restart invalidates them all, which costs a client one retry. A bearer-scheme request, or a
 token without `cnf.jkt`, is `401 DPOP_REQUIRED` with the DPoP challenge.
 
 **Which proofs need the nonce.** Only a proof whose target has a readable path outside `/exchange` —
-since 2026-09-28 a path the gateway does not serve — skips it; an unparseable target, a target without a path and `/exchange`
+a path the gateway does not serve — skips it; an unparseable target, a target without a path and `/exchange`
 itself count as exchange routes (fail closed). A proof without the nonce is refused before the replay
 check, so it takes no room in the `jti` cache.
 
@@ -630,15 +623,12 @@ the member's row in `exchange_client_revocation` on every exchange request and r
 made at or before the later of the two seconds (`client_revoked`); a request relayed without a
 connection time counts as connected before it, as a token without the claim does at the gateway.
 Both sides therefore compare the same time, and the stored row keeps the check working while the
-mirror is off or behind. *Corrected 2026-09-28 (security review G5, L2): the gate read only the
-mirror, so with mirroring switched off a whole-client disconnect went unseen by it.* A mirror the
+mirror is off or behind. A mirror the
 backend cannot read fails closed: the request is refused `503 REGISTRY_UNAVAILABLE`
 (`revocations_unreadable`), as the gateway refuses revocations it cannot read, with the gateway's
 `Retry-After: 30`. Every refusal of the backend's gate carries the gateway's code for the same
 situation — `401 INSTALLATION_REVOKED`, `401 CLIENT_REVOKED` — and passes the gateway unchanged
-(REQ-XCH-025). *Corrected 2026-09-28: the backend refused these as a generic `403` and an
-unreadable mirror as `502`, which reached the client as `403 NOT_PERMITTED` and `502
-BACKEND_RELAY_FAILED`.* The backend's Redis user already holds `GET` on
+(REQ-XCH-025). The backend's Redis user already holds `GET` on
 `exchange:*`. The member's controls are `/api/v1/connected-apps` (list,
 `DELETE /{clientId}`, `DELETE /installations/{id}`), reachable only from the member's own web session.
 
@@ -666,10 +656,9 @@ BACKEND_RELAY_FAILED`.* The backend's Redis user already holds `GET` on
   (backend `ExchangeGateTest`, `ExchangeCatalogControllerTest`; the compared time in the gateway's
   `ExchangeGateTest`, the relay header in `ExchangeRelayTest`). The disconnect answers only in a
   second after the revocation's, holding no transaction
-  (`ExchangeRevocationSecondTest`, `ConnectedAppsControllerTest`). *Changed 2026-09-28: it answered
-  at once, so a device login finished in the revocation's own second got `401 CLIENT_REVOKED`
-  (E2E run 36388920243, chromium 1280x800); the `<=` comparison stays, so a refresh of the old
-  session in that second is still refused.* End to end:
+  (`ExchangeRevocationSecondTest`, `ConnectedAppsControllerTest`), so a device login finished in
+  the revocation's own second is not refused `401 CLIENT_REVOKED`, while the `<=` comparison still
+  refuses a refresh of the old session in that second. End to end:
   `ExchangeConnectionsE2eTest.aNewConnectionAfterAWholeClientDisconnectWorksAtOnce` — after the
   member disconnects the client on „Verbundene Anwendungen", the gateway refuses it `401
   CLIENT_REVOKED` on the next request, and the first call of a new device login with
@@ -733,8 +722,6 @@ that gate's marker, so the gates refuse as they do for the web. The marker is no
 reach (REQ-SEC-015, REQ-ORG-032), so a member without `KRT Member` reaches no unit on the exchange
 either (`RequestScopeResolver`, `DatabaseActingMemberAuthoritiesTest`). The demand feed reads the
 member's memberships itself (`ExchangeDemandService`, REQ-XCH-018).
-*Corrected 2026-09-27: this requirement said the acting member would also hold the memberships the
-demand feed needs, arriving with it; the feed was built without any membership authority.*
 
 **Acceptance**
 
@@ -746,8 +733,6 @@ demand feed needs, arriving with it; the feed was built without any membership a
   blueprint `remove` of the other's product is `unchanged`, a `set-quantity` on a lot only the
   other holds is `VERSION_CONFLICT`, and a ship `remove` or `upsert` of the other's ship is
   `unmatched`, each leaving the other's rows as they were.*
-  *Corrected 2026-09-28: this box said the own-rows half was proven by each route as it shipped;
-  no route test used an `ADMIN` member until then (epic #2078 plan audit).*
 - [x] ArchUnit: exchange services never call an admin-gated method or the admin scope predicate;
   exchange controllers call exchange services only; exchange DTOs stay in the exchange layer
   (`ArchitectureTest`).
@@ -1112,13 +1097,6 @@ the batch is `VERSION_CONFLICT`, since the batch counted the refused move. An un
 nothing, then sets the lot's quantity back; stock cannot go back into the pool of a unit the member
 has left, which leaves the lot skipped as `GONE`.
 
-*Amended 2026-10-02 (ADR-0230, owner decision of the same day):* a lot covered the member's personal
-rows only, and a material carrying a UEX commodity id — nearly the whole catalogue, every ore and
-refined metal included — was stored at quality 0 whatever the client sent. Three lots of one
-mineral at qualities 561, 682 and 371 became one lot without a quality, and a lot the feed showed
-at its quality could not be written at it. Until the amendment, every client stock write in
-production had landed at quality 0 (203 journal entries, 36 lots).
-
 **Acceptance**
 
 - [x] Concurrent `set-quantity` on one lot: one applies, the other gets `VERSION_CONFLICT`, for a
@@ -1269,8 +1247,6 @@ ship's `version`; naming the stored unit writes nothing, even when the member ha
 unit outside the member's stampable units rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a
 missing or stale `orgUnitVersion` with `ORG_UNIT_VERSION_CONFLICT`; the rest of the batch still
 applies.
-*Corrected 2026-09-27: a member of several units had the whole batch refused with
-`OWNER_ORG_UNIT_REQUIRED`.*
 
 **Acceptance**
 
@@ -1322,8 +1298,7 @@ place like a stock lot's; an absent `fitted` keeps the ship's. Every write is au
 area with the client and journaled. Only the member's own ships are row-locked
 (`ShipRepository.lockOwnedById`, owner in the `WHERE`): a ship id of another member, like an
 unknown one, is `unmatched` and its row is never locked, so a batch cannot hold up other members'
-web edits. *Corrected 2026-09-27 (security review L6): the ship was locked before the owner check,
-so a batch could keep up to 500 foreign rows locked for its transaction.*
+web edits.
 
 **Status:** built in the backend, and the gateway's read route (`GET /exchange/v1/me/ships`) —
 WP 4.4 (#2086), and its write route (`POST …/changes`)
@@ -1377,8 +1352,7 @@ is the gap per material, quality floor (650 for „gut", else 0) and source, com
 Materialbedarf computes it: required and booked are summed over the orders of one responsible unit,
 each rounded to the material's precision, and the difference is clamped at 0 once — so stock booked
 beyond one order's need offsets another order's gap in that unit — then the units are added up
-(owner decision 2026-09-27; `ExchangeDemandParityTest`). *Corrected 2026-09-27: the feed clamped
-per order and rounded the difference, and so disagreed with the Materialbedarf in both cases.* `rawRefs` are the materials whose refined material it is. An item
+(owner decision 2026-09-27; `ExchangeDemandParityTest`). `rawRefs` are the materials whose refined material it is. An item
 line sums `max(0, ordered − delivered − earmarked)` per game item, and `craftableByMe` matches the
 member's blueprints the way the order's blueprint coverage does (variant family when the order counts
 variants). Lines with nothing open are left out; `bt` is the material's or game item's id.
@@ -1393,9 +1367,7 @@ including reach granted by a leadership seat. The rule runs on every request, so
 qualifying unit withholds the feed even while orders stay open. A permitted member sees the demand of every
 unit they belong to (owner decision 2026-09-28, #2095). `reason` is an optional field of
 `org-demand.schema.json` with the one value `NOT_PERMITTED`; the gateway refuses any other value as
-a relay failure. *Corrected 2026-09-28: #2095 promised this gate and the `reason`, but the feed was
-built without either, so a member of a unit that lost its profit eligibility kept seeing its open
-demand.*
+a relay failure.
 
 **Acceptance**
 
@@ -1482,8 +1454,6 @@ write routes they take an `Idempotency-Key` and count against the daily quota.
 
 The web blueprint import reads the same `basetool.blueprints` envelope as an upload, so a client's
 offline file and its draft end in the same review (owner decision 2026-09-27, REQ-INV-014).
-*Corrected 2026-09-27: the owner's answer of 2026-09-26 kept the envelope to the draft route; it was
-revisited once the SC Extractor was to write its offline files in that format.*
 
 **Status:** built in the backend and the gateway — WP 3.2 (#2082); the extractor's side is WP 5.1
 (#2088)
@@ -1519,9 +1489,6 @@ mass change, or a store failure escaping a route — each answers `503 SERVICE_U
 revocation mirror is `503 REGISTRY_UNAVAILABLE` (REQ-XCH-003) and a write quota that cannot be
 counted is `503 SERVICE_UNAVAILABLE` (REQ-XCH-023), both with `Retry-After: 30`; a full byte budget
 is `503 EXCHANGE_BUDGET_EXHAUSTED` with a `Retry-After` read from the budget (REQ-XCH-023).
-*Changed 2026-09-28: it was a fixed `Retry-After: 60`.* *Corrected 2026-09-27: this paragraph
-said every Redis failure answered `Retry-After: 60`; the registry and quota reads have answered 30
-since they were built.*
 
 The lock is `ingest:xch:idem-lock:<client>:<member>:<sha256>`, taken with `SET NX` and a random
 per-request token. Holding it, the gateway reads the cache again: a duplicate that looked before the
@@ -1663,9 +1630,6 @@ failure — a timeout, an unavailable backend, a lost connection — shows a ret
 „Erneut versuchen". A repeated load of a handoff this session already consumed previews the batch
 the session keeps for it, within its staging lifetime; another session gets `404`
 (`ConnectedAppsConfirmControllerMvcTest.aRepeatedLoadPreviewsTheChangeSetThisSessionKeeps`).
-*Corrected 2026-09-27 (security review L3): the session kept a loaded batch as long as the session
-lived and the backend only looked for disconnects in the 30 minutes before the confirmation, so a
-batch loaded before a disconnect could still be confirmed hours later.*
 
 **Status:** built — WP 3.3 (#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086), WP 3.2 (#2082),
 WP 4.5 (#2087)
@@ -1749,12 +1713,7 @@ only stampable unit, or none for a member with none or several; an existing ship
 link one of them replaced is put back only while the ship is still the member's. The restored
 entries' journal rows are marked undone, the undo is audited as `EXCHANGE_CHANGES_UNDONE` (restored
 and skipped counts) and counted in `basetool_exchange_undo_total{resource,outcome}`, and the
-member's pages refresh live. *Corrected 2026-09-27 (second security review L9): the reach was a
-fixed 90 days whatever the retention, an entry without a change-log entry was restored unchecked, a
-removed ship of a member of several units failed the whole undo with `OWNER_ORG_UNIT_REQUIRED`, and
-a replaced link was put back on a ship that merely still existed. Corrected 2026-10-15 (#2615): the
-undo ignored the journaled org unit, so a client's unit change stayed in place after a reported
-restore.*
+member's pages refresh live.
 
 **Status:** journal and undo built — WP 3.3 (#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086),
 WP 4.5 (#2087)
@@ -1981,15 +1940,13 @@ The gateway's gates count their refusals on `basetool_ingest_exchange_refused_to
 as the `reason` label (`ExchangeRefusals.CODES`); the routes' own answers (`SCHEMA_INVALID`,
 `BATCH_TOO_LARGE`, `PAYLOAD_TOO_LARGE`, `CURSOR_EXPIRED`, `BACKEND_RELAY_FAILED`, a staging store's
 `503`) and those written before the token is read are not counted there; `RELAY_BUSY`, the relay's
-refusal of a large change set without a free slot (REQ-XCH-023), is, as `relay_busy`. *Corrected 2026-09-28: this
-said every gateway-side code was such a label.*
+refusal of a large change set without a free slot (REQ-XCH-023), is, as `relay_busy`.
 
 No answer on an exchange route falls outside the registry. A body that is not a JSON document is
 `400 SCHEMA_INVALID` with one error at the pointer `""` (on any other path it stays `BAD_REQUEST`); a body of another media type is `415 UNSUPPORTED_MEDIA_TYPE`; the bot filter
 answers an exchange path it blocks with `404 NOT_FOUND`, as the gate answers an unknown route or
 method, and a query parameter without a name with `400 SCHEMA_INVALID` at `/`; an unexpected
-failure is the generic `500 INTERNAL_ERROR`. *Changed 2026-09-28: the first two answered
-`400 BAD_REQUEST` and a `415` without `code`, and the bot filter a bare `405`, `404` or `400`.*
+failure is the generic `500 INTERNAL_ERROR`.
 
 A backend refusal reaches a client with its registry code and a **fixed English detail per code**
 (`ExchangeRelay.DETAILS`); the backend's own `detail` is never relayed. The backend's
@@ -2424,8 +2381,8 @@ web's request forms announce, so the staff queue, „Anträge an unsere Konten" 
 
 **Status:** built for the web pages — `ExchangeLiveSync`, the frames of REQ-XCH-013 — WP 3.3
 (#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086); the refinery-order frames built for the
-writes, cancels, deletes and pickups without store lines (#3168, #3169, #3170), the store lines
-planned (#3171)
+writes, cancels, deletes and pickups without store lines (#3168, #3169, #3170) and the pickups with
+store lines (#3171)
 
 ### REQ-XCH-031 — The account check answers match, mismatch or unknown — never the handle
 
@@ -2474,10 +2431,9 @@ the address the developer site's onboarding page links as well.
 An installation is always named as `‹client name› – „‹label›"`, the client-supplied label escaped
 and never first, so a label cannot pose as the Basetool. Both disconnects ask first and re-swap the
 `connected-apps :: apps` fragment; the page is the member's own and joins no peer sync.
-*Amended 2026-10-03 (website overhaul phase 3):* both pages wear the page head of REQ-UI-027 — the
-confirmation page with „Verbundene Anwendungen" as its back link instead of a link at the bottom —
-and each client is a card with its capabilities as chips; the installation table keeps label,
-first and last seen (first seen as the row's sub-line). No behaviour changed.
+Both pages wear the page head of REQ-UI-027 — the confirmation page with „Verbundene
+Anwendungen" as its back link — and each client is a card with its capabilities as chips; the
+installation table shows label, first and last seen (first seen as the row's sub-line).
 
 The notification is the rule-engine event `EXCHANGE_INSTALLATION_CONNECTED` (seed `V251`,
 `EVENT_RECIPIENT`), published when the installation upsert reports that it created the row, so two
@@ -2495,17 +2451,12 @@ audited.
 - [x] The admin registry page. *See REQ-XCH-003.*
 - [x] The page links the public list of approved clients, opening in a new tab.
   *`ConnectedAppsPageControllerMvcTest.thePageLinksThePublicListOfApprovedApplicationsInANewTab`.*
-  *Corrected 2026-09-28: #2087 required the link, but this requirement did not name it and the
-  page shipped without it (epic #2078 plan audit).*
 - [x] A new installation notifies its member once, by the client's name; the list reports it
   unseen until marked seen. *`ExchangeInstallationServiceTest`, `ExchangeInstallationControllerTest`,
   `ConnectedAppsControllerTest`.*
 - [x] The page highlights an unseen installation („Neu") with a warning and reports it seen only
   when the member acknowledges its row („Gesehen"), one installation at a time; loading the page
   marks nothing. *`ConnectedAppsPageControllerMvcTest`, `ConnectedAppsControllerTest`.*
-  *Corrected 2026-09-27:* this item first read „and then reports it seen; the highlight ends with
-  the next load" — the page marked every new connection seen on its first load, which made the
-  highlight a weak phishing signal (security review 2 of #2092).
 - [x] Undo a client's changes since a chosen span, with the skipped entries listed.
   *`ConnectedAppsPageControllerMvcTest`, `ExchangeUndoControllerTest`.*
 - [x] Confirm or discard a staged mass change. *`ExchangeMassChangeControllerTest`,
@@ -3387,8 +3338,8 @@ Data is classified **by content, per column**; a column has exactly one class, w
 fills it (P4K import, SC Wiki, UEX, admin):
 
 - **`@GameText`** (yellow) marks every description column — `GameItem.description_en` /
-  `description_de`, `ShipType.description_en` / `description_de`, `Manufacturer.description` and
-  the planned `Manufacturer.description_de`, `Material.description` — and `displayType` should it ever be persisted. The
+  `description_de`, `ShipType.description_en` / `description_de`, `Manufacturer.description` /
+  `description_de`, `Material.description` — and `displayType` should it ever be persisted. The
   classification rule itself is in [`p4k-catalogue.md`](p4k-catalogue.md).
 - **`@GameMedia`** (red) exists and marks no column: no archive media is in scope. The UEX link and
   image columns (`uex_screenshot`, `url_photo`, `url_video`, `url_store`, …) stay unmarked UEX data.
@@ -3965,7 +3916,7 @@ date or a price never leaves the Basetool (ADR-0386, which narrows ADR-0295).
 | Device-code phishing (RFC 8628 §5.4) | the warning on the device page and, with the user code to compare, on the consent page an attacker's `verification_uri_complete` link leads to (ADR-0228); clients showing only the bare `verification_uri`; notification and a highlight of every new connection until the member acknowledges it; 600 s code lifespan (REQ-XCH-005/-027/-032) — countered, not prevented |
 | A revoked installation refreshing its way back | persistent `jkt` deny list (REQ-XCH-008) |
 | A member who leaves keeping access | departure revocations (REQ-XCH-008) |
-| Malicious client update, compromised maintainer account | capability scoping, own-data-only, journal and undo, guard, suspension, and the admin's undo of the client for every member at once; signing recommended (REQ-XCH-002/-009/-021/-022/-034) — accepted residual risk. *Changed 2026-09-27: undo was per member only, which the owner no longer accepts.* |
+| Malicious client update, compromised maintainer account | capability scoping, own-data-only, journal and undo, guard, suspension, and the admin's undo of the client for every member at once; signing recommended (REQ-XCH-002/-009/-021/-022/-034) — accepted residual risk. |
 | Compromised admin account (no capability ceiling) | audit area „Verbundene Anwendungen", `ExchangeRegistryChanged` alert, suspension; display names that cannot pose as the Basetool, bounded limits, no first-party client ids (REQ-XCH-003) — accepted risk (ADR-0217) |
 | An admin's client running with admin authority | reduced exchange authentication and ArchUnit rule (REQ-XCH-009) |
 | Confused deputy on the relay hop; forged `X-Exchange-*` headers | headers honoured only from the gateway identity; explicit relay route list (REQ-XCH-010, REQ-XCH-001) |
@@ -3974,7 +3925,7 @@ date or a price never leaves the Basetool (ADR-0386, which narrows ADR-0295).
 | DoS against Redis (shared with sessions, `noeviction`) or the backend | hard byte budgets, quotas, batch cap, larger Redis (REQ-XCH-023, ADR-0221) |
 | Guard evasion by batching, near-zero cuts or overwriting stock updates | window counting rules against each lot's state at window start (REQ-XCH-021) |
 | Guard evasion by overwriting ship updates (retyping every ship, clearing names and locations) | counted only when one `upsert` changes both name and type, with no comparison to the window start; journal and undo restore the ships (REQ-XCH-021/-022) — accepted risk (owner decision 2026-09-27) |
-| A malicious release changing many members' data at once | journal and each member's own undo, suspension, and the admin's audited undo of the client for every member at once, which suspends it first (REQ-XCH-022/-034); Materialbörse offers and mission units it removed stay reported, not undone (rows below). *Changed 2026-09-27: the admin bulk undo is built; the row still said it was being addressed.* |
+| A malicious release changing many members' data at once | journal and each member's own undo, suspension, and the admin's audited undo of the client for every member at once, which suspends it first (REQ-XCH-022/-034); Materialbörse offers and mission units it removed stay reported, not undone (rows below). |
 | A single open order recognisable in the org demand feed | withheld unless the member passes the web's job-order gate (`canViewJobOrders`, under the reduced authorities); membership-only scope, catalogue fields only, no requester, title or free text; no low-count suppression, 7-day client cache (REQ-XCH-018) — accepted risk (ADR-0220 and its 2026-09-28 amendment); the per-order details go only to a Logistician of the responsible unit under their own capability (REQ-XCH-047, ADR-0257) |
 | Members' names and notes on a third-party program's PC | only for a Logistician of the pool, under `exchange.orgstock.details`, membership-only scope, 7-day client cache; each member can withhold their name; a per-client pseudonym instead of the user id (REQ-XCH-043/-044) — accepted (ADR-0257) |
 | A faulty or malicious client release changing other members' shared stock | only a Logistician of the pool, only shared rows of that pool, through the Lager's services with web rules; journal, the writer's and the admin's undo, the guard per writer and pool, audit naming writer and client (REQ-XCH-045/-046) — accepted (ADR-0257) |

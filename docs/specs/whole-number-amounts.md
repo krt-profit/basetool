@@ -68,7 +68,7 @@ amount.
 `MoneyFormatTest`,
 `MissionPageControllerMvcTest#missionDetail_WithFinanceEntry_ShouldRenderEditButtonWithoutTemplateError`,
 `MissionFinanceEntryE2eTest` (e2e create→view: add a finance entry, reopen the detail page, assert
-200 + the rendered `data-amount`). **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
+200 + the rendered `data-amount`). **Code:** `backend/.../mission/internal/MissionFinanceEntry{Create,Update}Dto`
 (`@WholeNumber`, `@DecimalMin`, `@DecimalMax`), `frontend/.../mission/model/MissionFinanceEntryForm`
 (`@WholeNumber`), `backend/.../kernel/WholeNumber` + `frontend/.../kernel/web/WholeNumber`,
 `frontend/.../kernel/web/MoneyFormat`, `templates/mission/mission-detail.html`, `templates/operation/operation-detail.html`.
@@ -128,8 +128,8 @@ non-material whole-number rule shared with the order counts above.
 - [ ] Personal-inventory quantity accepts only positive whole numbers; `0`, negative, or fractional input is rejected at the form and the API.
 
 **Enforced by:** `PersonalInventoryItemRequestValidationTest` (`quantityBelowOneShouldBeRejected`).
-**Code:** `backend/.../model/dto/PersonalInventoryItem{Create,Update}Request`,
-`backend/.../model/PersonalInventoryItem` (`quantity` is `Integer`),
+**Code:** `backend/.../personalinventory/internal/PersonalInventoryItem{Create,Update}Request`,
+`backend/.../personalinventory/internal/PersonalInventoryItem` (`quantity` is `Integer`),
 `static/js/personalinventory/personal-inventory.js`, `templates/personalinventory/personal-inventory.html`,
 `templates/personalinventory/admin/personal-inventory.html`, `frontend/.../personalinventory/model/PersonalInventoryForm`.
 **Issues:** PR #465.

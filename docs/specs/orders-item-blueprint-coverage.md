@@ -1,10 +1,10 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
-> **Status:** Implemented baseline with accepted/planned shared-order amendments below.
-> The marked target is not implemented; new criteria are unchecked. Existing acceptance and
-> Enforced-by references establish baseline behavior only. Shared truth: [orders-core.md](orders-core.md)
-> and [orders-material-claims.md](orders-material-claims.md).
+> **Status:** Implemented, including the shared-order amendments marked implemented below. The
+> REQ-ORDERS-021 target is partly implemented: the toggle uses the shared edit gate, which blocks it
+> under invalid responsibility, but still writes against the order's `version`. Shared truth:
+> [orders-core.md](orders-core.md) and [orders-material-claims.md](orders-material-claims.md).
 
 # Item-order blueprint coverage
 
@@ -94,22 +94,17 @@ data exposed.
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`, `JobOrderItemBlueprintOwnersServiceTest`, `BlueprintVariantFamilyResolverTest`,
 `JobOrderItemDetailRenderTest` ·
 **Code:** `JobOrderItemBlueprintOwnersService`, `BlueprintVariantFamilyResolver`,
-`JobOrderController.getItemBlueprintOwners` (`GET /api/v1/orders/{id}/item-blueprint-owners`) ·
+`JobOrderMaterialController.getItemBlueprintOwners` (`GET /api/v1/orders/{id}/item-blueprint-owners`) ·
 **Issues:** —
 
 ### REQ-ORDERS-016 — Coverage view is restricted to the responsible org unit's members
 
-> **Approved shared-order target - not implemented:** retain this separate producer-view gate for
-> every responsible kind, including the Profit Bereich. The broader common order read audience in
+> **Implemented shared-order gate:** this separate producer-view gate applies to every responsible
+> kind, including the Profit Bereich. The broader common order read audience in
 > [orders-core.md](orders-core.md) does not grant the named producer view to requesters, helpers,
 > assignees or money holders who fail that independent gate. Global sharing still widens owners
 > counted inside an authorised view, not its viewers. The order's linked-stock read is a different
 > contract and cannot be used to bypass this one.
-
-**Target acceptance**
-
-- [ ] Direct Profit-Bereich responsibility supports the producer projection under its separate gate.
-- [ ] Queue/order/support/personal visibility alone does not reveal named blueprint owners.
 
 The blueprint-coverage view MUST be visible **only to members of the order's responsible
 unit** (and to admins, who hold system-wide oversight). This is **stricter** than the order's own
@@ -128,9 +123,12 @@ this gate — it changes only which owners are counted *inside* the view, never 
 - [ ] A reader of the order who is not a member of the responsible unit receives HTTP 403 from the
   coverage endpoint, and the detail page renders without the section.
 - [ ] An admin receives the coverage view for any order.
+- [ ] Direct Profit-Bereich responsibility supports the producer projection under its separate gate.
+- [ ] Queue/order/support/personal visibility alone does not reveal named blueprint owners.
 
 **Enforced by:** `ScopeKernelTest` (canSeeJobOrderBlueprintOwners),
-`JobOrderAccessPolicyDifferentialTest`, `JobOrderControllerTest` (getItemBlueprintOwners auth) ·
+`JobOrderAccessPolicyDifferentialTest`, `JobOrderMaterialControllerTest` (getItemBlueprintOwners),
+`authorization-matrix.txt` ·
 **Code:** `JobOrderAccessPolicy.canSeeJobOrderBlueprintOwners` · **Issues:** —
 
 ### REQ-ORDERS-021 — Per-order toggle: count blueprint coverage with or without variants
@@ -154,7 +152,8 @@ default **true**) that governs how its blueprint-coverage view (`REQ-ORDERS-015`
 The flag is **persisted on the order** and applies for **every** viewer (it is a property of the
 order, not a per-viewer view preference), so a lead who needs the strict count for a one-specific-
 variant order sets it once. The flag is toggled **live** from the coverage panel: a control visible
-only to editors (`hasRole('LOGISTICIAN')` + the order's edit scope, `@jobOrderAccessPolicy.canEditJobOrder`)
+only to editors (the current responsible-unit writer while the responsibility is valid,
+`@jobOrderAccessPolicy.canEditJobOrder`)
 PATCHes the order and re-renders the coverage panel **in place** (no full-page reload, per
 `REQ-FE-001`); the order's optimistic-lock `version` guards the write (a stale version yields HTTP 409),
 and the bumped version is propagated to the order's other version-carrying controls so a subsequent edit

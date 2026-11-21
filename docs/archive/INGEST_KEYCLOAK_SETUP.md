@@ -130,7 +130,7 @@ What to know before running it:
   `--frontend-client confidential` switches `basetool-frontend` to confidential and sets Keycloak's
   secret from `$KEYCLOAK_FRONTEND_CLIENT_SECRET` in the same update (refused without it);
   `--frontend-client public` is the rollback. Without the flag a run never changes the type, in
-  either direction ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
+  either direction ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
   **Since 2026-09-25 production's frontend client is confidential**, so every run below passes
   `--frontend-client confidential` with the secret from `.env`; on an already-confidential client
   that plans nothing for the type and never rewrites the secret. On a host whose frontend does

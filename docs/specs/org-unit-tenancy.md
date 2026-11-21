@@ -152,9 +152,7 @@ opens no private producer panel, unrelated Mission, Inventory or Bank object, an
 
 ### REQ-ORG-004 — Create-time OrgUnit stamping
 
-> **Implemented JobOrder authority:** JobOrder creation requires a contextual writer of either the requesting unit or proposed responsible Profit unit. Valid responsibilities are the unique active Profit Bereich and its active subordinate Staffeln/SK. Any permitted requester kind remains distinct from that responsible set. Do not copy generic aggregate stamping or the old authentication-only/flag-only intake into this approved replacement; see [orders-core.md](orders-core.md).
->
-> For JobOrders, the following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance. Requirements for other aggregates remain binding.
+> **Implemented JobOrder authority:** JobOrder creation requires a contextual writer of either the requesting unit or proposed responsible Profit unit. Valid responsibilities are the unique active Profit Bereich and its active subordinate Staffeln/SK. Any permitted requester kind remains distinct from that responsible set. Do not copy generic aggregate stamping or the old authentication-only/flag-only intake into JobOrder creation; see [orders-core.md](orders-core.md).
 
 Stamp the OrgUnit via the central picker resolvers on `OrgUnitStampingService` — never read
 `user.getSquadron()` directly. A new row's **stampable units** are its owner's (ship, Lager row,
@@ -427,10 +425,6 @@ shared pools. A **non-owner** stays bound by the strict `owning_org_unit_id` sco
 
 ### REQ-ORG-014 — Three-tier org hierarchy (Organisationsleitung > Bereich > Staffel/SK)
 
-> **Approved planned JobOrder amendment (not implemented):** For planned JobOrders, the existing Bereich designation Department.PROFIT identifies exactly one root, independent of name/shorthand. Prevent a second designation and treat missing/contradictory root data as a prerequisite to resolve, not a first-match fallback. Active hierarchy determines eligibility; retire the independent Staffel/SK processing flag. See [orders-core.md](orders-core.md) and [ADR-0356](../adr/0356-job-orders-use-profit-hierarchy-responsibility-and-participation.md).
->
-> For JobOrders, the following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance. Requirements for other aggregates remain binding.
-
 The org unit world gains two levels **above** Staffel and SK, modelled on the existing single-table
 `org_unit` (ADR-0025): two new `OrgUnitKind` values `BEREICH` (area/division, e.g. Profit, Sub-Radar,
 Raumüberlegenheit) and `ORGANISATIONSLEITUNG` (OL), plus a nullable self-referential
@@ -485,10 +479,7 @@ expanded set, so lists and per-row gates widen together (ADR-0026).
 > job-order) and the Job-Order profit gate `canViewJobOrders()`. The JWT-authority cascade ships in
 > the same phase. **Phase 6 (#699, #711) then cascaded `currentOversightScope()`** together with the
 > bank's read/write split: the balance **view** and the blueprint-availability overview cascade down
-> (`cascadedOfficerReach`), while bank booking **requests** use the separate, non-cascading
-> `currentOwnLevelOversightScope()` (REQ-BANK-027). *(Updated 2026-09-22: this note used to describe
-> the oversight scope as not yet cascaded. Corrected 2026-10-10: REQ-BANK-039 replaced the own-level
-> request scope with the view gate, and the unused method left the scope hub.)*
+> (`cascadedOfficerReach`), and bank booking **requests** use the same view gate (REQ-BANK-039).
 
 Hard invariants:
 
@@ -543,10 +534,6 @@ data) · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · al
 [REQ-SEC-015](security-and-access.md) · **Issues:** #692, #696.
 
 ### REQ-ORG-016 — Bereich/OL as direct owners of org-unit-scoped aggregates
-
-> **Approved planned JobOrder amendment (not implemented):** The approved [JobOrder contract](orders-core.md) admits direct Profit-Bereich responsibility for MATERIAL, ITEM and aUEC and immediate transfer by current responsible-unit writers to another eligible unit, without target acceptance or automatic stock/money movement. Invalid legacy or later ineligible responsibility permits only reading/transfer before any processing, correction, settlement or coupled posting. Preserve real history; do not reparent units automatically. End ineligible support/open promises immediately, with history retained; automatic eligibility maintenance is separate from the blocked user writes. Other aggregates keep their existing ownership rules.
->
-> For JobOrders, the following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance. Requirements for other aggregates remain binding.
 
 A Bereich and the OL **own their own data** — `owning_org_unit_id` may reference a `BEREICH` or
 `ORGANISATIONSLEITUNG` org_unit — in addition to overseeing subordinate units (ADR-0027). Leadership may
@@ -711,8 +698,7 @@ dropped to one:
 - [x] A duplicate squadron in the desired set, or more than two squadrons, is rejected with 400.
 - [x] Making a user an SK-lead while they hold a Staffel membership is rejected. The lead's
   reach-less Bereichsleitung seat is **derived** from the `SK_LEAD` rank + the SK's parent Bereich
-  (rule 2), never stored as a membership row. *(Corrected 2026-09-22: this line used to say the seat
-  was auto-added as a membership, which contradicted rule 2 and the code.)*
+  (rule 2), never stored as a membership row.
 - [x] A Bereichsleitung or OL flag on a user who holds a Staffel membership is rejected.
 - [x] A leadership flag on the wrong `kind` is rejected by CHECK.
 
@@ -937,9 +923,8 @@ sidebar (`activeSquadronId`) is one of its options and nothing else is selected,
 **preselected** and the empty choice is left out, so the stamp is the unit the sidebar shows.
 `activeSquadronId` is the unit of the effective context the backend reports (REQ-ORG-032), so in
 „Alle meine Org-Einheiten" nothing is preselected.
-Otherwise the empty choice reads „-- Bitte wählen --" / „-- Please choose --". *Amended 2026-10-02 by
-the owner: the empty choice read „-- Heimat-Staffel beibehalten --", although an empty pick resolves
-to the only direct membership or the pin, and is refused otherwise.* The shared
+Otherwise the empty choice reads „-- Bitte wählen --" / „-- Please choose --"; an empty pick
+resolves to the only direct membership or the pin, and is refused otherwise. The shared
 `kernel/fragments/owner-picker.html` renders initial choices. Its JavaScript counterpart
 `/js/kernel/krt-owner-picker.js` renders choices reloaded for a destination member, grouping
 options by kind when several kinds are offered. It picks the effective active unit when eligible,

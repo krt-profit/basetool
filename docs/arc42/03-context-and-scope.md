@@ -52,10 +52,10 @@ address over PROXY protocol v2; TLS still terminates at the edge, which publishe
 | Public name | Terminates at | Reaches | Notes |
 | --- | --- | --- | --- |
 | `profit-base.online` | edge (nginx) | `frontend`; `keycloak` under `/auth` | The whole interactive UI, and identity on the same origin (ADR-0166). The landing page and the legal pages are the only unauthenticated content (ADR-0159). |
-| `ingest.profit-base.online` | edge | `ingest` | The desktop-extractor gateway (`/v1`) and the exchange API (`/exchange/v1`), through the edge's catch-all location. Approved clients only; an unapproved caller gets `403 CLIENT_NOT_ALLOWED`. |
+| `ingest.profit-base.online` | edge | `ingest` | The exchange API (`/exchange/v1`) for the SC Extractor and the approved third-party clients, through the edge's catch-all location. Approved clients only; an unapproved caller gets `403 CLIENT_NOT_ALLOWED`. |
 | `grafana.profit-base.online` | edge | `grafana` | Operator-facing, behind Grafana's own OIDC login against the same Keycloak. |
 
-Everything else — the backend's REST API, both PostgreSQL instances, Redis, Prometheus, Loki,
+Everything else — the backend's REST API, both PostgreSQL instances, both Redis instances, Prometheus, Loki,
 Tempo, Alertmanager and every exporter — is reachable only on the container network or on loopback.
 
 **The ingest gateway is the single public API entry point, and the backend is internal-only**

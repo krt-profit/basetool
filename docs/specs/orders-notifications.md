@@ -11,14 +11,15 @@ claim an edit withdrew now hear about it instead of finding it by opening the pa
 after the commit, never for the actor, carries no free text beyond the order's display id and contact
 handle and a material name, and has a seeded, admin-editable rule. Each can be muted (REQ-NOTIF-027).
 
-## Approved target: notification audiences and causes
+## Notification audiences and causes
 
 The shared MATERIAL and ITEM policy below uses the existing channels and Inbox preferences. The
 linked-money and Bank outcomes follow their separate [aUEC](orders-auec.md) and
 [optional Bank](orders-auec-bank.md) contracts.
 
 Use existing notification channels, preferences and current access; introduce no watcher enrolment.
-The default target policy is:
+The default policy (seeded by `V387__seed_shared_order_notification_audiences.sql`, `V390` and
+`V395`) is:
 
 | Logical cause | Concretely affected default audience |
 | --- | --- |
@@ -33,8 +34,8 @@ its outcome. Accountless participants are coordinated through the responsible un
 without an invented account, channel or notification identity.
 
 Routine individual money movements are live/history updates, not broadcasts to every participant.
-Do not notify all Profit members or all administrators. The global-Admin creation default is removed;
-an administrator who independently qualifies through an affected functional relationship may receive it.
+Do not notify all Profit members or all administrators. The creation default has no global-Admin
+selector; an administrator who independently qualifies through an affected functional relationship may receive it.
 
 An accepted provision for a linked holder is registered as `JOB_ORDER_MONEY_PROVISIONED`.
 The notice is limited to that account even when a configured rule selects additional users, and
@@ -57,8 +58,8 @@ Publish/register data-only causes in the business transaction; notification crea
 live delivery follow successful commit under the existing architecture. Replayed causes are
 idempotent; genuine later revisions remain distinct. Remove or replace obsolete action prompts
 when resolved or responsibility changes. Inbox cleanup never deletes the participant-readable
-business history. Transfer from SK to Staffel is no longer a reason to delete preserved contributions
-or send a misleading withdrawal notice.
+business history. A transfer from SK to Staffel deletes no preserved contribution and sends no
+withdrawal notice.
 
 **Linked-money acceptance**
 

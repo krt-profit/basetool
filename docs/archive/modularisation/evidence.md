@@ -1,4 +1,8 @@
-> **Doc type:** Appendix of the frozen plan [Domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) — measured on `origin/main` `95e945326` on 2026-09-29; counts are exact for that commit, line numbers drift.
+> **Archived 2026-11-21.** Doc type: Historical appendix of the frozen domain modularisation plan.
+>
+> **Current truth:** [`module-boundaries.md`](../../specs/module-boundaries.md) and arc42 [§5](../../arc42/05-building-block-view.md). Index of the archive: [`README.md`](../README.md).
+
+> **Doc type:** Appendix of the frozen plan [Domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) — measured on `origin/main` `95e945326` on 2026-09-29; counts are exact for that commit, line numbers drift.
 
 # Evidence and data
 

@@ -24,7 +24,7 @@ The baseline freezes **module coupling only**. A security or structural rule is 
 assigns every top-level backend production type to exactly one module. It is line-oriented:
 
 - `base <package>` names the root package;
-- `module <name> <rank>` declares a module and its rank — the 25 modules of plan §5.1 plus the
+- `module <name> <rank>` declares a module and its rank — 29 modules, among them the
   transitional `privacy` (rank 13), which exists only until the GDPR classes are dissolved into
   identity-owned SPIs (plan §7.6);
 - `allow <from> <to>` permits one dependency between two modules of the same rank;
@@ -49,7 +49,7 @@ exists, a `package` rule assigns its tree (for example `audit`, `kernel`, `orgun
 - [x] The map parses: one `base`, every module declared once with a non-negative rank, every rule
       names a declared module, at most one `class` rule per class, every `name` pattern compiles.
 - [x] Today's 1,390 source types are assigned to 26 modules: the 1,389 of the audit with the sizes
-      of the [evidence appendix](../modularisation/evidence.md#target-modules-and-ranks), plus
+      of the [evidence appendix](../archive/modularisation/evidence.md#target-modules-and-ranks), plus
       `InventoryMergeCandidatesDto`, which the `name ^(Inventory|…)` rule assigns to `inventory`.
 
 **Enforced by:** `DomainMapTest`, `DomainMapChecksTest` · **Code:** `DomainMap`, `ModuleSubjects`

@@ -29,8 +29,7 @@ client-supplied `size` outside that set snaps back to the default before the bac
 negative `page` clamps to 0.
 
 **Segments.** The list is split by the `view` parameter into four segments, each one backend
-request (amended 2026-10-03; the list used to page only by status and filter the open segments in
-memory):
+request, so no segment is filtered in memory:
 
 | `view` | Backend request | Sort |
 | --- | --- | --- |

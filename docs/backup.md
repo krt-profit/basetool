@@ -1,6 +1,6 @@
 # Backup & disaster recovery — operator runbook
 
-> **Doc type:** Runbook — the *how-to*. Last reviewed: 2026-10-02. The binding requirements (the
+> **Doc type:** Runbook — the *how-to*. Last reviewed: 2026-11-21. The binding requirements (the
 > *what-must-hold*) live in [`docs/specs/backup-recovery.md`](specs/backup-recovery.md)
 > (`REQ-OPS-008..012`); the decision record is
 > [ADR-0056](adr/0056-offsite-encrypted-backup-to-nextcloud.md).
@@ -64,7 +64,7 @@ success over a snapshot missing the certificates, the ACL and the keystore.
   sessions, so users transparently re-login after a restore; `redis-shared` holds the exchange and
   ingest state, which the backend rewrites from Postgres or which expires within the hour. The ACL file
   beside each *is* captured.
-- **Logs** — `/var/log/basetool/{backend,frontend,keycloak}`.
+- **Logs** — `/var/log/basetool/{backend,frontend,ingest,keycloak}`.
 - **The Loki log store** — a deliberate data-protection decision (ADR-0072): its GFS retention
   would silently extend the approved 31-day IP retention. Tempo traces and exporter/textfile data
   are regenerable and excluded too.
@@ -372,15 +372,15 @@ Sessions are not restored, so every member logs in again; that is expected.
 ### Rotate secrets after a compromise-driven restore
 
 The host-config archive restores the **live secrets** (`basetool.env`, `keystore.p12`, `realm-export.json`,
-the provider JARs, the redis ACL). If this restore is the recovery from a **suspected host
+the provider JARs, the two Redis ACLs). If this restore is the recovery from a **suspected host
 compromise** (ransomware, intrusion — as opposed to hardware loss or an accidental delete), those
 secrets must be assumed exposed: **rotate them once the stack is back up** (REQ-OPS-010). At
 minimum —
 
 - the backend/Keycloak **database passwords** (`POSTGRES_PASSWORD`, `KC_POSTGRES_PASSWORD`) and the
   **Redis passwords** (`REDIS_SESSION_PASSWORD`, `REDIS_SESSION_EXPORTER_PASSWORD`,
-  `REDIS_SESSION_FRONTEND_PASSWORD`, `REDIS_PASSWORD`, `REDIS_EXPORTER_PASSWORD` and, once the per-service
-  users are rolled out, `REDIS_FRONTEND_PASSWORD` / `_BACKEND_` / `_INGEST_`) in `/etc/basetool/basetool.env`,
+  `REDIS_SESSION_FRONTEND_PASSWORD`, `REDIS_PASSWORD`, `REDIS_EXPORTER_PASSWORD` and the per-service
+  `REDIS_FRONTEND_PASSWORD` / `_BACKEND_` / `_INGEST_`) in `/etc/basetool/basetool.env`,
   applied to the DBs — and to the two ACL files, which is where Redis actually reads them:
   re-render both with `render-redis-acl.py` and `ACL LOAD` ([`deployment.md` → *The Redis
   ACL*](deployment.md#the-redis-acl)). The captured ACL itself holds SHA-256 hashes, not passwords,

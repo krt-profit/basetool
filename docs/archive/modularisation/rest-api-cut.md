@@ -1,4 +1,8 @@
-> **Doc type:** Appendix of the frozen plan [Domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md)
+> **Archived 2026-11-21.** Doc type: Historical appendix of the frozen domain modularisation plan.
+>
+> **Current truth:** [`api-conventions.md`](../../specs/api-conventions.md) and the committed `openapi.json`. Index of the archive: [`README.md`](../README.md).
+
+> **Doc type:** Appendix of the frozen plan [Domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md)
 > — the target cut decided on 2026-09-29 (full cut, hard cut with forced update); a snapshot
 > against `origin/main` `95e945326`.
 
@@ -15,8 +19,8 @@
 >
 > Current truth: [`api-cut-waves.md`](api-cut-waves.md) (the living work plan, which carries the
 > same note), `docs/specs/api-conventions.md` (REQ-API-016/017/020/021, superseded) and
-> [ADR-0269](../adr/0269-the-frozen-external-contract-ends-with-its-only-client.md). Per the
-> lifecycle convention in [`docs/specs/INDEX.md`](../specs/INDEX.md) this frozen appendix is not
+> [ADR-0269](../../adr/0269-the-frozen-external-contract-ends-with-its-only-client.md). Per the
+> lifecycle convention in [`docs/specs/INDEX.md`](../../specs/INDEX.md) this frozen appendix is not
 > edited to track new changes; it keeps its value as the record of what was measured and decided.
 
 This appendix is the detail behind decisions D-03, D-04 and D-05 and behind §5.10 and §7.9 of the
@@ -700,7 +704,7 @@ first calls race the wall, which is harmless for showing it.
 > (`APP_ANDROID_*_OVERRIDE`, empty by default, logged at `WARN`, alerted after a day); the old
 > `APP_ANDROID_MINIMUM_VERSION_CODE` / `…_LATEST_VERSION_CODE` / `…_RELEASES_URL` reach no container
 > and bind to nothing. Raising the floor is a change in the wave's pull request, not S8 — procedure in
-> [`deployment.md` → *The Android app floor*](../deployment.md#the-android-app-floor).
+> [`deployment.md` → *The Android app floor*](../../deployment.md#the-android-app-floor).
 
 - `app.android.minimum-version-code` comes from `APP_ANDROID_MINIMUM_VERSION_CODE` (default `0`,
   meaning no floor), with `…LATEST_VERSION_CODE` and `…RELEASES_URL` beside it

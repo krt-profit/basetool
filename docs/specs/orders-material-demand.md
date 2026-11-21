@@ -29,24 +29,25 @@ Tracked by [#1522](https://github.com/krt-profit/basetool/issues/1522).
 
 > **Implemented web-read contract:** Shared hierarchy-based responsibility and complete permitted MATERIAL/ITEM web reads follow orders-core.md, including direct Profit-Bereich responsibility.
 >
-> **Remaining material/money extension:** Aggregate only active MATERIAL/ITEM material requirements, excluding cancelled and other terminal work; aUEC contributes no fictitious material rows. Outstanding physical demand minus suitable linked stock remains distinct from outstanding promises and historical credited provision. Use the uncovered-demand and credit-before-cut definitions of REQ-ORDERS-024, including ITEM material demand for unmanufactured items; the older claim/required arithmetic below is not the new promise rule. External exchange retains its reduced direct-membership contract.
->
-> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+> **Implemented material/money extension:** Only active MATERIAL/ITEM material requirements are aggregated (`JobOrderScope.STOCK_KINDS`, `OPEN`/`IN_PROGRESS`); aUEC contributes no material rows. Outstanding physical demand minus suitable linked stock stays distinct from open promises (Eintragungen) and historical credited provision, which the page does not show. Open promises follow the uncovered-demand and credit-before-cut definitions of REQ-ORDERS-024, including ITEM material demand for unmanufactured items. External exchange retains its reduced direct-membership contract.
 
 The order area MUST offer a **material-demand overview** at `/orders/material-demand`, reachable
 from its own entry in the navigation's `logistics` group, that aggregates the material still to be
 gathered across every job order the caller may see whose status is `OPEN` or `IN_PROGRESS`.
 
-**Which orders contribute.** Terminal orders (`COMPLETED`, `REJECTED`) MUST NOT contribute — they
-are excluded in the query, not filtered out afterwards. Both order kinds contribute, kind-agnostically
-as elsewhere in the order domain: a `MATERIAL` order through its `JobOrderMaterial` lines, an `ITEM`
-order through the blueprint-derived, snapshotted `JobOrderItemMaterial` requirements
-(`JobOrderItemService.aggregateMaterials`).
+**Which orders contribute.** Terminal orders (`COMPLETED`, `REJECTED`, `CANCELLED`) MUST NOT
+contribute — they are excluded in the query, not filtered out afterwards. Both stock kinds
+contribute, kind-agnostically as elsewhere in the order domain: a `MATERIAL` order through its
+`JobOrderMaterial` lines, an `ITEM` order through the blueprint-derived, snapshotted
+`JobOrderItemMaterial` requirements (`JobOrderItemService.aggregateMaterials`). An `AUEC` order
+contributes nothing.
 
 **Outstanding, not original, demand.** The required amount is the **outstanding** requirement,
-consistent with the order detail: a `MATERIAL` line's `amount` is already decremented by handovers,
-and an `ITEM` order's aggregation already scales each line by its not-yet-manufactured share
-(REQ-ORDERS-025). Neither reduction may be applied a second time by the aggregation.
+consistent with the order detail: a `MATERIAL` line's remaining need is its requested amount less
+its handed-over credit (`JobOrderMaterial#remainingAmount`, REQ-ORDERS-077), and an `ITEM` order's
+aggregation already scales each line by its not-yet-manufactured share (REQ-ORDERS-025), both
+through `JobOrderMaterialRequirementResolver`. Neither reduction may be applied a second time by
+the aggregation.
 
 **Grouping and rows.** The page MUST render one section per **responsible** org unit
 (`JobOrder.responsibleOrgUnit`, REQ-ORDERS-022 / REQ-ORG-003) — the unit that has to procure the
@@ -73,7 +74,7 @@ row that meets two floors of one order counts toward only one of them (REQ-ORDER
 is a signal-only promise that has moved no inventory, so subtracting it would understate what a
 gathering run still has to collect. For the same reason the two are separate columns and are never
 summed. Note this `Offen` is deliberately *not* the per-order `openAmount` of `AggregatedMaterialDto`,
-which is a claims figure (`required − claims`); the two answer different questions.
+which is a claims figure (uncovered outstanding demand − claims); the two answer different questions.
 
 **Drill-down.** Each row MUST expand to the orders contributing to it — order id (linking to its
 detail page), kind, status and that order's own required / booked / claimed shares — so a user gets

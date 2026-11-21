@@ -1,3 +1,7 @@
+> **Archived 2026-11-21.** Doc type: Historical record — the independent review of the #3267 implementation, frozen when PR #3325 merged on 2026-11-11.
+>
+> **Current truth:** [`audit-3267.md`](audit-3267.md). Index of the archive: [`README.md`](README.md).
+
 # Independent audit implementation review
 
 ## Scope

@@ -1,8 +1,12 @@
+> **Archived 2026-11-21.** Doc type: Historical record — frozen, kept as a record and no longer updated. Commands and states below describe the hosts and the code as they were.
+>
+> **Current truth:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md), REQ-SEC-069 in [`security-and-access.md`](../specs/security-and-access.md) and [`deployment.md`](../deployment.md); production has been a confidential client since 2026-09-25. Index of the archive: [`README.md`](README.md).
+
 # OAuth2 confidential-client migration (audit finding M-6)
 
-> **Doc type:** Implementation runbook for [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md)
+> **Doc type:** Implementation runbook for [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md)
 > and REQ-SEC-069. The *decision* and its rationale live in the ADR; this document is the
-> step-by-step *how*. Registered in [`docs/specs/INDEX.md`](specs/INDEX.md). Rewritten 2026-09-23 when
+> step-by-step *how*. Registered in [`docs/specs/INDEX.md`](../specs/INDEX.md). Rewritten 2026-09-23 when
 > the code part shipped (improvement audit finding APPSEC-07).
 
 **Status:** the **code part is done**, and the **production rollout is done** (2026-09-25, see the
@@ -74,7 +78,7 @@ frontend's environment holds. PKCE stays on: the pattern is **PKCE + client secr
 
 ## Rollout (production — every step is a write that needs the owner's yes)
 
-As root, from `/`, with the [shell conventions](deployment.md#shell-conventions-used-below)
+As root, from `/`, with the [shell conventions](../deployment.md#shell-conventions-used-below)
 (`UCTL`, `UPOD`). The release carrying the code must be deployed first.
 
 **1. Generate the secret on the host and give it to the frontend** (Keycloak still public):
@@ -95,7 +99,7 @@ The frontend now sends the secret; Keycloak, still public, ignores it. Log in on
 window — it must work exactly as before. Nobody is signed out.
 
 **2. Switch Keycloak, with the same secret, in one update** (the provisioner session of
-[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner),
+[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner),
 steps 1–3, for `kc`/`KCADM` and the rollback basis):
 
 ```bash
@@ -154,7 +158,7 @@ step, because they refresh with the registration the frontend runs with now.
 
 - ~~Make `--frontend-client confidential` part of every documented provisioner run~~ — **done
   2026-09-25**: the procedure in
-  [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)
+  [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)
   passes it with `KEYCLOAK_FRONTEND_CLIENT_SECRET` from `basetool.env`, and says what a host whose frontend
   has no secret yet must do first.
 - **Open:** update the host's `/etc/basetool/realm-export.json` seed (`"publicClient": false`,
@@ -165,14 +169,14 @@ step, because they refresh with the registration the frontend runs with now.
 
 - **Another secret to guard.** It lives in `/etc/basetool/basetool.env` and the rendered
   `env.d/frontend.env` (`0640`), rides in every backup's `config/dotenv`, and joins the rotation list
-  in [`docs/backup.md`](backup.md#rotate-secrets-after-a-compromise-driven-restore). It does **not**
+  in [`docs/backup.md`](../backup.md#rotate-secrets-after-a-compromise-driven-restore). It does **not**
   reach Redis: the stored authorized client carries an empty secret.
 - **Local stacks.** The dev and test stacks keep a public client unless their `.env.test` sets the
   variable; the E2E stack is confidential by design.
 
 ## Related documents
 
-- [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md) — the decision.
-- [ADR-0202](adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md) — the provisioner, amendment 2.
-- [`KEYCLOAK_HARDENING_RUNBOOK.md`](archive/KEYCLOAK_HARDENING_RUNBOOK.md) — step 6 (PKCE `S256`).
-- [`CHANGELOG.md`](../CHANGELOG.md)
+- [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) — the decision.
+- [ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md) — the provisioner, amendment 2.
+- [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md) — step 6 (PKCE `S256`).
+- [`CHANGELOG.md`](../../CHANGELOG.md)

@@ -1,3 +1,7 @@
+> **Archived 2026-11-21.** Doc type: Historical plan — every wave of the REST API cut merged (#2475 … #2504, October 2026); frozen and no longer updated.
+>
+> **Current truth:** [`api-conventions.md`](../../specs/api-conventions.md), [`module-boundaries.md`](../../specs/module-boundaries.md), ADR-0231 and ADR-0269. Index of the archive: [`README.md`](../README.md).
+
 > **Doc type:** Living work plan of the REST API cut — the wave-by-wave execution plan behind
 > [`rest-api-cut.md`](rest-api-cut.md) (the measured cut) and plan §7.9. Written 2026-10-10 against
 > `origin/main` `110e16def`; the counts below were taken from the committed `openapi.json`, the app
@@ -39,7 +43,7 @@
 | Backend layout | layer packages | controllers live in `<module>/web` for 13 modules (e.g. `mission/web/MissionController`, `bank/web/…`); the rest still in `controller` |
 | Frontend | one `BackendApiClient` | **typed clients per domain** (`<domain>/client/*BackendClient`): the path strings of a domain are in one class, plus a few page controllers that still hold literals |
 
-The machine-readable map is [`api-cut-map.txt`](../../backend/src/test/resources/api/api-cut-map.txt):
+The machine-readable map is [`api-cut-map.txt`](../../../backend/src/test/resources/api/api-cut-map.txt):
 `<wave> <VERB> <old path> <new path|-> <tier> <app|->`, one line per operation, 185 lines for the
 path moves and deletions (the shape changes are in § 5). `ApiCutMapTest` (built with wave 1)
 holds the committed document to it: every line is in exactly one of its two states, and a wave that

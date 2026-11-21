@@ -83,7 +83,7 @@ holder's handle and the balance. The notice goes when the holder is reactivated 
 - [x] A holder without money, a reactivated holder and an emptied holder have no standing notice.
 - [x] The default rules exist, are enabled, and use the intended selector kinds.
 
-**Approved target acceptance - not implemented**
+**Acceptance — linked requests and outcomes**
 
 - [ ] New linked requests retain necessary approval/readiness tasks and remove stale prompts under current access.
 - [ ] One logical Bank/order outcome reaches each recipient once across overlapping roles; a muted outcome is not recreated as order success.

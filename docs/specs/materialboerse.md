@@ -356,11 +356,6 @@ it only for an entry the member picked (a row tap or a `selected` id that is in 
 „Liste" returns to the list and drops that pick, so a later refresh keeps the list in view. This
 holds on both views.
 
-*Amended 2026-10-03 (website overhaul phase 3): the four tabs „Alle/Meine Angebote/Gesuche" became
-two tabs plus the scope segment, the four create buttons one menu per tab, the filter row a toolbar
-with a filter popover, chips and a sort menu; `view`/`scope` parameters added, `mode`/`tab` kept as
-fallbacks.*
-
 **Acceptance**
 - [ ] Filter, view, scope and sort changes and writes never trigger a full-page reload.
 - [ ] `?view=requests&scope=mine` opens the own requests; `?mode=requests&tab=mein` opens the same
@@ -697,9 +692,6 @@ on a **new `requests` section key** beside the offers' `board` key — wired at 
 mirror points at once (acting-client broadcast ↔ `LiveSyncTopicClass.MATERIALBOARD` accept-list ↔
 receiving-client apply map, REQ-FE-010) and pinned by `LiveSyncSectionMapParityTest`. The receiver
 refreshes only the visible board (the `requests` key never re-pulls the offers list and vice-versa).
-
-*Amended 2026-10-03 (website overhaul phase 3): four tabs → two tabs and the scope segment; two
-relabelled CTAs → one create menu per tab; one shared toolbar with per-view stored filters.*
 
 **Acceptance**
 - [ ] View and scope switches, filters, sorting and writes update the board in place.

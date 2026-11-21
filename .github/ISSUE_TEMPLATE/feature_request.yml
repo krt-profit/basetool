@@ -78,7 +78,7 @@ body:
         - label: Requires new/changed role logic (`@PreAuthorize`, `app_user` flags)
         - label: Requires multi-user data isolation (filter by JWT `sub`)
         - label: Has a UI component (responsive check on Smartphone/Tablet/Desktop/Ultra-wide required)
-        - label: Introduces new user-visible strings (i18n keys in de + en + fallback)
+        - label: Introduces new user-visible strings (i18n keys in de + en)
         - label: Requires a changelog fragment in `changelog.d/`
         - label: Requires OpenAPI updates (`openapi.json` + SpringDoc annotations)
         - label: Requires Resilience4j configuration for new backend calls

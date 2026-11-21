@@ -235,7 +235,7 @@ They are held in the Basetool's `user_roles` alone; Keycloak holds none of them 
 them (REQ-SEC-088, ADR-0355). The authority is the role name upper-cased with spaces turned into
 underscores (`KRT Member` → `ROLE_KRT_MEMBER`), plus the role's seeded permissions from
 [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/app/internal/DataInitializer.java).
-The constants live in `kernel.Roles` (backend) and `support.Roles` (frontend). In addition, a **role hierarchy**
+The constants live in `kernel.Roles` (backend) and `kernel.security.Roles` (frontend). In addition, a **role hierarchy**
 applies.
 
 **The roles are assigned in the Basetool** (REQ-SEC-088, ADR-0355): an admin assigns and withdraws
@@ -406,7 +406,7 @@ gets past the public surface of §1. The tables carried an `Anonymous` column un
 | Own settings: description, payout preference, blueprint sharing, RSI handle (REQ-SEC-072), home location (curated home locations only, REQ-PATCH-030), announcement read-marker, pickable org units, capabilities, the one-call layout read (`/users/me/**`, `/me/**` incl. `/me/layout`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Own notifications + SSE stream + mute preferences (`/notifications/**`, `/api/v1/notifications/preferences`, `/profile/notification-preferences`), live-sync stream (`/live-sync/**`), registration status (`/users/me/registration-status`) (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Terms of Use status + consent (`/terms/status`, `POST /terms/acceptance`; consent refused for `ROLE_INGEST_GATEWAY`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; organisation-wide, whatever the caller's units or pin (REQ-ORG-017); peer-redacted for every non-admin (roles, permissions, flags, join date, Discord link and read watermark are admin-only; `description` is visible to all); the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, KRT_MEMBER)`; organisation-wide, whatever the caller's units or pin (REQ-ORG-017); peer-redacted for every non-admin (roles, permissions, flags, join date, Discord link and read watermark are admin-only; `description` is visible to all); the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ### 3.2 Hangar & Personal Data
 
@@ -652,13 +652,13 @@ order-ownership check: naming anybody but yourself requires
 `canManageUserInventory(<receiver>)` of the inventory access policy — admin, self, or a **shared editable org
 unit** with that receiver — and any other value is refused with `403` (REQ-SEC-039). The Einbuchen
 path (`POST /api/v1/inventory`) and the owner-on-behalf create `POST /api/v1/refinery-orders/users/{userId}` (which replaced the `owner` override of `POST /api/v1/refinery-orders` in wave 6 of the API cut) carry the
-same gate. **Amended 2026-08-30:** all three previously accepted the flat `ROLE_LOGISTICIAN`, which
-is the OR-union over every membership and carries no org unit, so a logistician of any Staffel could
-write into any other Staffel's member ledger (REQ-SEC-005). The store dialog therefore shows the
+same gate. None of the three accepts the flat `ROLE_LOGISTICIAN` for this: it is the OR-union over
+every membership and carries no org unit, so it would let a logistician of any Staffel write into
+any other Staffel's member ledger (REQ-SEC-005). The store dialog therefore shows the
 receiver picker only to a Logistician, and the receiver must additionally be in scope. The
-production book-in (`bookIn.ownerUserId`, REQ-INV-032) carries the same gate since 2026-09-22
-(APPSEC-01) — before, `canEditJobOrder` alone let a logistician book produced stock into any
-member's ledger. Einbuchen and the production book-in
+production book-in (`bookIn.ownerUserId`, REQ-INV-032) carries the same gate (APPSEC-01), so
+`canEditJobOrder` alone does not let a logistician book produced stock into another member's
+ledger. Einbuchen and the production book-in
 additionally refuse `personal = true` for a foreign target; the specified personal-for-someone-else
 capability stays in the refinery store dialog (REQ-INV-035).
 ³ Only for a target member who shares one of the caller's org units, and the list is filtered per
@@ -846,7 +846,7 @@ cascade) and „Alle meine Org-Einheiten"; admins between every active unit and 
 and restored at the next login (REQ-ORG-031); a pin on any other unit counts as no pin
 (REQ-ORG-032). ³ SK member management
 is **admin or SK-Lead of this SK** — not tied
-to the global Officer role. The web surface for it is the SK's **„Mitglieder"** tab on the
+to officer reach elsewhere. The web surface for it is the SK's **„Mitglieder"** tab on the
 **„Leitung"** page (`/organisation/leitung?unit={id}`, since 2026-10-03), and the SK member page
 `/organisation/special-commands/{id}` that the admin list opens (frontend gate
 `OfficerSurfaceGate.canOpenLeitung()` on „Leitung", `hasOfficerReach()` on the member page; the
@@ -856,7 +856,7 @@ only to whoever may appoint the lead (on the member page: admins only) — and n
 removes their own row or another lead's row, which render read-only.
 ⁴ Besides the admin, the **Bereichsleiter of the SK's parent Bereich** sets the lead, on the
 „Leitung" page (`OrgRoleManagementSecurityService.canAppointSkLead`, REQ-ROLE-004) — never the SK
-lead itself. *(Corrected 2026-09-22: this row said `hasRole('ADMIN')` only.)*
+lead itself.
 
 #### 3.9.1 Leitung — the delegated appointment ladder (REQ-ROLE-004, ADR-0042)
 
@@ -1155,7 +1155,7 @@ It carries two offer kinds: a **material offer** over a Lager row and a **item o
 craftable item (one an active blueprint produces), where the member states the quantity (#1185,
 REQ-MARKET-012). The whole board — reads and writes — is class-gated on `hasRole('KRT_MEMBER')`
 (`MaterialExchangeController`, `MaterialRequestController`, `MaterialboersePageController`). The role
-hierarchy does **not** imply `KRT_MEMBER` from `OFFICER` or `ADMIN`, so the Officer and Admin columns
+hierarchy does **not** imply `KRT_MEMBER` from `ADMIN`, and officer reach requires it, so the Officer and Admin columns
 below hold for an account that holds the `KRT Member` role as well, which is the operational
 norm; an account without it gets `403`. Within that gate every write is **owner-scoped** in
 `MaterialExchangeService` (not by role). Interessenten
@@ -1325,7 +1325,7 @@ active unit or sole option preselected.
 
 Above Staffeln and Spezialkommandos come two new levels: the **Bereich** (e.g. Profit, Sub-Radar,
 Raumüberlegenheit) and the **Organisationsleitung (OL)** at the very top. Responsibility **cascades**
-analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
+analogously to Admin > officer reach > `LOGISTICIAN`/`MISSION_MANAGER`:
 
 - **Bereichsleitung** (`MembershipRole` `BEREICHSLEITER` / `BEREICHSKOORDINATOR` / `BEREICHSOPERATOR`;
   the old boolean flags were removed with V187, ADR-0042) has **officer-equivalent** responsibility
@@ -1433,7 +1433,7 @@ einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMI
 | Mein Inventar, Meine Blueprints (`/personal-inventory/**`)                                                                           | `isAuthenticated()`                                                     | always, in the personal menu („Persönlich“) of the drawer’s user row           |
 | Star-Citizen-Links (`/sc-links`, REQ-UI-025)                                                                                         | `isAuthenticated()`; read-only                                          | always, as a link in the footer                                              |
 | Leitung (`/organisation/leitung`)                                                                                                    | `@officerSurfaceGate.canOpenLeitung()` (page and every write proxy)     | tab „Leitung" of Meine Einheit, if `canOpenLeitung`                                                                  |
-| Meine Einheit → Bank (`/org-unit-bank/**`) | member-or-above | link „Meine Einheit" in the Staffel group for `ADMIN`/`OFFICER`/`LOGISTICIAN`/`MISSION_MANAGER`/`KRT_MEMBER` |
+| Meine Einheit → Bank (`/org-unit-bank/**`) | member-or-above | link „Meine Einheit" in the Staffel group for `ADMIN`/`LOGISTICIAN`/`MISSION_MANAGER`/`KRT_MEMBER` |
 | Bank-Dashboard, Bankverwaltung, Anträge (`/bank`, `/bank/manage`, `/bank/requests`, `/bank/accounts/{id}`, `/bank/holders/{id}`)    | `BANK_EMPLOYEE`                                                         | `BANK_EMPLOYEE`                                                                |
 | Berechtigungen (`/bank/grants`)                                                                                                      | `BANK_MANAGEMENT`                                                       | `BANK_MANAGEMENT`                                                              |
 | Mitgliederverwaltung (`/members/**`) and every `/admin/**` page — Spezialkommandos, Organisationsstruktur, Informationen, Nutzungsbedingungen, Missionsdaten, Orte, Materialien, Material-Aliase, Blueprints, Standard-Blueprints, UEX-Daten, P4K-Import, Gegenstände, Bank-Administration, Audit-Logs, Systemeinstellungen, Notification rules, Sync-Berichte, Discord-Registrierungen, Löschanträge, Personensuche, Pers. Inventar/Blueprints (Admin) | `hasRole('ADMIN')`                                                      | `ADMIN`, in the drawer’s administration mode                                   |

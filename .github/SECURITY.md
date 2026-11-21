@@ -63,17 +63,17 @@ advisory and the [`CHANGELOG.md`](../CHANGELOG.md) unless you ask us not to.
 ## Supported Versions
 
 Profit Basetool is in the `1.x` release line (current release: see
-[`CHANGELOG.md`](../CHANGELOG.md) — `v1.9.2` as of 2026-09-22) and under active
+[`CHANGELOG.md`](../CHANGELOG.md) — `v1.26.6` as of 2026-11-21) and under active
 development. It is operated as a single production deployment, so only the
 latest minor release receives security fixes; older releases do not get
 backports — the fix ships in the next patch release of the current minor.
 
 |                    Version                     |                   Supported                    |
 |------------------------------------------------|------------------------------------------------|
-| Latest `1.x` minor (e.g. `1.9.x`) and `main`   | :white_check_mark:                             |
+| Latest `1.x` minor (e.g. `1.26.x`) and `main`  | :white_check_mark:                             |
 | Older `1.x` minors and every `0.x` release     | :x: (please upgrade)                           |
 | Container tags `:edge`, `:sha-<short>`, `:stable` | :white_check_mark:                          |
-| Container tags `:1`, `:1.9`, `:1.9.2`, `:latest`  | :white_check_mark: for the *current* minor only |
+| Container tags `:1`, `:1.26`, `:1.26.6`, `:latest` | :white_check_mark: for the *current* minor only |
 
 ## Scope
 
@@ -94,8 +94,8 @@ The following are **in scope** for this policy:
   files, the Quadlet units generated from them (`quadlet/`), the host
   bootstrap (`ansible/`), the edge proxy configuration (`docker/edge/`), the
   monitoring configuration (`monitoring/`) and the deployment scripts.
-- The default Keycloak realm export and theme shipped here, when used as
-  documented.
+- The Keycloak realm provisioner (`scripts/provision-keycloak-realm.py`) and
+  theme shipped here, when used as documented.
 
 The following are typically **out of scope**:
 
@@ -212,7 +212,7 @@ before reporting a finding against it:
   organisation's CI really build this digest?"*:
 
   ```bash
-  gh attestation verify oci://ghcr.io/krt-profit/basetool-backend:1.9.2 --repo krt-profit/basetool
+  gh attestation verify oci://ghcr.io/krt-profit/basetool-backend:1.26.6 --repo krt-profit/basetool
   ```
 
   The same works for `basetool-frontend`, `basetool-ingest`,

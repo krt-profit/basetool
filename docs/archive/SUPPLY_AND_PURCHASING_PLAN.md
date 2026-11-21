@@ -462,7 +462,7 @@ queries; the list reads are statement-bounded (REQ-DATA-003, no N+1).
   family; `no-store` for every new family — the two roots go into `NoStoreApiScopes`
   (REQ-SEC-031, D-18 of the modularisation plan).
 
-### 5.6 REST API (the target cut of [`rest-api-cut.md`](../modularisation/rest-api-cut.md), tier T2 — web only)
+### 5.6 REST API (the target cut of [`rest-api-cut.md`](modularisation/rest-api-cut.md), tier T2 — web only)
 
 The REST cut of the old roots has not run (it waits for the owner's release decision and an app
 release), but the new modules are born in its shape: one root per domain, member-scoped resources under

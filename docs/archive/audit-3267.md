@@ -1,3 +1,7 @@
+> **Archived 2026-11-21.** Doc type: Historical record — the implementation record of the whole-codebase audit #3267, frozen when PR #3325 merged on 2026-11-11.
+>
+> **Current truth:** the specs under [`docs/specs/`](../specs/INDEX.md) and the code; the research notes stay in [`docs/research/`](../research/). Index of the archive: [`README.md`](README.md).
+
 # Whole-codebase audit implementation
 
 > **Doc type:** Living implementation record for #3267.

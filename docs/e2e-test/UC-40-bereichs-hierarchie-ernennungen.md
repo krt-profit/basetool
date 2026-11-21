@@ -4,8 +4,8 @@
 |----------------|--------|
 | **ID**         | UC-40  |
 | **Tag**        | `e2e`  |
-| **Testklasse** | [`OrgHierarchyVisibilityMatrixE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrgHierarchyVisibilityMatrixE2eTest.java) · [`RoleAppointmentMatrixE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RoleAppointmentMatrixE2eTest.java) |
-| **Spec**       | [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (REQ-ORG-015/-016/-017) · [`role-model.md`](../specs/role-model.md) (REQ-ROLE-004) |
+| **Testklasse** | [`OrgHierarchyVisibilityMatrixE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrgHierarchyVisibilityMatrixE2eTest.java) · [`RoleAppointmentMatrixE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RoleAppointmentMatrixE2eTest.java) · [`OfficerReachCrossUnitE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OfficerReachCrossUnitE2eTest.java) |
+| **Spec**       | [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (REQ-ORG-004/-015/-016/-017) · [`role-model.md`](../specs/role-model.md) (REQ-ROLE-004) · [`security-and-access.md`](../specs/security-and-access.md) (REQ-SEC-065) |
 
 ## Akteure
 
@@ -13,6 +13,7 @@
 - `test-bereich` — Realm-Nutzer nur mit `KRT Member` und ohne Staffel; wird Bereichsleiter von Bereich A.
 - `test-appoint-bl` (Bereichsleiter dieser Suite) und `test-appoint-tgt` (Ziel ohne Staffel) — eigene Realm-Nutzer der Ernennungsmatrix.
 - `test-member` — einfaches Staffelmitglied.
+- `test-officer` — Staffelleiter einer frischen Staffel A; die kanonische IRIDIUM-Staffel spielt Einheit B (`OfficerReachCrossUnitE2eTest`).
 
 ## Vorbedingungen
 
@@ -34,10 +35,15 @@ Ein Bereichsleiter liest Lager-Daten oder ernennt Rollen.
 
 3. Per API als ernennender Nutzer: der Bereichsleiter ernennt einen Koordinator im eigenen Bereich, jemanden im fremden Bereich und einen weiteren Bereichsleiter; ein einfaches Mitglied ernennt eine Bereichsrolle und vergibt einen Staffelrang; der Admin gibt einem Staffelmitglied einen Silo-Leitungsrang; die Leitung-Ansicht (`GET /api/v1/leadership`) wird nach der Ernennung gelesen.
 
+### Offiziers-Reichweite über Einheiten (`OfficerReachCrossUnitE2eTest`, REQ-SEC-065, REQ-ORG-004)
+
+4. Der Staffelleiter von A versucht, den Besitzer eines Einsatzes von B zu wechseln, einen Job Order von B zu bearbeiten und Bestand für B einzubuchen.
+
 ## Erwartetes Ergebnis
 
 - **Sichtbarkeit:** Der Bereichsleiter sieht den Bestand seines Bereichs, nie den des fremden; ein einfaches Staffelmitglied sieht keinen Bereichsbestand; der ADMIN-Endpunkt bleibt **403** (REQ-ORG-015). In der UI erscheint nur die Gruppenzeile des eigenen Bereichs.
 - **Ernennungen:** Koordinator im eigenen Bereich — erlaubt; fremder Bereich und weiterer Bereichsleiter — verweigert; einfaches Mitglied — **403** auf beiden Endpunkten; Silo-Rang für ein Staffelmitglied — **400** vom Service-Wächter, bevor der DB-Trigger (V165/V187) feuert (REQ-ORG-017). Der ernannte Bereichsleiter steht in der Leitung-Ansicht (REQ-ROLE-004).
+- **Offiziers-Reichweite:** Alle drei Versuche werden abgewiesen — der Leitungsposten in A gibt keine Rechte in B.
 
 ## Sonderfälle & Lehren
 

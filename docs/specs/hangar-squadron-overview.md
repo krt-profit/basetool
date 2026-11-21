@@ -73,11 +73,10 @@ writes; the overview does not tell them apart.
 `ShipRepository#countShipsByType`, `HangarPageController`,
 `frontend/src/main/resources/templates/hangar/hangar.html` · **Issues:** —
 
-*Amended 2026-10-03 (website overhaul phase 3):* the overview became the tab „Org-Einheit <Kürzel>" of
-`hangar/hangar.html` (`hangar-squadron.html` is gone, `/hangar/squadron` renders `hangar` and swaps its
-`squadronResults` fragment), its rows became a tree with a readiness bar „n von m", and the
-„Details" disclosure and the „Zurück zum Hangar" link are gone (the chevron and the tab bar replace
-them).
+The overview is the tab „Org-Einheit <Kürzel>" of `hangar/hangar.html`: `/hangar/squadron` renders
+`hangar` and swaps its `squadronResults` fragment, the readiness bar reads „n von m", and the
+chevron and the tab bar are the only disclosure and navigation (no „Details" disclosure, no
+„Zurück zum Hangar" link).
 
 ### REQ-HANGAR-003 — Unit overview spans every unit the caller can see, OL sees all ships
 
@@ -129,9 +128,6 @@ member assigns one. It then enters these scopes like a ship created in the web.
 `ShipRepository#countShipsByType` · **ADR:**
 [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) · amends
 [REQ-ORG-015](org-unit-tenancy.md) · **Issues:** —
-
-*Amended 2026-11-11:* `GET /api/v1/hangar/ships`, which listed every ship in scope with its owner,
-location and fitted flag behind `HANGAR_READ` alone and had no caller, is removed.
 
 ### REQ-HANGAR-013 — The unit overview updates in place when a unit's ships change
 

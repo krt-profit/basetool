@@ -13,7 +13,7 @@
 > <https://api.anthropic.com/v1/design/h/mM6v29vZctN6kiBsF62_eA>
 > — a gzip bundle; extract it and open `project/Basetool SC Extractor.html` to click
 > through every screen and state. **Offline-capable mirror (vendored in this repo):**
-> [`design/basetool-sc-extractor.offline.zip`](../design/basetool-sc-extractor.offline.zip)
+> [`design/basetool-sc-extractor.offline.zip`](design/basetool-sc-extractor.offline.zip)
 > — a single self-contained HTML file (all CSS / JS / fonts / images embedded; **no
 > network needed**), shipped zipped; extract it and open the HTML in any browser to click
 > through every screen offline. This Markdown file is the written contract that
@@ -31,7 +31,7 @@
 > **Reference prototype:** the interactive HTML prototype inside the Claude Design
 > bundle linked above (`project/Basetool SC Extractor.html`), or — fully offline — the
 > vendored mirror
-> [`design/basetool-sc-extractor.offline.zip`](../design/basetool-sc-extractor.offline.zip) (extract + open the HTML) — every screen and state
+> [`design/basetool-sc-extractor.offline.zip`](design/basetool-sc-extractor.offline.zip) (extract + open the HTML) — every screen and state
 > below is clickable; the DE/EN toggle, density, nav model and confidence display are
 > togglable via the in-app Tweaks panel, but the **frozen defaults** are the ones
 > listed under *Locked decisions*.

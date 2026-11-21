@@ -1,7 +1,6 @@
 # ADR-0389 — The ingest gateway runs no Lua in Redis
 
-- **Status:** Accepted — the scripts are replaced; the ACL keeps `EVAL`/`EVALSHA` until production
-  runs this release, and their removal is the follow-up step of decision 4
+- **Status:** Accepted — implemented: the scripts are replaced and the ACL grants no `EVAL`/`EVALSHA`
 - **Date:** 2026-11-16
 - **Deciders:** @greluc
 - **Related:** [REQ-SEC-068](../specs/security-and-access.md), [REQ-XCH-020](../specs/external-exchange.md),

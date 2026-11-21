@@ -17,7 +17,7 @@
   deploys on its own) · [ADR-0231](0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md)
   (the cut that continues) · specs `REQ-API-001`, `REQ-API-007`, `REQ-API-009`, `REQ-API-010`,
   `REQ-API-016`, `REQ-API-017`, `REQ-API-020`, `REQ-API-021`, `REQ-SEC-052`, `REQ-XCH-039` ·
-  [`rest-api-cut.md`](../modularisation/rest-api-cut.md)
+  [`rest-api-cut.md`](../archive/modularisation/rest-api-cut.md)
 
 ## Context
 

@@ -11,7 +11,7 @@
 - **Date:** 2026-09-29 (hard cut, D-03, D-04, D-05); 2026-10-01 (release-bound floor, D-11)
 - **Deciders:** @greluc (owner decisions D-03, D-04, D-05, D-11)
 - **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §5.10, §7.9 ·
-  [REST API cut](../modularisation/rest-api-cut.md) (*Contract tiers*, *The forced update*,
+  [REST API cut](../archive/modularisation/rest-api-cut.md) (*Contract tiers*, *The forced update*,
   *Contract machinery*) · spec REQ-API-001, REQ-API-009, REQ-API-010 ·
   [ADR-0135](0135-public-api-vhost-not-a-gateway.md) (amended) ·
   [ADR-0216](0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md) (amended) ·
@@ -88,7 +88,7 @@ same `.env`, so the old backend walls old apps while new apps find their paths g
   already updated; a defect found after the floor rose is better fixed forward.
 - Implementation: the waves are built on the integration branch `claude/api-cut` and ship together (D-24); the web-only wave
   moved every administration tree to `/api/v1/<root>/admin/**` behind one ADMIN rule (REQ-API-023). The wave plan is
-  [api-cut-waves.md](../modularisation/api-cut-waves.md).
+  [api-cut-waves.md](../archive/modularisation/api-cut-waves.md).
 - Left open inside D-11: a static policy file served by the edge while the backend restarts, only if
   the app's re-read proves insufficient.
 

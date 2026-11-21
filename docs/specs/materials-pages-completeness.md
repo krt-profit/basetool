@@ -65,10 +65,6 @@ and each cell a planet stripe; the material column and the head stay put while s
 title carries the freshness chip „UEX · vor n min" (minutes, hours or days since the newest
 `uexSyncedAt` of the cached terminal catalogue; absent when that catalogue is unavailable).
 
-*Amended 2026-10-03 (website overhaul phase 3): page head with the UEX freshness chip, filters as
-dropdown buttons with a selection summary plus „+ Filter" chips, best-sale/best-purchase markers,
-the spread and the legend.*
-
 „+ Filter" also holds „Nur mit Einkaufsmöglichkeit": it hides every material row that has no
 positive purchase price in any of the shown terminals, and a category left without rows disappears
 with its head. Like the grouping switch it is client-side presentation over the fetched grid and
@@ -77,8 +73,6 @@ follows the design system's control rule (REQ-UI-001): the two dropdown buttons 
 button (the shared `filterPopover`, `.btn-ghost` with its active-filter count) carry the control
 fill and the Grau-2 border, and a dropdown with a narrowed selection is marked like a selected
 control (orange tint and border).
-
-*Amended 2026-10-17: the purchase-option row filter and the readable toolbar controls.*
 
 **Acceptance**
 
@@ -115,13 +109,8 @@ exists are dropped; a saved subset none of whose values still exist falls back t
 default. The preference is a pure client-side concern — nothing is stored server-side, and a
 storage-denying privacy mode degrades to the defaults without breaking the page (same guard as
 REQ-UI-010). The select-all checkbox and the dropdown button's selection summary („Alle", the one
-picked name, or „n von N") are synchronised with the restored state.
-
-*Amended 2026-10-03 (website overhaul phase 3): the dropdown summary reads „n von N" instead of „N
-ausgewählt"; the boolean filters also appear as removable chips.*
-
-*Amended 2026-10-17: the purchase-option row filter of REQ-UI-014 is persisted in the same object
-(`hasBuy`, default off).*
+picked name, or „n von N") are synchronised with the restored state. The purchase-option row
+filter of REQ-UI-014 is persisted in the same object (`hasBuy`, default off).
 
 **Acceptance**
 
@@ -172,13 +161,6 @@ absolute time in Europe/Berlin below it, inside a `<time datetime>` carrying the
 update **older than seven days** is stale: the age is shown in the warning colour with the warning
 icon and a visually hidden „veraltet", so colour is never the only signal. A row without an update
 time shows „–".
-
-*Amended 2026-10-03 (website overhaul phase 3): chips, the four figures, the location column, the
-sale-price sort. Amended 2026-10-17 (#2634): the column headers sort, the „Verkauf · Einkauf"
-segment is gone.*
-
-*Amended 2026-10-17 (#2649): the per-row „UEX-Stand" column with the seven-day stale mark; the
-sweep figure is labelled „Letzter UEX-Sync".*
 
 **Acceptance**
 

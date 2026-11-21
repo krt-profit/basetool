@@ -7,7 +7,7 @@
 
 ## 7.1 One host, three privilege levels
 
-Production is a single Rocky Linux 10 host with SELinux enforcing, rootless Podman and systemd.
+Production is a single Rocky Linux 10.3 host with SELinux enforcing, rootless Podman 6 and systemd.
 There is no cluster, no orchestrator and no standby — a deliberate consequence of the
 one-maintainer constraint (§2). Two other machines exist around it: a **testing host** built by the
 same role and fed by its own `:testing` channel (`REQ-OPS-022`), and the **retired Docker host**,
@@ -16,7 +16,7 @@ shut down on cutover day but not yet decommissioned (§7.7). Addresses are delib
 The host is provisioned by the Ansible role in [`ansible/`](../../ansible/README.md) (ADR-0188):
 packages (EPEL fixed to the host's own minor release, `REQ-OPS-062`), the accounts below and the
 subuid range, directory ownership, SELinux contexts,
-`containers.conf`, the CIS level-1 scan, firewalld and fail2ban, haproxy, the host half of the
+a `containers.conf` drop-in, the CIS level-1 scan, firewalld and fail2ban, haproxy, the host half of the
 monitoring plane, and unattended **security** updates (`dnf-automatic`, the container runtime
 excluded, never rebooting — `REQ-OPS-032`, since 2026-09-22). It provisions and never delivers — nothing it does ships a unit, an image or a
 configuration bundle.
@@ -114,8 +114,7 @@ Consequences worth stating:
   to the shared `/etc/basetool/secrets/keystore.p12`. `deploy.sh` refuses a release whose units mount any
   PKCS#12 the host lacks. The shared keystore stays on the host as the rollback of that release;
   no unit of it mounts the file — the REQ-OPS-022 JVM-truststore mount moved to the CA-only
-  `/etc/basetool/secrets/tls/truststore.p12` as well *(corrected 2026-09-25: this said that mount still
-  defaults to the shared keystore; the units #2036 generated say otherwise)*. Production minted the material on 2026-09-25 (rollout step 2); the
+  `/etc/basetool/secrets/tls/truststore.p12` as well. Production minted the material on 2026-09-25 (rollout step 2); the
   flip (#2036) reached it with v1.12.0 the same day (step 3), and step 4 left the CA as the only
   anchor.
 - **Hand-installed drop-ins live beside the generated units.** `deploy.sh` never touches a
@@ -130,8 +129,8 @@ Consequences worth stating:
   2026-09-25), restarting `redis-session` restarts the frontend and restarting `redis-shared` the
   gateway, while login keeps working.
 - **Podman features go through Quadlet keys, not raw arguments** — `RunInit=`, `Ulimit=` and the
-  network's `Options=` since 2026-09-22. Only `--cpus` and `--oom-score-adj`, which have no key in
-  podman 5.8, remain `PodmanArgs=`.
+  network's `Options=` since 2026-09-22. Only `--cpus` and `--oom-score-adj`, which have no Quadlet
+  key, remain `PodmanArgs=`.
 - **The edge publishes on loopback only** and is pinned with `ip=` on every network it joins, so
   the set of addresses haproxy's PROXY header can arrive from is finite (§11.5c).
 - **No vhost reaches the backend.** The edge joins `net-proxy-frontend`, `-keycloak`, `-ingest` and
@@ -202,7 +201,7 @@ distribution's own `dnf-automatic.timer` with a role drop-in; none rides the con
 | --- | --- | --- | --- |
 | `basetool-deploy` | every 5 min on the clock (:00, :05 …) | `deploy` | Pull, Cosign-verify, reconcile (§6.6) |
 | `basetool-backup` | daily 04:15 | `deploy` | The restic backup to Nextcloud (§6.7) |
-| `basetool-restore-drill` | Sunday 05:30 | `deploy` | Restore the latest snapshot into a throwaway Postgres and score seven artifacts |
+| `basetool-restore-drill` | Sunday 05:30 | `deploy` | Restore the latest snapshot into a throwaway Postgres and score eight artifacts |
 | `basetool-cert-expiry` | daily 03:40, and at boot | `root` | Write `basetool_certificate_expiry_timestamp_seconds` for the certificate *files* |
 | `basetool-container-metrics` | every 30 s | `root` | The cgroup textfile collector that replaces part of cAdvisor |
 | `basetool-container-cleanup` | Saturday 02:00 UTC | `deploy` | Weekly prune of stopped containers, superseded image names, unused images and networks — never volumes (§7.4a) |

@@ -4,8 +4,8 @@
 |----------------|------------------------------------------------------------------------------------------------------------------------------------------|
 | **ID**         | UC-29                                                                                                                                    |
 | **Tag**        | `e2e`                                                                                                                                    |
-| **Testklasse** | [`AdminMissionDataCrudE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminMissionDataCrudE2eTest.java) |
-| **Spec**       | REQ-FE-002 (In-Place-Swap)                                                                                                               |
+| **Testklasse** | [`AdminMissionDataCrudE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminMissionDataCrudE2eTest.java) · [`AdminFrequencyTypeReorderWithoutDragE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminFrequencyTypeReorderWithoutDragE2eTest.java) |
+| **Spec**       | REQ-FE-002 (In-Place-Swap) · [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-031)                                         |
 
 ## Akteur
 
@@ -24,10 +24,13 @@ Der Admin legt über das Modal eine Staffel an und löscht sie über den Confirm
 1. Navigiere zu `/admin/mission-data`.
 2. **Anlegen:** `#add-squadron-btn` öffnet das Modal; `#sq-name`, `#sq-shorthand`, `#sq-desc` füllen; `#squadron-form`-Submit → `POST /admin/mission-data/squadrons` (`krtFetch`, Backend `POST /api/v1/squadrons`). Der Abschnitt `#squadrons-results` wird in place neu gerendert; die Zeile erscheint.
 3. **Löschen:** `.delete-btn` der Zeile öffnet `#delete-confirm-modal`; `#delete-confirm-form`-Submit → `POST …/squadrons/{id}/delete` (Backend `DELETE /api/v1/squadrons/{id}`, Soft-Delete). Die Zeile verschwindet.
+4. **Frequenztypen ohne Ziehen sortieren** (`AdminFrequencyTypeReorderWithoutDragE2eTest`, REQ-UI-031): einen Frequenztyp mit dem Hoch-Knopf und mit Alt+Pfeil runter je um einen Platz verschieben.
 
 ## Erwartetes Ergebnis
 
 Nach dem Anlegen ist die Staffel in `#squadrons-results` sichtbar, nach dem Löschen weg (Default-Filter blendet Inaktive aus). Kein Schritt lädt die Seite neu (`window.__krtNoReload` überlebt), keiner erzeugt einen Fehler-Toast.
+
+Der Frequenztyp rückt in place um einen Platz, der Fokus bleibt auf ihm, und die Live-Region sagt die Verschiebung an.
 
 ## Sonderfälle & Lehren
 

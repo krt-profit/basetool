@@ -74,10 +74,9 @@ path (REQ-INV-026). Every append, transfer and split carries the row's „gestoh
 A stock write through the exchange (REQ-XCH-016) follows the same rules. Its book-in inserts a new
 personal row without an org unit, records `INVENTORY_ITEM_CREATED` and then runs the write-time
 merge without the `SCU` opt-in, so piece-counted stock joins its existing row; its book-out is the
-Lager's own `DISCARD` book-out (REQ-INV-025). *Corrected 2026-09-27: the planned amendment said
-both go through the same services; the book-in is built by the exchange's own stock service
-(`ExchangeStockWriteService`), not by the Lager's create, and only the merge and the book-out are
-the Lager's.*
+Lager's own `DISCARD` book-out (REQ-INV-025). The book-in is built by the exchange's own stock
+service (`ExchangeStockWriteService`), not by the Lager's create; only the merge and the book-out
+are the Lager's.
 
 **Acceptance**
 
@@ -309,8 +308,7 @@ so they are exclusive by construction; the page translates the segment into the 
 stores it as the same two booleans (REQ-UI-017). The backend query intersects the two clauses, so
 were both ever `true` the result is simply empty.
 
-*Amended 2026-10-03 (website overhaul phase 3): the two checkboxes became the segment „Alle ·
-Persönlich · Gemeinsam"; the query params and the stored preference are unchanged.* The narrowing is applied **in SQL** by the same group-on-read query
+The narrowing is applied **in SQL** by the same group-on-read query
 (`findUserStacks`), so the material-group aggregates (summed amount, amount-weighted mean quality,
 max quality, entry count) always reflect exactly the visible stacks rather than a client-side subset.
 Both flags are URL-driven (a filtered view is shareable), compose with the other filters and the
@@ -683,10 +681,7 @@ several targets: with two or more target rows there is no unambiguous split, so 
 entered. A targeted row left blank is **refused, not dropped**: the form marks the row and does not
 submit, and the frontend write controller answers `422` with code
 `INVENTORY_ALLOCATION_AMOUNT_MISSING` (classic path: a field error) without calling the backend.
-*Amended 2026-10-02 by the owner: the blank row used to be dropped silently, so a member who named
-two orders and typed one amount earmarked only that one without being told.* An explicitly entered
-amount always wins over the
-shorthand, and a not-yet-picked row (no target) is neither counted as a target nor sent. The create
+An explicitly entered amount always wins over the shorthand, and a not-yet-picked row (no target) is neither counted as a target nor sent. The create
 form states the rule as a per-dimension hint and hides that hint as soon as a second target is named.
 
 **Delivered is per-(entry, job-order) slice (Variante A).** The "Geliefert" marker moved onto the
@@ -851,10 +846,9 @@ here is unchanged and excludes item rows.
 
 The overview makes no distinction for the „gestohlen" marker (owner decision, REQ-INV-053). The
 exchange books every material at the quality the client sends (REQ-XCH-016), so a rebooked exchange
-row counts here at its real quality. *Amended 2026-10-02 (ADR-0230): the exchange stored every UEX
-commodity — nearly the whole catalogue — at quality 0, and such a row, once rebooked into the
-shared pool, lowered the average here; that was accepted in ADR-0218 and is gone. Rows booked that
-way before the amendment keep their quality 0 until the member corrects them.*
+row counts here at its real quality (ADR-0230). Exchange rows booked under ADR-0218 carry quality 0
+until the member corrects them, and such a row, rebooked into the shared pool, lowers the average
+here.
 
 **Acceptance**
 
@@ -986,10 +980,9 @@ no-silent-cap principle).
   (`inventory.bulk.checkout.select.entry`), each as `aria-label` and `title`, so a screen reader
   announces what it ticks (WCAG 4.1.2).
 
-*Amended 2026-10-03 (website overhaul phase 3): „Alle markieren" moved into the toolbar, and the
-bulk buttons („Markierte ausbuchen", „Markierte umbuchen", „Markierte: Einheit ändern", the stolen
-pair) moved into a sticky selection bar that appears only while something is marked, labelled
-„Ausbuchen", „Umbuchen" and, in its „⋯" menu, „Einheit ändern" and the stolen pair.*
+„Alle markieren" sits in the toolbar, and the bulk actions sit in a sticky selection bar that
+appears only while something is marked: „Ausbuchen", „Umbuchen" and, in its „⋯" menu, „Einheit
+ändern" and the stolen pair.
 
 **Acceptance**
 
@@ -1080,9 +1073,8 @@ offers **„Umbuchen"** next to „Ausbuchen", acting on the **same** marked sel
 single-row Umbuchen modal (REQ-INV-007 / REQ-INV-025) and covers both of its destinations: another
 Ort / Nutzer / OrgUnit-Pool, or the personal marker. The same bar's „⋯" menu offers „Einheit
 ändern" (REQ-INV-052) and „Als gestohlen markieren" / „Markierung entfernen" (REQ-INV-053), and
-every bulk move carries a row's „gestohlen" marker. *Amended 2026-10-03 (website overhaul phase
-3): the button „Markierte umbuchen" is „Umbuchen" in the selection bar, which shows only while
-something is marked.*
+every bulk move carries a row's „gestohlen" marker. The selection bar shows only while something
+is marked.
 
 - **Every marked row moves in full.** There is no per-row amount. The selection spans collapsed
   stacks and later pages, so a per-row quantity could not be reviewed before submitting; moving the
@@ -1159,18 +1151,9 @@ form exists in the DOM (REQ-INV-030), so one popover serves both.
 `data-filter-panel="inventory-my"`) and the shared "Einheitslager" (`globalFilterPanel`,
 `data-filter-panel="inventory-all"`). On "Mein Lager" the visibility segment „Alle · Persönlich ·
 Gemeinsam" (REQ-INV-046) sits **in the toolbar beside it**, not in the popover; the shared Lager has
-no visibility dimension. Everything else below holds verbatim on both.
-
-> **Correction (2026-09-22).** This requirement first shipped with page-local collapse code, a
-> first-visit rule "collapse only when nothing is filtered" and the preference stored inside the
-> REQ-UI-017 filter object. All three were replaced when the mechanism was generalised to every list
-> page by [`frontend-ajax-mutations.md`](frontend-ajax-mutations.md) REQ-FE-021.
->
-> **Amended 2026-10-03 (website overhaul phase 3).** The collapsible panel below the action bar
-> became the toolbar's transient filter popover: it always starts closed, stores no open/closed
-> preference (the `krt.filterPanel.inventory-*` keys are no longer written), and every active filter
-> is also shown as a removable chip below the toolbar. The two personal checkboxes became the
-> toolbar segment, which the count leaves out.
+no visibility dimension. Everything else below holds verbatim on both. The popover always starts
+closed and stores no open/closed preference (no `krt.filterPanel.inventory-*` key is written), as
+REQ-FE-021 of [`frontend-ajax-mutations.md`](frontend-ajax-mutations.md) sets for every list page.
 
 - **A closed popover must never hide the fact that the tree is filtered.** The „Filter" button
   carries a badge with the number of filter dimensions currently narrowing the view, shown whenever
@@ -1501,8 +1484,9 @@ stock of every org unit, an admin pinned to one org unit wipes only that unit's.
 `InventoryCheckoutServiceAuditTest#deleteAllGlobalInventory_locksAuditsAndDeletesTheSameRowsAndRecordsWipedAudit`,
 `MaterialExchangeOfferDeleteRaceIntegrationTest`,
 `InventoryItemControllerTest#deleteAllGlobalInventory_returns204_andDelegatesToService`,
-`InventoryDeleteAllProxyControllerTest` (backend 403 propagated) — the two `hasRole('ADMIN')` gates
-themselves are not yet pinned by a test · **Code:**
+`InventoryDeleteAllProxyControllerTest` (backend 403 propagated); the two `hasRole('ADMIN')` gates
+are pinned by the snapshots of `AuthorizationMatrixTest` (backend) and `RouteGateSnapshotTest`
+(frontend) · **Code:**
 `InventoryItemController#deleteAllGlobalInventory`, `InventoryCheckoutService#deleteAllGlobalInventory`,
 `InventoryRowLockRepository#findNonPersonalIdsInScope` / `#deleteAllByIdIn`,
 `InventoryOrderWrites#prepareWrites`, `InventoryDeleteAllProxyController`,
@@ -1579,8 +1563,7 @@ Lager row — shared or personal, material or game item — carries a **„gesto
   identity unchanged (`POST /api/v1/inventory/{id}/stolen`, optimistic `version`), for **whoever may
   edit the row** (no new permission): the row's scope (`canEditInventoryItem`) and then, like every
   other per-row write, the owner or a Logistician or above — a member marking another member's row
-  gets `403`. *Amended 2026-10-04:* the second gate was missing until then, so any member whose
-  scope covered the unit could mark or split another member's row. A selection of one's own rows is marked or unmarked whole
+  gets `403`. A selection of one's own rows is marked or unmarked whole
   (`POST /api/v1/inventory/bulk-stolen`, locked in sorted id order like REQ-INV-036). A split may
   not leave the row below the amount it offers on the Materialbörse (refused with a message naming
   the offer) or below its earmarks (`422`).

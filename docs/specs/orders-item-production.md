@@ -2,10 +2,8 @@
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md),
 > [ADR-0101](../adr/0101-inventory-game-item-rows.md) (production book-in)
 
-> **Status:** Implemented baseline with accepted/planned shared-order amendments below.
-> The marked target is not implemented; new criteria are unchecked. Existing acceptance and
-> Enforced-by references establish baseline behavior only. Shared truth: [orders-core.md](orders-core.md)
-> and [orders-material-claims.md](orders-material-claims.md).
+> **Status:** Implemented, including the shared-order amendments marked below. Shared truth:
+> [orders-core.md](orders-core.md) and [orders-material-claims.md](orders-material-claims.md).
 
 # Item-order production booking (Herstellung) & order-detail tab layout
 
@@ -42,29 +40,24 @@ booking flow is [ADR-0099](../adr/0099-job-order-item-production-booking.md).
 
 ### REQ-ORDERS-025 — Production booking (Herstellung) consumes linked stock and gates delivery
 
-> **Approved shared-order target - not implemented:** shared responsibility, action grants and
-> lifecycle follow [orders-core.md](orders-core.md), including direct Profit-Bereich responsibility
-> and supporting Staffeln. No aUEC holding, movement or fee model is added to ITEM/MATERIAL.
+> **Implemented shared-order production:** shared responsibility, action grants and lifecycle
+> follow [orders-core.md](orders-core.md), including direct Profit-Bereich responsibility and
+> supporting Staffeln. No aUEC holding, movement or fee model is added to ITEM/MATERIAL.
 > Production and item delivery retain their own counters, recipes, quantity/quality checks,
 > inventory ownership and atomic book-in/consumption. No production reversal feature is introduced.
 >
-> The ITEM material-promise capacity replaces the full-original-requirement baseline below:
-> calculate material demand only for not-yet-manufactured units, then deduct currently linked
-> qualifying coverage using REQ-ORDERS-037. Open promises cannot exceed that uncovered demand.
-> The common contribution contract in REQ-ORDERS-024 owns credit-before-reduction, proportional
-> reductions and historical attribution; production/consumption cannot erase or re-credit true past
-> contributions. The production quantity calculation itself is unchanged.
+> The ITEM material-promise capacity is the material demand of the not-yet-manufactured units less
+> the currently linked qualifying coverage of REQ-ORDERS-037 (`MaterialPromiseCapacity`). Open
+> promises cannot exceed that uncovered demand. The common contribution contract in REQ-ORDERS-024
+> owns credit-before-reduction, proportional reductions and historical attribution
+> (`MaterialPromiseCoordinator`); production/consumption cannot erase or re-credit true past
+> contributions.
 >
 > ITEM may be manually completed early under the shared status rights; delivery still cannot
 > exceed manufactured-but-undelivered units when it is booked. COMPLETED, REJECTED and CANCELLED
-> release order earmarks, without deleting physical/produced stock, undoing production or erasing
-> handovers. Need edits do not automatically reopen manual completion/cancellation.
-
-**Target acceptance**
-
-- [ ] Production lowers unmanufactured demand and uncovered promise capacity without resetting historical contribution credit.
-- [ ] Partial-work safe edits preserve all manufactured/delivered bounds and production history.
-- [ ] Early manual completion and cancellation release earmarks without a physical reversal or automatic reopening.
+> release order earmarks (`StockCommands.releaseJobOrderEarmarks`), without deleting
+> physical/produced stock, undoing production or erasing handovers. Need edits do not automatically
+> reopen manual completion/cancellation.
 
 An `ITEM` order's line (`JobOrderItem`) MUST carry a **`manufacturedAmount`** (whole units already
 manufactured) alongside its `deliveredAmount` and ordered `amount`, subject to the invariant
@@ -168,10 +161,9 @@ rounded per bucket), so the aggregated *Materialien* tab and the item-order *Off
 (derived from `totalQuantity`) drop by the manufactured portion and reach 0 once a bucket is fully
 manufactured (the row is kept so its quality bucket and claims stay visible). This is what makes a
 skipped material's demand actually disappear even though its stock was never drawn down. The
-squadron **material-claim** targets (`MaterialClaimService.requiredByBucket`, the Eintragungen supply
-sign-up) in the implemented baseline stay on the **full** order requirement — a supply commitment is against the
-whole order, independent of how far production has progressed. The approved target above
-replaces that claim basis with uncovered unmanufactured demand; production arithmetic stays intact.
+squadron **material-claim** targets (the Eintragungen supply sign-up) use the same unmanufactured
+demand less the linked qualifying coverage (`MaterialPromiseCapacity`, REQ-ORDERS-024), so a
+booking also lowers the room left for open promises.
 - **Audits**: one `JOB_ORDER_PRODUCTION_BOOKED` (domain `JOB_ORDER`) for the booking — its details
 recording the manufactured `amount`, the number of `consumed` entries and the count of `skipped`
 (not-booked-out) materials — plus one `INVENTORY_CONSUMED_BY_PRODUCTION` (domain `INVENTORY`) per
@@ -244,8 +236,8 @@ registry), and the receiver's apply map.
 - [ ] The aggregated-materials demand (and the item-order *Offene Menge* KPI) reflects only the
   not-yet-manufactured units: booking `N` units reduces each line's contribution to `requiredQuantity
   × (amount − manufacturedAmount) / amount`, reaching 0 for a fully manufactured line — regardless of
-  whether the material was booked out or skipped. The material-claim (Eintragungen) target stays on
-  the full order requirement (baseline only; approved target: uncovered unmanufactured demand).
+  whether the material was booked out or skipped. The material-claim (Eintragungen) capacity is that
+  unmanufactured demand less the linked qualifying coverage.
 - [ ] A consumption entry not earmarked to the order, or holding a different material, or drawing
   more than the order's slice/stock, is rejected (400 / 422 respectively); a whole depletion deletes
   the row and a partial draw decrements amount + order slice and clamps the mission earmarks.
@@ -264,6 +256,9 @@ registry), and the receiver's apply map.
 - [ ] The endpoint uses the current order's fulfillment authority. The success response
   re-renders the `items` (booking surface and inline stock) and `kpi` sections in place and
   propagates them to a peer without a reload.
+- [ ] Production lowers unmanufactured demand and uncovered promise capacity without resetting historical contribution credit.
+- [ ] Partial-work safe edits preserve all manufactured/delivered bounds and production history.
+- [ ] Early manual completion and cancellation release earmarks without a physical reversal or automatic reopening.
 
 **Enforced by:** `JobOrderItemProductionServiceTest` (amount/coverage/slice caps, delete-on-depletion,
 mission auto-clamp, 409/422 mapping, audit, skipped/not-booked-out material),
@@ -299,12 +294,6 @@ ADR-0099
 > limits use the uncovered unmanufactured basis in REQ-ORDERS-025/-024, including after production.
 > Private producer access remains REQ-ORDERS-016; inventory writes retain their own gates. Relevant
 > sections/capabilities update in place for current readers after scoped edits and lifecycle changes.
-
-**Target acceptance**
-
-- [ ] A responsible Bereich or Staffel has the same participation/contribution surface as an SK.
-- [ ] Requesters can explain current progress and handovers without gaining private producer or inventory-write rights.
-- [ ] No displayed claim maximum uses the full original ITEM demand after production/coverage reduced the remaining need.
 
 The order-detail page (`/orders/{id}`) MUST render a page head, a summary card, a **KPI grid** and a
 `.tab-nav` with **one `.tab-pane` per section**, adopting the mission-detail tab pattern
@@ -404,16 +393,9 @@ on the right, separated by hairlines — the quality tier, the amounts, the clai
 the *Eintragen* action, and the status chip. Every value cell therefore carries a `data-label`. The
 desktop table is unchanged.
 
-*Amended 2026-10-03 (website overhaul phase 3): page head with kind and status badges and the
-overflow menu; the KPI band became a `.kpi-grid` led by the „Geliefert / benötigt" progress tile (the
-„Items geliefert" tile folded into it), requester-redacted views drop the fulfilment and handover
-tiles; tabs renamed and reordered per kind (*Bestellte Items* → *Items*, *Aggregierte Materialien* →
-*Materialien*, *Blaupausen* → *Herstellung*, *Item-Übergaben* → *Übergaben*, *Materialien* of a
-material order → *Bedarf*), empty tabs hidden, the handover dialog titled „Übergabe erfassen".*
-
-*Amended 2026-10-04 (owner decision): the blueprint-coverage tab is called *Hersteller* instead of
-*Herstellung*, so it no longer shares its name with the production booking (*Herstellung erfassen*)
-on the *Items* tab.*
+The handover dialog is titled „Übergabe erfassen". The blueprint-coverage tab is called
+*Hersteller*, so it does not share its name with the production booking (*Herstellung erfassen*) on
+the *Items* tab.
 
 **Acceptance**
 
@@ -450,6 +432,9 @@ on the *Items* tab.*
 - [ ] The item order's *Übergaben* tab shows the "record production first" hint while the order is
   not fully delivered and nothing is manufactured-but-undelivered, and the "all delivered" note only
   once every ordered unit is delivered (`isFullyDelivered`).
+- [ ] A responsible Bereich or Staffel has the same participation/contribution surface as an SK.
+- [ ] Requesters can explain current progress and handovers without gaining private producer or inventory-write rights.
+- [ ] No displayed claim maximum uses the full original ITEM demand after production/coverage reduced the remaining need.
 
 **Enforced by:** `JobOrderItemDetailRenderTest` (item tab set + KPI tiles; the folded-in Herstellung
 button and per-unit-demand chevron in the items table; the `isFullyDelivered` item-handover message
@@ -743,20 +728,15 @@ persists) · **Code:** `ItemCollectionPageController`, `joborder/item-collection
 
 ### REQ-ORDERS-032 — An item-order edit re-derives its lines in place and never discards booked production
 
-> **Approved shared-order target - not implemented:** a prior item handover does not impose a
-> blanket edit freeze. A requesting-side need writer may safely change ordered needs after partial
-> work, while processing-side writers retain their separate rights under orders-core. Reconcile
-> persistent line identities and preserve manufactured/delivered counters, recipe/history and
+> **Implemented shared-order edit:** a prior item handover does not freeze the requester edit
+> (`updateItemJobOrderAsRequester`): a requesting-side need writer may change ordered needs after
+> partial work, while the processing-side `updateItemJobOrder` keeps its handover freeze and its
+> separate rights under orders-core. Both reconcile persistent line identities
+> (`JobOrderItemReconciliation`) and preserve manufactured/delivered counters, recipe/history and
 > existing catalogue validation; no amount may fall below booked manufacture/delivery and no
-> produced line may be deleted or retyped to another item. Require the relevant scoped versions.
-> No implicit production undo or automatic reopening follows a need edit. Invalid responsibility
-> blocks these mutations until the permitted transfer.
-
-**Target acceptance**
-
-- [ ] A safe quantity/need edit after a partial handover preserves identities and booked work.
-- [ ] Deleting/retyping produced lines or lowering quantities below their booked bounds remains refused.
-- [ ] A need edit does not silently reopen a completed/cancelled ITEM order.
+> produced line may be deleted or retyped to another item. No implicit production undo or
+> automatic reopening follows a need edit. Invalid responsibility blocks these mutations until the
+> permitted transfer.
 
 Editing an `ITEM` order MUST preserve every line's booked `manufacturedAmount` and `deliveredAmount`.
 
@@ -809,6 +789,12 @@ Before this requirement the edit paths ran `jobOrder.getItems().clear()` followe
 `manufacturedAmount = 0` — so **every** save of an item order silently reset all recorded production,
 with no error and no audit trace. The handover freeze did not cover it: it blocks editing only once a
 *delivery* exists, while production is booked long before that.
+
+**Acceptance**
+
+- [ ] A safe quantity/need edit after a partial handover preserves identities and booked work.
+- [ ] Deleting/retyping produced lines or lowering quantities below their booked bounds remains refused.
+- [ ] A need edit does not silently reopen a completed/cancelled ITEM order.
 
 **Enforced by:** `JobOrderServiceTest.UpdateItemJobOrderTests`
 (`matchedLine_isReDerivedInPlace_soBookedProductionSurvives`,

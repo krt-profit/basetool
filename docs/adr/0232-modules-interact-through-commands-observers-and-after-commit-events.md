@@ -4,7 +4,7 @@
 - **Date:** 2026-09-29
 - **Deciders:** @greluc (the plan decided on 2026-09-29)
 - **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §5.3, §6 (red lines),
-  §7.3 · [evidence: cross-domain write families](../modularisation/evidence.md#cross-domain-write-families) ·
+  §7.3 · [evidence: cross-domain write families](../archive/modularisation/evidence.md#cross-domain-write-families) ·
   [ADR-0231](0231-the-backend-becomes-a-modular-monolith-one-package-per-domain.md) ·
   [ADR-0233](0233-module-boundaries-are-enforced-by-archunit-and-spring-modulith-in-test-scope.md) ·
   spec REQ-AUDIT-001 · arc42 §8.8, §8.14

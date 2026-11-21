@@ -83,9 +83,9 @@ outstanding split), `JobOrderServiceTest` (UpdateItemJobOrderTests — aggregate
 
 ### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
 
-> **Approved target — implementation pending:** For the approved target, only MATERIAL/ITEM accept these stock/material links. Apply the common current order-read/capability contract in orders-core.md to web allocation eligibility; aUEC monetary holders are not inventory allocations. The reduced external-exchange contract remains separate and is not widened by the web read rule.
->
-> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+Only `MATERIAL` and `ITEM` orders accept stock links: an `AUEC` order requires no material and is
+absent from the lookup (`JobOrderScope.STOCK_KINDS`), and its monetary holders are not inventory
+allocations.
 
 Because the order's material view (the `MATERIAL` requirement rows and the `ITEM` aggregated
 list, REQ-ORDERS-017) is built **solely from the order's requirements** with linked stock
@@ -186,10 +186,6 @@ two gates are parallel, not a replacement.
 
 ### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory
 
-> **Approved target — implementation pending:** For the approved target, common authorised order readers retain visibility of orphaned stock facts. Cancellation releases MATERIAL/ITEM purpose links, not physical stock or delivery/production history; see orders-core.md. This is separate from explicit aUEC residual-money settlement.
->
-> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
-
 To make pre-existing orphaned links (inventory linked before the REQ-ORDERS-018 gate, or via a
 future path) discoverable, the order **detail** page MUST surface every inventory item linked to
 the order whose material is **not** among the order's requirements, as a warning section listing
@@ -202,6 +198,11 @@ allocation chip on the entry). Computing
 the warning MUST NOT add an N+1 to the order **list** endpoint — it is only resolved on the
 detail view.
 
+Every common reader of the order sees the warning (`canSeeJobOrder`, [orders-core.md](orders-core.md)).
+A terminal status releases the order's purpose links (`StockCommands.releaseJobOrderEarmarks`), not
+the physical stock or the delivery/production history; aUEC residual-money settlement is a
+separate contract ([orders-auec.md](orders-auec.md)).
+
 **Acceptance**
 
 - [ ] An order with an inventory item linked for a non-required material shows the
@@ -210,15 +211,11 @@ detail view.
 
 **Enforced by:** `JobOrderServiceTest`
 (`getOrphanedLinkedInventoryReturnsOnlyLinksWhoseMaterialIsNotRequired`) · **Code:**
-`JobOrderQueryService.getOrphanedLinkedInventory`, `JobOrderController` `GET
+`JobOrderQueryService.getOrphanedLinkedInventory`, `JobOrderMaterialController` `GET
 /api/v1/orders/{id}/allocations/orphaned`, `JobOrderPageController.viewOrderDetail`,
 `templates/joborder/orders-detail.html`
 
 ### REQ-ORDERS-020 — Order list is paginated server-side
-
-> **Approved target — implementation pending:** The approved common three-kind queue and all admitted reader relationships in orders-core.md apply to server-side pagination as well as details. Filtering/paging remains permission-scoped and in-place.
->
-> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 The order-overview list (`GET /orders`) MUST fetch one **server-side page** of orders instead of
 the former unbounded `size=1000` pull, rendering the shared pagination component (the `.pagination`
@@ -235,7 +232,9 @@ queue — the only draggable rows, since completed/rejected orders carry no prio
 bounded. A crafted out-of-list `size` snaps back to the default; the sort stays `priority,asc` so
 queue order is preserved across pages. Page and size links MUST keep the active status and
 squadron filter (the repeatable `squadronId` params, REQ-ORDERS-027), and the pagination controls
-live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-renders them.
+live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-renders them. The page
+holds all three kinds and every reader relationship of [orders-core.md](orders-core.md); the
+permission predicate (`JobOrderScope.READ_PREDICATE`) runs in the paged query, never after paging.
 
 **Acceptance**
 
@@ -291,9 +290,10 @@ backend change is needed and the order-list endpoint gains no query; the badge r
 
 ### REQ-ORDERS-027 — Overview: collapsible material sublist + status & squadron filters
 
-> **Approved target — implementation pending:** The approved overview supports MATERIAL, ITEM and aUEC kind filtering beside the existing useful filters; remember selection/return context. Do not render material collection widgets as aUEC fulfilment. See orders-core.md and orders-auec.md.
->
-> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+The overview filters by kind — `MATERIAL`, `ITEM` and `AUEC` (`OrderKind`) — beside the filters
+below, and remembers the selection per browser (`orders_type_filter`, REQ-ORDERS-040). An `AUEC`
+row renders no material sublist, so no material collection widget reads as aUEC fulfilment
+([orders-auec.md](orders-auec.md)).
 
 Three order-overview affordances, all persisted **per browser** in `localStorage` — the same
 client-side persistence the Lager tree uses (REQ-INV-002, [`inventory-lager.md`](inventory-lager.md)), and not a server cookie. Note the one
@@ -400,7 +400,7 @@ context cannot obtain rows through a forged scope.
 The initial view is Alle when no remembered choice exists. Scope, status, squadron and kind
 selections persist per browser (`orders_scope_filter`, `orders_type_filter`, REQ-UI-017); an explicit
 URL selection wins and a remembered scope is restored only while it is offered. The kind filter
-contains MATERIAL and ITEM only; unfinished aUEC work is not an available choice. Pagination and
+offers MATERIAL, ITEM and AUEC; an aUEC row shows no material sublist. Pagination and
 fragment requests carry all active narrowing filters. Count and rows use the same SQL predicate;
 permission filtering never happens after paging.
 

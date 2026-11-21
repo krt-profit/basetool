@@ -1,6 +1,6 @@
 # PostgreSQL major upgrade — operator runbook
 
-> **Doc type:** Runbook — living, kept in sync with `main`. Last reviewed: 2026-11-20. The binding
+> **Doc type:** Runbook — living, kept in sync with `main`. Last reviewed: 2026-11-21. The binding
 > requirements are [`REQ-OPS-063`](specs/deployment-delivery.md#req-ops-063--a-postgresql-major-moves-beside-the-untouched-old-cluster)
 > and the operator gate in front of it, [`REQ-OPS-006`](specs/deployment-delivery.md#req-ops-006--stateful-infra-changes-are-operator-gated);
 > the decision record is [ADR-0399](adr/0399-a-postgresql-major-moves-by-dump-and-restore-beside-the-old-cluster.md).
