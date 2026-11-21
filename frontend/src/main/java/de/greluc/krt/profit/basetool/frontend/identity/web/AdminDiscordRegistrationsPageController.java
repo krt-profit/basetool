@@ -46,6 +46,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
@@ -53,7 +54,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * approves, rejects, links or merges them in place via {@code /api/v1/users/admin/registrations}.
  *
  * <p>Approval grants no Basetool roles. Rejected registrations are listed too and can be reopened
- * (REQ-SEC-034).
+ * (REQ-SEC-034). The open page follows the admin dashboard room's registrations section and
+ * re-renders both lists in place on a change (REQ-SEC-017).
  */
 @Controller
 @UsesLayoutModel
@@ -67,14 +69,18 @@ public class AdminDiscordRegistrationsPageController {
   private final IdentityBackendClient identityClient;
 
   /**
-   * Renders the pending-registration queue.
+   * Renders the pending and the rejected registrations; {@code ?fragment=panels} renders only the
+   * two queue panels, which the page swaps in place on a live-sync frame (REQ-FE-010).
    *
-   * @param model Thymeleaf model populated with the pending registrations
-   * @return the {@code admin/discord-registrations} view name
+   * @param fragment {@code panels} to render only the queue panels, otherwise the whole page
+   * @param model Thymeleaf model populated with the pending and the rejected registrations
+   * @return the {@code identity/admin/discord-registrations} view name, or its {@code panels}
+   *     fragment
    */
   @NotNull
   @GetMapping
-  public String list(Model model) {
+  public String list(
+      @Nullable @RequestParam(name = "fragment", required = false) String fragment, Model model) {
     if (!SectionFallback.run(
         log,
         "pending-registrations",
@@ -86,7 +92,9 @@ public class AdminDiscordRegistrationsPageController {
       model.addAttribute("registrations", List.of());
     }
     model.addAttribute("rejected", loadRejected());
-    return "identity/admin/discord-registrations";
+    return "panels".equals(fragment)
+        ? "identity/admin/discord-registrations :: panels"
+        : "identity/admin/discord-registrations";
   }
 
   /**

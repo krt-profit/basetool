@@ -12,8 +12,6 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.discordregistrations', eyebrowKey='nav.admin.group.members', titleText=#{admin.discordRegistrations.title},
         count=${#lists.size(registrations)}, countId='registrationsCount')}"></th:block>
 
-    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
-
     <section class="list-panel">
         <div class="toolbar">
             <div class="krt-segmented" role="tablist" th:aria-label="#{admin.discordRegistrations.title}" data-testid="reg-tabs">
@@ -31,6 +29,10 @@
                 </button>
             </div>
         </div>
+
+        <div id="reg-panels" class="reg-panels">
+        <th:block th:fragment="panels">
+        <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
 
         <section id="reg-panel-open" class="card card--flush" role="tabpanel" aria-labelledby="reg-tab-open">
             <div class="table-responsive">
@@ -128,6 +130,8 @@
                     textKey='admin.discordRegistrations.rejected.empty.text')}"></th:block>
             </div>
         </section>
+        </th:block>
+        </div>
     </section>
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='reject-modal', titleKey='admin.discordRegistrations.reject.modal.title', variant='krt-modal--wide krt-modal--danger', body=~{::reject-modal-body})}">
@@ -202,14 +206,11 @@
         linkNoTarget: /*[[#{error.admin.discordRegistrations.link.noTarget}]]*/ 'Bitte einen Account auswählen.',
         reopened: /*[[#{admin.discordRegistrations.reopened}]]*/ 'Registrierung wieder eröffnet.',
         reopenError: /*[[#{error.admin.discordRegistrations.reopen}]]*/ 'Wiederöffnen fehlgeschlagen.',
-        reopen: /*[[#{admin.discordRegistrations.reopen}]]*/ 'Wiederöffnen',
-        approve: /*[[#{admin.discordRegistrations.approve}]]*/ 'Freigeben',
-        link: /*[[#{admin.discordRegistrations.link}]]*/ 'Verknüpfen',
-        merge: /*[[#{admin.discordRegistrations.merge}]]*/ 'Zusammenführen',
         merged: /*[[#{admin.discordRegistrations.merged}]]*/ 'Konten zusammengeführt.',
         mergeError: /*[[#{error.admin.discordRegistrations.merge}]]*/ 'Zusammenführen fehlgeschlagen.',
         mergeNoSource: /*[[#{error.admin.discordRegistrations.merge.noSource}]]*/ 'Bitte ein Konto auswählen.',
-        reject: /*[[#{admin.discordRegistrations.reject}]]*/ 'Ablehnen'
+        conflict: /*[[#{admin.discordRegistrations.conflict}]]*/ 'Die Registrierung hat sich inzwischen geändert.',
+        loadError: /*[[#{error.admin.discordRegistrations.load}]]*/ 'Registrierungen konnten nicht geladen werden.'
     };
 </script>
 <script type="module" th:src="@{/js/identity/discord-registrations.js}" th:attr="nonce=${cspNonce}"></script>

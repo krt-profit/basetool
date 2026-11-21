@@ -314,7 +314,8 @@ public enum LiveSyncTopicClass {
   /**
    * Global admin dashboard room with one section per admin widget: {@code deletion-requests},
    * {@code discord-registrations}, {@code terms} and {@code sync-status}; authorized locally by
-   * {@code ROLE_ADMIN} ({@link #requiredAnyRole}). The backend publishes into it (REQ-UI-034).
+   * {@code ROLE_ADMIN} ({@link #requiredAnyRole}). The backend publishes into it (REQ-UI-034); the
+   * sync reports page and the Discord registration queue follow their sections too.
    */
   ADMIN_DASHBOARD(
       "admin-dashboard",

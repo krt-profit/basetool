@@ -418,6 +418,22 @@ class LiveSyncSectionMapParityTest {
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MEMBERS.allowedSections());
   }
 
+  /**
+   * The Discord registration queue follows the registrations section of the backend-published admin
+   * dashboard room, so an edit of a pending account refreshes its versions.
+   */
+  @Test
+  void discordRegistrationsSeamMap_followsTheAdminDashboardRegistrationsSection()
+      throws IOException {
+    String path = "/static/js/identity/discord-registrations.js";
+    assertThat(readResource(path))
+        .contains("topicClass: 'ADMIN_DASHBOARD'", "topic: 'admin-dashboard'");
+    assertThat(seamMapKeys(path, "sections"))
+        .as("sections keys in discord-registrations.js vs LiveSyncTopicClass.ADMIN_DASHBOARD")
+        .containsExactly("discord-registrations")
+        .isSubsetOf(LiveSyncTopicClass.ADMIN_DASHBOARD.allowedSections());
+  }
+
   @Test
   void memberRolesSeamMap_matchesTheMemberTopicWhitelist() throws IOException {
     String js = readResource("/static/js/identity/member-roles.js");

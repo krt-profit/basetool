@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.identity.internal;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationChangedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
@@ -45,6 +46,14 @@ class RegistrationDashboardLiveSyncTest {
   @Test
   void aFiledRegistration_announcesOnlyTheRegistrationsSection() {
     publish(new DiscordRegistrationPendingEvent(UUID.randomUUID(), "user"));
+
+    verify(adminDashboardLiveSync).registrationsChanged();
+    verifyNoMoreInteractions(adminDashboardLiveSync);
+  }
+
+  @Test
+  void aChangedRegistration_announcesOnlyTheRegistrationsSection() {
+    publish(new DiscordRegistrationChangedEvent(UUID.randomUUID()));
 
     verify(adminDashboardLiveSync).registrationsChanged();
     verifyNoMoreInteractions(adminDashboardLiveSync);

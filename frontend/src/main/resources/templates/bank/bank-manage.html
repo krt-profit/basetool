@@ -151,38 +151,36 @@
                           th:text="#{'bank.account.status.' + ${a.status()}}">Aktiv</span>
                 </td>
                 <td class="cell-actions">
-                    <div class="bank-manage-row-actions">
-                        <th:block th:if="${management}">
-                            <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'bank-acc-more-' + a.id()}, items=~{::bank-acc-more-items})}">
-                                <th:block th:ref="bank-acc-more-items">
-                                    <button type="button" class="overflow-menu__item" role="menuitem"
-                                            data-trigger="open-modal-display" data-modal-id="bank-rename-modal"
-                                            th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-name=${a.name()}"
-                                            data-testid="bank-rename-open" th:text="#{bank.manage.account.rename}">Umbenennen</button>
-                                    <button type="button" class="overflow-menu__item" role="menuitem"
-                                            data-trigger="open-modal-display" data-modal-id="bank-target-modal"
-                                            th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-target=${a.balanceTarget() != null ? a.balanceTarget().toBigInteger() : ''}"
-                                            data-testid="bank-target-open" th:text="#{bank.manage.account.target}">Zielkontostand</button>
-                                    <button type="button" class="overflow-menu__item" role="menuitem"
-                                            th:if="${a.status() == 'CLOSED'}"
-                                            data-trigger="open-modal-display" data-modal-id="bank-reopen-modal"
-                                            th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
-                                            data-testid="bank-reopen-open" th:text="#{bank.manage.account.reopen}">Wieder&ouml;ffnen</button>
-                                    <div class="overflow-menu__sep" role="separator" th:if="${a.status() == 'ACTIVE'}"></div>
-                                    <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
-                                            th:if="${a.status() == 'ACTIVE' and a.balance().signum() == 0}"
-                                            data-trigger="open-modal-display" data-modal-id="bank-close-modal"
-                                            th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
-                                            data-testid="bank-close-open" th:text="#{bank.manage.account.close} + ' &hellip;'">Schlie&szlig;en &hellip;</button>
-                                    <button type="button" class="overflow-menu__item" role="menuitem" disabled aria-disabled="true"
-                                            th:if="${a.status() == 'ACTIVE' and a.balance().signum() != 0}"
-                                            th:title="#{bank.manage.account.close.blocked}"
-                                            data-testid="bank-close-blocked" th:text="#{bank.manage.account.close}">Schlie&szlig;en</button>
-                                </th:block>
+                    <th:block th:if="${management}">
+                        <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'bank-acc-more-' + a.id()}, items=~{::bank-acc-more-items})}">
+                            <th:block th:ref="bank-acc-more-items">
+                                <button type="button" class="overflow-menu__item" role="menuitem"
+                                        data-trigger="open-modal-display" data-modal-id="bank-rename-modal"
+                                        th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-name=${a.name()}"
+                                        data-testid="bank-rename-open" th:text="#{bank.manage.account.rename}">Umbenennen</button>
+                                <button type="button" class="overflow-menu__item" role="menuitem"
+                                        data-trigger="open-modal-display" data-modal-id="bank-target-modal"
+                                        th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-target=${a.balanceTarget() != null ? a.balanceTarget().toBigInteger() : ''}"
+                                        data-testid="bank-target-open" th:text="#{bank.manage.account.target}">Zielkontostand</button>
+                                <button type="button" class="overflow-menu__item" role="menuitem"
+                                        th:if="${a.status() == 'CLOSED'}"
+                                        data-trigger="open-modal-display" data-modal-id="bank-reopen-modal"
+                                        th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
+                                        data-testid="bank-reopen-open" th:text="#{bank.manage.account.reopen}">Wieder&ouml;ffnen</button>
+                                <div class="overflow-menu__sep" role="separator" th:if="${a.status() == 'ACTIVE'}"></div>
+                                <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                        th:if="${a.status() == 'ACTIVE' and a.balance().signum() == 0}"
+                                        data-trigger="open-modal-display" data-modal-id="bank-close-modal"
+                                        th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
+                                        data-testid="bank-close-open" th:text="#{bank.manage.account.close} + ' &hellip;'">Schlie&szlig;en &hellip;</button>
+                                <button type="button" class="overflow-menu__item" role="menuitem" disabled aria-disabled="true"
+                                        th:if="${a.status() == 'ACTIVE' and a.balance().signum() != 0}"
+                                        th:title="#{bank.manage.account.close.blocked}"
+                                        data-testid="bank-close-blocked" th:text="#{bank.manage.account.close}">Schlie&szlig;en</button>
                             </th:block>
                         </th:block>
-                        <svg class="krt-icon row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                    </div>
+                    </th:block>
+                    <svg class="krt-icon row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
                 </td>
             </tr>
             </tbody>
@@ -229,21 +227,19 @@
                               th:text="${h.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}">Aktiv</span>
                     </td>
                     <td class="cell-actions">
-                        <div class="bank-manage-row-actions">
-                            <th:block th:if="${management}">
-                                <button type="button" class="btn btn-quiet-danger btn-xs" th:if="${h.active()}"
-                                        data-trigger="open-modal-display" data-modal-id="bank-holder-deactivate-modal"
-                                        th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
-                                        data-testid="bank-holder-deactivate-open"
-                                        th:text="#{bank.manage.holder.deactivate}">Deaktivieren</button>
-                                <button type="button" class="btn btn-ghost btn-xs" th:unless="${h.active()}"
-                                        data-trigger="open-modal-display" data-modal-id="bank-holder-reactivate-modal"
-                                        th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
-                                        data-testid="bank-holder-reactivate-open"
-                                        th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
-                            </th:block>
-                            <svg th:if="${canViewHolder}" class="krt-icon row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                        </div>
+                        <th:block th:if="${management}">
+                            <button type="button" class="btn btn-quiet-danger btn-xs" th:if="${h.active()}"
+                                    data-trigger="open-modal-display" data-modal-id="bank-holder-deactivate-modal"
+                                    th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
+                                    data-testid="bank-holder-deactivate-open"
+                                    th:text="#{bank.manage.holder.deactivate}">Deaktivieren</button>
+                            <button type="button" class="btn btn-ghost btn-xs" th:unless="${h.active()}"
+                                    data-trigger="open-modal-display" data-modal-id="bank-holder-reactivate-modal"
+                                    th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
+                                    data-testid="bank-holder-reactivate-open"
+                                    th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
+                        </th:block>
+                        <svg th:if="${canViewHolder}" class="krt-icon row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
                     </td>
                 </tr>
                 </tbody>

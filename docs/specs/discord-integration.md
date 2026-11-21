@@ -525,6 +525,50 @@ are assigned manually (Track 1) — no automated mapping.
 
 **Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserRegistrationServiceTest` (approve/reject + 409) + `UserReconciliationServiceTest` (`DiscordSyncTests`: new credential ⇒ PENDING, new admin ⇒ ACTIVE; `SyncKeycloakUserTests`: scheduled-sync fail-safe) + `UserDeletionServiceTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption + `forgetApprovalVerdict`) + `PendingApprovalPageControllerTest` (status poll + the per-state render branch, incl. the unreadable-backend fallback and the redirect-loop regression) + `PendingApprovalRenderMvcTest` (the rendered page for all three states: which block exists, which is visible, which copy it carries, and whether the poll is wired) + `PendingApprovalAccessFilterTest` (backend `/api/**` gate, incl. the percent-encoded-prefix bypass) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `PendingApprovalAccessFilter`, `UserRegistrationService`, `UserDeletionService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `identity/pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
 
+### REQ-SEC-090 — The approval queue stays current while an admin edits a registration elsewhere
+
+An admin prepares a registration before approving it — display name, rank, squadrons, roles, a
+leadership post — on a second tab while `/admin/discord-registrations` stays open. Every decision on
+the queue is optimistic-locked on the account row's `version` (REQ-SEC-017, REQ-SEC-026,
+REQ-SEC-034), so an edit of that row on the other tab leaves the queue echoing a stale version.
+
+The queue MUST follow every committed write to an account it lists. The backend announces each
+update or removal of a `PENDING` or `REJECTED` account in the `discord-registrations` section of the
+`admin-dashboard` room after the commit (REQ-FE-015, ADR-0328). A JPA listener on `User` publishes
+`DiscordRegistrationChangedEvent` from the flush, so every writer is covered: an admin edit, a login
+refreshing the guild nickname, the Keycloak reconciliation, a merge. `RegistrationDashboardLiveSync`
+maps it to the section like the module's other registration events. An `ACTIVE` account is on no
+queue and announces nothing. A filed
+registration and a decision announce through their events as before. A write that leaves the
+account row alone — the role set with its own counter (REQ-SEC-088), an org-unit membership, a
+leadership post — does not change the version the queue echoes.
+
+The page re-renders both lists, open and rejected, as one server-rendered fragment in place, keeps
+the selected tab and brings the counts in line. It renders the rows from that fragment after its own
+decisions too, so the template is the only source of the row markup. A decision refused with `409`
+re-renders the lists in place and says that the registration changed, instead of offering a reload.
+A dialog resolves its registration only when it is confirmed, so the lists also refresh while a
+dialog is open; a dialog whose registration left the lists meanwhile closes with the same notice.
+
+**Acceptance**
+
+- [x] An update of a `PENDING` or `REJECTED` account queues a `discord-registrations` frame for the
+  commit, also when only the commit flushes it; an update of an `ACTIVE` account queues none.
+- [x] `?fragment=panels` renders only the two queue panels, each row with its current version, and a
+  failed read of the pending queue shows its error inside them.
+- [x] The page follows the `discord-registrations` section of the `admin-dashboard` room, a key the
+  relay whitelists.
+- [x] A decision refused with `409` re-renders the lists in place with a toast and offers no reload.
+
+**Enforced by:** `RegistrationQueueListenerTest`, `RegistrationQueueListenerIntegrationTest`,
+`RegistrationDashboardLiveSyncTest`, `AdminDiscordRegistrationsNicknameRenderTest` (panels
+fragment), `LiveSyncSectionMapParityTest` (seam map vs whitelist) · **Code:**
+`RegistrationQueueListener`, `User`, `DiscordRegistrationChangedEvent`,
+`RegistrationDashboardLiveSync`, `AdminDashboardLiveSync`,
+`AdminDiscordRegistrationsPageController`, `identity/admin/discord-registrations.html`,
+`discord-registrations.js`, `admin-discord-registrations.css` · **Related:** REQ-FE-001, REQ-FE-010,
+REQ-FE-015, REQ-UI-034 · **Decision:** ADR-0328
+
 ### REQ-NOTIF-012 — Admins notified on new PENDING registration
 
 When any brand-new non-admin account enters `PENDING` (awaiting approval), every admin receives
