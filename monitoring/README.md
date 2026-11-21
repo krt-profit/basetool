@@ -41,7 +41,11 @@ them that recurs lives here.
   because a rootless container cannot do their job: `node_exporter` (`:9100`; needs the systemd
   dbus socket), `alloy` (`:12345`; needs the real `adm` and `systemd-journal` groups), and
   `prometheus-podman-exporter` (`:9882`, a **user** unit of `basetool`, so it sees the rootless
-  containers). Two collector timers write into node_exporter's textfile directory
+  containers). Its `podman_image_*` series are the image list it read when it started. An image with
+  two digest names of one repository makes every scrape log `… was collected before with the same
+  name and label values`; deploy and the weekly cleanup drop the extra name, and the exporter stops
+  reporting it at its next restart (REQ-OPS-064,
+  [`docs/deployment.md`](../docs/deployment.md#superseded-image-names)). Two collector timers write into node_exporter's textfile directory
   `/var/lib/basetool/textfile`: `basetool-container-metrics.timer` (every 30 s,
   [`scripts/cgroup-container-metrics.py`](../scripts/cgroup-container-metrics.py) — the replacement
   for cAdvisor) and `basetool-cert-expiry.timer` (daily 03:40,

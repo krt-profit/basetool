@@ -3290,7 +3290,8 @@ isolated projects have nothing to reject and a module added later inherits no de
   it a shared image input, and `build-logic/**` is a path filter of the vulnerability-scan and
   sandbox-image workflows.
 - **The plugin classpath resolves from the portal with Maven Central behind it.** Both settings
-  files declare `pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }`, which
+  files declare `gradlePluginPortal()` and then `mavenCentral()` in `pluginManagement { repositories
+  { … } }`, behind the mirror of the next item, which
   is what seeds every project's `buildscript.repositories` in both builds — the repositories of
   `dependencyResolutionManagement` do not apply to that classpath, so without the declaration the
   default leaves the Gradle Plugin Portal as the only source. The portal answers the plugin markers
@@ -3300,6 +3301,20 @@ isolated projects have nothing to reject and a module added later inherits no de
   Central is a fallback, not a second source of truth — the portal stays first and every artifact
   still matches its committed checksum (REQ-OPS-034), the same bytes either way
   ([ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)).
+- **Maven Central is read through Google's mirror first.** Every repository block of both settings
+  files — `pluginManagement` and `dependencyResolutionManagement` in `settings.gradle.kts` and in
+  `build-logic/settings.gradle.kts`, four declarations — names
+  `maven("https://maven-central.storage-download.googleapis.com/maven2/")` (`Maven Central mirror
+  (Google)`) first, with `content { excludeModuleByRegex(".*", ".*\\.gradle\\.plugin") }`, and the
+  order of the previous item behind it. A build added later with its own settings file declares the
+  same. Central limits consumption per source IP and answers shared CI egress addresses with `429`
+  blocks of about half an hour, which Gradle's three attempts within seconds cannot outlast, and a
+  repository Gradle disables fails the resolution instead of falling through. The mirror never
+  answers a plugin marker, because the portal's generated markers are the bytes the checksums pin
+  and Central's copies differ. The mirror is a cache, not a source of truth: every artifact still
+  matches its committed checksum (REQ-OPS-034), an artifact it does not hold yet is a `404` that the
+  next repository resolves, and Gradle's internal retry properties stay at their defaults
+  ([ADR-0401](../adr/0401-maven-central-is-read-through-googles-mirror-first.md)).
 - **No behaviour change by the move.** The task graph (`build -m`, `tasks --all`), every task's
   type, dependencies and inputs, the compiler arguments including Error Prone's, the test JVM
   arguments, the resolved classpaths and the SBOM component lists are identical before and after.
@@ -3312,12 +3327,16 @@ isolated projects have nothing to reject and a module added later inherits no de
 - [x] `./gradlew help --configuration-cache` and `./gradlew build -m --configuration-cache` reuse
   their entry on the second run.
 - [x] A cold Gradle user home resolves the whole build under the strict verification metadata.
+- [x] An `assemble` from a cold Gradle user home downloads every library artifact from the Maven
+  Central mirror and every plugin marker from the portal, and nothing from `repo.maven.apache.org`,
+  under the strict verification metadata.
 - [x] `check_sbom_coverage.py` finds the SBOM convention and each module's application of it.
 
 **Enforced by:** `build-logic/` · `settings.gradle.kts` · `.github/scripts/check_sbom_coverage.py`
 (`sbom-coverage`) · `.github/scripts/image_reuse_plan.py` (`--selftest`) · **Decision:**
 [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md),
-[ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md) ·
+[ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md),
+[ADR-0401](../adr/0401-maven-central-is-read-through-googles-mirror-first.md) ·
 **Related:** REQ-OPS-034, REQ-OPS-037, REQ-OPS-038
 
 Node script tests register through `registerNodeScriptTest` in `build-logic`, retaining their task
@@ -3979,6 +3998,48 @@ host that resolves another branch also stops rehearsing the other's package set.
 (`epel-branch`) · `scripts/check-conformance.test.sh` · **Decision:**
 [ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
 Amendment 2 · **Related:** REQ-OPS-032, REQ-OPS-053, ADR-0163
+
+### REQ-OPS-064 — An image carries one digest name per repository
+
+**Status:** Accepted
+
+The stateful and monitoring images are pinned to an index digest, and upstream re-publishes an
+index without changing its linux/amd64 image. A pin moved to such an index names an image the store
+already holds: Podman adds the new `repo@sha256:` name to it and keeps the old one. The podman
+exporter turns every name of an image into its own `podman_image_info`, `podman_image_size` and
+`podman_image_created_seconds` series, labelled with the repository and the tag `<none>`, so two
+digest names of one repository are two identical series and every scrape fails with *"was collected
+before with the same name and label values"* (#3518: redis after the 2026-11-19 bump, postgres
+before it).
+
+- **A successful deploy drops every digest name an image carries beyond one per repository**, after
+  the monitoring units and the edge are reconciled; a failure is logged and does not fail the
+  deploy.
+- **The weekly cleanup does the same** as a step of its own, so a pair made outside a deploy (a
+  manual stateful-infra upgrade) lasts a week at most, and a failure there withholds its success
+  stamp like any other step.
+- **The name kept is the one an installed unit pins** (`Image=` of a `.container` or a drop-in),
+  else the first one podman lists. Nothing is pulled or removed, and a tagged name is left alone: a
+  unit naming a dropped digest resolves to the same image through the digests the image records.
+
+**Acceptance**
+
+- [x] A store whose image holds the old and the new index digest of one repository keeps only the
+  pinned one after a deploy, and a pair with no pinned name keeps the first listed
+  (`container-runtime.test.sh`, `deploy.test.sh`).
+- [x] A tagged name, a second repository and a repeated listing line drop nothing, and a listing
+  that fails fails the step (`container-runtime.test.sh`).
+- [x] On podman 5.8, two pulls of `redis` by its two index digests give one image with two names;
+  `podman image untag` drops one, and the dropped digest still resolves without a pull.
+- [ ] After the host step and the next deploy, the production exporter's journal carries no
+  `collected before with the same name and label values`.
+
+**Enforced by:** `scripts/lib/container-runtime.sh` (`rt_drop_superseded_digest_names`,
+`rt_superseded_digest_names`, `rt_unit_pinned_digests`) · `scripts/deploy.sh` ·
+`scripts/container-cleanup.sh` · `ansible/roles/basetool_host/defaults/main.yml`
+(`image list`, `image untag` in `basetool_host_deploy_podman_subcommands`) ·
+`scripts/container-runtime.test.sh` · `scripts/deploy.test.sh`
+(`scenario_podman_drops_a_superseded_digest_name`) · **Related:** REQ-OPS-035, ADR-0194
 
 ## Open questions
 

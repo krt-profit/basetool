@@ -106,8 +106,9 @@ The layout and the realm name are decided in
 
 `deploy` reaches `basetool`'s containers only through `/etc/sudoers.d/basetool-deploy`: the podman
 sub-commands its scripts run (`basetool_host_deploy_podman_subcommands` in the role defaults —
-`container prune`, `cp`, `create`, `exec`, `image inspect`, `image prune`, `info`, `inspect`, `login`,
-`network prune`, `ps`, `pull`, `rm`, `run`, `system df`, `volume inspect`) and
+`container prune`, `cp`, `create`, `exec`, `image inspect`, `image list`, `image prune`,
+`image untag`, `info`, `inspect`, `login`, `network prune`, `ps`, `pull`, `rm`, `run`,
+`system df`, `volume inspect`) and
 `systemctl --user *` as `basetool`, plus `systemctl restart alloy.service` as root, nothing else
 (`ansible/roles/basetool_host/tasks/22-deploy-user.yml`). A script that needs another sub-command
 adds it to that list in the same PR — repo-lint's `check-deploy-podman-allowlist.py` fails
@@ -765,8 +766,9 @@ Within about five minutes the timer fires `deploy.sh`, which:
    a `restart` of each monitoring unit the release re-defined, its `env.d` file included, and a
    `start` of the others — and the edge (config drift or renewed certificates → `nginx reloaded in
    place` through `docker/edge/reload.sh`; a configuration nginx refuses keeps the running edge and
-   raises `EdgeConfigNotLoaded`, any other reload failure recreates it), and prunes dangling images older
-   than 30 days;
+   raises `EdgeConfigNotLoaded`, any other reload failure recreates it), drops every digest name an
+   image carries beyond one per repository (non-gating, REQ-OPS-064, [Superseded image
+   names](#superseded-image-names)), and prunes dangling images older than 30 days;
 7. on a health failure logs which units did not come up and what the release changed, restores the
    previous config tree, the previous units, the previous `env.d/` (rendered again from the previous
    tree's templates), the previous pin drop-ins **and the previous provider JAR** — together, never
@@ -2672,9 +2674,9 @@ cd / && sudo -u deploy /opt/basetool/scripts/deploy.sh --check-only && tail -n 2
 
 `basetool-container-cleanup.timer` (Saturday 02:00 UTC) runs
 [`scripts/container-cleanup.sh`](../scripts/container-cleanup.sh) as `deploy` through the runtime
-seam: stopped containers older than 24 h, unused images older than 14 days (outliving the deploy
-rollback anchor), unused networks older than 24 h. Each is overridable with `BASETOOL_CLEANUP_*`
-(`--help`).
+seam: stopped containers older than 24 h, the superseded digest names of an image ([below](#superseded-image-names)),
+unused images older than 14 days (outliving the deploy rollback anchor), unused networks older than
+24 h. Each age is overridable with `BASETOOL_CLEANUP_*` (`--help`).
 
 **Two steps the Docker job had are gone, deliberately (ADR-0194).** `podman builder prune` is only an
 alias for `image prune`. And **`podman volume prune` is never run**: unlike Docker's, it removes every
@@ -2689,6 +2691,33 @@ systemctl start basetool-container-cleanup.service && tail -f /var/log/basetool/
 ```
 
 `ContainerCleanupStaleOrMissing` fires when the last success is over eight days old.
+
+### Superseded image names
+
+The stateful and monitoring images are pinned to an **index** digest. Upstream re-publishes an
+index — new attestations, another platform added — without touching the linux/amd64 image, so a pin
+bump can name a new index whose image is already in the store. Podman then adds the new
+`repo@sha256:` name to that image instead of creating one, and keeps the old name beside it.
+The podman exporter reports every name of an image as its own `podman_image_*` series with the
+repository and the tag `<none>`, so two digest names of one repository are two identical series,
+and every scrape logs `error gathering metrics: 3 error(s) occurred … was collected before with the
+same name and label values` (#3518: redis `d8642290c6a4` after the pin moved from index
+`71885d8c…` to `7958cfbb…`, both carrying the amd64 manifest `41ed50f5…`).
+
+So a successful deploy and the weekly cleanup drop every digest name an image carries beyond one
+per repository (`rt_drop_superseded_digest_names`, REQ-OPS-064). The name kept is the one whose
+digest an installed unit's `Image=` pins, else the first podman lists, which is the most recently
+added. Nothing is pulled or removed: a unit that still names the dropped digest — a rollback —
+resolves to the same image through the digests the image records.
+
+The exporter reads the image list when it starts, so it reports a dropped name until its next
+restart. By hand on a host, after `podman image list --no-trunc --format '{{.ID}} {{.Names}}'`
+showed the pair, as the operator:
+
+```bash
+cd / && sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) podman image untag <image id> <superseded repo@sha256:…>
+sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user restart prometheus-podman-exporter.service
+```
 
 ---
 

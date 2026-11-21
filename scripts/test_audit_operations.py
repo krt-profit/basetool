@@ -180,6 +180,7 @@ export RT_BACKEND=podman RT_CLI="{directory}/runtime" RT_SYSTEMCTL="{directory}/
 export BASETOOL_CLEANUP_LOCKFILE="{directory}/cleanup.lock" BASETOOL_MONITORING_TEXTFILE_DIR="{directory}/textfile"
 export PRUNE_FAIL=7
 if bash "{linux(script)}" > "{directory}/cleanup.log" 2>&1; then exit 1; fi
+grep -q 'image list' "$CALLS"
 grep -q 'image prune' "$CALLS"
 grep -q 'network prune' "$CALLS"
 ! grep -q 'volume prune' "$CALLS"
@@ -191,6 +192,7 @@ cp "{directory}/textfile/container_cleanup.prom" "{directory}/before.prom"
 : > "$CALLS"
 bash "{linux(script)}" --dry-run >> "{directory}/cleanup.log" 2>&1
 ! grep -q prune "$CALLS"
+! grep -q 'image list' "$CALLS"
 cmp "{directory}/before.prom" "{directory}/textfile/container_cleanup.prom"
 ''')
 
