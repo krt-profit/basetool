@@ -23,9 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderForm;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverForm;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
@@ -609,8 +607,9 @@ public class JobOrderPageController {
    * delivered-against-required progress head, fulfilment, the open quantity split into SCU and
    * pieces, and the claim and handover counts.
    *
-   * <p>A material order's requirement is the still-open line amount plus what its handovers
-   * delivered, per unit, for every permitted order reader. Missing stock or claims count as zero.
+   * <p>A material order's requirement is its lines' requested amount and its open quantity the
+   * remaining amount not covered by linked stock, per unit, for every permitted order reader.
+   * Missing stock or claims count as zero.
    *
    * @param order the loaded order (any kind)
    * @return an insertion-ordered map of KPI values keyed for the fragment ({@code fulfilled},
@@ -692,12 +691,12 @@ public class JobOrderPageController {
       if (order.materials() != null) {
         total = order.materials().size();
         for (JobOrderMaterialDto mat : order.materials()) {
-          double required = mat.amount() != null ? mat.amount() : 0.0;
+          double remaining = mat.remainingAmount();
           double stock = mat.currentStock() != null ? mat.currentStock() : 0.0;
-          if (stock >= required) {
+          if (stock >= remaining) {
             fulfilled++;
           }
-          double open = Math.max(0.0, required - stock);
+          double open = Math.max(0.0, remaining - stock);
           if (mat.material() != null && "PIECE".equals(mat.material().quantityType())) {
             hasPieceMaterial = true;
             openAmountPiece += open;
@@ -729,9 +728,9 @@ public class JobOrderPageController {
    * Puts a material order's delivered and required quantities per unit and its progress into the
    * KPI map (REQ-ORDERS-026).
    *
-   * <p>A handover lowers its line's amount, so the requirement is the open line amount plus the
-   * delivered amount. With both units present the progress is the mean of the two per-unit shares,
-   * because SCU and pieces are never summed.
+   * <p>The requirement is the lines' requested amount and the delivery their handed-over credit, so
+   * a surplus beyond every line does not count. With both units present the progress is the mean of
+   * the two per-unit shares, because SCU and pieces are never summed.
    *
    * @param kpi the KPI map to fill
    * @param order the loaded material order
@@ -740,30 +739,17 @@ public class JobOrderPageController {
       @NotNull Map<String, Object> kpi, @NotNull JobOrderDto order) {
     double deliveredScu = 0.0;
     double deliveredPiece = 0.0;
-    if (order.handovers() != null) {
-      for (JobOrderHandoverDto handover : order.handovers()) {
-        if (handover.items() == null) {
-          continue;
-        }
-        for (JobOrderHandoverItemDto line : handover.items()) {
-          double amount = line.amount() != null ? line.amount() : 0.0;
-          if (line.material() != null && "PIECE".equals(line.material().quantityType())) {
-            deliveredPiece += amount;
-          } else {
-            deliveredScu += amount;
-          }
-        }
-      }
-    }
-    double requiredScu = deliveredScu;
-    double requiredPiece = deliveredPiece;
+    double requiredScu = 0.0;
+    double requiredPiece = 0.0;
     if (order.materials() != null) {
       for (JobOrderMaterialDto mat : order.materials()) {
-        double open = mat.amount() != null ? mat.amount() : 0.0;
+        double requested = mat.amount() != null ? mat.amount() : 0.0;
         if (mat.material() != null && "PIECE".equals(mat.material().quantityType())) {
-          requiredPiece += open;
+          requiredPiece += requested;
+          deliveredPiece += mat.handedOverAmount();
         } else {
-          requiredScu += open;
+          requiredScu += requested;
+          deliveredScu += mat.handedOverAmount();
         }
       }
     }

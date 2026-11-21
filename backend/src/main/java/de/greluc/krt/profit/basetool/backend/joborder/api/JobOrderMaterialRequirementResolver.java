@@ -51,8 +51,8 @@ public class JobOrderMaterialRequirementResolver {
   private final QualityTierMapper qualityTierMapper;
 
   /**
-   * Normalises one order into its material buckets: a {@code MATERIAL} order's lines as they are,
-   * an {@code ITEM} order's blueprint-derived outstanding aggregation.
+   * Normalises one order into its material buckets: a {@code MATERIAL} order's lines with their
+   * remaining amount, an {@code ITEM} order's blueprint-derived outstanding aggregation.
    *
    * @param order the managed order to normalise.
    * @return its buckets; empty for an order with no requirements, never {@code null}.
@@ -82,7 +82,7 @@ public class JobOrderMaterialRequirementResolver {
           new MaterialRequirement(
               materialMapper.toDto(line.getMaterial()),
               qualityTierMapper.toDto(line.getQualityTier()),
-              line.getAmount() == null ? 0.0 : line.getAmount()));
+              line.remainingAmount()));
     }
     return requirements;
   }

@@ -33,8 +33,10 @@ import java.util.UUID;
  * @param material the required material (carries {@code quantityType} for unit-aware display)
  * @param minQuality the floor of the line's quality tier, or {@code null} for the base tier
  * @param qualityTier the line's quality tier, with its labels and floor
- * @param amount the required amount
- * @param currentStock the summed linked-inventory stock
+ * @param amount the requested amount; handovers do not lower it
+ * @param handedOverAmount the handed-over amount credited to this line
+ * @param remainingAmount the requested amount less the handed-over amount, never negative
+ * @param currentStock the linked stock attributed to the remaining need
  * @param claims the per-squadron claims on this bucket; empty when no squadron has claimed
  * @param openAmount the uncovered outstanding demand less the claims, floored at 0
  * @param version optimistic-lock version
@@ -46,6 +48,8 @@ public record JobOrderMaterialDto(
     Integer minQuality,
     QualityTierDto qualityTier,
     Double amount,
+    double handedOverAmount,
+    double remainingAmount,
     Double currentStock,
     List<ClaimDto> claims,
     Double openAmount,

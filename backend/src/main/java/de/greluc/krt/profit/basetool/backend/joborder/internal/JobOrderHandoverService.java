@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverMapper;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -42,8 +43,11 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -91,26 +95,15 @@ public class JobOrderHandoverService {
       double amount,
       double remaining,
       boolean depleted,
-      @Nullable String quality) {
-
-    /**
-     * Returns this snapshot with the tier it was booked against.
-     *
-     * @param tierCode the tier's code
-     * @return the completed snapshot
-     */
-    HandedItem withQuality(@Nullable String tierCode) {
-      return new HandedItem(itemId, label, material, amount, remaining, depleted, tierCode);
-    }
-  }
+      @Nullable String quality) {}
 
   /**
    * Creates a job-order handover and atomically applies its effects.
    *
    * <ul>
    *   <li>reduces inventory amounts, deleting fully consumed rows,
-   *   <li>reduces the open amount per {@link
-   *       de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial},
+   *   <li>credits each item to the requirement lines it fulfils and records the rest as its
+   *       surplus, leaving every line's requested amount unchanged (ADR-0400),
    *   <li>persists the handover and its items,
    *   <li>unlinks remaining inventory of fully fulfilled materials,
    *   <li>completes the order once every material is fulfilled.
@@ -165,6 +158,9 @@ public class JobOrderHandoverService {
 
     final Integer orderDisplayId = jobOrder.getDisplayId();
     final List<HandedItem> handedItems = new ArrayList<>();
+    final Map<UUID, JobOrderMaterial> lines =
+        jobOrder.getMaterials().stream()
+            .collect(Collectors.toMap(JobOrderMaterial::getId, Function.identity()));
 
     int bookingIndex = 0;
     for (JobOrderHandoverItemCreateDto itemDto : items) {
@@ -173,6 +169,7 @@ public class JobOrderHandoverService {
               stockCommands.lockRow(itemDto.inventoryItemId()), "Inventory item not found");
 
       final double remainingAmount = inventoryItem.getAmount() - itemDto.amount();
+      final MaterialHandoverCalculation.Booking booking = booked.bookings().get(bookingIndex++);
 
       JobOrderHandoverItem handoverItem = new JobOrderHandoverItem();
       handoverItem.setMaterial(Objects.requireNonNull(inventoryItem.getMaterial()));
@@ -181,6 +178,10 @@ public class JobOrderHandoverService {
       handoverItem.setAmount(itemDto.amount());
       handoverItem.setLocationName(
           inventoryItem.getLocation() != null ? inventoryItem.getLocation().getName() : null);
+      for (MaterialHandoverCalculation.LineCredit credit : booking.credits()) {
+        handoverItem.credit(Objects.requireNonNull(lines.get(credit.lineId())), credit.amount());
+      }
+      handoverItem.setSurplusAmount(booking.surplus());
 
       handover.addItem(handoverItem);
 
@@ -197,7 +198,7 @@ public class JobOrderHandoverService {
               itemDto.amount(),
               itemDepleted ? 0.0 : remainingAmount,
               itemDepleted,
-              null));
+              booking.tierCode()));
 
       stockCommands.takeFromEarmarkedRow(
           inventoryItem.getId(),
@@ -205,14 +206,7 @@ public class JobOrderHandoverService {
           itemDto.amount(),
           itemDto.missionReductions(),
           StockChangeReason.HANDOVER);
-
-      String tierCode = booked.bookings().get(bookingIndex++).tierCode();
-      handedItems.set(handedItems.size() - 1, handedItems.getLast().withQuality(tierCode));
     }
-    jobOrder
-        .getMaterials()
-        .forEach(
-            line -> line.setAmount(Objects.requireNonNull(booked.remaining().get(line.getId()))));
 
     JobOrderHandover savedHandover = jobOrderHandoverRepository.save(handover);
     final JobOrderHandoverDto resultDto = jobOrderHandoverMapper.toDto(savedHandover);

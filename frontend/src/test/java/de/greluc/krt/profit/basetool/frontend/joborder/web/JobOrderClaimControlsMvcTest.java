@@ -294,7 +294,7 @@ class JobOrderClaimControlsMvcTest {
         "MATERIAL".equals(type)
             ? List.of(
                 new JobOrderMaterialDto(
-                    UUID.randomUUID(), material, null, null, 10.0, 0.0, claims, 5.0, 1L))
+                    UUID.randomUUID(), material, null, null, 10.0, 0.0, 10.0, 0.0, claims, 5.0, 1L))
             : List.of(),
         List.of(),
         "ITEM".equals(type)

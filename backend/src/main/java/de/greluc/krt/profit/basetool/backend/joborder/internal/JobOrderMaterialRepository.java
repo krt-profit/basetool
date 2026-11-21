@@ -40,7 +40,7 @@ public interface JobOrderMaterialRepository extends JpaRepository<JobOrderMateri
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialHandoverRequirement(
-          m.id, m.version, m.material.id, q.id, q.code, q.minQuality, m.amount)
+          m.id, m.version, m.material.id, q.id, q.code, q.minQuality, m.amount - m.creditedAmount)
       FROM JobOrderMaterial m JOIN m.qualityTier q
       WHERE m.jobOrder.id = :orderId ORDER BY m.id
       """)

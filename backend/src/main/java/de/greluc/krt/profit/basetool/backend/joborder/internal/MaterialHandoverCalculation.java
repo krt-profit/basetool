@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -55,28 +56,46 @@ public final class MaterialHandoverCalculation {
       double amount,
       @Nullable String tierCode) {}
 
-  /** The first material tier selected for one request entry. */
-  record Booking(@NotNull UUID rowId, @Nullable String tierCode) {}
+  /**
+   * The part of one request entry credited to one requirement line.
+   *
+   * @param lineId the credited requirement line
+   * @param amount the credited quantity, at SCU scale and positive
+   */
+  record LineCredit(@NotNull UUID lineId, double amount) {}
+
+  /**
+   * How one request entry is booked: its credits in take order and the part no line could take.
+   *
+   * @param rowId the named physical source
+   * @param tierCode the code of the first selected line, or null when no line matches the material
+   * @param credits the per-line credits in take order
+   * @param surplus the quantity beyond every eligible line's remaining need, at SCU scale
+   */
+  record Booking(
+      @NotNull UUID rowId,
+      @Nullable String tierCode,
+      @NotNull List<LineCredit> credits,
+      double surplus) {
+    Booking {
+      credits = List.copyOf(credits);
+    }
+  }
 
   /** A complete booking result or a precise requirement-validation refusal. */
   sealed interface Result permits Booked, Refused {}
 
   /**
-   * Final requirement quantities and exact fulfillment effects of the handover.
+   * The bookings of every request entry and the exact fulfillment effects of the handover.
    *
-   * @param remaining the remaining quantity keyed by requirement identity
-   * @param bookings the first selected tier for each request entry
+   * @param bookings the booking of each request entry, in request order
    * @param fulfilledMaterials touched materials whose every requirement is fulfilled
    * @param allFulfilled whether every material requirement is fulfilled
    */
   record Booked(
-      @NotNull Map<UUID, Double> remaining,
-      @NotNull List<Booking> bookings,
-      @NotNull Set<UUID> fulfilledMaterials,
-      boolean allFulfilled)
+      @NotNull List<Booking> bookings, @NotNull Set<UUID> fulfilledMaterials, boolean allFulfilled)
       implements Result {
     Booked {
-      remaining = Map.copyOf(remaining);
       bookings = List.copyOf(bookings);
       fulfilledMaterials = Set.copyOf(fulfilledMaterials);
     }
@@ -93,11 +112,19 @@ public final class MaterialHandoverCalculation {
   /** One requirement refusal without any mutation. */
   record Refused(@NotNull Refusal reason) implements Result {}
 
+  /**
+   * Books every entry against the lines of its material: the explicit tier first, then the other
+   * lines its quality meets by descending floor, each up to its remaining need (REQ-ORDERS-038).
+   *
+   * @param lines the order's requirement lines with their remaining need
+   * @param inputs the deliberate handover entries in request order
+   * @return the bookings, or the refusal that prevents the whole handover
+   */
   @NotNull
   static Result calculate(
       @NotNull List<MaterialHandoverRequirement> lines, @NotNull List<Input> inputs) {
     Map<UUID, Double> remaining = new LinkedHashMap<>();
-    lines.forEach(line -> remaining.put(line.id(), line.amount()));
+    lines.forEach(line -> remaining.put(line.id(), line.remaining()));
     List<Booking> bookings = new ArrayList<>();
     Set<UUID> touched = new LinkedHashSet<>();
     for (Input input : inputs) {
@@ -126,17 +153,26 @@ public final class MaterialHandoverCalculation {
         return new Refused(Refusal.QUALITY_BELOW_FLOOR);
       }
       double left = input.amount();
+      List<LineCredit> credits = new ArrayList<>();
       for (MaterialHandoverRequirement line : eligible) {
         if (left <= EPSILON) {
           break;
         }
         double current = Objects.requireNonNull(remaining.get(line.id()));
-        double take = Math.min(left, current);
-        remaining.put(line.id(), Math.max(0.0, current - take));
-        left -= take;
+        double take = ScuAmounts.roundToScuScale(Math.min(left, current));
+        if (take > EPSILON) {
+          remaining.put(line.id(), Math.max(0.0, ScuAmounts.roundToScuScale(current - take)));
+          credits.add(new LineCredit(line.id(), take));
+          left -= take;
+        }
       }
+      double surplus = left > EPSILON ? ScuAmounts.roundToScuScale(left) : 0.0;
       bookings.add(
-          new Booking(input.rowId(), eligible.isEmpty() ? null : eligible.getFirst().tierCode()));
+          new Booking(
+              input.rowId(),
+              eligible.isEmpty() ? null : eligible.getFirst().tierCode(),
+              credits,
+              surplus));
       touched.add(input.materialId());
     }
     Set<UUID> fulfilled = new LinkedHashSet<>();
@@ -148,9 +184,6 @@ public final class MaterialHandoverCalculation {
       }
     }
     return new Booked(
-        remaining,
-        bookings,
-        fulfilled,
-        remaining.values().stream().allMatch(amount -> amount <= EPSILON));
+        bookings, fulfilled, remaining.values().stream().allMatch(amount -> amount <= EPSILON));
   }
 }

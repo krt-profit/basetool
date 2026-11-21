@@ -217,11 +217,11 @@ class JobOrderHandoverCompletionIntegrationTest {
           "JobOrder must be COMPLETED after final handover");
       for (JobOrderMaterial m : reloaded.getMaterials()) {
         assertTrue(
-            m.getAmount() <= 0.0001,
+            m.remainingAmount() <= 0.0001,
             "All required materials must be fulfilled, but "
                 + m.getMaterial().getName()
                 + " is still "
-                + m.getAmount());
+                + m.remainingAmount());
       }
       InventoryItem inv1 = inventoryItemRepository.findById(f.invItem1Id()).orElseThrow();
       InventoryItem inv2 = inventoryItemRepository.findById(f.invItem2Id()).orElseThrow();

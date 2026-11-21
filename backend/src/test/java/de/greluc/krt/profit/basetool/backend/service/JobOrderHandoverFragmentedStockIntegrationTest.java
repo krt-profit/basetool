@@ -281,11 +281,11 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
           "JobOrder must be COMPLETED after fragmented-stock handover");
       for (JobOrderMaterial m : reloaded.getMaterials()) {
         assertTrue(
-            m.getAmount() <= 0.0001,
+            m.remainingAmount() <= 0.0001,
             "All required materials must be fulfilled, but "
                 + m.getMaterial().getName()
                 + " is still "
-                + m.getAmount());
+                + m.remainingAmount());
       }
       for (UUID id : f.aslariteInvIds()) {
         inventoryItemRepository

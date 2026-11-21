@@ -159,6 +159,46 @@ class JobOrderHandoverServiceTest {
     verify(inventoryItemRepository, never()).delete(any());
   }
 
+  /**
+   * An over-delivery keeps the requested amount, credits the line up to its need and records the
+   * rest as the item's surplus (REQ-ORDERS-077).
+   */
+  @Test
+  void createHandover_creditsTheLineAndRecordsTheSurplus_whenMoreIsHandedOverThanRequested() {
+    inventoryItem.setAmount(12.0);
+    inventoryItem.getJobOrderAllocations().iterator().next().setAmount(12.0);
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(
+            Instant.now(),
+            "HanSolo",
+            "Rogue",
+            List.of(new JobOrderHandoverItemCreateDto(inventoryId, 12.0, null, null)));
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
+        .thenReturn(mock(JobOrderHandoverDto.class));
+
+    service.createHandover(orderId, createDto);
+
+    org.mockito.ArgumentCaptor<JobOrderHandover> saved =
+        org.mockito.ArgumentCaptor.forClass(JobOrderHandover.class);
+    verify(jobOrderHandoverRepository).save(saved.capture());
+    var item = saved.getValue().getItems().iterator().next();
+    assertEquals(
+        List.of(
+            new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverCredit(
+                jobOrderMaterial.getId(), 10.0)),
+        item.getCredits());
+    assertEquals(2.0, item.getSurplusAmount(), 1e-9);
+    assertEquals(10.0, jobOrderMaterial.getAmount());
+    assertEquals(10.0, jobOrderMaterial.getCreditedAmount(), 1e-9);
+    assertEquals(0.0, jobOrderMaterial.remainingAmount());
+  }
+
   @Test
   void createHandover_shouldReduceInventoryAmount_whenAmountIsSmallerThanStock() {
     JobOrderHandoverItemCreateDto itemDto =
@@ -178,7 +218,8 @@ class JobOrderHandoverServiceTest {
     service.createHandover(orderId, createDto);
 
     assertEquals(6.0, inventoryItem.getAmount());
-    assertEquals(6.0, jobOrderMaterial.getAmount());
+    assertEquals(10.0, jobOrderMaterial.getAmount(), "the requested amount is kept");
+    assertEquals(6.0, jobOrderMaterial.remainingAmount());
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(inventoryItemRepository, never())
@@ -317,7 +358,7 @@ class JobOrderHandoverServiceTest {
 
     service.createHandover(orderId, createDto);
 
-    assertEquals(0.0, jobOrderMaterial.getAmount());
+    assertEquals(0.0, jobOrderMaterial.remainingAmount());
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository, never()).save(any());
     verify(offerRatchet).beforeDelete(List.of(inventoryItem.getId()), StockChangeReason.HANDOVER);
@@ -420,12 +461,12 @@ class JobOrderHandoverServiceTest {
 
     assertEquals(
         5.0,
-        jobOrderMaterial.getAmount(),
+        jobOrderMaterial.remainingAmount(),
         0.0001,
         "First material's open amount must be reduced from 10.0 to 5.0");
     assertEquals(
         0.0,
-        jobOrderMaterial2.getAmount(),
+        jobOrderMaterial2.remainingAmount(),
         0.0001,
         "Second material's open amount must be reduced from 8.0 to 0.0");
     verify(inventoryItemRepository).delete(inventoryItem2);
@@ -506,7 +547,7 @@ class JobOrderHandoverServiceTest {
     service.createHandover(orderId, createDto);
 
     verify(jobOrderService, never()).updateJobOrderStatus(any(), any());
-    assertEquals(6.0, jobOrderMaterial.getAmount(), 0.0001);
+    assertEquals(6.0, jobOrderMaterial.remainingAmount(), 0.0001);
   }
 
   @Test
@@ -626,7 +667,7 @@ class JobOrderHandoverServiceTest {
 
     assertDoesNotThrow(() -> service.createHandover(orderId, createDto));
 
-    assertEquals(0.0, jobOrderMaterial.getAmount(), 0.0001);
+    assertEquals(0.0, jobOrderMaterial.remainingAmount(), 0.0001);
     verify(jobOrderService).completeJobOrderWithinTransaction(order);
     verify(jobOrderService, never()).updateJobOrderStatus(any(), any());
     verify(jobOrderRepository, times(2)).findById(orderId);
@@ -690,7 +731,7 @@ class JobOrderHandoverServiceTest {
     service.createHandover(orderId, createDto);
 
     assertEquals(7.0, inventoryItem.getAmount());
-    assertEquals(7.0, jobOrderMaterial.getAmount());
+    assertEquals(7.0, jobOrderMaterial.remainingAmount());
     verify(inventoryItemRepository).save(inventoryItem);
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
   }

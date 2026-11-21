@@ -223,12 +223,12 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
           Material ouratiteFromMaterials = null;
           for (JobOrderMaterial m : reloaded.getMaterials()) {
-            if (m.getAmount() <= 0.0001) {
+            if (m.remainingAmount() <= 0.0001) {
               continue;
             }
             assertEquals(
                 3.7,
-                m.getAmount(),
+                m.remainingAmount(),
                 0.0001,
                 "Ouratite remaining amount must reflect the partial handover");
             ouratiteFromMaterials = m.getMaterial();
@@ -261,11 +261,11 @@ class JobOrderHandoverMixedFlowIntegrationTest {
           "JobOrder must be COMPLETED after the final partial handover");
       for (JobOrderMaterial m : reloaded.getMaterials()) {
         assertTrue(
-            m.getAmount() <= 0.0001,
+            m.remainingAmount() <= 0.0001,
             "All required materials must be fulfilled after final handover, but "
                 + m.getMaterial().getName()
                 + " is still "
-                + m.getAmount());
+                + m.remainingAmount());
       }
       InventoryItem inv2 = inventoryItemRepository.findById(f.invItem2Id()).orElseThrow();
       assertEquals(0.030999999999999, inv2.getAmount(), 0.0001);

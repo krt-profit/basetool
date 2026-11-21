@@ -73,15 +73,29 @@ class JobOrderFormTest {
   }
 
   /**
-   * Builds a material line.
+   * Builds a material line without handovers.
    *
    * @param materialId the material's id
    * @param minQuality the minimum quality
-   * @param amount the ordered amount
+   * @param amount the requested amount
    * @return the line
    */
   private static @NotNull JobOrderMaterialDto line(
       @NotNull UUID materialId, int minQuality, double amount) {
+    return line(materialId, minQuality, amount, 0.0);
+  }
+
+  /**
+   * Builds a material line with a handed-over credit.
+   *
+   * @param materialId the material's id
+   * @param minQuality the minimum quality
+   * @param amount the requested amount
+   * @param handedOver the amount already credited to the line
+   * @return the line
+   */
+  private static @NotNull JobOrderMaterialDto line(
+      @NotNull UUID materialId, int minQuality, double amount, double handedOver) {
     MaterialDto material =
         new MaterialDto(
             materialId,
@@ -100,7 +114,31 @@ class JobOrderFormTest {
             null,
             1L);
     return new JobOrderMaterialDto(
-        UUID.randomUUID(), material, minQuality, null, amount, 0.0, List.of(), amount, 1L);
+        UUID.randomUUID(),
+        material,
+        minQuality,
+        null,
+        amount,
+        handedOver,
+        amount - handedOver,
+        0.0,
+        List.of(),
+        amount,
+        1L);
+  }
+
+  /** A line with handovers is prefilled with its requested total and its handed-over minimum. */
+  @Test
+  void prefillsTheRequestedTotalAndTheHandedOverAmount() {
+    UUID material = UUID.randomUUID();
+
+    JobOrderForm form = JobOrderForm.forEdit(order(List.of(line(material, 650, 10.0, 4.5))));
+
+    assertThat(form.getMaterials())
+        .extracting(
+            JobOrderForm.JobOrderMaterialForm::getAmount,
+            JobOrderForm.JobOrderMaterialForm::getHandedOverAmount)
+        .containsExactly(tuple(10.0, 4.5));
   }
 
   /** Comment, version and every material line are copied in order. */

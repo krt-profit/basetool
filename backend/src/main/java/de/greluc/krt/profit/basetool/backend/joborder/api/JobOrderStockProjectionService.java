@@ -200,8 +200,7 @@ public class JobOrderStockProjectionService {
             jobOrder.getId(),
             baseMaterials.stream()
                 .map(m ->
-                    new MaterialRequirement(
-                        m.material(), m.qualityTier(), m.amount() == null ? 0.0 : m.amount()))
+                    new MaterialRequirement(m.material(), m.qualityTier(), m.remainingAmount()))
                 .toList());
     List<JobOrderMaterialDto> updatedMaterials = new ArrayList<>();
     for (int i = 0; i < baseMaterials.size(); i++) {
@@ -215,6 +214,8 @@ public class JobOrderStockProjectionService {
               matDto.minQuality(),
               matDto.qualityTier(),
               matDto.amount(),
+              matDto.handedOverAmount(),
+              matDto.remainingAmount(),
               round3(booked[i]),
               bucket != null ? bucket.claims() : List.of(),
               bucket != null ? bucket.openRemaining() : null,

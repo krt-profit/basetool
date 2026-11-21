@@ -497,8 +497,8 @@ public class JobOrderService {
   }
 
   /**
-   * Fully updates the order's metadata and replaces its materials; removed materials are deleted,
-   * kept ones retain their inventory links.
+   * Fully updates the order's metadata and its requested materials in place; removed materials are
+   * deleted, kept lines retain their handed-over credit and inventory links.
    *
    * @param id job order primary key
    * @param updateDto update payload with the expected version
@@ -564,17 +564,19 @@ public class JobOrderService {
   }
 
   /**
-   * Replaces the order's material lines and unlinks the inventory of every removed material, shared
-   * by the logistician and requester edits.
+   * Reconciles the order's material lines with the edited requested amounts in place and unlinks
+   * the inventory of every removed material, shared by the logistician and requester edits.
    *
-   * <p>The aggregate is saved and flushed before the context-clearing bulk unlinks run, and the
-   * order is then re-fetched, so the save never degrades into a stale merge and the returned
-   * version is current.
+   * <p>Kept lines keep their identity and handed-over credit (ADR-0400). The aggregate is saved and
+   * flushed before the context-clearing bulk unlinks run, and the order is then re-fetched, so the
+   * save never degrades into a stale merge and the returned version is current.
    *
    * @param id the order id, used for the re-fetch and the bulk unlink
    * @param managed the managed order whose scalars the caller has already set
-   * @param materials the new material lines
-   * @return the re-fetched order plus the removed-line and withdrawn-claim counts
+   * @param materials the edited material lines with their requested amounts
+   * @return the re-fetched order plus the removed-material and withdrawn-claim counts
+   * @throws BadRequestException when a line would fall below its handed-over amount, or a line with
+   *     handed-over credit would be removed or moved to another tier
    */
   @NotNull
   private MaterialReplaceOutcome replaceMaterialsWithinTransaction(
@@ -589,15 +591,7 @@ public class JobOrderService {
       }
     }
 
-    Set<UUID> keptTierIds = new LinkedHashSet<>();
-    for (JobOrderMaterial mat : managed.getMaterials()) {
-      keptTierIds.add(mat.getQualityTier().getId());
-    }
-    List<JobOrderMaterial> lines = materialLines.build(materials, keptTierIds);
-    managed.getMaterials().clear();
-    for (JobOrderMaterial line : lines) {
-      managed.addMaterial(line);
-    }
+    materialLines.reconcile(managed, materials);
     jobOrderRepository.saveAndFlush(managed);
 
     for (UUID removedId : removedMaterialIds) {
@@ -617,7 +611,7 @@ public class JobOrderService {
    * order and the counts recorded in the audit payload.
    *
    * @param order the re-fetched managed job order
-   * @param removedCount number of removed material lines
+   * @param removedCount number of materials the edit removed from the order
    * @param orphanedClaimsWithdrawn number of orphaned claims withdrawn
    */
   private record MaterialReplaceOutcome(
@@ -715,7 +709,8 @@ public class JobOrderService {
   }
 
   /**
-   * Edits remaining MATERIAL need and the requester comment while retaining booked handovers.
+   * Edits the requested MATERIAL amounts and the requester comment while retaining booked
+   * handovers; no line may fall below its handed-over amount.
    *
    * <p>Removed materials are unlinked from Inventory and current promises are reconciled
    * atomically.

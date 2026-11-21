@@ -31,7 +31,7 @@ import org.jetbrains.annotations.NotNull;
  * @param tierId the selected requirement tier
  * @param tierCode the selected requirement code
  * @param floor the minimum physical quality
- * @param amount the outstanding demand
+ * @param remaining the requested amount less the handed-over credit
  */
 public record MaterialHandoverRequirement(
     @NotNull UUID id,
@@ -40,4 +40,4 @@ public record MaterialHandoverRequirement(
     @NotNull UUID tierId,
     @NotNull String tierCode,
     int floor,
-    double amount) {}
+    double remaining) {}

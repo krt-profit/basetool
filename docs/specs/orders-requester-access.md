@@ -20,7 +20,7 @@ They see collection progress, assignees and notes, material requirements, handov
 reports, and the linked-stock owner/location. The DTO has no reduced-requester flag.
 
 `canEdit` reports current responsible-side processing authority. `canEditAsRequester` reports
-the current requesting-unit writer's capability to edit remaining need. Ordinary membership
+the current requesting-unit writer's capability to edit the requested need. Ordinary membership
 grants reading. An observed former requesting unit retains concrete order read through current
 legitimate unit reach.
 
@@ -32,9 +32,11 @@ The producer panel retains REQ-ORDERS-016's independent viewer gate. Unreadable 
 planned start remain anonymous in linked stock. Unrelated Inventory, private Bank data and the
 reduced external Exchange surface keep their own authority checks.
 
-A current requester writer edits remaining MATERIAL need and comment through
-`PUT /orders/{id}/requested`. For ITEM, `PUT /orders/{id}/items/requested` reconciles persistent
-line identities in place. Recorded handovers and manufactured and delivered quantities survive.
+A current requester writer edits the requested MATERIAL amounts and comment through
+`PUT /orders/{id}/requested`. The lines are reconciled in place by material and tier, and none
+may fall below, lose or move its handed-over credit (REQ-ORDERS-077). For ITEM,
+`PUT /orders/{id}/items/requested` reconciles persistent line identities in place. Recorded
+handovers and manufactured and delivered quantities survive.
 A produced line remains present with the same item and an amount that covers booked quantities.
 Both edits use the observed need version, reconcile material promises atomically, and preserve
 the current lifecycle. The central detail exposes the appropriate existing editor.

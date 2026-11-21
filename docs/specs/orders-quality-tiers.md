@@ -1,5 +1,6 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
-> **Owner area:** ORDERS/DATA · **Related ADRs:** [ADR-0241](../adr/0241-quality-tiers-are-a-catalogue-table.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-21.
+> **Owner area:** ORDERS/DATA · **Related ADRs:** [ADR-0241](../adr/0241-quality-tiers-are-a-catalogue-table.md),
+> [ADR-0400](../adr/0400-a-material-handover-credits-lines-and-keeps-the-requested-amount.md)
 
 > **Status:** Implemented baseline with accepted/planned shared-order amendments below.
 > The marked target is not implemented; new criteria are unchecked. Existing acceptance and
@@ -166,7 +167,8 @@ and only suggests one. Each position of a **material** handover MAY name a tier 
 - **Without a code** (a client that does not know the field, or a material with one tier), the
   amount goes to the line with the highest floor the entry's quality meets.
 - **Spill-over:** what the first line cannot take goes to the other lines the quality meets,
-  highest floor first; anything beyond every line is dropped, as an over-delivery always was.
+  highest floor first; anything beyond every line is the item's surplus, credited to no line
+  (REQ-ORDERS-077).
 - **Quality is checked:** stock below every floor of the material on the order is refused with a
   400 instead of silently reducing a line it does not satisfy.
 - **Unlinking:** the order's remaining allocations of a material are released only when **every**
@@ -184,9 +186,56 @@ and only suggests one. Each position of a **material** handover MAY name a tier 
   one tier keeps the material's allocations for the other.
 
 **Enforced by:** `JobOrderHandoverQualityTierTest`, `JobOrderHandoverServiceTest`, the handover
-integration tests · **Code:** `JobOrderHandoverService#bookAgainstLines`,
+integration tests · **Code:** `MaterialHandoverCalculation`, `JobOrderHandoverService`,
 `JobOrderHandoverItemCreateDto`, `static/js/joborder/orders-detail.js` (`_refreshHandoverTierChoice`,
 `_loadHandoverTierSuggestions`)
+
+### REQ-ORDERS-077 — A material line keeps its requested amount; handovers credit lines
+
+A `MATERIAL` order's line MUST keep the amount that was requested. A handover never lowers it
+(ADR-0400):
+
+- **Remaining need is derived.** Remaining = requested − handed-over credit, never below 0. Every
+  reader of the open need uses it: the handover booking and its auto-complete check, claims and
+  promise capacity (REQ-ORDERS-024), the quality-bucket allocation (REQ-ORDERS-037), the
+  material-demand overview (REQ-ORDERS-034), the pickers, stock levels and the exchange feed.
+- **Each handover item records where it counted.** It stores its credit per requirement line, as
+  booked by REQ-ORDERS-038, and its surplus beyond every eligible line's remaining need. Credits and
+  surplus add up to the delivered amount. The line's credited amount is the sum of its credits and
+  never exceeds its requested amount.
+- **An edit updates lines in place.** A line is matched by material and tier. The edit form shows
+  and posts each line's requested total, with the handed-over amount as a hint and minimum. A line
+  with credit keeps its identity and credit, and its material and tier are fixed in the form.
+  Refused with a 400 and no write:
+  - requesting a line below its handed-over credit (`error.job_order.material_below_handed_over`);
+  - removing a line with credit, or moving it to another tier
+    (`error.job_order.material_line_handed_over`). To end such a line, set it to its handed-over
+    amount.
+- **Existing handovers (`V439`).** Each existing item is credited in full to one line of its
+  material: the highest floor its quality meets, else the lowest floor, the smallest id on a tie.
+  The line's requested amount becomes its stored remaining plus that credit. A line at remaining 0
+  is therefore assumed not over-delivered. An item without a line of its material becomes surplus.
+- The order detail shows requested, handed-over and linked-stock amounts per line. A line is
+  fulfilled when its linked stock covers its remaining need. The KPI progress is handed-over
+  credit over requested.
+
+**Acceptance**
+
+- [x] A partial handover leaves the line's requested amount and raises its credit; the remaining
+  need drops by the credited amount.
+- [x] An over-delivery credits each eligible line up to its remaining need and records the rest as
+  the item's surplus.
+- [x] An entry split across two tiers credits each line separately.
+- [x] Editing keeps a credited line's id and credit. Lowering it below the credit, removing it or
+  changing its tier is a 400 with no write, and setting it to the credit is accepted.
+- [x] The migration credits existing items as described and keeps requested ≥ credited.
+
+**Enforced by:** `MaterialHandoverCalculationTest`, `JobOrderHandoverServiceTest`,
+`JobOrderHandoverQualityTierTest`, `JobOrderMaterialLinesTest`, `JobOrderMaterialEditCreditIntegrationTest`,
+`V439HandoverCreditMigrationTest`, `JobOrderFormTest`, `OrdersDetailPatternRenderTest` · **Code:**
+`JobOrderMaterial#remainingAmount`, `JobOrderHandoverItem#credit`, `JobOrderHandoverCredit`,
+`MaterialHandoverCalculation`, `JobOrderMaterialLines#reconcile`,
+`JobOrderMaterialRequirementResolver`, V439
 
 ### REQ-ORDERS-039 — A production run consumes only stock that meets the line's tier
 

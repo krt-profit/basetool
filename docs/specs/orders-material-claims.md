@@ -24,7 +24,8 @@ demand, S the matching current order-earmarked stock, and P the sum of active ou
 promises. Capacity is max(0, D − S), and 0 <= P <= capacity must hold at commit, including concurrent
 changes and the first promise in an empty set.
 
-MATERIAL D is its remaining requested quantity. ITEM D is the material needed for items not yet
+MATERIAL D is its requested quantity less the handed-over credit (REQ-ORDERS-077). ITEM D is the
+material needed for items not yet
 manufactured, changing the intentional full-original-order denominator in REQ-ORDERS-025.
 Existing manufactured, skipped-consumption and delivered counters and safe edit bounds remain.
 Use the established quality-floor allocation (REQ-ORDERS-036/-037): each physical stock quantity

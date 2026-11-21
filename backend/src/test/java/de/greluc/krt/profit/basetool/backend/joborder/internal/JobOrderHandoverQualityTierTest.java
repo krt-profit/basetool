@@ -173,8 +173,9 @@ class JobOrderHandoverQualityTierTest {
 
     handOver(new JobOrderHandoverItemCreateDto(row.getId(), 1.0, null, "NONE"));
 
-    assertThat(noneLine.getAmount()).isEqualTo(1.64, org.assertj.core.data.Offset.offset(1e-9));
-    assertThat(goodLine.getAmount()).isEqualTo(0.1);
+    assertThat(noneLine.remainingAmount())
+        .isEqualTo(1.64, org.assertj.core.data.Offset.offset(1e-9));
+    assertThat(goodLine.remainingAmount()).isEqualTo(0.1);
   }
 
   @Test
@@ -183,8 +184,8 @@ class JobOrderHandoverQualityTierTest {
 
     handOver(new JobOrderHandoverItemCreateDto(row.getId(), 0.1, null, "good"));
 
-    assertThat(goodLine.getAmount()).isZero();
-    assertThat(noneLine.getAmount()).isEqualTo(2.64);
+    assertThat(goodLine.remainingAmount()).isZero();
+    assertThat(noneLine.remainingAmount()).isEqualTo(2.64);
   }
 
   @Test
@@ -193,8 +194,9 @@ class JobOrderHandoverQualityTierTest {
 
     handOver(new JobOrderHandoverItemCreateDto(row.getId(), 1.0, null, null));
 
-    assertThat(goodLine.getAmount()).isZero();
-    assertThat(noneLine.getAmount()).isEqualTo(1.74, org.assertj.core.data.Offset.offset(1e-9));
+    assertThat(goodLine.remainingAmount()).isZero();
+    assertThat(noneLine.remainingAmount())
+        .isEqualTo(1.74, org.assertj.core.data.Offset.offset(1e-9));
   }
 
   @Test
@@ -203,8 +205,9 @@ class JobOrderHandoverQualityTierTest {
 
     handOver(new JobOrderHandoverItemCreateDto(row.getId(), 2.0, null, null));
 
-    assertThat(goodLine.getAmount()).isEqualTo(0.1);
-    assertThat(noneLine.getAmount()).isEqualTo(0.64, org.assertj.core.data.Offset.offset(1e-9));
+    assertThat(goodLine.remainingAmount()).isEqualTo(0.1);
+    assertThat(noneLine.remainingAmount())
+        .isEqualTo(0.64, org.assertj.core.data.Offset.offset(1e-9));
   }
 
   @Test
@@ -246,8 +249,8 @@ class JobOrderHandoverQualityTierTest {
         new JobOrderHandoverItemCreateDto(row.getId(), 0.1, null, "GOOD"),
         new JobOrderHandoverItemCreateDto(row.getId(), 2.64, null, "NONE"));
 
-    assertThat(goodLine.getAmount()).isZero();
-    assertThat(noneLine.getAmount()).isZero();
+    assertThat(goodLine.remainingAmount()).isZero();
+    assertThat(noneLine.remainingAmount()).isZero();
 
     verify(inventoryItemRepository).delete(row);
     verify(jobOrderService).completeJobOrderWithinTransaction(order);
@@ -259,7 +262,7 @@ class JobOrderHandoverQualityTierTest {
 
     handOver(new JobOrderHandoverItemCreateDto(row.getId(), 0.1, null, "GOOD"));
 
-    assertThat(goodLine.getAmount()).isZero();
+    assertThat(goodLine.remainingAmount()).isZero();
     verify(inventoryItemRepository, never())
         .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());

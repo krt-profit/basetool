@@ -203,6 +203,17 @@ function initMaterialEditor() {
     if (addMaterialBtn && materialsContainer && !boundOrderControls.has(materialsContainer)) {
         boundOrderControls.add(materialsContainer);
         /**
+         * Raises the amount input's minimum to the line's handed-over amount, when it has one.
+         *
+         * @param {Element} amountInput the row's amount input
+         * @param {string} unitMin the smallest amount of the material's unit
+         */
+        function setAmountMin(amountInput, unitMin) {
+            const handedOver = Number(amountInput.getAttribute('data-handed-over') || 0);
+            amountInput.setAttribute('min', String(Math.max(Number(unitMin), handedOver)));
+        }
+
+        /**
          * Shows the unit and the SCU hint matching the material chosen in an edit-form row.
          *
          * @param {Element | null} row the material row
@@ -228,17 +239,17 @@ function initMaterialEditor() {
             }
             if (qt === 'PIECE') {
                 amountInput.setAttribute('step', '1');
-                amountInput.setAttribute('min', '1');
+                setAmountMin(amountInput, '1');
                 if (unitSpan) unitSpan.textContent = `(${MSG_UNIT_PIECE})`;
                 if (hint) hint.classList.add('is-hidden');
             } else if (qt === 'SCU') {
                 amountInput.setAttribute('step', '0.001');
-                amountInput.setAttribute('min', '0.001');
+                setAmountMin(amountInput, '0.001');
                 if (unitSpan) unitSpan.textContent = `(${MSG_UNIT_SCU})`;
                 if (hint) hint.classList.remove('is-hidden');
             } else {
                 amountInput.setAttribute('step', '0.001');
-                amountInput.setAttribute('min', '0.001');
+                setAmountMin(amountInput, '0.001');
                 if (unitSpan) unitSpan.textContent = '';
                 if (hint) hint.classList.add('is-hidden');
             }
