@@ -1746,9 +1746,10 @@ not support rolling that back (upgrading guide, *Preparing for an upgrade*): tak
 first ([`backup.md`](backup.md)), and treat a rollback after the migration as a restore of that
 dump, because moving the image back does not undo the migration. Logins that are in flight at the
 restart must begin again, and the migration has a 30-minute timeout by default
-(`--transaction-setup-timeout`). For a **Postgres major** no procedure is written yet — the running cluster will not start on a newer
-major, so plan it as its own change (a dump and restore into a fresh data directory, the mechanism
-[`backup.md`](backup.md) already restores with) before promoting it.
+(`--transaction-setup-timeout`). A **PostgreSQL major** follows
+[`postgres-major-upgrade.md`](postgres-major-upgrade.md) (REQ-OPS-063, ADR-0399): each cluster is
+dumped, restored into a fresh cluster of the new major beside the old data directory and checked
+against it before `--force`, because the running cluster does not start on a newer major.
 
 When bumping a third-party image, re-check the container still starts under its unit's hardening
 (`ReadOnly=true`, `DropCapability=ALL`, its own `User=`, REQ-OPS-014); the health gate rolls a
