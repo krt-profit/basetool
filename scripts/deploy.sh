@@ -991,6 +991,8 @@ if rt_apply_stack; then
 
   reconcile_edge
 
+  rt_drop_superseded_digest_names \
+    || log "WARN: a superseded image name was not dropped — the podman exporter fails its image metrics until the weekly cleanup drops it (REQ-OPS-064)"
   rt_prune_images 720h
   exit 0
 fi

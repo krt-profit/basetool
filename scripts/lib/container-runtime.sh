@@ -625,6 +625,59 @@ rt_prune_images() {
   ${RT_CLI} image prune --force --filter "until=$1" >/dev/null 2>&1 || true
 }
 
+rt_unit_pinned_digests() {
+  local dir="${RT_UNIT_DIR:-}" file
+  [[ -d "${dir}" ]] || return 0
+  for file in "${dir}"/*.container "${dir}"/*.container.d/*.conf; do
+    if [[ -f "${file}" ]]; then
+      sed -n 's/^Image=[^[:space:]]*@\(sha256:[0-9a-f]\{64\}\)[[:space:]]*$/\1/p' "${file}"
+    fi
+  done
+}
+
+# Reads "<image id> <name>..." lines and prints "<image id> <name>" for every digest name beyond one
+# per repository (REQ-OPS-064). Kept is the name whose digest $1 lists, else the first one listed.
+rt_superseded_digest_names() {
+  local pinned=" ${1//$'\n'/ } " id rest name repo
+  local -a names=()
+  local -A seen=() kept=()
+  while read -r id rest; do
+    [[ -n "${id}" && -z "${seen[${id}]:-}" ]] || continue
+    seen[${id}]=1
+    read -ra names <<<"${rest}"
+    kept=()
+    for name in "${names[@]}"; do
+      [[ "${name}" == *@sha256:* ]] || continue
+      repo="${name%@sha256:*}"
+      if [[ -z "${kept[${repo}]:-}" ]] \
+        || [[ "${pinned}" != *" ${kept[${repo}]##*@} "* && "${pinned}" == *" ${name##*@} "* ]]; then
+        kept[${repo}]="${name}"
+      fi
+    done
+    for name in "${names[@]}"; do
+      [[ "${name}" == *@sha256:* && "${name}" != "${kept[${name%@sha256:*}]}" ]] || continue
+      printf '%s %s\n' "${id}" "${name}"
+    done
+  done
+}
+
+# A pin moved to a new index digest of an image already in the store adds a name to that image
+# instead of a new image; the old name stays until it is untagged.
+rt_drop_superseded_digest_names() {
+  local listing pinned id name short rc=0
+  listing="$(${RT_CLI} image list --no-trunc --format '{{.ID}} {{join .Names " "}}')" || return 1
+  pinned="$(rt_unit_pinned_digests)"
+  while read -r id name; do
+    if ${RT_CLI} image untag "${id}" "${name}"; then
+      short="${id#sha256:}"
+      echo "container-runtime: dropped the superseded name ${name} from image ${short:0:12}" >&2
+    else
+      rc=1
+    fi
+  done < <(rt_superseded_digest_names "${pinned}" <<<"${listing}")
+  return "${rc}"
+}
+
 rt_prune_networks() {
   ${RT_CLI} network prune -f >/dev/null 2>&1 || true
 }

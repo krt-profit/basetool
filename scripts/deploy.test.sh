@@ -123,6 +123,10 @@ case "${1:-}" in
     exit 0
     ;;
   image)
+    case "${2:-}" in
+      list) [[ -z "${FAKE_IMAGE_LIST:-}" ]] || printf '%s\n' "${FAKE_IMAGE_LIST}"; exit 0 ;;
+      untag) exit 0 ;;
+    esac
     img="${!#}"
     printf '%s\n' "$(lookup FAKE_REPODIGESTS "${img#img-cid-}")"
     exit 0
@@ -1885,12 +1889,35 @@ scenario_podman_refuses_without_quadlet() {
   rm -rf "${tmp}"
 }
 
+scenario_podman_drops_a_superseded_digest_name() {
+  echo "Scenario: a deploy leaves an image one digest name per repository (REQ-OPS-064)"
+  local tmp rc=0 img old new
+  img="$(hexdig d864)"
+  old="docker.io/library/redis@$(hexdig 7188)"
+  new="docker.io/library/redis@$(hexdig 7958)"
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  printf '[Container]\nContainerName=redis-session\nImage=docker.io/redis:8-alpine@%s\n' "${new#*@}" \
+    >"${T_UNIT_DIR}/redis-session.container"
+  write_marker "${PMARKER_OLD}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" "FAKE_IMAGE_LIST=${img} ${new} ${old}" || rc=$?
+  assert_exit 0 "$rc" "podman: the deploy succeeds"
+  assert_docker "podman image untag ${img} ${old}" "podman: the name the old pin left on the image is untagged"
+  assert_no_docker "podman image untag ${img} ${new}" "podman: ...and the name the unit pins stays"
+  assert_contains "dropped the superseded name ${old}" "podman: the deploy log names the dropped name"
+  rm -rf "${tmp}"
+}
+
 scenario_podman_resolves_without_pulling
 scenario_podman_applies_through_systemd
 scenario_podman_pin_is_a_dropin
 scenario_podman_health_gate_rolls_back
 scenario_podman_refuses_without_skopeo
 scenario_podman_refuses_without_quadlet
+scenario_podman_drops_a_superseded_digest_name
 
 write_bundle() {
   local b="$1"

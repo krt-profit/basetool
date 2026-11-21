@@ -16,7 +16,9 @@ basetool_host_deploy_podman_subcommands:
   - create
   - exec
   - image inspect
+  - image list
   - image prune
+  - image untag
   - info
   - inspect
   - login

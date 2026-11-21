@@ -205,7 +205,7 @@ distribution's own `dnf-automatic.timer` with a role drop-in; none rides the con
 | `basetool-restore-drill` | Sunday 05:30 | `deploy` | Restore the latest snapshot into a throwaway Postgres and score seven artifacts |
 | `basetool-cert-expiry` | daily 03:40, and at boot | `root` | Write `basetool_certificate_expiry_timestamp_seconds` for the certificate *files* |
 | `basetool-container-metrics` | every 30 s | `root` | The cgroup textfile collector that replaces part of cAdvisor |
-| `basetool-container-cleanup` | Saturday 02:00 UTC | `deploy` | Weekly prune of stopped containers, unused images and networks — never volumes (§7.4a) |
+| `basetool-container-cleanup` | Saturday 02:00 UTC | `deploy` | Weekly prune of stopped containers, superseded image names, unused images and networks — never volumes (§7.4a) |
 | `dnf-automatic` | daily 07:00 (+ up to 15 min) | `root` | Security advisories only, container runtime excluded, never reboots; each run records itself for `HostSecurityUpdates*` / `HostRebootRequired` (`REQ-OPS-032`) |
 
 ### 7.4a The weekly cleanup never prunes volumes
@@ -216,6 +216,7 @@ as the rootless service user, and what it does **not** prune is the part worth k
 | what | weekly cleanup |
 | --- | --- |
 | stopped containers, unused images, unused networks | pruned |
+| a digest name an image carries beyond one per repository | untagged, here and after every successful deploy — the one a unit pins stays ([REQ-OPS-064](../specs/deployment-delivery.md#req-ops-064--an-image-carries-one-digest-name-per-repository)) |
 | build cache | not run — `podman builder prune` is an alias for `image prune`, which already ran |
 | volumes, anonymous or named | **never** |
 
