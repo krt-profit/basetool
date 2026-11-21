@@ -8553,14 +8553,6 @@
     }
 
     @media (width <= 768px) {
-        .filter-popover {
-            position: static;
-        }
-
-        .filter-popover .filter-toggle {
-            width: auto;
-        }
-
         .toolbar__search {
             flex: 1 1 12rem;
         }
@@ -8596,17 +8588,6 @@
             :not(div, .meter)
             + .cell-sub:not(.stack-sub-break)::before {
             content: '\00a0\00b7\00a0';
-        }
-
-        .filter-popover__panel {
-            position: fixed;
-            inset: auto 0 var(--krt-tabbar-height) 0;
-            z-index: var(--z-floating);
-            width: auto;
-            max-width: none;
-            max-height: 70vh;
-            overflow-y: auto;
-            border-width: 1px 0 0;
         }
     }
 

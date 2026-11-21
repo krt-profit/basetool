@@ -465,7 +465,36 @@ the gate: it leaves the stack on the vulnerable build precisely when it should m
 - [ ] The first config bundle on a host with no previous definition is applied without a
   `CARVE-OUT`.
 
-**Enforced by:** `scripts/deploy.sh` (`infra_image_pins`, carve-out block) · **Runbook:** `docs/deployment.md` → *Stateful-infra upgrades*
+**Enforced by:** `scripts/deploy.sh` (`infra_image_pins`, carve-out block) · **Runbook:** `docs/deployment.md` → *Stateful-infra upgrades*; a PostgreSQL major: `docs/postgres-major-upgrade.md` (REQ-OPS-063)
+
+### REQ-OPS-063 — A PostgreSQL major moves beside the untouched old cluster
+
+A change of the `postgres:` image's **major** is applied by dumping each cluster and restoring the
+dump into a fresh cluster of the new major, initialised beside the old data directory in the same
+mount ([ADR-0399](../adr/0399-a-postgresql-major-moves-by-dump-and-restore-beside-the-old-cluster.md)).
+The old cluster is the way back: it is set aside, never deleted or written, until the new one has
+proven itself. The new cluster is complete before anything connects to it, because the backend's
+Flyway builds a fresh schema on an empty database and Keycloak a fresh realm.
+
+**Acceptance**
+
+- [ ] The old cluster's data directory is renamed, not deleted, and nothing writes to it until the
+  new cluster has passed the fingerprint check and a backup and a restore drill on the new major
+  have succeeded.
+- [ ] No application, Keycloak or exporter can connect to the new cluster before its roles, its
+  restore and its statistics are complete: it is initialised in a container without a network.
+- [ ] The release is applied only when every table's row count, every sequence's value and the
+  number of invalid constraints and indexes are identical in the old cluster (taken with the
+  writers stopped) and the new one.
+- [ ] The cluster-wide roles a dump does not carry are created in the new cluster before the restore.
+- [ ] Before production, the procedure has run end to end on the testing host, and production's
+  latest backup has been restored into the new major by the restore drill.
+- [ ] The release that changes the major changes nothing else.
+
+**Enforced by:** the operator, following the runbook — no script checks the order of its steps;
+`scripts/deploy.sh` holds the release back until `--force` (REQ-OPS-006), and
+`scripts/restore-drill.sh` takes the new major through `BASETOOL_DRILL_IMAGE` · **Runbook:**
+`docs/postgres-major-upgrade.md`
 
 ### REQ-OPS-007 — Keycloak provider JAR delivered as a separate promotable artifact
 
