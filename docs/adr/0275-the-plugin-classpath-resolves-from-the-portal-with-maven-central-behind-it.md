@@ -1,6 +1,8 @@
 # ADR-0275 — The plugin classpath resolves from the portal with Maven Central behind it
 
-- **Status:** Accepted
+- **Status:** Accepted — **amended by [ADR-0401](0401-maven-central-is-read-through-googles-mirror-first.md)**
+  (Google's Maven Central mirror is asked before the portal for everything but plugin markers; the
+  portal stays before Central)
 - **Date:** 2026-10-17
 - **Deciders:** @greluc
 - **Related:** spec [`deployment-delivery.md`](../specs/deployment-delivery.md) (REQ-OPS-046,
