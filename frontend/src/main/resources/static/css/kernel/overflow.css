@@ -5,6 +5,10 @@
         position: relative;
     }
 
+    .data-table .cell-actions > .overflow-menu {
+        display: inline-block;
+    }
+
     .overflow-menu__panel {
         position: absolute;
         top: calc(100% + 4px);

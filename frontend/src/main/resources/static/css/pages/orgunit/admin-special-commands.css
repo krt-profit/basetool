@@ -16,7 +16,8 @@
         font-family: var(--font-body);
         box-sizing: border-box;
     }
-    .sc-row--inactive td:not(.cell-actions) {
+    .sc-row--inactive .cell-title,
+    .sc-row--inactive td:not(:first-child, .cell-actions) {
         opacity: 0.6;
     }
     .sc-desc {
