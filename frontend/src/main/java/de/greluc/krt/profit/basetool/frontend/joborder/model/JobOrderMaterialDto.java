@@ -53,4 +53,15 @@ public record JobOrderMaterialDto(
     Double currentStock,
     List<ClaimDto> claims,
     Double openAmount,
-    Long version) {}
+    Long version) {
+
+  /**
+   * Returns the overview's collection progress (REQ-ORDERS-017): the linked stock plus the
+   * handed-over amount, as a share of the requested amount.
+   *
+   * @return the progress in percent, clamped to 0–100; {@code 0} when nothing is requested
+   */
+  public double collectionProgressPercent() {
+    return CollectionProgress.percent(amount, currentStock, handedOverAmount);
+  }
+}

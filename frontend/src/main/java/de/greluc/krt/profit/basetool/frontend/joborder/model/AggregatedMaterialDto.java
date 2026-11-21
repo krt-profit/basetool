@@ -53,9 +53,6 @@ public record AggregatedMaterialDto(
     List<ClaimDto> claims,
     Double openAmount) {
 
-  /** A complete collection, in percent. */
-  private static final double COMPLETE_PERCENT = 100.0;
-
   /**
    * Returns the overview's collection progress (REQ-ORDERS-017): the linked stock plus the material
    * built into manufactured units, as a share of the ordered quantity.
@@ -63,12 +60,6 @@ public record AggregatedMaterialDto(
    * @return the progress in percent, clamped to 0–100; {@code 0} when nothing is ordered
    */
   public double collectionProgressPercent() {
-    double ordered = orderedQuantity == null ? 0.0 : orderedQuantity;
-    if (ordered <= 0.0) {
-      return 0.0;
-    }
-    double stock = currentStock == null ? 0.0 : currentStock;
-    double built = manufacturedQuantity == null ? 0.0 : manufacturedQuantity;
-    return Math.clamp((stock + built) * COMPLETE_PERCENT / ordered, 0.0, COMPLETE_PERCENT);
+    return CollectionProgress.percent(orderedQuantity, currentStock, manufacturedQuantity);
   }
 }

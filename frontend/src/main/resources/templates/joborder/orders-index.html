@@ -179,7 +179,7 @@
                                         <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                                         <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                                     </td>
-                                    <td class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'">0 %</td>
+                                    <td class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal(mat.collectionProgressPercent(), 1, 0)} + ' %'">0 %</td>
                                 </tr>
                             </tbody>
                         </table>
