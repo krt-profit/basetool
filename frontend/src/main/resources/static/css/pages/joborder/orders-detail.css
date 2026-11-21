@@ -437,6 +437,10 @@
     .od-line__meta {
         margin-top: 0;
     }
+    .od-line__note {
+        grid-column: 1 / -1;
+        margin: 0;
+    }
     .od-add-line {
         width: 100%;
         margin-top: var(--space-3);
