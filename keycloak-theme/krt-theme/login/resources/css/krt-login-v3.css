@@ -663,6 +663,27 @@ select[aria-invalid='true'],
     text-decoration: underline !important;
 }
 
+.krt-legal-links {
+    display: flex !important;
+    flex-wrap: wrap;
+    justify-content: center !important;
+    gap: 4px 20px;
+    margin-top: 24px !important;
+    font-size: 0.85em !important;
+}
+
+.krt-legal-links a {
+    padding: 8px 4px;
+    color: var(--color-gray-2-text) !important;
+    text-decoration: none !important;
+}
+
+.krt-legal-links a:hover,
+.krt-legal-links a:focus-visible {
+    color: var(--color-primary) !important;
+    text-decoration: underline !important;
+}
+
 .pf-c-login__main,
 .pf-v5-c-login__main,
 .pf-v6-c-login__main,

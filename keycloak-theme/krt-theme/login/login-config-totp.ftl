@@ -1,4 +1,5 @@
 <#import "template.ftl" as layout>
+<#import "krt-legal.ftl" as legal>
 <@layout.registrationLayout displayRequiredFields=false displayMessage=!messagesPerField.existsError('totp','userLabel'); section>
     <#if section = "header">
         ${msg("loginTotpTitle")}
@@ -91,6 +92,7 @@
                     </#if>
                 </div>
             </form>
+            <@legal.links/>
         </div>
     </#if>
 </@layout.registrationLayout>

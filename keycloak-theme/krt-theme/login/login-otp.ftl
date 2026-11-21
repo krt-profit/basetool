@@ -1,4 +1,5 @@
 <#import "template.ftl" as layout>
+<#import "krt-legal.ftl" as legal>
 <@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp'); section>
     <#if section="header">
         ${msg("doLogIn")}
@@ -31,6 +32,7 @@
                     <input class="krt-button" name="login" id="kc-login" type="submit" value="${msg("doLogIn")}" />
                 </div>
             </form>
+            <@legal.links/>
         </div>
     </#if>
 </@layout.registrationLayout>

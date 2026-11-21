@@ -1,4 +1,5 @@
 <#import "template.ftl" as layout>
+<#import "krt-legal.ftl" as legal>
 <@layout.registrationLayout displayInfo=true displayMessage=!messagesPerField.existsError('username'); section>
     <#if section = "header">
         ${msg("emailForgotTitle")}
@@ -27,6 +28,7 @@
                     </div>
                 </div>
             </form>
+            <@legal.links/>
         </div>
     </#if>
 </@layout.registrationLayout>
