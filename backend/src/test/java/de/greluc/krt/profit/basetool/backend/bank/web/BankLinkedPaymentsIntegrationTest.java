@@ -72,6 +72,8 @@ import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
@@ -889,6 +891,74 @@ class BankLinkedPaymentsIntegrationTest {
                 .query(Integer.class)
                 .single())
         .isZero();
+  }
+
+  /**
+   * A linked deposit of an actor without Bank booking rights on the account ends as a pending
+   * request and posts nothing (REQ-BANK-019).
+   *
+   * @param actor the submitting actor, none of whom may book a deposit on the own unit's account
+   */
+  @ParameterizedTest
+  @EnumSource(
+      value = Actor.class,
+      names = {"MEMBER", "STAFFELLEITER", "OL_MEMBER", "EMPLOYEE_VIEW"})
+  void aLinkedDepositWithoutBookingRightsOnlyFilesARequest(Actor actor) {
+    FixtureHandler handler = addHandler();
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    BigDecimal original = balance("bank_posting", "account_id", account);
+
+    BankLinkedOutcome outcome = as(actor, () -> payments.submit(attempt(), linkedDeposit(), null));
+
+    assertThat(outcome).isInstanceOf(BankLinkedOutcome.Pending.class);
+    assertThat(handler.outcomes).noneMatch(BankLinkedOutcome.Posted.class::isInstance);
+    assertThat(balance("bank_posting", "account_id", account)).isEqualByComparingTo(original);
+  }
+
+  /**
+   * Confirming a linked request needs Bank booking rights on its account; anyone else is refused
+   * and the request stays pending until Bank staff book it (REQ-BANK-019).
+   *
+   * @param decider the refused decider, none of whom may book a deposit on the own unit's account
+   */
+  @ParameterizedTest
+  @EnumSource(
+      value = Actor.class,
+      names = {"STAFFELLEITER", "OL_MEMBER", "EMPLOYEE_VIEW"})
+  void onlyBankBookingRightsConfirmALinkedRequest(Actor decider) throws Exception {
+    addHandler();
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    UUID holder = world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER);
+    BigDecimal original = balance("bank_posting", "account_id", account);
+    UUID request =
+        ((BankLinkedOutcome.Pending)
+                as(Actor.MEMBER, () -> payments.submit(attempt(), linkedDeposit(), null)))
+            .requestId();
+
+    confirm(request, decider, holder, null, false).andExpect(status().isForbidden());
+    assertThat(requestStatus(request)).isEqualTo("PENDING");
+    assertThat(balance("bank_posting", "account_id", account)).isEqualByComparingTo(original);
+
+    confirm(request, Actor.EMPLOYEE_DEPOSIT, holder, null, false).andExpect(status().isOk());
+    entityManager.flush();
+    assertThat(balance("bank_posting", "account_id", account))
+        .isEqualByComparingTo(original.add(new BigDecimal("500")));
+  }
+
+  private Deposit linkedDeposit() {
+    return new Deposit(
+        world.account(Account.OWN_ORG_UNIT),
+        world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
+        new Counterparty.Accountless("Linked Depositor", null),
+        terms("500"));
+  }
+
+  private String requestStatus(UUID request) {
+    entityManager.flush();
+    return jdbc.sql("SELECT status FROM bank_booking_request WHERE id = :id")
+        .param("id", request)
+        .query(String.class)
+        .single();
   }
 
   private UUID fundSixMillion() {
