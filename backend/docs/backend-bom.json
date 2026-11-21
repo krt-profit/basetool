@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:39f83954-efa7-4809-9660-36ad40b96057",
+  "serialNumber" : "urn:uuid:3035b0c5-d680-46ef-9852-b7b1520de2f1",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-11-20T19:46:28Z",
+    "timestamp" : "2026-11-21T09:45:14Z",
     "tools" : {
       "components" : [
         {
@@ -17,16 +17,16 @@
     },
     "component" : {
       "type" : "application",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.5?project_path=%3Abackend",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.6?project_path=%3Abackend",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "backend",
-      "version" : "1.26.5",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.5?project_path=%3Abackend",
+      "version" : "1.26.6",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.6?project_path=%3Abackend",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/44805048711"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/44890923169"
         },
         {
           "type" : "vcs",
@@ -1687,11 +1687,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.5?project_path=%3Alogging-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "logging-support",
-      "version" : "1.26.5",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.5?project_path=%3Alogging-support",
+      "version" : "1.26.6",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support",
       "modified" : false,
       "properties" : [
         {
@@ -1702,11 +1702,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.5?project_path=%3Atechnical-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "technical-support",
-      "version" : "1.26.5",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.5?project_path=%3Atechnical-support",
+      "version" : "1.26.6",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support",
       "modified" : false,
       "properties" : [
         {
@@ -12645,15 +12645,15 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.5?project_path=%3Abackend",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.6?project_path=%3Abackend",
       "dependsOn" : [
         "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.3.1?type=jar",
         "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
         "pkg:maven/com.github.luben/zstd-jni@1.5.7-28?type=jar",
         "pkg:maven/com.google.guava/guava@33.8.0-jre?type=jar",
-        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.5?project_path=%3Alogging-support",
-        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.5?project_path=%3Atechnical-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.18.0?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
         "pkg:maven/org.flywaydb/flyway-core@13.12.2?type=jar",
@@ -12678,14 +12678,14 @@
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.5?project_path=%3Alogging-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support",
       "dependsOn" : [
         "pkg:maven/ch.qos.logback/logback-classic@1.6.6?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.5?project_path=%3Atechnical-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support",
       "dependsOn" : [
         "pkg:maven/io.micrometer/micrometer-observation@1.18.0?type=jar"
       ]

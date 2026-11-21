@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:eebf2d09-9d4e-47ac-bb75-e2c8a6fa55a2" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:10067d53-4b3c-4113-ad47-6ee6e425ac0c" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-11-20T19:46:26Z</timestamp>
+    <timestamp>2026-11-21T09:45:10Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -11,15 +11,15 @@
         </component>
       </components>
     </tools>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@1.26.5?project_path=%3Akeycloak-spi">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@1.26.6?project_path=%3Akeycloak-spi">
       <group>de.greluc.krt.profit.basetool</group>
       <name>keycloak-spi</name>
-      <version>1.26.5</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@1.26.5?project_path=%3Akeycloak-spi</purl>
+      <version>1.26.6</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@1.26.6?project_path=%3Akeycloak-spi</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/44805048711</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/44890923169</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
