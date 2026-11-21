@@ -77,8 +77,9 @@ public enum SyncEventType {
   MANUFACTURER_RELINKED,
 
   /**
-   * Wiki vehicle sync: a complete census no longer carries the ship type's game UUID and the Wiki
-   * vehicle carrying its P4K GUID took its place, so {@code external_uuid} moved to it.
+   * Wiki vehicle sync: the ship type's {@code external_uuid} moved to another Wiki vehicle — the
+   * one carrying its P4K GUID once a complete census no longer carries its game UUID, or the base
+   * of a shared name taking the row over from one of its variants.
    */
   VEHICLE_RELINKED,
 

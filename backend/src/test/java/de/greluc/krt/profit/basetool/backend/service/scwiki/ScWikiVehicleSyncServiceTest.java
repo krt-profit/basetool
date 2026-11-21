@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service.scwiki;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.service.RecordingTransactionManager
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -47,6 +49,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -570,6 +574,148 @@ class ScWikiVehicleSyncServiceTest {
             eq("Skylark"),
             eq("Name is held by a sibling Wiki vehicle of this census."));
     verify(shipTypeRepository).markScwikiDeletedExcept(eq(Set.of(first, second)), any());
+  }
+
+  @ParameterizedTest(name = "display listed first: {0}")
+  @ValueSource(booleans = {true, false})
+  void theBaseOfASharedNameTakesTheRowOverFromTheVariantHoldingIt(boolean displayFirst) {
+    UUID display = UUID.randomUUID();
+    UUID base = UUID.randomUUID();
+    ShipType skylark = new ShipType();
+    skylark.setName("Skylark");
+    skylark.setClassName("RSI_Skylark_Display");
+    skylark.setExternalUuid(display);
+    skylark.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    var displayDto = skylarkDto(display, "RSI_Skylark_Display");
+    var baseDto = skylarkDto(base, "RSI_Skylark");
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                displayFirst ? List.of(displayDto, baseDto) : List.of(baseDto, displayDto)));
+    when(shipTypeRepository.findByExternalUuid(any()))
+        .thenAnswer(inv -> {
+          UUID requested = inv.getArgument(0);
+          return Optional.of(skylark).filter(row -> requested.equals(row.getExternalUuid()));
+        });
+    when(shipTypeRepository.findByNameIgnoreCase("Skylark")).thenReturn(Optional.of(skylark));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncVehicles();
+    service.syncVehicles();
+
+    assertEquals(base, skylark.getExternalUuid());
+    assertEquals("RSI_Skylark", skylark.getClassName());
+    assertEquals("rsi-skylark", skylark.getScwikiSlug());
+    verify(syncReportService, times(1))
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.VEHICLE_RELINKED),
+            eq("ship_type"),
+            eq(base),
+            eq("Skylark"),
+            eq("previousUuid=" + display));
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository, times(2)).markScwikiDeletedExcept(eq(Set.of(display, base)), any());
+  }
+
+  @ParameterizedTest(name = "display listed first: {0}")
+  @ValueSource(booleans = {true, false})
+  void aVariantNeverSeedsTheRowOfANameItsBaseCarries(boolean displayFirst) {
+    UUID display = UUID.randomUUID();
+    UUID base = UUID.randomUUID();
+    var displayDto = skylarkDto(display, "RSI_Skylark_Display");
+    var baseDto = skylarkDto(base, "RSI_Skylark");
+    ShipType[] stored = new ShipType[1];
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                displayFirst ? List.of(displayDto, baseDto) : List.of(baseDto, displayDto)));
+    when(shipTypeRepository.findByNameIgnoreCase(anyString()))
+        .thenAnswer(inv -> {
+          String name = inv.getArgument(0);
+          return Optional.ofNullable(stored[0]).filter(row -> row.getName().equalsIgnoreCase(name));
+        });
+    when(shipTypeRepository.save(any(ShipType.class)))
+        .thenAnswer(inv -> {
+          stored[0] = inv.getArgument(0);
+          return stored[0];
+        });
+
+    assertEquals(1, service.syncVehicles());
+
+    verify(shipTypeRepository, times(1)).save(any(ShipType.class));
+    assertEquals(base, stored[0].getExternalUuid());
+    assertEquals("RSI_Skylark", stored[0].getClassName());
+    assertEquals(GameItemSourceSystem.WIKI_ONLY, stored[0].getSourceSystems());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            eq(display),
+            eq("Skylark"),
+            eq(
+                displayFirst
+                    ? "Name goes to the base Wiki vehicle of this census."
+                    : "Name is held by a sibling Wiki vehicle of this census."));
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.VEHICLE_RELINKED), any(), any(), any(), any());
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository).markScwikiDeletedExcept(eq(Set.of(display, base)), any());
+  }
+
+  @Test
+  void aRowTheP4kTiesToAVariantStaysWithItAndTheBaseCountsAsCovered() {
+    UUID display = UUID.randomUUID();
+    UUID base = UUID.randomUUID();
+    ShipType skylark = new ShipType();
+    skylark.setName("Skylark");
+    skylark.setClassName("RSI_Skylark_Display");
+    skylark.setExternalUuid(display);
+    skylark.setP4kUuid(display);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(
+                    skylarkDto(base, "RSI_Skylark"), skylarkDto(display, "RSI_Skylark_Display"))));
+    when(shipTypeRepository.findByExternalUuid(base)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByExternalUuid(display)).thenReturn(Optional.of(skylark));
+    when(shipTypeRepository.findByNameIgnoreCase("Skylark")).thenReturn(Optional.of(skylark));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    assertEquals(1, service.syncVehicles());
+
+    assertEquals(display, skylark.getExternalUuid());
+    assertEquals("RSI_Skylark_Display", skylark.getClassName());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            eq(base),
+            eq("Skylark"),
+            eq("Name is held by a sibling Wiki vehicle of this census."));
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.VEHICLE_RELINKED), any(), any(), any(), any());
+    verify(syncReportService, never()).recordIncomplete();
+  }
+
+  /**
+   * Builds a Wiki vehicle named {@code Skylark}, as the Wiki lists the ship and its showroom
+   * display.
+   *
+   * @param uuid the vehicle's UUID
+   * @param className its class name
+   * @return the vehicle
+   */
+  private static ScWikiVehicleDto skylarkDto(UUID uuid, String className) {
+    return ScWikiVehicleDto.builder()
+        .uuid(uuid)
+        .slug(className.toLowerCase(Locale.ROOT).replace('_', '-'))
+        .name("Skylark")
+        .gameName("RSI Skylark")
+        .className(className)
+        .build();
   }
 
   @Test
