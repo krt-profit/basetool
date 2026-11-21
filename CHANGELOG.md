@@ -2,6 +2,68 @@
 
 ## [Unreleased]
 
+## [v1.26.6](https://github.com/krt-profit/basetool/releases/tag/v1.26.6) - 2026-11-21
+
+### Changed
+
+- **Server.** skopeo, mit dem der Deploy-Lauf Images auflöst und sich an der Registry anmeldet, wird
+  nicht mehr unbeaufsichtigt aktualisiert, sondern zusammen mit Podman in der geplanten Wartung,
+  zuerst auf dem Testhost. So bleiben beide in einer Version, die zueinander passt.
+
+- **Aufträge.** In der Übersicht ist klarer erkennbar, dass eine Zeile zum Auftrag führt: Beim
+  Überfahren werden der Pfeil am Zeilenende orange und die Auftragsnummer unterstrichen. Auch ein
+  Klick auf die aufgeklappte Materialliste oder den Pfeil öffnet jetzt den Auftrag.
+
+- **Discord-Registrierungen.** Die Seite aktualisiert sich selbst, wenn eine offene oder abgelehnte
+  Registrierung anderswo geändert wird, etwa Anzeigename oder Rang auf einem zweiten Tab. Freigeben,
+  Ablehnen, Verknüpfen und Zusammenführen klappen danach ohne Neuladen; hat sich eine Registrierung
+  doch inzwischen geändert, wird die Liste an Ort und Stelle aktualisiert.
+
+### Fixed
+
+- **Überwachung.** Ein Container, der noch nie gestartet ist, zählt bei `ContainerRestartLoop` und
+  `ContainerStartTimeMissing` nicht mehr mit. Der podman-Exporter 2.0 meldet für ihn `-1` als
+  Startzeit, was sonst einen Neustart doppelt zählen oder einen fehlenden Container verdecken würde.
+
+- **Server.** Pakete aus EPEL kommen wieder aus dem Zweig für die Rocky-Version des Servers, nicht
+  aus dem CentOS-Stream-Zweig, der ihr eine Version voraus ist. Der ungenutzte Mailserver `exim`,
+  den fail2ban mitgebracht hatte, wird entfernt.
+
+- **Filter auf dem Smartphone.** Der Filter-Button öffnet seine Filter wieder als Leiste über der
+  unteren Navigation, über die volle Breite. Bisher klemmte das Feld als schmaler Streifen unter dem
+  Button und verdeckte etwa auf der Auftragsseite den Umschalter „Meine / Zu bearbeiten / Alle".
+
+- **Schiffskatalog.** Teilen sich ein Schiff und seine Schaufenster- oder Sondervariante im SC Wiki
+  einen Namen, gehört der Schiffstyp jetzt immer dem Schiff selbst, egal in welcher Reihenfolge das
+  Wiki beide liefert. Die Skylark bekommt dadurch wieder ihre UEX-Daten, und der tägliche UEX-Abgleich
+  läuft wieder vollständig durch.
+
+- **Aufträge.** Bei Item-Aufträgen zeigt die Übersicht unter „Gefordert“ das ganze
+  benötigte Material aller bestellten Items. Herstellung und Übergabe verringern die Menge nicht
+  mehr; der Fortschritt zählt Lagerbestand und das in hergestellten Items verbaute Material, ein
+  komplett hergestellter Auftrag steht auf 100 % statt auf 0 %.
+
+- **Listen.** Ein Klick oder Tipp auf eine beliebige Stelle einer Listenzeile öffnet sie jetzt auf
+  jeder Breite – auch auf den Chevron, die Meta-Zeile am Handy und inaktive Sonderkommandos. Nur
+  echte Bedienelemente fangen ihn selbst; ein geöffnetes „⋯"-Menü bleibt über den Zeilen darunter
+  bedienbar.
+
+- **Listen.** Beim Überfahren einer Zeile und bei Tastaturfokus wird der Chevron hausorange und
+  der Titel orange unterstrichen.
+
+- **Materialaufträge.** Eine Übergabe überschreibt die geforderte Menge nicht mehr. Jede Übergabe
+  merkt sich, auf welche Materialzeile sie angerechnet wurde, und eine Überlieferung wird als
+  Überschuss festgehalten. Die Auftragsseite zeigt pro Zeile „Gefordert“ und „Übergeben“.
+
+- **Aufträge.** Bei Material-Aufträgen zeigt die Übersicht unter „Gefordert“ die bestellte Menge;
+  der Fortschritt zählt Lagerbestand und bereits Übergebenes, ein komplett übergebener Auftrag
+  steht auf 100 % statt auf 0 %.
+
+- **Materialauftrag bearbeiten.** Das Formular zeigt die geforderte Gesamtmenge. Eine Zeile mit
+  Übergaben kann nicht unter die übergebene Menge gesenkt, entfernt oder in eine andere
+  Qualitätsstufe verschoben werden. Bei bestehenden Aufträgen wird die geforderte Menge aus Rest
+  und Übergaben wiederhergestellt; eine frühere Überlieferung lässt sich dabei nicht mehr erkennen.
+
 ## [v1.26.5](https://github.com/krt-profit/basetool/releases/tag/v1.26.5) - 2026-11-20
 
 ### Security
