@@ -3,9 +3,9 @@
 |                |        |
 |----------------|--------|
 | **ID**         | UC-44  |
-| **Tag**        | `e2e` · `smoke` (`AccessibilitySmokeE2eTest`) · `e2e` (`TouchClassLayoutE2eTest`) |
-| **Testklasse** | [`AccessibilitySmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AccessibilitySmokeE2eTest.java) · [`TouchClassLayoutE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/TouchClassLayoutE2eTest.java) |
-| **Spec**       | [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-009, REQ-UI-020) · [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) |
+| **Tag**        | `e2e` · `smoke` (`AccessibilitySmokeE2eTest`) · `e2e` (`TouchClassLayoutE2eTest`, `FilterPopoverBottomSheetE2eTest`) |
+| **Testklasse** | [`AccessibilitySmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AccessibilitySmokeE2eTest.java) · [`TouchClassLayoutE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/TouchClassLayoutE2eTest.java) · [`FilterPopoverBottomSheetE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/FilterPopoverBottomSheetE2eTest.java) |
+| **Spec**       | [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-009, REQ-UI-020, REQ-UI-027) · [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) |
 
 ## Akteur
 
@@ -32,6 +32,10 @@ Jede Seite der Pfadkataloge wird geladen und vermessen bzw. gescannt.
 3. Für jede Geräteklasse einen eigenen Browser-Kontext öffnen: 375×812 (Smartphone), 810×1080 und 1024×768 (Tablet hoch und quer), 1280×800 (Desktop), 1600×900 (Ultra-wide). In CI misst jeder Runner genau eine Klasse (`-Pe2e.device`, Matrix in `e2e.yml`).
 4. Jede Seite aus `FrontendPageRoutes#PAGES` laden und vermessen, dazu jedes Modal der Seite öffnen; alle Befunde sammeln und erst am Ende scheitern.
 
+### Filter als Bottom-Sheet (`FilterPopoverBottomSheetE2eTest`)
+
+5. `/orders` in 375×812 mit Touch öffnen und „Filter" antippen.
+
 ## Erwartetes Ergebnis
 
 - **Barrierefreiheit:** Keine Verletzung der Stufen `critical` oder `serious`. Jede Verletzung jeder Stufe wird nach `build/e2e/a11y-<seite>.txt` geschrieben und geloggt, mit Selektor, Markup und Fehlerbeschreibung jedes betroffenen Knotens (bei `color-contrast` samt Farben und Kontrastwert; bis 2026-09-25 nur die Anzahl der Knoten).
@@ -43,6 +47,7 @@ Jede Seite der Pfadkataloge wird geladen und vermessen bzw. gescannt.
   5. Eine Tabelle breiter als der Viewport hat einen scrollenden Vorfahren.
   6. Formularfelder passen in den Viewport, und ihre **wirksame** Trefferfläche (inklusive `::after`-Overlay oder aktivierendem `<label>`) erreicht auf den Touch-Klassen die 44-px-Untergrenze aus REQ-UI-009, mit deren Ausnahme für dichte Zeilenaktionen.
 - Ein Abdeckungsbericht nennt jede Listenseite, die keine Zeile rendert, und eine Mindestzahl gemessener Routen je Klasse muss erreicht sein.
+- **Filter-Bottom-Sheet:** Das Panel reicht über die volle Viewport-Breite, endet genau an der Oberkante der Tab-Leiste, und das Typ-Feld liegt vollständig in seinem sichtbaren Bereich (REQ-UI-027).
 
 ## Sonderfälle & Lehren
 
@@ -53,4 +58,5 @@ Jede Seite der Pfadkataloge wird geladen und vermessen bzw. gescannt.
 - **Flex-`fieldset` in WebKit.** WebKit 2388 bemisst die Kinder eines `fieldset` mit `display: flex` mitunter nach ihrem Inhalt statt nach der Breite des `fieldset`, und zwar nur, wenn die Seite mit schon geladenen Schriften gelayoutet wird: Der erste Aufruf ist sauber, die folgenden meist nicht. Auf `/orders/create` stand die Materialzeile so auf 484 px in einem 375 px breiten Viewport; `min-width: 0` auf der Zeile ändert daran nichts, ein einspaltiges Grid statt Flexbox im `fieldset` schon. Prüfen lässt sich so ein Befund nur mit mehreren Aufrufen derselben Seite in einem Kontext, nicht mit einem einzelnen.
 - **Ein Kontext pro Klasse** statt `setViewportSize` pro Seite: Einige Skripte werten die Media Queries beim Laden aus, und eine nachträglich verkleinerte Seite ist ein Zustand, den ein Telefon nie erreicht.
 - **Artefakte nur aus Chromium.** Jede Engine misst und scheitert an ihren eigenen Befunden, aber nur der Chromium-Shard schreibt die Screenshots nach `build/e2e-artifacts/touch-layout/` — ~430 Aufnahmen dreifach kosteten den Firefox-Shard seinen 45-Minuten-Timeout.
+- **Kaskade über Dateigrenzen.** `filters.css` lädt nach `styles.css`, beide im Layer `components`. Eine Telefonregel für `.filter-popover__panel` in `styles.css` verliert deshalb gegen die gleich spezifische Grundregel in `filters.css`: Das Panel blieb `absolute` mit `top` und `bottom` zugleich und schrumpfte auf einen Streifen unter dem Button. Die Telefonregeln einer Komponente stehen darum in ihrer eigenen Datei, nach den Grundregeln.
 - **Warum das zählt:** Seit REQ-UI-020 ist die installierbare Web-App der mobile Client für iPhone und iPad.
