@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-21.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0120](../adr/0120-per-browser-filter-selection-persistence.md)
 
 # Order-overview Materialien column
@@ -33,18 +33,27 @@ item-order view); this spec adds the per-bucket stock that the overview progress
 The order-overview list's **Materialien** column MUST, for an `ITEM` order, render the order's
 **aggregated material list** — the materials derived and summed from the ordered items'
 blueprints, one row per material — with the same three columns a `MATERIAL` order shows:
-material name, total required amount (unit-formatted by the material's `quantityType`), and a
+material name, required amount (unit-formatted by the material's `quantityType`), and a
 **collection progress** percentage. It MUST NOT show the ordered items or their delivery
-count. A `MATERIAL` order's column is unchanged.
+count. A `MATERIAL` order's column shows its requirement lines with `currentStock / amount`;
+a material handover lowers a line's `amount` to the remaining need.
 
-The progress per row is `currentStock / totalQuantity`, clamped to 100 %, where
-`currentStock` is the inventory **linked to that order** for the material that the quality-bucket
-allocation counts toward the aggregated bucket (REQ-ORDERS-037, [`orders-quality-tiers.md`](orders-quality-tiers.md))
+The required amount of an `ITEM` row is `orderedQuantity`: the snapshotted recipe demand of
+**every ordered unit**, never reduced by production (REQ-ORDERS-025) or delivery. The progress
+per row is `(currentStock + manufacturedQuantity) / orderedQuantity`, clamped to 100 %, so the
+row always shows what was requested and how much of it is in stock or already built into
+manufactured units — delivered units included, because delivery never exceeds manufacture.
+`manufacturedQuantity` is `requiredQuantity × manufacturedAmount / amount` summed over the
+ordered lines, also for a material the production run skipped („nicht ausbuchen"), since the
+units exist. `currentStock` is the inventory **linked to that order** for the material that the
+quality-bucket allocation counts toward the bucket's outstanding demand `totalQuantity` (the
+not-yet-manufactured share, REQ-ORDERS-037, [`orders-quality-tiers.md`](orders-quality-tiers.md))
 — the same figure the `MATERIAL` requirement rows use, resolved through
 `JobOrderStockProjectionService.loadOrderLinkedStockIndex` on both the detail and the list path
-(one query per page, no N+1). `currentStock` is carried on
-`AggregatedMaterialDto` and populated by the backend for every item order it returns (list and
-detail); it is `0.0` when nothing is linked. An item order whose blueprints derived no
+(one query per page, no N+1). All three figures are carried on `AggregatedMaterialDto`;
+`currentStock` is populated by the backend for every item order it returns (list and detail)
+and is `0.0` when nothing is linked. The frontend computes the percentage in
+`AggregatedMaterialDto.collectionProgressPercent()`. An item order whose blueprints derived no
 material renders the empty-materials placeholder. The requester Meine view carries the same
 collection-progress facts as Alle ([`orders-requester-access.md`](orders-requester-access.md),
 REQ-ORDERS-023).
@@ -53,14 +62,19 @@ REQ-ORDERS-023).
 
 - [ ] An item order's overview row shows its aggregated material names, required amounts, and a
   collection-progress percentage — not the ordered items or a delivered/ordered count.
-- [ ] The progress equals `currentStock / totalQuantity` (100 % once stock meets the requirement).
-- [ ] A material order's overview column is unchanged (per-material requirement + progress).
+- [ ] The required amount is the demand of every ordered unit and stays the same after
+  production and delivery.
+- [ ] The progress equals `(currentStock + manufacturedQuantity) / orderedQuantity`; a fully
+  manufactured item order shows 100 %.
+- [ ] A material order's overview column shows its per-material requirement + progress.
 - [ ] An item order with no derived materials shows the empty-materials placeholder.
 
-**Enforced by:** `JobOrderListRenderTest` (frontend render),
+**Enforced by:** `JobOrderListRenderTest` (frontend render), `AggregatedMaterialDtoTest`
+(progress), `JobOrderItemServiceTest` (ordered / manufactured / outstanding split),
 `JobOrderServiceTest` (UpdateItemJobOrderTests — aggregated stock enrichment) · **Code:**
 `JobOrderStockProjectionService.enrichAggregatedWithClaims`, `JobOrderItemService.aggregateMaterials`,
-`AggregatedMaterialDto.currentStock`, `templates/joborder/orders-index.html` · **Issues:** #595
+`AggregatedMaterialDto` (`orderedQuantity`, `manufacturedQuantity`, `currentStock`),
+`templates/joborder/orders-index.html` · **Issues:** #595
 
 ### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
 
@@ -291,6 +305,14 @@ is stored in `localStorage` and re-applied on load **and after every results-fra
 filter change, a live-sync refresh, a drag-reorder), so a user's expand/collapse choices survive the
 in-place re-renders. Order ids are globally unique, so a single per-browser key suffices.
 
+**Row link.** The whole overview row opens the order's detail page (REQ-UI-027 rule 6), the
+expanded material sublist and the chevron included, on every device class: every cell but the
+link's own lets a click through to the row link, and only the sublist toggle and the reorder
+buttons catch it as separate controls. Hovering the row anywhere but those controls, or
+focusing its link by keyboard, turns the chevron house orange and underlines the order number in
+house orange, beside the row hover fill; at rest the chevron is Grau 1, so it stays visible on
+touch devices without hover.
+
 **Multi-squadron filter.** The former mine/all squadron **scope toggle** is replaced by a
 multi-select checkbox **dropdown** (the `.multi-select-container` idiom shared with the Lager
 filters) listing **all active squadrons** plus an "Alle" select-all. It MUST default to **all
@@ -321,6 +343,9 @@ swap.
 
 - [ ] Each order row's material sublist starts collapsed; toggling it expands/collapses it, and the
   state survives a filter change / fragment swap and a page reload (per-browser localStorage).
+- [ ] A click anywhere on an order row, the expanded sublist and the chevron included, opens the
+  order; the sublist toggle and the reorder buttons do not navigate. Row hover and keyboard focus
+  light the chevron and underline the order number.
 - [ ] The squadron filter is a multi-select dropdown of all active squadrons, all checked by default.
 - [ ] Unchecking some squadrons narrows the list to orders whose responsible OR requesting unit is a
   checked squadron; all-checked shows every scoped order (incl. SK-only); the state persists in

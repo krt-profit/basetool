@@ -220,19 +220,20 @@ public class JobOrderItemServiceImpl implements JobOrderItemService {
   }
 
   /**
-   * Aggregates the outstanding material demand of all ordered lines into one row per {@code
-   * (material, quality tier)}, counting only each line's not-yet-manufactured share. Sorted SCU
-   * first, then by name, then by descending tier floor.
+   * Aggregates the material demand of all ordered lines into one row per {@code (material, quality
+   * tier)}: the outstanding demand of each line's not-yet-manufactured share, the full demand of
+   * every ordered unit and the part already built into manufactured units. Sorted SCU first, then
+   * by name, then by descending tier floor.
    *
    * @param order the job order to aggregate
-   * @return the outstanding-material rows; empty for a material order
+   * @return the aggregated material rows; empty for a material order
    */
   @NotNull
   @Override
   public List<AggregatedMaterialDto> aggregateMaterials(@NotNull JobOrder order) {
     record Key(UUID materialId, UUID tierId) {}
 
-    Map<Key, Double> sums = new LinkedHashMap<>();
+    Map<Key, MaterialShare> sums = new LinkedHashMap<>();
     Map<UUID, Material> materials = new LinkedHashMap<>();
     Map<UUID, QualityTier> tiers = new LinkedHashMap<>();
     for (JobOrderItem item : order.getItems()) {
@@ -244,8 +245,7 @@ public class JobOrderItemServiceImpl implements JobOrderItemService {
         QualityTier tier = req.getQualityTier();
         Key key = new Key(material.getId(), tier.getId());
         double reqTotal = req.getRequiredQuantity() == null ? 0.0 : req.getRequiredQuantity();
-        double outstanding = lineAmount > 0 ? reqTotal * remaining / lineAmount : 0.0;
-        sums.merge(key, outstanding, Double::sum);
+        sums.merge(key, MaterialShare.of(reqTotal, lineAmount, remaining), MaterialShare::plus);
         materials.putIfAbsent(material.getId(), material);
         tiers.putIfAbsent(tier.getId(), tier);
       }
@@ -254,11 +254,14 @@ public class JobOrderItemServiceImpl implements JobOrderItemService {
         .map(e -> {
           Material material = Objects.requireNonNull(materials.get(e.getKey().materialId()));
           QualityTier tier = Objects.requireNonNull(tiers.get(e.getKey().tierId()));
+          MaterialShare share = e.getValue();
           return new AggregatedMaterialDto(
               materialMapper.toDto(material),
               tier.getCode(),
               qualityTierMapper.toDto(tier),
-              QuantityTypeRounding.roundForQuantityType(e.getValue(), material),
+              QuantityTypeRounding.roundForQuantityType(share.outstanding(), material),
+              QuantityTypeRounding.roundForQuantityType(share.ordered(), material),
+              QuantityTypeRounding.roundForQuantityType(share.manufactured(), material),
               null,
               List.of(),
               null);
@@ -521,5 +524,46 @@ public class JobOrderItemServiceImpl implements JobOrderItemService {
         ? ingredient.wikiName()
         : messageSource.getMessage(
             "orders.item.unresolved_ingredient", null, LocaleContextHolder.getLocale());
+  }
+
+  /**
+   * The unrounded demand of one material bucket, split by production state.
+   *
+   * @param ordered the demand of every ordered unit
+   * @param manufactured the demand already built into manufactured units
+   * @param outstanding the demand of the units not yet manufactured
+   */
+  private record MaterialShare(double ordered, double manufactured, double outstanding) {
+
+    /**
+     * Splits one line's snapshotted requirement by its manufactured and remaining units.
+     *
+     * @param requiredQuantity the line's requirement for all its ordered units
+     * @param lineAmount the ordered units; a line with none contributes nothing
+     * @param remaining the units not yet manufactured, at most {@code lineAmount}
+     * @return the line's share of the bucket
+     */
+    static MaterialShare of(double requiredQuantity, int lineAmount, int remaining) {
+      if (lineAmount <= 0) {
+        return new MaterialShare(0.0, 0.0, 0.0);
+      }
+      return new MaterialShare(
+          requiredQuantity,
+          requiredQuantity * (lineAmount - remaining) / lineAmount,
+          requiredQuantity * remaining / lineAmount);
+    }
+
+    /**
+     * Adds another line's share of the same bucket.
+     *
+     * @param other the share to add
+     * @return the summed share
+     */
+    MaterialShare plus(MaterialShare other) {
+      return new MaterialShare(
+          ordered + other.ordered,
+          manufactured + other.manufactured,
+          outstanding + other.outstanding);
+    }
   }
 }

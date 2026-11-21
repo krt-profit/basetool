@@ -51,7 +51,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Verifies that the order list renders an ITEM order's material column as its aggregated materials
- * with collection progress ({@code currentStock / totalQuantity}).
+ * with the ordered quantity and the collection progress {@code (currentStock +
+ * manufacturedQuantity) / orderedQuantity}.
  */
 class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
 
@@ -124,6 +125,8 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
                     "NONE",
                     QualityTierTestData.forCode("NONE"),
                     10.0,
+                    10.0,
+                    0.0,
                     4.0,
                     List.of(),
                     null)),
@@ -155,6 +158,103 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
     assertThat(html)
         .as("the overview no longer renders the ordered items in the Materialien column")
         .doesNotContain("ZZZ Unrendered Item Name");
+  }
+
+  @Test
+  @WithMockUser
+  void viewOrders_ItemOrder_KeepsTheOrderedAmountAndCountsBuiltMaterialAsProgress()
+      throws Exception {
+    AggregatedMaterialDto partlyBuilt =
+        new AggregatedMaterialDto(
+            material("Hadanite", "PIECE"),
+            "NONE",
+            QualityTierTestData.forCode("NONE"),
+            10.0,
+            40.0,
+            30.0,
+            6.0,
+            List.of(),
+            null);
+    givenItemOrderList(partlyBuilt);
+
+    String html =
+        mockMvc
+            .perform(get("/orders"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("Gefordert shows every ordered unit's demand, not the unmanufactured rest")
+        .containsPattern("<span>40\\s")
+        .doesNotContainPattern("<span>10\\s");
+    assertThat(html)
+        .as("progress counts linked stock plus the material built into manufactured units")
+        .contains("90 %");
+  }
+
+  @Test
+  @WithMockUser
+  void viewOrders_FullyManufacturedItemOrder_ShowsCompleteProgress() throws Exception {
+    AggregatedMaterialDto allBuilt =
+        new AggregatedMaterialDto(
+            material("Carinite", "PIECE"),
+            "NONE",
+            QualityTierTestData.forCode("NONE"),
+            0.0,
+            12.0,
+            12.0,
+            0.0,
+            List.of(),
+            null);
+    givenItemOrderList(allBuilt);
+
+    String html =
+        mockMvc
+            .perform(get("/orders"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).containsPattern("<span>12\\s").contains("100 %").doesNotContain(">0 %<");
+  }
+
+  private void givenItemOrderList(AggregatedMaterialDto aggregated) {
+    JobOrderDto order =
+        new JobOrderDto(
+            UUID.randomUUID(),
+            7,
+            null,
+            null,
+            "Tester",
+            null,
+            null,
+            "COMPLETED",
+            "ITEM",
+            true,
+            List.of(),
+            List.of(),
+            List.of(aggregated),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L,
+            null,
+            null,
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
+    when(reader.readOrderList(any()))
+        .thenReturn(
+            JobOrderPageStubs.list(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of())));
   }
 
   @Test

@@ -34,6 +34,10 @@ import org.jetbrains.annotations.Nullable;
  * @param qualityTier the bucket's quality tier
  * @param totalQuantity outstanding required quantity for units not yet manufactured
  *     (REQ-ORDERS-025); {@code 0} once all lines are done
+ * @param orderedQuantity required quantity across every ordered unit, never reduced by production
+ *     or delivery (REQ-ORDERS-017)
+ * @param manufacturedQuantity the share of {@code orderedQuantity} built into manufactured units,
+ *     delivered units included (REQ-ORDERS-017)
  * @param currentStock linked stock attributed to this bucket (REQ-ORDERS-037); {@code null} only
  *     before the projection enriches the row
  * @param claims per-squadron claims on this bucket; empty when no squadron has claimed
@@ -45,6 +49,8 @@ public record AggregatedMaterialDto(
     String qualityRequirement,
     QualityTierDto qualityTier,
     Double totalQuantity,
+    Double orderedQuantity,
+    Double manufacturedQuantity,
     @Nullable Double currentStock,
     List<ClaimDto> claims,
     @Nullable Double openAmount) {}

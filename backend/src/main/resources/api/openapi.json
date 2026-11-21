@@ -89649,10 +89649,18 @@
             "type" : "number",
             "format" : "double"
           },
+          "manufacturedQuantity" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "material" : {
             "$ref" : "#/components/schemas/MaterialDto"
           },
           "openAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "orderedQuantity" : {
             "type" : "number",
             "format" : "double"
           },
