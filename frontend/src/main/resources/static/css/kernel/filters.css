@@ -138,6 +138,23 @@
         margin: 0;
     }
 
+    @media (width <= 768px) {
+        .filter-popover .filter-toggle {
+            width: auto;
+        }
+
+        .filter-popover__panel {
+            position: fixed;
+            inset: auto 0 var(--krt-tabbar-height) 0;
+            z-index: var(--z-floating);
+            width: auto;
+            max-width: none;
+            max-height: 70vh;
+            overflow-y: auto;
+            border-width: 1px 0 0;
+        }
+    }
+
     @media (width <= 1024px), (pointer: coarse) {
         .filter-chip,
         .filter-add,
