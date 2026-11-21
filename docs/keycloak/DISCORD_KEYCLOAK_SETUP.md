@@ -2,10 +2,10 @@
 
 > **Doc type:** Runbook — operator deployment steps for epic #720, Track 1.
 > **Scope:** Discord **login** with a fail-closed Kartell-membership gate. **OAuth only — no bot.**
-> The Discord **bot** (and the automated role-sync) belong to Track 2 and are set up separately later.
+> A Discord **bot** with an automated role-sync (Track 2, #726–#730) is not planned.
 > Spec: [`docs/specs/discord-integration.md`](../specs/discord-integration.md) · decision:
 > [ADR-0030](../adr/0030-discord-federation-first-login-membership-gate.md). Last reviewed:
-> 2026-09-22 (checked against `keycloak-spi/`, the realm reference and the Quadlet units; commands
+> 2026-11-21 (checked against `keycloak-spi/`, the realm reference and the Quadlet units; commands
 > rewritten for the rootless-Podman production host). Host commands run as root, from `/`, with the
 > `UCTL` / `UPOD` shorthands of
 > [`deployment.md` → *Shell conventions*](../deployment.md#shell-conventions-used-below).
@@ -49,7 +49,7 @@ Enable **Developer Mode** in Discord (User Settings → Advanced) to get the *Co
 2. **OAuth2** tab → copy the **Client ID** and **Client Secret** (reset the secret to reveal it).
 3. **OAuth2 → Redirects** → add exactly the Keycloak broker endpoint from the table above. Save.
 4. No bot, no privileged intents, no scopes selected on this screen — Keycloak requests the scopes.
-   (The bot + `Server Members` intent are a **Track 2** step; do not enable them now.)
+   (Nothing uses a bot or the `Server Members` intent; do not enable them.)
 
 ---
 
@@ -61,9 +61,8 @@ The Discord identity provider, its mappers and the membership gate ship as one J
 
 **On production there is nothing to do.** The JAR is a promotable artifact (ADR-0055,
 `basetool-keycloak-spi`): `deploy.sh` stages `keycloak-spi.jar` whenever a new one is promoted and
-restarts keycloak, restoring the previous JAR on failure. *(Corrected 2026-09-25: this said
-"keycloak alone" — backend, frontend and ingest `Requires=` keycloak and restart with it; see the
-warning in §3d.)* The manual fallback (build, install
+restarts keycloak — and with it backend, frontend and ingest, which `Requires=` it (see the warning
+in §3d) — restoring the previous JAR on failure. The manual fallback (build, install
 as `deploy` `0644` — Keycloak runs as container uid 1000 and must read it — `restorecon`, restart)
 is in [`deployment.md` → *Keycloak provider JAR*](../deployment.md#keycloak-provider-jar).
 
@@ -259,8 +258,8 @@ ambiguity (5xx / timeout / malformed / rate-limited), distinct from a clean 404 
 
 > **Enforced once, at first link.** The guild + KRT-Mitglied check runs in the first-broker-login
 > flow — i.e. only when the Discord account is first linked, not on every login. A member later
-> kicked from the guild or stripped of KRT-Mitglied keeps access until the Track 2 role-sync
-> (planned, #726–#730) lands; until then, revoke access by disabling/removing the user in Keycloak.
+> kicked from the guild or stripped of KRT-Mitglied keeps access, because there is no automated
+> role-sync; revoke access by disabling/removing the user in Keycloak.
 
 ### 5a. `IDENTITY_PROVIDER_LOGIN_ERROR … error="cookie_not_found"` (REQ-SEC-071)
 
@@ -283,9 +282,6 @@ if `basetool-frontend` has a `baseUrl` — the realm provisioner sets it (ADR-02
 - Rotating the client secret: reset it in the Discord app, update the IdP config, no restart needed.
 - A new provider JAR (step 2) needs a Keycloak restart to rebuild providers — `deploy.sh` does
   that itself when it stages a promoted JAR.
-
-> **Track 2 (later):** the Discord **bot** (bot token + `Server Members` privileged intent, read-only
-> invite) and the automated role/unit sync are configured in a separate runbook when Track 2 ships.
 
 ---
 

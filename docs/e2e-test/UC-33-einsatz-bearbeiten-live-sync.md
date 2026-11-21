@@ -4,8 +4,8 @@
 |----------------|--------|
 | **ID**         | UC-33  |
 | **Tag**        | `e2e`  |
-| **Testklasse** | [`MissionCoreEditInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionCoreEditInPlaceE2eTest.java) · [`MissionUnitResponsibleClearE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionUnitResponsibleClearE2eTest.java) · [`MissionParticipantCountE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionParticipantCountE2eTest.java) · [`MissionListFilterInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionListFilterInPlaceE2eTest.java) · [`MissionLiveSyncE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionLiveSyncE2eTest.java) · [`MissionOrganisationLiveSyncE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionOrganisationLiveSyncE2eTest.java) · [`MissionCrewBoardTouchDragE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionCrewBoardTouchDragE2eTest.java) · [`MissionOwnerChangeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionOwnerChangeE2eTest.java) |
-| **Basis-Flow** | [UC-02](UC-02-mission-anlegen.md) · Spec [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (REQ-FE-001/-005/-010/-011/-015) |
+| **Testklasse** | [`MissionCoreEditInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionCoreEditInPlaceE2eTest.java) · [`MissionUnitResponsibleClearE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionUnitResponsibleClearE2eTest.java) · [`MissionParticipantCountE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionParticipantCountE2eTest.java) · [`MissionListFilterInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionListFilterInPlaceE2eTest.java) · [`MissionLiveSyncE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionLiveSyncE2eTest.java) · [`MissionOrganisationLiveSyncE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionOrganisationLiveSyncE2eTest.java) · [`MissionCrewBoardTouchDragE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionCrewBoardTouchDragE2eTest.java) · [`MissionOwnerChangeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionOwnerChangeE2eTest.java) · [`MissionPhoneHeadE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionPhoneHeadE2eTest.java) · [`MissionTemplateEditorE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MissionTemplateEditorE2eTest.java) |
+| **Basis-Flow** | [UC-02](UC-02-mission-anlegen.md) · Spec [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (REQ-FE-001/-005/-010/-011/-015) · [`mission-detail-tabs.md`](../specs/mission-detail-tabs.md) (REQ-MISSION-033) · [`mission-templates.md`](../specs/mission-templates.md) (REQ-MISSION-035…037) |
 
 ## Akteur
 
@@ -55,6 +55,16 @@ Der Nutzer bearbeitet einen Einsatz, filtert die Einsatzliste oder verschiebt au
 12. Im Bearbeiten-Modus den Besitzer über die Server-Such-Combobox auf `test-member` setzen und den Bestätigungsdialog annehmen (`PUT /missions/{id}/owner/ajax`); `#owner-row` trägt vorher `data-ownership-version="0"`.
 13. Den Zähler auf der Zeile auf `0` zurücksetzen — die Seite eines zweiten Verwalters, die vor dem Wechsel geöffnet wurde — und den Besitzer auf `test-officer` setzen.
 
+### Kompakter Kopf auf dem Smartphone (`MissionPhoneHeadE2eTest`, REQ-MISSION-033)
+
+14. Die Einsatz-Detailseite in der Smartphone-Klasse öffnen, nach unten scrollen und sich über die Mini-Leiste zum Einsatz anmelden.
+
+### Einsatzvorlagen (`MissionTemplateEditorE2eTest`, REQ-MISSION-035…037)
+
+15. Auf `/mission-templates` eine Vorlage anlegen, während ein zweiter Kontext die Liste mit offenem Editor zeigt.
+16. Im Anlegeformular eines Einsatzes eine Vorlage anwenden, erneut anwenden und lösen.
+17. Den Plan eines an eine Operation geknüpften Einsatzes als Vorlage unter einem anderen Besitzer speichern.
+
 ## Erwartetes Ergebnis
 
 - **Kerndaten:** Der erste Speichervorgang wird ohne Reload persistiert (per API gelesen), der zweite läuft ohne 409 durch — der AJAX-Zwilling hat die vier Versionszähler des Formulars zurückgeschrieben. Der ungültige Link zeigt den Feldfehler inline ohne Navigation; er verschwindet nach dem gültigen Speichern.
@@ -64,6 +74,8 @@ Der Nutzer bearbeitet einen Einsatz, filtert die Einsatzliste oder verschiebt au
 - **Live-Sync:** B zeigt den neuen Teilnehmer im Kopfzähler, die neue Zielzeile im Editor bzw. den neuen Party-Lead in der Übersicht — jeweils **in place**, nur durch das Änderungssignal.
 - **Touch:** Der Teilnehmer ist danach an Bord der Einheit und nicht mehr im Pool — der Pointer-Drag erreicht denselben Crew-Endpunkt wie der Maus-Drop. Die Zeile hat `user-select: none`, eine `touch-action`, die vertikales Scrollen und Zoomen dem Browser lässt, und das Board bricht das `contextmenu` des Drucks ab.
 - **Besitzerwechsel:** Der erste Wechsel antwortet 200, das Backend führt `test-member` als Besitzer, und `#owner-row` trägt **in place** den Zähler `1` (Marker überlebt). Der Wechsel mit dem veralteten Zähler `0` wird mit **409** abgewiesen, und der Besitzer bleibt `test-member`.
+- **Smartphone-Kopf:** Der Kopf scrollt weg, die Tabs bleiben angeheftet, und die Mini-Leiste übernimmt; ihre Anmeldung wirkt, und sie führt zurück an den Seitenanfang.
+- **Vorlagen:** Die Liste des zweiten Kontexts aktualisiert sich, ohne seinen offenen Editor zu ersetzen; Anwenden lässt den offenen Entwurf des Planers stehen; die gespeicherte Vorlage ist ein eigenständiger, bearbeitbarer Entwurf mit den Planungsfeldern des Einsatzes.
 
 ## Sonderfälle & Lehren
 

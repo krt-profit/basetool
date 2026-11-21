@@ -1195,16 +1195,6 @@ firewall, and its kernel takes no routing advice from the network.
 
 ### REQ-OPS-018 — Redis session store: durable persistence and a session-safe memory ceiling
 
-> [!note] Planned — the production rollout (epic #2078, WP 2.1, #2092)
-> Built in the repository: both command lines below carry `--maxmemory 768mb` in a 1024M container
-> (ADR-0221), sized for the exchange's bounded 128 MiB partition (REQ-XCH-023) plus headroom. Still
-> to come: no release tag carries it yet. It reaches production **with** the release that carries the
-> exchange (1.13.0, planned 2026-09-28): its Quadlet unit restarts Redis in that release's restart
-> window, with the exchange still switched off. An application rollback to an earlier release
-> restores that release's unit, and with it `384mb` in 512 MB. *Corrected 2026-09-28:* this said the
-> resize was a production step that had to precede the first exchange release, which the unit makes
-> impossible (ADR-0221 amendment 2).
-
 The Redis instance backing Spring Session (frontend) and the ingest handoff staging — and, for the
 exchange, the backend's registry mirror, revocations and key deny list under `exchange:*` and the
 gateway's quotas, byte budget and idempotency results under `ingest:xch:*` (ADR-0221,
@@ -1267,9 +1257,9 @@ posture has ever had on the **primary** durability layer.
   with an ageing snapshot does not page. Pinned by
   `monitoring/prometheus/tests/redisrdbstale_idle_guard_test.yml`.
 
-*Ticked 2026-09-28 against the repository (`docker-compose.yml`, `quadlet/systemd/redis.container`,
-`infrastructure.yml`); production carries the 768mb / 1024M pair only after the rollout in the note
-above.*
+*Ticked against the repository (`docker-compose.yml`, `quadlet/systemd/redis-session.container`,
+`quadlet/systemd/redis-shared.container`, `infrastructure.yml`); production carries these values
+through the Quadlet units of the release it runs.*
 
 **Enforced by:** `docker-compose.yml` (`x-redis` template + the `redis-session` / `redis-shared` services) · the generated
 `quadlet/systemd/redis-session.container` and `redis-shared.container` (`Exec=` carries the prod line; `quadlet-drift` keeps it equal) ·
@@ -2774,8 +2764,8 @@ the result onto the Dependabot branch.
   (`contents: write`) read from the Dependabot secret `RELEASE_APP_PRIVATE_KEY`, through
   `createCommitOnBranch`, so GitHub signs it; `GITHUB_TOKEN` is never used for it, because its commits
   trigger no workflow.
-- **It passes the DCO check as a bot commit**: its author `basetool-release[bot]` is in `dco.yml`'s bot
-  list, and its `Signed-off-by` matches the author.
+- **It passes the DCO check as a bot commit**: its author `basetool-release[bot]` is in the `bot_emails`
+  list of the *dco* step of `commit-gates.yml`, and its `Signed-off-by` matches the author.
 - **A digest that cannot be resolved is kept and warned about**, never dropped; the workflow never
   adds or removes a file.
 - **The test images follow the compose pins.** Each digest-pinned constant in the test-support
@@ -2811,7 +2801,7 @@ the result onto the Dependabot branch.
 
 **Enforced by:** `.github/workflows/dependabot-compose.yml` ·
 `.github/scripts/dependabot_compose_followup.py` · `.github/scripts/create_signed_commit.py` ·
-`.github/workflows/dco.yml` (`bot_emails`) · `repo-lint.yml` (`quadlet-drift`,
+`.github/workflows/commit-gates.yml` (`bot_emails`) · `repo-lint.yml` (`quadlet-drift`,
 `monitoring-image-pins`) · **Decision:**
 [ADR-0215](../adr/0215-a-dependabot-compose-bump-carries-its-regenerated-units.md) · **Runbook:**
 `docs/deployment.md` → *Dependabot image bumps* · **Related:** REQ-OPS-004 (the units as the delivered

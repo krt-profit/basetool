@@ -545,7 +545,7 @@ intercepted authorization code is redeemable without it.
 > [!note] Superseded on production 2026-09-25 — `basetool-frontend` is confidential
 > ADR-0001 is carried out: since 16:15 UTC that day production's client is confidential (client
 > secret **and** PKCE `S256`, which stays required), so M-6 is closed there
-> ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)). The callout
+> ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)). The callout
 > below describes the state before, and still the testing realm's.
 
 > [!important] This step is the interim state, not the target — [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) is still pending
@@ -561,7 +561,7 @@ intercepted authorization code is redeemable without it.
 > the downgrade: without the attribute an authorization request that simply omits the challenge is
 > accepted. What neither gives you is the second factor at the token endpoint that ADR-0001 wants,
 > so **audit finding M-6 stays open after this step**, and its runbook is
-> [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). Do not read
+> [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). Do not read
 > a green step 6 as M-6 closed.
 
 **Console (26.7):** *Clients* → `basetool-frontend` → *Settings* → **Capability config** →

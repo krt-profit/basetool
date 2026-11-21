@@ -4,7 +4,7 @@
 |----------------|----------------------------------------------------------------------------------------------------------------------------------|
 | **ID**         | UC-14                                                                                                                            |
 | **Tag**        | `e2e`                                                                                                                            |
-| **Testklasse** | [`InventoryTenancyE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventoryTenancyE2eTest.java) |
+| **Testklasse** | [`InventoryTenancyE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventoryTenancyE2eTest.java) · [`ActiveOrgUnitContextE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ActiveOrgUnitContextE2eTest.java) |
 
 ## Akteur
 
@@ -42,6 +42,7 @@ Zusätzlich abgedeckt:
 - **Create-Stamping** (REQ-ORG-004): 1 Mitgliedschaft → Auto-Stamp; mehrere ohne Auswahl → 400; gültige Auswahl → übernommen; fremde Auswahl → 400; mitgliedschaftslos ohne Auswahl → eigentümerlos.
 - **Edit-Gate** (`canEditInventoryItem`): ein **Nicht-Eigentümer** außerhalb des OrgUnit-Scopes kann nicht ausbuchen (403), ein Mitglied der besitzenden OrgUnit schon.
 - **Eigentümer-Escape** (REQ-ORG-011): der **Eigentümer** (`inventory_item.user`) eines Eintrags darf ihn **immer** ausbuchen/bearbeiten, auch nachdem er die besitzende OrgUnit verlassen hat, während der Eintrag noch auf diese OrgUnit gebucht ist. Geseedet, indem `test-member` (Staffel A) kurzfristig einer frischen SK beitritt, einen darauf gestempelten Eintrag anlegt und die SK wieder verlässt — die SK-Mitgliedschaft war nicht die *letzte*, daher demotet der `InventoryOrgUnitReconciler` den Eintrag nicht auf `NULL` (REQ-INV-004), und `test-member` besitzt nun einen SK-gestempelten Eintrag, ohne Mitglied der SK zu sein. Ein Nicht-Eigentümer außerhalb dieser SK bleibt 403.
+- **Aktiver Org-Einheiten-Kontext** (`ActiveOrgUnitContextE2eTest`, REQ-ORG-024/-031/-032): Ein Mitglied einer Staffel und einer SK sieht ohne Wahl „Alle meine Org-Einheiten" und beide Einheiten im Lager; eine gewählte Staffel oder SK bleibt gewählt, engt das Lager auf sie ein und überlebt eine neue Anmeldung, und ein Wechsel in einem Tab lädt die anderen Tabs des Browsers neu.
 
 ## Sonderfälle & Lehren
 

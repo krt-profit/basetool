@@ -777,16 +777,13 @@ bank mutation came through is recorded on the trail (REQ-BANK-012, REQ-AUDIT-005
 
 ### REQ-BANK-019 — Season independence
 
-> **Approved aUEC target - not implemented (ADR-0357):** allow the explicit optional aUEC connection
-> through the application-composition adapter and public Bank API. This is the scoped exception to
-> the automated-order exclusion below. Bank code still imports no order aggregate, repository or
+> **Linked aUEC exception (ADR-0357):** the explicit optional aUEC connection runs through the
+> application-composition adapter `AuecBankComposition` and the public Bank API
+> (`bank.api.BankLinkedPayments`, `BankLinkedEffectHandler`). This is the scoped exception to the
+> automated-order exclusion below. Bank code still imports no order aggregate, repository or
 > internal service; progress/completion never implicitly books money. The complete order flow is
 > Bank-independent. Other mission/operation/profit integrations remain excluded. The order meaning
 > lives only in [orders-auec-bank.md](orders-auec-bank.md).
-
-**Target acceptance**
-
-- [ ] Explicit linked actions work without implicit progress-to-ledger flows or weakened Bank independence.
 
 The bank has **no coupling** to seasons, price lines, mission finance entries, operation
 payouts or job-order profit flows. No bank code reads or writes those aggregates; no
@@ -798,6 +795,7 @@ require a spec change.
 
 - [x] Bank services/repositories have no dependency on mission/operation/order types
   (ArchUnit-checkable package rule).
+- [ ] Explicit linked actions work without implicit progress-to-ledger flows or weakened Bank independence.
 
 **Enforced by:** `ArchitectureTest` (`bankClassesMustStaySeasonAndProfitIndependent`) · **Code:** every class of the bank domain (`ArchitectureTest.BANK_CLASSES` and a future `bank` module package, REQ-SEC-073) — the rule forbids any season/profit dependency · **Issues:** #556
 
@@ -1228,11 +1226,11 @@ confirm/reject/queue surface; the audit log stays admin-only.
 
 ### REQ-BANK-026 — Notifications on booking-request lifecycle
 
-> **Approved aUEC target - not implemented:** linked/no-ledger causes follow REQ-BANK-057/-059 in
-> [bank-notifications.md](bank-notifications.md). Preserve approval tasks, allowed attestation,
-> current recipients, muting and priority. Publish after successful commit and group the same
-> logical cause across Bank/order roles. Rollback emits no success; no private note enters an order
-> notice.
+> **Linked aUEC causes:** linked/no-ledger causes follow REQ-BANK-057/-059 in
+> [bank-notifications.md](bank-notifications.md) (`BANK_FUNDS_AUTHORISED`, V401). Approval tasks,
+> allowed attestation, current recipients, muting and priority stay. Notices publish after a
+> successful commit and group the same logical cause across Bank/order roles. Rollback emits no
+> success; no private note enters an order notice.
 
 > **Amended 2026-10-10 (#2413):** a requester's correction (REQ-BANK-056) replaces the open notices
 > with `BANK_BOOKING_REQUEST_UPDATED` for the same recipients, so the decision events now clear both
@@ -1912,10 +1910,10 @@ audit row each) · **Code:** `bank/internal/OrgUnitBankSettingsService`, `db/mig
 
 ### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
 
-> **Approved aUEC target - not implemented:** order linkage grants no Bank account/global-custody,
-> unrelated history, private-note or audit access. Order financial facts use their own audience;
-> Bank detail links still apply Bank authority/redactions. No staff/approval note is copied into
-> an order projection.
+> **Linked aUEC boundary:** order linkage grants no Bank account/global-custody, unrelated
+> history, private-note or audit access. Order financial facts use their own audience; Bank detail
+> links still apply Bank authority/redactions (`AuecBankComposition#canSeeAccount` asks
+> `BankAccessPolicy`). No staff/approval note is copied into an order projection.
 
 A caller who may view an account (REQ-BANK-035/-037) may open a **read-only copy of the bank-staff
 account detail** from the org-unit bank page: the account header, the balance + target, the 30-day
@@ -3362,7 +3360,7 @@ A linked account-only transfer checks source coverage and records a zero-fee deb
 between active accounts. Custody totals remain unchanged. Account-only authorisation applies
 the same debit controls and records the authorising actor and account.
 
-**Target acceptance**
+**Acceptance**
 
 - [ ] The internal contract covers approved actions/accounts/outcomes with opaque linkage and actual parties, without foreign aggregates.
 - [ ] Duplicate/replacement attempts cannot create a second effective Bank posting or logical payment.
@@ -3682,7 +3680,7 @@ read out of the rest of the bank.
 - **Accounts for individual players** — an explicit owner decision: players appear only
   as holders (custody dimension, REQ-BANK-003), never as account owners.
 - **Implicit automated money flows** from missions/operations/orders remain excluded.
-  The approved/planned explicit optional aUEC integration is the REQ-BANK-019 exception;
+  The explicit optional aUEC integration (`AuecBankComposition`, ADR-0357) is the REQ-BANK-019 exception;
   [orders-auec-bank.md](orders-auec-bank.md) owns its order effects. Other automatic profit flows
   and progress-to-ledger behavior are not authorised.
 - **Interest, loans, bank-levied fees and currencies other than aUEC.** The in-game transfer fee

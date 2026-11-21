@@ -407,8 +407,8 @@ def client_specs(
 ) -> list[ClientSpec]:
     """Every Basetool client in its production shape, with the environment's origins filled in.
 
-    The approved third-party clients follow the first-party ones and the Android client comes
-    last. `frontend_client` is `public`, `confidential` or None; None leaves an existing frontend
+    The first-party clients come first, then the testing-only seed client, then the approved
+    third-party clients. `frontend_client` is `public`, `confidential` or None; None leaves an existing frontend
     client's type unmanaged (ADR-0001). `seed_client` adds the testing-only seed client.
     """
     frontend_confidential = frontend_client == "confidential"
@@ -1288,7 +1288,7 @@ class Planner:
                 self.followup_notes.append(
                     f"'{spec.client_id}' becomes confidential with the secret from "
                     f"${spec.value_env} (not printed). The frontend must already send that value "
-                    f"(docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)."
+                    f"(docs/archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)."
                 )
         attributes = live.get("attributes") or {}
         attribute_diff = {

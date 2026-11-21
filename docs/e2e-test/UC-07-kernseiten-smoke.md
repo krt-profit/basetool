@@ -3,8 +3,8 @@
 |                |                                                                                                                              |
 |----------------|------------------------------------------------------------------------------------------------------------------------------|
 | **ID**         | UC-07                                                                                                                        |
-| **Tag**        | `smoke`                                                                                                                      |
-| **Testklasse** | [`CorePagesSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/CorePagesSmokeE2eTest.java) |
+| **Tag**        | `smoke` · `smoke` + `e2e` (`ScriptLoadOrderE2eTest`)                                                                         |
+| **Testklasse** | [`CorePagesSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/CorePagesSmokeE2eTest.java) · [`ScriptLoadOrderE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ScriptLoadOrderE2eTest.java) |
 
 ## Akteur
 
@@ -27,13 +27,19 @@ Für jeden Pfad in `/`, `/missions`, `/orders`, `/refinery-orders`, `/hangar`, `
 2. Prüfe, dass die authentifizierte App-Shell rendert: das Abmelde-Element `nav-logout` der Seitenleiste ist sichtbar.
 3. Schlägt die Prüfung fehl, sichert `E2eSupport.dump` Screenshot und DOM unter `smoke-<pfad>`.
 
+### Ladereihenfolge der Skripte (`ScriptLoadOrderE2eTest`, REQ-FE-023)
+
+4. Jede Seitenroute laden und nach `load` die gemeinsamen Skripte, den `krtEvents`-Stub und den Client-Fehler-Beacon (`POST /internal/client-error`) prüfen.
+
 ## Erwartetes Ergebnis
 
 Jede Kernseite rendert für einen eingeloggten User die App-Shell — keine Weiterleitung zum Identity Provider, kein Fehler.
+
+Auf jeder Seitenroute sind die gemeinsamen Skripte installiert, der Bootstrap-Stub von `krtEvents` ist ersetzt, kein Skript hat geworfen und den Beacon erreichte nichts. Das Gegenstück ohne Browser ist `InlineScriptLoadOrderTest`.
 
 ## Sonderfälle & Lehren
 
 - **Nicht-destruktiv & ziel-agnostisch:** Der Flow erzeugt/ändert nichts und ist daher gefahrlos gegen ein geteiltes Staging-Deployment einsetzbar. Er läuft sowohl gegen den ephemeren Stack als auch (mit gesetztem `E2E_BASE_URL`) gegen Staging.
 - **Assertion-Ziel `nav-logout`:** Es löste `nav-orders` ab. Die Navigationslinks liegen inzwischen in eingeklappten `<details>`-Abschnitten (`display:none`, bis sie aufgeklappt werden); das Abmelde-Element dagegen rendert für jeden angemeldeten Nutzer immer. Seine Sichtbarkeit beweist, dass die Seite weder einen Fehler zeigt noch zum Identity Provider umgeleitet hat.
 - **Die Pfadliste ist ein Ausschnitt aus einem Katalog.** Bis 2026-09-13 zählten dieser Test, `AdminPagesSmokeE2eTest` und `TouchClassLayoutE2eTest` die Seitenrouten je von Hand auf, und die drei Listen widersprachen sich. Heute stammen alle aus `FrontendPageRoutes`; `PageRouteCatalogueTest` prüft, dass jeder Eintrag eine existierende Seitenroute ist. Welche Seiten in *diesen* Ausschnitt gehören, bleibt eine Auswahl: Sie müssen auch für ein Nicht-Admin-Konto rendern, weil das Ziel ein geteiltes Staging sein kann.
-- **Nur `@Tag("smoke")`:** Die Klasse läuft über `./gradlew :frontend:smokeTest`, nicht über `e2eTest`. Der Smoke-Subset läuft in einem eigenen Workflow (`e2e-smoke.yml`) per `workflow_dispatch` gegen Staging (der nächtliche Zeitplan ist seit 2026-09-22 geparkt, bis es einen Staging-Host gibt) (nur wenn die Repository-Variable `E2E_BASE_URL` gesetzt ist; Nutzer aus den Secrets `E2E_USERNAME`/`E2E_PASSWORD`) — nicht als PR-Check. Lokal/ephemer braucht WebKit den Hosts-Eintrag `127.0.0.1 host.docker.internal` (siehe den Cross-Browser-Abschnitt im [Projekt-README](../../README.md)).
+- **Nur `@Tag("smoke")`:** `CorePagesSmokeE2eTest` läuft über `./gradlew :frontend:smokeTest`, nicht über `e2eTest`. Der Smoke-Subset läuft in einem eigenen Workflow (`e2e-smoke.yml`) per `workflow_dispatch` gegen Staging (der nächtliche Zeitplan ist seit 2026-09-22 geparkt, bis es einen Staging-Host gibt) (nur wenn die Repository-Variable `E2E_BASE_URL` gesetzt ist; Nutzer aus den Secrets `E2E_USERNAME`/`E2E_PASSWORD`) — nicht als PR-Check. Lokal/ephemer braucht WebKit den Hosts-Eintrag `127.0.0.1 host.docker.internal` (siehe den Cross-Browser-Abschnitt im [Projekt-README](../../README.md)).

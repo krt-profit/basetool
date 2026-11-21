@@ -28,9 +28,9 @@
 > ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
 > ADR-0214, ADR-0216, ADR-0219, ADR-0223, ADR-0229, ADR-0231 … ADR-0239 · **Specs:**
 > REQ-API-\*, REQ-SEC-\*, REQ-AUDIT-001, REQ-DATA-\*, REQ-FE-\*, REQ-XCH-\*
-> **Appendices:** [the REST API cut](../modularisation/rest-api-cut.md) ·
-> [previous audits re-evaluated](../modularisation/previous-audits.md) ·
-> [evidence and data](../modularisation/evidence.md)
+> **Appendices:** [the REST API cut](modularisation/rest-api-cut.md) ·
+> [previous audits re-evaluated](modularisation/previous-audits.md) ·
+> [evidence and data](modularisation/evidence.md)
 
 # Domain modularisation plan
 
@@ -73,7 +73,7 @@ refuses code that reaches past that API. It is the report of a whole-repository 
 | --- | --- | --- |
 | D-01 | **Target architecture C** | First a modular monolith: one package per domain inside the existing `backend` Gradle module, boundaries enforced by tests, today's violations frozen in a baseline that may only shrink. Later, once their boundary has held for some releases, `exchange` and `bank` become Gradle modules of their own, so the compiler enforces their boundary. Every other domain stays a package. Runtime, database, image and deployment are unchanged. |
 | D-02 | **Enforcement with both ArchUnit and Spring Modulith** | ArchUnit keeps the security and structural rules (re-keyed so a move cannot disarm them, §6) and carries the frozen module baseline; Spring Modulith 2.1.1 runs in **test scope only** for module verification, generated module documentation and module-scoped tests. Its event publication registry is not adopted (§10). |
-| D-03 | **Full per-domain cut of the REST API** | `/api/v1` is re-cut per domain, naming clean-ups included (`/slim`, `/search`, admin sub-trees, …). Details: [appendix](../modularisation/rest-api-cut.md). |
+| D-03 | **Full per-domain cut of the REST API** | `/api/v1` is re-cut per domain, naming clean-ups included (`/slim`, `/search`, admin sub-trees, …). Details: [appendix](modularisation/rest-api-cut.md). |
 | D-04 | **Hard cut with forced update for the Android app** | No parallel old and new paths and no sunset windows. Each API wave ships with a new app release and raises the minimum version through the frozen version gate `GET /api/v1/app/version-policy` (REQ-API-010). |
 | D-05 | **The exchange contract is frozen** | External clients use `/exchange/v1` on the ingest gateway; that contract and the backend surface the gateway relays to (`/api/v1/exchange/**`) keep their behaviour byte-identical. |
 | D-06 | **Previous audits** | The July 2026 modularity audit and the September 2026 improvement audit are re-evaluated in full; the earlier focused audits only for items that were deferred, rejected or left open, plus fixes a domain split could put at risk. Sibling-repository findings are listed, not re-verified. |
@@ -171,7 +171,7 @@ The backend has 1,389 top-level types (174,597 lines) in layer packages: `contro
 `service` 208 + 65, `repository` 115, `model` 169, `model.dto` 342, `mapper` 51, `support` 63,
 `config` 47, `task` 11, `event` 19. 1,383 of the 1,389 types are `public`, so no domain can hide
 anything. The domain map — the ordered rule set that assigns each of the 1,389 types — and the
-coupling matrix are in the [evidence appendix](../modularisation/evidence.md#backend-module-inventory).
+coupling matrix are in the [evidence appendix](modularisation/evidence.md#backend-module-inventory).
 
 | Fact | Value | Consequence |
 | --- | --- | --- |
@@ -330,7 +330,7 @@ Two fixed points:
   its read gate), `ActiveOrgUnitProvider` (scope → logging MDC), and the GDPR participants of §7.6.
 
 The sixteen cross-domain write families, with the mechanism each gets, are listed in the
-[evidence appendix](../modularisation/evidence.md#cross-domain-write-families).
+[evidence appendix](modularisation/evidence.md#cross-domain-write-families).
 
 ### 5.4 Authorization and tenancy
 
@@ -504,7 +504,7 @@ audience second (`/api/v1/<root>/admin/**`); member-scoped resources in their ow
 suffixes (`/slim`); one collection `GET` with typed filters plus `/lookup`; a frozen tier T0 that
 never moves; every wave one app release, one deploy and one floor raise. The concrete cut per domain,
 with the Android operations, edge allow-list lines, probes, E2E, frontend call sites and security
-deltas of each move, is the [REST API appendix](../modularisation/rest-api-cut.md).
+deltas of each move, is the [REST API appendix](modularisation/rest-api-cut.md).
 
 **Contract tiers.** Every operation carries a tier: **T0** never breaks — the version gate
 `GET /api/v1/app/version-policy`, `POST /internal/discord/account-existence` (the SPI fails open if
@@ -3483,13 +3483,13 @@ their own (REQ-OPS-041). Open in F5: the ES modules.
 
 **Delivery decided 2026-10-04 (D-24):** the waves below are built and merged one by one, but ship
 together as one backend release and one app release, so the paragraph's per-wave release cadence
-is replaced by a single cut. Each wave is one domain's cut ([appendix](../modularisation/rest-api-cut.md)), shipped together with the
+is replaced by a single cut. Each wave is one domain's cut ([appendix](modularisation/rest-api-cut.md)), shipped together with the
 backend and frontend change of that domain in one release (frontend and backend deploy in one
 restart window), with a new app release published first and the minimum version raised once the
 re-cut release is verified healthy — or, once the floor is release-bound (D-11), by the release itself.
 The executable wave plan (counts re-measured on 2026-10-10, the machine-readable map, the
 integration branch `claude/api-cut`, the shape changes, the forced-update mechanics, the owner
-questions and the app work split) is [`modularisation/api-cut-waves.md`](../modularisation/api-cut-waves.md).
+questions and the app work split) is [`modularisation/api-cut-waves.md`](modularisation/api-cut-waves.md).
 Suggested order by risk and app impact: web-only moves first (admin sub-trees, notification rules,
 the demonstration ping), then identity and org units, mission, bank, job orders and the game-item
 catalogue, and the small rest (Materialbörse, hangar, refinery, typed settings). The T0 tier never
@@ -3686,7 +3686,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 ## 11 Previous audits re-evaluated
 
 Full tables, per finding with status, evidence and verdict:
-[previous-audits appendix](../modularisation/previous-audits.md).
+[previous-audits appendix](modularisation/previous-audits.md).
 
 - **September 2026 improvement audit (176 findings).** 156 are in this repository's scope (20
   concern the sibling repositories; the knowledge base records 19 of them done and one decided as

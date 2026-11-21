@@ -184,7 +184,7 @@ The template intentionally asks for:
 - **Alternatives** you considered and rejected.
 - A scope checklist that flags non-obvious follow-on work (Flyway
   migration, role logic, multi-user / multi-squadron isolation,
-  responsive UI work, i18n keys in DE + EN + fallback, changelog fragment,
+  responsive UI work, i18n keys in DE + EN, changelog fragment,
   OpenAPI updates, Resilience4j configuration for new backend calls).
 
 If your proposal needs a Flyway migration or touches the role model or
@@ -320,7 +320,7 @@ it; after a change there run the checks above (`help --configuration-cache` twic
 
 **A module script names repository files with `layout.settingsDirectory.file|dir(…)`**, never
 `rootProject`; `scripts/check-gradle-input-paths.py` (`repo-lint.yml`) fails a script that does. A
-library module of an application is named `<app>-<name>` (none exists; the extraction of `backend-exchange` is not implemented, plan §5.8): the image-reuse plan
+library module of an application is named `<app>-<name>` (none exists; the extraction of `backend-exchange` is not implemented, [archived plan](docs/archive/DOMAIN_MODULARISATION_PLAN.md) §5.8): the image-reuse plan
 counts its `src/main` as an input of `<app>` only, the SBOM check counts it as shipped inside `<app>`
 (which must declare it as an `implementation` project dependency), and `<app>`'s JaCoCo report and floors
 include its classes and tests (REQ-OPS-047).
@@ -411,7 +411,7 @@ entry does no harm).
   takes one of its proposals regenerates the file. `native-tool-updates.yml`
   writes the entries of the versions it proposes itself.
 
-The `main` ruleset makes eight checks **required**: *Build, Test & Lint*
+The `main` ruleset makes nine checks **required**: *Build, Test & Lint*
 ([`ci.yml`](.github/workflows/ci.yml)), the two CodeQL jobs *Analyze
 (java-kotlin)* and *Analyze (actions, python, js)*
 ([`codeql.yml`](.github/workflows/codeql.yml)), *Commit & repo gates*
@@ -419,18 +419,19 @@ The `main` ruleset makes eight checks **required**: *Build, Test & Lint*
 wrapper checksum, the DCO sign-off of every commit, the gitleaks secret
 scan and the Flyway version numbering; gitleaks reads `.gitleaks.toml`
 from the **base** commit, so an allowlist change takes effect from the
-next PR on) and the four jobs of
+next PR on), *Dependency review*
+([`dependency-submission.yml`](.github/workflows/dependency-submission.yml), on every PR) and the
+four jobs of
 [`repo-lint.yml`](.github/workflows/repo-lint.yml), split by
 toolchain: *Linters* (shellcheck, actionlint, zizmor, hadolint),
 *Repository gates* (Quadlet drift, ADR numbering and registry, the cosign
 signer identity, image pins, dashboards, log masking, ansible-lint, …),
 *Self-tests* (the operational scripts' suites) and *Container checks*
 (Prometheus rules and config, Alertmanager, Alloy, Loki, the edge nginx,
-the Keycloak issuer). Every check is a step named `<check> / …` and runs
+the Keycloak issuer). Every repo-lint check is a step named `<check> / …` and runs
 even when an earlier one failed, so the job log lists every finding.
 Further PR checks run alongside (some only when their paths are
-touched) and are expected to pass: *Dependency review*
-([`dependency-submission.yml`](.github/workflows/dependency-submission.yml), on every PR),
+touched) and are expected to pass:
 [`vulnerability-scan.yml`](.github/workflows/vulnerability-scan.yml),
 [`deploy-script.yml`](.github/workflows/deploy-script.yml) and
 [`keycloak-provisioner.yml`](.github/workflows/keycloak-provisioner.yml).
@@ -719,7 +720,7 @@ commit of the branch and to the PR title.
 ```
 
 - **`<type>`** — one of `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `style`, `build`, `ci`, `perf`. Add a `!` (e.g. `feat!`) for breaking changes, or use a `BREAKING CHANGE:` footer.
-- **`<scope>`** — short identifier of the affected area. Recent history uses scopes such as `multi-tenant`, `db/V80`, `frontend/orders`, `admin/uex`, `operations`, `missions`, `materials`, `actions`, `deps`. Look at `git log --oneline` for live examples; pick the closest existing scope rather than inventing a new one.
+- **`<scope>`** — short identifier of the affected area. Recent history uses scopes such as `catalogue`, `ops`, `orders`, `bank`, `exchange`, `deploy`, `monitoring`, `ui`, `deps`. Look at `git log --oneline` for live examples; pick the closest existing scope rather than inventing a new one.
 - **`<short summary>`** — imperative mood (*"add foo"*, not *"added foo"* or *"adds foo"*), lower-case start, no trailing period, ≤ 72 characters including the prefix.
 - **Body** — explain the *why*. Reference Issues / PRs (`closes #123`, `refs #456`). Keep lines ≤ 100 characters.
 - **Footer** — `BREAKING CHANGE:` (with a colon), `Co-authored-by:`, and — required on every commit — the `Signed-off-by:` trailer from `git commit -s` (see [DCO sign-off](#developer-certificate-of-origin-dco-sign-off)). A commit an AI agent authored also names the agent and its model, e.g. `Co-Authored-By: Codex <Model> <noreply@openai.com>` ([`docs/agents/git-and-commits.md`](docs/agents/git-and-commits.md)).
@@ -878,16 +879,17 @@ Javadoc is **gate-enforced** via Checkstyle (`MissingJavadocType`,
 ### Internationalization (i18n)
 
 - **Every** user-visible string comes from
-  `frontend/src/main/resources/messages.properties` (and
-  `messages_de.properties` / `messages_en.properties`). No exceptions —
+  `frontend/src/main/resources/messages_de.properties` /
+  `messages_en.properties`. No exceptions —
   labels, buttons, tooltips, error messages, flash messages, alerts,
   placeholders, titles. No hardcoded text in HTML, JS, or Java.
 - **German umlauts in `.properties` files MUST be encoded as `\uXXXX`**
   — e.g. `\u00e4` for `ä`. This is a hard rule, enforced by review.
 - **German umlauts in Markdown files MUST be literal UTF-8 characters.**
   Never use `\uXXXX` outside `.properties`.
-- New keys land in `messages.properties` (fallback) plus both
-  `messages_de.properties` and `messages_en.properties`.
+- New keys land in both `messages_de.properties` and
+  `messages_en.properties`; the build derives the fallback
+  `messages.properties` from the German bundle (`:frontend:generateDefaultMessages`).
 
 ### Frontend / UI
 
@@ -1159,7 +1161,7 @@ the PR — every box should be reasonably tickable.
 - [ ] **Every** commit in the PR carries a `Signed-off-by:` trailer (DCO; `git commit -s`).
 - [ ] For schema changes: a new `V<n>__<desc>.sql` migration, `ddl-auto=validate` still passes, destructive operations follow the two-phase rule.
 - [ ] For API changes: `openapi.json` updated, every endpoint carries SpringDoc annotations, write DTOs carry Jakarta validation annotations, list endpoints whitelist sort fields, all timestamps in UTC.
-- [ ] For UI changes: verified on at least one of each device class (Smartphone / Tablet / Desktop / Ultra-wide), every user-visible string in `messages.properties` (DE + EN + fallback), umlauts encoded `\uXXXX` in `.properties`, literal in Markdown.
+- [ ] For UI changes: verified on at least one of each device class (Smartphone / Tablet / Desktop / Ultra-wide), every user-visible string in `messages_de.properties` and `messages_en.properties`, umlauts encoded `\uXXXX` in `.properties`, literal in Markdown.
 - [ ] For dependency upgrades: edited the version catalog `gradle/libs.versions.toml`, not `build.gradle.kts` directly (there is no `versions.properties`; the refreshVersions run recreates an empty, gitignored one), and regenerated `gradle/verification-metadata.xml` ([Dependency verification](#dependency-verification)).
 - [ ] For build-script changes: `./gradlew help --configuration-cache` twice (second run reuses the entry) and `./gradlew build -m --configuration-cache` are green.
 

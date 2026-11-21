@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-25.
-> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0036 (Discord link recognised from the federated identity); ADR-0051 (account-existence precheck denies a colliding first-login); ADR-0111 (admin-mediated linking of a Discord registration to an existing account); role/unit sync (planned — Track 2)
+> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0036 (Discord link recognised from the federated identity); ADR-0051 (account-existence precheck denies a colliding first-login); ADR-0111 (admin-mediated linking of a Discord registration to an existing account)
 
 # Discord integration — login, membership gate & admin approval
 
@@ -10,8 +10,7 @@ verified DAS KARTELL members — present in the `das-kartell` Discord guild **an
 `KRT-Mitglied` role. Discord login is **additive** to the existing Keycloak credential login. A
 brand-new Discord user lands in a **PENDING** state with no access until an admin approves; admins
 are notified. Approval grants `KRT Member` (REQ-SEC-088); further Basetool roles and org-unit
-memberships are assigned **manually** with the existing tooling — the automated Discord-role → app-role/unit **sync is a separate, later track**
-(Track 2) and is out of scope here.
+memberships are assigned **manually** with the existing tooling — the automated Discord-role → app-role/unit **sync** (Track 2) was closed as not planned and is out of scope here.
 
 This is epic **#720, Track 1** (issues #721–#725). The federation and the gate are implemented in an
 owned Keycloak provider module (`keycloak-spi/`), per [ADR-0030](../adr/0030-discord-federation-first-login-membership-gate.md).
@@ -173,7 +172,7 @@ second time for the nickname. All Discord calls of the provider JAR share one `H
   verified members, that this also holds for connecting another application (an exchange client's
   device login, REQ-XCH-005), and that a member who has just been given the role signs in again.
 
-**Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `DiscordGuildRoleGateAuthenticatorTest` (exactly one Discord call per first login) · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `kernel/fragments/sidebar.html`, `kernel/fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
+**Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `DiscordGuildRoleGateAuthenticatorTest` (exactly one Discord call per first login) · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `kernel/fragments/sidebar.html`, `kernel/fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
 
 ### REQ-SEC-071 — A Discord login that returns to the wrong browser ends on a page with a way back
 
@@ -740,12 +739,11 @@ match.
 ## Out of scope
 
 - **Automated Discord-role → app-role/org-unit sync** and the Discord **bot** — Track 2 (#726–#730),
-  its ADR not yet written (the number ADR-0031 once pencilled in for it now belongs to the live
-  mission sync). Track 1 keeps Basetool roles manual.
+  closed as not planned. Basetool roles stay manual.
 - **Continuous membership enforcement.** The guild + KRT-Mitglied gate (REQ-SEC-016) runs **once**,
   at first-broker-login when the Discord identity is first linked. A member later removed from the
-  guild or stripped of `KRT-Mitglied` keeps Basetool access until the Track 2 role-sync revokes it —
-  Track 1 does no periodic re-check.
+  guild or stripped of `KRT-Mitglied` keeps Basetool access — there is
+  no periodic re-check.
 - **Discord OAuth application + Keycloak realm provisioning** (client id/secret, IdP, mappers, the
   custom first-broker-login flow, the gate config) — operator steps in
   [`DISCORD_KEYCLOAK_SETUP.md`](../keycloak/DISCORD_KEYCLOAK_SETUP.md); never committed secrets.

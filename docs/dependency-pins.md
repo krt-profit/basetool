@@ -1,6 +1,6 @@
 # Dependency pins, holds and floors
 
-> **Doc type:** Living reference — kept in sync with `main`. Last reviewed: 2026-11-20.
+> **Doc type:** Living reference — kept in sync with `main`. Last reviewed: 2026-11-21.
 
 This file records why a dependency version is **held** behind upstream, **pinned** to match another
 component, or **floored** / overridden for a security advisory — the standing reasons the version
@@ -53,7 +53,7 @@ A floor only has to clear its advisory: stay on the lines above rather than taki
 |---|---|---|---|
 | `junit` (keycloak-spi only) | 6.1.3 | keycloak-spi is deliberately no Spring Boot module and has no BOM to supply JUnit. Boot 4.2.0 manages the same 6.1.3, so the repository runs one JUnit line. | Move together with the Boot bump that moves the managed JUnit. |
 | `mockito` (keycloak-spi only) | 5.24.0 | Same reason as `junit`; backend, frontend and ingest keep Boot's managed Mockito, 5.24.0 under Boot 4.2.0. Kept in the catalog, not the build script, so refreshVersions can see it. The module's tests set `net.bytebuddy.experimental=true`: without the Boot BOM, Mockito 5.24.0 brings Byte Buddy 1.17.7, which officially supports class files up to Java 25, and the toolchain is JDK 27. | Drop the Byte Buddy flag once Mockito brings Byte Buddy 1.18.9 or later (Java 27 support). |
-| `test-support`, `logging-support` | Boot BOM | Both import the Spring Boot BOM without the Boot plugin and pin nothing of their own; the root script's BOM property overrides reach them through the dependency-management plugin, so they compile against what the applications run. No `platform(libs.junit.bom)` on top (removed 2026-09-22: it put a second JUnit line into one module). | — |
+| `test-support`, `logging-support` | Boot BOM | Both import the Spring Boot BOM without the Boot plugin and pin nothing of their own; the BOM property overrides of `basetool.dependency-management-conventions` reach them through the dependency-management plugin, so they compile against what the applications run. No `platform(libs.junit.bom)` on top (removed 2026-09-22: it put a second JUnit line into one module). | — |
 | Java toolchain, `setup-java` `java-version` and the `eclipse-temurin:27-*-alpine` images | 27 | A feature release, not an LTS: the owner prefers the newest stable JDK and takes each one within its six-month support window ([ADR-0398](adr/0398-the-stack-leaves-the-java-25-lts-for-java-27.md)). | JDK 28 ships (March 2027) and a Spring Boot release supports it; Java 29 (LTS) follows in September 2027. |
 | `jacoco` (`basetool.coverage-conventions`) | 0.8.16 | Gradle's default JaCoCo (0.8.15 under Gradle 9.9) reads Java 27 class files only through its experimental path; 0.8.16 supports them. | Keep it at the newest release; it must read the class-file version of the toolchain. |
 | `pitestCore` (`pitestVersion` in `basetool.mutation-conventions`) | 1.30.2 | The pitest Gradle plugin 1.19.0 defaults to PIT 1.22.1, whose bundled ASM reads class files up to Java 26 only; PIT reads Java 27 from 1.25.6 on. | Keep it at the newest release; it must read the class-file version of the toolchain. |

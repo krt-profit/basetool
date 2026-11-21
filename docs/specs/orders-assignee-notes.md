@@ -20,16 +20,13 @@ so enrolling, unenrolling and editing notes refresh the list in place without a 
 
 ### REQ-ORDERS-013 — Per-assignee note
 
-> **Approved target — implementation pending:** The approved shared model applies the personal Bearbeiter note to all three kinds, independently versioned from other parts of the order. This personal entry is separate from a Staffel participation or money-holder identity; see orders-core.md.
->
-> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
-
-Each assignee entry on a job order MAY carry one optional free-text note, at most
+Each assignee entry on a job order of any kind (`MATERIAL`, `ITEM`, `AUEC`) MAY carry one optional free-text note, at most
 **500 characters**. The note is plain text, stored HTML-escaped-on-render, never logged, and
 visible to **everyone who can see the order**. A note may be created, replaced, or cleared
 independently of the rest of the order. Editing a note bumps only the assignee edge's own
 `@Version`, never the parent order's version, so a note edit never collides with an
-order-level write; a stale note edit surfaces as HTTP 409.
+order-level write; a stale note edit surfaces as HTTP 409. The entry is personal and separate from
+a Staffel participation or a money-holder identity ([orders-core.md](orders-core.md)).
 
 **Acceptance**
 
@@ -48,10 +45,6 @@ the `JobOrderService` facade), `JobOrderAssigneeController.setAssigneeNote` / `d
 `JobOrderWriteController` + `orders-detail.js` · **Issues:** —
 
 ### REQ-ORDERS-014 — Who may change an assignee note
-
-> **Approved target — implementation pending:** The approved shared access/actor contract in orders-core.md preserves the assignee's own-note/self-removal scope without granting general order or financial writes. Relevant current unit grants remain distinct from that personal entry.
->
-> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 A user may create, edit, or delete the note **only on their own assignee entry**. A
 **Logistician of the order** — a caller holding the Logistician grant of the order's processing
@@ -82,10 +75,6 @@ in the controller, not the service, so business logic stays free of `SecurityCon
 · **Issues:** —
 
 ### REQ-ORDERS-047 — Being an assignee grants read visibility of that order
-
-> **Approved target — implementation pending:** The approved common reader model in orders-core.md retains the personal assignee escape while adding the separately defined unit/holder/payee audiences. A Bearbeiter entry still grants no broad financial rights; linked holder/payee history rights have their own basis.
->
-> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 An assignee entry (`JobOrderAssignee`) is the only meaning of „assigned to me"; there is no separate
 responsible person. Current responsible-unit writers enroll accounts. Existing assignees remove themselves and
@@ -154,19 +143,18 @@ REQ-ORDERS-013, REQ-ORDERS-014, REQ-ORDERS-040, REQ-ORDERS-043, REQ-ORG-003, REQ
 
 ### REQ-ORDERS-048 — Job orders are found by number
 
-> **Approved target — implementation pending:** The approved number lookup uses the same current readable set as common queue/detail/history, including permitted requester, supporting-unit and linked holder/payee relationships from orders-core.md. An ID/number result never grants additional access or private Bank/blueprint/mission details.
->
-> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
-
 `GET /api/v1/orders/by-number?number=<digits>&limit=<n>` (`isAuthenticated()`) returns the orders
 whose `displayId` starts with the one to nine digits, by ascending number, at most `limit` (1–20,
 default 5), each as `JobOrderNumberHitDto {id, displayId, status, createdAt}`. Any other `number`
 is a 400.
 
-- The result is exactly what the caller may open from the order list: for a caller inside the order
-  workflow the scoped orders of `JobOrderScope.PREDICATE` (REQ-DATA-010), and for every caller the
-  orders they hold an assignee entry on (REQ-ORDERS-047). A caller outside the workflow therefore
-  finds only their assigned orders; an unidentified caller finds none.
+- The result is exactly what the caller may open from the order list: for a non-admin caller inside
+  the order workflow every order (the Profit-wide readership of [orders-core.md](orders-core.md),
+  REQ-ORDERS-052), and for every other caller the common readable set of
+  `JobOrderScope.READ_PREDICATE` — orders of their requesting, responsible, read-history and
+  supporting units, their assignee entries (REQ-ORDERS-047) and their linked aUEC holder/payee
+  relationships. An unidentified caller finds none. A hit grants no further access and carries no
+  private Bank, blueprint or mission detail.
 - The quick access (REQ-UI-033) is the only consumer; it shows the number only.
 
 **Enforced by:** `JobOrderScopeQueryIntegrationTest` (scope, prefix, assignee grant),

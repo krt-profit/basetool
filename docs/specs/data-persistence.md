@@ -760,7 +760,7 @@ checks. The six scope fragments are pinned byte for byte by `ScopeFragmentsGolde
 differential tests (`ScopeParityCallers`): the list never shows a row the gate refuses, and the two agree on every row another member
 owns in a unit (for Mission, Operation and JobOrder on every row). `RefineryOrderRepositoryScopedTest` and `ScopeKernelTest` still cover the scoped queries.
 
-**Code:** `backend/src/main/java/.../backend/catalogue/internal/LookupTableRepository.java`,
+**Code:** `backend/src/main/java/.../backend/catalogue/api/LookupTableRepository.java`,
 `mission/api/MissionScope.java`, `hangar/api/ShipScope.java`, `joborder/api/JobOrderScope.java`, `inventory/api/InventoryScope.java`
 
 ### REQ-DATA-011 — Background sync sweeps evict the master-data caches they rewrite (CACHE-SYNC-EVICT-001)

@@ -1,6 +1,6 @@
 # Personal-data breach runbook (Art. 33, 34 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-21.
 
 **The clock is 72 hours from becoming aware, and it does not pause for the weekend.** "Aware" means
 having a reasonable degree of certainty that a security incident has led to personal data being

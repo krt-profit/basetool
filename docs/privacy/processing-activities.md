@@ -230,7 +230,7 @@ requires it and duplicating it into further files spreads personal data for no g
   blueprint note or a ship name); the entries an admin bulk undo left alone; audit rows in the
   Blueprints, Lager, Hangar and „Verbundene Anwendungen" areas naming the client; the notifications
   `EXCHANGE_INSTALLATION_CONNECTED` and `EXCHANGE_BULK_UNDO_APPLIED`; transient entries (idempotency
-  results 24 h, a staged mass change 30 min, the Redis revocation and deny-list mirror 90 days); in
+  results 1 h, a staged mass change 30 min, the Redis revocation and deny-list mirror 90 days); in
   Keycloak the member's consent per client and the client's offline session. The account check
   compares a sent RSI handle with the stored one and keeps neither (REQ-XCH-031). The member's
   choice to withhold their name from connected applications (off by default, set on the profile,

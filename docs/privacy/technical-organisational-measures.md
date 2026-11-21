@@ -1,6 +1,6 @@
 # Technical and organisational measures (Art. 32 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-28.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-21.
 
 Art. 32 requires measures appropriate to the risk. This document does not restate them in the
 abstract; each measure names **where it is enforced**, so a reader can check the claim rather than
@@ -55,8 +55,7 @@ measures below are accordingly proportionate rather than exhaustive.
 - **The internal hops are TLS as well** — the backend serves HTTPS, and the SMTP transport (when
   enabled) requires STARTTLS and fails rather than falling back to plaintext.
 - **Session cookie** is `Secure`, `HttpOnly`, `SameSite=Lax` (REQ-SEC-025, pinned by
-  `SessionCookieAttributesTest`). *Corrected 2026-10-03:* this line said `SameSite=Strict`, which
-  was configured but never emitted; `Lax` is the deliberate value, because the login and links
+  `SessionCookieAttributesTest`). `Lax` is the deliberate value, because the login and links
   opened from other sites need the cookie on a cross-site top-level navigation.
 
 ### Encryption at rest
@@ -64,9 +63,10 @@ measures below are accordingly proportionate rather than exhaustive.
 - **Backups are client-side encrypted** before leaving the host; the storage target only ever
   receives encrypted blobs (REQ-OPS-008). This is the copy that leaves the controller's own
   infrastructure, so it is the one that must be encrypted regardless of the target.
-- **The TLS keystore stays with the service account**: it lives under `/etc/basetool/secrets`, owned by
-  the unprivileged account the containers run as, and is mounted read-only into the four containers
-  that use it (`quadlet/systemd/{backend,frontend,ingest,keycloak}.container`).
+- **The TLS keystores stay with the service account**: each of the four services that serve TLS has
+  its own keystore under `/etc/basetool/secrets/tls`, signed by the internal CA (REQ-SEC-070), owned
+  by the unprivileged account the containers run as, and mounted read-only into that service's
+  container alone (`quadlet/systemd/{backend,frontend,ingest,keycloak}.container`).
 
 ### Confidentiality of the operational record
 

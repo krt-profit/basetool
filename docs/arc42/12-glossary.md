@@ -36,7 +36,7 @@ worth reading even if you know the domain.
 | **Einsatz / Mission** | A planned squadron mission members sign up to, check in and out of, and are paid for. Non-internal missions are visible to the whole organisation, not only to the owning unit. |
 | **Einsatzvorlage / Mission template** | An org unit's named, reusable plan containing goals, procedure steps and unit planning rows. See [REQ-MISSION-035](../specs/mission-templates.md). |
 | **Operation** | A grouping of missions with per-participant finances and a mark/clear payout gate. |
-| **Auftrag / Aufträge** | Current runtime: the material/item JobOrder queue. The approved, implementation-pending three-kind contract is defined in section 12.9; its canonical rules are [orders-core.md](../specs/orders-core.md). |
+| **Auftrag / Aufträge** | The JobOrder queue of three exclusive kinds — material, item and aUEC procurement (`JobOrderType`); the terms are in section 12.9, the canonical rules in [orders-core.md](../specs/orders-core.md). |
 | **Eintragung / material promise** | A Staffel's still-outstanding material/quality contribution within its single order participation. It is distinct from actual stock and historically credited provision (section 12.9). |
 | **Materialbedarf** | The cross-order demand overview: what each responsible unit still has to gather per material, with booked stock and signed-up claims side by side. |
 | **Qualitätsstufe** | A catalogue tier a material requirement is stated in — a code, a floor (0–1000) and two labels, maintained by an administrator. „Keine" (floor 0) accepts any stock, „Gut (650+)" only 650 and up. An order's linked stock counts toward exactly one of its tiers (REQ-ORDERS-036/037, ADR-0241). |
@@ -46,7 +46,7 @@ worth reading even if you know the domain.
 | **Umbuchen** | Transferring stock, individually or for a whole marked selection at once. |
 | **Pledge** | An RSI purchase in a member's hangar, one or more ships plus extras, with an id, a date, a price and whether it can be melted or gifted. An imported ship carries its pledge data, shown only to its owner and to admins (REQ-HANGAR-015, ADR-0295). |
 | **Ship origin** (Herkunft) | Whether a ship is pledged (`PLEDGE`, „Gepledged"), bought in-game (`IN_GAME`, „Ingame gekauft") or of unknown origin (`UNKNOWN`). A patch wipe removes only in-game ships; a ship from a file import or with a pledge id is locked to pledged. Private like the pledge data, exchanged with the member's own client (REQ-HANGAR-017, REQ-XCH-057, ADR-0386). |
-| **Gestohlen** | The marker on Lager stock that is stolen cargo (REQ-INV-053). Part of the stack identity, so stolen and legitimate stock never share a stack or merge; carried by every move, shown as a danger chip wherever stock appears, and gated by a server switch until the app release that shows it. |
+| **Gestohlen** | The marker on Lager stock that is stolen cargo (REQ-INV-053). Part of the stack identity, so stolen and legitimate stock never share a stack or merge; carried by every move, shown as a danger chip wherever stock appears, and gated by a server switch. |
 | **Materialbörse** | The org-wide exchange board. **Angebote** are offers of owned stock; **Gesuche** are requests, optionally with a minimum quality and a desired quantity. |
 | **Raffinerie** | Refinery — job orders, material handovers and the planet-aware materials matrix. |
 | **Kartellbank** | The organisation bank: a double-entry, append-only ledger with accounts, a holder registry, per-account grants, approval ladders and PDF statements. |
@@ -68,7 +68,7 @@ worth reading even if you know the domain.
 
 | Term | Means |
 | --- | --- |
-| **Audited area** | One of the fifteen areas (the bank and fourteen `AuditDomain` values) whose every state-mutating activity is written to the append-only trail (`REQ-AUDIT-001`). |
+| **Audited area** | One of the sixteen areas (the bank and fifteen `AuditDomain` values) whose every state-mutating activity is written to the append-only trail (`REQ-AUDIT-001`). |
 | **Live update** | A single client's own mutation updating the DOM **in place**, with no full-page reload (`REQ-FE-*`). |
 | **Live sync** | A *peer's* change propagating to other viewers over `/ws/sync`, fanned across replicas by Redis pub/sub. Not the same thing as live update, and both are required. The backend's parallel SSE bridge for the app is discontinued (ADR-0274) — see §12.5. |
 | **Discord-Registrierung / approval queue** | A self-service sign-up through Discord waits here as `PENDING` and sees nothing until an admin approves, rejects or links it to an existing account. |
@@ -80,7 +80,7 @@ worth reading even if you know the domain.
 | **Config bundle** | The promotable, signed OCI artifact carrying host configuration (ADR-0049). Distinct from the **provider-JAR bundle**, which carries the Keycloak SPI and is deliberately a *separate* artifact (ADR-0055). |
 | **Promotion** | Moving a `:stable` tag onto a chosen digest. A deliberate human act; the deploy timer only consumes it. |
 | **Front end (haproxy)** | The host service that binds `:80`/`:443` and hands connections to the edge with a PROXY v2 header naming the client (ADR-0187). Not to be confused with the `frontend` module. |
-| **Edge** | The nginx container terminating TLS for the four public names, behind the haproxy front end. **acme** is a separate container that issues and renews the certificates it serves. |
+| **Edge** | The nginx container terminating TLS for the three public names, behind the haproxy front end. **acme** is a separate container that issues and renews the certificates it serves. |
 | **Ingest** | The internet-facing gateway module serving the **Exchange (API)** of approved clients, the SC Extractor included, and the single **public API entry point** (ADR-0268); its former `/v1` extractor routes were removed on 2026-09-28. Owns no database; relays to the backend internally. |
 | **Public API entry point** | The ingest gateway, alone (ADR-0268). Every API interface reachable from the internet is on it: `/exchange/v1/**` and the connected-apps surface. The backend API is internal-only and has no public hostname; the web UI, Keycloak and Grafana are public surfaces but not APIs. |
 | **Internal callers of the backend** | Exactly three (ADR-0268): the `frontend` module over `net-backend-frontend`, the `ingest` gateway over `net-backend-ingest`, and the **Keycloak SPI**, which calls `POST /internal/discord/account-existence` on a shared secret (REQ-SEC-022). A token is accepted only from the first two, matched on `azp` (ADR-0270); anything else reaching `/api/v1` is a defect, not a configuration option. |
@@ -98,7 +98,7 @@ worth reading even if you know the domain.
 | **Pool / Org-Bestand** | A **pool** is one unit's shared (non-personal) Lager stock. The **org stock** (`orgstock`) is what the exchange serves of the pools of the units a member belongs to directly — the web's „Einheitslager" without oversight reach. Its lot is keyed by unit first, so one material in two units is two lots (REQ-XCH-042, ADR-0257). „Staffellager" is colloquial for a Staffel's pool. |
 | **Holder ref** | The pseudonym of a holder in the org stock's single entries: an HMAC of the user id under a salt per exchange client, so one member looks the same at one client and different at every other (REQ-XCH-043, ADR-0257). |
 | **Draft** | A client upload staged for review in the browser — a blueprint import or a refinery order — that writes nothing until the member saves it through the ordinary path. Distinct from a **mass change held for confirmation**, which is a staged change set. |
-| **Restore drill** | The weekly job that restores the **latest snapshot** into a throwaway PostgreSQL and scores seven artifacts. It reports on the *snapshot*, never on the host. |
+| **Restore drill** | The weekly job that restores the **latest snapshot** into a throwaway PostgreSQL and scores eight artifacts. It reports on the *snapshot*, never on the host. |
 | **Conformance suite** | `check-conformance.py` — invariants asserted against a **running host**, because the recurring defect class is configuration that is correct on disk and not in force in the process. |
 
 ## 12.4 Names that mean less than they look like
@@ -114,12 +114,12 @@ worth reading even if you know the domain.
 
 The native app is discontinued (issue #2638) and members use the installable web app instead, which
 is the frontend itself (ADR-0164). The six terms below named things the app was the only reason for.
-The decision to end each is recorded; the code and configuration follow in the sub-issues named, so
-until those land the artifacts are still there — and nothing new may be built on them.
+The decision to end each is recorded, and the code and configuration are removed in the sub-issues
+named; nothing new may be built on them.
 
 | Term | Actually |
 | --- | --- |
-| **API vhost** (`api.profit-base.online`) | The backend's public vhost (ADR-0135), **discontinued by ADR-0268**: the backend is internal-only and the ingest gateway is the only public API. Removed in #2672, together with the DNS record, the certificate SAN, `docker/edge/conf.d/50-api.conf.template`, the admission include and the `net-proxy-api` network — and replaced by a probe asserting the host does not resolve. |
+| **API vhost** (`api.profit-base.online`) | The backend's public vhost (ADR-0135), **discontinued by ADR-0268**: the backend is internal-only and the ingest gateway is the only public API. Removed in #2672, together with the DNS record, the certificate SAN, the edge's `50-api` vhost template, the admission include and the `net-proxy-api` network — and replaced by a probe asserting the host does not resolve. |
 | **Frozen contract**, **contract tiers T0 / T1** | `contract-tiers.txt`, `ContractTiers`, `x-contract-tier`, `ExternalContractTest`, the app call lists and the declared-break ledger (ADR-0136, ADR-0234), which froze `/api/v1` because one client could not redeploy. **Discontinued by ADR-0269**, removed in #2673; `/api/v1` is back under REQ-API-001's atomic-deploy carve-out. The **Exchange (API)**'s freeze is a different thing and stays (ADR-0219). |
 | **App floor**, **version policy** | `GET /api/v1/app/version-policy` and the release-bound minimum app `versionCode` behind the non-dismissible update wall (ADR-0234). **Discontinued by ADR-0269**, removed in #2673: no release raises a floor, and no deploy waits on one. |
 | **Retired operation** | A path that answered `410 APP_UPDATE_REQUIRED` after a declared hard-cut break (`retired-operations.txt`, `RetiredOperationFilter`, REQ-API-020). **Discontinued by ADR-0269**, removed in #2673. |
@@ -152,7 +152,7 @@ These terms come with ADR-0297…0302 (map #2800).
 ## 12.7 P4K catalogue
 
 These terms come with ADR-0335…0347 (map #2884); the rules are in
-[`p4k-catalogue.md`](../specs/p4k-catalogue.md) (`REQ-P4K-*`, planned).
+[`p4k-catalogue.md`](../specs/p4k-catalogue.md) (`REQ-P4K-*`).
 
 | Term | Means |
 | --- | --- |

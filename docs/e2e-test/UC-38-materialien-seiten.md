@@ -4,8 +4,8 @@
 |----------------|--------|
 | **ID**         | UC-38  |
 | **Tag**        | `e2e`  |
-| **Testklasse** | [`MaterialsOverviewMatrixRendersE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MaterialsOverviewMatrixRendersE2eTest.java) · [`MaterialsOverviewFilterPersistenceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MaterialsOverviewFilterPersistenceE2eTest.java) · [`MaterialsProfitCalculationRendersE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MaterialsProfitCalculationRendersE2eTest.java) |
-| **Spec**       | [`materials-pages-completeness.md`](../specs/materials-pages-completeness.md) (REQ-UI-016) · [ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) |
+| **Testklasse** | [`MaterialsOverviewMatrixRendersE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MaterialsOverviewMatrixRendersE2eTest.java) · [`MaterialsOverviewFilterPersistenceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MaterialsOverviewFilterPersistenceE2eTest.java) · [`MaterialsProfitCalculationRendersE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MaterialsProfitCalculationRendersE2eTest.java) · [`MaterialDetailPriceSortE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MaterialDetailPriceSortE2eTest.java) |
+| **Spec**       | [`materials-pages-completeness.md`](../specs/materials-pages-completeness.md) (REQ-UI-015, REQ-UI-016) · [ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) |
 
 ## Akteur
 
@@ -13,23 +13,25 @@
 
 ## Vorbedingungen
 
-Keine geseedeten UEX-Daten nötig. Die drei Lesetests sind ziel-agnostisch und verändern nichts.
+Keine geseedeten UEX-Daten nötig. Die drei Lesetests sind ziel-agnostisch und verändern nichts. Nur die Preistabelle der Detailseite braucht einen Seed: ein Material mit Preisen an drei Terminals.
 
 ## Auslöser
 
-Der Nutzer öffnet `/materials/overview` oder `/materials/profit-calculation`.
+Der Nutzer öffnet `/materials/overview`, `/materials/profit-calculation` oder die Detailseite `/materials/{id}`.
 
 ## Hauptablauf
 
 1. **Preisübersicht rendert:** `/materials/overview` laden und die Konsole mitschneiden.
 2. **Filter überleben den Reload** (REQ-UI-016): die beiden Boolean-Filter „hat Ladedock" und „Auto-Load" setzen, wo der Katalog mehrere Materialien bietet auch den Material-Multiselect einengen, dann neu laden.
 3. **Preiskalkulation rendert:** `/materials/profit-calculation` laden, ein Schiff wählen (entfällt, wenn der Stack keine Schiffe kennt), die Konsole mitschneiden.
+4. **Preistabelle der Detailseite sortiert** (`MaterialDetailPriceSortE2eTest`, REQ-UI-015): auf `/materials/{id}` die Spaltenköpfe der Preistabelle anklicken, dann dasselbe in 375×812.
 
 ## Erwartetes Ergebnis
 
 - Der Matrix-Container `#tableContainer` wird sichtbar, Lade- und Fehlerbox sind versteckt, und keine CSP-Verletzung `style-src-attr` steht in der Konsole.
 - Nach dem Reload sind die Filter wiederhergestellt, **und** die erste Anfrage an `/materials/overview/data` trägt sie schon — die Wiederherstellung passiert vor dem ersten Abruf, nicht als kosmetisches Nachsetzen nach einem ungefilterten Laden.
 - Der Ergebnisbereich der Preiskalkulation kommt in einem Endzustand an — `#profitResults` trägt `data-state="ready"`, `"empty"` oder `"error"` (Ergebniszeilen oder die Zustandszeile darunter) —, ohne CSP-Verletzung.
+- Ein Klick auf einen Spaltenkopf sortiert die Preistabelle in place; die Sortierknöpfe bleiben auch in Smartphone-Breite bedienbar.
 
 ## Sonderfälle & Lehren
 

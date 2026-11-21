@@ -15,10 +15,9 @@ suspension, a minimum version or a revocation lives in the registry that adminis
 with a pull request to this file; its merge is recorded in the client's row as an amendment, with the
 pull request and the date.
 
-An approved capability or limit takes effect once an administrator sets it in the registry. The
-registry grants VerseKit's refinery-order scopes and its `writesPerDay` of 2000 after the release
-that ships the refinery-order resource; until then VerseKit cannot use them, and its writes count
-against the default of 500.
+An approved capability or limit takes effect once an administrator sets it in the registry; until
+then the client cannot use the capability, and its writes count against the default `writesPerDay`
+of 500.
 
 The document is outside the consent hash of the terms of use, so changing it asks no member to
 consent again (REQ-SEC-028).

@@ -17,10 +17,6 @@ check on the loaded aggregate, and the version rule of a job-order edit.
 
 ### REQ-SEC-085 — The edit module authorises an edit on the loaded aggregate
 
-> **Approved planned JobOrder amendment (not implemented):** Keep owning edit-module access/audit responsibility while extending JobOrders to the scoped child/section contracts in [the approved aUEC contract](orders-auec.md) and [the approved shared JobOrder contract](orders-core.md). Narrow integration commands may apply validated bank outcomes; a browser actor or Bank staff role gains no general order-edit bypass. Strict invalid-responsibility read/transfer-only policy also gates coupled financial results.
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
-
 Every Mission timeline (steps, goals), roster (sign-up, participant row, check-in and check-out,
 payout preference, removal, party lead, co-managers) and structure (units, crews) mutation runs
 through `MissionEditor`, and every Job Order edit (status, blueprint counting, full and requester
@@ -41,7 +37,11 @@ The Bank-free aUEC provision passes through the scoped `JobOrderEditor` money ed
 current order and responsibility are checked under the same row guard used by lifecycle and
 deletion. The holder revision is independent of the target and common information. A matching
 accepted replay returns its durable result before the fresh holder version check and records no
-new audit. See [REQ-ORDERS-065 and REQ-ORDERS-066](orders-auec.md).
+new audit. See [REQ-ORDERS-065 and REQ-ORDERS-066](orders-auec.md). A validated Bank outcome
+reaches the order only through the narrow `JobOrderEditor#prepareLinkedBankEffect` integration
+step, which holds the same row guard and refuses an order whose responsibility is invalid
+(`JobOrderResponsibilityGuard`); neither a browser actor nor a Bank staff role gains a general
+order-edit bypass.
 
 **Acceptance**
 
@@ -57,15 +57,15 @@ new audit. See [REQ-ORDERS-065 and REQ-ORDERS-066](orders-auec.md).
 
 ### REQ-ORDERS-046 — A job-order edit that carries a version requires it
 
-> **Approved planned JobOrder amendment (not implemented):** Replace a coarse parent-version dependency with the smallest independently editable owner and the versions each command actually relies on. Fresh writes require their relevant versions; a known successful replay checks current access and identical terms, then returns the stored outcome instead of failing on its old input versions. Meaningful quantity edits are not last-writer-wins retries. See [the approved aUEC contract](orders-auec.md) and [material contribution consistency](orders-material-claims.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
-
-A job-order edit whose request carries the order's optimistic-lock `version` — status change,
-blueprint counting, the full material and item edits and the two requester edits — requires that
-version: a missing version is HTTP 409 like a stale one (`OptimisticLock.check`). The decision is
-made once, in `JobOrderEditor`, not per method. Edits whose request carries no version
-(responsible-unit reassignment, the material and stock unlinks) are not version-checked. Because
+A job-order edit whose request carries a version requires the version of the part it edits: a
+status change the order's `lifecycleVersion`, the responsible-unit reassignment its
+`responsibilityVersion`, blueprint counting, the full material and item edits and the two
+requester edits the order's `version`. A missing version is HTTP 409 like a stale one
+(`OptimisticLock.check`). The decision is made once, in `JobOrderEditor`, not per method. Money
+edits check the holder and target revisions they rely on, and a matching accepted replay returns
+its recorded outcome instead of failing on its old input versions (REQ-SEC-085,
+[orders-auec.md](orders-auec.md)). Edits whose request carries no version (the material and stock
+unlinks) are not version-checked. Because
 the version is checked before the edit's own preconditions, a stale or missing version answers 409
 even where the edit would otherwise be refused with 400 (a material order sent to an item edit).
 

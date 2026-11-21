@@ -27,7 +27,7 @@ realm, the same throwaway credentials and the same seeding. The runbook
   `<username>-pw`. These values exist only in `realm-export.e2e.json` and this local stack. They
   are published on purpose and are never real credentials (root `AGENTS.md`, Testing).
 - **The ports are fixed, so only one stack runs per machine.** Before compose starts, the task
-  checks every host port of the dev profile (18080, 18081, 11261, 11262, 15432, 15433, 6379). If a
+  checks every host port of the dev profile (18080, 18081, 11261, 11262, 15432, 15433, 6379, 6380). If a
   container of **another** checkout publishes one of them, the task fails and names that
   container. **Never tear down another checkout's or another agent's stack on your own.** Report
   the container and its compose project (`docker inspect <name> --format

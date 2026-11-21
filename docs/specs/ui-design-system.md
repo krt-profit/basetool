@@ -2390,7 +2390,7 @@ descending; Verkauf starts descending, the others ascending; ties by terminal na
 material-demand page keeps its own three-step cycle (REQ-ORDERS-034)
 until it moves onto the helper.
 
-**Enforced by:** `:frontend:testTableSort` (`scripts/krt-table-sort.test.mjs`),
+**Enforced by:** `:frontend:testTableSort` (`frontend/scripts/krt-table-sort.test.mjs`),
 `MaterialsProfitCalculationRendersE2eTest`, `MaterialDetailPriceSortE2eTest` ·
 **Code:** `static/js/kernel/krt-table-sort.js`, `static/css/kernel/styles.css` (`.sort-header`),
 `templates/catalogue/materials-profit-calculation.html`,
@@ -2429,7 +2429,7 @@ and mission template forms also use the helper for their ordered draft rows. Eac
 the form locally and announces the new position. The final form submission persists the draft
 order (REQ-MISSION-015, REQ-MISSION-035, REQ-MISSION-037).
 
-**Enforced by:** `:frontend:testReorderJs` (`scripts/krt-reorder.test.mjs`),
+**Enforced by:** `:frontend:testReorderJs` (`frontend/scripts/krt-reorder.test.mjs`),
 `OrdersQueueReorderWithoutDragE2eTest`, `AdminFrequencyTypeReorderWithoutDragE2eTest` ·
 **Code:** `static/js/kernel/krt-reorder.js`, `templates/kernel/fragments/components.html`
 (`reorderControls`, `reorderLive`), `static/css/kernel/styles.css` (`.krt-reorder`),

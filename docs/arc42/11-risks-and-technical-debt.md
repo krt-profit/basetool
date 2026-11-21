@@ -242,8 +242,8 @@ external exchange client; the way back was a server snapshot taken immediately b
   Loki alert `KeycloakBackendTruststoreUnreadable` reads the `WARN` a start writes when it cannot
   load the store, and `KeycloakAccountExistenceProbeFailing` reads the `Account-existence probe
   could not reach the backend` `WARN` a first login writes when the store loads but does not trust
-  the backend (or the backend does not answer). **Closes on a host** with the deploy of that
-  release.
+  the backend (or the backend does not answer). Both hosts run it since release 1.26.0
+  (2026-11-18).
 - **A drift re-apply could destroy the only rollback anchor.** A re-apply of the deployed release
   ("drift: frontend: no container") saved the deployed pin over `previous-digest-pin.yml` — and, with
   the unit files gone, the deployed tree over `config-previous/`. Had that re-apply failed its gate,
@@ -270,7 +270,7 @@ not happened.
   confidential (PKCE **and** a client secret), closing security-audit finding M-6. The code shipped
   on 2026-09-23 (REQ-SEC-069) and is inert until `KEYCLOAK_FRONTEND_CLIENT_SECRET` is set; the
   production switch is two owner steps with no login window —
-  [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).
+  [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).
 - **Three of the twelve Keycloak hardening steps are open** —
   [`KEYCLOAK_HARDENING_RUNBOOK.md`](../archive/KEYCLOAK_HARDENING_RUNBOOK.md): step 2 (decide *Forgot
   password* on Keycloak's own SMTP; `resetPasswordAllowed` was still on at the last recorded
@@ -294,14 +294,14 @@ not happened.
   `REDIS_DEFAULT_USER` is `off` there
   ([`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl)). Left behind: a release
   rollback to 1.10.0 or older now needs `default` switched back on first.
-- **The session store shares one Redis process with the internet-facing ingest gateway.** The
-  per-service ACL bounds a compromised client, not a fault in the Redis server: a gateway compromise
-  combined with such a fault — the Lua faults of October 2025 were that class — reads every member's
-  OAuth2 tokens, and a full `noeviction` Redis refuses logins first. ADR-0389 takes scripting away
-  from the gateway's user (its ACL drops `EVAL`/`EVALSHA` once production runs the release without
-  scripts, #3494). [ADR-0388](../adr/0388-the-session-store-gets-a-redis-the-ingest-gateway-cannot-reach.md)
-  gives the sessions a Redis the gateway cannot reach: built in the stacks and the Quadlet units, it
-  closes this risk once production has run the cut-over (#3493).
+- ~~**The session store shares one Redis process with the internet-facing ingest gateway.**~~ —
+  **closed on production 2026-11-18** (release 1.26.0, #3493). The per-service ACL bounds a
+  compromised client, not a fault in the Redis server: a gateway compromise combined with such a
+  fault — the Lua faults of October 2025 were that class — could read every member's OAuth2 tokens,
+  and a full `noeviction` Redis refused logins first.
+  [ADR-0388](../adr/0388-the-session-store-gets-a-redis-the-ingest-gateway-cannot-reach.md) gives
+  the sessions `redis-session`, which the gateway cannot reach, and ADR-0389 takes scripting away
+  from the gateway's user: its ACL grants no `EVAL`/`EVALSHA` (#3494).
 - ~~**One internal TLS key is every service's identity until the per-service rollout.**~~ —
   **closed on production 2026-09-25.** Backend, frontend, ingest and Keycloak served the same
   self-signed `keystore.p12`, which was also the anchor every client pinned — so the
@@ -422,19 +422,17 @@ since the go-live of 2026-09-28, so these risks hold now.
   neither is renewed and the material in them expires in place. They are documented so the count of
   five directories against three live vhosts does not read as a missing certificate; pruning them is
   a deliberate change on the host's `edge-certs` volume, not a clean-up to do in passing.
-- ~~**`versions.properties` is vestigial**~~ — **resolved 2026-09-23.** The entry said "nothing
-  reads it", which was wrong: the three application Dockerfiles copied it, and the refreshVersions
-  settings plugin — applied on every build — recreated it when missing, which is why deleting it
-  was never a one-line change. It went together with that plugin's unconditional application
-  (audit items BLD-PERF-04, DOC-20): refreshVersions now runs only under `-PrefreshVersions`, its
-  recreated file is gitignored, and the configuration cache it was blocking is on in CI.
+- ~~**`versions.properties` is vestigial**~~ — **resolved 2026-09-23.** The file is gone together
+  with the refreshVersions plugin's unconditional application (audit items BLD-PERF-04, DOC-20):
+  refreshVersions runs only under `-PrefreshVersions`, its recreated file is gitignored, and the
+  configuration cache it was blocking is on in CI.
 - **The Discord login leaves the app origin for one hop, and cannot be made not to.** ADR-0166 put
   Keycloak on the app origin, but Discord's authorize page stays on `discord.com`. A callback that
   comes back in another browser context — the Discord app, an installed iOS web app's outside view,
   a reopened history entry — finds no Keycloak cookies and ends in `cookie_not_found`. Accepted as
   a client-side condition; `REQ-SEC-071` only makes it recoverable (message + link back), and
   `KeycloakLoginErrorSpike` catches it if it ever becomes the norm rather than the exception.
-- **Sessions are not carried across a host move** unless somebody chooses to copy the Redis data.
+- **Sessions are not carried across a host move** unless somebody chooses to copy the `redis-session` data.
   Skipping it logs everyone out at the moment of the move — a user-visible choice rather than a
   technical one. The archived cutover runbook has the copy, including the `--numeric-owner` trap.
 - **The SPI jar leans on Keycloak internals, and a Keycloak upgrade can break it without a compile
@@ -505,7 +503,7 @@ the job order. The blueprint's move into module packages waits for the inventory
 4). The baseline is at 45 class edges.
 The frontend is packaged by domain since 2026-10-10 (plan F4, REQ-FE-032): its controllers, mirrors
 and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, the kernel in the
-eight `kernel.*` packages. The cross-domain references between domains are page composition and no
+nine `kernel.*` packages. The cross-domain references between domains are page composition and no
 frontend rule bounds them yet; the kernel's ten reaches into `orgunit`, `identity` and `catalogue`
 (§5.3) are frozen by `KernelDomainReachTest` and may only shrink.
 

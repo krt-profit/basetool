@@ -133,7 +133,7 @@ against `v1.26.0`; a `<` line blocks the promotion.
 ### 4.3 Redis cut-over, before the deploy
 
 Steps 0, 1 and 3 of
-[`deployment.md` → Cut-over](../deployment.md#cut-over-the-session-store-gets-its-own-instance-adr-0388-needs-the-owners-yes):
+[`deployment.md` → Cut-over](REDIS_ACL_AND_SPLIT_ROLLOUT.md#cut-over-the-session-store-gets-its-own-instance-adr-0388-needs-the-owners-yes):
 the memory check (`used_memory` below 300000000), the three passwords, both ACL files rendered as
 new files with `restorecon`. Step 2 is §4.2. `REDIS_DEFAULT_USER` must be set in `basetool.env`
 (production: `off`); the renderer refuses an unset value.
@@ -185,7 +185,7 @@ backup snapshot that carries both ACL files, then `systemctl start basetool-depl
 
 - **Release:** an application rollback to 1.25.0 brings back `redis` on `/var/lib/basetool/redis`
   with its kept `users.acl`; the sessions survive, the exchange answers `503` until the backend's
-  reconcile has run ([`deployment.md` → Cut-over, Rollback](../deployment.md#cut-over-the-session-store-gets-its-own-instance-adr-0388-needs-the-owners-yes)).
+  reconcile has run ([`deployment.md` → Cut-over, Rollback](REDIS_ACL_AND_SPLIT_ROLLOUT.md#cut-over-the-session-store-gets-its-own-instance-adr-0388-needs-the-owners-yes)).
   The three new passwords may stay; 1.25.0 does not read them.
 - **OS:** boot the previous kernel from the boot menu if 264.16.1 fails. Podman 6 is not downgraded
   in place; a host that cannot run it is restored from the PVE snapshot (testing) or rebuilt

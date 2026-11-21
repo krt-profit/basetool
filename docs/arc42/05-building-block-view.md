@@ -93,7 +93,7 @@ entity, its repository, the viewer and the retention purge lie in the module's `
 The domain events live in their publisher's `<module>.api.events` package (plan §5.2, §5.3); there
 is no central `event` package. Every listener runs after commit (`@TransactionalEventListener`),
 so the reaction may happen later or fail on its own, and none records an audit row for the mutation
-that published the event (REQ-AUDIT-007). Thirteen modules publish today:
+that published the event (REQ-AUDIT-007). Fifteen modules publish today:
 
 | Package | Events |
 | --- | --- |
@@ -113,7 +113,7 @@ that published the event (REQ-AUDIT-007). Thirteen modules publish today:
 | `admin.api.events` | `HangarNotices`, the factory of the hangar and blueprint notices: a deleted ship dropping out of a mission, fitted marks reset, hangar or blueprints changed by an admin (REQ-HANGAR-006…008) |
 | `refinery.api.events` | `RefineryNotices`, the factory of the order-ready, order-ready-cleared and changed-by-somebody-else notices (REQ-REFINERY-023, -024) |
 
-An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244). The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
+An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244). The publishing services and the listeners sit in their modules' `internal` packages. `OrgUnitRef` stays with the
 notification contract rather than the kernel, because it carries the org-unit module's
 `OrgUnitKind`.
 
@@ -373,7 +373,7 @@ REQ-FE-032, REQ-FE-037 and [ADR-0369](../adr/0369-frontend-operations-own-comple
 
 The frontend is packaged by domain (plan §5.9, F4, REQ-FE-032): each of the 21 domains of the
 evidence table plus `shell` (landing, legal pages, manifest, client-error beacon, licence report)
-has up to three packages, and the kernel has eight. `DomainPackageLayoutTest` fails on a main class
+has up to three packages, and the kernel has nine. `DomainPackageLayoutTest` fails on a main class
 anywhere else.
 
 | Package | What lives there |
@@ -404,10 +404,8 @@ list that may only shrink (§11.9): the layout advices and loader read `orgunit.
 `RegistrationStatusDto`, `TermsStatusDto`), `BackendApiClient` reads `TermsDocumentDto` and
 `QualityTierCatalog` reads `catalogue.model.QualityTierDto`.
 
-*Corrected 2026-09-29:* this table called `BackendApiClient` "the single seam" (see §4.1), placed
-view-shaping services in `service` and view models in `view`; the view shaping lived in
-`controller`, and `view` held one class. *Updated 2026-10-10:* every layer package is gone (plan
-F4).
+The frontend has no layer packages; view shaping lives in `<domain>.web` and view models in
+`<domain>.model` (plan F4).
 
 **The page chrome is one template fragment** (plan F5, REQ-FE-033, 2026-10-11). Each of the 90
 Thymeleaf page templates that carry the chrome hands `fragments/layout :: page` its title, its own
@@ -532,10 +530,9 @@ of its own to the backend rows below, writing through the refinery module's serv
 | keycloak-spi | `ExchangeClientSessionResourceProviderFactory` (`basetool-exchange`) | Ends one client inside a member's shared user sessions when the member disconnects it (ADR-0226, REQ-XCH-008) |
 | keycloak-spi | `DeviceConsentLoginFormsProviderFactory` (`krt-freemarker`) | Hands a device login's user code to the consent page, beside the phishing warning (ADR-0228, REQ-XCH-005) |
 
-*Corrected 2026-09-29:* the write-services row said every exchange write goes "through the domain's
-own services". The stock book-in does not: it is a second write path into the Lager, which the
-[domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) (§5.3, §7.5) routes through the
-inventory module's command API.
+The stock book-in is the one exchange write that does not go through the domain's own services: it
+is a second write path into the Lager, routed through the inventory module's command API
+([domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §5.3, §7.5).
 
 ## 5.6 The monitoring plane
 

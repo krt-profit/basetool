@@ -2214,7 +2214,7 @@ nothing, so the alert stays silent on a host without one.
   display id, the ordered item and the blueprint's current output — catalogue names only, never the
   order's user-entered handle.
 
-- Queue-depth gauges (the `BusinessGaugeSource` beans, run by `BusinessMetricsCollector`; the registered meter set is pinned by `BusinessMetricsCollectorTest` against `monitoring/business-gauges.txt`): `basetool_registration_pending_count` +
+- Queue-depth gauges (the `BusinessGaugeSource` beans, run by `BusinessMetricsCollector`; the registered meter set is pinned by `BusinessMetricsCollectorTest` against `backend/src/test/resources/monitoring/business-gauges.txt`): `basetool_registration_pending_count` +
   `_oldest_age_seconds`, `basetool_bank_booking_request_pending_count` + `_oldest_age_seconds`,
   and `{status}`-labelled `basetool_job_order_open_count` / `basetool_operation_open_count` /
   `basetool_refinery_order_open_count` / `basetool_p4k_import_job_pending_count` each with an
@@ -4341,7 +4341,7 @@ alerts never carry `source="P4K"`.
   version above a branch lower bound reads as due (`P4kImportRunTest`, `P4kImportDueTest`).
 - [x] The banner shows on `/admin/p4k-import` while the signal holds (`AdminP4kImportDueMvcTest`);
   the alert fires only after 7 days of it (`p4k_catalogue_alerts_test.yml`).
-- [x] Every gauge above is registered, pinned in `monitoring/business-gauges.txt`, and carries only
+- [x] Every gauge above is registered, pinned in `backend/src/test/resources/monitoring/business-gauges.txt`, and carries only
   `kind` and `outcome` (`BusinessMetricsCollectorTest`, `P4kCatalogueBusinessGaugesTest`).
 - [x] Each refusal reason of the gate bumps `basetool_p4k_import_rejected_total` once, and every
   reason exists at zero before the first refusal (`P4kUploadGateTest`, `P4kRejectionsTest`).

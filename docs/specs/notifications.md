@@ -1346,10 +1346,6 @@ stored, and so does a value that is not a plain decimal. Lists the producer pre-
 
 ### REQ-NOTIF-032 — A click on a notification opens its subject and marks it read
 
-> **Approved planned JobOrder amendment (not implemented):** Shared JobOrder links must preserve current server-side order/field access, including linked holders/payees and corrected account links. Ordinary order readers receive no private bank target/data by notification. Accountless names have no Inbox identity. See [the approved shared JobOrder contract](orders-core.md) and [the approved optional-bank contract](orders-auec-bank.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
-
 Every notification row, in the bell dropdown and on the `/notifications` page, links to the subject
 it is about when the viewer can open it. `NotificationViewDto.href` is set by
 `NotificationTargets.targetOf(type, entityType, entityId, viewer)`; the link passes
@@ -1379,8 +1375,8 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 
 | Notification types | Link |
 | --- | --- |
-| `JOB_ORDER_CREATED`, `JOB_ORDER_UPDATED_BY_REQUESTER`, `JOB_ORDER_REASSIGNED`, `JOB_ORDER_FINISHED` | `/orders/{id}`; none for a deleted order (`JOB_ORDER_DELETED`) |
-| `JOB_ORDER_ASSIGNED` / `JOB_ORDER_CLAIM_WITHDRAWN` | `/orders/{id}?tab=assignees` / `?tab=materials` |
+| `JOB_ORDER_CREATED`, `JOB_ORDER_UPDATED_BY_REQUESTER`, `JOB_ORDER_UPDATED_BY_RESPONSIBLE`, `JOB_ORDER_REASSIGNED`, `JOB_ORDER_FINISHED`, `JOB_ORDER_REOPENED`, `JOB_ORDER_CLARIFICATION_REQUIRED`, `JOB_ORDER_PARTICIPATION_CHANGED`, `JOB_ORDER_MONEY_PROVISIONED`, `JOB_ORDER_MONEY_MOVED`, `JOB_ORDER_MONEY_COMMITMENT_CHANGED` | `/orders/{id}`; none for a deleted order (`JOB_ORDER_DELETED`) |
+| `JOB_ORDER_ASSIGNED` / `JOB_ORDER_CLAIM_WITHDRAWN`, `JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED` | `/orders/{id}?tab=assignees` / `?tab=materials` |
 | `MISSION_RESCHEDULED`, `MISSION_CANCELLED`, `MISSION_PARTICIPANT_REMOVED_BY_OTHER`, `MISSION_RESPONSIBILITY_ASSIGNED` | `/missions/{id}` |
 | `MISSION_REMINDER`, `MISSION_CHECKIN_OPEN`, `MISSION_PARTICIPANT_ADDED_BY_OTHER`, `MISSION_PARTICIPANT_LEFT`, `HANGAR_SHIP_REMOVED_FROM_UNIT` | `/missions/{id}?tab=crew` |
 | `MISSION_NEVER_ENDED` | `/missions/{id}?tab=verw` |

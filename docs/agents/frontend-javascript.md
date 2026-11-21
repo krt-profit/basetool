@@ -30,7 +30,7 @@ is gone (ADR-0130). What that means when you write a script:
   variable needs a cast at the assignment.
 - **A caught value is `unknown`.** Narrow it where the code reads it
   (`err instanceof Error ? err.message : String(err)`).
-- **`scripts/gen-api-types.mjs` is ours to extend.** It covers the flat-object subset springdoc
+- **`frontend/scripts/gen-api-types.mjs` is ours to extend.** It covers the flat-object subset springdoc
   emits today (`$ref`, `items`, `enum`, `additionalProperties`, `nullable`, primitives) and
   **fails the build** on `allOf` / `oneOf` / `anyOf` / `not` / `discriminator`. The realistic
   trigger is a backend model gaining `@JsonSubTypes`. When that build failure names a construct,

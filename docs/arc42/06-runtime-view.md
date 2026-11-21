@@ -18,7 +18,7 @@ requirements own behavior and verification status.
 4. A new sign-up that passes the gate lands in the **approval queue** instead of the application:
    while it is pending the account sees nothing but its own registration status, and an admin
    approves it, rejects it, or links it onto an existing account.
-5. The frontend receives the tokens, creates a Spring Session in **Redis**, and calls the backend
+5. The frontend receives the tokens, creates a Spring Session in **`redis-session`** (ADR-0388), and calls the backend
    as a *resource server* with a bearer token. The backend never sees a credential. The code-for-token
    exchange, the ID token's keys and the userinfo call are the frontend's own requests to Keycloak:
    with `BASETOOL_KEYCLOAK_BACKCHANNEL_URI` set they go to the internal connector, otherwise through the
@@ -65,7 +65,7 @@ missing one turns the next edit into a spurious 409.
    subscription; only *receiving* needs an authorised subscribe, which the relay checks again for as
    long as the socket holds the room (REQ-FE-015). Where no browser is involved, the server
    publishes the same frame itself.
-3. The frontend relays the frame to the room's local members and onto **Redis pub/sub**
+3. The frontend relays the frame to the room's local members and onto **`redis-shared` pub/sub**
    (`basetool:livesync:changed`), so every other frontend replica reaches its own members.
 4. Each receiving client re-reads the named sections and swaps them in place.
 
@@ -141,11 +141,11 @@ itself changes only through the Ansible role, which never delivers):
 ## 6.7 Every night a backup, every week the drill that proves it
 
 1. `basetool-backup.timer` (daily, 04:15) runs `backup.sh`: `pg_dump` of both databases, Grafana's
-   SQLite, the monitoring secrets, the three `edge-*` volumes, `basetool.env`, the keystore, the realm
-   export, the Keycloak providers and the **redis ACL** — pushed with **restic** through an
+   SQLite, the monitoring secrets, the three `edge-*` volumes, `basetool.env`, the keystore and the
+   internal TLS material, the realm export, the Keycloak providers and the **two redis ACLs** — pushed with **restic** through an
    **rclone** WebDAV remote to Nextcloud, under a GFS retention policy.
 2. `basetool-restore-drill.timer` (weekly, Sunday 05:30) runs `restore-drill.sh`, which restores the
-   **latest snapshot** into a throwaway PostgreSQL and checks seven artifacts, writing the result
+   **latest snapshot** into a throwaway PostgreSQL and checks eight artifacts, writing the result
    as Prometheus textfile metrics (`basetool_restore_drill_artifact_ok`).
 
 The drill inspects **what a restored snapshot contains**, not what the host happens to have. That

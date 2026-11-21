@@ -1501,8 +1501,9 @@ stock of every org unit, an admin pinned to one org unit wipes only that unit's.
 `InventoryCheckoutServiceAuditTest#deleteAllGlobalInventory_locksAuditsAndDeletesTheSameRowsAndRecordsWipedAudit`,
 `MaterialExchangeOfferDeleteRaceIntegrationTest`,
 `InventoryItemControllerTest#deleteAllGlobalInventory_returns204_andDelegatesToService`,
-`InventoryDeleteAllProxyControllerTest` (backend 403 propagated) — the two `hasRole('ADMIN')` gates
-themselves are not yet pinned by a test · **Code:**
+`InventoryDeleteAllProxyControllerTest` (backend 403 propagated); the two `hasRole('ADMIN')` gates
+are pinned by the snapshots of `AuthorizationMatrixTest` (backend) and `RouteGateSnapshotTest`
+(frontend) · **Code:**
 `InventoryItemController#deleteAllGlobalInventory`, `InventoryCheckoutService#deleteAllGlobalInventory`,
 `InventoryRowLockRepository#findNonPersonalIdsInScope` / `#deleteAllByIdIn`,
 `InventoryOrderWrites#prepareWrites`, `InventoryDeleteAllProxyController`,

@@ -1,3 +1,9 @@
+> **Archived 2026-11-21.** Doc type: Historical record — the design prototype of the SC Extractor
+> rebuild (epic #439, closed). The extractor is discontinued and its repository archived.
+>
+> **Current truth:** [`refinery-screenshot-import.md`](../../specs/refinery-screenshot-import.md).
+> Index of the archive: [`README.md`](../README.md).
+
 # Design references — Basetool SC Extractor
 
 This folder holds the **offline-capable design prototype** for the SC Extractor rebuild
@@ -11,14 +17,13 @@ This folder holds the **offline-capable design prototype** for the SC Extractor 
   It is the offline mirror of the Claude Design prototype, and a permanent template even if
   the online link ever goes away.
 
-**Authoritative sources**
+**Sources at the time**
 
-- Written UI/UX contract: [`../DESIGN_SC_EXTRACTOR.md`](../archive/DESIGN_SC_EXTRACTOR.md)
+- Written UI/UX contract: [`../DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md)
 - Online Claude Design prototype / handoff bundle:
   <https://api.anthropic.com/v1/design/h/mM6v29vZctN6kiBsF62_eA>
-- Living spec of the import it feeds: [`../specs/refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md)
+- Living spec of the import it feeds: [`../../specs/refinery-screenshot-import.md`](../../specs/refinery-screenshot-import.md)
 - Implementation plan (historical, archived — v1 shipped 2026-06-10):
-  [`../archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md)
+  [`../REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md)
 
-Pixels: the prototype wins; `DESIGN_SC_EXTRACTOR.md` is the written contract. Where they
-disagree, reconcile against the prototype and update the doc.
+Pixels: the prototype wins; `DESIGN_SC_EXTRACTOR.md` is the written contract.

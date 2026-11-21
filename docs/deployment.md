@@ -1,6 +1,6 @@
 # Profit Basetool — Deployment Runbook
 
-> **Doc type:** Operator runbook — living, kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Operator runbook — living, kept in sync with `main`. Last reviewed: 2026-11-21.
 >
 > **Written for the post-cutover host.** Since 2026-09-22 production is `rocky-16gb-nbg1-1`: Rocky
 > Linux 10, rootless Podman, every container a Quadlet-generated systemd user unit of the service
@@ -59,7 +59,7 @@ The layout and the realm name are decided in
 │     systemctl --user (as basetool) start/restart → wait for healthy │
 │                                                                     │
 │  :80/:443 haproxy (host) ──PROXY v2──► edge 127.0.0.1:8080/8443     │
-│  18 containers + 18 networks + 3 volumes, all systemd user units    │
+│  20 containers + 19 networks + 3 volumes, all systemd user units    │
 │  of `basetool`; alloy, node_exporter, podman-exporter on the host   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -102,11 +102,11 @@ The layout and the realm name are decided in
 |---|---|---|
 | `root` | the operator's SSH login | haproxy, alloy, node_exporter, fail2ban, firewalld, the `basetool-*` system units |
 | `deploy` | system account, `/sbin/nologin`, home `/var/lib/basetool/deploy` | runs `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`; owns `/var/lib/basetool/deploy`, `/var/lib/basetool/textfile`, `/var/cache/basetool/restic`, `/etc/basetool/deploy`, `/opt/basetool`, the unit directory |
-| `basetool` | the rootless service user (lingering, subuid base 100000) | the container store and all 39 Quadlet units; the podman-exporter user unit |
+| `basetool` | the rootless service user (lingering, subuid base 100000) | the container store and all 42 Quadlet units; the podman-exporter user unit |
 
 `deploy` reaches `basetool`'s containers only through `/etc/sudoers.d/basetool-deploy`: the podman
 sub-commands its scripts run (`basetool_host_deploy_podman_subcommands` in the role defaults —
-`cp`, `create`, `exec`, `image inspect`, `image prune`, `info`, `inspect`, `login`,
+`container prune`, `cp`, `create`, `exec`, `image inspect`, `image prune`, `info`, `inspect`, `login`,
 `network prune`, `ps`, `pull`, `rm`, `run`, `system df`, `volume inspect`) and
 `systemctl --user *` as `basetool`, plus `systemctl restart alloy.service` as root, nothing else
 (`ansible/roles/basetool_host/tasks/22-deploy-user.yml`). A script that needs another sub-command
@@ -191,7 +191,7 @@ UPOD="sudo -u basetool podman"
    ```
 
    Expect `container runtime: podman`, five `signature OK`, the config bundle staged,
-   `quadlet units: 39 installed/updated, 0 retired`, `applying`, `deploy successful`.
+   `quadlet units: 42 installed/updated, 0 retired`, `applying`, `deploy successful`.
 
    > [!note] The first deploy has no rollback anchor
    > A health failure on a fresh host ends with `no previous pin available — manual intervention
@@ -301,7 +301,7 @@ reaches no session key. No user on either instance may run a script or `CLIENT T
 (ADR-0389), and `ACL DRYRUN basetool-ingest EVAL "return 1" 0` answers with a refusal.
 
 An application reaches Redis as its own user only when its `REDIS_<SVC>_USERNAME` is set; with it
-empty it sends a password-only `AUTH` with the shared `REDIS_PASSWORD`, which is the `default` user —
+empty it sends a password-only `AUTH` with that instance's admin password, which is the `default` user —
 exactly the pre-rollout behaviour. The ingest gateway is the exception from the release after 1.12.0
 on: under `prod` it refuses to start when `REDIS_INGEST_USERNAME` is empty or `default`
 (`RedisUsernameGuard`, REQ-SEC-068). The server carries `--notify-keyspace-events Egx` itself, so the
@@ -392,187 +392,14 @@ password (`REDIS_SESSION_PASSWORD` or `REDIS_PASSWORD`) touches its `default`/`a
 own environment: render, `ACL LOAD`, then restart that unit so the container sees the new
 `REDIS_PASSWORD` for the next `ACL LOAD`.
 
-##### Cut-over: the session store gets its own instance (ADR-0388, needs the owner's yes)
+##### After the split: the old ACL file
 
-The release that carries ADR-0388's second instance retires the `redis` and `redis-exporter` units
-and starts `redis-session`, `redis-shared` and an exporter for each. `redis-session` keeps
-`/var/lib/basetool/redis`, so the sessions stay and nobody is signed out; it loads
-`/etc/basetool/redis/session-users.acl` and leaves `/var/lib/basetool/redis/users.acl` untouched for
-a rollback. `redis-shared` starts empty in `/var/lib/basetool/redis-shared` and loads
-`/etc/basetool/redis/shared-users.acl`. Both ACL files live outside the data directories, which
-each container owns. Every step below is a production write; run them in one sitting with
-`basetool-deploy.timer` stopped.
-
-0. **Read first: the data fits the session store** (read-only, no approval needed).
-   `redis-session` loads the whole of today's AOF — the exchange and ingest keys included, until
-   step 6 removes them — under `maxmemory 384mb` with `noeviction`, and refuses every write,
-   logins included, while it is over:
-
-   ```bash
-   ${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin INFO memory' \
-     | grep -E '^used_memory:'   # must be below 300000000 (~286 MiB); above it, stop
-   ```
-
-1. **Three new passwords into `basetool.env`**, generated on the host. The running release reads
-   none of them, so this step is inert until the deploy:
-
-   ```bash
-   cd /
-   cp -p /etc/basetool/basetool.env /etc/basetool/basetool.env.backup-$(date +%Y%m%d-%H%M%S)
-   for v in REDIS_SESSION_PASSWORD REDIS_SESSION_EXPORTER_PASSWORD REDIS_SESSION_FRONTEND_PASSWORD; do
-     grep -q "^${v}=" /etc/basetool/basetool.env || \
-       printf '%s=%s\n' "$v" "$(openssl rand -base64 36 | tr -d '/+=\n')" >> /etc/basetool/basetool.env
-   done
-   grep -c -E '^REDIS_SESSION_(EXPORTER_|FRONTEND_)?PASSWORD=' /etc/basetool/basetool.env   # 3
-   ```
-
-2. **The role** (from WSL): `ansible-playbook site.yml --limit production --tags
-   directories,selinux,scripts --check --diff`, then without `--check --diff`. It creates
-   `/var/lib/basetool/redis-shared` owned by the container's user and the root-owned
-   `/etc/basetool/redis`, and installs both templates; without the data directory `redis-shared`
-   dies on its first write and the health gate rolls the deploy back.
-3. **Render both ACL files** as new files, before the units that mount them exist. No `ACL LOAD`:
-   the running `redis` keeps its own file.
-
-   ```bash
-   cd /
-   stat -c '%U:%G %a' /etc/basetool/redis   # root:root 755, from step 2
-   for pair in redis-session-users.acl.tmpl:/etc/basetool/redis/session-users.acl \
-               redis-shared-users.acl.tmpl:/etc/basetool/redis/shared-users.acl; do
-     /opt/basetool/scripts/render-redis-acl.py --env /etc/basetool/basetool.env \
-       --template "/opt/basetool/scripts/${pair%%:*}" --out "${pair#*:}.new" || break
-     grep -c '^user default ' "${pair#*:}.new"   # must be 1
-     grep -c '>' "${pair#*:}.new"                 # must be 0: hashes only
-     cat "${pair#*:}.new" > "${pair#*:}" && rm "${pair#*:}.new"
-     restorecon -F "${pair#*:}"
-     stat -c '%U:%G %a' "${pair#*:}"              # root:root 644
-   done
-   ```
-4. **Deploy the release.** Until the backend's reconcile has rewritten the registry and the
-   revocations into `redis-shared` (at most 60 s) the exchange answers `503 REGISTRY_UNAVAILABLE`;
-   quotas, budgets, idempotency answers and pending handoffs start empty.
-5. **Verify**: `check-conformance.py --only redis-requires-auth` and `--only
-   redis-default-user-off` pass for both instances, `--only redis-session-isolated` finds only
-   `redis-session`, `frontend` and `redis-session-exporter` on `net-redis-session`; `ACL
-   USERS` in `redis-session` lists `default`, `admin`, `monitoring` and `basetool-frontend` only;
-   `redis_up` is 1 for `redis="session"` and `redis="shared"`; a signed-in browser stays signed in,
-   a mission page receives live updates, a refinery import reaches its review form, and an exchange
-   call succeeds a minute after the deploy.
-6. **Delete what moved out of the session store**, as `admin`, without printing a key:
-
-   ```bash
-   ${UPOD} exec redis-session sh -c 'for p in "exchange:*" "ingest:*"; do
-     REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin --scan --pattern "$p" \
-       | xargs -r -n 200 env REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin UNLINK >/dev/null
-   done
-   REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin --scan --pattern "*:*" \
-     | grep -c -v "^basetool:session:"'   # 0
-   ```
-
-7. **Take a snapshot now**: `systemctl start basetool-backup.service`, and check its log names
-   both `session-users.acl` and `shared-users.acl`. Until a snapshot carries them, the Sunday
-   restore drill reads the last one from before the split, misses both ACLs and fires
-   `RestoreDrillArtifactNotRestorable`.
-8. Start `basetool-deploy.timer` again. Once no rollback to a release before the split is wanted,
-   delete `/var/lib/basetool/redis/users.acl` and its `users.acl.backup-*` copies.
-
-**Rollback**: an application rollback to the release before the split brings back the `redis` unit
-on `/var/lib/basetool/redis` with its kept `users.acl`. The sessions survive; the exchange answers
-`503 REGISTRY_UNAVAILABLE` until the backend's reconcile has rewritten the registry, and
-`/var/lib/basetool/redis-shared` stays unused until the split is deployed again. Snapshots from
-after the split no longer carry `users.acl`; a host restored for a rollback takes it from the last
-snapshot before the cut-over.
-
-##### Rollout: one ACL user per service (needs the owner's yes)
-
-On a host that runs the two instances of ADR-0388, run each step below against `redis-session` and
-`redis-shared` with that instance's template, ACL file and exporter; the commands name the single
-instance the rollout was written for.
-
-> [!note] Production: steps 1–5 done on 2026-09-25
-> Step 1 with the 1.11.0 role run (~11:5x UTC), steps 2–5 at ~15:47–15:51 UTC in one sitting with
-> the deploy timer stopped; the render went through `.new` + `cat` (inode kept) and the first
-> `ACL LOAD` authenticated as `default`. The procedure stays for the testing host and a rebuilt one.
-
-Merging and deploying REQ-SEC-068 changes no credential. The deploy restarts `redis` once — its
-unit gained `--notify-keyspace-events Egx` and the credential-free health probe — and every
-application still authenticates as `default`. The rollout is the owner's, in this order; each step
-can be stopped and rolled back on its own.
-
-1. **Install the renderer** (from WSL): `ansible-playbook site.yml --limit production --tags scripts
-   --check --diff`, then without `--check --diff`. Verify
-   `ls -l /opt/basetool/scripts/render-redis-acl.py /opt/basetool/scripts/redis-*-users.acl.tmpl`.
-
-> [!warning] Steps 2–4 are one sitting, with the deploy timer stopped *(corrected 2026-09-25)*
-> Step 2 is **not** inert. The env templates pick each service's password with
-> `REDIS_PASSWORD=${REDIS_<SVC>_PASSWORD:-${REDIS_PASSWORD…}}` — whether or not its
-> `REDIS_<SVC>_USERNAME` is set. So from the moment the three passwords are in `basetool.env`, **any**
-> `env.d/` render hands each application its new password with no username: a password-only `AUTH`
-> as `default` with the wrong password, `WRONGPASS`, and the service goes unhealthy on its next
-> restart. `deploy.sh` re-renders `env.d/` on every config change, so a deploy tick between step 2
-> and step 4 is exactly that render. Hence: `systemctl stop basetool-deploy.timer` before step 2, run
-> steps 2–4 back to back, and `systemctl start basetool-deploy.timer` only after step 4 verified (or after
-> a rollback). And never add the three passwords before the release carrying REQ-SEC-068 (1.11.0)
-> is live.
-
-2. **Three new passwords into `basetool.env`**, generated on the host so they never cross a terminal:
-
-   ```bash
-   cd /
-   cp -p /etc/basetool/basetool.env /etc/basetool/basetool.env.backup-$(date +%Y%m%d-%H%M%S)
-   for v in REDIS_FRONTEND_PASSWORD REDIS_BACKEND_PASSWORD REDIS_INGEST_PASSWORD; do
-     grep -q "^${v}=" /etc/basetool/basetool.env || \
-       printf '%s=%s\n' "$v" "$(openssl rand -base64 36 | tr -d '/+=\n')" >> /etc/basetool/basetool.env
-   done
-   grep -c -E '^REDIS_(FRONTEND|BACKEND|INGEST)_PASSWORD=' /etc/basetool/basetool.env   # 3
-   ```
-
-3. **Render with `default` still on, and load it** — append `REDIS_DEFAULT_USER=on` to
-   `basetool.env` (the renderer refuses while it is unset), then the block above, first load without
-   `--user admin`. Nothing changes for the applications yet; `admin` and the three service users now exist.
-   Before rendering, confirm that `basetool.env`'s `REDIS_EXPORTER_PASSWORD` is the password the hand-written
-   file gives `monitoring` — the render re-derives that user's hash from `basetool.env`, and a mismatch takes
-   `redis-exporter` down (`redis_up == 0`). Compare digests, never the values:
-   `grep '^user monitoring ' /var/lib/basetool/redis/users.acl | grep -o '>[^ ]*' | cut -c2- | tr -d '\n' | sha256sum`
-   against `sed -n 's/^REDIS_EXPORTER_PASSWORD=//p' /etc/basetool/basetool.env | tr -d '"\n' | sha256sum` —
-   the two sums must be equal; if they differ, stop and settle which one is right first.
-   Check: `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL
-   USERS'` lists all six.
-4. **Move the applications**, one at a time, watching each come back healthy:
-
-   ```bash
-   printf '%s\n' REDIS_BACKEND_USERNAME=basetool-backend REDIS_INGEST_USERNAME=basetool-ingest \
-     REDIS_FRONTEND_USERNAME=basetool-frontend >> /etc/basetool/basetool.env
-   sudo -u deploy /opt/basetool/scripts/render-env-d.py \
-     --env /etc/basetool/basetool.env --templates /opt/basetool/quadlet/env.d --out /etc/basetool/env.d
-   ${UCTL} restart backend.service     # live sync + notifications: basetool_redis_fanout_subscribed == 1
-   ${UCTL} restart ingest.service      # a desktop import reaches "Import-Link" and opens
-   ${UCTL} restart frontend.service    # nobody is signed out: the sessions are in Redis
-   ```
-
-   Verify: `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin CLIENT
-   LIST' | grep -o 'user=[^ ]*' | sort | uniq -c` shows the three service users and no application
-   on `default`; `RedisAclDenials` stays silent; log in, open a mission (live sync), run one
-   refinery import. On 1.11.0, `ACL LOG` shows the frontend's refused `config|get` from its
-   restart (see the note above; verified gone on production after the v1.12.0 deploy, 2026-09-25); nothing else.
-5. **Switch `default` off**: set `REDIS_DEFAULT_USER=off` in `basetool.env`, render, `ACL LOAD` as
-   `admin`. Verify `${UPOD} exec redis sh -c 'redis-cli ping'` answers `NOAUTH`,
-   `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'` (password-only, i.e.
-   `default`) answers `WRONGPASS … or user is disabled`, `${UPOD} healthcheck run redis` is healthy,
-   and `redis-exporter` still scrapes (`redis_up == 1`); `check-conformance.py --only
-   redis-default-user-off` passes.
-
-**Rollback**, from any step: step 5 — set `REDIS_DEFAULT_USER=on`, render,
-`ACL LOAD`. Step 4 — delete the three `REDIS_*_USERNAME` lines **and** the three
-`REDIS_{FRONTEND,BACKEND,INGEST}_PASSWORD` lines, render `env.d/`, restart the three services: they
-are back on `default` with the shared password — except ingest from the release after 1.12.0 on,
-which then refuses to start; there, keep `REDIS_INGEST_USERNAME` and `REDIS_INGEST_PASSWORD` (and
-its ACL user) or roll the release back first. Step 3 — `cat` the `users.acl.backup-*` back into
-`users.acl` (keeping the inode, as above) and `ACL LOAD` (authenticating as `default`); step 2 —
-delete the three password lines. *(Corrected 2026-09-25: this used to say the passwords may stay in
-`basetool.env` because nothing reads them without the usernames — the templates read them either way, see
-the warning above.)* **A release rollback** to a version before REQ-SEC-068 (1.10.0 or older) needs
-`default` **on** first: its health check and its applications authenticate as `default`.
+Both hosts run the two instances since v1.26.0. The one-time procedures that got them there — the
+per-service ACL rollout and the session-store cut-over, with the rollback to a release before the
+split — are archived in
+[`REDIS_ACL_AND_SPLIT_ROLLOUT.md`](archive/REDIS_ACL_AND_SPLIT_ROLLOUT.md). Once no rollback to a
+release before 1.26.0 is wanted, delete `/var/lib/basetool/redis/users.acl` and its
+`users.acl.backup-*` copies on each host (a host write: needs the owner's yes).
 
 ---
 
@@ -582,7 +409,7 @@ the warning above.)* **A release rollback** to a version before REQ-SEC-068 (1.1
 
 `docker-compose.yml` and `docker-compose.monitoring.yml` remain the **source**: the local and test
 stacks run them directly, and [`scripts/generate-quadlet.py`](../scripts/generate-quadlet.py)
-translates them into `quadlet/systemd/` (18 `.container`, 18 `.network`, 3 `.volume`) and
+translates them into `quadlet/systemd/` (20 `.container`, 19 `.network`, 3 `.volume`) and
 `quadlet/env.d/<svc>.env.tmpl`. Both are committed.
 
 ```bash
@@ -595,7 +422,7 @@ python scripts/generate-quadlet.py --list     # each service's disposition and w
 (`generate-quadlet.test.sh`). A Dependabot compose bump regenerates the units on its own branch —
 see [Dependabot image bumps](#dependabot-image-bumps). Dispositions: `node-exporter` and `alloy` become host services, the
 podman exporter is a user unit the role installs; every other service is a container. (`cadvisor`
-and `socket-proxy` were deleted by the translation and removed from the compose file on 2026-09-22.) The edge's six network addresses are pinned by the generator and must
+and `socket-proxy` were deleted by the translation and removed from the compose file on 2026-09-22.) The edge's five network addresses are pinned by the generator and must
 equal the role's `basetool_host_edge_trusted_proxies`; the generator refuses the build otherwise.
 
 What Quadlet cannot interpolate is resolved at generation time: every `*_HOST_PATH`,
@@ -623,8 +450,8 @@ that is when every container of the service user has stopped, at the latest at t
 | Path | Written by | Content |
 |---|---|---|
 | `/opt/basetool/` | `deploy.sh` (bundle) | compose files, `docker/{edge,acme,maintenance}`, `keycloak-theme/`, `monitoring/`, `quadlet/` |
-| `/opt/basetool/scripts/` | the role | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `render-env-d.py`, `render-redis-acl.py`, `mint-internal-tls.sh`, the two collectors — `root:root 0755`, so `deploy` cannot rewrite its own deployer |
-| `/etc/containers/systemd/users/<basetool-uid>/` | `deploy.sh` | the 39 units, plus `<svc>.container.d/10-digest-pin.conf` (the release's digest) and the role's host drop-ins |
+| `/opt/basetool/scripts/` | the role | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/*.sh`, `render-env-d.py` with `env_file.py`, `host_companions.py` and `host-companions.json`, `render-redis-acl.py` and its two ACL templates, `mint-internal-tls.sh`, the two collectors and `host-updates-metrics.sh` — `root:root 0755`, so `deploy` cannot rewrite its own deployer |
+| `/etc/containers/systemd/users/<basetool-uid>/` | `deploy.sh` | the 42 units, plus `<svc>.container.d/10-digest-pin.conf` (the release's digest) and the role's host drop-ins |
 | `/etc/basetool/env.d/` | `deploy.sh` via `render-env-d.py` | one rendered environment file per service |
 | `/var/lib/basetool/deploy/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records (`failed.digests` for a release, `reapply-failed.digests` for a re-apply of the deployed release, `health-restart.digests` for the heal), `config-stage/`, `config-previous/`, `config-blocked.marker`, `config-apply.incomplete` (only while a config apply is unfinished or could not be undone), `edge/` and `monitoring-reload/` snapshots |
 
@@ -644,8 +471,9 @@ all three anchors onto the release that is already deployed. Use `deploy.sh --re
 `~basetool/.config/containers/systemd/` must stay **empty**: Quadlet searches it before the delivery
 directory, so a unit of the same name there silently shadows every release.
 
-**Networks** are 18 `.network` units with pinned `/24` subnets under `172.28.0.0/16` (IPv6 on the
-ingress and proxy networks; `Internal=true` on the proxy, database and Redis networks). `deploy.sh`
+**Networks** are 19 `.network` units, all but `net-monitoring-core`, `net-monitoring-redis` and the
+IPv6-only `net-blackbox-v6` with a pinned `/24` subnet under `172.28.0.0/16` (IPv6 on the
+ingress and frontend proxy networks; `Internal=true` on the proxy, database and Redis networks). `deploy.sh`
 installs a changed `.network` unit and does not apply it: Quadlet creates networks with `--ignore`, so
 an existing one keeps its settings until it is removed and recreated — see *Network changes are
 installed, not applied* below, and verify with `${UPOD} network inspect <name>` afterwards.
@@ -892,8 +720,8 @@ Within about five minutes the timer fires `deploy.sh`, which:
    `/var/lib/basetool/deploy/keycloak-spi-stage.jar`, before anything on the host changes;
 4. if the config digest moved: extracts the bundle, asserts it carries no secret, **compares the
    bundle's `host-scripts.sha256` with the host's scripts and refuses the release, changing nothing and
-   recording no backoff, when `deploy.sh`, `lib/common.sh`, `lib/container-runtime.sh` or
-   `render-env-d.py` differ** (`HOST SCRIPTS:` in the log, `DeployFailed`; the fix is the role from the
+   recording no backoff, when `deploy.sh`, `lib/common.sh`, `lib/container-runtime.sh`, a
+   `lib/deploy-*.sh`, `render-env-d.py` or `env_file.py` differ** (`HOST SCRIPTS:` in the log, `DeployFailed`; the fix is the role from the
    release's tag, then the next tick applies it; `--force` or `BASETOOL_REQUIRE_CURRENT_SCRIPTS=false`
    bypass it), applies the stateful-infra gate (below), **checks that `deploy` owns and can write every directory it is
    about to mirror into** (and the compose directory, the unit directory and `env.d/`), **checks
@@ -1155,7 +983,7 @@ none of this: the drift re-apply of the next tick brings it back the same way.
 > them needs the switch undone **first**: to 1.11.0 or older, the internal-TLS step 4
 > ([Step 4 → release rollback](#step-4--drop-the-old-certificate)); to 1.10.0 or older, additionally
 > Redis `default` back on ([The Redis ACL](#the-redis-acl)) and the confidential frontend client
-> back to public ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
+> back to public ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
 
 `--check-only` doubles as the signature preflight in the real `deploy` context and writes no metric.
 
@@ -1326,7 +1154,7 @@ mode and mtime. A directory created by hand as root blocks every config change. 
 > [!note] Monitoring and `acme` units are restarted like the rest — fixed 2026-09-22
 > Every unit a release re-defines is **restarted**, every other one merely **started**: the ten
 > application services (`db-backend db-keycloak redis-session redis-shared keycloak backend ingest frontend edge acme`)
-> in the gated apply, the nine monitoring units in the non-gating monitoring apply after it. A
+> in the gated apply, the ten monitoring units in the non-gating monitoring apply after it. A
 > restarted monitoring unit is restarted once per release, not once per apply pass. Until
 > 2026-09-22 this was a known gap (REQ-OPS-013): the monitoring apply only ever said
 > `systemctl --user start`, a no-op on an active unit, and `acme` was in neither list, so a changed
@@ -1708,7 +1536,7 @@ members of the changed networks stopped. For the 2026-09-22 change that made the
 
 ```bash
 systemctl stop basetool-deploy.timer
-# every member of the five networks; stopping a database also stops what Requires= it
+# every member of the six networks; stopping a database also stops what Requires= it
 ${UCTL} stop frontend.service ingest.service backend.service keycloak.service \
   postgres-exporter-backend.service postgres-exporter-keycloak.service redis-session-exporter.service redis-shared-exporter.service \
   db-backend.service db-keycloak.service redis-session.service redis-shared.service
@@ -1856,7 +1684,7 @@ missing or wrong binding shows up there.
 `--frontend-client public|confidential`; a run without it leaves the type as it is. The switch to
 confidential is a two-step owner rollout with no login window — the frontend receives
 `KEYCLOAK_FRONTEND_CLIENT_SECRET` first, then the provisioner flips Keycloak with the same value:
-[`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). **Production
+[`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). **Production
 is confidential since 2026-09-25** (both steps applied), so every production provisioner run passes
 `--frontend-client confidential` with the secret from `basetool.env`, and a release rollback to 1.10.0 or
 older needs `--frontend-client public --apply` first — through a new provisioner session.
@@ -2128,9 +1956,7 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
   `blackbox-api-absent` / `blackbox-api-absent-aaaa` jobs and `PublicApiHostResolvesAgain` carry
   the DNS half continuously, one job per record type.
 
-  **Until the DNS record is deleted, both are red.** Removing it is rollout step 2 of #2672 and
-  happens at the DNS provider, outside this repository; the probe is reporting a pending rollout
-  until then, the way the admission table used to report a pending deploy. Afterwards two stale
+  The DNS record is deleted at the provider (rollout step 2 of #2672), and both are green. Two stale
   certificate directories stay on the `edge-certs` volume — `api.<domain>` and the older
   `keycloak.<domain>` — renewed by nothing, because `acme` writes only what `ACME_HOSTS` names
   (arc42 §11.8).
@@ -2616,7 +2442,7 @@ too; `-importcert -noprompt -storetype PKCS12 -alias … -file /work/…`), rebu
 > `/etc/basetool/basetool.env.backup-20260925-175805-step4`). A rollback to **1.10.0 or older** also needs
 > `REDIS_DEFAULT_USER` back on ([The Redis ACL](#the-redis-acl)) and the frontend client back to
 > public (`--frontend-client public --apply` through a new provisioner session,
-> [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)) — then promote.
+> [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)) — then promote.
 
 **Rotation after the rollout** is a re-mint: all leaves and the CA together, into a fresh directory,
 then the same widening (old CA as second anchor) → switch → narrowing. No single leaf can be
@@ -2809,7 +2635,7 @@ verifying image signatures (cosign keyless)
 **The host cosign** is installed by the role (`15-cosign.yml`) from the upstream release, verified
 against the sha256 pinned in `ansible/roles/basetool_host/defaults/main.yml`
 (`basetool_host_cosign_version`, currently v3.1.4) — it is in no Rocky or EPEL repository. It must
-never be an older major than the cosign CI signs with (`sigstore/cosign-installer`, v4.1.2 →
+never be an older major than the cosign CI signs with (`sigstore/cosign-installer`, v4.1.3 →
 cosign 3.x): cosign 2.x cannot verify 3.x signatures, and the fail-closed gate would stop every
 deploy. To upgrade: change the version and the checksum in `defaults/main.yml` in a reviewed commit,
 then `ansible-playbook site.yml --limit production --tags cosign`, then
@@ -2893,7 +2719,7 @@ goes.
 | Container never starts, `statfs …: no such file or directory` | `${UCTL} status <svc>.service` | a missing bind-mount source — see [Secrets and host-only files](#secrets-and-host-only-files) |
 | keycloak cannot read `/run/secrets/keystore.p12` | `${UPOD} logs keycloak`, `getfacl -p /etc/basetool/secrets/keystore.p12` | the ACL for uid 100999 is missing — re-apply step 4 of the [rotation](#internal-keystore-and-certificate-rotation) |
 | backend/frontend/ingest die on the OIDC issuer (`Connect timed out`, `did not match`) | `${UPOD} logs backend` | missing public-name alias drop-in (ADR-0196), or `BASETOOL_KEYCLOAK_HOSTNAME` without its `/auth` path (ADR-0167) |
-| every request logged from one internal address | `${UPOD} logs edge` | `EDGE_TRUSTED_PROXY` does not name all six pinned addresses — see [The edge](#the-edge) |
+| every request logged from one internal address | `${UPOD} logs edge` | `EDGE_TRUSTED_PROXY` does not name all five pinned addresses — see [The edge](#the-edge) |
 | `curl: … wrong version number` on 443 | `journalctl -u haproxy`, `${UPOD} logs edge` | `EDGE_TRUSTED_PROXY` empty: the edge's listeners are plain while haproxy sends a PROXY header |
 | nothing answers on 80/443 | `systemctl status haproxy`, `firewall-cmd --list-all` | haproxy not started (fresh host), or a firewall layer — probe from a third machine |
 | Stack comes back after a manual stop | `drift:` lines in the deploy log | the drift check (REQ-OPS-013); stop the timer first |

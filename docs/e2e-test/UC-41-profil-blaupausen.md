@@ -4,8 +4,8 @@
 |----------------|--------|
 | **ID**         | UC-41  |
 | **Tag**        | `e2e`  |
-| **Testklasse** | [`ProfileDescriptionInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ProfileDescriptionInPlaceE2eTest.java) · [`ProfilePayoutPreferenceInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ProfilePayoutPreferenceInPlaceE2eTest.java) · [`ProfileBlueprintSharingInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ProfileBlueprintSharingInPlaceE2eTest.java) · [`ProfileNameWithholdingInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ProfileNameWithholdingInPlaceE2eTest.java) · [`DefaultBlueprintsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/DefaultBlueprintsE2eTest.java) |
-| **Spec**       | [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (REQ-FE-001/-004) · [`personal-inventory-blueprints.md`](../specs/personal-inventory-blueprints.md) (REQ-INV-016/-017/-018) · [`external-exchange.md`](../specs/external-exchange.md) (REQ-XCH-044) |
+| **Testklasse** | [`ProfileDescriptionInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ProfileDescriptionInPlaceE2eTest.java) · [`ProfilePayoutPreferenceInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ProfilePayoutPreferenceInPlaceE2eTest.java) · [`ProfileBlueprintSharingInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ProfileBlueprintSharingInPlaceE2eTest.java) · [`ProfileNameWithholdingInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ProfileNameWithholdingInPlaceE2eTest.java) · [`DefaultBlueprintsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/DefaultBlueprintsE2eTest.java) · [`ProfileRsiHandleInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/ProfileRsiHandleInPlaceE2eTest.java) · [`PersonalBlueprintBatchFailureE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/PersonalBlueprintBatchFailureE2eTest.java) |
+| **Spec**       | [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (REQ-FE-001/-004) · [`personal-inventory-blueprints.md`](../specs/personal-inventory-blueprints.md) (REQ-INV-016/-017/-018) · [`external-exchange.md`](../specs/external-exchange.md) (REQ-XCH-044) · [`security-and-access.md`](../specs/security-and-access.md) (REQ-SEC-072) |
 
 ## Akteur
 
@@ -28,18 +28,25 @@ Der Nutzer speichert Angaben auf `/profile` oder öffnet seine Blaupausen; ein A
 2. **Auszahlungs-Präferenz:** auf den Wert wechseln, auf dem das Formular gerade **nicht** steht, speichern (`POST /profile/payout-preference` → `PUT /api/v1/missions/me/payout-preference`), dann ohne Reload zurückwechseln und erneut speichern.
 3. **Blaupausen-Freigabe** (REQ-INV-018): den Schalter umlegen und speichern (`POST /profile/blueprint-sharing` → `PUT /api/v1/blueprints/me/sharing`), dann ohne Reload zurücklegen und erneut speichern.
 4. **Namen zurückhalten** (REQ-XCH-044): den Schalter „Meinen Namen nicht an verbundene Anwendungen weitergeben" dreimal umlegen und jeweils speichern (`POST /profile/name-withholding` → `PUT /api/v1/connected-apps/name-withholding`), dann die Seite neu laden.
+5. **RSI-Handle** (`ProfileRsiHandleInPlaceE2eTest`, REQ-SEC-072): auf der Karte „RSI-Handle" einen Handle speichern und wieder leeren, zweimal hintereinander.
 
 ### Standard-Blaupausen (`DefaultBlueprintsE2eTest`, REQ-INV-016/-017)
 
-5. Die eigene Blaupausen-Liste öffnen und eine automatisch vergebene Standard-Blaupause auswählen.
-6. `/admin/default-blueprints` öffnen und einen Eintrag über das Bestätigungsmodal entfernen.
+6. Die eigene Blaupausen-Liste öffnen und eine automatisch vergebene Standard-Blaupause auswählen.
+7. `/admin/default-blueprints` öffnen und einen Eintrag über das Bestätigungsmodal entfernen.
+
+### Abgelehnter Blaupausen-Stapel (`PersonalBlueprintBatchFailureE2eTest`)
+
+8. Auf `/personal-inventory/blueprints` eine Blaupause vormerken und den Stapel absenden; eine Playwright-Route lehnt `…/blueprints/add-selected` mit `application/problem+json` ab.
 
 ## Erwartetes Ergebnis
 
 - **Beschreibung:** Beide Speichervorgänge zeigen einen Erfolgs-Toast ohne Reload; der zweite gelingt trotz verfälschtem Token über ein transparentes `GET /csrf` und genau einen Wiederholungsversuch (`krtCsrf.refresh()`).
 - **Präferenz und Freigabe:** Beide Speichervorgänge zeigen einen Erfolgs-Toast, keinen Fehler- oder Konflikt-Toast und keinen Reload-Bestätigungsdialog; der Marker überlebt, und das Backend hält den zweiten Wert.
 - **Namen zurückhalten:** Alle drei Speichervorgänge gelingen in place ohne Konflikt; nach dem Neuladen steht der Schalter auf dem zuletzt gespeicherten Wert. Der Test stellt den Ausgangswert am Ende wieder her.
+- **RSI-Handle:** Speichern und Leeren gelingen in place, auch beim zweiten Durchgang ohne Konflikt wegen veralteter Version.
 - **Standard-Blaupausen:** Der Detailbereich bietet Bearbeiten an, aber **kein** Löschen (`removable=false`). Die Admin-Seite listet den geseedeten Satz, und nach dem Entfernen ist er um einen Eintrag kleiner.
+- **Abgelehnter Stapel:** Der Dialog bleibt offen, und die vorgemerkte Auswahl steht für einen neuen Versuch bereit.
 
 ## Sonderfälle & Lehren
 

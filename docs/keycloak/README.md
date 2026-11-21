@@ -2,19 +2,19 @@
 
 This directory documents the production Keycloak realm (`basetool`) that backs the Profit Basetool
 deployment, **in sanitized form**, so the realm's configuration is versioned and reviewable
-without ever committing secrets or PII. Last reviewed: 2026-09-22.
+without ever committing secrets or PII. Last reviewed: 2026-11-21.
 
 ## The realm at a glance
 
-As of the 2026-09-09 snapshot (the version moved to Keycloak 26.8 on 2026-10-01; the realm values
-below were not re-read). Keycloak 26.8 (`quay.io/keycloak/keycloak:26.8`, pinned by digest),
+The realm values below are those of the 2026-09-09 snapshot with the hand-corrections listed in
+its `_comment`. Keycloak 26.8.2 (`quay.io/keycloak/keycloak:26.8`, pinned by digest),
 serving under `/auth` on the web origin since ADR-0166; in production it runs as the Quadlet unit
 `quadlet/systemd/keycloak.container` (rootless Podman, **read-only root filesystem**, `start`
 without `--import-realm` — the Keycloak database, not `realm-export.json`, is the source of truth).
 
 |          Client           |              Kind               |                                   Used by                                    |                                 Canonical runbook                                 |
 |---------------------------|---------------------------------|------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
-| `basetool-frontend`       | public, authorization code, PKCE `S256` required — **confidential** (client secret + PKCE) once the owner's rollout is done | the web app's login (Spring OAuth2 client)                  | [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md) (ADR-0001: code shipped 2026-09-23, rollout pending) |
+| `basetool-frontend`       | confidential, authorization code, client secret + PKCE `S256` required | the web app's login (Spring OAuth2 client)                  | [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md), REQ-SEC-069 |
 | `backend-service`         | confidential, service account   | the backend's user sync and Discord linking (Admin API)                      | [below](#backend-service-service-account-roles-admin-api)                          |
 | `basetool-sc-extractor`   | public, device grant            | the desktop SC Extractor (ingest)                                            | [`INGEST_KEYCLOAK_SETUP.md`](../archive/INGEST_KEYCLOAK_SETUP.md)                          |
 | `basetool-ingest-gateway` | confidential, service account   | the ingest gateway's own identity towards the backend (ADR-0129)             | [`INGEST_KEYCLOAK_SETUP.md` step 9](../archive/INGEST_KEYCLOAK_SETUP.md)                   |
@@ -214,11 +214,8 @@ login among them) stay signed in. It checks `manage-users` over that member, the
 new grant and the provisioner changes nothing. A Keycloak running an older SPI jar answers `404`;
 the backend then logs a warning and leaves the shared sessions to the gateway's `auth_time` check.
 
-> **Corrected 2026-09-22.** This table listed only the two `view-` roles. `KeycloakService` names
-> `manage-users` for the merge writes, and production's service account holds it (configuration
-> snapshot of 2026-09-22); the testing realm's did not. `scripts/provision-keycloak-realm.py` grants
-> the two roles of the table — or, when its identity lacks `manage-users`, prints them for the
-> Admin Console.
+`scripts/provision-keycloak-realm.py` grants the two roles of the table — or, when its identity
+lacks `manage-users`, prints them for the Admin Console.
 
 ## Token & session settings (source of truth for session behaviour)
 
@@ -377,12 +374,12 @@ script needs a session.
   confidential-client migration.
 - **`basetool-sc-extractor` carries an unused authorization-code flow** (`standardFlowEnabled:
   true`, loopback redirect wildcards, no PKCE) — the extractor uses only the device grant. The
-  hardening runbook's thirteenth item. **Decided 2026-09-22: off, redirect URIs removed** — together
-  with the frontend's `http://frontend:18081` pair (ADR-0202 amendment 1; the third entry, both
-  ingest scopes on `basetool-android`, went with that client in #2674).
-  `scripts/provision-keycloak-realm.py` removes both; production keeps them until it is applied
-  there. `realm-config.reference.json` was hand-corrected to the target
-  shape on 2026-09-23 and says so in its `_comment`; regenerate it from an export after the apply.
+  hardening runbook's thirteenth item. **Off, redirect URIs removed** — together with the
+  frontend's `http://frontend:18081` pair (ADR-0202 amendment 1; the third entry, both ingest
+  scopes on `basetool-android`, went with that client in #2674).
+  `scripts/provision-keycloak-realm.py` removes both and has applied this to production.
+  `realm-config.reference.json` carries the target shape as a hand-correction named in its
+  `_comment`; a regeneration from an export replaces it.
 - **`basetool-provisioner` is in the 2026-09-09 snapshot** — an artifact of exporting mid-procedure;
   it goes when WP-K2 finishes, and the snapshot is regenerated then.
 
@@ -394,6 +391,6 @@ The remaining open hardening steps (2, 11, 12) are tracked in the
 - **`fullScopeAllowed: false` on `basetool-sc-extractor` (by 2026-09-09).** Hardening step 8; the
   extractor's tokens carry only its mapped realm roles.
 - **ROPC disabled on `basetool-frontend` (2026-06-18).** `directAccessGrantsEnabled` is now `false`
-  on the public frontend client (it used the browser authorization-code flow anyway), so the
+  on the frontend client (it used the browser authorization-code flow anyway), so the
   password can never traverse a direct-access (resource-owner-password) grant. The e2e test realm
   (`realm-export.e2e.json`) deliberately keeps it `true` for its ROPC test logins.

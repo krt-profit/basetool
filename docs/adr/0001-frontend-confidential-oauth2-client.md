@@ -2,11 +2,11 @@
 
 - **Status:** Accepted — implemented 2026-09-23 (code, inert until configured); rolled out on
   production 2026-09-25 (both steps, owner-approved — see *Implementation* and
-  `docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`)
+  `docs/archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`)
 - **Date:** 2026-05-20
 - **Deciders:** Repository owner (security-audit follow-up)
 - **Related:** security-audit finding **M-6** (2026-05-20) · implementation runbook
-  [`docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)
+  [`docs/archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../archive/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)
 
 ## Context
 

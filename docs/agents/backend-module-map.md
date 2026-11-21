@@ -2,9 +2,9 @@
 
 Read this before adding a class, a package or a dependency between backend modules.
 
-The backend is being cut by domain (ADR-0231, `docs/archive/DOMAIN_MODULARISATION_PLAN.md`). Until the
-domain packages exist, `src/test/resources/architecture/domain-map.txt` assigns every main class to
-its target module, first matching rule wins (REQ-MOD-001…006).
+The backend is cut by domain (ADR-0231; the executed plan is
+`docs/archive/DOMAIN_MODULARISATION_PLAN.md`). `src/test/resources/architecture/domain-map.txt`
+assigns every main class to its module, first matching rule wins (REQ-MOD-001…006).
 
 - **A new class must match a rule.** `DomainMapTest` fails on an unassigned class, a dead rule, an
   empty module and a duplicate simple name. Add an explicit `class` rule with its reason when no name
@@ -39,18 +39,15 @@ its target module, first matching rule wins (REQ-MOD-001…006).
   data only: `eventLayerShouldNotDependOnServiceLayer` selects every `api.events` package tree.
 - **The platform modules (`audit`, `notification`, `livesync`, `platform`) never name a domain
   class.** When they need a domain's data, they own an SPI and the domain implements it (plan
-  §5.3): `ActorHandleResolver` and `RetentionParticipant` (audit), the three
+  §5.3): `ActorHandleResolver` and `RetentionParticipant` (audit), the five
   `*RecipientDirectory` interfaces (notification), `ActiveOrgUnitProvider` (platform). A new
   audit trail outside the audit module joins retention as a `RetentionParticipant`. The
-  `livesync` module owns no SPI any more: the `LiveSyncTopicAuthorizer` seam went with the app's
-  subscribe path (ADR-0274), because the backend publishes into the frontend's rooms and authorises
-  no subscriber of its own. A domain announces its own committed write through
+  `livesync` module owns no SPI: the backend publishes into the frontend's rooms and authorises
+  no subscriber of its own (ADR-0274). A domain announces its own committed write through
   `livesync.api.LiveSyncPublisher`, and a room it publishes into must exist in the **frontend's**
   `LiveSyncTopicClass` with the same prefix, arity and section keys —
   `LiveSyncTopicRegistryParityTest` fails otherwise, and a key only the backend knows is a frame the
-  browser clips away on arrival. A platform SPI
-  in a layer package sits in a package its implementations already live in (`ActiveOrgUnitProvider`
-  in `service`, not `logging`), or the implementation closes a layer cycle.
+  browser clips away on arrival.
 - **A Spring Data fragment implementation lies in the package of its fragment interface.** Spring Data looks
   the `Impl` up beside the interface; when a move splits them the method is silently derived from its name as a
   query (and auto-flushes). `RepositoryFragmentPlacementTest` pins it.

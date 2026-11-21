@@ -4,18 +4,19 @@
 |----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **ID**         | UC-42                                                                                                                                                                                                                                                                                                                                                        |
 | **Tag**        | `e2e`                                                                                                                                                                                                                                                                                                                                                        |
-| **Testklasse** | [`AdminSettingsInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminSettingsInPlaceE2eTest.java) · [`AuditLogE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AuditLogE2eTest.java) · [`AdminPagesSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminPagesSmokeE2eTest.java) · [`AdminMaterialCreateInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminMaterialCreateInPlaceE2eTest.java) · [`CatalogueListSearchInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/CatalogueListSearchInPlaceE2eTest.java) |
+| **Testklasse** | [`AdminSettingsInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminSettingsInPlaceE2eTest.java) · [`AuditLogE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AuditLogE2eTest.java) · [`AdminPagesSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminPagesSmokeE2eTest.java) · [`AdminMaterialCreateInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminMaterialCreateInPlaceE2eTest.java) · [`CatalogueListSearchInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/CatalogueListSearchInPlaceE2eTest.java) · [`MaterialAliasEmptyStateInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/MaterialAliasEmptyStateInPlaceE2eTest.java) |
 | **Spec**       | [`audit.md`](../specs/audit.md) (REQ-AUDIT-001/-002/-004/-005) · [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md) · REQ-FE-001/-002                                                                                                                                                                                                          |
 
 ## Akteur
 
-`test-admin` (ADMIN). Alle vier Klassen betreffen ADMIN-only-Seiten.
+`test-admin` (ADMIN). Alle Klassen betreffen ADMIN-only-Seiten.
 
 ## Vorbedingungen
 
 - Eingeloggte Admin-Session.
 - Für das Audit-Log: eine per REST geseedete Bank-Einzahlung, damit der Bank-Tab mindestens eine Zeile vom Typ `DEPOSIT_BOOKED` hat.
 - Der Adminseiten-Smoke seedet nichts.
+- Für den Leerzustand der Material-Aliasse: ein frischer Stack ohne Alias (V108 seedet Aliasse nur für vorhandene Materialien); der Test seedet seinen einen Alias per REST.
 
 ## Auslöser
 
@@ -47,12 +48,17 @@ Der Admin speichert Systemeinstellungen, liest das Audit-Log oder öffnet eine d
 
 9. Auf `/admin/materials`, `/admin/locations` und `/ship-data` je den Reload-Marker setzen und einen pro Lauf eindeutigen, nirgends vorkommenden Namen in die Suche eintragen.
 
+### Letzten Material-Alias löschen (`MaterialAliasEmptyStateInPlaceE2eTest`, REQ-FE-001, REQ-UI-008)
+
+10. Auf `/admin/material-aliases` den letzten Alias in place löschen und durch den Erfolgs-Toast hindurch auf das darunterliegende Element klicken.
+
 ## Erwartetes Ergebnis
 
 - **Einstellungen:** Beide Speichervorgänge zeigen einen Erfolgs-Toast, keinen Fehler- oder Konflikt-Toast und keinen Reload-Bestätigungsdialog (`.krt-confirm-overlay`); der Marker überlebt, und das Backend hat den zweiten Wert gespeichert.
 - **Audit-Log:** Die Alt-URL leitet auf `/admin/audit-log?domain=BANK` um; das Panel listet mindestens eine Zeile, und der Löschen-Dialog zeigt die Warnung, vorher ein Backup zu ziehen (REQ-AUDIT-004). Der Ereignisfilter läuft in place (Marker überlebt, URL trägt `eventType=DEPOSIT_BOOKED`) und listet weiter die Einzahlung. Der Client-Filter wird auf dem Bank-Tab ebenfalls angeboten (seit V238, REQ-AUDIT-005). Nach dem Tabwechsel trägt die URL `domain=INVENTORY`, und der Client-Filter läuft in place mit `clientId=basetool-frontend` in der URL.
 - **Smoke:** Jede Seite antwortet mit **HTTP 200** und rendert die angemeldete Shell (`nav-logout`) — keine Umleitung zum Identity Provider, kein Fehler.
 - **Katalogsuche:** Die Liste wird in place durch ihr `?fragment=results` ersetzt und zeigt den Leerzustand, der Zähler zeigt `0`, die URL trägt `query=…`, und der Marker überlebt — kein Reload.
+- **Material-Alias:** Nach dem Löschen steht der Platzhalter „keine Einträge" wieder da, ohne Reload; der Toast lässt den Zeiger zu dem durch, was er überdeckt.
 - **Material anlegen:** Genau **ein** `POST /admin/materials/ajax` verlässt den Browser (`krtFetch` sperrt den Knopf beim ersten Klick), die neue Zeile erscheint in `#materialsTable`, und der Marker überlebt — kein Reload.
 
 ## Sonderfälle & Lehren

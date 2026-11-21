@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * (REQ-API-018).
  *
  * <p>The table is the controller-to-domain map of the REST API cut ({@code
- * docs/modularisation/rest-api-cut.md}, "Today's surface") plus the patch-change module: 23
+ * docs/archive/modularisation/rest-api-cut.md}, "Today's surface") plus the patch-change module: 23
  * domains, every controller in exactly one. A controller missing here is tagged {@link
  * #UNASSIGNED}, which the document assertions refuse.
  */

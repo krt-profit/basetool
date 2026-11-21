@@ -33,15 +33,12 @@ sub-issue that implements it.
 
 > [!note] Each requirement's own status line is authoritative
 > Each requirement carries its work package; its status line says what is built and what remains,
-> and moves in the PR that lands the change, together with its **Enforced by** test. What remains
-> is chiefly the clients' migrations (WP 5.1, #2088; WP 5.2, #2089), the app (#2097) and the go-live
-> (WP 6, #2092). Requirements of other specs that this one changes state it in their own text; a
-> callout there marks only what is still planned. *Corrected 2026-09-27: this note said nothing was
-> built yet, long after most of the requirements had landed.* *Corrected 2026-09-28: it still named
-> the sandbox (WP 2.3, #2099) as open after #2099 had closed; the end-to-end runs the requirements
-> had deferred to it — an installation revoke, a reconnect, a departure, the account check, the
-> corpus round trip, a confirmed mass change and an admin suspension — are now built on the E2E
-> stack (`ExchangeConnectionsE2eTest`, `ExchangeSyncE2eTest`, `ExchangeDepartureE2eTest`).*
+> and moves in the PR that lands the change, together with its **Enforced by** test. The exchange
+> is live since 2026-09-28 (WP 6, #2092). Requirements of other specs that this one changes state it
+> in their own text; a callout there marks only what is still planned. The end-to-end runs — an
+> installation revoke, a reconnect, a departure, the account check, the corpus round trip, a
+> confirmed mass change and an admin suspension — run on the E2E stack
+> (`ExchangeConnectionsE2eTest`, `ExchangeSyncE2eTest`, `ExchangeDepartureE2eTest`).
 
 ## Requirements
 
@@ -2424,8 +2421,8 @@ web's request forms announce, so the staff queue, „Anträge an unsere Konten" 
 
 **Status:** built for the web pages — `ExchangeLiveSync`, the frames of REQ-XCH-013 — WP 3.3
 (#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086); the refinery-order frames built for the
-writes, cancels, deletes and pickups without store lines (#3168, #3169, #3170), the store lines
-planned (#3171)
+writes, cancels, deletes and pickups without store lines (#3168, #3169, #3170) and the pickups with
+store lines (#3171)
 
 ### REQ-XCH-031 — The account check answers match, mismatch or unknown — never the handle
 
@@ -3387,8 +3384,8 @@ Data is classified **by content, per column**; a column has exactly one class, w
 fills it (P4K import, SC Wiki, UEX, admin):
 
 - **`@GameText`** (yellow) marks every description column — `GameItem.description_en` /
-  `description_de`, `ShipType.description_en` / `description_de`, `Manufacturer.description` and
-  the planned `Manufacturer.description_de`, `Material.description` — and `displayType` should it ever be persisted. The
+  `description_de`, `ShipType.description_en` / `description_de`, `Manufacturer.description` /
+  `description_de`, `Material.description` — and `displayType` should it ever be persisted. The
   classification rule itself is in [`p4k-catalogue.md`](p4k-catalogue.md).
 - **`@GameMedia`** (red) exists and marks no column: no archive media is in scope. The UEX link and
   image columns (`uex_screenshot`, `url_photo`, `url_video`, `url_store`, …) stay unmarked UEX data.

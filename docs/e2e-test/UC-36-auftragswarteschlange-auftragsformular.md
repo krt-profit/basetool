@@ -4,7 +4,7 @@
 |----------------|--------|
 | **ID**         | UC-36  |
 | **Tag**        | `e2e`  |
-| **Testklasse** | [`JobOrderQueueLiveSyncE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderQueueLiveSyncE2eTest.java) · [`JobOrderReactivatePriorityInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderReactivatePriorityInPlaceE2eTest.java) · [`OrdersSquadronFilterE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrdersSquadronFilterE2eTest.java) · [`OrdersCreateItemLineRendersE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrdersCreateItemLineRendersE2eTest.java) · [`OrdersCreateScuHintRevealE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrdersCreateScuHintRevealE2eTest.java) |
+| **Testklasse** | [`JobOrderQueueLiveSyncE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderQueueLiveSyncE2eTest.java) · [`JobOrderReactivatePriorityInPlaceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderReactivatePriorityInPlaceE2eTest.java) · [`OrdersSquadronFilterE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrdersSquadronFilterE2eTest.java) · [`OrdersCreateItemLineRendersE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrdersCreateItemLineRendersE2eTest.java) · [`OrdersCreateScuHintRevealE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrdersCreateScuHintRevealE2eTest.java) · [`OrdersCreateMaterialRowsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrdersCreateMaterialRowsE2eTest.java) · [`OrdersQueueReorderWithoutDragE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrdersQueueReorderWithoutDragE2eTest.java) |
 | **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md), [UC-16](UC-16-job-order-status.md) |
 
 ## Akteur
@@ -43,12 +43,22 @@ Ein anderer Nutzer legt einen Auftrag an; ein abgeschlossener Auftrag wird wiede
 6. `/orders/create` im Item-Modus öffnen und eine Item-Zeile hinzufügen.
 7. `/orders/create` im Material-Modus öffnen, eine Materialzeile hinzufügen und ein SCU-Material wählen (gefunden über den Proxy `/catalog/material-search`, den auch die Combobox abfragt); danach die Combobox programmatisch mit `setValue('')` leeren.
 
+### Materialzeilen des Anlegeformulars (`OrdersCreateMaterialRowsE2eTest`, REQ-UI-027)
+
+8. Auf `/orders/create` Materialzeilen hinzufügen und entfernen, einen Kommentar tippen und den scmdb-Import öffnen — ohne abzusenden.
+
+### Warteschlange ohne Ziehen sortieren (`OrdersQueueReorderWithoutDragE2eTest`, REQ-ORDERS-020, REQ-UI-031)
+
+9. Auf `/orders` einen Auftrag mit dem Hoch-Knopf und mit Alt+Pfeil runter je um einen Platz verschieben; dasselbe in der Smartphone-Klasse vermessen.
+
 ## Erwartetes Ergebnis
 
 - **Live:** B bekommt die neue Zeile **ohne Reload**. Die Prüfung hat einen großzügigen Timeout, weil der globale Raum `orders` Änderungen etwa 1,5 s lang sammelt.
 - **Reaktivieren:** Der Header wird in place neu geholt (die Anfrage `GET /orders/{id}?fragment=header` tritt auf), der Marker überlebt, und das Backend hat eine neue, nicht leere Priorität vergeben.
 - **Filter:** Der IRIDIUM-Auftrag verschwindet aus der Warteschlange; nach dem Reload ist die Abwahl aus `localStorage` wiederhergestellt und angewendet, ohne Zutun.
 - **Formular:** Die clientseitig gebaute Item-Zeile (`oc-line-fields`) ist mit Flex-Layout sichtbar; beim SCU-Material erscheint der „?"-SCU-Hinweis der Zeile. In keinem der beiden Fälle protokolliert der Browser eine CSP-Verletzung `style-src-attr`. Die Option `data-quantity-type` wird auf das Hidden-Input der Combobox gespiegelt und nach `setValue('')` wieder entfernt (REQ-FE-016).
+- **Materialzeilen:** Eine Zeile lässt sich nur entfernen, solange eine weitere bleibt; die übrigen werden lückenlos neu nummeriert, der Kommentarzähler folgt dem Text, und der scmdb-Import öffnet als Dialog.
+- **Sortieren ohne Ziehen:** Der Auftrag rückt in place um einen Platz, der Fokus bleibt auf ihm, die Live-Region sagt die Verschiebung an, und auf dem Smartphone behalten die Knöpfe die 44-px-Trefferfläche.
 
 ## Sonderfälle & Lehren
 

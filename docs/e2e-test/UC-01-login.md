@@ -4,7 +4,7 @@
 |----------------|----------------------------------------------------------------------------------------------------------------------|
 | **ID**         | UC-01                                                                                                                |
 | **Tag**        | `e2e`                                                                                                                |
-| **Testklasse** | [`LoginSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/LoginSmokeE2eTest.java) |
+| **Testklasse** | [`LoginSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/LoginSmokeE2eTest.java) · [`NavigateCookieJarRestoreE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/NavigateCookieJarRestoreE2eTest.java) |
 
 ## Akteur
 
@@ -25,11 +25,16 @@ Der Browser ruft den Spring-OAuth2-Login-Einstieg `/oauth2/authorization/keycloa
 2. `E2eSupport.submitKeycloakLogin`: warte auf den `load`-Zustand der Loginseite und ein sichtbares `#kc-login`, fülle `#username` und `#password`, klicke `#kc-login` und warte, bis der POST an `login-actions/authenticate` den Browser verlassen hat. Geht nach 10 s kein POST raus, wird genau einmal erneut geklickt.
 3. Keycloak authentifiziert und leitet zurück auf die Frontend-Origin (`<baseUrl>/...`) — binnen 30 s, gemessen ab dem POST.
 
+### Session nach geleertem Cookie-Speicher (`NavigateCookieJarRestoreE2eTest`)
+
+4. Einen angemeldeten Kontext komplett von Cookies leeren, wie es WebKit bei einem abgestürzten Navigationsversuch tut, und die Kopie per `E2eSupport.restoreLostCookieJar` wieder einsetzen.
+
 ## Erwartetes Ergebnis
 
 - Der Browser landet wieder auf der Frontend-Origin (Authorization-Code-Flow abgeschlossen).
 - Eine Redis-backed Spring-Session ist etabliert: der Browser-Kontext hält ein Cookie namens `__Host-SESSION` (bis 2026-09-22: `SESSION`) — die Session ist **cookie-**, nicht token-getragen.
 - Der authentifizierte Zustand wird als Playwright-`storageState` nach `build/e2e/storageState.json` geschrieben (für Diagnose und manuelle Wiederverwendung; die übrigen Testklassen melden sich selbst an, siehe unten).
+- **Cookie-Wiederherstellung:** Der geleerte Kontext verliert die Session, der wiederhergestellte hat sie wieder — die Grundlage des Retrys in `E2eSupport.navigate` (*Cookie-Verlust nach dem Login* in der [Übersicht](README.md)).
 
 ## Sonderfälle & Lehren
 

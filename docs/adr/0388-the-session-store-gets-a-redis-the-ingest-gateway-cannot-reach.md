@@ -1,7 +1,7 @@
 # ADR-0388 — The session store gets a Redis the ingest gateway cannot reach
 
 - **Status:** Accepted — implemented: the frontend's two connections, the two instances with their
-  ACL files, networks, exporters and backup artifacts; the production cut-over is the owner's (#3493)
+  ACL files, networks, exporters and backup artifacts; testing and production cut over with v1.26.0 (#3493)
 - **Date:** 2026-11-16
 - **Deciders:** @greluc
 - **Related:** [REQ-SEC-089](../specs/security-and-access.md),
