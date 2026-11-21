@@ -116,3 +116,12 @@ skipped, together with the build-cache age and volume-prune switches and the uni
 The removal condition of the transitional double name was met — both Rocky hosts have run the role,
 and the retired Docker host never will again — so `basetool_docker_cleanup_*` left the alert
 expression and the old docker-cleanup log path left Alloy's path list the same day (arc42 §11.1).
+
+## Amendment 2026-11-21 — a fourth step untags superseded digest names (REQ-OPS-064)
+
+An index-digest pin bump whose linux/amd64 image is already in the store adds a second
+`repo@sha256:` name to that image, and the podman exporter fails its image metrics on the pair
+(#3518). The job gains one step before the image prune, `rt_drop_superseded_digest_names`, which
+untags every digest name beyond one per repository and keeps the one an installed unit pins. It
+removes no image and touches no volume, so the decision above is unchanged; the same step also runs
+after every successful deploy.

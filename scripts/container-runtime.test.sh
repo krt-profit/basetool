@@ -42,7 +42,9 @@ STUB
   chmod +x "${BIN}/${name}"
 }
 
+# shellcheck disable=SC2016
 make_stub podman 'case "$*" in
+  *"image list"*) [ -z "${STUB_IMAGE_LIST:-}" ] || printf "%s\n" "${STUB_IMAGE_LIST}" ;;
   *"volume inspect"*) exit 0 ;;
   *"ps -aq"*) echo "cid-podman-1" ;;
   *"ps --format"*) echo "backend" ;;
@@ -971,6 +973,73 @@ expect_no_call "...so the service user never opens the deploy account's file" po
   "cp ${WORK}/krt_basetool.dump"
 expect_call "and it is removed whatever state it is in" podman \
   'rt_rm_force basetool-restore-drill' 'rm -f -v basetool-restore-drill'
+
+say ""
+say "== an image carries one digest name per repository (REQ-OPS-064) =="
+D_OLD="sha256:$(printf '1%.0s' $(seq 1 64))"
+D_NEW="sha256:$(printf '2%.0s' $(seq 1 64))"
+D_THIRD="sha256:$(printf '3%.0s' $(seq 1 64))"
+IMG="sha256:$(printf 'd%.0s' $(seq 1 64))"
+IMG2="sha256:$(printf 'e%.0s' $(seq 1 64))"
+REDIS="docker.io/library/redis"
+superseded() {
+  run_rt podman "$(printf 'rt_superseded_digest_names %q <<<%q' "$1" "$2")" 2>/dev/null
+}
+expect_superseded() {
+  local label="$1" pinned="$2" listing="$3" want="$4" got
+  got="$(superseded "$pinned" "$listing")"
+  if [[ "$got" == "$want" ]]; then ok "$label"; else
+    bad "$label"
+    printf '        wanted: %s\n        got   : %s\n' "$want" "$got"
+  fi
+}
+expect_superseded "the old index digest of a pinned image is superseded" "$D_NEW" \
+  "${IMG} ${REDIS}@${D_NEW} ${REDIS}@${D_OLD}" "${IMG} ${REDIS}@${D_OLD}"
+expect_superseded "...whichever of the two podman lists first" "$D_NEW" \
+  "${IMG} ${REDIS}@${D_OLD} ${REDIS}@${D_NEW}" "${IMG} ${REDIS}@${D_OLD}"
+expect_superseded "with no pinned name the first listed, the most recent, stays" "" \
+  "${IMG} ${REDIS}@${D_NEW} ${REDIS}@${D_OLD}" "${IMG} ${REDIS}@${D_OLD}"
+expect_superseded "of two pinned names the first listed stays, and every other name goes" "$(printf '%s\n%s' "$D_THIRD" "$D_NEW")" \
+  "${IMG} ${REDIS}@${D_OLD} ${REDIS}@${D_NEW} ${REDIS}@${D_THIRD}" \
+  "$(printf '%s\n%s' "${IMG} ${REDIS}@${D_OLD}" "${IMG} ${REDIS}@${D_THIRD}")"
+expect_superseded "a tagged name beside one digest name is no pair" "" \
+  "${IMG} ${REDIS}:8-alpine ${REDIS}@${D_OLD}" ""
+expect_superseded "one digest name in each of two repositories is no pair" "" \
+  "${IMG} ${REDIS}@${D_OLD} docker.io/library/valkey@${D_NEW}" ""
+expect_superseded "an image podman lists once per tag is handled once" "$D_NEW" \
+  "$(printf '%s\n%s' "${IMG} ${REDIS}:8 ${REDIS}@${D_NEW} ${REDIS}@${D_OLD}" "${IMG} ${REDIS}:8 ${REDIS}@${D_NEW} ${REDIS}@${D_OLD}")" \
+  "${IMG} ${REDIS}@${D_OLD}"
+expect_superseded "each image is judged on its own names" "$D_NEW" \
+  "$(printf '%s\n%s' "${IMG} ${REDIS}@${D_NEW} ${REDIS}@${D_OLD}" "${IMG2} ${REDIS}@${D_THIRD}")" \
+  "${IMG} ${REDIS}@${D_OLD}"
+PINS="${WORK}/pins"
+mkdir -p "${PINS}/redis-session.container.d" "${PINS}/redis-shared.container.d"
+printf '[Container]\nImage=docker.io/redis:8-alpine@%s\n' "$D_NEW" >"${PINS}/redis-session.container"
+printf '[Container]\nImage=placeholder\n' >"${PINS}/redis-shared.container"
+printf '[Container]\nImage=docker.io/redis@%s\n' "$D_THIRD" >"${PINS}/redis-shared.container.d/10-digest-pin.conf"
+expect_out "the pins are read from the units and their drop-ins" podman \
+  "RT_UNIT_DIR=$(printf %q "${PINS}"); rt_unit_pinned_digests | sort | tr '\n' ' '" "${D_NEW} ${D_THIRD} "
+expect_out "a missing unit directory pins nothing, and is no error" podman \
+  "RT_UNIT_DIR=$(printf %q "${WORK}/absent"); rt_unit_pinned_digests; echo rc=\$?" 'rc=0'
+DROP_PAIR="$(printf 'export STUB_IMAGE_LIST=%q; RT_UNIT_DIR=%q; rt_drop_superseded_digest_names' \
+  "${IMG} ${REDIS}@${D_NEW} ${REDIS}@${D_OLD}" "${PINS}")"
+expect_call "the store is listed with full ids and every name" podman "${DROP_PAIR}" \
+  'podman image list --no-trunc --format {{.ID}} {{join .Names " "}}'
+expect_call "the superseded name is untagged from its image" podman "${DROP_PAIR}" \
+  "podman image untag ${IMG} ${REDIS}@${D_OLD}"
+expect_no_call "...and the name a unit pins is not" podman "${DROP_PAIR}" "untag ${IMG} ${REDIS}@${D_NEW}"
+expect_no_call "nothing is pulled for it" podman "${DROP_PAIR}" 'pull'
+expect_no_call "...and no image is removed" podman "${DROP_PAIR}" 'image rm'
+expect_out "the dropped name is reported" podman "${DROP_PAIR} 2>&1" \
+  "dropped the superseded name ${REDIS}@${D_OLD} from image dddddddddddd"
+expect_out "a store without a pair untags nothing and succeeds" podman \
+  "$(printf 'export STUB_IMAGE_LIST=%q; rt_drop_superseded_digest_names; echo "rc=$?"; grep -c untag %q' \
+    "${IMG} ${REDIS}@${D_NEW}" "${LOG}")" \
+  "$(printf 'rc=0\n0')"
+expect_out "a listing that fails fails the step" podman \
+  "export STUB_FAIL=image_list; ${DROP_PAIR}; echo rc=\$?" 'rc=1'
+expect_out "an untag that fails fails the step" podman \
+  "export STUB_FAIL=image_untag; ${DROP_PAIR}; echo rc=\$?" 'rc=1'
 
 say ""
 say "== credentials never reach a command line =="
