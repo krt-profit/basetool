@@ -1,4 +1,4 @@
-# ADR-0401 — Per-interface network sysctls are set by glob, and the boot is checked, not healed
+# ADR-0402 — Per-interface network sysctls are set by glob, and the boot is checked, not healed
 
 - **Status:** Accepted
 - **Date:** 2026-11-21

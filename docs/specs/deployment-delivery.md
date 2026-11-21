@@ -1170,7 +1170,7 @@ firewall, and its kernel takes no routing advice from the network.
   when either `all` or the interface allows it, and IPv6 reads the interface value), turns on
   strict reverse-path filtering and logs martians. The per-interface keys are globs
   (`net.ipv6.conf.*.accept_redirects`), so they reach an interface whatever it is called when
-  `systemd-sysctl` runs and stay with it through a later rename (ADR-0401). The role reads the
+  `systemd-sysctl` runs and stay with it through a later rename (ADR-0402). The role reads the
   running values of every physical interface back and refuses a run whose kernel does not run
   with them. It applies the file only when the file changed, so a boot that misses a key fails
   the next run rather than being healed without a trace.
@@ -1197,7 +1197,7 @@ firewall, and its kernel takes no routing advice from the network.
 **Enforced by:** `ansible/roles/basetool_host/tasks/65-firewall.yml` ·
 `ansible/roles/basetool_host/templates/basetool-network.sysctl.conf.j2` ·
 `ansible/roles/basetool_host/templates/fail2ban-jail.local.j2` · `scripts/check-conformance.py`
-(`network-sysctls`) · **Decision:** ADR-0401 · **Runbook:** `docs/deployment.md` → *Management
+(`network-sysctls`) · **Decision:** ADR-0402 · **Runbook:** `docs/deployment.md` → *Management
 access*
 
 ### REQ-OPS-018 — Redis session store: durable persistence and a session-safe memory ceiling
@@ -3344,7 +3344,8 @@ isolated projects have nothing to reject and a module added later inherits no de
   it a shared image input, and `build-logic/**` is a path filter of the vulnerability-scan and
   sandbox-image workflows.
 - **The plugin classpath resolves from the portal with Maven Central behind it.** Both settings
-  files declare `pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }`, which
+  files declare `gradlePluginPortal()` and then `mavenCentral()` in `pluginManagement { repositories
+  { … } }`, behind the mirror of the next item, which
   is what seeds every project's `buildscript.repositories` in both builds — the repositories of
   `dependencyResolutionManagement` do not apply to that classpath, so without the declaration the
   default leaves the Gradle Plugin Portal as the only source. The portal answers the plugin markers
@@ -3354,6 +3355,20 @@ isolated projects have nothing to reject and a module added later inherits no de
   Central is a fallback, not a second source of truth — the portal stays first and every artifact
   still matches its committed checksum (REQ-OPS-034), the same bytes either way
   ([ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md)).
+- **Maven Central is read through Google's mirror first.** Every repository block of both settings
+  files — `pluginManagement` and `dependencyResolutionManagement` in `settings.gradle.kts` and in
+  `build-logic/settings.gradle.kts`, four declarations — names
+  `maven("https://maven-central.storage-download.googleapis.com/maven2/")` (`Maven Central mirror
+  (Google)`) first, with `content { excludeModuleByRegex(".*", ".*\\.gradle\\.plugin") }`, and the
+  order of the previous item behind it. A build added later with its own settings file declares the
+  same. Central limits consumption per source IP and answers shared CI egress addresses with `429`
+  blocks of about half an hour, which Gradle's three attempts within seconds cannot outlast, and a
+  repository Gradle disables fails the resolution instead of falling through. The mirror never
+  answers a plugin marker, because the portal's generated markers are the bytes the checksums pin
+  and Central's copies differ. The mirror is a cache, not a source of truth: every artifact still
+  matches its committed checksum (REQ-OPS-034), an artifact it does not hold yet is a `404` that the
+  next repository resolves, and Gradle's internal retry properties stay at their defaults
+  ([ADR-0401](../adr/0401-maven-central-is-read-through-googles-mirror-first.md)).
 - **No behaviour change by the move.** The task graph (`build -m`, `tasks --all`), every task's
   type, dependencies and inputs, the compiler arguments including Error Prone's, the test JVM
   arguments, the resolved classpaths and the SBOM component lists are identical before and after.
@@ -3366,12 +3381,16 @@ isolated projects have nothing to reject and a module added later inherits no de
 - [x] `./gradlew help --configuration-cache` and `./gradlew build -m --configuration-cache` reuse
   their entry on the second run.
 - [x] A cold Gradle user home resolves the whole build under the strict verification metadata.
+- [x] An `assemble` from a cold Gradle user home downloads every library artifact from the Maven
+  Central mirror and every plugin marker from the portal, and nothing from `repo.maven.apache.org`,
+  under the strict verification metadata.
 - [x] `check_sbom_coverage.py` finds the SBOM convention and each module's application of it.
 
 **Enforced by:** `build-logic/` · `settings.gradle.kts` · `.github/scripts/check_sbom_coverage.py`
 (`sbom-coverage`) · `.github/scripts/image_reuse_plan.py` (`--selftest`) · **Decision:**
 [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md),
-[ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md) ·
+[ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md),
+[ADR-0401](../adr/0401-maven-central-is-read-through-googles-mirror-first.md) ·
 **Related:** REQ-OPS-034, REQ-OPS-037, REQ-OPS-038
 
 Node script tests register through `registerNodeScriptTest` in `build-logic`, retaining their task
