@@ -37,9 +37,10 @@ while [[ $# -gt 0 ]]; do
       cat <<'USAGE'
 Usage: container-cleanup.sh [--dry-run]
 
-Removes unused container resources: stopped containers, unused images and unused networks.
-Volumes are never pruned (ADR-0194). Resources still in use, and anything inside its step's
-until= window, are left untouched.
+Removes unused container resources: stopped containers, unused images and unused networks, and
+every digest name an image carries beyond one per repository (REQ-OPS-064). Volumes are never
+pruned (ADR-0194). Resources still in use, and anything inside its step's until= window, are left
+untouched.
 
 Options:
   --dry-run    Remove nothing; print the current disk usage and the steps that would run.
@@ -157,6 +158,8 @@ BEFORE_BYTES="$(df_total_bytes)"
 
 run_prune "stopped containers" \
   "${RT_CLI_ARGV[@]}" container prune --force --filter "until=${CONTAINER_UNTIL}"
+
+run_prune "superseded image names" rt_drop_superseded_digest_names
 
 run_prune "unused images" \
   "${RT_CLI_ARGV[@]}" image prune --all --force --filter "until=${IMAGE_UNTIL}"

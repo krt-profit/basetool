@@ -4053,6 +4053,48 @@ host that resolves another branch also stops rehearsing the other's package set.
 [ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
 Amendment 2 · **Related:** REQ-OPS-032, REQ-OPS-053, ADR-0163
 
+### REQ-OPS-064 — An image carries one digest name per repository
+
+**Status:** Accepted
+
+The stateful and monitoring images are pinned to an index digest, and upstream re-publishes an
+index without changing its linux/amd64 image. A pin moved to such an index names an image the store
+already holds: Podman adds the new `repo@sha256:` name to it and keeps the old one. The podman
+exporter turns every name of an image into its own `podman_image_info`, `podman_image_size` and
+`podman_image_created_seconds` series, labelled with the repository and the tag `<none>`, so two
+digest names of one repository are two identical series and every scrape fails with *"was collected
+before with the same name and label values"* (#3518: redis after the 2026-11-19 bump, postgres
+before it).
+
+- **A successful deploy drops every digest name an image carries beyond one per repository**, after
+  the monitoring units and the edge are reconciled; a failure is logged and does not fail the
+  deploy.
+- **The weekly cleanup does the same** as a step of its own, so a pair made outside a deploy (a
+  manual stateful-infra upgrade) lasts a week at most, and a failure there withholds its success
+  stamp like any other step.
+- **The name kept is the one an installed unit pins** (`Image=` of a `.container` or a drop-in),
+  else the first one podman lists. Nothing is pulled or removed, and a tagged name is left alone: a
+  unit naming a dropped digest resolves to the same image through the digests the image records.
+
+**Acceptance**
+
+- [x] A store whose image holds the old and the new index digest of one repository keeps only the
+  pinned one after a deploy, and a pair with no pinned name keeps the first listed
+  (`container-runtime.test.sh`, `deploy.test.sh`).
+- [x] A tagged name, a second repository and a repeated listing line drop nothing, and a listing
+  that fails fails the step (`container-runtime.test.sh`).
+- [x] On podman 5.8, two pulls of `redis` by its two index digests give one image with two names;
+  `podman image untag` drops one, and the dropped digest still resolves without a pull.
+- [ ] After the host step and the next deploy, the production exporter's journal carries no
+  `collected before with the same name and label values`.
+
+**Enforced by:** `scripts/lib/container-runtime.sh` (`rt_drop_superseded_digest_names`,
+`rt_superseded_digest_names`, `rt_unit_pinned_digests`) · `scripts/deploy.sh` ·
+`scripts/container-cleanup.sh` · `ansible/roles/basetool_host/defaults/main.yml`
+(`image list`, `image untag` in `basetool_host_deploy_podman_subcommands`) ·
+`scripts/container-runtime.test.sh` · `scripts/deploy.test.sh`
+(`scenario_podman_drops_a_superseded_digest_name`) · **Related:** REQ-OPS-035, ADR-0194
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not
