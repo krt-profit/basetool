@@ -32,8 +32,10 @@ import org.jetbrains.annotations.Nullable;
  * @param material the required material, with its {@code quantityType}
  * @param minQuality the floor of the line's quality tier, or {@code null} for the base tier
  * @param qualityTier the line's quality tier
- * @param amount the required amount in the material's own unit
- * @param currentStock the linked stock attributed to this line (REQ-ORDERS-037)
+ * @param amount the requested amount in the material's own unit; handovers do not lower it
+ * @param handedOverAmount the handed-over amount credited to this line
+ * @param remainingAmount the requested amount less the handed-over amount, never negative
+ * @param currentStock the linked stock attributed to this line's remaining need (REQ-ORDERS-037)
  * @param claims per-squadron claims on this bucket; empty when no squadron has claimed
  * @param openAmount the uncovered outstanding demand less the claims, floored at 0; {@code null}
  *     when the line was mapped without the stock projection
@@ -45,6 +47,8 @@ public record JobOrderMaterialDto(
     Integer minQuality,
     QualityTierDto qualityTier,
     Double amount,
+    double handedOverAmount,
+    double remainingAmount,
     @Nullable Double currentStock,
     List<ClaimDto> claims,
     @Nullable Double openAmount,

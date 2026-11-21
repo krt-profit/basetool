@@ -272,7 +272,8 @@
             <tr>
                 <th th:text="#{orders.material.name}">Material</th>
                 <th th:text="#{orders.material.minQuality}">Min. Qualität</th>
-                <th class="num" th:text="#{orders.detail.amount}">Benötigt</th>
+                <th class="num" th:text="#{orders.detail.amount}">Gefordert</th>
+                <th class="num" th:text="#{orders.detail.handedOver}">Übergeben</th>
                 <th class="num" th:text="#{orders.detail.stock}">Im Lager</th>
                 <th th:if="${showClaims}" th:text="#{orders.detail.claims}">Eingetragen</th>
                 <th th:if="${showClaims}" th:text="#{orders.detail.open}">Offen</th>
@@ -298,6 +299,10 @@
                 <td class="num" th:attr="data-label=#{orders.detail.amount}" th:switch="${mat.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                </td>
+                <td class="num" th:attr="data-label=#{orders.detail.handedOver}" th:switch="${mat.material.quantityType}" data-testid="order-material-handed-over">
+                    <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(mat.handedOverAmount, 1)} #{material.quantity.piece}|"></span>
+                    <span th:case="*" th:text="|${#numbers.formatDecimal(mat.handedOverAmount, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.stock}" th:switch="${mat.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${mat.currentStock != null ? #numbers.formatInteger(mat.currentStock, 1) : '0'} #{material.quantity.piece}|"></span>
@@ -344,8 +349,8 @@
                     </div>
                 </td>
                 <td class="cell-status" th:attr="data-label=#{orders.detail.status}">
-                    <span th:if="${mat.currentStock >= mat.amount}" class="chip chip--success" th:text="#{orders.detail.status.fulfilled}">Erfüllt</span>
-                    <span th:if="${mat.currentStock < mat.amount}" class="chip chip--warning" th:text="#{orders.detail.status.missing}">Fehlend</span>
+                    <span th:if="${mat.currentStock >= mat.remainingAmount}" class="chip chip--success" th:text="#{orders.detail.status.fulfilled}">Erfüllt</span>
+                    <span th:if="${mat.currentStock < mat.remainingAmount}" class="chip chip--warning" th:text="#{orders.detail.status.missing}">Fehlend</span>
                 </td>
             </tr>
             </tbody>
@@ -919,19 +924,32 @@
 
             <h3 class="od-modal-section" th:text="#{orders.detail.materials.title}">Materialien</h3>
             <div id="materials-container" class="od-lines">
-                <div th:each="mat, stat : *{materials}" class="material-row od-line od-line--material">
+                <div th:each="mat, stat : *{materials}" class="material-row od-line od-line--material"
+                     th:with="handedOver=${mat.handedOverAmount > 0}">
                     <div>
                         <label th:text="#{orders.material.name}" class="form-label-sm">Material</label>
-                        <select class="w-full" th:field="*{materials[__${stat.index}__].materialId}" data-role="material-select" data-krt-combobox="remote-materials-joborder" required>
+                        <select th:unless="${handedOver}" class="w-full" th:field="*{materials[__${stat.index}__].materialId}" data-role="material-select" data-krt-combobox="remote-materials-joborder" required>
                             <option value="" disabled selected th:text="#{orders.create.select}">-- Bitte wählen --</option>
                             <option th:each="m : ${materials}" th:if="${m.id == jobOrderForm.materials[stat.index].materialId}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.displayName(#locale)}"></option>
                         </select>
+                        <th:block th:if="${handedOver}">
+                            <select class="w-full" disabled data-role="material-select" th:aria-label="#{orders.material.name}">
+                                <option th:each="line : ${order.materials}" th:if="${line.material.id == mat.materialId}" selected th:data-quantity-type="${line.material.quantityType}" th:text="${line.material.displayName(#locale)}"></option>
+                            </select>
+                            <input type="hidden" th:field="*{materials[__${stat.index}__].materialId}">
+                        </th:block>
                     </div>
                     <div>
                         <label th:text="#{orders.material.minQuality}" class="form-label-sm">Min. Qualität</label>
-                        <select class="w-full" th:field="*{materials[__${stat.index}__].minQuality}">
+                        <select class="w-full" th:unless="${handedOver}" th:field="*{materials[__${stat.index}__].minQuality}">
                             <th:block th:replace="~{joborder/fragments/quality-tier :: floorOptions(${qualityTiers}, ${jobOrderForm.materials[__${stat.index}__].minQuality})}"></th:block>
                         </select>
+                        <th:block th:if="${handedOver}">
+                            <select class="w-full" disabled th:aria-label="#{orders.material.minQuality}">
+                                <th:block th:replace="~{joborder/fragments/quality-tier :: floorOptionsSelected(${qualityTiers}, ${mat.minQuality})}"></th:block>
+                            </select>
+                            <input type="hidden" th:field="*{materials[__${stat.index}__].minQuality}">
+                        </th:block>
                     </div>
                     <div>
                         <label class="form-label-sm">
@@ -939,11 +957,14 @@
                             <span data-role="amount-unit"></span>
                             <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint(null, true)}"></th:block>
                         </label>
-                        <input class="w-full" type="text" inputmode="decimal" data-number-input data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required>
+                        <input class="w-full" type="text" inputmode="decimal" data-number-input data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required
+                               th:attr="data-handed-over=${handedOver ? mat.handedOverAmount : null}">
                     </div>
                     <div>
-                        <button type="button" class="btn btn-quiet-danger btn-icon remove-material-btn" th:title="#{orders.detail.material.remove}" th:aria-label="#{orders.detail.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        <button th:unless="${handedOver}" type="button" class="btn btn-quiet-danger btn-icon remove-material-btn" th:title="#{orders.detail.material.remove}" th:aria-label="#{orders.detail.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                     </div>
+                    <p th:if="${handedOver}" class="form-hint od-line__note" data-testid="order-edit-handed-over-hint"
+                       th:text="#{orders.detail.material.handedOverHint(${#numbers.formatDecimal(mat.handedOverAmount, 1, 'DEFAULT', 3, 'DEFAULT')})}">Bereits übergeben: 2.000</p>
                 </div>
             </div>
 

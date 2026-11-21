@@ -195,8 +195,9 @@ independent of creation and individual action rights.
 Current authority is rechecked on each action. A genuine own transfer may introduce a new
 counterparty with exactly that transfer's credit, not fabricate provision for another holder.
 Active account search is scoped to the permitted action. Display names alone grant no rights.
-Requesters may safely edit MATERIAL remaining demand and ITEM quantities after partial work,
-within existing booked-production/delivery lower bounds; recorded facts are not discarded.
+Requesters may safely edit MATERIAL requested amounts and ITEM quantities after partial work,
+within the handed-over credit (REQ-ORDERS-077) and the booked-production/delivery lower bounds;
+recorded facts are not discarded.
 
 **Acceptance**
 

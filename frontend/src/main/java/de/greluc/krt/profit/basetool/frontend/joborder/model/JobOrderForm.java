@@ -57,8 +57,8 @@ public class JobOrderForm {
   }
 
   /**
-   * Prefills an edit form with the order's comment, version and material lines, keeping one empty
-   * line when the order has none.
+   * Prefills an edit form with the order's comment, version and material lines with their requested
+   * and handed-over amounts, keeping one empty line when the order has none.
    *
    * @param order the order being edited
    * @return the prefilled form
@@ -75,6 +75,7 @@ public class JobOrderForm {
         mf.setMaterialId(mat.material().id());
         mf.setMinQuality(mat.minQuality());
         mf.setAmount(mat.amount());
+        mf.setHandedOverAmount(mat.handedOverAmount());
         form.getMaterials().add(mf);
       }
     }
@@ -86,6 +87,13 @@ public class JobOrderForm {
   public static class JobOrderMaterialForm {
     private UUID materialId;
     private Integer minQuality = 650;
+
+    /** The requested amount of the line. */
     private Double amount;
+
+    /**
+     * The amount already handed over against an existing line, shown as its minimum; never posted.
+     */
+    private double handedOverAmount;
   }
 }

@@ -66,7 +66,7 @@ final class MaterialHandoverPlannerFixtures {
                         line.getQualityTier().getId(),
                         line.getQualityTier().getCode(),
                         line.getQualityTier().getMinQuality(),
-                        line.getAmount()))
+                        line.remainingAmount()))
                 .sorted(Comparator.comparing(MaterialHandoverRequirement::id))
                 .toList());
     lenient()

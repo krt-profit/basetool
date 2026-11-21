@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -33,12 +35,16 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /** Job Order Handover Item JPA entity. */
@@ -81,8 +87,36 @@ public class JobOrderHandoverItem extends AbstractEntity<UUID> {
   private Boolean stolen = false;
 
   /**
-   * Rounds the delivered {@code amount} to SCU scale (three decimals, {@code HALF_UP}) on insert
-   * and update; a no-op for whole {@code PIECE} amounts.
+   * The requirement lines this delivery was credited to, in booking order; together with {@link
+   * #surplusAmount} they account for the whole {@link #amount} (ADR-0400).
+   */
+  @ElementCollection(fetch = FetchType.LAZY)
+  @CollectionTable(
+      name = "job_order_handover_credit",
+      joinColumns = @JoinColumn(name = "job_order_handover_item_id"))
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private List<JobOrderHandoverCredit> credits = new ArrayList<>();
+
+  /** The delivered amount beyond every eligible line's remaining need, credited to no line. */
+  @Column(name = "surplus_amount", nullable = false)
+  @Builder.Default
+  private double surplusAmount = 0.0;
+
+  /**
+   * Credits part of this delivery to a requirement line and raises the line's credited amount.
+   *
+   * @param line the credited line of the same order and material
+   * @param credit the credited quantity, positive and at most the line's remaining amount
+   */
+  public void credit(@NotNull JobOrderMaterial line, double credit) {
+    credits.add(new JobOrderHandoverCredit(line.getId(), credit));
+    line.credit(credit);
+  }
+
+  /**
+   * Rounds the delivered and surplus amounts to SCU scale (three decimals, {@code HALF_UP}) on
+   * insert and update; a no-op for whole {@code PIECE} amounts.
    *
    * @see ScuAmounts#roundToScuScale(Double)
    */
@@ -92,5 +126,6 @@ public class JobOrderHandoverItem extends AbstractEntity<UUID> {
     if (amount != null) {
       amount = ScuAmounts.roundToScuScale(amount.doubleValue());
     }
+    surplusAmount = ScuAmounts.roundToScuScale(surplusAmount);
   }
 }

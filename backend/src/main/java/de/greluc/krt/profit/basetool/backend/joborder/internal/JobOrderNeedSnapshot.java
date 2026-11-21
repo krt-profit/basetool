@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
  * @param requester the requesting unit
  * @param handle the contact handle
  * @param comment the order comment
- * @param materials remaining MATERIAL need, independent of regenerated line ids
+ * @param materials remaining MATERIAL need per material and tier
  * @param items requested ITEM lines with persistent identities
  */
 record JobOrderNeedSnapshot(
@@ -77,7 +77,9 @@ record JobOrderNeedSnapshot(
         order.getMaterials().stream()
             .map(line ->
                 new MaterialNeed(
-                    line.getMaterial().getId(), line.getQualityTier().getId(), line.getAmount()))
+                    line.getMaterial().getId(),
+                    line.getQualityTier().getId(),
+                    line.remainingAmount()))
             .collect(Collectors.toUnmodifiableSet());
     Set<ItemNeed> items =
         order.getItems().stream().map(ItemNeed::of).collect(Collectors.toUnmodifiableSet());

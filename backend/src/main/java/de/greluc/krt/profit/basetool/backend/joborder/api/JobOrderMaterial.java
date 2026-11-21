@@ -35,6 +35,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -69,13 +70,42 @@ public class JobOrderMaterial extends AbstractEntity<UUID> {
   @JoinColumn(name = "quality_tier_id", nullable = false)
   private QualityTier qualityTier;
 
+  /** The requested amount; handovers never change it, only an order edit does (ADR-0400). */
   @Column(nullable = false)
   private Double amount;
 
   /**
-   * Rounds the requirement {@code amount} to SCU scale (three decimals, {@code HALF_UP}) on every
-   * insert and update, covering both the creation snapshot and handover decrements; a no-op for
-   * whole {@code PIECE} amounts.
+   * The handed-over amount credited to this line, the sum of its handover credits; never above
+   * {@link #amount}.
+   */
+  @Column(name = "credited_amount", nullable = false)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private double creditedAmount = 0.0;
+
+  /**
+   * Returns the need still open on this line.
+   *
+   * @return the requested amount less the credited amount, never negative; 0 without an amount
+   */
+  public double remainingAmount() {
+    return amount == null
+        ? 0.0
+        : Math.max(0.0, ScuAmounts.roundToScuScale(amount - creditedAmount));
+  }
+
+  /**
+   * Adds a handover credit to this line's credited amount.
+   *
+   * @param credit the credited quantity, positive and at most the remaining amount
+   */
+  public void credit(double credit) {
+    creditedAmount = ScuAmounts.roundToScuScale(creditedAmount + credit);
+  }
+
+  /**
+   * Rounds the requested and credited amounts to SCU scale (three decimals, {@code HALF_UP}) on
+   * every insert and update; a no-op for whole {@code PIECE} amounts.
    *
    * @see ScuAmounts#roundToScuScale(Double)
    */
@@ -85,5 +115,6 @@ public class JobOrderMaterial extends AbstractEntity<UUID> {
     if (amount != null) {
       amount = ScuAmounts.roundToScuScale(amount.doubleValue());
     }
+    creditedAmount = ScuAmounts.roundToScuScale(creditedAmount);
   }
 }

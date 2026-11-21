@@ -134,6 +134,8 @@ public abstract class JobOrderMapper {
   @Mapping(target = "openAmount", ignore = true)
   @Mapping(target = "minQuality", expression = "java(floorOrNull(material))")
   @Mapping(target = "qualityTier", source = "qualityTier")
+  @Mapping(target = "handedOverAmount", source = "creditedAmount")
+  @Mapping(target = "remainingAmount", expression = "java(material.remainingAmount())")
   public abstract JobOrderMaterialDto toDto(JobOrderMaterial material);
 
   /**

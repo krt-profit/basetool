@@ -55,6 +55,7 @@ inventory_stock_level inventory
 job_order joborder
 job_order_assignees joborder
 job_order_handover joborder
+job_order_handover_credit joborder
 job_order_handover_item joborder
 job_order_item joborder
 job_order_item_handover joborder

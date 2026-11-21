@@ -35,8 +35,10 @@ The order-overview list's **Materialien** column MUST, for an `ITEM` order, rend
 blueprints, one row per material — with the same three columns a `MATERIAL` order shows:
 material name, required amount (unit-formatted by the material's `quantityType`), and a
 **collection progress** percentage. It MUST NOT show the ordered items or their delivery
-count. A `MATERIAL` order's column shows its requirement lines with `currentStock / amount`;
-a material handover lowers a line's `amount` to the remaining need.
+count. A `MATERIAL` order's column shows its requirement lines: the required amount is the line's
+requested `amount`, which a handover never lowers (REQ-ORDERS-077), and the progress is
+`(currentStock + handedOverAmount) / amount`, clamped to 100 %, where `currentStock` is the linked
+stock counting toward the line's remaining need. A fully handed-over line therefore shows 100 %.
 
 The required amount of an `ITEM` row is `orderedQuantity`: the snapshotted recipe demand of
 **every ordered unit**, never reduced by production (REQ-ORDERS-025) or delivery. The progress
@@ -66,15 +68,18 @@ REQ-ORDERS-023).
   production and delivery.
 - [ ] The progress equals `(currentStock + manufacturedQuantity) / orderedQuantity`; a fully
   manufactured item order shows 100 %.
-- [ ] A material order's overview column shows its per-material requirement + progress.
+- [ ] A material order's overview column shows each line's requested amount, unchanged by
+  handovers, and the progress `(currentStock + handedOverAmount) / amount`; a fully handed-over
+  line shows 100 %.
 - [ ] An item order with no derived materials shows the empty-materials placeholder.
 
-**Enforced by:** `JobOrderListRenderTest` (frontend render), `AggregatedMaterialDtoTest`
-(progress), `JobOrderItemServiceTest` (ordered / manufactured / outstanding split),
-`JobOrderServiceTest` (UpdateItemJobOrderTests — aggregated stock enrichment) · **Code:**
-`JobOrderStockProjectionService.enrichAggregatedWithClaims`, `JobOrderItemService.aggregateMaterials`,
-`AggregatedMaterialDto` (`orderedQuantity`, `manufacturedQuantity`, `currentStock`),
-`templates/joborder/orders-index.html` · **Issues:** #595
+**Enforced by:** `JobOrderListRenderTest` (frontend render), `AggregatedMaterialDtoTest` and
+`JobOrderMaterialDtoTest` (progress), `JobOrderItemServiceTest` (ordered / manufactured /
+outstanding split), `JobOrderServiceTest` (UpdateItemJobOrderTests — aggregated stock enrichment)
+· **Code:** `JobOrderStockProjectionService.enrichAggregatedWithClaims`,
+`JobOrderItemService.aggregateMaterials`, `AggregatedMaterialDto` (`orderedQuantity`,
+`manufacturedQuantity`, `currentStock`), `JobOrderMaterialDto` (`amount`, `handedOverAmount`,
+`currentStock`), `CollectionProgress`, `templates/joborder/orders-index.html` · **Issues:** #595
 
 ### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
 

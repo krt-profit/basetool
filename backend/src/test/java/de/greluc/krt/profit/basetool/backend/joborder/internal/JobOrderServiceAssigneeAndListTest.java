@@ -817,6 +817,8 @@ class JobOrderServiceAssigneeAndListTest {
                   QualityTierFixtures.goodDto(),
                   1.0,
                   0.0,
+                  1.0,
+                  0.0,
                   List.of(),
                   null,
                   0L));
@@ -1169,7 +1171,17 @@ class JobOrderServiceAssigneeAndListTest {
             ? QualityTierFixtures.noneDto()
             : QualityTierFixtures.dto(QualityTierFixtures.tier("Q" + minQuality, minQuality));
     return new JobOrderMaterialDto(
-        UUID.randomUUID(), material, minQuality, tier, requiredAmount, 0.0, List.of(), null, 0L);
+        UUID.randomUUID(),
+        material,
+        minQuality,
+        tier,
+        requiredAmount,
+        0.0,
+        requiredAmount,
+        0.0,
+        List.of(),
+        null,
+        0L);
   }
 
   /**

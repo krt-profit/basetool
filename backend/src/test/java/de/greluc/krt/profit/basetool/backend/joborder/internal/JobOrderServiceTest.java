@@ -323,6 +323,8 @@ class JobOrderServiceTest {
             100,
             QualityTierFixtures.dto(lineTier),
             50.0,
+            0.0,
+            50.0,
             null,
             java.util.List.of(),
             null,

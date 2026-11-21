@@ -96313,6 +96313,10 @@
             "type" : "number",
             "format" : "double"
           },
+          "handedOverAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "id" : {
             "type" : "string",
             "format" : "uuid"
@@ -96330,6 +96334,10 @@
           },
           "qualityTier" : {
             "$ref" : "#/components/schemas/QualityTierDto"
+          },
+          "remainingAmount" : {
+            "type" : "number",
+            "format" : "double"
           },
           "version" : {
             "type" : "integer",

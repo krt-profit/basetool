@@ -103,7 +103,7 @@ class OrdersDetailPatternRenderTest {
             orderId,
             "MATERIAL",
             "IN_PROGRESS",
-            List.of(materialLine(titanium, 300.0)),
+            List.of(materialLine(titanium, 400.0, 100.0)),
             List.of(),
             List.of(handover(orderId, titanium, 100.0)),
             false);
@@ -137,7 +137,16 @@ class OrdersDetailPatternRenderTest {
     assertThat(html)
         .contains("class=\"data-table data-table--stack od-table\"")
         .contains("class=\"cell-status\"")
-        .contains(">Fehlend<");
+        .contains(">Fehlend<")
+        .contains(">Gefordert<", ">Übergeben<", "data-testid=\"order-material-handed-over\"");
+    String editForm = editForm(html);
+    assertThat(editForm)
+        .as("a line with handovers shows its credit as the minimum")
+        .contains("data-handed-over=\"100.0\"", "data-testid=\"order-edit-handed-over-hint\"")
+        .contains("Bereits übergeben: 100,000");
+    assertThat(editForm.split("remove-material-btn\"", -1))
+        .as("only the blank row template offers removal, the credited line does not")
+        .hasSize(2);
 
     String handovers = section(html, "id=\"pane-handovers\"");
     assertThat(handovers.split("btn--cta", -1)).hasSize(2);
@@ -392,7 +401,7 @@ class OrdersDetailPatternRenderTest {
             orderId,
             "MATERIAL",
             "CANCELLED",
-            List.of(materialLine(titanium, 300.0)),
+            List.of(materialLine(titanium, 400.0, 100.0)),
             List.of(),
             List.of(handover(orderId, titanium, 100.0)),
             false));
@@ -581,16 +590,39 @@ class OrdersDetailPatternRenderTest {
   }
 
   /**
-   * Builds an open material line with no linked stock and no claims.
+   * Builds an open material line without handovers, linked stock or claims.
    *
    * @param material the material
-   * @param amount the still-open amount
+   * @param amount the requested amount
    * @return the line DTO
    */
   private static @NotNull JobOrderMaterialDto materialLine(
       @NotNull MaterialDto material, double amount) {
+    return materialLine(material, amount, 0.0);
+  }
+
+  /**
+   * Builds a material line with a handed-over credit and no linked stock or claims.
+   *
+   * @param material the material
+   * @param amount the requested amount
+   * @param handedOver the amount already credited to the line
+   * @return the line DTO
+   */
+  private static @NotNull JobOrderMaterialDto materialLine(
+      @NotNull MaterialDto material, double amount, double handedOver) {
     return new JobOrderMaterialDto(
-        UUID.randomUUID(), material, 0, null, amount, 0.0, List.of(), null, 1L);
+        UUID.randomUUID(),
+        material,
+        0,
+        null,
+        amount,
+        handedOver,
+        amount - handedOver,
+        0.0,
+        List.of(),
+        null,
+        1L);
   }
 
   /**
@@ -672,6 +704,18 @@ class OrdersDetailPatternRenderTest {
         .results()
         .map(m -> m.group(1))
         .toList();
+  }
+
+  /**
+   * Cuts the order edit form out of the page.
+   *
+   * @param html the rendered page
+   * @return the form's markup up to its closing tag
+   */
+  private static @NotNull String editForm(@NotNull String html) {
+    int start = html.indexOf("id=\"edit-order-form\"");
+    assertThat(start).as("the edit form rendered").isPositive();
+    return html.substring(start, html.indexOf("</form>", start));
   }
 
   /**

@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
@@ -52,7 +53,8 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * Verifies that the order list renders an ITEM order's material column as its aggregated materials
  * with the ordered quantity and the collection progress {@code (currentStock +
- * manufacturedQuantity) / orderedQuantity}.
+ * manufacturedQuantity) / orderedQuantity}, and a MATERIAL order's lines with the requested amount
+ * and the progress {@code (currentStock + handedOverAmount) / amount}.
  */
 class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
 
@@ -221,7 +223,62 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
     assertThat(html).containsPattern("<span>12\\s").contains("100 %").doesNotContain(">0 %<");
   }
 
+  /**
+   * A material order's Gefordert stays the requested amount after handovers, and its progress
+   * counts the handed-over amount beside the linked stock (REQ-ORDERS-017, REQ-ORDERS-077).
+   */
+  @Test
+  @WithMockUser
+  void viewOrders_MaterialOrder_KeepsTheRequestedAmountAndCountsHandedOverAsProgress()
+      throws Exception {
+    givenOrderList(
+        "MATERIAL",
+        List.of(
+            materialLine(material("Hadanite", "PIECE"), 10.0, 4.0, 3.0),
+            materialLine(material("Carinite", "PIECE"), 12.0, 12.0, 0.0)),
+        List.of());
+
+    String html =
+        mockMvc
+            .perform(get("/orders"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("Gefordert shows the requested amount, not what is left after the handovers")
+        .containsPattern("<span>10\\s")
+        .containsPattern("<span>12\\s")
+        .doesNotContainPattern("<span>6\\s");
+    assertThat(html)
+        .as("progress counts linked stock plus the handed-over amount")
+        .contains("70 %", "100 %")
+        .doesNotContain(">0 %<");
+  }
+
+  private static JobOrderMaterialDto materialLine(
+      MaterialDto material, double requested, double handedOver, double stock) {
+    return new JobOrderMaterialDto(
+        UUID.randomUUID(),
+        material,
+        null,
+        QualityTierTestData.forCode("NONE"),
+        requested,
+        handedOver,
+        requested - handedOver,
+        stock,
+        List.of(),
+        null,
+        1L);
+  }
+
   private void givenItemOrderList(AggregatedMaterialDto aggregated) {
+    givenOrderList("ITEM", List.of(), List.of(aggregated));
+  }
+
+  private void givenOrderList(
+      String type, List<JobOrderMaterialDto> materials, List<AggregatedMaterialDto> aggregated) {
     JobOrderDto order =
         new JobOrderDto(
             UUID.randomUUID(),
@@ -232,11 +289,11 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
             null,
             null,
             "COMPLETED",
-            "ITEM",
+            type,
             true,
+            materials,
             List.of(),
-            List.of(),
-            List.of(aggregated),
+            aggregated,
             List.of(),
             List.of(),
             List.of(),
