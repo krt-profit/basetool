@@ -51,6 +51,15 @@ public class ScWikiVehicleSyncService {
 
   private static final int PRESENCE_BATCH_SIZE = 500;
   private static final double MICRO_SCU_PER_SCU = 1_000_000.0;
+
+  /** Sync-report detail of a variant whose shared name a sibling's ship type holds. */
+  private static final String SIBLING_HOLDS_NAME =
+      "Name is held by a sibling Wiki vehicle of this census.";
+
+  /** Sync-report detail of a variant whose shared name its base seeds. */
+  private static final String BASE_SEEDS_NAME =
+      "Name goes to the base Wiki vehicle of this census.";
+
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
   private final ShipTypeRepository shipTypeRepository;
@@ -188,7 +197,7 @@ public class ScWikiVehicleSyncService {
    * @param dto the Wiki vehicle
    * @param run the census-wide facts of this run
    * @return {@link Disposition#WRITTEN} for a saved row, {@link Disposition#COVERED_BY_SIBLING} for
-   *     a variant whose shared name a ship type of this census holds, {@link
+   *     a variant whose shared name a ship type of this census holds or its base seeds, {@link
    *     Disposition#NAME_HELD_BY_OTHER_VEHICLE} for a name held by a departed vehicle of another
    *     class, {@code null} for a conflict
    */
@@ -207,21 +216,24 @@ public class ScWikiVehicleSyncService {
     if (match.isEmpty()) {
       matchedBy = MatchKey.NAME;
       Optional<NameHit> named = findByName(dto);
+      if (named.isEmpty() && run.yieldsNameToBase(dto)) {
+        return reportSiblingVariant(dto, run.runId(), BASE_SEEDS_NAME);
+      }
       if (named.isPresent() && run.sharesName(named.get().key())) {
         ShipType holder = named.get().ship();
-        if (run.covers(holder)) {
-          return reportSiblingVariant(dto, run.runId());
-        }
-        if (run.isOtherVehicle(holder, dto)) {
+        String key = named.get().key();
+        UUID base = run.baseOf(key);
+        if (run.takesOverFromVariant(dto, holder, key)) {
+          matchedBy = MatchKey.SHARED_NAME_BASE;
+        } else if (run.covers(holder)) {
+          return reportSiblingVariant(dto, run.runId(), SIBLING_HOLDS_NAME);
+        } else if (run.isOtherVehicle(holder, dto)) {
           return reportNameHeldByOtherVehicle(dto, run.runId());
-        }
-        UUID base = run.baseOf(named.get().key());
-        if (base == null) {
+        } else if (base == null) {
           return reportIdentityConflict(
               dto, run.runId(), "Name is shared by several Wiki vehicles.");
-        }
-        if (!base.equals(dto.uuid())) {
-          return reportSiblingVariant(dto, run.runId());
+        } else if (!base.equals(dto.uuid())) {
+          return reportSiblingVariant(dto, run.runId(), SIBLING_HOLDS_NAME);
         }
       }
       match = named.map(NameHit::ship);
@@ -229,7 +241,10 @@ public class ScWikiVehicleSyncService {
     ShipType ship = match.orElseGet(ShipType::new);
     UUID stored = ship.getExternalUuid();
     if (stored != null && !stored.equals(dto.uuid())) {
-      if (matchedBy == MatchKey.P4K_UUID && !run.census().contains(stored)) {
+      if (matchedBy == MatchKey.SHARED_NAME_BASE) {
+        reportRelinked(dto, stored, run.runId());
+        ship.setClassName(dto.className());
+      } else if (matchedBy == MatchKey.P4K_UUID && !run.census().contains(stored)) {
         reportRelinked(dto, stored, run.runId());
       } else if (matchedBy == MatchKey.NAME && run.isOtherVehicle(ship, dto)) {
         return reportNameHeldByOtherVehicle(dto, run.runId());
@@ -310,20 +325,18 @@ public class ScWikiVehicleSyncService {
 
   /**
    * Reports a Wiki variant left without a row of its own because a ship type linked to another
-   * vehicle of this census holds its shared name; the census still covers it (REQ-DATA-014).
+   * vehicle of this census holds its shared name, or the base of that name seeds it; the census
+   * still covers it (REQ-DATA-014).
    *
    * @param dto the Wiki variant left unlinked
    * @param runId the sync run the event belongs to
+   * @param reason the fixed, non-user text naming the sibling, {@link #SIBLING_HOLDS_NAME} or
+   *     {@link #BASE_SEEDS_NAME}
    * @return always {@link Disposition#COVERED_BY_SIBLING}
    */
-  private Disposition reportSiblingVariant(ScWikiVehicleDto dto, UUID runId) {
+  private Disposition reportSiblingVariant(ScWikiVehicleDto dto, UUID runId, String reason) {
     syncReportService.logScwikiEvent(
-        runId,
-        SyncEventType.SOURCE_IDENTITY_CONFLICT,
-        "ship_type",
-        dto.uuid(),
-        dto.name(),
-        "Name is held by a sibling Wiki vehicle of this census.");
+        runId, SyncEventType.SOURCE_IDENTITY_CONFLICT, "ship_type", dto.uuid(), dto.name(), reason);
     return Disposition.COVERED_BY_SIBLING;
   }
 
@@ -403,7 +416,12 @@ public class ScWikiVehicleSyncService {
     /** The ship type holds the UEX vehicle id aliased to the vehicle's class name. */
     UEX_ALIAS,
     /** The ship type carries the vehicle's name, ignoring case. */
-    NAME
+    NAME,
+    /**
+     * The ship type carries the vehicle's shared name and is linked to a variant of it; the vehicle
+     * is that name's base and takes the row over.
+     */
+    SHARED_NAME_BASE
   }
 
   /**
@@ -450,6 +468,36 @@ public class ScWikiVehicleSyncService {
         }
       }
       return null;
+    }
+
+    /**
+     * Tells whether a Wiki vehicle is a variant of a base that carries its name in this census, so
+     * the base, not the variant, seeds the ship type of that name.
+     *
+     * @param dto the Wiki vehicle no stored ship type matched
+     * @return {@code true} when another carrier of its name is that name's base
+     */
+    boolean yieldsNameToBase(ScWikiVehicleDto dto) {
+      UUID base = baseOf(dto.name());
+      return base != null && !base.equals(dto.uuid());
+    }
+
+    /**
+     * Tells whether a Wiki vehicle, as the base of a shared name, takes over the ship type holding
+     * that name: the row is linked to another carrier of the name and no P4K GUID ties it there.
+     *
+     * @param dto the Wiki vehicle
+     * @param holder the stored ship type carrying the name
+     * @param name the shared name that found it
+     * @return {@code true} when the row moves to the vehicle
+     */
+    boolean takesOverFromVariant(ScWikiVehicleDto dto, ShipType holder, String name) {
+      UUID held = holder.getExternalUuid();
+      return held != null
+          && !held.equals(dto.uuid())
+          && holder.getP4kUuid() == null
+          && dto.uuid().equals(baseOf(name))
+          && carriersOf(name).stream().anyMatch(carrier -> held.equals(carrier.uuid()));
     }
 
     private List<ScWikiVehicleDto> carriersOf(String name) {

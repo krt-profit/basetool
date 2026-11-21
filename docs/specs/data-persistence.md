@@ -1469,7 +1469,11 @@ request and no sync writes it.
     vehicles carrying the name has a class name that every other carrier's class name extends by an
     underscore suffix (`RSI_Galaxy` for `RSI_Galaxy_TEMP_Cargo` and `RSI_Galaxy_TEMP_Medical`), that
     base vehicle links the holding row by name and the others are reported as covered siblings, so
-    the census stays complete. Without such a base the shared name stays a blocking conflict.
+    the census stays complete. Without such a base the shared name stays a blocking conflict. A
+    variant never seeds a row under a name its base carries. A row a variant of the same census
+    already holds, with no P4K GUID, moves to the base (`RSI_Skylark_Display` to `RSI_Skylark`): it
+    takes the base's game UUID and class name, reported as `VEHICLE_RELINKED`. This is the one move
+    of a game UUID the census still carries. A row the P4K ties to the variant stays with it.
 - **The P4K import** resolves by `external_uuid`, then the class name, and when no row carries the
   class name, the ship type that holds the aliased UEX vehicle id, then the name.
 - A row matched through the alias keeps its own `name`; each source writes only its own columns, as
@@ -1497,6 +1501,9 @@ request and no sync writes it.
   the same class name still blocks it.
 - [x] The base of a shared name links the stored row whatever the census order, its variants count
   as covered and the sweep runs; carriers without a base among them still block it.
+- [x] The base of a shared name takes over the row a variant holds, in either census order, and a
+  second run moves nothing; a variant listed first seeds no row of its own; a row whose P4K GUID is
+  the variant's stays with the variant.
 - [x] The V310 merge moves every reference onto the survivor, carries the UEX columns over, bumps
   the versions and deletes the UEX half; a half that is not `UEX_ONLY`, or an ambiguous class name,
   merges nothing.
