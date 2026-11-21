@@ -21,21 +21,46 @@
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
+
+/** The admin dashboard section the backend announces every change of the queue in (REQ-UI-034). */
+const QUEUE_SECTION = 'discord-registrations';
 
 /**
- * @typedef {object} DiscordRegistration
- * @property {string} id
- * @property {number | null} [version]
- * @property {string | null} [username]
- * @property {string | null} [serverNickname]
- * @property {string | null} [registeredAt] ISO instant
- * @property {string | null} [decidedAt] ISO instant
+ * @typedef {object} Decision
+ * @property {Element} row the registration's row
+ * @property {string} action the decision's path segment below the registration
+ * @property {Record<string, unknown>} [payload] the body sent beside the version
+ * @property {string} success the localized success toast
+ * @property {string} error the localized failure toast
+ * @property {boolean} [stays] whether the row stays on its list, as after a merge
+ * @property {() => void} [close] closes the dialog the decision was confirmed in
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    const body = document.getElementById('registrationsBody');
-    const rejectedBody = document.getElementById('rejectedBody');
+    const panels = document.getElementById('reg-panels');
+    if (!panels) {
+        return;
+    }
+    const queue = krtPageSections.create({
+        topicClass: 'ADMIN_DASHBOARD',
+        topic: 'admin-dashboard',
+        sections: {
+            'discord-registrations': {
+                container: '#reg-panels',
+                fragmentValue: 'panels',
+                refreshWhileModalOpen: true,
+            },
+        },
+        dict() {
+            return { refreshError: DISCORD_MSG.loadError };
+        },
+        keys: { refreshErrorKey: 'refreshError' },
+        pageUrl() {
+            return window.location.pathname;
+        },
+        receiver: { coalesceMs: 1500 },
+    });
     const modal = document.getElementById('reject-modal');
     const reasonInput = /** @type {HTMLInputElement | null} */ (
         document.getElementById('reject-reason')
@@ -46,13 +71,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const reopenReasonInput = /** @type {HTMLInputElement | null} */ (
         document.getElementById('reopen-reason')
     );
-    /** @type {Element | null} */
+    /** @type {string | null} */
     let rejectTarget = null;
-    /** @type {Element | null} */
+    /** @type {string | null} */
     let linkTarget = null;
-    /** @type {Element | null} */
+    /** @type {string | null} */
     let mergeTarget = null;
-    /** @type {Element | null} */
+    /** @type {string | null} */
     let reopenTarget = null;
 
     /** @returns {HTMLInputElement | null} the combobox host of the link dialog */
@@ -66,12 +91,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * @param {HTMLElement | null} tbody the table body whose rows are counted
+     * @param {string | null} rowId the element id of the row a dialog was opened for
+     * @returns {Element | null} that row as the panels show it now, or null once it left them
+     */
+    function currentRow(rowId) {
+        return rowId ? document.getElementById(rowId) : null;
+    }
+
+    /**
+     * @param {string} bodyId id of the table body whose rows are counted
      * @param {string} tableId id of the table shown while rows exist
      * @param {string} emptyId id of the empty state shown otherwise
      * @param {string} countKey `data-reg-count` key of the tab chip
      */
-    function syncList(tbody, tableId, emptyId, countKey) {
+    function syncList(bodyId, tableId, emptyId, countKey) {
+        const tbody = document.getElementById(bodyId);
         const rows = tbody ? tbody.querySelectorAll('tr[data-id]').length : 0;
         const table = document.getElementById(tableId);
         const empty = document.getElementById(emptyId);
@@ -93,28 +127,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function syncPending() {
-        syncList(body, 'registrationsTable', 'registrationsEmpty', 'open');
-    }
-
-    function syncRejected() {
-        syncList(rejectedBody, 'rejectedTable', 'rejectedEmpty', 'rejected');
-    }
-
-    /**
-     * @param {Element} row the pending-registration row to remove
-     */
-    function removeRow(row) {
-        row.remove();
-        syncPending();
+    /** Brings both lists' tables, empty states and counts in line with their rows. */
+    function syncLists() {
+        syncList('registrationsBody', 'registrationsTable', 'registrationsEmpty', 'open');
+        syncList('rejectedBody', 'rejectedTable', 'rejectedEmpty', 'rejected');
     }
 
     /**
-     * @param {Element} row the rejected-registration row to remove
+     * Re-renders both panels from the server; the backend announces the change to the other
+     * viewers itself.
+     *
+     * @returns {Promise<boolean[]>} whether the panels were re-rendered
      */
-    function removeRejectedRow(row) {
-        row.remove();
-        syncRejected();
+    function rerender() {
+        return queue.refresh(QUEUE_SECTION, { broadcast: false });
     }
 
     const tabs = /** @type {HTMLElement[]} */ (
@@ -165,194 +191,89 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    /**
-     * @param {number | string} value the value to left-pad with zeros
-     * @returns {string} the value padded to two characters
-     */
-    function pad(value) {
-        return String(value).padStart(2, '0');
+    /** @returns {HTMLElement | undefined} the tab of the list shown now */
+    function selectedTab() {
+        return tabs.find((tab) => tab.getAttribute('aria-selected') === 'true');
     }
 
     /**
-     * @param {string | null | undefined} iso an ISO instant
-     * @returns {string} `dd.MM.yyyy HH:mm` in UTC, or an empty string when absent or invalid
+     * Moves focus from a row about to leave the panels to the selected tab, so a focused row control
+     * neither holds back the re-render of a live-sync frame nor drops focus to the page.
      */
-    function formatUtc(iso) {
-        if (!iso) {
-            return '';
+    function focusSelectedTab() {
+        const selected = selectedTab();
+        if (selected) {
+            selected.focus();
         }
-        const date = new Date(iso);
-        if (Number.isNaN(date.getTime())) {
-            return '';
-        }
-        return `${pad(date.getUTCDate())}.${pad(
-            date.getUTCMonth() + 1,
-        )}.${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
     }
 
-    /**
-     * @param {string} action the `data-action` value
-     * @param {string} className the button classes
-     * @param {string} label the button text
-     * @returns {HTMLButtonElement} the new button
-     */
-    function actionButton(action, className, label) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = className;
-        button.setAttribute('data-action', action);
-        button.textContent = label;
-        return button;
-    }
-
-    /**
-     * @param {string} text the cell text
-     * @param {string} className the cell classes, or an empty string
-     * @param {string} label the `data-label` for the stacked layout, or an empty string
-     * @returns {HTMLTableCellElement} the new cell
-     */
-    function textCell(text, className, label) {
-        const cell = document.createElement('td');
-        if (className) {
-            cell.className = className;
-        }
-        if (label) {
-            cell.setAttribute('data-label', label);
-        }
-        cell.textContent = text;
-        return cell;
-    }
-
-    /**
-     * @param {HTMLElement | null} table the table whose header is read
-     * @param {number} index the column index
-     * @returns {string} the trimmed header text, or an empty string
-     */
-    function headerLabel(table, index) {
-        const th = table ? table.querySelectorAll('thead th')[index] : null;
-        return th ? (th.textContent || '').trim() : '';
-    }
-
-    /**
-     * @param {DiscordRegistration} reg the registration
-     * @param {string} idPrefix prefix of the row id
-     * @param {HTMLElement | null} table the table the row joins
-     * @returns {HTMLTableRowElement} the row with its name, nickname and date cells
-     */
-    function baseRow(reg, idPrefix, table) {
-        const row = document.createElement('tr');
-        row.id = idPrefix + reg.id;
-        row.setAttribute('data-id', reg.id);
-        if (reg.version !== null && reg.version !== undefined) {
-            row.setAttribute('data-version', String(reg.version));
-        }
-
-        const nameCell = document.createElement('td');
-        const name = document.createElement('span');
-        name.className = 'cell-title';
-        name.textContent = reg.username == null ? '' : reg.username;
-        nameCell.appendChild(name);
-        row.appendChild(nameCell);
-
-        const nickCell = textCell('', '', headerLabel(table, 1));
-        const nick = document.createElement('span');
-        if (reg.serverNickname) {
-            nick.textContent = reg.serverNickname;
-        } else {
-            nick.className = 'reg-when';
-            nick.setAttribute('aria-hidden', 'true');
-            nick.textContent = '—';
-        }
-        nickCell.appendChild(nick);
-        row.appendChild(nickCell);
-
-        row.appendChild(textCell(formatUtc(reg.registeredAt), 'reg-when', headerLabel(table, 2)));
-        return row;
-    }
-
-    /**
-     * @param {HTMLButtonElement[]} buttons the action buttons
-     * @returns {HTMLTableCellElement} the actions cell
-     */
-    function actionsCell(buttons) {
-        const cell = document.createElement('td');
-        cell.className = 'cell-actions';
-        const actions = document.createElement('div');
-        actions.className = 'cluster gap-2 reg-actions';
-        buttons.forEach((button) => {
-            actions.appendChild(button);
-        });
-        cell.appendChild(actions);
-        return cell;
-    }
-
-    /**
-     * @param {DiscordRegistration | null | undefined} reg the reopened registration
-     */
-    function insertPendingRow(reg) {
-        if (!body || !reg || !reg.id) {
+    document.addEventListener('krt:swapped', (event) => {
+        const detail = /** @type {CustomEvent<{ container?: Element }>} */ (event).detail;
+        if (!detail || detail.container !== panels) {
             return;
         }
-        const row = baseRow(reg, 'reg-row-', document.getElementById('registrationsTable'));
-        row.appendChild(
-            actionsCell([
-                actionButton('approve', 'btn btn-success btn-xs', DISCORD_MSG.approve),
-                actionButton('link', 'btn btn-ghost btn-xs', DISCORD_MSG.link),
-                actionButton('merge', 'btn btn-ghost btn-xs', DISCORD_MSG.merge),
-                actionButton('reject', 'btn btn-quiet-danger btn-xs', DISCORD_MSG.reject),
-            ]),
-        );
-        body.appendChild(row);
-        syncPending();
-    }
-
-    /**
-     * @param {DiscordRegistration | null | undefined} reg the rejected registration
-     */
-    function insertRejectedRow(reg) {
-        if (!rejectedBody || !reg || !reg.id) {
-            return;
+        const selected = selectedTab();
+        if (selected) {
+            selectTab(selected, false);
         }
-        const table = document.getElementById('rejectedTable');
-        const row = baseRow(reg, 'rejected-row-', table);
-        row.appendChild(
-            textCell(
-                reg.decidedAt ? formatUtc(reg.decidedAt) : '—',
-                'reg-when',
-                headerLabel(table, 3),
-            ),
-        );
-        row.appendChild(
-            actionsCell([actionButton('reopen', 'btn btn-ghost btn-xs', DISCORD_MSG.reopen)]),
-        );
-        rejectedBody.insertBefore(row, rejectedBody.firstChild);
-        syncRejected();
-    }
+        syncLists();
+    });
 
     /**
-     * @param {Element} row the pending-registration row to approve
+     * Sends one decision through the queue's write seam and re-renders both panels afterwards. A
+     * conflict re-renders them too, so the next try carries the current version without a reload.
+     *
+     * @param {Decision} decision the decision to send
      */
-    function approve(row) {
-        const id = /** @type {string} */ (row.getAttribute('data-id'));
+    function decide(decision) {
+        const row = decision.row;
+        const id = row.getAttribute('data-id') || '';
         const version = row.getAttribute('data-version');
-        krtFetch.write({
+        const close = decision.close;
+        queue.write({
             method: 'POST',
-            url: `/admin/discord-registrations/${encodeURIComponent(id)}/approve`,
-            payload: { version: version == null ? null : Number(version) },
+            url: `/admin/discord-registrations/${encodeURIComponent(id)}/${decision.action}`,
+            payload: Object.assign({}, decision.payload, {
+                version: version == null ? null : Number(version),
+            }),
             toast: false,
-            errorMessage: DISCORD_MSG.approveError,
+            errorMessage: decision.error,
             onSuccess() {
-                showFrontendSuccessToast(DISCORD_MSG.approved);
-                removeRow(row);
+                showFrontendSuccessToast(decision.success);
+                if (close) {
+                    close();
+                }
+                if (!decision.stays) {
+                    row.remove();
+                    syncLists();
+                }
+                return rerender();
+            },
+            onConflict() {
+                showFrontendErrorToast(DISCORD_MSG.conflict);
+                if (close) {
+                    close();
+                }
+                rerender();
             },
         });
+    }
+
+    /**
+     * Closes a dialog whose registration left the panels while it was open and says so.
+     *
+     * @param {() => void} close closes the dialog
+     */
+    function targetGone(close) {
+        showFrontendErrorToast(DISCORD_MSG.conflict);
+        close();
     }
 
     /**
      * @param {Element} row the row to reject
      */
     function openReject(row) {
-        rejectTarget = row;
+        rejectTarget = row.id;
         if (reasonInput) {
             reasonInput.value = '';
         }
@@ -368,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {Element} row the row to link
      */
     function openLink(row) {
-        linkTarget = row;
+        linkTarget = row.id;
         const picker = linkPicker();
         if (picker && picker.krtCombobox) {
             picker.krtCombobox.setValue('');
@@ -385,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {Element} row the row to merge
      */
     function openMerge(row) {
-        mergeTarget = row;
+        mergeTarget = row.id;
         const picker = mergePicker();
         if (picker && picker.krtCombobox) {
             picker.krtCombobox.setValue('');
@@ -402,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {Element} row the rejected row to reopen
      */
     function openReopen(row) {
-        reopenTarget = row;
+        reopenTarget = row.id;
         if (reopenReasonInput) {
             reopenReasonInput.value = '';
         }
@@ -414,41 +335,32 @@ document.addEventListener('DOMContentLoaded', () => {
         reopenTarget = null;
     }
 
-    /** @type {HTMLElement} */ (body).addEventListener('click', (event) => {
-        const btn = /** @type {Element} */ (event.target).closest('button[data-action]');
-        if (!btn) {
-            return;
-        }
-        const row = btn.closest('tr[data-id]');
-        if (!row) {
+    panels.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const btn = target ? target.closest('button[data-action]') : null;
+        const row = btn ? btn.closest('tr[data-id]') : null;
+        if (!btn || !row) {
             return;
         }
         const action = btn.getAttribute('data-action');
         if (action === 'approve') {
-            approve(row);
+            focusSelectedTab();
+            decide({
+                row,
+                action: 'approve',
+                success: DISCORD_MSG.approved,
+                error: DISCORD_MSG.approveError,
+            });
         } else if (action === 'link') {
             openLink(row);
         } else if (action === 'merge') {
             openMerge(row);
-        } else {
+        } else if (action === 'reject') {
             openReject(row);
+        } else if (action === 'reopen') {
+            openReopen(row);
         }
     });
-
-    if (rejectedBody) {
-        rejectedBody.addEventListener('click', (event) => {
-            const btn = /** @type {Element} */ (event.target).closest(
-                'button[data-action="reopen"]',
-            );
-            if (!btn) {
-                return;
-            }
-            const row = btn.closest('tr[data-id]');
-            if (row) {
-                openReopen(row);
-            }
-        });
-    }
 
     const cancelBtn = document.getElementById('reject-cancel');
     if (cancelBtn) {
@@ -457,28 +369,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmBtn = document.getElementById('reject-confirm');
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
-            if (!rejectTarget) {
+            const row = currentRow(rejectTarget);
+            if (!row) {
+                targetGone(closeReject);
                 return;
             }
-            const row = rejectTarget;
-            const id = row.getAttribute('data-id');
-            const version = row.getAttribute('data-version');
             const reason = reasonInput ? reasonInput.value.trim() : '';
-            krtFetch.write({
-                method: 'POST',
-                url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/reject`,
-                payload: {
-                    reason: reason === '' ? null : reason,
-                    version: version == null ? null : Number(version),
-                },
-                toast: false,
-                errorMessage: DISCORD_MSG.rejectError,
-                onSuccess(data) {
-                    showFrontendSuccessToast(DISCORD_MSG.rejected);
-                    closeReject();
-                    removeRow(row);
-                    insertRejectedRow(data);
-                },
+            decide({
+                row,
+                action: 'reject',
+                payload: { reason: reason === '' ? null : reason },
+                success: DISCORD_MSG.rejected,
+                error: DISCORD_MSG.rejectError,
+                close: closeReject,
             });
         });
     }
@@ -490,7 +393,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const linkConfirmBtn = document.getElementById('link-confirm');
     if (linkConfirmBtn) {
         linkConfirmBtn.addEventListener('click', () => {
-            if (!linkTarget) {
+            const row = currentRow(linkTarget);
+            if (!row) {
+                targetGone(closeLink);
                 return;
             }
             const picker = linkPicker();
@@ -499,23 +404,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 showFrontendErrorToast(DISCORD_MSG.linkNoTarget);
                 return;
             }
-            const row = linkTarget;
-            const id = row.getAttribute('data-id');
-            const version = row.getAttribute('data-version');
-            krtFetch.write({
-                method: 'POST',
-                url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/link`,
-                payload: {
-                    targetUserId,
-                    version: version == null ? null : Number(version),
-                },
-                toast: false,
-                errorMessage: DISCORD_MSG.linkError,
-                onSuccess() {
-                    showFrontendSuccessToast(DISCORD_MSG.linked);
-                    closeLink();
-                    removeRow(row);
-                },
+            decide({
+                row,
+                action: 'link',
+                payload: { targetUserId },
+                success: DISCORD_MSG.linked,
+                error: DISCORD_MSG.linkError,
+                close: closeLink,
             });
         });
     }
@@ -528,7 +423,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const mergeConfirmBtn = document.getElementById('merge-confirm');
     if (mergeConfirmBtn) {
         mergeConfirmBtn.addEventListener('click', () => {
-            if (!mergeTarget) {
+            const row = currentRow(mergeTarget);
+            if (!row) {
+                targetGone(closeMerge);
                 return;
             }
             const picker = mergePicker();
@@ -537,25 +434,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 showFrontendErrorToast(DISCORD_MSG.mergeNoSource);
                 return;
             }
-            const row = mergeTarget;
-            const id = row.getAttribute('data-id');
-            const version = row.getAttribute('data-version');
-            krtFetch.write({
-                method: 'POST',
-                url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/merge`,
-                payload: {
-                    sourceUserId,
-                    version: version == null ? null : Number(version),
-                },
-                toast: false,
-                errorMessage: DISCORD_MSG.mergeError,
-                onSuccess(data) {
-                    showFrontendSuccessToast(DISCORD_MSG.merged);
-                    if (data && data.version != null) {
-                        row.setAttribute('data-version', String(data.version));
-                    }
-                    closeMerge();
-                },
+            decide({
+                row,
+                action: 'merge',
+                payload: { sourceUserId },
+                success: DISCORD_MSG.merged,
+                error: DISCORD_MSG.mergeError,
+                stays: true,
+                close: closeMerge,
             });
         });
     }
@@ -567,28 +453,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const reopenConfirmBtn = document.getElementById('reopen-confirm');
     if (reopenConfirmBtn) {
         reopenConfirmBtn.addEventListener('click', () => {
-            if (!reopenTarget) {
+            const row = currentRow(reopenTarget);
+            if (!row) {
+                targetGone(closeReopen);
                 return;
             }
-            const row = reopenTarget;
-            const id = row.getAttribute('data-id');
-            const version = row.getAttribute('data-version');
             const reason = reopenReasonInput ? reopenReasonInput.value.trim() : '';
-            krtFetch.write({
-                method: 'POST',
-                url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/reopen`,
-                payload: {
-                    reason: reason === '' ? null : reason,
-                    version: version == null ? null : Number(version),
-                },
-                toast: false,
-                errorMessage: DISCORD_MSG.reopenError,
-                onSuccess(data) {
-                    showFrontendSuccessToast(DISCORD_MSG.reopened);
-                    closeReopen();
-                    removeRejectedRow(row);
-                    insertPendingRow(data);
-                },
+            decide({
+                row,
+                action: 'reopen',
+                payload: { reason: reason === '' ? null : reason },
+                success: DISCORD_MSG.reopened,
+                error: DISCORD_MSG.reopenError,
+                close: closeReopen,
             });
         });
     }

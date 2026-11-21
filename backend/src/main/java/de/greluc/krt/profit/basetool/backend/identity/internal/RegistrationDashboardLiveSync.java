@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationChangedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
@@ -28,9 +29,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Tells the open admin dashboards that the Discord registrations or the members without accepted
- * terms changed (REQ-UI-034): a registration was filed or decided, and the terms version in force
- * may have changed with this start.
+ * Tells the open admin dashboards and registration queues that the Discord registrations or the
+ * members without accepted terms changed (REQ-UI-034, REQ-SEC-090): a registration was filed,
+ * changed or decided, and the terms version in force may have changed with this start.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,6 +42,12 @@ public class RegistrationDashboardLiveSync {
   /** Announces a newly filed registration. */
   @EventListener(DiscordRegistrationPendingEvent.class)
   public void onRegistrationFiled() {
+    adminDashboardLiveSync.registrationsChanged();
+  }
+
+  /** Announces a written account on the queue, so the queue echoes its current version. */
+  @EventListener(DiscordRegistrationChangedEvent.class)
+  public void onRegistrationChanged() {
     adminDashboardLiveSync.registrationsChanged();
   }
 
