@@ -601,6 +601,39 @@ class JobOrderItemServiceTest {
   }
 
   @Test
+  void aggregateMaterialsKeepsTheOrderedDemandAndCountsManufacturedUnitsSeparately() {
+    Material steel = material("Steel", QuantityType.SCU);
+    stubMapper(steel);
+
+    JobOrderItem partly =
+        JobOrderItem.builder().amount(4).manufacturedAmount(1).deliveredAmount(1).build();
+    partly.addMaterial(
+        JobOrderItemMaterial.builder()
+            .material(steel)
+            .requiredQuantity(160.0)
+            .qualityTier(QualityTierFixtures.none())
+            .build());
+    JobOrderItem done = JobOrderItem.builder().amount(2).manufacturedAmount(2).build();
+    done.addMaterial(
+        JobOrderItemMaterial.builder()
+            .material(steel)
+            .requiredQuantity(80.0)
+            .qualityTier(QualityTierFixtures.none())
+            .build());
+    JobOrder order = JobOrder.builder().type(JobOrderType.ITEM).build();
+    order.addItem(partly);
+    order.addItem(done);
+
+    List<AggregatedMaterialDto> aggregated = service.aggregateMaterials(order);
+
+    assertThat(aggregated).hasSize(1);
+    AggregatedMaterialDto row = aggregated.get(0);
+    assertThat(row.orderedQuantity()).isEqualTo(240.0);
+    assertThat(row.manufacturedQuantity()).isEqualTo(120.0);
+    assertThat(row.totalQuantity()).isEqualTo(120.0);
+  }
+
+  @Test
   void deriveForPreviewReturnsResolvedMaterialsSubAssembliesAndUnresolvedNames() {
     GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
     Material steel = material("Steel", QuantityType.SCU);

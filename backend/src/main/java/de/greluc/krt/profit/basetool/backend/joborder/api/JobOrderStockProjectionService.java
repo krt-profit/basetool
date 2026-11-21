@@ -297,6 +297,8 @@ public class JobOrderStockProjectionService {
               agg.qualityRequirement(),
               agg.qualityTier(),
               agg.totalQuantity(),
+              agg.orderedQuantity(),
+              agg.manufacturedQuantity(),
               round3(booked[i]),
               bucket != null ? bucket.claims() : agg.claims(),
               bucket != null ? bucket.openRemaining() : agg.openAmount()));

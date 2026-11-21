@@ -122,12 +122,13 @@ public interface JobOrderItemService {
   List<JobOrderItemDto> toItemDtos(@NotNull JobOrder order);
 
   /**
-   * Aggregates the outstanding material demand of all ordered lines into one row per {@code
-   * (material, quality tier)}, counting only each line's not-yet-manufactured share. Sorted SCU
-   * first, then by name, then by descending tier floor.
+   * Aggregates the material demand of all ordered lines into one row per {@code (material, quality
+   * tier)}: {@code totalQuantity} counts only each line's not-yet-manufactured share, {@code
+   * orderedQuantity} every ordered unit and {@code manufacturedQuantity} the manufactured units.
+   * Sorted SCU first, then by name, then by descending tier floor.
    *
    * @param order the job order to aggregate
-   * @return the outstanding-material rows; empty for a material order
+   * @return the aggregated material rows; empty for a material order
    */
   @NotNull
   List<AggregatedMaterialDto> aggregateMaterials(@NotNull JobOrder order);

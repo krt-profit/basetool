@@ -298,7 +298,9 @@ class JobOrderClaimControlsMvcTest {
             : List.of(),
         List.of(),
         "ITEM".equals(type)
-            ? List.of(new AggregatedMaterialDto(material, "GOOD", null, 10.0, 0.0, claims, 5.0))
+            ? List.of(
+                new AggregatedMaterialDto(
+                    material, "GOOD", null, 10.0, 10.0, 0.0, 0.0, claims, 5.0))
             : List.of(),
         List.of(),
         List.of(),
