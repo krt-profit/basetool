@@ -37,6 +37,7 @@ The task files themselves carry the measurements behind each step. This README c
 | Task file | Tag(s) | What |
 |---|---|---|
 | `00-preflight.yml` | `preflight` | EL 10, cgroup v2, SELinux loaded — and **sets** enforcing, scheduling a relabel and saying a reboot is owed when it had to change the mode |
+| `05-epel.yml` | `packages`, `epel` | `epel-release` for its key, and `/etc/yum.repos.d/epel.repo` written by the role: one `[epel]` whose metalink names the host's own minor (`epel-10.3` on Rocky 10.3), never the packaged template's dnf variables; refuses a release that names no minor (REQ-OPS-062) |
 | `10-packages.yml` | `packages` | podman, passt, netavark, aardvark-dns, crun, skopeo, restic, rclone, acl, rsync, firewalld, SELinux tooling; asserts the Podman floor; removes cockpit and refuses a host still listening on 9090 |
 | `15-cosign.yml` | `packages`, `cosign` | the upstream cosign binary, checked against the sha256 pinned in `defaults/main.yml` |
 | `20-user.yml` | `user` | the service user `basetool`, its subuid/subgid range, lingering |
@@ -49,7 +50,7 @@ The task files themselves carry the measurements behind each step. This README c
 | `45-updates.yml` | `updates` | `dnf-automatic` for **security advisories only**, the container runtime excluded, never rebooting; its timer moved to 07:00 (started); an `ExecStopPost=` that records each run and `basetool-host-updates-metrics.service`, which re-reads `needs-restarting -r` at boot (REQ-OPS-032) |
 | `50-podman.yml` | `podman` | the drop-in `~basetool/.config/containers/containers.conf.d/50-basetool.conf` (the pasta `--map-guest-addr` pair, ADR-0196) and no main `~basetool/.config/containers/containers.conf`, which Podman 6 would read instead of the vendor one; the public-name alias drop-ins, the optional JVM truststore drop-in |
 | `60-hardening.yml` | `hardening` | an OpenSCAP scan against `cis_server_l1` with the tailoring in `defaults/main.yml`; remediation only with `basetool_host_hardening_remediate: true`; removes and refuses a sudo `logfile` (REQ-OPS-016) |
-| `65-firewall.yml` | `firewall` | firewalld default-deny (SSH, plus the front end's ports), `cockpit` and `dhcpv6-client` closed, forwarding off, loopback trusted; the kernel network sysctls in `/etc/sysctl.d/90-basetool-network.conf` (no redirects, `rp_filter`, martians logged), read back and asserted; fail2ban's `sshd` and `recidive` jails (REQ-OPS-053) |
+| `65-firewall.yml` | `firewall` | firewalld default-deny (SSH, plus the front end's ports), `cockpit` and `dhcpv6-client` closed, forwarding off, loopback trusted; the kernel network sysctls in `/etc/sysctl.d/90-basetool-network.conf` (no redirects, `rp_filter`, martians logged), read back and asserted; fail2ban's `sshd` and `recidive` jails from `fail2ban-server`, `-firewalld` and `-systemd`, removing the `fail2ban` meta package, `fail2ban-sendmail` and the `exim` they pulled in (REQ-OPS-053) |
 | `70-frontend.yml` | `frontend` | haproxy on 80/443 forwarding to the edge's loopback ports with PROXY protocol v2 (ADR-0187); **enabled, not started** |
 
 It deliberately does **not** write any secret: `basetool.env`, the keystore, `realm-export.json`, the two
@@ -115,7 +116,7 @@ ansible-playbook site.yml --limit production --tags deploy,scripts
 ```
 
 `--tags observability` does the same for the two collectors, `--tags updates` for the security-update
-setup, `--tags podman` for the alias drop-ins,
+setup, `--tags epel` after a minor upgrade of the host, `--tags podman` for the alias drop-ins,
 `--tags cosign` after a cosign pin bump. Each task file that needs the service user's uid looks it
 up itself, so a tag-limited run does not depend on a skipped file.
 

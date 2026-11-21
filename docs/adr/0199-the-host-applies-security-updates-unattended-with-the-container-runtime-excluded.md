@@ -5,7 +5,7 @@
 - **Deciders:** @greluc (runtime exclusion decided in chat, 2026-09-22)
 - **Related:** [ADR-0163](0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) ·
   [ADR-0188](0188-the-host-bootstrap-is-an-ansible-role.md) ·
-  [`docs/specs/deployment-delivery.md`](../specs/deployment-delivery.md) (`REQ-OPS-032`) ·
+  [`docs/specs/deployment-delivery.md`](../specs/deployment-delivery.md) (`REQ-OPS-032`, `REQ-OPS-062`) ·
   [`docs/specs/observability.md`](../specs/observability.md) (`REQ-OBS-011`)
 
 ## Context
@@ -61,3 +61,46 @@ excluded, and never reboots — and the host reports every run and every pending
 `reboot = when-needed` (an automatic outage of the only host, at a time nobody chose), pinning every
 package in the role (blocks the security fixes this exists to apply), and leaving patching manual (the
 status quo that nobody had decided).
+
+## Amendment 1 — skopeo moves with the runtime — 2026-11-20
+
+Rocky Linux 10.3's `containers-common-6:6.1` (Podman 6) declares `Conflicts: skopeo < 1:1.23`, so
+upstream treats skopeo as part of the runtime set. On EL that conflict never applies: skopeo's
+epoch is 2 on 10.2 and 3 on 10.3, and `2:1.22.2` compares above `1:1.23`. dnf would have left skopeo
+1.22.2 next to containers-common 6.1, the pairing upstream forbids. skopeo also requires
+`containers-common` and `podman-sequoia`, both already excluded (`podman-*`). With `best=True`, a
+skopeo advisory that needs a newer version of either would leave the whole unattended run unresolved.
+And `deploy.sh` resolves digests, reads labels and logs in with skopeo, so a skopeo change is a change
+to the promotion path that the testing host should rehearse first.
+
+**The decision (the owner's, in chat).** `skopeo` joins the exclusion list of item 2 and moves on the
+same deliberate maintenance as the runtime, testing host first; the manual runtime update names it,
+because no package relation pulls it along. `check-conformance.py`'s `security-updates-enabled` now
+requires every name of the list in `exclude`, not only `podman`.
+
+**Carried:** a skopeo security fix waits for that maintenance, the same trade as for podman.
+
+## Amendment 2 — EPEL comes from the host's own minor release — 2026-11-20
+
+`dnf-automatic` installs from every enabled repository, so the branch EPEL resolves to decides what
+an unattended run puts on the host. The packaged `epel.repo` leaves that branch to dnf's variables:
+production resolved `epel-10s`, the CentOS Stream branch one minor ahead, and installed `el10_4`
+builds on a 10.3 host, while the testing host resolved the moving `epel-10` (#3517). Since Rocky's
+release package stopped shipping the `stream` variable (both hosts, 2026-11-18), both resolve
+`epel-10`, which leaves the host's minor as soon as RHEL publishes the next one.
+
+**The role owns `/etc/yum.repos.d/epel.repo` and fixes its metalink to `epel-<VERSION_ID>`**, the
+minor read from the host's facts at run time (`tasks/05-epel.yml`, `REQ-OPS-062`). A minor upgrade of
+the host is followed by `--tags epel`; a package already installed from a later branch is synced
+back by hand. `check-conformance.py --only epel-branch` asks the host's dnf what it resolves and fails
+on another branch or on an EPEL package with a later minor's dist tag.
+
+The same reading found `exim` on both hosts: the `fail2ban` meta package requires
+`fail2ban-sendmail`, whose mail actions need `/usr/sbin/sendmail`. The jails ban through firewalld and
+mail nobody, so the role installs `fail2ban-server`, `fail2ban-firewalld` and `fail2ban-systemd` and
+removes the meta package, the mail actions and the MTA (`REQ-OPS-053`).
+
+**Rejected:** a dnf variable (`$releasever_minor`) in the metalink, which would follow a minor
+upgrade by itself but leaves the branch to whatever the release package provides, as the `stream`
+variable did; overriding Rocky's own dnf variables, which other repositories read; keeping the
+packaged file, whose `epel-10` follows RHEL's newest minor rather than the host's.

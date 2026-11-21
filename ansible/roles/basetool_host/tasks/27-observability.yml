@@ -16,11 +16,6 @@
   ansible.builtin.set_fact:
     basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
 
-- name: Enable EPEL
-  ansible.builtin.dnf:
-    name: epel-release
-    state: present
-
 - name: Add Grafana's package repository
   ansible.builtin.yum_repository:
     name: grafana

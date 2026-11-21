@@ -2031,14 +2031,24 @@ ansible-playbook site.yml --limit production --tags deploy,scripts --check --dif
 ansible-playbook site.yml --limit production --tags deploy,scripts
 ansible-playbook site.yml --limit production --tags observability   # the two collectors and their timers
 ansible-playbook site.yml --limit production --tags updates         # dnf-automatic (REQ-OPS-032)
+ansible-playbook site.yml --limit production --tags epel            # EPEL's branch (REQ-OPS-062)
 ```
 
 **Host patching** is `dnf-automatic`, set up by the same role: security advisories daily at 07:00
 (+ up to 15 minutes), the container runtime excluded, **never a reboot** (ADR-0199). A due reboot
 raises `HostRebootRequired`; take it as a maintenance — the stack comes back on its own, because the
 units are `WantedBy=default.target` and `basetool` lingers. The runtime (podman, crun, conmon, netavark,
-aardvark-dns, containers-common, passt) is updated by hand, testing host first:
-`dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt`.
+aardvark-dns, containers-common, passt, skopeo) is updated by hand, testing host first:
+`dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt skopeo`.
+Name skopeo every time: no package relation on EL pulls it along with podman (ADR-0199 Amendment 1).
+
+**EPEL serves the host's own minor release** (`REQ-OPS-062`): the role writes
+`/etc/yum.repos.d/epel.repo` with `epel-<VERSION_ID>`, so neither the packaged template nor a dnf
+variable picks the branch. After a minor upgrade of the host (`dnf upgrade` to a new Rocky release),
+run `--tags epel` on that host, testing first, then
+`python scripts/check-conformance.py --ssh greluc@<host> --only epel-branch`. The check also names
+every package dnf took from a later EPEL branch; fixing the branch does not downgrade it, and
+`sudo dnf distro-sync <name>` returns it to the host's branch — a host change like any other.
 
 > [!success] Fixed by #2069 (2026-09-25): four failed `basetool-*` units after a reboot
 > Production was rebooted for kernel 6.12.0-211.58.1 on 2026-09-25 at 15:56 UTC; all 18 containers
