@@ -71,6 +71,19 @@
     XDG_RUNTIME_DIR: "/run/user/{{ basetool_host_service_uid }}"
   when: not ansible_check_mode
 
+- name: Restart the podman exporter
+  ansible.builtin.systemd_service:
+    name: prometheus-podman-exporter.service
+    scope: user
+    state: restarted
+  become: true
+  become_user: "{{ basetool_host_service_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ basetool_host_service_uid }}"
+  when:
+    - not ansible_check_mode
+    - basetool_host_manage_observability | default(true) | bool
+
 - name: Reload systemd-journald
   ansible.builtin.systemd_service:
     name: systemd-journald.service

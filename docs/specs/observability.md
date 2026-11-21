@@ -3485,6 +3485,15 @@ therefore alerts on:
   and heals on its next run, hours later; patching is watched by `HostSecurityUpdatesStale`; false
   positive 2026-10-11, `monitoring/prometheus/tests/external_fetch_errors_reason_test.yml`). Locked by
   `tests/host_service_metrics_test.yml` and the collector's self-test.
+- **The podman exporter's image list follows the store** (ADR-0403). The exporter re-reads its
+  image list on every podman image event. Under journald it saw none: `basetool` is a system
+  account, journald keeps its entries in the system journal, which `basetool` cannot read, and
+  podman's journald reader waits on that unreadable journal without an error. Its `podman_image_*`
+  series stayed the list it read at start. So the service user's podman writes its events to a
+  file (`containers.conf.d/60-events.conf`, `events_logger = "file"`), the role fails its run unless
+  `podman info` reports `file`, and it restarts the exporter when the drop-in changes. No alert
+  reads `podman_image_*`; `check-conformance.py --only podman-exporter-images-current` is the
+  check, and it fails when an image a running container uses is not in `podman_image_info`.
 - **Container memory pressure is measured on ANONYMOUS memory, not the working set** (amended
   2026-08-02). `ContainerMemoryHigh` (warning) fires when
   `basetool:container:memory_anon_bytes / basetool:container:memory_limit_bytes > 0.90` for 10m —
@@ -3669,6 +3678,9 @@ Alertmanager, Alloy and Loki configuration files, each validated by its own tool
 the two collector-liveness alerts) · `scripts/cgroup-container-metrics.py` +
 `basetool-container-metrics.timer` and `ansible/roles/basetool_host/tasks/27-observability.yml` (the
 host-side collectors, node_exporter, the podman exporter, the persistent journal and `psi=1`) ·
+`ansible/roles/basetool_host/tasks/50-podman.yml` (the service user's file events backend, its
+read-back and the exporter restart) · `scripts/check-conformance.py` + `.test.sh`
+(`podman-exporter-images-current`) ·
 `monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
 `scripts/deploy.sh` + `scripts/lib/container-runtime.sh` (`reconcile_monitoring_reload(s)`
 self-healing restart + the

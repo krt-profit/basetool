@@ -19,6 +19,17 @@
     group: "{{ basetool_host_service_group }}"
     mode: "0644"
 
+- name: Write podman's events to a file the service user can read back
+  ansible.builtin.copy:
+    dest: "~{{ basetool_host_service_user }}/.config/containers/containers.conf.d/60-events.conf"
+    owner: "{{ basetool_host_service_user }}"
+    group: "{{ basetool_host_service_group }}"
+    mode: "0644"
+    content: |
+      [engine]
+      events_logger = "file"
+  notify: Restart the podman exporter
+
 - name: Remove the user's main containers.conf, which would hide the vendor one from Podman 6
   ansible.builtin.file:
     path: "~{{ basetool_host_service_user }}/.config/containers/containers.conf"
@@ -57,6 +68,30 @@
 - name: Name it
   ansible.builtin.set_fact:
     basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
+
+- name: Read back where podman writes the service user's events
+  when: not ansible_check_mode
+  become: true
+  become_user: "{{ basetool_host_service_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ basetool_host_service_uid }}"
+  ansible.builtin.command: podman info --format '{{ "{{" }} .Host.EventLogger {{ "}}" }}'
+  register: basetool_host_events_logger
+  changed_when: false
+  check_mode: false
+
+- name: Refuse an event log the service user cannot read
+  when: not ansible_check_mode
+  ansible.builtin.assert:
+    that: basetool_host_events_logger.stdout | trim == 'file'
+    fail_msg: >-
+      podman reports events logger '{{ basetool_host_events_logger.stdout | default('?') | trim }}'
+      for {{ basetool_host_service_user }}, not 'file'. The service user is a system account, so
+      journald keeps its entries in the system journal, which it cannot read: under journald the
+      podman exporter never sees an image event and reports the image list it read at start, and
+      `podman events` as the service user prints nothing (ADR-0403). Look for a later
+      containers.conf.d file or a main containers.conf that sets events_logger.
+    quiet: true
 
 - name: Refuse an inventory still carrying the singular alias variable
   ansible.builtin.assert:
