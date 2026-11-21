@@ -400,7 +400,7 @@ context cannot obtain rows through a forged scope.
 The initial view is Alle when no remembered choice exists. Scope, status, squadron and kind
 selections persist per browser (`orders_scope_filter`, `orders_type_filter`, REQ-UI-017); an explicit
 URL selection wins and a remembered scope is restored only while it is offered. The kind filter
-contains MATERIAL and ITEM only; unfinished aUEC work is not an available choice. Pagination and
+offers MATERIAL, ITEM and AUEC; an aUEC row shows no material sublist. Pagination and
 fragment requests carry all active narrowing filters. Count and rows use the same SQL predicate;
 permission filtering never happens after paging.
 

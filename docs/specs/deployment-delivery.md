@@ -525,11 +525,7 @@ the owner's decision of 2026-09-25). When the promoted `keycloak-spi` digest mov
    restarted on its own before the stop, REQ-OPS-061): it serves the maintenance page while the
    window is open, and the applications fetch the issuer's discovery document through the public
    name, which the host alias routes through haproxy to the edge, so an edge that is down fails every
-   application start with `Remote host terminated the handshake`. *(Corrected 2026-10-03: the edge
-   started last, which broke the testing host's jump from 1.10.0 to 1.13.6 twice.)* *(Corrected
-   2026-11-19: the edge started right after keycloak and a re-defined edge was stopped inside the
-   window, so the public endpoint gave no answer at all until keycloak was healthy — 72 s on
-   production for v1.26.3, ADR-0397.)* **One health gate** covers the app images, the units and the
+   application start with `Remote host terminated the handshake` (ADR-0397). **One health gate** covers the app images, the units and the
    JAR, and the run records success only when every stack unit is healthy.
 
 If the gate fails, **everything the release changed is rolled back together** — the digest pin
@@ -547,28 +543,6 @@ exactly this apply with only keycloak re-defined; a combined Keycloak-**image** 
 stays operator-gated by the postgres/Keycloak carve-out of REQ-OPS-006 (the image change blocks the
 tick until `--force`). A missing/unresolvable `basetool-keycloak-spi` artifact degrades to no
 provider-JAR change for that tick (the manual-staging fallback in the runbook still applies).
-
-*(Corrected 2026-09-25, third time — a changed requirement, not a wording fix: until ADR-0213 the
-JAR was staged only **after** the app apply had passed its gate, and a failed JAR was reverted alone
-while the app release stayed. That cost a second full-app outage for every JAR-moving release (v1.12.0:
-about two of the ~five minutes of maintenance page), and the app apply itself restarted re-defined
-units one by one, so a `restart` of backend followed by `restart`s of ingest and frontend restarted
-those two twice. A failed JAR extraction after the gate recorded no failure. All three are gone; the
-two corrections below describe the step as it was.)*
-
-*(Corrected 2026-09-25: "recreates **only** the keycloak container" holds under Compose's
-`--no-deps`, not under Quadlet. `backend` `Requires=` keycloak, and `frontend` and `ingest` require
-backend, so `systemctl --user restart keycloak.service` restarts all three with it — measured on
-production 2026-09-25 for a manual restart of the same unit: about two minutes of maintenance page.
-A provider-JAR delivery is therefore a short full-app restart, not a Keycloak-only one:
-`rt_recreate` leaves keycloak's *dependencies* alone, but systemd restarts its *dependents*.)*
-
-*(Corrected 2026-09-25, second time: the gate was keycloak's alone. `systemctl restart
-keycloak.service` returns once keycloak is healthy, while the restarts of backend, frontend and
-ingest are still running — frontend and ingest stopped, with no container, until backend is up. On
-production that day the v1.12.0 deploy logged "deploy successful" at 17:43:17 in that window, and the
-next tick's drift check found frontend and ingest with no container and re-applied. Since then the
-step waits for the whole stack and records success only after it; see the paragraph above.)*
 
 **Acceptance**
 
@@ -1267,16 +1241,15 @@ through the Quadlet units of the release it runs.*
 
 ### REQ-OPS-019 — Containers with a wget-HTTPS healthcheck reap orphaned subprocesses (PID-1 zombie reaping)
 
-**Scope rule (amended 2026-07-26): this applies to *every* container — in either compose file —
+**Scope rule: this applies to *every* container — in either compose file —
 whose PID 1 is not an init and whose healthcheck fetches an `https://` URL with BusyBox `wget`.** It
-is not a JVM property. The requirement was originally written for the three JVM app services and
-therefore silently exempted `grafana`, which carries the identical probe against its own TLS port
-with a Go binary as PID 1 (Go does not reap orphans either). It leaked one `ssl_client` zombie per
-30 s probe into a `pids: 512` cap — roughly four hours to exhaustion — and on 2026-07-26 was found
-at 512/512 with 493 zombies and `pids.events max=7445`, refusing every `fork()`: the healthcheck
-itself could no longer run (`/bin/sh: can't fork: Resource temporarily unavailable`), so the
-container reported `unhealthy` for two days while the Go server, which needs no fork, kept serving.
-When adding any service, check the probe, not the runtime.
+is not a JVM property: `grafana` carries the identical probe against its own TLS port with a Go
+binary as PID 1, and Go does not reap orphans either. Without an init such a container leaks one
+`ssl_client` zombie per 30 s probe into its `pids: 512` cap — roughly four hours to exhaustion —
+after which every `fork()` is refused: the healthcheck itself can no longer run
+(`/bin/sh: can't fork: Resource temporarily unavailable`), so the container reports `unhealthy`
+while a server that needs no fork keeps serving. When adding any service, check the probe, not the
+runtime.
 
 Every JVM app service (`backend`, `frontend`, `ingest`) runs with a zombie-reaping init as PID 1
 (`init: true`, Docker's bundled tini). The image entrypoint `exec java …` makes the JVM PID 1, and a
@@ -2279,12 +2252,6 @@ whole reason the flag is mandatory rather than advisory.
 **Acceptance**
 
 - [x] `frontend`, `backend` and `ingest` each pass an explicit collector flag.
-  **Corrected 2026-09-15:** this box was ticked when the requirement was written, and for the
-  `backend` it was wrong. `e401742db` wrote the flag onto `frontend` and `ingest` only, so the
-  busiest JVM stayed on ergonomics — which picks G1 at its 2048M limit and would have picked Serial
-  the moment the limit dropped below 1792M, i.e. exactly the silent switch this requirement exists to
-  prevent. Found while evaluating JDK 27 (whose JEP 523 would have made the ergonomics half moot) and
-  closed in the same change as REQ-OPS-030.
 - [x] The frontend's limit is at or above 1792M, so ergonomics and the explicit flag agree rather
   than contradict each other.
 - [x] The sum of limits over all prod-profile services stays under ADR-0085's ~14 GB review trigger
@@ -2593,9 +2560,8 @@ there.
   the testing realm keeps them until it is provisioned.
 - **`basetool-frontend` carries `baseUrl` = `<--public-origin>/`** (2026-09-25, ADR-0202
   amendment 3, `REQ-SEC-071`) — an added field, not in the 2026-09-22 production snapshot, so that
-  Keycloak's error pages for the web login link back to the app. *(Updated 2026-09-25: production
-  carries it — the owner set Home URL `https://profit-base.online/` by hand in the Admin Console,
-  not through an `--apply`; it equals what the provisioner converges to.)*
+  Keycloak's error pages for the web login link back to the app. Production carries it, equal to
+  what the provisioner converges to.
 - **The retired Android client is deleted wherever it is found** (owner decision 2026-10-17,
   ADR-0268, ADR-0202 amendment 7, #2674): the client policy `krt-mobile-dpop-policy` is detached
   first, the client profile `krt-mobile-dpop` removed next, and the client `basetool-android` —
@@ -2634,10 +2600,7 @@ there.
   (ADR-0303).
 - **A fresh realm is in shape after one run.** Keycloak 26 keeps its own
   `backchannel.logout.session.required` when a client is created, so the provisioner writes the
-  attributes a create did not store right after it. *(Corrected 2026-09-26: until then an apply on
-  an empty realm of the pinned 26.7.4 image failed its verification on `basetool-frontend` and only
-  a second apply converged it; the stub did not model the behaviour, so the self-test stayed green.
-  Found against a throwaway local Keycloak while building WP 2.2.)*
+  attributes a create did not store right after it.
 - **A WebAuthn policy is written whole.** The passwordless policy states its passkey requirement
   with `residentKey` = `required` and leaves the deprecated `requireResidentKey` `not specified`,
   which Keycloak warns about at every policy load while it is `Yes` or `No`. Keycloak 26.8 applies a

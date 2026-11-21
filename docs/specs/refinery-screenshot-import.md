@@ -83,12 +83,10 @@ external names. A matched input's `outputMaterial` derives from the admin-curate
 `Material.refinedMaterial` link; a missing link is `NO_REFINED_MATERIAL` (INFO), not an
 error.
 
-*Amended 2026-06-11:* stage 3 originally tested only the candidate names. A field
-sample showed the game UI and the synced catalogue can spell the same material
-differently (screen `"Construction Salvage"`, UEX `"Construction Material Salvage"`),
-so a clipped read like `"UCTION SALVAGE"` named a material whose master name does not
-contain the fragment. Canonicalized aliases now serve as additional containment
-anchors: one curated alias of the full on-screen spelling resolves every clipping
+Stage 3 tests the aliases as well because the game UI and the synced catalogue can spell
+the same material differently (screen `"Construction Salvage"`, UEX `"Construction
+Material Salvage"`), so a clipped read like `"UCTION SALVAGE"` names a material whose
+master name does not contain the fragment. One curated alias of the full on-screen spelling resolves every clipping
 variant (front, back, or both — clipping always yields a contiguous fragment).
 
 ### REQ-REFINERY-005 — Row skip rules & un-quoted state
@@ -126,16 +124,8 @@ changed, to re-quote and re-capture. A shortfall is never flagged: the materials
 is a scrolling ~6-row viewport, so scrolled-out rows legitimately reduce the visible
 sum. `rawInManifestTotal` is **never** validated — its composition is not reliably
 reconstructible from a single frame (golden-set order a4 counted some refine-OFF rows
-but not others; a 2026-06 field sample excluded the inert row entirely).
-
-*Amended 2026-06-11:* the original v1 hypothesis (`rawInManifestTotal` = sum of all
-rows, hard equality on both totals) was refuted by the Phase 0 (#433) verification and
-a field sample; the rule above mirrors the extractor's frozen `Validation` semantics.
-
-*Amended 2026-06-12:* field sample order 10 showed the headers freeze at GET QUOTE
-while rows stay live, refuting the premise that an excess always indicates a read
-error; the check, severity, and tolerance are unchanged — only the documented causes
-and the user-facing message wording were widened.
+but not others; a 2026-06 field sample excluded the inert row entirely). The rule mirrors
+the extractor's frozen `Validation` semantics.
 
 ### REQ-REFINERY-008 — Order-level resolution
 
@@ -156,12 +146,7 @@ to the uploading user; `startedAt` derives from the screenshot capture metadata
 (REQ-REFINERY-017); `mission`, `otherExpenses`, `oreSales` and the org-unit stamping
 stay with the create flow.
 
-*Amended 2026-06-11:* `startedAt` originally stayed with the create flow ("now" at save
-time); REQ-REFINERY-017 now derives it from the contract's per-image `capturedAt`.
-
-*Amended 2026-07-21:* `rawMethodName` originally resolved by exact case-insensitive name
-only; it now runs a canonical-fold + fuzzy nearest-match over the closed method enum so
-the VLM's `DINYX SOLVATION` mis-read resolves. The nine method names are distinct enough
+The nine method names are distinct enough
 (mis-read ~0.83 vs. runner-up ≤ ~0.36, non-method text ~0.4) that the low accept
 threshold cannot mis-snap.
 
@@ -251,22 +236,16 @@ pre-fill (REQ-REFINERY-014), whether flashed on the classic redirect or swapped 
 AJAX import twin (REQ-REFINERY-013), replaces the page's form state wholesale; nothing typed
 before the import survives, and no merge of old and imported values is attempted.
 
-*Amended 2026-06-11:* picking the extract JSON armed the guard (the file input's
-`change` event marked the page dirty) and the programmatic `submit()` skipped the
-submit event that resets it, so the native leave-page warning appeared on every
-import — even on a pristine form.
-
-*Amended 2026-06-14 (#591):* the upload now goes through an **in-place AJAX twin** by
-default. `POST /refinery-orders/import` carrying an `X-Requested-With=XMLHttpRequest`
+The upload goes through an **in-place AJAX twin** by default. `POST /refinery-orders/import` carrying an `X-Requested-With=XMLHttpRequest`
 header routes to `RefineryOrderPageController.importExtractAjax`, which returns the
 pre-filled create-form fragment (`refinery-orders-create :: refineryImportFormBody`)
 instead of a redirect; the client swaps it into the stable `#refineryImportFormContainer`
 with no full page reload, and every error branch (invalid/oversized file, unparseable
 JSON, backend reject) renders inline in the swapped region. The classic `POST→redirect`
 proxy handler stays the no-JS fallback, and both paths share one parse contract
-(`RefineryImportProxyController.parseExtractObject`). Making the swap safe required an
-idempotent, `krt:swapped`-aware `datetime-splitter.js` (REQ-FE-005). The `no-track` /
-`requestSubmit()` dirty-guard contract above is unchanged; the client additionally calls
+(`RefineryImportProxyController.parseExtractObject`). The swap relies on an idempotent,
+`krt:swapped`-aware `datetime-splitter.js` (REQ-FE-005). Beside the `no-track` /
+`requestSubmit()` dirty-guard contract above, the client calls
 `resetUnsavedChanges()` after the swap so the freshly imported form is not flagged
 dirty-vs-empty.
 
@@ -282,9 +261,6 @@ time; an absent value stays empty and the create flow defaults it to "now" at sa
 time — REQ-REFINERY-017). An all-skipped draft keeps the form's single seeded empty
 goods row so the template's row-clone JS keeps working. Saving still goes exclusively
 through the unchanged create POST with full validation (REQ-REFINERY-002).
-
-*Amended 2026-06-11:* `startedAt` was originally always left empty; it now carries the
-REQ-REFINERY-017 capture-derived value when the extract provides one.
 
 ### REQ-REFINERY-015 — Review rendering
 
@@ -378,9 +354,9 @@ backend matching (REQ-REFINERY-004), the issue model (REQ-REFINERY-009), and cru
 saved exclusively through `POST /api/v1/refinery-orders` after the user reviews it. Direct
 ingest must never persist a refinery order without that human review-and-save step.
 
-*Amended 2026-09-28 (#2092 step 9):* the transport is the exchange's refinery draft route
-(`POST /exchange/v1/me/drafts/refinery-orders`, REQ-XCH-019) since SC Extractor 2.10.0; the
-gateway's own `/v1/refinery-extract` is removed. The rule above is unchanged.
+The transport is the exchange's refinery draft route
+(`POST /exchange/v1/me/drafts/refinery-orders`, REQ-XCH-019); the gateway has no refinery route
+of its own.
 
 ### REQ-REFINERY-021 — VerseKit link in the create page's import bar
 

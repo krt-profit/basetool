@@ -359,7 +359,7 @@ time is a new file: run `restorecon -F` on it before the unit first mounts it.
 unauthenticated `PING`, and `--only redis-default-user-off` that both refuse a password-only `AUTH`
 with their admin password while `admin` accepts it — the password stays inside the container.
 
-**Why `.new` and `cat`** *(corrected 2026-09-25)*. Each unit mounts its single file
+**Why `.new` and `cat`**. Each unit mounts its single file
 (`Volume=/etc/basetool/redis/session-users.acl:/etc/redis/users.acl:ro`), and a single-file bind mount follows
 the **inode**, not the name. `render-redis-acl.py` writes atomically — a temporary file renamed over
 the target, i.e. a **new** inode — so rendering straight onto the live path would leave the
@@ -970,15 +970,14 @@ recording nothing — on a host with no deployed release, together with `--tag`,
 `current-digest-pin.yml` and the marker name different app digests. A missing container needs
 none of this: the drift re-apply of the next tick brings it back the same way.
 
-> [!warning] Deleting the marker turns the deployed release into a new one *(added 2026-09-25)*
+> [!warning] Deleting the marker turns the deployed release into a new one
 > Without `last-deployed.digests` the run cannot tell that its target is the deployed release, so it
 > takes the release path: it copies the deployed pin over `previous-digest-pin.yml`, snapshots the
 > deployed tree over `config-previous/` and the deployed JAR over `keycloak-spi-previous.jar` — all
 > three anchors then name the deployed release, and a failed gate "rolls back" to it and fires
-> `DeployRolledBack`. It still does exactly that. Until 2026-09-26 it was the documented way to force
-> a full re-apply; use `--reapply` instead, which keeps the anchors.
+> `DeployRolledBack`. To force a full re-apply, use `--reapply`, which keeps the anchors.
 
-> [!warning] Rolling production back past a host switch *(added 2026-09-25)*
+> [!warning] Rolling production back past a host switch
 > Some switches applied on production pin the releases that support them, and a rollback below
 > them needs the switch undone **first**: to 1.11.0 or older, the internal-TLS step 4
 > ([Step 4 → release rollback](#step-4--drop-the-old-certificate)); to 1.10.0 or older, additionally
@@ -1973,7 +1972,7 @@ carries it changes nothing but one read-only mount: the edge now mounts `grafana
 Grafana itself needs to start. `deploy.sh`'s mount pre-flight reads the units **already installed**
 at the start of a tick (before the tick installs the incoming bundle's), so it does not stop the
 release that *adds* this mount: with the file missing, that release fails at the edge's start and
-the health gate rolls it back; only later ticks refuse it up front *(corrected 2026-09-25)*. The
+the health gate rolls it back; only later ticks refuse it up front. The
 file exists wherever Grafana runs, and on production it was confirmed on 2026-09-25.
 
 > [!note] Applied on production 2026-09-25 (~15:40 UTC, #2039)
@@ -2305,8 +2304,7 @@ Merge and promote the follow-up release that bakes the step-2 files into the uni
 already installed at the start of the tick, not the incoming ones, so it does **not** refuse this
 release before applying it: a missing file makes the containers fail to start and the health gate
 roll the release back (and later ticks then refuse it). Check the files by hand first
-(`ls -l /etc/basetool/secrets/tls/`) *(corrected 2026-09-25: this used to say the pre-flight refuses the
-release before anything is applied)*. The deploy recreates backend, frontend, ingest and Keycloak on their own leaves; the
+(`ls -l /etc/basetool/secrets/tls/`). The deploy recreates backend, frontend, ingest and Keycloak on their own leaves; the
 truststore still carries the old certificate, so the restart order does not matter.
 
 Verify:
@@ -2394,7 +2392,7 @@ is `0`, the edge serves the app, and in Prometheus
 `subject="CN=Profit Basetool internal CA,…"`.
 
 > [!warning] As run on production, 2026-09-25 17:58–18:03 UTC — and why this step was rewritten
-> *(corrected 2026-09-25)* This step used to run `keytool -delete -alias legacy-shared -keystore
+> This step used to run `keytool -delete -alias legacy-shared -keystore
 > /work/truststore.p12` directly against `-v /etc/basetool/secrets/tls:/work`. On production that failed
 > with `keytool error: java.io.FileNotFoundException: /work/truststore.p12 (Permission denied)`:
 > 2d had made the store `root:root 0644`, and the container's root is `basetool` on the host. The rest of
@@ -2422,7 +2420,7 @@ too; `-importcert -noprompt -storetype PKCS12 -alias … -file /work/…`), rebu
 2e, restart the same units.
 
 > [!important] A release rollback to 1.11.0 or older needs the old certificate trusted again first
-> *(added 2026-09-25, after step 4 on production)* 1.11.0's units mount the shared `keystore.p12`
+> 1.11.0's units mount the shared `keystore.p12`
 > as every service's identity again, and after step 4 nothing trusts it: the edge, Prometheus and
 > blackbox would refuse every upstream. **And the Discord duplicate-account precheck fails open,
 > silently** (REQ-SEC-022) — as on a rollback to any release from before keycloak's managed

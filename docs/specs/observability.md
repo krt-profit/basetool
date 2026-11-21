@@ -694,7 +694,7 @@ it is invisible until something waits on the container's health.
 - The scrape chain is stateless (no session, no request cache) so a 30-second scrape interval
   creates no session state; a scrape response never carries `Set-Cookie`. CSRF protection stays
   on: a `GET` scrape never triggers it and never generates a token, and any state-changing request
-  on the path is refused with 403. *(Amended 2026-09-26: CSRF used to be disabled on this chain.)*
+  on the path is refused with 403.
 - `/actuator/health` is **unauthenticated at the app** (`permitAll`) so the container health check
   can reach it over `localhost` inside the container — but it is **not internet-reachable**: the
   same `location /actuator { return 404; }` edge deny that hides `/actuator/prometheus` also hides
@@ -797,8 +797,7 @@ rule — no blanket "everything is masked" claim:
   the three `<svc>-stdout` streams were measured carrying 1k–43k lines/24h on the host; and neither
   the single `older_than = "167h"` drop stage nor any of the three masking replaces can touch a fresh
   line or either phrase. The observed lines are recorded verbatim in
-  `scripts/check-loki-rule-signatures.py` (amended 2026-09-25, ADR-0214: until then also in a
-  comment beside the rule), because their wording
+  `scripts/check-loki-rule-signatures.py`, because their wording
   is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate them. The
   re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* was done
   on `…@sha256:3137541d…` (2026-09-22) and on `…@sha256:2ca9adf4…` (2026-09-25) and on
@@ -892,9 +891,8 @@ not silent — so the only detector was a human reading a log export.
   the unprivileged `alloy` user — so each log file must be readable through the `adm` group. The
   four `scripts/basetool-*.logrotate` snippets rotate with `copytruncate`, under which logrotate ignores
   their `create 0640 deploy adm` line: the live file is truncated in place and keeps whatever owner
-  and mode it had when the unit's `append:` first created it — nothing in the repository sets it
-  (corrected 2026-09-22; this sentence used to claim a `0640 deploy adm` re-create on every
-  rotation). A `0640 root:root` file ships silently empty. The backup, cleanup and restore-drill
+  and mode it had when the unit's `append:` first created it — nothing in the repository sets it.
+  A `0640 root:root` file ships silently empty. The backup, cleanup and restore-drill
   streams carry no liveness guard (REQ-OBS-014).
 - **Edge access/error log, SSH/host-auth logs, and the host security logs
   (auditd `sshd_config`/`authorized_keys` tamper watches, fail2ban SSH-jail bans)** — ingested
@@ -1187,10 +1185,9 @@ Tracing on the OTel SDK) behind a hard master gate:
   source, which the generator carries into their units as `StopTimeout=45` (podman's own wait
   before the `SIGKILL`) plus `TimeoutStopSec=60` (systemd's wait for podman), so a routine restart
   cannot `SIGKILL` them mid-drain (dskit `server.graceful_shutdown_timeout` 30s) and truncate the
-  write-ahead log (ADR-0072 amendment 2026-07-12). *Corrected 2026-09-22:* until then only
-  `TimeoutStopSec=45` was generated, and Quadlet's `ExecStop` (`podman rm -f`) killed the container
-  after podman's default 10 s regardless — the protection this paragraph described did not exist on
-  the Podman host. The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
+  write-ahead log (ADR-0072 amendment 2026-07-12). `TimeoutStopSec` alone does not protect them:
+  without `StopTimeout`, Quadlet's `ExecStop` (`podman rm -f`) kills the container after podman's
+  default 10 s. The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
   processor → Prometheus `remote_write` (#1041 item 22a, ADR-0076 amendment): it authenticates as the
   shared `grafana` web-auth user (Tempo runs `-config.expand-env`), Prometheus adds
   `--web.enable-remote-write-receiver`, cardinality is capped by `max_active_series`, and
@@ -1867,10 +1864,9 @@ nothing, so the alert stays silent on a host without one.
   `PERSONAL_INVENTORY`, `MARKET`, — since 2026-08-16 — `ROLE`, — since 2026-09-26 — `HANGAR` and
   `BLUEPRINT`, — since 2026-09-27, by owner decision — `CONNECTED_APPS`, whose registry changes
   are rare admin actions like `ROLE`'s and are announced by `ExchangeRegistryChanged` anyway, and
-  `SUPPLY` (REQ-SUP-017), which stays silent while its feature switch is off. *(Changed 2026-09-26 by owner decision: the window was 14 d and the two new areas were
-  alerted by default. Production over the preceding 180 days, read-only: ship changes happened on 40
-  days with one pause of 15.1 days, blueprint changes on 64 days with a longest pause of 10.9 days —
-  a 14-day window would have fired on the hangar once in half a year, on an ordinary quiet stretch.)* `ROLE` covers
+  `SUPPLY` (REQ-SUP-017), which stays silent while its feature switch is off. *(Production over 180 days before 2026-09-26, read-only: ship changes happened on 40 days with one
+  pause of 15.1 days, blueprint changes on 64 days with a longest pause of 10.9 days — a 14-day
+  window would fire on the hangar on an ordinary quiet stretch.)* `ROLE` covers
   role/membership admin, Kommando groups and user deletion, all admin actions rather than daily
   traffic, so a fortnight without one is an ordinary quiet period; while it was still alerted it
   fired through every such period and, the condition being a level rather than an event, re-notified
@@ -1973,11 +1969,10 @@ nothing, so the alert stays silent on a host without one.
   The normal DPoP nonce challenge (`use_dpop_nonce`) is not counted as a refusal: it is the
   protocol's first round trip and stays counted on the auth-failure counter; a reason of its own
   would break this counter's rule that the reason is the answer's code (load test of 2026-09-28,
-  finding 6). *Changed 2026-09-28: it was counted as `dpop_invalid`, a few hundred refusals per
-  five minutes at production scale.* `ExchangeRegistryUnreadableAtGateway` (warning,
+  finding 6). `ExchangeRegistryUnreadableAtGateway` (warning,
   5 m) fires while the gateway fails closed on `registry_unavailable`.
-- `basetool_ingest_auth_failures_total{reason,path_scope}` gains `path_scope` (`exchange`, `other`;
-  `legacy` too until the extractor's `/v1` routes were removed on 2026-09-28) so the exchange's
+- `basetool_ingest_auth_failures_total{reason,path_scope}` carries `path_scope` (`exchange`,
+  `other`) so the exchange's
   failures stay apart from scanner noise elsewhere, and four reasons:
   `invalid_dpop_proof`, `use_dpop_nonce` (the normal first round trip, never alerted),
   `dpop_proof_limit` for an exchange proof over its member's cap, answered `429 DPOP_PROOF_LIMIT`,
@@ -2082,8 +2077,7 @@ nothing, so the alert stays silent on a host without one.
   `revocations_unreadable`), registered at zero. The gateway checks first, so a
   sustained rate means the two disagree: `ExchangeGateRefusing` (warning, 15 m). Each refusal of a
   relayed request answers the gateway gate's own code for it, which the relay passes to the client
-  unchanged, so it is counted as the relay's `refused` outcome, not as `failed` (REQ-XCH-025).
-  *Corrected 2026-09-28: the reason list lacked `client_revoked` and `revocations_unreadable`.* The relay's
+  unchanged, so it is counted as the relay's `refused` outcome, not as `failed` (REQ-XCH-025). The relay's
   own refusals join `basetool_on_behalf_of_refused_total` as `forged_exchange_header`,
   `exchange_client_invalid` and `exchange_installation_invalid`; the first backs
   `ExchangeRelayHeaderForged` (warning, 15 m). Relayed exchange requests count under the external client in `basetool_api_client_requests_total`
@@ -2244,11 +2238,10 @@ nothing, so the alert stays silent on a host without one.
   (PII). `MailDeliveryFailing` fires on `failed` > 2/h; `MailDroppedConfigDrift` fires on
   `dropped_no_host` / `dropped_no_sender` — mail was enabled but is silently going nowhere (blank
   `spring.mail.host`, or no `JavaMailSender` bean), previously visible only via `LogbackErrorSpike`.
-  **`dropped_disabled` is deliberately out of scope** (amended 2026-07-25): the rule originally fired
-  on any `dropped_*` on the premise that "mail is configured on the monitored deployment", but on prod
-  `APP_MAIL_ENABLED=false` is the *intended* state until the privacy policy gains an e-mail section, so
-  every send took the kill-switch branch and the alert paged every 4 h about a policy decision rather
-  than a regression. Because `SmtpMailService` checks its gates in the order enabled → host → sender,
+  **`dropped_disabled` is deliberately out of scope**: on prod `APP_MAIL_ENABLED=false` is the
+  *intended* state until the privacy policy gains an e-mail section, so every send takes the
+  kill-switch branch, and an alert on it would page about a policy decision rather than a
+  regression. Because `SmtpMailService` checks its gates in the order enabled → host → sender,
   the two in-scope outcomes are unreachable while the kill-switch is off — the rule is correctly silent
   today and starts protecting the moment mail is switched on. An *unintended* kill-switch flip is still
   caught downstream by `RegistrationApprovalOverdue` (nobody acting on pending registrations). Locked
@@ -2269,10 +2262,10 @@ nothing, so the alert stays silent on a host without one.
   Zero connections while
   the frontend is still serving **real user page traffic** drives `SsePushChannelDead` (a dead push
   channel, e.g. reverse-proxy buffering drift). The "users are online" guard **must be live request
-  rate, never `basetool_active_sessions`** (amended 2026-07-26): that gauge counts Spring Session
+  rate, never `basetool_active_sessions`**: that gauge counts Spring Session
   entries in Redis, whose authenticated TTL is 720h (REQ-SEC-025), so on prod it sits at ~365
-  against ~30 real principals and never dips. The original `basetool_active_sessions > 3` guard was
-  therefore true 24/7 and reduced the rule to a bare `basetool_sse_connections == 0 for 30m`, which
+  against ~30 real principals and never dips. A `basetool_active_sessions > 3` guard is
+  therefore true 24/7 and reduces the rule to a bare `basetool_sse_connections == 0 for 30m`, which
   fires every night the org is simply asleep — measured 2026-07-26, SSE fell 25 → 0 at 00:45Z and
   returned at 06:30Z while the session gauge held flat at 362–370, producing two firing/resolved
   mail pairs for an idle site. The guard sums `http_server_requests_seconds_count{job="basetool-frontend"}`
@@ -2815,9 +2808,7 @@ exchange's draft and mass-change routes count it since 2026-09-28), and
 `basetool_ratelimit_rejections_total{bucket}` (`bucket` = `ip`; shares the metric name with the
 backend counter, the `application` common tag separating the modules) — paired since #1041 item 19
 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter, feeding the same
-`RateLimitRejectionRatioHigh` ratio alert. *Amended 2026-09-28 (#2092 step 9):* the relay-failure
-reasons `backend_reject` / `backend_unavailable` / `backend_auth` and the `subject` bucket belonged to
-the removed `/v1` relay and its per-member limiter; exchange relay failures are
+`RateLimitRejectionRatioHigh` ratio alert. Exchange relay failures are
 `basetool_ingest_exchange_relay_total{outcome="failed"}`.
 `basetool_ingest_auth_failures_total{reason}` counts every `401` under its RFC 6750 bearer error
 code (`invalid_token` / `invalid_request` / `insufficient_scope`, anything else collapsing to
@@ -3530,11 +3521,10 @@ therefore alerts on:
   the cap is hit. It fires when `basetool:container:pids` (the cgroup `pids.current` task count —
   cAdvisor's `container_threads`, now read directly by the cgroup collector) exceeds **80% of that
   container's own `basetool:container:pids_max`** (= `pids.max`) for 10m. The
-  comparison **must be cap-relative and must cover every named container** (amended 2026-07-26): the
-  rule originally read `container_threads{name=~"backend|frontend|ingest|keycloak"} > 1638` and was
-  blind twice over — the name list omitted every non-JVM container, and the `1638` literal (80% of
-  2048) is *unreachable* for the services capped at `pids: 512`, so for those it could not fire even
-  at 100% of their cap. Grafana fell through both holes: its wget-HTTPS healthcheck forks an
+  comparison **must be cap-relative and must cover every named container**: a name list misses
+  every container it does not name, and a fixed literal such as `1638` (80% of 2048) is
+  *unreachable* for the services capped at `pids: 512`, so for those it could not fire even at
+  100% of their cap. Grafana fell through both holes: its wget-HTTPS healthcheck forks an
   `ssl_client` per probe that reparents to the Go server (no init, never `wait()`s), and on
   2026-07-26 it sat at 512/512 pids with 493 unreaped zombies and `pids.events max=7445`, refusing
   every fork and reporting `unhealthy` for two days **with no alert mail at all**. The root cause is
@@ -3564,7 +3554,7 @@ therefore alerts on:
   `image` labels, so an alert kept its identity across the cutover. The dashboard panels that still
   read cAdvisor names directly were moved onto these rules on 2026-09-22 (CHANGELOG v1.9.2 — they had
   read "No data" since the cutover); `ContainerRestartLoop` was the one consumer left behind and was
-  repointed the same day (above). *Corrected 2026-09-22.*
+  repointed the same day (above).
   The per-alert mapping is `docs/archive/PODMAN_MIGRATION_PLAN.md` → *"The seven alerts, one by one"*.
   `ContainerCgroupCollectorStale` and `ContainerCgroupCollectorFoundNothing` (both warning) watch
   the collector itself, because a collector that stops writing — or writes a **fresh** file

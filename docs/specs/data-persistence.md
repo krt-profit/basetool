@@ -169,15 +169,14 @@ before it leaves (`RoleService.getAllRoles`), and `hibernate.query.fail_on_pagin
 is on in the base configuration, so a paged collection fetch that Hibernate would page in memory
 fails instead of warning.
 
-> **Corrected 2026-09-22:** this section said a collection fetch-join on a paged query *forces*
-> in-memory pagination (`HHH000104` / `HHH90003004`). Under Hibernate 7.4 on PostgreSQL that is no
-> longer the general case: Hibernate pushes the `OFFSET`/`LIMIT` into a derived table whenever the
-> query shape allows it, and falls back to paging in memory only for the shapes it cannot push down
-> (e.g. ordering by the fetched collection before its owner). The rule stands for the other reason
-> — every page row is multiplied by the collection's size, and by the product of the sizes when
-> several are fetched — and the fail flag catches the fallback. `PagedFindersNoCollectionFetchTest`
-> proves the flag live on a shape that cannot be pushed down, because a plain collection fetch
-> passes it silently.
+Under Hibernate 7.4 on PostgreSQL a collection fetch-join on a paged query does not in general force
+in-memory pagination (`HHH000104` / `HHH90003004`): Hibernate pushes the `OFFSET`/`LIMIT` into a
+derived table whenever the query shape allows it, and falls back to paging in memory only for the
+shapes it cannot push down (e.g. ordering by the fetched collection before its owner). The rule
+holds because every page row is multiplied by the collection's size, and by the product of the
+sizes when several are fetched; the fail flag catches the fallback. `PagedFindersNoCollectionFetchTest`
+proves the flag live on a shape that cannot be pushed down, because a plain collection fetch
+passes it silently.
 
 An **authorization gate must not load the aggregate its decision does not read.** A `@PreAuthorize`
 gate that inspects only a couple of `@ManyToOne`s / a small association (mission `owningOrgUnit` /
@@ -585,9 +584,6 @@ Concrete handling, in order:
   `app_user(id)` with `ON DELETE CASCADE` and go with the account; `UserIdentityColumnForeignKeyTest`
   holds them to it like every other `user_id` column. The bulk-undo run itself stays and keeps its
   counts; its `requested_by` is `ON DELETE SET NULL` (`V256`).
-  *Corrected 2026-09-27: the planned amendment named `UserDeletionForeignKeyIntegrityTest` as their
-  guard; that test exercises named deletion scenarios, and the schema sweep is
-  `UserIdentityColumnForeignKeyTest`.*
 - **Reassigned to the admin** (shared aggregates that must outlive the member):
   `refinery_order.owner_id`, `mission.owner_id`, and — paired with the last — the 1:1 companion
   `mission_ownership.owner_id`. These are not account data: they carry operation finances and

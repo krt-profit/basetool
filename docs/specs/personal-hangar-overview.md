@@ -105,11 +105,10 @@ without a reload.
 `frontend/src/main/resources/templates/kernel/fragments/pagination.html` · **Issues:** #773 (performance
 audit item 10), #772 (orders/refinery pagination).
 
-*Amended 2026-10-03 (website overhaul phase 3):* `/my-ships` takes the optional `fitted` filter, the
-page offers it as the segment „Alle · Bereit · Nicht bereit" beside the search with the readiness
-counter „n von m einsatzbereit", and the list is the first tab „Meine Schiffe (n)" of the one hangar
-page whose second tab is the unit overview (REQ-HANGAR-001). The import, „Home-Location für alle
-setzen" and „Hangar leeren …" moved from the box under the table into the page head (import as a ghost
+The page offers the `fitted` filter as the segment „Alle · Bereit · Nicht bereit" beside the search
+with the readiness counter „n von m einsatzbereit", and the list is the first tab „Meine Schiffe (n)"
+of the one hangar page whose second tab is the unit overview (REQ-HANGAR-001). The import,
+„Home-Location für alle setzen" and „Hangar leeren …" sit in the page head (import as a ghost
 button, the other two in the ⋯ menu).
 
 ### REQ-HANGAR-004 — Every hangar mutation is audited

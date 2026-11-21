@@ -65,9 +65,8 @@ users outside the requested family.
 `BlueprintVariantFamilyCatalog`, `frontend/src/main/resources/static/js/blueprint/blueprint-overview.js` ·
 **Issues:** #364
 
-*Amended 2026-10-03 (website overhaul phase 3):* the „Details" button per row is gone; the owners
-show as chips in the row („Kann craften") and only the overflow beyond four expands the companion
-row. The columns are Blueprint · Anzahl · Kann craften.
+The columns are Blueprint · Anzahl · Kann craften; a row carries no „Details" button, and only the
+overflow beyond four owners expands the companion row.
 
 ### REQ-INV-013 — True server-side pagination with selectable page size
 
@@ -99,8 +98,7 @@ chooses between 10, 50 and 100 entries per page.
 **Code:** `PersonalBlueprintOverviewService`, `BlueprintOverviewPageController`,
 `kernel/fragments/pagination.html` · **Issues:** #364
 
-*Amended 2026-10-03 (website overhaul phase 3):* the search also matches the display names of the
-in-scope owners (placeholder „Blueprint oder Person suchen …"), read only when a term is given.
+The search field's placeholder reads „Blueprint oder Person suchen …".
 
 ## Out of scope
 

@@ -381,8 +381,9 @@ plan guard G-25
 
 Roles: `ADMIN`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles, which the
 matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159) and **`OFFICER` is not one of
-them since `V318`** (ADR-0300): there is no role below member, and a token that maps to none of
-these is refused with `403 NO_ROLE` (REQ-SEC-053).
+them since `V318`** (ADR-0300): there is no role below member. The roles are the ones stored for
+the account in `user_roles`; a realm-role claim in the token is ignored (REQ-SEC-088). A caller whose
+account holds none of them is refused with `403 NO_ROLE` (REQ-SEC-053).
 Hierarchy (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, and on
 the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **never**
 `MISSION_MANAGER > LOGISTICIAN`, which is why a mission manager is inside the peer-redaction tier
@@ -608,11 +609,8 @@ For **every non-admin** — a plain member, a Logistician, a Mission Manager or 
 own profile — never elsewhere.) The naming convention is enforced structurally by the ArchUnit rule
 `peerReadableMissionEndpointsMustRedactPii`.
 
-> **Amended 2026-09-06 (ADR-0159).** This requirement had **two** tiers: the member-peer one above,
-> and a stricter *outsider* tier (`cleanupOutsiderMissionForGuest`) that additionally hid the
-> free-text description and each participant's payout preference and comment, for anonymous and
-> role-less `GUEST` callers. Both audiences are gone (REQ-SEC-052, REQ-SEC-053), so the tier went
-> with them and `MissionGuestRedactor` became `MissionPeerRedactor`.
+The member-peer shape is the only tier (ADR-0159): there are no anonymous or role-less `GUEST`
+callers to redact for (REQ-SEC-052, REQ-SEC-053), and `MissionPeerRedactor` applies it.
 
 **The mission's owner and managers are visible to everyone who may see the mission**, in the peer shape of
 this requirement (names and rank, no admin fields; the username only when no display name is set). They are
@@ -1111,11 +1109,10 @@ out) — so neither edge that reaches it is cleartext:
   JWKS decoder) speaks HTTP/1.1 and is bounded by the connect and read timeouts of
   `RestClientConfig` (5 s / 30 s), so a hung Keycloak cannot hold a request thread unbounded; the
   ingest copy uses 5 s / 10 s.
-  *(Corrected 2026-09-22, ADR-0204: this used to say the JDK `HttpClient` cannot disable hostname
-  verification per client. Its API cannot, but a trust manager can — JSSE does endpoint
-  identification inside an `X509ExtendedTrustManager` — and that is how the ingest relay, now on the
-  same JDK client, keeps its no-hostname-check `backend-trust` posture. The Keycloak admin client
-  does not use it: verifying the name here is the intent, not a limitation.)*
+  The JDK `HttpClient` API cannot disable hostname verification per client, but a trust manager
+  can — JSSE does endpoint identification inside an `X509ExtendedTrustManager` — and that is how
+  the ingest relay, on the same JDK client, keeps its no-hostname-check `backend-trust` posture
+  (ADR-0204). The Keycloak admin client does not use it: verifying the name here is the intent.
 
 The management/health interface (port 9000) is exempt: it stays HTTP via
 `--http-management-scheme=http` because the Quarkus image ships no TLS-capable CLI client for the
@@ -1657,13 +1654,11 @@ from masquerading as an application outage (the failure mode that drove the fron
   confusion). Empty (the default) preserves the auto-configured, issuer-derived decoder
   byte-for-byte — the knob is off until an operator opts in, and the `test` profile's placeholder
   issuer is unaffected.
-  *(Corrected 2026-09-23: the backend's production environment never carried the variable —
-  neither `docker-compose.yml` nor the Quadlet `env.d` template passed it — so the opt-in could not
-  be taken in production. It now reaches the backend as `KEYCLOAK_JWK_SET_URI` from the host's
+  In production the value reaches the backend as `KEYCLOAK_JWK_SET_URI` from the host's
   `BASETOOL_BACKEND_KEYCLOAK_JWK_SET_URI`, empty by default; the runbook is
   [`deployment.md` → *Internal JWKS for the backend*](../deployment.md#internal-jwks-for-the-backend).
   The ingest gateway reads the same property but sits on no network that reaches Keycloak, so it is
-  not wired.)*
+  not wired.
 - **The knob lives on `app.security.jwt.*` and MUST NOT be declared under Spring's
   `spring.security.oauth2.resourceserver.jwt.jwk-set-uri`.** The two keys look interchangeable and
   behave oppositely when blank. The application's own key is read by
@@ -1762,20 +1757,18 @@ is a weaker CSRF model than the retained server-side synchronizer token + `SameS
 ADR-0088). Runaway regression is caught by `ActiveSessionsRunaway`
 ([`observability.md`](observability.md)).
 
-**The cookie is `SameSite=Lax`, deliberately (corrected 2026-10-03).** This requirement used to
-say `SameSite=Strict`, and `application.yml` configured it — but the value never reached the
-browser. Spring Session writes the session cookie with its own `CookieSerializer`; with no such
-bean it builds one from the servlet `SessionCookieConfig`, which carries no `SameSite`, and falls
-back to `Lax`. Boot's mapping of `server.servlet.session.cookie.same-site` sits in
-`spring-boot-session`, which the frontend does not depend on. Production therefore emitted `Lax`
-for as long as it has used Spring Session. The owner chose to keep `Lax`: under `Strict` the
+**The cookie is `SameSite=Lax`, deliberately.** Spring Session writes the session cookie with its
+own `CookieSerializer`; with no such bean it builds one from the servlet `SessionCookieConfig`,
+which carries no `SameSite`, and falls back to `Lax`. Boot's mapping of
+`server.servlet.session.cookie.same-site` sits in `spring-boot-session`, which the frontend does
+not depend on. The owner chose `Lax`: under `Strict` the
 browser withholds the cookie on any top-level navigation started on another site, so the return
 from the Discord consent screen would lose the saved OAuth2 authorization request
 (`authorization_request_not_found`), and a link opened from Discord in a browser or from webmail
 would arrive without the session, start a fresh one that overwrites the member's cookie, and land
 on `/?error`. CSRF protection does not rest on the attribute: the synchronizer token
 (REQ-SEC-010) carries it, and `Lax` already withholds the cookie from cross-site `POST`s,
-subresources and frames. `SessionCookieSerializerConfig` now builds the serializer from
+subresources and frames. `SessionCookieSerializerConfig` builds the serializer from
 `server.servlet.session.cookie.*`, so every configured attribute is the emitted one.
 
 **The cookie is `__Host-SESSION` (FE-SEC-06, 2026-09-22).** The session cookie was called
@@ -2220,12 +2213,9 @@ against `PathContainer.parsePath(...)`. It MUST NOT use `HttpServletRequest#getR
 (REQ-XCH-001): the backend's `ActingMemberFilter` list of `/api/v1/exchange/**` routes and the
 gateway's `ExchangeRoutes` table are parsed `PathPattern`s matched against a parsed path.
 
-> **Amended 2026-09-28 (#2092 step 9).** The acting-member bound used to name two more endpoints,
-> `POST /api/v1/refinery-orders/import-extract` and `POST /api/v1/personal-blueprints/import/preview`,
-> which the SC Extractor's `/v1` relay called with the member's full stored authorities. That relay
-> is removed, so `ActingMemberFilter` accepts an acting member on the exchange routes alone; the two
-> import endpoints stay for the web and refuse the header as `endpoint_not_bound`. The gateway's
-> client-identity gate, one of the four ingest-scoped filters below, went with the relay.
+`ActingMemberFilter` accepts an acting member on the exchange routes alone; the web import endpoints
+`POST /api/v1/refinery-orders/import-extract` and `POST /api/v1/personal-blueprints/import/preview`
+refuse the header as `endpoint_not_bound`.
 
 `getRequestURI()` is the **raw, still percent-encoded** URI per the servlet spec, while Spring MVC
 routes on the **decoded** path. The two therefore disagree, and the disagreement is exploitable in
@@ -4496,10 +4486,8 @@ a method gate.
 | `/actuator/health`, `/actuator/health/**`                                       | The container health check (the image's `HEALTHCHECK`, rendered into the Quadlet `HealthCmd` in prod); in prod Actuator lives on the internal management port (ADR-0090).                                                                                                                                                     |
 | `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                                                                                                                                                                                                 |
 
-> **Amended 2026-09-22 (ADR-0197, approved by @greluc):** `/licenses` joined the table. It is the
-> third-party licence notice of REQ-UI-021 — a legal page like the three above it, with no backend
-> call and no data — and it is a `LEGAL_PAGES` entry of `PublicPaths`, so neither session gate
-> redirects a member away from it.
+`/licenses` is a `LEGAL_PAGES` entry of `PublicPaths`, like the other legal pages, so neither
+session gate redirects a member away from it.
 
 > [!note] `/auth/**` is on this origin and is **not** in the table above — it never reaches Spring
 > Since [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md) Keycloak answers at `/auth` on
@@ -4820,9 +4808,8 @@ it) · `UserRegistrationServiceTest` (the `PENDING` path passes the waiver) ·
 
 `CustomJwtGrantedAuthoritiesConverter` memoises the assembled authority collection per `(sub,
 Keycloak session, azp, claims fingerprint)` — the session is the token's `sid`, falling back to its
-`issuedAt` for a token without one (amended 2026-09-23, BE-PERF-08; until then the key was `(sub,
-token issuedAt, azp)`, so every five-minute token refresh was a miss and a TTL above the
-access-token lifespan bought nothing). That memoisation is the single control on how much load the authorization path puts
+`issuedAt` for a token without one (BE-PERF-08), so a token refresh within the same Keycloak session
+hits the cache and a TTL above the access-token lifespan pays off. That memoisation is the single control on how much load the authorization path puts
 on [`PostgreSQL`](data-persistence.md): the converter runs on **every** authenticated call, and a
 **miss** costs a write-capable `syncUser` transaction plus five to eight SELECTs — user load,
 `user_roles`, the role permissions, and the membership read.
@@ -6209,7 +6196,7 @@ leaf and all four verify against the CA alone with the name checked; step 4 17:5
 `basetool-cert-expiry` reports the CA's expiry (2036). **Steps 0–4 are done: the target shape holds on
 production.** The documented step-4 command failed on the root-owned truststore and was redone on
 a working copy; the runbook now carries that form. A release rollback to 1.11.0 or older needs step
-4 undone first. *(Updated 2026-09-25 evening; this paragraph said steps 3 and 4 were open.)* The
+4 undone first. The
 separate SPI truststore built in step 2 is replaced by Keycloak's mount of the internal truststore
 (ADR-0051 amendment, 2026-11-13); its leftovers on the host are a one-time cleanup
 ([`deployment.md`](../deployment.md#one-time-cleanup-the-hand-built-precheck-truststore)).

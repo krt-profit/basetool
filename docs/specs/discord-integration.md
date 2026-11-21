@@ -97,17 +97,13 @@ boolean `UserDto.discordLinked` — `true` iff the user has a non-blank `discord
 in any DTO**; only the boolean fact of the link leaves the backend, consistent with the
 never-log/never-expose-Discord-id posture of REQ-SEC-016. The page is already `@PreAuthorize(ADMIN)`
 (frontend) so the indicator is admin-only; every peer redaction shape that strips PII leaves
-`discordLinked` `null`. **Corrected 2026-08-30:** this sentence used to claim the link status
-"never reaches non-admins through any shared-`UserDto` path (mission participants, pickers, etc.)",
-and that was false for its own example. Only surfaces that apply the peer projection strip it — `GET
-/api/v1/users/{id}`, the user list/search, and (since the 2026-08-30 audit) the job-order assignees.
+`discordLinked` `null`. Only surfaces that apply the peer projection strip it — `GET
+/api/v1/users/{id}`, the user list/search, and the job-order assignees.
 The mission surfaces (`GET /api/v1/missions/{id}` and the finance ledger) strip it for every caller
-below Logistician since ADR-0159 — participants and assigned-ship owners go through
+below Logistician (ADR-0159) — participants and assigned-ship owners go through
 `MissionPeerRedactor.cleanupUserForPeer` — but a Logistician-or-above caller still receives the full
 nested `UserDto`, `discordLinked` included, by the documented member tier of `UserMapper#toDto`. So
-the honest statement is that `discordLinked` is admin-only **on the surfaces that redact**, not on
-every nested one. *(Updated 2026-09-22: this used to say the mission detail handed it to every
-member.)* The visual treatment follows the monochrome-icon
+`discordLinked` is admin-only **on the surfaces that redact**, not on every nested one. The visual treatment follows the monochrome-icon
 design-system convention: linked → the Discord brand mark in the inherited link/text colour
 (`currentColor`, like the sibling GitHub mark), not linked → a muted em-dash.
 
@@ -377,11 +373,9 @@ and redirected to self-service linking; this action resolves the registrations t
 precheck let through. Because a `PENDING` account carries **zero** authorities (REQ-SEC-017) until an
 admin acts, no privilege can be inherited before the link, so the merge never widens access.
 
-*Corrected 2026-09-27: a planned-amendment note on this requirement said the account merge carries
-the exchange's member-linked tables and the RSI handle. Linking moves no member data — its DB step
-deletes the throwaway account (step 4). The account merge that moves data is REQ-SEC-046 in
-[`security-and-access.md`](security-and-access.md), which states the exchange tables, and the RSI
-handle rule is REQ-SEC-072's.*
+Linking moves no member data — its DB step deletes the throwaway account (step 4). The account
+merge that moves data is REQ-SEC-046 in [`security-and-access.md`](security-and-access.md), which
+states the exchange tables, and the RSI handle rule is REQ-SEC-072's.
 
 **Acceptance**
 

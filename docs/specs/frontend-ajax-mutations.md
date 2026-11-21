@@ -1400,8 +1400,7 @@ whose receivers re-fetch the viewer's *own* filter and page:
   be published by a client, and this room, like `members` and `org-structure`, is web-only and out of
   the backend's registry: every viewer whose run list shows a running run — its own start, a peer's
   start arriving through the room, or a page opened while one runs — re-reads the list every 3 s
-  until no run is running. Role-gated like `members`. *Added 2026-09-27; before, the registry section
-  had no room at all and another admin's change showed only after a reload.*
+  until no run is running. Role-gated like `members`.
 - **`org-structure`** — the admin Organisationsstruktur editor (`units` = the unit + parent-edge
   table, `forms` = its create forms, whose Bereich/OL pickers go stale when a peer adds one).
   Subscribe is authenticated-only; the admin-only fragments stay protected per fragment, and the
@@ -2081,8 +2080,7 @@ treated a failure here as a failed write would show an error for a change that i
 defeats the bound it just hit. Both refusals are standard problems (REQ-API-004): an unknown topic or a
 frame naming no known section is `400 BAD_REQUEST`, a full bucket is `429 RATE_LIMIT_EXCEEDED` with
 `Retry-After: 1`, the buckets' refill granularity. The status is the contract; the app classifies by it
-and also tolerates the body (`ApiErrorMapper`). *Corrected 2026-10-03: both answered with an empty
-body until then, although the document promised a problem.*
+and also tolerates the body (`ApiErrorMapper`).
 
 **The bounds are REQ-FE-015's, unchanged**: per-subject burst 40 / refill 20 per second, per-topic
 burst 200 / refill 100 per second, and receiver-side coalescing of 400 ms for a per-resource room
@@ -2188,10 +2186,10 @@ reads — four uncached, plus the cached squadron page-walk — to build a model
 in-place mutation is the app's primary interaction model (REQ-FE-001…REQ-FE-010), that sat on the
 hot path.
 
-**Amended 2026-09-23 (FE-PERF-01) — per handler, and one read.** A `@ControllerAdvice` selects per
-controller *type*, so the marker alone left the ~200 `ResponseBody` handlers that live inside view
-controllers (the in-place mutation endpoints, the unread-count poll) paying for the model. Two rules
-close that:
+**Per handler, and one read (FE-PERF-01).** A `@ControllerAdvice` selects per
+controller *type*, so the marker alone would leave the ~200 `ResponseBody` handlers that live inside
+view controllers (the in-place mutation endpoints, the unread-count poll) paying for the model. Two
+rules close that:
 
 - **A handler that cannot render does not read the layout.** `LayoutContextLoader.needsLayoutModel`
   looks at the handler the dispatcher matched: a method that writes its own body (`ResponseBody` on
@@ -2240,17 +2238,15 @@ ADR-0165
 
 ### REQ-FE-021 — A list page's filters collapse behind one toggle
 
-> **Amended 2026-10-03 (website overhaul phases 1–3).** Every list page now renders its filter block
-> as the toolbar's transient filter popover (`fragments/components :: filterPopover`, REQ-UI-027):
-> it keeps the `.filter-toggle` / `.filter-panel` contract, the count badge and the
+> **Where this note and the text below differ, this note holds.** Every list page renders its
+> filter block as the toolbar's transient filter popover (`fragments/components :: filterPopover`,
+> REQ-UI-027): it keeps the `.filter-toggle` / `.filter-panel` contract, the count badge and the
 > script-collapses-a-rendered-panel fallback below, but it **always starts closed and stores no
-> open/closed preference** — the third property below is retired. No page uses `filterToggle` any
-> more; active filters are additionally shown as `.filter-chips`.
->
-> **Amended 2026-10-04 (phase 4):** the unused `components :: filterToggle` fragment and the stored
-> preference (`krt.filterPanel.<name>` in localStorage) are removed: `krt-filter-panel.js` treats every
-> `[data-filter-panel]` as the transient popover, so `data-filter-transient` on the markup only marks
-> that contract. The text below describes the toggle as first built.
+> open/closed preference** — the third property below does not apply. There is no
+> `components :: filterToggle` fragment and no stored preference (`krt.filterPanel.<name>`):
+> `krt-filter-panel.js` treats every `[data-filter-panel]` as the transient popover, so
+> `data-filter-transient` on the markup only marks that contract. Active filters are additionally
+> shown as `.filter-chips`.
 
 Every list page whose filter block carries **more than a single control** must render that block as
 a collapsible panel: the block gets `data-filter-panel="<page>"`, and the shared

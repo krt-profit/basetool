@@ -479,10 +479,7 @@ expanded set, so lists and per-row gates widen together (ADR-0026).
 > job-order) and the Job-Order profit gate `canViewJobOrders()`. The JWT-authority cascade ships in
 > the same phase. **Phase 6 (#699, #711) then cascaded `currentOversightScope()`** together with the
 > bank's read/write split: the balance **view** and the blueprint-availability overview cascade down
-> (`cascadedOfficerReach`), while bank booking **requests** use the separate, non-cascading
-> `currentOwnLevelOversightScope()` (REQ-BANK-027). *(Updated 2026-09-22: this note used to describe
-> the oversight scope as not yet cascaded. Corrected 2026-10-10: REQ-BANK-039 replaced the own-level
-> request scope with the view gate, and the unused method left the scope hub.)*
+> (`cascadedOfficerReach`), and bank booking **requests** use the same view gate (REQ-BANK-039).
 
 Hard invariants:
 
@@ -701,8 +698,7 @@ dropped to one:
 - [x] A duplicate squadron in the desired set, or more than two squadrons, is rejected with 400.
 - [x] Making a user an SK-lead while they hold a Staffel membership is rejected. The lead's
   reach-less Bereichsleitung seat is **derived** from the `SK_LEAD` rank + the SK's parent Bereich
-  (rule 2), never stored as a membership row. *(Corrected 2026-09-22: this line used to say the seat
-  was auto-added as a membership, which contradicted rule 2 and the code.)*
+  (rule 2), never stored as a membership row.
 - [x] A Bereichsleitung or OL flag on a user who holds a Staffel membership is rejected.
 - [x] A leadership flag on the wrong `kind` is rejected by CHECK.
 
@@ -927,9 +923,8 @@ sidebar (`activeSquadronId`) is one of its options and nothing else is selected,
 **preselected** and the empty choice is left out, so the stamp is the unit the sidebar shows.
 `activeSquadronId` is the unit of the effective context the backend reports (REQ-ORG-032), so in
 „Alle meine Org-Einheiten" nothing is preselected.
-Otherwise the empty choice reads „-- Bitte wählen --" / „-- Please choose --". *Amended 2026-10-02 by
-the owner: the empty choice read „-- Heimat-Staffel beibehalten --", although an empty pick resolves
-to the only direct membership or the pin, and is refused otherwise.* The shared
+Otherwise the empty choice reads „-- Bitte wählen --" / „-- Please choose --"; an empty pick
+resolves to the only direct membership or the pin, and is refused otherwise. The shared
 `kernel/fragments/owner-picker.html` renders initial choices. Its JavaScript counterpart
 `/js/kernel/krt-owner-picker.js` renders choices reloaded for a destination member, grouping
 options by kind when several kinds are offered. It picks the effective active unit when eligible,

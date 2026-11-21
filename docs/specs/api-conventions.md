@@ -410,10 +410,7 @@ never served to a client (REQ-XCH-039, ADR-0216). `openapi.json` does not contai
 The frontend serves HTML, not an API, and therefore has no document of its own. The ingest gateway
 has no generated document either: its only API is the exchange, whose hand-written contract
 `ingest/src/main/resources/api/exchange-v1.openapi.json` it serves at `/exchange/v1/openapi.json`
-(REQ-XCH-011). *Amended 2026-09-28 (#2092 step 9, owner decision of the same day):* the ingest
-module's springdoc document described the desktop extractor's two `/v1` endpoints; with them removed
-it listed nothing, and springdoc, `OpenApiConfig`, the generated `openapi.json` and its generator
-test were removed from the module.
+(REQ-XCH-011). The ingest module carries no springdoc dependency and no `OpenApiConfig`.
 
 The backend depends on springdoc **`-api`** (not `-ui`): the document is generated at
 `/v3/api-docs`, no Swagger UI webjar is bundled, and `springdoc.api-docs.enabled=false` in its

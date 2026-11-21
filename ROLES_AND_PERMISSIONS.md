@@ -652,13 +652,13 @@ order-ownership check: naming anybody but yourself requires
 `canManageUserInventory(<receiver>)` of the inventory access policy — admin, self, or a **shared editable org
 unit** with that receiver — and any other value is refused with `403` (REQ-SEC-039). The Einbuchen
 path (`POST /api/v1/inventory`) and the owner-on-behalf create `POST /api/v1/refinery-orders/users/{userId}` (which replaced the `owner` override of `POST /api/v1/refinery-orders` in wave 6 of the API cut) carry the
-same gate. **Amended 2026-08-30:** all three previously accepted the flat `ROLE_LOGISTICIAN`, which
-is the OR-union over every membership and carries no org unit, so a logistician of any Staffel could
-write into any other Staffel's member ledger (REQ-SEC-005). The store dialog therefore shows the
+same gate. None of the three accepts the flat `ROLE_LOGISTICIAN` for this: it is the OR-union over
+every membership and carries no org unit, so it would let a logistician of any Staffel write into
+any other Staffel's member ledger (REQ-SEC-005). The store dialog therefore shows the
 receiver picker only to a Logistician, and the receiver must additionally be in scope. The
-production book-in (`bookIn.ownerUserId`, REQ-INV-032) carries the same gate since 2026-09-22
-(APPSEC-01) — before, `canEditJobOrder` alone let a logistician book produced stock into any
-member's ledger. Einbuchen and the production book-in
+production book-in (`bookIn.ownerUserId`, REQ-INV-032) carries the same gate (APPSEC-01), so
+`canEditJobOrder` alone does not let a logistician book produced stock into another member's
+ledger. Einbuchen and the production book-in
 additionally refuse `personal = true` for a foreign target; the specified personal-for-someone-else
 capability stays in the refinery store dialog (REQ-INV-035).
 ³ Only for a target member who shares one of the caller's org units, and the list is filtered per
@@ -856,7 +856,7 @@ only to whoever may appoint the lead (on the member page: admins only) — and n
 removes their own row or another lead's row, which render read-only.
 ⁴ Besides the admin, the **Bereichsleiter of the SK's parent Bereich** sets the lead, on the
 „Leitung" page (`OrgRoleManagementSecurityService.canAppointSkLead`, REQ-ROLE-004) — never the SK
-lead itself. *(Corrected 2026-09-22: this row said `hasRole('ADMIN')` only.)*
+lead itself.
 
 #### 3.9.1 Leitung — the delegated appointment ladder (REQ-ROLE-004, ADR-0042)
 

@@ -393,16 +393,9 @@ on the right, separated by hairlines — the quality tier, the amounts, the clai
 the *Eintragen* action, and the status chip. Every value cell therefore carries a `data-label`. The
 desktop table is unchanged.
 
-*Amended 2026-10-03 (website overhaul phase 3): page head with kind and status badges and the
-overflow menu; the KPI band became a `.kpi-grid` led by the „Geliefert / benötigt" progress tile (the
-„Items geliefert" tile folded into it), requester-redacted views drop the fulfilment and handover
-tiles; tabs renamed and reordered per kind (*Bestellte Items* → *Items*, *Aggregierte Materialien* →
-*Materialien*, *Blaupausen* → *Herstellung*, *Item-Übergaben* → *Übergaben*, *Materialien* of a
-material order → *Bedarf*), empty tabs hidden, the handover dialog titled „Übergabe erfassen".*
-
-*Amended 2026-10-04 (owner decision): the blueprint-coverage tab is called *Hersteller* instead of
-*Herstellung*, so it no longer shares its name with the production booking (*Herstellung erfassen*)
-on the *Items* tab.*
+The handover dialog is titled „Übergabe erfassen". The blueprint-coverage tab is called
+*Hersteller*, so it does not share its name with the production booking (*Herstellung erfassen*) on
+the *Items* tab.
 
 **Acceptance**
 

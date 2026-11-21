@@ -608,13 +608,13 @@ sets remain bounded by their chunk or viewport sizes.
 >
 > **Amended (2026-07-05) — view options as checkboxes + dashboard Kontobewegung CTA:** the two per-user view options are now **independent checkboxes** (a "Tabellenansicht" toggle and a "Nach Bereich gruppieren" toggle, `bank.dashboard.view.tableToggle` / `.groupToggle`) rather than filled orange segmented buttons — **both unchecked is the default card grid ordered A→Z**; each still persists per user in `localStorage` and replays through the `layout` / `group` query parameters on the `bankGrid` fragment swap (`bank.js` reads their `checked` state on `change`, not a button's `aria-pressed`). The dashboard header additionally gains the shared direct-booking **"Kontobewegung"** CTA + unified movement modal (REQ-BANK-023/-017, shown when an active account exists); a successful booking re-renders the `bankGrid` in place so balances and 30-day deltas refresh without a reload (`bankGrid` refresh target, REQ-FE-005). The **Verwaltung / Berechtigungen** links are removed from the header — they remain reachable from the sidebar (`nav.bank.manage` / `nav.bank.grants`) — while the three-month report stays bank-management-only. `BankPageController#addMovementModalData` assembles the modal's catalogs (active accounts, holders, counterparty users, org units, fee rate) only on the full-page render, not the `bankGrid` fragment swap, and reuses the unchanged `/deposits` · `/withdrawals` · `/transfers` endpoints, so this adds **no new endpoint, audit event or metric**.
 >
-> **Amended 2026-10-03 (website overhaul phase 3):** the dashboard uses the shared page head — the
+> **Page head and toolbar:** the dashboard uses the shared page head — the
 > role hint „Ansicht: Bankleitung · n Konten" / „Ansicht: Bank-Mitarbeiter · n berechtigte Konten"
 > (`bank.dashboard.subtitle.*`) is the eyebrow, the title „Kartellbank", the actions the ghost
 > „3-Monats-Report" (management only) and the CTA „Kontobewegung" — and a toolbar below it holds the
 > account-name filter, the two view options and a „Stand <Zeit>" note. The view options render as
-> `.krt-switch` toggles instead of checkboxes; their state, storage and `layout` / `group` swap are
-> unchanged.
+> `.krt-switch` toggles, superseding the checkboxes above; their state, storage and `layout` /
+> `group` swap are as described there.
 
 The bank landing page (`/bank`) is a **dashboard** in the design system's **card grid**
 layout: one `.kpi-card` per visible account showing the current balance and the **net change
@@ -707,7 +707,7 @@ user-visible string lives in `messages.properties` / `_de` / `_en` under new `ba
 >
 > **Amended (2026-07-05) — Kontobewegung modal polish:** three refinements to the shared movement modal. (1) On the account-selectable variant (requests overview + dashboard) the account label follows the movement type (`bank.js` `syncMovementRows`): a **deposit** lands ON the account so its label is **Zielkonto** (a deposit has no source account — money from a source account would be a transfer), while a withdrawal/transfer keeps **Quellkonto**; the label carries per-type `data-label-*` (reusing `bank.field.targetAccount`). (2) The "kein Tool-Account" counterparty toggle (`bank-counterparty.html`) now sits **below** the Einzahler/Empfänger picker (and its external-name alternative) and above the shared Einheit row, matching reading order. (3) The **"?" field-hint tooltip** (`fragments/scu-hint`) no longer clips inside a scrolling `.krt-modal-body` (whose `overflow-y: auto` also clips horizontally): `common-handlers.js` measures the bubble against its clipping ancestor on hover/focus and sets a `--hint-shift` CSS variable that slides it back inside (the arrow counter-shifts to keep pointing at the disc). All three are UI-only — no endpoint, DTO, audit or monitoring change.
 >
-> **Amended 2026-10-03 (website overhaul phase 3) — one account-detail fragment:** both account-detail
+> **One account-detail fragment:** both account-detail
 > pages (`bank/bank-account-detail.html`, `bank/org-unit-bank-account-detail.html`) are assembled from
 > `templates/bank/fragments/bank-account-detail.html`: a head (back link as eyebrow, the account name, chips
 > for the account number and the type, a muted status chip when the account is not active, the ghost
@@ -719,12 +719,12 @@ user-visible string lives in `messages.properties` / `_de` / `_en` under new `ba
 > card (REQ-BANK-049) and the booking history (REQ-BANK-051). The selected tab is remembered per user
 > (`bank_account_tab_<user>` / `org_unit_bank_account_tab_<user>`, REQ-UI-017). This **supersedes** two
 > parts of the 2026-07-03 amendment above on the account-detail pages: the **Konto-Info** collapsible
-> tile is now a tab panel, and a booking row **no longer expands** — the columns are Datum · Vorgang
+> tile is a tab panel, and a booking row **does not expand** — the columns are Datum · Vorgang
 > (type chip) · Gegenpartei · Betrag (± coloured) · Saldo nach Buchung (plus „Stornieren" for the
 > Bankleitung), and the Begründung, the Notiz, the Notiz Bankmitarbeiter and, for bank staff, the
 > Halter stand as sub-lines under the Gegenpartei. The request tables of `/bank/requests` and
-> `/org-unit-bank` keep their expandable sub-rows. The collapsible `.bank-panel-head` panels are gone
-> (REQ-BANK-050). UI only — no endpoint, DTO, audit or metric change.
+> `/org-unit-bank` keep their expandable sub-rows. There are no collapsible `.bank-panel-head`
+> panels (REQ-BANK-050).
 
 **Acceptance**
 
@@ -786,16 +786,21 @@ bank mutation came through is recorded on the trail (REQ-BANK-012, REQ-AUDIT-005
 > lives only in [orders-auec-bank.md](orders-auec-bank.md).
 
 The bank has **no coupling** to seasons, price lines, mission finance entries, operation
-payouts or job-order profit flows. No bank code reads or writes those aggregates; no
-automated flow books into the bank in v1 (all bookings are manual by bank staff).
-Integrations (e.g. auto-booking operation payouts) are explicitly out of scope and would
-require a spec change.
+payouts or job-order profit flows. No bank code reads or writes those aggregates. **Only Bank staff
+books.** A booking is posted either directly by a person with current Bank booking rights on that
+account (a grant for the booking type, or Bank management), within the direct-booking ceiling, or
+by Bank staff confirming a booking request; everyone else, a linked aUEC order action (ADR-0357)
+included, only files a request. Bank staff carry the money out in game, which is why no flow books
+on its own. Other integrations (e.g. auto-booking operation payouts) are explicitly out of scope and
+would require a spec change.
 
 **Acceptance**
 
 - [x] Bank services/repositories have no dependency on mission/operation/order types
   (ArchUnit-checkable package rule).
 - [ ] Explicit linked actions work without implicit progress-to-ledger flows or weakened Bank independence.
+- [ ] A linked action of a member without Bank booking rights on the account ends as a pending
+  request and posts nothing; confirming it needs Bank booking rights on that account.
 
 **Enforced by:** `ArchitectureTest` (`bankClassesMustStaySeasonAndProfitIndependent`) · **Code:** every class of the bank domain (`ArchitectureTest.BANK_CLASSES` and a future `bank` module package, REQ-SEC-073) — the rule forbids any season/profit dependency · **Issues:** #556
 
@@ -915,13 +920,12 @@ org-unit-blind.
 > state across a layout swap and resets the filter on a request swap. Its `data-ou-view-*` attributes
 > are distinct from the dashboard's `data-bank-view-*` module so the two never cross-fire.
 >
-> **Amended 2026-10-03 (website overhaul phase 3):** the page uses the shared page head (eyebrow
-> „Organisation", title „Bank meiner Org-Einheit", the CTA „Antrag stellen"). The tabs read
-> „Konten (n) · Meine Anträge (n) · Anträge an unsere Konten (n)" — the third renamed from „Fremde
-> Anträge" (`bank.tab.foreignRequests`). In the card view each account is a card: the name as the
+> **Page head, tabs and cards:** the page uses the shared page head (eyebrow „Organisation", the
+> title of the unit naming below, the CTA „Antrag stellen"). The tabs read „Konten (n) · Meine
+> Anträge (n) · Anträge an unsere Konten (n)" (`bank.tab.foreignRequests` for the third). In the card view each account is a card: the name as the
 > link plus a chevron, the account number · unit, the balance, the sparkline, the 30-day delta „· 30
 > Tage" and the target as a bar „63 % von 5.000.000" (or „— kein Ziel"); the card view has no separate
-> „Details" button any more, the table view keeps „Details & Verlauf" / „Details & Verwaltung". Below
+> „Details" button, the table view keeps „Details & Verlauf" / „Details & Verwaltung". Below
 > the account list the Konten tab shows **„Laufende Anträge"** — the caller's own and the
 > to-be-approved pending requests with their approval path (REQ-BANK-041).
 >
@@ -1069,14 +1073,14 @@ shows the status alone
 >
 > **Amended (2026-07-05) — status filters as checkboxes:** the parallel status filters render as **independent checkboxes** (Ausstehend / Bestätigt / Abgelehnt / Zurückgezogen) instead of filled orange toggle chips, so an active filter no longer shouts. The behaviour is unchanged — each is independent, the selection persists per user in `localStorage` and replays through the multi-valued `status` query parameter (`NONE` sentinel = all off), defaulting to only Ausstehend — only the control and its styling change (`bank.js` reads each checkbox's `checked` state on `change`, not a button's `aria-pressed`).
 >
-> **Amended 2026-10-03 (website overhaul phase 3) — one status segment, supersedes the two filter
-> amendments above:** the checkboxes are replaced by one segmented control **„Ausstehend n · Bestätigt
-> n · Abgelehnt n · Alle"** (single choice, default Ausstehend; the „Kein Status-Filter aktiv" empty
-> state is gone with the `NONE` sentinel). `status` now names one segment — `PENDING`, `CONFIRMED`,
+> **One status segment, superseding the two filter amendments above:** the status filter is one
+> segmented control **„Ausstehend n · Bestätigt n · Abgelehnt n · Alle"** (single choice, default
+> Ausstehend; there is no `NONE` sentinel and no „Kein Status-Filter aktiv" empty state). `status`
+> names one segment — `PENDING`, `CONFIRMED`,
 > `REJECTED` or `ALL`; `ALL` lists all four states, so withdrawn requests („Zurückgezogen") appear only
-> there. An old multi-valued value is mapped: one of the three counted states selects its segment, any
+> there. A multi-valued value is mapped: one of the three counted states selects its segment, any
 > other combination of known states (a lone `CANCELLED` included) selects `ALL`, and a blank, unknown
-> or `NONE` value opens `PENDING`. The choice stays persisted per user under the same key
+> or `NONE` value opens `PENDING`. The choice is persisted per user under the key
 > (`bank_request_status_filter_<uid>`); a stored checkbox list migrates by the same mapping
 > (`bank-requests.js`). The Ausstehend count comes from the pending page itself, the other two from one
 > single-entry read each unless their segment is shown. The toolbar's right side counts **„n warten
@@ -1093,7 +1097,7 @@ shows the status alone
 > Bankmitarbeiter remain in the expandable sub-row. The page-level direct-booking button reads
 > „Kontobewegung erfassen" (outline).
 >
-> **Amended 2026-10-04 — the confirm action follows the caller's capability:** every row of
+> **The confirm action follows the caller's capability:** every row of
 > `GET /api/v1/bank/requests` carries **`callerMayConfirm`** (`BankBookingRequestDto`, `null` on every
 > other read of that DTO): `true` exactly when the request is `PENDING` and the caller passes the same
 > capability check the confirm endpoint enforces — `BankStaffRights#canBook`, i.e. management,
@@ -1104,12 +1108,12 @@ shows the status alone
 > (and the attested „Bestätigen, Freigabe liegt vor …") **only where `callerMayConfirm` is true**; a
 > ready row the caller may not confirm says **„wartet auf berechtigte Bankmitarbeiter"** and keeps
 > only „Ablehnen" in its ⋯ menu (rejection still needs visibility alone), loses the accent edge, and
-> no longer counts toward „n warten auf dich" (`BankRequestQueuePageController#awaitsTheCaller`). The
-> confirm endpoint itself is unchanged and still answers 403 when the capability is missing.
+> does not count toward „n warten auf dich" (`BankRequestQueuePageController#awaitsTheCaller`). The
+> confirm endpoint itself answers 403 when the capability is missing.
 >
-> **Amended 2026-11-20 — a transfer names its destination account:** the title of a transfer row
+> **A transfer names its destination account:** the title of a transfer row
 > reads „Konto → Zielkonto" with the **display names** of both accounts, and its sub-line carries
-> both account numbers, „KB-0003 → KB-0018", ahead of the Begründung. `BankBookingRequestDto` gains
+> both account numbers, „KB-0003 → KB-0018", ahead of the Begründung. `BankBookingRequestDto` carries
 > `targetAccountName` beside `targetAccountNo` for it, `null` wherever a request has no destination
 > account.
 
@@ -1232,8 +1236,8 @@ confirm/reject/queue surface; the audit log stays admin-only.
 > successful commit and group the same logical cause across Bank/order roles. Rollback emits no
 > success; no private note enters an order notice.
 
-> **Amended 2026-10-10 (#2413):** a requester's correction (REQ-BANK-056) replaces the open notices
-> with `BANK_BOOKING_REQUEST_UPDATED` for the same recipients, so the decision events now clear both
+> **Corrections and holder changes:** a requester's correction (REQ-BANK-056) replaces the open notices
+> with `BANK_BOOKING_REQUEST_UPDATED` for the same recipients, so the decision events clear both
 > `…_CREATED` and `…_UPDATED` (`BankBookingRequestEvent.OPEN_REQUEST_NOTICES`). A change of the
 > account's responsible holders moves each open request's notice from the former to the new holders
 > (REQ-BANK-034, REQ-NOTIF-023).
@@ -1585,7 +1589,7 @@ bank owes them, so their own money exceeds the entered balance.
   (= the custody total) and the own private money (= balance − custody total) live and client-side;
   nothing is persisted.
 
-*Amended 2026-10-03 (website overhaul phase 3):* the holder detail uses the shared page head (eyebrow
+The holder detail uses the shared page head (eyebrow
 „Verwaltung" linking back to the holder tab, the holder's name as title, chips for active/inactive and
 auto/manual), two KPI tiles („Hält gesamt", „Buchungen") and the calculator as a compact card whose
 result is a `.stack-bar` — „Bank-reserviert" against „Privat (eigenes Geld)", the reserved share
@@ -1774,7 +1778,7 @@ the exchange, which has no active context (REQ-BXCH-001)
 > inside the seam (both ArchUnit pins hold), reached from the membership/user services via an
 > `ObjectProvider` to break the constructor cycle.
 >
-> **Amended 2026-10-10 (#2413, notifications on a holder change):** the same diff now also tells the
+> **Notifications on a holder change:** the same diff also tells the
 > people concerned. Every member who **became** a responsible holder receives
 > `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` („Du bist jetzt für Konto {accountNo} verantwortlich …") with the
 > number of open requests waiting for a responsible holder's approval (`PENDING`, approval required,
@@ -1973,11 +1977,11 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 > `org-unit-bank-settings` testid so the `orgUnitBankSettings` swap target and the tests still resolve
 > the region.
 >
-> **Amended 2026-10-03 (website overhaul phase 3) — supersedes the tab names and the untabbed viewer
-> layout above:** the drill-in is built from the shared account-detail fragment (REQ-BANK-017). Every
-> viewer now gets a tab bar: **„Buchungen (n)"** (default, the chart card and the Halter-redacted
-> history) and a second tab — **„Ziel & Sichtbarkeit"** for the manage-capable caller (`settings !=
-> null`; formerly „Verantwortung & Sichtbarkeit", the same three tiles, now `.card`s) or **„Konto-Info"**
+> **Shared fragment, superseding the tab names and the untabbed viewer layout above:** the drill-in
+> is built from the shared account-detail fragment (REQ-BANK-017). Every viewer gets a tab bar:
+> **„Buchungen (n)"** (default, the chart card and the Halter-redacted history) and a second tab —
+> **„Ziel & Sichtbarkeit"** for the manage-capable caller (`settings != null`; the three tiles as
+> `.card`s) or **„Konto-Info"**
 > for a plain viewer (number, type, org unit, Bereich, status, created). A plain viewer's read-only
 > approval limits stand above the tab bar; the KRT ladder card („Freigabe-Stufen", REQ-BANK-047) sits
 > in the second tab. The head carries the ghost „Kontoauszug" (when `canExportStatement`) and the CTA
@@ -1985,7 +1989,7 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 > list is the drill-in account; deposits for any viewer, withdrawals and transfers when the caller may
 > debit it, with the same limit warning as on `/org-unit-bank`) and refreshes `orgUnitBankSettings` on
 > success. The last tab is remembered per user (`org_unit_bank_account_tab_<user>`). Endpoints,
-> versions, redaction and the swap seams are unchanged.
+> versions, redaction and the swap seams are those described above.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` (Buchungen + Ziel & Sichtbarkeit for a manager; Buchungen + Konto-Info, no settings, for a plain viewer), `BankAccountDetailPatternRenderTest` · **Code:** `bank/internal/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `bank/internal/BankStatementReportService#generateStatement(..., redactHolders)`, `bank/internal/OrgUnitBankAccountDetailDto`, `bank/web/OrgUnitBankController`, frontend `bank/web/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/bank/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
@@ -2157,7 +2161,7 @@ ceilings, so the box carries **no management-only gate** on that surface, and it
 **own always-visible tile** above the collapsible Konto-Info panel rather than nested inside it
 (amending the REQ-BANK-017 placement): the Konto-Info tile is `hidden` by default and re-collapses
 on every `accountBody` swap, which buried the one figure the employee needs behind a click they had
-no reason to make. *Amended 2026-10-03 (website overhaul phase 3):* Konto-Info is now a tab, and the
+no reason to make. On the shared account-detail fragment Konto-Info is a tab, and the
 limits tile stands between the KPI tiles and the tab bar, visible on both tabs.
 Setting/clearing a limit is audited (`APPROVAL_LIMIT_SET` / `APPROVAL_LIMIT_CLEARED`).
 
@@ -2166,8 +2170,7 @@ the requester at all** (amended) — it is flagged `requires_owner_approval`; th
 warning that it must be approved first. **A request by the account's responsible holder is never
 flagged** (amended, ADR-0123), so neither step below runs for them and the request modal shows no
 warning. (1) The
-responsible holder may **grant approval in-app** from the „Anträge an unsere Konten" tab („Fremde
-Anträge" until 2026-10-03) — the requests
+responsible holder may **grant approval in-app** from the „Anträge an unsere Konten" tab — the requests
 raised against the accounts they are responsible for — recorded as `owner_approval_granted` (with
 who/when) and audited (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED` / `…_REVOKED`). (2) The bank employee
 sees an explicit warning in the confirmation dialog and must tick a mandatory
@@ -2185,12 +2188,12 @@ came from the employee checkbox alone (step (2) without step (1)) keeps `owner_a
 false` forever, so an action-worded chip would still demand an approval that is long settled. The
 queue's last column is headed **"Entscheidung"** rather than "Aktionen" for the same reason — it holds
 the confirm/reject buttons only while the request is `PENDING` and otherwise names the decider.
-*Amended 2026-10-03 (website overhaul phase 3):* while such a request is still `PENDING` and the
+While such a request is still `PENDING` and the
 approval is open, the queue shows instead where it waits — a warning chip „→ <approver>" at the amount
 and „wartet auf <approver>" in the decision column (approver = Kontoverantwortliche, Bankleitung or
 Organisationsleitung, from `requiredApprover`; a missing value reads as Kontoverantwortliche), with
-the employee's attested confirm moved into the row's ⋯ menu (REQ-BANK-023). „Über Limit" (muted) now
-marks only a decided request whose approval never came in-app; „Freigegeben" is unchanged.
+the employee's attested confirm in the row's ⋯ menu (REQ-BANK-023). „Über Limit" (muted) marks only
+a decided request whose approval never came in-app; „Freigegeben" is as above.
 
 **The approver sees the Begründung too ("Anträge an unsere Konten", formerly "Fremde Anträge").** Each row of the approval tab carries the
 same **expandable Begründung + Notiz sub-row** as the bank-staff queue (REQ-BANK-023/-045): a leading
@@ -2465,8 +2468,8 @@ user free text) and sets the structured `target_user_id` on `DEPOSIT_BOOKED` / `
 > counterparty, unified exactly as the PDFs already do. The **Begründung + Notiz** move out of their own
 > columns into an **expandable per-booking sub-row** (REQ-BANK-017/-045), reason first.
 >
-> **Amended 2026-10-03 (website overhaul phase 3):** on both account-detail tables the column is headed
-> **„Gegenpartei"** again (`bank.booking.party`; the PDFs keep „Quell-/Zielkonto") and shows the same
+> **Account-detail tables:** on both account-detail tables the column is headed
+> **„Gegenpartei"** (`bank.booking.party`; the PDFs keep „Quell-/Zielkonto") and shows the same
 > content — the counter-account with its direction arrow for a transfer, else the counterparty with
 > its unit — with Begründung, Notiz and Notiz Bankmitarbeiter as sub-lines under it instead of an
 > expandable sub-row (REQ-BANK-017).
@@ -2691,14 +2694,14 @@ seam so the bank stays org-unit-blind (REQ-BANK-008, both ArchUnit pins green). 
 `employeeApprovalCeiling`/`areaLeadApprovalCeiling`; since 2026-10-03 the card „Freigabe-Stufen" in
 the drill-in's second tab, REQ-BANK-038).
 
-*Amended 2026-10-03 (website overhaul phase 3):* the KRT-Freigaben tab draws the ladder as a **tier
+The KRT-Freigaben tab draws the ladder as a **tier
 bar** — the question „Wer gibt Auszahlungen vom KRT-Konto frei?", three segments „Bankmitarbeiter ·
 Bankleitung · Organisationsleitung" each with its range („bis 250.000", „darüber", „keine
 Selbstfreigabe" / „keine Stufe" for an unset threshold), the two thresholds marked on a scale under
 the bar, the two number fields `T1` / `T2`, an `.alert-info` example („Beispiel: Eine Auszahlung über
 … aUEC braucht die Freigabe der Bankleitung." plus the OL sentence when `T2` is set) and the one
 action „Schwellen speichern". Bar, scale and example follow the fields as you type
-(`bank-manage.js`); the write is the unchanged `PATCH …/approval-tiers`. Each Verwaltung tab has one
+(`bank-manage.js`); the write is `PATCH …/approval-tiers`. Each Verwaltung tab has one
 primary action in the page head (Halter: „+ Umbuchung", with „+ Halter registrieren" as a ghost
 button for the Bankleitung; Konten: „+ Konto anlegen" / „+ Sonderkonto anlegen").
 
@@ -2847,9 +2850,8 @@ REQ-OBS-011).
 `bank/internal/BankBalanceSeriesDto` + `BankBalancePointDto`, frontend `bank/web/BankBalanceChart`,
 `bank/web/BankAccountDetailSupport`, `templates/bank/fragments/bank-balance-chart.html` · **Issues:** —
 
-*Amended 2026-10-03 (website overhaul phase 3):* the chart is a fixed card on the „Buchungen" tab,
-titled „Saldoverlauf · <Zeitraum>" with the range links on the right of its head; it no longer
-collapses (REQ-BANK-050 superseded). Range, series, swap and persistence are unchanged.
+The chart is a fixed card on the „Buchungen" tab, titled „Saldoverlauf · <Zeitraum>" with the
+range links on the right of its head; it does not collapse (REQ-BANK-050 superseded).
 
 ### REQ-BANK-050 — Collapsible chart and booking-history panels (per-user state)
 
@@ -2913,16 +2915,16 @@ frontend `BankAccountDetailFragmentMvcTest` (period filter + page-size picker) +
 `bank/web/OrgUnitBankController`, frontend `bank/web/BankAccountDetailSupport`,
 `templates/bank/bank-account-detail.html`, `templates/bank/org-unit-bank-account-detail.html` · **Issues:** —
 
-*Amended 2026-10-03 (website overhaul phase 3):* the period is chosen with the segment **„30 Tage · 90
+The period is chosen with the segment **„30 Tage · 90
 Tage · Zeitraum …"** above the history (default 90 Tage). A preset fills from/to (from = today minus
 the days, to = today) and re-renders the history at once; „Zeitraum …" reveals the Von/Bis date fields,
-and a date change re-renders at once — the „Anwenden" button is gone. The server marks the segment
+and a date change re-renders at once, with no „Anwenden" button. The server marks the segment
 from the resolved period (`BankAccountDetailSupport#historyPreset`: `30d` / `90d` when the period ends
 today and spans exactly that many days, else `custom`), so a deeplinked or paged period shows the
-right segment. The table gains the column **„Saldo nach Buchung"**: the frontend reads the balance at
-the newest posting of the page with one single-instant read of the existing `balance-series` endpoint
+right segment. The table carries the column **„Saldo nach Buchung"**: the frontend reads the balance at
+the newest posting of the page with one single-instant read of the `balance-series` endpoint
 (from = to = that posting's time) and walks the page's amounts backwards (`BankRunningBalance`); a
-failed read leaves the column „–". No new endpoint, audit event or metric. Enforced by
+failed read leaves the column „–". Enforced by
 `BankRunningBalanceTest`, `BankAccountDetailPatternRenderTest`, `OrgUnitBankPageControllerMvcTest`.
 
 ### REQ-BANK-052 — Chart and booking history side by side on ultra-wide screens
@@ -3063,9 +3065,8 @@ rejected/cancelled request.
 bank-facing eyes*: the bank-staff account-detail booking history, the request queue's expandable
 sub-row, the approval tab's sub-row (REQ-BANK-041), the account-statement PDF and the
 management-export PDF. On each surface it is a third line of the existing detail sub-row, after
-Begründung and Notiz, and its presence alone makes a row expandable. *Amended 2026-10-03 (website
-overhaul phase 3):* on the bank-staff account-detail history a booking row no longer expands — the
-note is a labelled sub-line under the Gegenpartei, after Begründung and Notiz (REQ-BANK-017); the
+Begründung and Notiz, and its presence alone makes a row expandable. On the bank-staff
+account-detail history a booking row does not expand — the note is a labelled sub-line under the Gegenpartei, after Begründung and Notiz (REQ-BANK-017); the
 request queue and the approval tab keep the expandable sub-row.
 
 It is **redacted for org-unit members**, and this is the one place it parts company with the other
@@ -3242,13 +3243,9 @@ binds, so an edit cannot blank a Begründung that the source account mandates.
 notices about the request (`BANK_BOOKING_REQUEST_CREATED`, `…_UPDATED`) and tells the same recipients
 again with `BANK_BOOKING_REQUEST_UPDATED` — bank management, the account's grant holders and its
 responsible holder, the requester excluded (`BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER`, seed V269,
-REQ-NOTIF-018). The staff queue and the approval tab still pick the change up through the live-sync
-broadcast, and the approval chip flips there without a reload.
-
-> **Amended 2026-10-10 (#2413):** this paragraph said an edit "deliberately fires none", reasoning
-> that the request was already announced. The announcement went stale, though: the approvers' open
-> notice kept showing the old amount, and they acted on it. The owner decided in #2413 that a
-> correction replaces the notice.
+REQ-NOTIF-018), so no approver acts on a notice that still shows the old amount. The staff queue and
+the approval tab also pick the change up through the live-sync broadcast, and the approval chip flips
+there without a reload.
 
 **UI:** a per-row "Bearbeiten" modal in "Meine Anträge", rendered once per editable row rather than
 as a primed singleton. The Empfänger picker is a **remote** combobox, which seeds itself from a

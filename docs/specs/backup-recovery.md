@@ -105,11 +105,6 @@ state is rewritten from Postgres or expires within the hour — logs, and the Lo
 silently extend the approved 31-day IP retention, ADR-0072); Tempo traces and exporter data are
 regenerable.
 
-> **Corrected 2026-09-22:** earlier revisions also excluded "the WireGuard `wg0.conf` key", to be
-> backed up out-of-band. A read-only check of the production host on 2026-09-22 found no WireGuard
-> on it at all — the management VPN was never built
-> ([`MGMT_VPN_PLAN.md`](../archive/MGMT_VPN_PLAN.md)) — so there is nothing to exclude.
-
 > [!warning] Two of those were added on 2026-09-18, and their absence was a live gap
 > This paragraph named *"the nginx-proxy-manager state ([…] SQLite config + Let's
 > Encrypt)"* — and NPM had been removed from the stack. Its successor keeps the same material in
@@ -172,10 +167,9 @@ The backend compares exact nonzero counts for `flyway_schema_history` and `org_u
 compares `realm` and `client`. Counts are read without logging row contents. The drill touches **no**
 production state, and a failure makes the unit report `failed` so it is caught.
 
-**The databases are not the whole claim** (added 2026-09-18). A host whose dumps restore perfectly
-still does not come up without the edge's TLS material or the Redis ACLs, and for as long as the
-drill looked only at the dumps it reported green over a snapshot that held neither. It therefore
-also asserts the **presence** of the non-database artifacts REQ-OPS-010 names — presence only, never
+**The databases are not the whole claim.** A host whose dumps restore perfectly still does not
+come up without the edge's TLS material or the Redis ACLs, and a drill that looked only at the
+dumps would report green over a snapshot that held neither. It therefore also asserts the **presence** of the non-database artifacts REQ-OPS-010 names — presence only, never
 content, so nothing it logs can carry a key — and reports each through
 `basetool_restore_drill_artifact_ok{artifact=…}`.
 
