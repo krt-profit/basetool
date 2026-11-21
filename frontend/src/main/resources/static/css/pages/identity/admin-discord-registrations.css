@@ -8,6 +8,9 @@
         color: var(--color-gray-2-text);
         font-size: 0.85rem;
     }
+    .reg-panels > .card--flush:nth-last-child(1 of :not([hidden])) {
+        --flush-corner-bottom: calc(var(--radius-box) - 1px);
+    }
     .reg-hint {
         margin: 0;
         padding: var(--space-3) var(--space-4);

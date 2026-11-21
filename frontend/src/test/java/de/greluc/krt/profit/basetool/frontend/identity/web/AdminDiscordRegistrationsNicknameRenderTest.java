@@ -51,7 +51,8 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * Full Thymeleaf render and proxy tests for the Discord registration-approval queue: the
  * server-nickname column (REQ-DATA-018), the link-to-existing-account action (REQ-SEC-026) and the
- * rejected table with its reopen action (REQ-SEC-034). Assertions are locale-independent.
+ * rejected table with its reopen action (REQ-SEC-034) and the panels fragment the live sync swaps
+ * in place (REQ-FE-010). Assertions are locale-independent.
  */
 @SpringBootTest
 class AdminDiscordRegistrationsNicknameRenderTest {
@@ -337,6 +338,83 @@ class AdminDiscordRegistrationsNicknameRenderTest {
         .as("the pending queue still renders and the rejected table degrades to its empty state")
         .contains("AliceCallsign")
         .contains("id=\"rejectedEmpty\"");
+  }
+
+  /**
+   * {@code ?fragment=panels} renders only the two queue panels the page swaps in place on a
+   * live-sync frame, each row with its current version, and none of the page around them.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void panelsFragment_rendersOnlyTheQueuePanelsWithTheCurrentVersions() throws Exception {
+    UUID pending = UUID.randomUUID();
+    UUID rejected = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/users/admin/registrations"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new PendingRegistrationDto(
+                    pending,
+                    "AliceCallsign",
+                    null,
+                    Instant.parse("2026-06-22T00:00:00Z"),
+                    null,
+                    false,
+                    7L)));
+    when(backendApiClient.get(
+            eq("/api/v1/users/admin/registrations?status=REJECTED"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new PendingRegistrationDto(
+                    rejected,
+                    "StolpiCallsign",
+                    null,
+                    Instant.parse("2026-06-22T00:00:00Z"),
+                    Instant.parse("2026-06-29T09:41:00Z"),
+                    false,
+                    4L)));
+
+    String html = panelsFragment();
+
+    assertThat(html)
+        .containsPattern("id=\"reg-row-" + pending + "\"[^>]*data-version=\"7\"")
+        .containsPattern("id=\"rejected-row-" + rejected + "\"[^>]*data-version=\"4\"")
+        .contains("id=\"reg-panel-open\"", "id=\"reg-panel-rejected\"")
+        .doesNotContain("id=\"reg-panels\"", "data-reg-tab", "id=\"reject-modal\"", "<html");
+  }
+
+  /**
+   * A failed read of the pending queue shows its error inside the swapped panels, so a live-sync
+   * refresh that fails says so instead of showing an empty queue.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void panelsFragment_showsAFailedPendingReadInsideThePanels() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/users/admin/registrations"), anyTypeRef()))
+        .thenThrow(new IllegalStateException("backend unavailable"));
+
+    assertThat(panelsFragment())
+        .contains("class=\"alert alert-danger\"")
+        .contains("id=\"registrationsEmpty\"");
+  }
+
+  /**
+   * Requests the queue panels fragment as an admin.
+   *
+   * @return the rendered fragment
+   * @throws Exception if the request fails
+   */
+  private String panelsFragment() throws Exception {
+    return mockMvc
+        .perform(
+            get("/admin/discord-registrations")
+                .param("fragment", "panels")
+                .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
   }
 
   @Test

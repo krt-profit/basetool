@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.identity.api;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
@@ -48,6 +49,7 @@ import org.jetbrains.annotations.Nullable;
 /** User JPA entity. */
 @Entity
 @Table(name = "app_user")
+@EntityListeners(RegistrationQueueListener.class)
 @Getter
 @Setter
 @ToString

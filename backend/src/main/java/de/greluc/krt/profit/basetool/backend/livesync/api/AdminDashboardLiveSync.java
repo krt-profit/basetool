@@ -52,7 +52,7 @@ public class AdminDashboardLiveSync {
     announce(DELETION_REQUESTS);
   }
 
-  /** Announces that a Discord registration was filed or decided. */
+  /** Announces that a Discord registration was filed, changed or decided. */
   public void registrationsChanged() {
     announce(DISCORD_REGISTRATIONS);
   }

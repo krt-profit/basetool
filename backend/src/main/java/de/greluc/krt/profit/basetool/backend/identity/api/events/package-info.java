@@ -18,8 +18,8 @@
  */
 
 /**
- * The identity module's published events: registration pending, approval decided and a member's
- * departure, consumed after commit (plan §5.3).
+ * The identity module's published events: registration pending, changed and decided, approval
+ * decided and a member's departure, consumed after commit (plan §5.3).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.identity.api.events;
