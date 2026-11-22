@@ -303,6 +303,16 @@ host_scripts_compare "{directory}/manifest"
         self.assertIn('env_keep = "TERM"', role)
         self.assertNotIn("NOPASSWD: SETENV:", role)
 
+    def test_keycloak_dump_leaves_out_the_event_store_and_the_sessions(self):
+        backup = (ROOT / "scripts/backup.sh").read_text()
+        for table in (
+            "event_entity",
+            "admin_event_entity",
+            "offline_user_session",
+            "offline_client_session",
+        ):
+            self.assertIn(f"--exclude-table-data={table}", backup)
+
     def test_otp_alt_text_is_localized_in_both_languages(self):
         theme = ROOT / "keycloak-theme/krt-theme/login"
         self.assertIn(

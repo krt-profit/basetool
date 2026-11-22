@@ -40,7 +40,11 @@ class LogFileRetentionTest {
   /** Days of rolled history one appender may keep beside the file of the current day. */
   private static final int MAX_HISTORY_DAYS = 30;
 
-  private static final Pattern MAX_HISTORY = Pattern.compile("<maxHistory>\\s*(\\d+)\\s*</");
+  /**
+   * A {@code maxHistory} of at most four digits, so every match parses as an {@code int}; a longer
+   * value matches nothing and fails the one-per-appender count instead.
+   */
+  private static final Pattern MAX_HISTORY = Pattern.compile("<maxHistory>\\s*(\\d{1,4})\\s*</");
 
   private static final Pattern ROLLING_APPENDER =
       Pattern.compile("class=\"ch\\.qos\\.logback\\.core\\.rolling\\.RollingFileAppender\"");

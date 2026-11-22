@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexVehicleServic
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.function.IntSupplier;
 import org.junit.jupiter.api.BeforeEach;
@@ -230,6 +231,42 @@ class UexSchedulerTest {
   }
 
   @Test
+  void aPartialVehicleSliceLetsTheLaterSlicesRunAndFailsTheSweep() {
+    endsPartially(SyncAggregate.SHIP_TYPE);
+
+    scheduler.scheduleCommodityPriceUpdate();
+
+    verify(uexItemSyncService).syncItems();
+    verify(uexItemPriceSyncService).syncItemPrices();
+    verify(uexRefinerySyncService).syncRefiningMethods();
+    verify(uexRefinerySyncService).syncRefineryYields();
+    assertEquals(1.0, executions("failure"), "the sweep must still fail on the partial slice");
+    assertEquals(0.0, executions("success"));
+  }
+
+  @Test
+  void aPartialSliceBeforeTheVehiclesStillAbortsTheSweep() {
+    endsPartially(SyncAggregate.MANUFACTURER);
+
+    scheduler.scheduleCommodityPriceUpdate();
+
+    verify(uexVehicleService, never()).syncVehicles();
+    verify(uexItemSyncService, never()).syncItems();
+    assertEquals(1.0, executions("failure"));
+  }
+
+  @Test
+  void aFailingVehicleSliceStillAbortsTheLaterSlices() {
+    doThrow(new RuntimeException("UEX 500")).when(uexVehicleService).syncVehicles();
+
+    scheduler.scheduleCommodityPriceUpdate();
+
+    verify(uexItemSyncService, never()).syncItems();
+    verify(uexRefinerySyncService, never()).syncRefiningMethods();
+    assertEquals(1.0, executions("failure"));
+  }
+
+  @Test
   void scheduleTask_evictsUexSyncedMasterDataAfterSweep() {
     scheduler.scheduleCommodityPriceUpdate();
 
@@ -290,5 +327,35 @@ class UexSchedulerTest {
         uexItemPriceSyncService,
         uexRefinerySyncService,
         masterDataCacheEvictionService);
+  }
+
+  /**
+   * Lets one UEX slice run its task and end {@code PARTIAL}; the other slices keep the default
+   * {@code SUCCESS} answer.
+   *
+   * @param aggregate the slice that applies partially
+   */
+  private void endsPartially(SyncAggregate aggregate) {
+    doAnswer(invocation ->
+            new SyncRunService.Result(
+                ((IntSupplier) invocation.getArgument(3)).getAsInt(), SyncRunStatus.PARTIAL))
+        .when(syncRuns)
+        .run(eq(SyncSourceSystem.UEX), eq(aggregate), any(), any());
+  }
+
+  /**
+   * Reads how often the UEX sync job ended with an outcome.
+   *
+   * @param outcome {@code success} or {@code failure}
+   * @return the executions counter, {@code 0} when it was never registered
+   */
+  private double executions(String outcome) {
+    Counter counter =
+        meterRegistry
+            .find(MetricNames.SCHEDULED_JOB_EXECUTIONS)
+            .tag(MetricNames.TAG_JOB, ScheduledJob.UEX_SYNC.label())
+            .tag(MetricNames.TAG_OUTCOME, outcome)
+            .counter();
+    return counter == null ? 0.0 : counter.count();
   }
 }

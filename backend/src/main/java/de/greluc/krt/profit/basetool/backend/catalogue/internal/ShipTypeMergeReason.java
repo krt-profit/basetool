@@ -45,6 +45,12 @@ enum ShipTypeMergeReason {
   UEX_FULL_NAME_IS_P4K_NAME(false),
 
   /**
+   * The merged row's name agrees with the surviving row's English or German P4K name once each
+   * drops its manufacturer word (REQ-P4K-053).
+   */
+  NAME_WITHOUT_MANUFACTURER_IS_P4K_NAME(false),
+
+  /**
    * The merged row's GUID left a complete catalogue, and the surviving row holds the record that
    * succeeds it (REQ-P4K-053).
    */
@@ -65,4 +71,14 @@ enum ShipTypeMergeReason {
 
   /** Whether the merged row may hold a P4K GUID, which then leaves the catalogue with it. */
   @Getter private final boolean mergingP4kRow;
+
+  /**
+   * Tells whether the merged row's Wiki and UEX listings list the surviving row's ship. A vanished
+   * edition keeps listings of its own, which the merge leaves behind (REQ-DATA-042, REQ-DATA-043).
+   *
+   * @return {@code false} for {@link #EDITION_OF_BASE}, else {@code true}
+   */
+  boolean listsTheSurvivorsShip() {
+    return this != EDITION_OF_BASE;
+  }
 }

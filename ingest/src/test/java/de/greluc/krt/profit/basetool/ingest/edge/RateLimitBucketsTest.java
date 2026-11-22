@@ -63,6 +63,34 @@ class RateLimitBucketsTest {
   }
 
   @Test
+  void dropsAKeyIdleLongerThanTheExpiry() {
+    long[] now = {0L};
+    Map<String, Bucket> buckets =
+        RateLimitBuckets.boundedLru(10, Duration.ofHours(1), () -> now[0]);
+    buckets.computeIfAbsent("203.0.113.9", key -> bucket());
+    buckets.computeIfAbsent("active", key -> bucket());
+
+    now[0] = Duration.ofMinutes(50).toNanos();
+    buckets.get("active");
+    now[0] = Duration.ofMinutes(61).toNanos();
+    buckets.computeIfAbsent("newcomer", key -> bucket());
+
+    assertThat(buckets).containsKeys("active", "newcomer").doesNotContainKey("203.0.113.9");
+  }
+
+  @Test
+  void keepsAKeyUsedWithinTheExpiry() {
+    long[] now = {0L};
+    Map<String, Bucket> buckets =
+        RateLimitBuckets.boundedLru(10, Duration.ofHours(1), () -> now[0]);
+    Bucket first = buckets.computeIfAbsent("member", key -> bucket());
+
+    now[0] = Duration.ofMinutes(59).toNanos();
+
+    assertThat(buckets.computeIfAbsent("member", key -> bucket())).isSameAs(first);
+  }
+
+  @Test
   void reusesTheBucketForAKnownKey() {
     Map<String, Bucket> buckets = RateLimitBuckets.boundedLru(10);
 

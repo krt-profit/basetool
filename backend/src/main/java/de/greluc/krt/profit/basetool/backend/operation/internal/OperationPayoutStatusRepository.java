@@ -24,6 +24,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for {@link OperationPayoutStatus}. */
@@ -68,4 +71,34 @@ public interface OperationPayoutStatusRepository
    */
   Optional<OperationPayoutStatus> findByOperationIdAndParticipantKey(
       UUID operationId, String participantKey);
+
+  /**
+   * Re-keys every payout status of the given member from the member's id to the key the payout
+   * calculation gives the member's participation once the account is gone, for the account
+   * deletion. The key becomes {@code deleted_<participantId>} of the member's first participation
+   * in the operation's missions, or {@code deleted_<statusId>} when the operation holds none. Must
+   * run while {@code mission_participant.user_id} still names the member.
+   *
+   * @param memberKey the departing member's {@code app_user.id} as a payout key
+   * @return the number of status rows re-keyed
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE operation_payout_status status
+          SET participant_key = 'deleted_' || COALESCE(
+                  (SELECT CAST(participant.id AS text)
+                   FROM mission_participant participant
+                   JOIN mission ON mission.id = participant.mission_id
+                   WHERE mission.operation_id = status.operation_id
+                     AND CAST(participant.user_id AS text) = status.participant_key
+                   ORDER BY participant.id
+                   LIMIT 1),
+                  CAST(status.id AS text)),
+              version = status.version + 1
+          WHERE status.participant_key = :memberKey
+          """,
+      nativeQuery = true)
+  int rekeyDeletedMember(@Param("memberKey") String memberKey);
 }

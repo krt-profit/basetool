@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiVehicleSyncService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ShipTypeRedirectRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
@@ -61,6 +62,7 @@ class ScWikiVehicleSyncServiceTest {
 
   @Mock private ScWikiClient scWikiClient;
   @Mock private ShipTypeRepository shipTypeRepository;
+  @Mock private ShipTypeRedirectRepository shipTypeRedirects;
   @Mock private SyncReportService syncReportService;
 
   private ScWikiProperties properties;
@@ -88,6 +90,7 @@ class ScWikiVehicleSyncServiceTest {
             scWikiClient,
             properties,
             shipTypeRepository,
+            shipTypeRedirects,
             syncReportService,
             new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress()));
   }
@@ -160,6 +163,43 @@ class ScWikiVehicleSyncServiceTest {
     assertEquals("Wiki Deutsch", result.getDescriptionDe());
     assertEquals("UEX English desc", result.getDescriptionEn());
     assertTrue(result.getIsBomber());
+  }
+
+  @Test
+  void aVehicleWhoseShipTypeWasMergedAwaySeedsNoRowAndKeepsTheCensusComplete() {
+    UUID edition = UUID.fromString("daf936a1-689f-4edb-980a-96947e2727c4");
+    ScWikiVehicleDto dto =
+        new ScWikiVehicleDto(
+            edition,
+            "constellation-phoenix-emerald",
+            "Constellation Mk IV Phoenix Emerald",
+            "RSI Constellation Mk IV Phoenix Emerald",
+            "RSI_Constellation_Phoenix_Emerald",
+            0.0,
+            Map.of(),
+            null,
+            null,
+            null,
+            null,
+            null);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRedirects.isMergedWikiUuid(edition)).thenReturn(true);
+    when(shipTypeRepository.markScwikiDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    verify(shipTypeRepository, never()).save(any());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            eq(edition),
+            eq("Constellation Mk IV Phoenix Emerald"),
+            eq("Vehicle belongs to the ship type its row was merged into."));
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository).markScwikiDeletedExcept(any(), any());
   }
 
   @Test

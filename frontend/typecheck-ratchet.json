@@ -216,6 +216,7 @@
     ],
     "materialexchange": [
       "materialexchange/exchange-item-options.js",
+      "materialexchange/exchange-picker.js",
       "materialexchange/materialboerse-release.js",
       "materialexchange/materialboerse.js",
       "materialexchange/materialgesuch-modal.js"

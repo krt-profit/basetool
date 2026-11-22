@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
@@ -38,8 +39,9 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The twin rules besides the Wiki UUID: same variant group and name, Wiki in-game name, and a
- * departed record whose successor has a row (REQ-P4K-053).
+ * The twin rules besides the Wiki UUID: same variant group and name, Wiki in-game name, UEX full
+ * name, the name without the manufacturer word, and a departed record whose successor has a row
+ * (REQ-P4K-053).
  */
 @SpringBootTest
 @Transactional
@@ -58,6 +60,7 @@ class P4kShipTwinRulesImportTest {
   @Autowired private P4kImportJobRepository jobs;
   @Autowired private P4kImportChangeRepository changes;
   @Autowired private ShipTypeRepository ships;
+  @Autowired private ManufacturerRepository manufacturers;
   @Autowired private EntityManager entityManager;
   @Autowired private JdbcTemplate jdbc;
 
@@ -202,6 +205,8 @@ class P4kShipTwinRulesImportTest {
     assertThat(jdbc.queryForObject("SELECT ship_type_id FROM ship WHERE id = ?", UUID.class, ship))
         .isEqualTo(survivor.getId());
     assertThat(merges(runId)).singleElement().extracting(P4kImportChange::getGuid).isEqualTo(BASE);
+    assertThat(ships.findById(survivor.getId()).orElseThrow().getUexVehicleId()).isNull();
+    assertThat(ships.isMergedUexVehicleId(DEPARTED_UEX_ID)).isTrue();
   }
 
   @Test
@@ -240,12 +245,80 @@ class P4kShipTwinRulesImportTest {
     assertThat(count(departedId)).isOne();
   }
 
+  @Test
+  void aRowNamedLikeARowWithoutItsManufacturerWordMergesIntoIt() {
+    assertMerged(
+        survivor -> survivor.setManufacturer(rulesShipworks()),
+        twin -> twin.setName("Test Ship"),
+        ShipTypeMergeReason.NAME_WITHOUT_MANUFACTURER_IS_P4K_NAME);
+  }
+
+  @Test
+  void aRowNamedLikeARowsGermanNameWithoutItsManufacturerWordMergesIntoIt() {
+    assertMerged(
+        survivor -> {
+          survivor.setManufacturer(rulesShipworks());
+          survivor.setNameDe("Rules Kurzschiff");
+        },
+        twin -> {
+          twin.setName("Kurzschiff");
+          twin.setSourceSystems(GameItemSourceSystem.BOTH);
+        },
+        ShipTypeMergeReason.NAME_WITHOUT_MANUFACTURER_IS_P4K_NAME);
+  }
+
+  @Test
+  void aRowWhoseNameWithoutTheManufacturerWordAgreesWithTwoRowsStays() {
+    Manufacturer maker = rulesShipworks();
+    ShipType survivor = base();
+    survivor.setManufacturer(maker);
+    ships.saveAndFlush(survivor);
+    ShipType edition = new ShipType();
+    edition.setName(NAME + " Edition");
+    edition.setNameDe(NAME);
+    edition.setP4kUuid(EDITION);
+    edition.setClassName(EDITION_CLASS);
+    edition.setManufacturer(maker);
+    edition.setSourceSystems(GameItemSourceSystem.BOTH);
+    ships.saveAndFlush(edition);
+    ShipType other = new ShipType();
+    other.setName("Test Ship");
+    other.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    UUID otherId = ships.saveAndFlush(other).getId();
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    UUID runId = runs.apply(catalogue(), false).runId();
+
+    assertThat(count(otherId)).isOne();
+    assertThat(merges(runId)).isEmpty();
+  }
+
+  /**
+   * Saves the manufacturer whose name opens with the word the fixture's ship names open with.
+   *
+   * @return the manufacturer
+   */
+  private Manufacturer rulesShipworks() {
+    Manufacturer manufacturer = new Manufacturer();
+    manufacturer.setName("Rules Shipworks");
+    manufacturer.setAbbreviation("RLSW");
+    return manufacturers.saveAndFlush(manufacturer);
+  }
+
   private void assertMerged(Consumer<ShipType> identity, ShipTypeMergeReason reason) {
-    ShipType survivor = ships.saveAndFlush(base());
+    assertMerged(_ -> {}, identity, reason);
+  }
+
+  private void assertMerged(
+      Consumer<ShipType> survivorSetup, Consumer<ShipType> identity, ShipTypeMergeReason reason) {
+    ShipType base = base();
+    survivorSetup.accept(base);
+    ShipType survivor = ships.saveAndFlush(base);
     ShipType twin = new ShipType();
     twin.setName("Rules Test Twin");
     twin.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
     identity.accept(twin);
+    String twinName = twin.getName();
     UUID twinId = ships.saveAndFlush(twin).getId();
     P4kImportRuns runs = new P4kImportRuns(imports, jobs);
 
@@ -259,7 +332,7 @@ class P4kShipTwinRulesImportTest {
     assertThat(merges(runId))
         .singleElement()
         .extracting(P4kImportChange::getOldValue)
-        .isEqualTo("Rules Test Twin");
+        .isEqualTo(twinName);
     assertThat(
             jdbc.queryForList(
                 "SELECT details FROM audit_event WHERE event_type = 'CATALOGUE_SHIP_TYPE_MERGED'",

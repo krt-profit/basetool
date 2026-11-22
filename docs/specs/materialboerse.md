@@ -96,13 +96,18 @@ strip (material · quality as a plain number), an **editable offered-quantity fi
 anbieten" in the material's own unit — SCU or Stück/piece, #1182 — defaulting to the row's full stock
 with an "Alles" shortcut) + a Markdown textarea (≤ 20 000 characters, live counter). When started
 from the board CTA ("Material anbieten") rather than a specific Lager checkbox, the dialog leads with
-a **searchable material/item picker** whose dropdown list is **closed on open** and reveals itself
-only when the member clicks into or types in the picker input — it is never force-opened as the modal
-appears (its absolutely-positioned list would otherwise cover the fields below it) — and closes again
-on a selection, an outside click, or Escape. The item picker of the "Item anbieten"
-dialog (REQ-MARKET-012) behaves identically. Above that picker a **Material/Item radio** (default
-Material) narrows the combobox to one row kind — the release picker otherwise lists **both** the
-caller's material rows and their stock-backed game-item rows (REQ-MARKET-014). The chosen kind is
+a **searchable material/item picker** — the shared searchable combobox (`.krt-combobox`,
+`krt-searchable-select.js`) the job-order, Lager and refinery forms use, fed by the relay search —
+whose dropdown list is **closed on open** and reveals itself only when the member clicks into, types
+in or presses an arrow key in the picker input — it is never force-opened as the modal appears — and
+closes again on a selection, a blur, or Escape (Escape on an open list closes only the list, not the
+dialog). Each option names the row's material or item, its quality (materials only), its stock, its
+location and the "bereits auf der Börse" / „Gestohlen" markers, so rows of the same material stay
+apart. The item picker of the "Item anbieten" dialog (REQ-MARKET-012) and both pickers of the request
+dialog (REQ-MARKET-015) are the same combobox. Above that picker a **Material/Item switch**
+(`.krt-segmented--block`, default Material, REQ-UI-028) narrows the combobox to one row kind — the
+release picker otherwise lists **both** the caller's material rows and their stock-backed game-item
+rows (REQ-MARKET-014). The chosen kind is
 applied **server-side** (`/releasable-items?kind=MATERIAL|ITEM`, gated inside the DB query
 <em>before</em> its row cap) rather than by filtering the returned list, so a row of the wanted kind
 past the cap is never silently hidden — the same reachability guarantee the picker's server-side name
@@ -134,9 +139,10 @@ the offer's shown/filtered/sorted amount drops to the remaining stock; when the 
 out it is deleted and its offer cascade-removed (no lingering zero-stock offer).
 - [ ] A remark over 20 000 characters is rejected (400).
 - [ ] The board-CTA release dialog opens with the material/item picker dropdown **closed**; the list
-appears only when the picker input is clicked or typed into, and dismisses on a selection, an outside
-click, or Escape.
-- [ ] The board-CTA release dialog carries a Material/Item radio (default Material); picking Item
+appears only when the picker input is clicked or typed into, and dismisses on a selection, a blur,
+or Escape, which leaves the dialog open.
+- [ ] The board-CTA release dialog carries a Material/Item `.krt-segmented--block` switch (default
+Material), not radio buttons; picking Item
 lists only the caller's stock-backed game-item rows, Material only material rows. The filter is
 applied server-side (`releasable-items?kind=…`) inside the DB query, so a matching row past the
 picker's row cap is still reachable; switching kind clears any already-picked row.
@@ -148,7 +154,7 @@ picker's row cap is still reachable; switching kind clears any already-picked ro
 `MaterialExchangeService#release/updateOffer`, `MaterialExchangeBoardService#myReleasableItems`
 (50-row picker cap), `InventoryItemRepository#findReleasableForUser`, `MaterialExchangeReleaseRequest`,
 `MaterialExchangeOfferUpdateRequest`, `materialexchange/fragments/materialboerse-modal.html`,
-`materialboerse-release.js`, `V212` offered-amount column, `V210` partial-unique index,
+`materialboerse-release.js`, `exchange-picker.js`, `V212` offered-amount column, `V210` partial-unique index,
 `V216` (historical PIECE merge skips offer-backed rows)
 
 ### REQ-MARKET-013 — Stock decrease ratchets the offer down (persisted); an increase never changes it
@@ -616,7 +622,14 @@ request's subject, the requester's affiliation badges, the desired quantity, the
 set, when it was posted, and the supplier count — the same shape as REQ-MARKET-001. `Standort` is
 never exposed (REQ-MARKET-004 holds verbatim), and posting is signal-only (REQ-MARKET-003).
 
+The request dialog picks the kind with a Material/Item `.krt-segmented--block` switch (REQ-UI-028)
+and the subject with the shared searchable combobox of REQ-MARKET-002: closed on open, a server-side
+search per typed fragment, Escape on an open list closes only the list. Switching kind drops the
+pick.
+
 **Acceptance**
+- [ ] The request dialog shows a Material/Item segmented switch, not radio buttons, and one
+searchable combobox for the chosen kind; its list opens only on a click into or typing in it.
 - [ ] A material request stores its material id, desired amount and optional min quality; an item
 request resolves + snapshots the blueprint product (404 if the key resolves to no active blueprint)
 or the catalogue row of a stocked item without a blueprint (400 for a type the Lager does not book)
@@ -628,11 +641,13 @@ non-whole item quantity is rejected (400).
 
 **Enforced by:** `MaterialRequestServiceTest`, `MaterialExchangeRequestRepositoryDataTest`,
 `MaterialExchangeCatalogueRowDataTest`, `MaterialRequestControllerTest`,
-`MaterialgesuchPageControllerMvcTest` · **Code:**
+`MaterialgesuchPageControllerMvcTest`, `MaterialboardRequestModalE2eTest` · **Code:**
 `MaterialRequestService#createMaterialRequest/#createItemRequest`, `ExchangeItemSubjects`,
 `MaterialExchangeRequest`, `MaterialRequestCreateRequest`, `MaterialItemRequestCreateRequest`,
 `MaterialRequestController`, `db/migration/V224__add_material_exchange_request.sql`,
-`db/migration/V407__name_exchange_items_by_catalogue_row.sql`
+`db/migration/V407__name_exchange_items_by_catalogue_row.sql`,
+`materialexchange/fragments/materialgesuch-modal.html`, `materialgesuch-modal.js`,
+`exchange-picker.js`
 
 ### REQ-MARKET-016 — Request lifecycle (edit / deactivate), owner-only, optimistic-locked
 

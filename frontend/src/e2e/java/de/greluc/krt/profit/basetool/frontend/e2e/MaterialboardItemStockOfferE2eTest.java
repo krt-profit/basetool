@@ -106,19 +106,20 @@ class MaterialboardItemStockOfferE2eTest {
 
         page.locator("[data-testid='mb-create-offer']").click();
         page.locator("[data-mb-open-release]").first().click();
-        Locator pickerInput = page.locator("#mb-modal [data-mb-picker-input]");
+        Locator pickerInput = page.getByTestId("mb-release-picker");
         assertThat(pickerInput)
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        page.locator("#mb-modal [data-mb-kind-radio][value=\"ITEM\"]").check();
+        page.getByTestId("segment-mb-release-kind-item").click();
 
         page.waitForResponse(
             response ->
                 response.url().contains("/materialboerse/releasable-items")
+                    && response.url().contains("kind=ITEM")
                     && response.url().contains("q="),
             () -> pickerInput.fill(ITEM_NAME));
         Locator option =
-            page.locator("#mb-modal [data-mb-picker-list] .krt-combobox__option")
+            page.locator("#mb-modal .krt-combobox:has(#mb-release-row) .krt-combobox__option")
                 .filter(new Locator.FilterOptions().setHasText(ITEM_NAME))
                 .first();
         assertThat(option).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));

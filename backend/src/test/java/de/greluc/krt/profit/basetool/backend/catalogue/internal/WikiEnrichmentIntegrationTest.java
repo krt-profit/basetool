@@ -70,6 +70,7 @@ class WikiEnrichmentIntegrationTest {
   @Autowired private MaterialMapper materialMapper;
   @Autowired private GameItemRepository items;
   @Autowired private ShipTypeRepository ships;
+  @Autowired private ShipTypeRedirectRepository shipTypeRedirects;
   @Autowired private SyncChunkWriter writer;
   @Autowired private EntityManager entities;
   @Autowired private WebApplicationContext context;
@@ -166,7 +167,8 @@ class WikiEnrichmentIntegrationTest {
     ScWikiProperties config =
         BoundProperties.bind(ScWikiProperties.class, Map.of("vehicle-sync-enabled", true));
     var service =
-        new ScWikiVehicleSyncService(client, config, ships, mock(SyncReportService.class), writer);
+        new ScWikiVehicleSyncService(
+            client, config, ships, shipTypeRedirects, mock(SyncReportService.class), writer);
     try {
       assertThat(service.syncVehicles()).isEqualTo(2);
       writer.runInNewTransaction(() -> {

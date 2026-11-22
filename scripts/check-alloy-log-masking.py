@@ -13,8 +13,10 @@ no back-references, so each stage must satisfy (REQ-OBS-007):
 2. at most one capturing group in ``expression`` (named groups count; ``(?:...)`` and flag groups
    do not). No group at all replaces the whole match and is accepted.
 
+It also requires every mask listed in ``REQUIRED_MASKS``; ``--syntax-only`` skips that check.
+
 Usage:
-    python scripts/check-alloy-log-masking.py [--config PATH]
+    python scripts/check-alloy-log-masking.py [--config PATH] [--syntax-only]
 
 Exits 0 when every stage is well-formed, 1 listing every offending stage, and 2 when the file
 cannot be read or holds no ``stage.replace`` at all.
@@ -132,6 +134,35 @@ def replace_stages(text: str):
         yield text.count("\n", 0, match.start()) + 1, attrs
 
 
+REQUIRED_MASKS = {
+    'loki.process "keycloak_mask"': (
+        "identity_provider_identity=",
+        "@[A-Za-z0-9.-]+",
+    ),
+    'selector = "{app=\\"keycloak-stdout\\"}"': ("identity_provider_identity=",),
+    'selector = "{app=\\"edge\\"}"': ("request: ", "upstream: ", "referrer: "),
+}
+
+
+def missing_masks(text: str) -> list[str]:
+    """List every required mask whose block is absent or holds no stage naming the field."""
+    missing: list[str] = []
+    for anchor, fields in REQUIRED_MASKS.items():
+        start = text.find(anchor)
+        if start < 0:
+            missing.append(f"{anchor}: block not found")
+            continue
+        open_brace = (
+            text.rfind("{", 0, start) if anchor.startswith("selector") else text.find("{", start)
+        )
+        body, _ = block_body(text, open_brace)
+        expressions = [unescape(attrs.get("expression", "")) for _, attrs in replace_stages(body)]
+        for field in fields:
+            if not any(field in expression for expression in expressions):
+                missing.append(f"{anchor}: no stage.replace masks '{field}'")
+    return missing
+
+
 def main() -> int:
     """Check every masking stage and report each rule it breaks, with its line number."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -140,6 +171,11 @@ def main() -> int:
         type=pathlib.Path,
         default=DEFAULT_CONFIG,
         help="path to the Alloy configuration (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--syntax-only",
+        action="store_true",
+        help="check the stage syntax only, not the presence of the required masks",
     )
     args = parser.parse_args()
 
@@ -179,6 +215,9 @@ def main() -> int:
                 "stage.replace overwrites EVERY one of them, so the field name in group 1 is "
                 "destroyed along with the value. Wrap only the value; use (?:...) for the rest."
             )
+
+    if not args.syntax_only:
+        problems.extend(f"{args.config.as_posix()}: {gap}" for gap in missing_masks(text))
 
     if problems:
         print(

@@ -23,16 +23,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountLifecycleRequest;
-import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankDepositRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankHolderTransferRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankTransactionDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankTransferRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankWithdrawalRequest;
-import de.greluc.krt.profit.basetool.frontend.bank.model.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.ConfirmBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankAccountRequest;
-import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankGrantRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.RegisterBankHolderRequest;
@@ -42,14 +39,12 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.ReverseBankTransactionR
 import de.greluc.krt.profit.basetool.frontend.bank.model.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.SetBankBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.SetCartelApprovalTiersRequest;
-import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankGrantRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankHolderRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -343,20 +338,11 @@ class BankBackendClientTest {
 
   @Test
   void orgUnitWritesSendTheBackendRecordsAndDecodeTheAnswers() {
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 15; i++) {
       backend.answerJson(VERSIONED);
     }
     SetBankApprovalLimitRequest limit = new SetBankApprovalLimitRequest(AMOUNT);
 
-    assertThat(
-            client.createOrgUnitRequest(
-                new CreateBankBookingRequest(
-                    ID, "WITHDRAWAL", null, AMOUNT, "Sprit", null, null, null, USER, OTHER)))
-        .extracting(BankBookingRequestDto::version)
-        .isEqualTo(2L);
-    client.cancelOrgUnitRequest(ID, new CancelBankBookingRequest(1L));
-    client.updateOrgUnitRequest(
-        ID, new UpdateBankBookingRequest(AMOUNT, null, null, OTHER, null, null, 1L));
     assertThat(client.setOrgUnitBalanceTarget(ID, new OrgUnitBalanceTargetRequest(AMOUNT, 1L)))
         .isNotNull();
     client.addRoleVisibility(ID, "KRT_MEMBER");
@@ -373,33 +359,9 @@ class BankBackendClientTest {
     client.clearAreaMembersApprovalLimit(ID);
     client.setUserApprovalLimit(ID, USER, limit);
     client.clearUserApprovalLimit(ID, USER);
-    assertThat(client.grantOwnerApproval(ID, Map.of()))
-        .extracting(BankBookingRequestDto::version)
-        .isEqualTo(2L);
-    client.revokeOwnerApproval(ID);
 
-    String requests = "/api/v1/bank/org-units/requests";
     String account = "/api/v1/bank/org-units/accounts/" + ID;
     String limitJson = "{\"limit\":1000}";
-    backend.expect(
-        "POST",
-        requests,
-        "{\"sourceAccountId\":\""
-            + ID
-            + "\",\"type\":\"WITHDRAWAL\",\"targetAccountId\":null,\"amount\":1000,"
-            + "\"note\":\"Sprit\",\"justification\":null,\"splitEnabled\":null,"
-            + "\"splitPercent\":null,\"counterpartyUserId\":\""
-            + USER
-            + "\",\"counterpartyOrgUnitId\":\""
-            + OTHER
-            + "\"}");
-    backend.expect("POST", requests + "/" + ID + "/cancel", "{\"version\":1}");
-    backend.expect(
-        "PUT",
-        requests + "/" + ID,
-        "{\"amount\":1000,\"note\":null,\"justification\":null,\"targetAccountId\":\""
-            + OTHER
-            + "\",\"counterpartyUserId\":null,\"counterpartyOrgUnitId\":null,\"version\":1}");
     backend.expect("PUT", account + "/balance-target", "{\"target\":1000,\"version\":1}");
     backend.expect("POST", account + "/visibility/role/KRT_MEMBER", null);
     backend.expect("DELETE", account + "/visibility/role/KRT_MEMBER", null);
@@ -415,8 +377,6 @@ class BankBackendClientTest {
     backend.expect("DELETE", account + "/approval-limit/area-members", null);
     backend.expect("PUT", account + "/approval-limit/user/" + USER, limitJson);
     backend.expect("DELETE", account + "/approval-limit/user/" + USER, null);
-    backend.expect("POST", requests + "/" + ID + "/owner-approval", "{}");
-    backend.expect("DELETE", requests + "/" + ID + "/owner-approval", null);
   }
 
   private static byte[] bytes(

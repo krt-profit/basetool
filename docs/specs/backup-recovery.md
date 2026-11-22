@@ -93,7 +93,11 @@ serves the existing maintenance page. An operator may opt into a zero-downtime o
 
 The backup set is exactly what a full restore needs, and exclusions are deliberate, not
 accidental. **Captured:** `pg_dump -Fc` of `krt_basetool`; `pg_dump -Fc` of `keycloak` (the live
-source of truth — **not** the sanitized `realm-export.json`); the **edge's TLS material and ACME
+source of truth — **not** the sanitized `realm-export.json`) **without the rows** of
+`event_entity`, `admin_event_entity`, `offline_user_session` and `offline_client_session`
+(`--exclude-table-data`): the event store expires after 30 days and must not live six months in the
+GFS set, and a restore that drops the sessions only makes members and connected apps sign in again
+(privacy policy, section 17); the **edge's TLS material and ACME
 account state** (the `edge-certs`, `edge-acme-state` and `edge-acme-webroot` volumes); and the host
 secrets/config needed to stand the stack up (`basetool.env`, `keystore.p12`, `realm-export.json`,
 `keycloak/providers`, and the **two Redis ACL files**, `session-users.acl` and `shared-users.acl`,

@@ -38,10 +38,8 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankTransferRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankWithdrawalRequest;
-import de.greluc.krt.profit.basetool.frontend.bank.model.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.ConfirmBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankAccountRequest;
-import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankGrantRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBankAccountDetailDto;
@@ -54,7 +52,6 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.ReverseBankTransactionR
 import de.greluc.krt.profit.basetool.frontend.bank.model.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.SetBankBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.SetCartelApprovalTiersRequest;
-import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankGrantRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankHolderRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -699,46 +696,6 @@ public class BankBackendClient {
   }
 
   /**
-   * Raises a booking request against an overseen org unit's account (REQ-BANK-022).
-   *
-   * @param request the new request
-   * @return the created request, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public BankBookingRequestDto createOrgUnitRequest(@NotNull CreateBankBookingRequest request) {
-    return backendApiClient.post(
-        "/api/v1/bank/org-units/requests", request, BankBookingRequestDto.class);
-  }
-
-  /**
-   * Cancels the caller's own pending booking request (REQ-BANK-022).
-   *
-   * @param id the request
-   * @param request the echoed version
-   * @return the cancelled request, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public BankBookingRequestDto cancelOrgUnitRequest(
-      @NotNull UUID id, @NotNull CancelBankBookingRequest request) {
-    return backendApiClient.post(
-        "/api/v1/bank/org-units/requests/{id}/cancel", request, BankBookingRequestDto.class, id);
-  }
-
-  /**
-   * Corrects the caller's own still-pending, unapproved booking request (REQ-BANK-056).
-   *
-   * @param id the request
-   * @param request the corrected values with the echoed version
-   * @return the updated request, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public BankBookingRequestDto updateOrgUnitRequest(
-      @NotNull UUID id, @NotNull UpdateBankBookingRequest request) {
-    return backendApiClient.put(
-        "/api/v1/bank/org-units/requests/{id}", request, BankBookingRequestDto.class, id);
-  }
-
-  /**
    * Sets or clears an account's balance target through the org-unit view (REQ-BANK-036).
    *
    * @param id the account
@@ -990,35 +947,6 @@ public class BankBackendClient {
         OrgUnitBankAccountSettingsDto.class,
         id,
         userId);
-  }
-
-  /**
-   * Grants the responsible holder's in-app approval of an over-limit request (REQ-BANK-041).
-   *
-   * @param id the request
-   * @param body the browser's body with the request's echoed {@code version}
-   * @return the updated request, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public BankBookingRequestDto grantOwnerApproval(
-      @NotNull UUID id, @NotNull Map<String, Object> body) {
-    return backendApiClient.post(
-        "/api/v1/bank/org-units/requests/{id}/owner-approval",
-        body,
-        BankBookingRequestDto.class,
-        id);
-  }
-
-  /**
-   * Revokes a previously granted in-app approval (REQ-BANK-041).
-   *
-   * @param id the request
-   * @return the updated request, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public BankBookingRequestDto revokeOwnerApproval(@NotNull UUID id) {
-    return backendApiClient.delete(
-        "/api/v1/bank/org-units/requests/{id}/owner-approval", BankBookingRequestDto.class, id);
   }
 
   /**

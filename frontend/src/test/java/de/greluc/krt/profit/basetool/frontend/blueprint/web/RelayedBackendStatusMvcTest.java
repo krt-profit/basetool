@@ -39,6 +39,7 @@ import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
 import de.greluc.krt.profit.basetool.frontend.audit.web.AuditReportProxyController;
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankRequestsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.web.BankReportProxyController;
 import de.greluc.krt.profit.basetool.frontend.bank.web.OrgUnitBankProxyController;
 import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
@@ -216,7 +217,8 @@ class RelayedBackendStatusMvcTest {
             "OrgUnitBankProxyController#downloadStatement",
             wc ->
                 new OrgUnitBankProxyController(
-                    new BankBackendClient(RealBackendApiClient.over(wc))),
+                    new BankBackendClient(RealBackendApiClient.over(wc)),
+                    new OrgUnitBankRequestsBackendClient(RealBackendApiClient.over(wc))),
             get("/api/proxy/org-units/bank/accounts/" + id + "/statement")
                 .param("from", FROM)
                 .param("to", TO)),

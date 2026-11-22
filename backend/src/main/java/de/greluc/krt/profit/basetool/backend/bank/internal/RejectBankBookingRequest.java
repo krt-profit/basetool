@@ -24,8 +24,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Write payload for a bank employee rejecting a pending booking request (REQ-BANK-023): a mandatory
- * reason recorded on the request, plus the echoed optimistic-locking version.
+ * Write payload for rejecting a pending booking request, by a bank employee (REQ-BANK-023) or by
+ * the request's required approver (REQ-BANK-041): a mandatory reason recorded on the request, plus
+ * the echoed optimistic-locking version.
  *
  * @param reason the rejection reason shown to the requester
  * @param version the request's echoed {@code @Version}; a mismatch surfaces as 409

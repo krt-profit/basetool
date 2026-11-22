@@ -155,7 +155,8 @@ class BankBookingRequestServiceTest {
             mock(BankLinkedBookings.class),
             mock(BankLinkedRequestLiveSync.class),
             mock(NotificationCauseCollector.class),
-            new BankRequestConfirmation(creation, bankAuditService));
+            new BankRequestConfirmation(creation, bankAuditService),
+            new BankRequestRejection(creation, bankAuditService));
   }
 
   @Test
@@ -1669,6 +1670,115 @@ class BankBookingRequestServiceTest {
     BankBookingRequestDto dto = service.reject(requestId, "changed my mind", 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.REJECTED);
+  }
+
+  /**
+   * REQ-BANK-041: the required approver's rejection decides the request exactly like the bank's —
+   * {@code REJECTED} with the reason and the approver as decider, audited and announced.
+   */
+  @Test
+  void rejectAsApprover_flipsRejectedWithReasonAndTheApproverAsDecider() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    UUID approver = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.WITHDRAWAL, requester, 2L);
+    request.setRequiresOwnerApproval(true);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(approver));
+    when(userRepository.findById(approver)).thenReturn(Optional.of(new User()));
+
+    BankBookingRequestDto dto =
+        service.rejectAsApprover(
+            requestId, "zu hoch", 2L, locked -> assertThat(locked).isSameAs(request));
+
+    assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.REJECTED);
+    assertThat(dto.rejectReason()).isEqualTo("zu hoch");
+    assertThat(request.getDecidedBy()).isEqualTo(approver);
+    verify(bankAuditService)
+        .record(
+            eq(BankAuditEventType.BOOKING_REQUEST_REJECTED),
+            eq(accountId),
+            eq(null),
+            eq(requester),
+            any());
+    ArgumentCaptor<BankBookingRequestRejectedEvent> event =
+        ArgumentCaptor.forClass(BankBookingRequestRejectedEvent.class);
+    verify(eventPublisher).publishEvent(event.capture());
+    assertThat(event.getValue().reason()).isEqualTo("zu hoch");
+    assertThat(event.getValue().actorSub()).isEqualTo(approver);
+  }
+
+  /** REQ-BANK-041: a caller the approver gate refuses rejects nothing. */
+  @Test
+  void rejectAsApprover_refusedByTheApproverGate_leavesTheRequestPending() {
+    UUID requestId = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            UUID.randomUUID(),
+            0L);
+    request.setRequiresOwnerApproval(true);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+
+    assertThrows(
+        AccessDeniedException.class,
+        () ->
+            service.rejectAsApprover(
+                requestId,
+                "nein",
+                0L,
+                _ -> {
+                  throw new AccessDeniedException("not the approver");
+                }));
+
+    assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
+    verifyNoInteractions(bankAuditService, eventPublisher);
+  }
+
+  /** REQ-BANK-041/-056: a request that changed since the approver read it is not rejected. */
+  @Test
+  void rejectAsApprover_staleVersion_isAConflictAndRejectsNothing() {
+    UUID requestId = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            UUID.randomUUID(),
+            4L);
+    request.setRequiresOwnerApproval(true);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> service.rejectAsApprover(requestId, "nein", 3L, _ -> {}));
+
+    assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
+    verifyNoInteractions(bankAuditService, eventPublisher);
+  }
+
+  /** REQ-BANK-041: a request that needs no approval has no approver who could reject it. */
+  @Test
+  void rejectAsApprover_requestWithoutApproval_isABadRequest() {
+    UUID requestId = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            UUID.randomUUID(),
+            0L);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+
+    assertThrows(
+        BadRequestException.class, () -> service.rejectAsApprover(requestId, "nein", 0L, _ -> {}));
+
+    assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
+    verifyNoInteractions(bankAuditService, eventPublisher);
   }
 
   @Test

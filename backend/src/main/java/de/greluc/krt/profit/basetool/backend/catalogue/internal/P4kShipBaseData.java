@@ -136,22 +136,26 @@ class P4kShipBaseData {
   }
 
   /**
-   * Checks that refreshing this row cannot leave a stored fact dependent on the variant source.
+   * Checks that refreshing this row cannot leave a stored fact dependent on the variant source. A
+   * row whose own record left the catalogue keeps its descriptions, which describe the same ship.
    *
    * @param row the currently stamped ship
    * @param base the verified base record
    * @param context the current manufacturer mappings
+   * @param departed whether the row's own record left the catalogue (REQ-P4K-051)
    * @return whether the normal writer has sufficient base evidence
    */
   boolean canRefreshBase(
-      @NotNull ShipType row, @NotNull P4kShipDto base, @NotNull P4kImportContext context) {
+      @NotNull ShipType row,
+      @NotNull P4kShipDto base,
+      @NotNull P4kImportContext context,
+      boolean departed) {
     if ((row.getManufacturer() != null && context.manufacturer(base.manufacturerGuid()) == null)
         || (row.getScu() != null && (!cargoComplete(base) || base.cargoScu() == null))
         || (row.getNameDe() != null && P4kFields.germanName(base.name()) == null)
         || (row.getNameKey() != null
             && P4kFields.storedNameKey(P4kLocalisedText.keyOf(base.name())) == null)
-        || !canKeepText(row.getDescriptionEn(), P4kLocalisedText.enOf(base.description()))
-        || !canKeepText(row.getDescriptionDe(), P4kLocalisedText.deOf(base.description()))
+        || (!departed && !canKeepDescriptions(row, base))
         || (base.insurance() == null && hasInsurance(row))) {
       return false;
     }
@@ -166,6 +170,18 @@ class P4kShipBaseData {
     RefreshableFacts proof = new RefreshableFacts();
     facts(row, base, proof);
     return proof.complete;
+  }
+
+  /**
+   * Checks whether the fill-only writer can retain or fill both descriptions during a repair.
+   *
+   * @param row the currently stamped ship
+   * @param base the verified base record
+   * @return whether neither retained description can differ from the base
+   */
+  private static boolean canKeepDescriptions(@NotNull ShipType row, @NotNull P4kShipDto base) {
+    return canKeepText(row.getDescriptionEn(), P4kLocalisedText.enOf(base.description()))
+        && canKeepText(row.getDescriptionDe(), P4kLocalisedText.deOf(base.description()));
   }
 
   /**
