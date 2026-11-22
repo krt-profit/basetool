@@ -236,6 +236,7 @@ class RowLinkHitAreaE2eTest {
       page.locator("#menu-toggle").click();
       Locator panel = page.locator("#menu-panel");
       assertThat(panel).isVisible();
+      awaitRenderedFrames(page);
       Object overlaps =
           panel.evaluate(
               """
@@ -357,21 +358,31 @@ class RowLinkHitAreaE2eTest {
   }
 
   /**
+   * Waits until two frames have rendered, so that the last pointer, focus or DOM change is styled,
+   * stacked and hit-tested as it is before a person can act on it. Firefox and WebKit apply such a
+   * change on a later frame than the Playwright call that caused it returns.
+   *
+   * @param page the fixture page
+   */
+  private static void awaitRenderedFrames(@NotNull Page page) {
+    page.evaluate(
+        "() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))");
+  }
+
+  /**
    * The settled chevron colour and title decoration colour of one row, read once the last pointer
-   * or focus change has been styled and its colour transitions have finished.
+   * or focus change has rendered and its colour transitions have finished.
    *
    * @param page the fixture page
    * @param rowId the row's id
    * @return the chevron's {@code color} and the title's {@code text-decoration-color}
    */
   private static @NotNull List<String> cue(@NotNull Page page, @NotNull String rowId) {
+    awaitRenderedFrames(page);
     return results(
         page.evaluate(
             """
-            async id => {
-              // Firefox and WebKit apply a hover or focus change on the next frame and start the
-              // 0.001 ms reduced-motion transition there; read before that and the old colour shows.
-              await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+            id => {
               document.getAnimations().forEach(animation => animation.finish());
               return [
                 getComputedStyle(document.querySelector('#' + id + ' .row-chevron')).color,
