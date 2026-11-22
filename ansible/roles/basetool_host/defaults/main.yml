@@ -151,6 +151,9 @@ basetool_host_alloy_listen: ":12345"
 basetool_host_journal_max_retention: "31d"
 basetool_host_journal_max_use: "4G"
 
+# Weekly rotation keeps the current week plus this many: at most 28 days, inside REQ-OBS-010's 31.
+basetool_host_logrotate_weekly_generations: 3
+
 basetool_host_alloy_memory_max: "512M"
 basetool_host_alloy_gomemlimit: "360MiB"
 basetool_host_node_exporter_memory_max: "64M"

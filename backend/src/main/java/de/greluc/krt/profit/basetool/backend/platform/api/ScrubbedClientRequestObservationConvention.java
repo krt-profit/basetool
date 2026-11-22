@@ -43,7 +43,7 @@ public class ScrubbedClientRequestObservationConvention
   @Override
   protected @NotNull KeyValue uri(@NotNull ClientRequestObservationContext context) {
     KeyValue uri = super.uri(context);
-    String scrubbed = ObservationPrivacyFilter.scrub(uri.getValue(), true);
+    String scrubbed = ObservationPrivacyFilter.scrub(uri.getValue());
     return scrubbed.equals(uri.getValue()) ? uri : KeyValue.of(uri.getKey(), scrubbed);
   }
 }

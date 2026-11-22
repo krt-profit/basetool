@@ -27,8 +27,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the observation scrubbing (REQ-OBS-006/-009): query strings (user search text!)
- * never reach metric tags or span attributes, entity ids never explode the low-cardinality {@code
- * uri} tag, and non-URL key-values pass through untouched.
+ * never reach metric tags or span attributes, entity and account ids reach neither the {@code uri}
+ * tag nor the {@code http.url} attribute, and non-URL key-values pass through untouched.
  */
 class ObservationPrivacyFilterTest {
 
@@ -50,19 +50,19 @@ class ObservationPrivacyFilterTest {
   }
 
   @Test
-  void shouldCollapseUuidAndNumericSegmentsInUriTagOnly() {
+  void shouldCollapseUuidAndNumericSegmentsInUriTagAndHttpUrlAttribute() {
     Observation.Context context = new Observation.Context();
     context.addLowCardinalityKeyValue(
         KeyValue.of("uri", "/api/v1/locations/3f2a8c1e-0d4b-4f6a-9c3e-1b2d3f4a5b6c/items/42"));
     context.addHighCardinalityKeyValue(
-        KeyValue.of("http.url", "/api/v1/locations/3f2a8c1e-0d4b-4f6a-9c3e-1b2d3f4a5b6c"));
+        KeyValue.of("http.url", "/api/v1/users/3f2a8c1e-0d4b-4f6a-9c3e-1b2d3f4a5b6c/ships/42"));
 
     filter.map(context);
 
     assertThat(context.getLowCardinalityKeyValue("uri").getValue())
         .isEqualTo("/api/v1/locations/{id}/items/{id}");
     assertThat(context.getHighCardinalityKeyValue("http.url").getValue())
-        .isEqualTo("/api/v1/locations/3f2a8c1e-0d4b-4f6a-9c3e-1b2d3f4a5b6c");
+        .isEqualTo("/api/v1/users/{id}/ships/{id}");
   }
 
   @Test
@@ -77,7 +77,7 @@ class ObservationPrivacyFilterTest {
 
   @Test
   void shouldReturnANullValueUnchanged() {
-    assertThat(ObservationPrivacyFilter.scrub(null, true)).isNull();
+    assertThat(ObservationPrivacyFilter.scrub(null)).isNull();
   }
 
   @Test

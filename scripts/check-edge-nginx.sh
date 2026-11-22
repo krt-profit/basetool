@@ -216,6 +216,29 @@ check_mode() {
       exit 1
     }
 
+  grep -qE '^[[:space:]]*access_log /dev/stdout krt_no_query;' "${dump}" \
+    || {
+      echo "FAIL: ${mode}: the access log does not use the query-free krt_no_query format"
+      exit 1
+    }
+  grep -E '^[[:space:]]*access_log ' "${dump}" | grep -vqE 'access_log (off|/dev/stdout krt_no_query);' \
+    && {
+      echo "FAIL: ${mode}: an access_log uses another format - it would log query strings"
+      exit 1
+    }
+  local fmt
+  fmt="$(awk '/log_format krt_no_query/,/;$/' "${dump}")"
+  [[ -n "${fmt}" ]] || {
+    echo "FAIL: ${mode}: the krt_no_query log format is missing"
+    exit 1
+  }
+  # shellcheck disable=SC2016
+  grep -qE '\$(request|request_uri|args|query_string|http_referer)([^_a-z]|$)' <<<"${fmt}" \
+    && {
+      echo "FAIL: ${mode}: the krt_no_query format logs the query string or the raw referrer"
+      exit 1
+    }
+
   awk '/listen 127.0.0.1:8081/,/^}/' "${dump}" | grep -q 'proxy_protocol' \
     && {
       echo "FAIL: ${mode}: the health listener speaks proxy_protocol"
