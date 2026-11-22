@@ -93,7 +93,9 @@ listing's own id. Because the UEX sweep stopped at the first incomplete slice, t
 refinery slices stopped with it. @greluc decided on 2026-11-22:
 
 - A vanished edition never hands its UEX listing to the row it merges into; the merge always leaves
-  it behind, whatever order the merges of one run take.
+  it behind, whatever order the merges of one run take. It hands its Wiki identity over only when
+  the Wiki UUID is the survivor's P4K GUID, and a Wiki vehicle of a ship type merged away seeds no
+  row of its own.
 - A listing whose id a merge into the row it finds left behind is that row's own listing.
 - A P4K-confirmed GUID outranks a differing UEX game UUID on every row a UEX vehicle reaches, unless
   another listing of the same fetch holds the row and no merge left this vehicle's id behind.

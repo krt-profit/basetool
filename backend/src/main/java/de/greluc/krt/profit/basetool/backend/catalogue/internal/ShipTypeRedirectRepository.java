@@ -102,6 +102,23 @@ public interface ShipTypeRedirectRepository extends JpaRepository<ShipTypeRedire
       UUID canonicalShipTypeId, Integer uexVehicleId);
 
   /**
+   * Tells whether a ship type merged away held a Wiki vehicle's game UUID, which makes that vehicle
+   * part of the ship type it was merged into (REQ-DATA-042).
+   *
+   * @param wikiUuid the Wiki vehicle's game UUID
+   * @return whether the snapshot of a merged row carries it as its {@code external_uuid}
+   */
+  @Query(
+      value =
+          """
+          SELECT EXISTS (SELECT 1 FROM ship_type_redirect
+                         WHERE retired_snapshot -> 'retiredShipType' ->> 'external_uuid'
+                               = CAST(:wikiUuid AS text))
+          """,
+      nativeQuery = true)
+  boolean isMergedWikiUuid(@Param("wikiUuid") UUID wikiUuid);
+
+  /**
    * Hands the left-behind UEX vehicle id of the merges into a ship type over when the ship type
    * takes that listing: the redirects then keep the listing the ship type gives up (REQ-DATA-043).
    *

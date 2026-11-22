@@ -139,12 +139,15 @@ class ShipTypeMergeServiceTest {
   @Test
   void anEditionMergedFirstLeavesItsListingBehindForTheShipsOwnListing() {
     UUID survivorGuid = UUID.randomUUID();
+    UUID editionWiki = UUID.randomUUID();
+    UUID baseWiki = UUID.randomUUID();
     ShipType survivor =
         ships.saveAndFlush(shipType("RSI Constellation Mk IV Phoenix", survivorGuid, null));
-    ShipType edition = shipType("RSI Constellation Mk IV Phoenix Emerald", UUID.randomUUID(), null);
+    ShipType edition =
+        shipType("RSI Constellation Mk IV Phoenix Emerald", UUID.randomUUID(), editionWiki);
     edition.setUexVehicleId(TWIN_UEX_ID);
     edition = ships.saveAndFlush(edition);
-    ShipType base = shipType("Constellation Mk IV Phoenix", UUID.randomUUID(), null);
+    ShipType base = shipType("Constellation Mk IV Phoenix", UUID.randomUUID(), baseWiki);
     base.setUexVehicleId(TWIN_UEX_ID + 1);
     base = ships.saveAndFlush(base);
 
@@ -155,10 +158,30 @@ class ShipTypeMergeServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThat(ships.findById(survivor.getId()).orElseThrow().getUexVehicleId())
-        .isEqualTo(TWIN_UEX_ID + 1);
+    ShipType merged = ships.findById(survivor.getId()).orElseThrow();
+    assertThat(merged.getUexVehicleId()).isEqualTo(TWIN_UEX_ID + 1);
+    assertThat(merged.getExternalUuid()).isEqualTo(baseWiki);
     assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID)).isTrue();
     assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID + 1)).isFalse();
+    assertThat(redirects.isMergedWikiUuid(editionWiki)).isTrue();
+    assertThat(redirects.isMergedWikiUuid(UUID.randomUUID())).isFalse();
+  }
+
+  @Test
+  void anEditionWhoseWikiUuidIsTheSurvivorsGuidHandsItOver() {
+    UUID survivorGuid = UUID.randomUUID();
+    ShipType survivor = ships.saveAndFlush(shipType("Aegis Hammerhead", survivorGuid, null));
+    ShipType edition =
+        ships.saveAndFlush(
+            shipType("Aegis Hammerhead Best In Show Edition", UUID.randomUUID(), survivorGuid));
+
+    merges.merge(
+        edition.getId(), survivor.getId(), survivorGuid, ShipTypeMergeReason.EDITION_OF_BASE);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(ships.findById(survivor.getId()).orElseThrow().getExternalUuid())
+        .isEqualTo(survivorGuid);
   }
 
   @Test

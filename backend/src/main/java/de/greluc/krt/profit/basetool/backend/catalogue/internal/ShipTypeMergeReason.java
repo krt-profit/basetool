@@ -67,13 +67,12 @@ enum ShipTypeMergeReason {
   @Getter private final boolean mergingP4kRow;
 
   /**
-   * Tells whether the merged row's UEX listing lists the surviving row's ship. UEX keeps a vanished
-   * edition as a listing of its own, which the merge leaves behind as a secondary listing
-   * (REQ-DATA-043).
+   * Tells whether the merged row's Wiki and UEX listings list the surviving row's ship. A vanished
+   * edition keeps listings of its own, which the merge leaves behind (REQ-DATA-042, REQ-DATA-043).
    *
    * @return {@code false} for {@link #EDITION_OF_BASE}, else {@code true}
    */
-  boolean handsOverUexListing() {
+  boolean listsTheSurvivorsShip() {
     return this != EDITION_OF_BASE;
   }
 }

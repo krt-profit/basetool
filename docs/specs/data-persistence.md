@@ -1471,6 +1471,10 @@ request and no sync writes it.
     already holds, with no P4K GUID, moves to the base (`RSI_Skylark_Display` to `RSI_Skylark`): it
     takes the base's game UUID and class name, reported as `VEHICLE_RELINKED`. This is the one move
     of a game UUID the census still carries. A row the P4K ties to the variant stays with it.
+  - **A vehicle of a ship type merged away belongs to its survivor.** A Wiki vehicle no step places
+    whose game UUID a ship type merged away held (REQ-DATA-042), such as a vanished edition the Wiki
+    still lists, seeds no row: it is reported as `SOURCE_IDENTITY_CONFLICT` and keeps the census
+    complete.
 - **The P4K import** resolves by `external_uuid`, then the class name, and when no row carries the
   class name, the ship type that holds the aliased UEX vehicle id, then the name.
 - A row matched through the alias keeps its own `name`; each source writes only its own columns, as
@@ -1501,6 +1505,9 @@ request and no sync writes it.
 - [x] The base of a shared name takes over the row a variant holds, in either census order, and a
   second run moves nothing; a variant listed first seeds no row of its own; a row whose P4K GUID is
   the variant's stays with the variant.
+- [x] A Wiki vehicle whose ship type was merged away seeds no row and keeps the census complete; an
+  edition merged into a survivor without a Wiki identity leaves its Wiki UUID behind unless that
+  UUID is the survivor's P4K GUID (`ScWikiVehicleSyncServiceTest`, `ShipTypeMergeServiceTest`).
 - [x] The V310 merge moves every reference onto the survivor, carries the UEX columns over, bumps
   the versions and deletes the UEX half; a half that is not `UEX_ONLY`, or an ambiguous class name,
   merges nothing.
@@ -1899,10 +1906,11 @@ managed rows, so every changed row keeps its optimistic lock, and audits it in i
 as `CATALOGUE_SHIP_TYPE_MERGED` with the merged id, the evidence and the number of moved
 references. The open hangar and template views hear of the change through live sync.
 
-The survivor takes the Wiki identity of the merged row when it has none, or when the merged row's
-Wiki UUID is the P4K GUID the survivor holds once the caller's run is through, and the UEX identity
-when it has none and the merged row is no vanished edition (`EDITION_OF_BASE`), whose UEX listing
-stays a listing of its own (REQ-DATA-043). Both rows are kept as JSON in `ship_type_redirect`, with
+The survivor takes the Wiki identity of the merged row when the merged row's Wiki UUID is the P4K
+GUID the survivor holds once the caller's run is through, or when it has none and the merged row is
+no vanished edition (`EDITION_OF_BASE`); it takes the UEX identity when it has none and the merged
+row is no vanished edition. An edition's Wiki and UEX listings stay listings of their own
+(REQ-DATA-026, REQ-DATA-043). Both rows are kept as JSON in `ship_type_redirect`, with
 the merged row's UEX vehicle id when the survivor did not take it. The merged id stays
 resolvable through `findById`, `existsById`, `findAllById` and `getReferenceById` of
 `ShipTypeRepository`. The exchange resolves it as a `bt` reference and names journal entries by it;
