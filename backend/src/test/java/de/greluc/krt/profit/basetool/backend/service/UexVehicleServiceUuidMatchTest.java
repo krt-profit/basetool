@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompanyRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ShipTypeRedirectRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
@@ -42,6 +43,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -62,8 +64,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class UexVehicleServiceUuidMatchTest {
 
+  /** UEX's listing of the Constellation Mk IV Phoenix. */
+  private static final int PHOENIX_UEX_ID = 47;
+
+  /** UEX's listing of the Phoenix Emerald edition the P4K merged into the Phoenix. */
+  private static final int EMERALD_UEX_ID = 48;
+
+  /** The P4K GUID of the Phoenix's {@code _GS} record. */
+  private static final UUID PHOENIX_GUID = UUID.fromString("1e26a179-45cf-4541-ade6-0f0daf7c372b");
+
   @Mock private UexClient uexClient;
   @Mock private ShipTypeRepository shipTypeRepository;
+  @Mock private ShipTypeRedirectRepository shipTypeRedirects;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private ManufacturerUexCompanyRepository manufacturerAliasRepository;
   @Mock private SyncReportService syncReportService;
@@ -523,6 +535,63 @@ class UexVehicleServiceUuidMatchTest {
     verify(shipTypeRepository).markUexDeletedExcept(any(), any());
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void aListingAMergeLeftBehindTakesTheSurvivorBackFromTheEditionsListing(boolean reverse) {
+    ShipType phoenix = mergedPhoenix();
+    List<ShipType> rows = inMemory(phoenix);
+    AtomicReference<Integer> leftBehind = new AtomicReference<>(PHOENIX_UEX_ID);
+    when(shipTypeRedirects.existsByCanonicalShipTypeIdAndUexVehicleId(eq(phoenix.getId()), any()))
+        .thenAnswer(inv -> leftBehind.get().equals(inv.getArgument(1)));
+    when(shipTypeRedirects.handOverUexVehicleId(phoenix.getId(), PHOENIX_UEX_ID, EMERALD_UEX_ID))
+        .thenAnswer(inv -> {
+          leftBehind.set(EMERALD_UEX_ID);
+          return 1;
+        });
+    lenient()
+        .when(shipTypeRepository.isMergedUexVehicleId(anyInt()))
+        .thenAnswer(inv -> leftBehind.get().equals(inv.getArgument(0)));
+    when(uexClient.getVehicles())
+        .thenReturn(
+            fetched(
+                reverse
+                    ? List.of(emeraldListing(), phoenixListing())
+                    : List.of(phoenixListing(), emeraldListing())));
+    when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    assertEquals(1, rows.size());
+    assertEquals(PHOENIX_UEX_ID, phoenix.getUexVehicleId());
+    assertEquals(PHOENIX_GUID, phoenix.getExternalUuid());
+    assertEquals(EMERALD_UEX_ID, leftBehind.get());
+    verify(syncReportService, never())
+        .logUexEvent(any(), eq(SyncEventType.SOURCE_IDENTITY_CONFLICT), any(), any(), any(), any());
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository).markUexDeletedExcept(any(), any());
+  }
+
+  @Test
+  void aListingNoMergeLeftBehindStillCannotTakeARowWhoseP4kGuidItsUuidContradicts() {
+    ShipType phoenix = mergedPhoenix();
+    inMemory(phoenix);
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(phoenixListing(), emeraldListing())));
+
+    service.syncVehicles();
+
+    assertEquals(EMERALD_UEX_ID, phoenix.getUexVehicleId());
+    verify(syncReportService)
+        .logUexEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            any(),
+            eq("Constellation Mk IV Phoenix"),
+            any());
+    verify(shipTypeRedirects, never()).handOverUexVehicleId(any(), anyInt(), any());
+    verify(shipTypeRepository, never()).markUexDeletedExcept(any(), any());
+  }
+
   @Test
   void aSecondListingOfARowTheOtherListingsUuidConfirmsStaysOff() {
     UUID confirmed = UUID.fromString("93e1a434-f4fa-43ee-a40c-71bcae5073bc");
@@ -742,6 +811,40 @@ class UexVehicleServiceUuidMatchTest {
 
     assertEquals(1, p4kKnown.getCrewMax());
     assertEquals(1, p4kKnown.getCrewMin());
+  }
+
+  /**
+   * Builds the survivor of the two Phoenix merges: the row of the P4K record whose UEX listing the
+   * edition merged into it first handed over.
+   *
+   * @return the row holding the edition's UEX id
+   */
+  private static ShipType mergedPhoenix() {
+    ShipType phoenix = new ShipType();
+    phoenix.setId(UUID.randomUUID());
+    phoenix.setName("RSI Constellation Mk IV Phoenix");
+    phoenix.setP4kUuid(PHOENIX_GUID);
+    phoenix.setExternalUuid(PHOENIX_GUID);
+    phoenix.setUexVehicleId(EMERALD_UEX_ID);
+    return phoenix;
+  }
+
+  private UexVehicleDto phoenixListing() {
+    return vehicleDto(
+        PHOENIX_UEX_ID,
+        "ecadf2b2-a404-4776-9289-04af91538d76",
+        "Constellation Mk IV Phoenix",
+        "RSI Constellation Mk IV Phoenix",
+        "1");
+  }
+
+  private UexVehicleDto emeraldListing() {
+    return vehicleDto(
+        EMERALD_UEX_ID,
+        "daf936a1-689f-4edb-980a-96947e2727c4",
+        "Constellation Mk IV Phoenix Emerald",
+        "RSI Constellation Mk IV Phoenix Emerald",
+        "1");
   }
 
   /**
