@@ -317,7 +317,13 @@ class TableOwnershipTest {
           new Crossing(
               Set.of("app_user"),
               "Reads the active accounts to grant the default set in one statement; a downward"
-                  + " read into identity."));
+                  + " read into identity."),
+          "OperationPayoutStatusRepository#rekeyDeletedMember",
+          new Crossing(
+              Set.of("mission", "mission_participant"),
+              "Reads the deleted member's participation in the operation's missions to re-key the"
+                  + " payout mark for the account deletion; a downward read into mission"
+                  + " (REQ-DATA-008)."));
 
   /**
    * The only classes allowed to run SQL that no repository declares, each with the reason: the GDPR
