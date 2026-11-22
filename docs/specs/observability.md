@@ -1625,7 +1625,9 @@ nothing, so the alert stays silent on a host without one.
 - `basetool_catalogue_attempt_last_complete_timestamp_seconds{source,aggregate}` moves only after
   `SUCCESS` or `UNCHANGED`. Source `CATALOGUE` freshness therefore means all required slices were
   applied, not merely that a scheduler callback returned. Partial or failed Wiki slices continue
-  independently but make the umbrella job fail; UEX preserves its fail-fast ordering. The existing
+  independently but make the umbrella job fail; UEX preserves its fail-fast ordering, except that a
+  partially applied vehicle slice lets the later slices run before the umbrella job fails naming it
+  (REQ-DATA-043). The existing
   scheduled-job freshness metrics and `ExternalSyncStale` now use that complete-source outcome.
   Dashboard `07` shows current outcomes, active sources, complete-apply age and attempt counts.
   `./gradlew testPrometheusRules` checks the alert syntax and every rule-test case using the exact

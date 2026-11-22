@@ -593,6 +593,72 @@ class UexVehicleServiceUuidMatchTest {
   }
 
   @Test
+  void aStaleUexGameUuidNeverBlocksAP4kConfirmedRowItsFullNameFindsUnheld() {
+    ShipType phoenix = mergedPhoenix();
+    phoenix.setUexVehicleId(null);
+    List<ShipType> rows = inMemory(phoenix);
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(phoenixListing())));
+    when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    assertEquals(1, rows.size());
+    assertEquals(PHOENIX_UEX_ID, phoenix.getUexVehicleId());
+    assertEquals(PHOENIX_GUID, phoenix.getExternalUuid());
+    assertStaleUuidReportedNotRefused();
+  }
+
+  @Test
+  void aRenumberedListingWithAStaleUuidTakesItsRowBackFromItsVanishedId() {
+    ShipType phoenix = mergedPhoenix();
+    phoenix.setUexVehicleId(PHOENIX_UEX_ID + 1000);
+    List<ShipType> rows = inMemory(phoenix);
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(phoenixListing())));
+    when(shipTypeRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncVehicles();
+
+    assertEquals(1, rows.size());
+    assertEquals(PHOENIX_UEX_ID, phoenix.getUexVehicleId());
+    assertEquals(PHOENIX_GUID, phoenix.getExternalUuid());
+    assertStaleUuidReportedNotRefused();
+  }
+
+  @Test
+  void aPartialFeedStillCannotMoveAP4kConfirmedRowOffAnUnlistedIdThroughACuratedAlias() {
+    ShipType phoenix = mergedPhoenix();
+    phoenix.setUexVehicleId(PHOENIX_UEX_ID + 1000);
+    inMemory(phoenix);
+    when(shipTypeRepository.findByUexAliasOfVehicleId(PHOENIX_UEX_ID)).thenReturn(List.of(phoenix));
+    when(uexClient.getVehicles())
+        .thenReturn(UexClient.FetchResult.partial(List.of(phoenixListing())));
+
+    service.syncVehicles();
+
+    assertEquals(PHOENIX_UEX_ID + 1000, phoenix.getUexVehicleId());
+    verify(syncReportService)
+        .logUexEvent(any(), eq(SyncEventType.SOURCE_IDENTITY_CONFLICT), any(), any(), any(), any());
+  }
+
+  /** Asserts the Phoenix listing's stale game UUID was reported as a disagreement, not refused. */
+  private void assertStaleUuidReportedNotRefused() {
+    ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+    verify(syncReportService)
+        .logUexEvent(
+            any(),
+            eq(SyncEventType.P4K_DISAGREEMENT),
+            eq("ship_type"),
+            eq(PHOENIX_GUID),
+            eq("Constellation Mk IV Phoenix"),
+            detail.capture());
+    assertTrue(detail.getValue().contains("column=external_uuid;stored=" + PHOENIX_GUID));
+    verify(syncReportService, never())
+        .logUexEvent(any(), eq(SyncEventType.SOURCE_IDENTITY_CONFLICT), any(), any(), any(), any());
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository).markUexDeletedExcept(any(), any());
+  }
+
+  @Test
   void aSecondListingOfARowTheOtherListingsUuidConfirmsStaysOff() {
     UUID confirmed = UUID.fromString("93e1a434-f4fa-43ee-a40c-71bcae5073bc");
     ShipType retaliator = new ShipType();

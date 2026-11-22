@@ -60,9 +60,17 @@ public class ScWikiVehicleSyncService {
   private static final String BASE_SEEDS_NAME =
       "Name goes to the base Wiki vehicle of this census.";
 
+  /** Sync-report detail of a vehicle whose ship type was merged into another. */
+  private static final String MERGED_INTO_SHIP =
+      "Vehicle belongs to the ship type its row was merged into.";
+
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
   private final ShipTypeRepository shipTypeRepository;
+
+  /** Knows the Wiki vehicle UUIDs of ship types merged away (REQ-DATA-042). */
+  private final ShipTypeRedirectRepository shipTypeRedirects;
+
   private final SyncReportService syncReportService;
   private final SyncChunkWriter chunkWriter;
 
@@ -199,7 +207,8 @@ public class ScWikiVehicleSyncService {
    * @return {@link Disposition#WRITTEN} for a saved row, {@link Disposition#COVERED_BY_SIBLING} for
    *     a variant whose shared name a ship type of this census holds or its base seeds, {@link
    *     Disposition#NAME_HELD_BY_OTHER_VEHICLE} for a name held by a departed vehicle of another
-   *     class, {@code null} for a conflict
+   *     class, {@link Disposition#MERGED_AWAY} for a vehicle no step places whose ship type was
+   *     merged into another, {@code null} for a conflict
    */
   @Nullable
   private Disposition upsert(ScWikiVehicleDto dto, VehicleRun run) {
@@ -237,6 +246,16 @@ public class ScWikiVehicleSyncService {
         }
       }
       match = named.map(NameHit::ship);
+    }
+    if (match.isEmpty() && shipTypeRedirects.isMergedWikiUuid(dto.uuid())) {
+      syncReportService.logScwikiEvent(
+          run.runId(),
+          SyncEventType.SOURCE_IDENTITY_CONFLICT,
+          "ship_type",
+          dto.uuid(),
+          dto.name(),
+          MERGED_INTO_SHIP);
+      return Disposition.MERGED_AWAY;
     }
     ShipType ship = match.orElseGet(ShipType::new);
     UUID stored = ship.getExternalUuid();
@@ -404,7 +423,12 @@ public class ScWikiVehicleSyncService {
      * The vehicle has no row of its own; a ship type of another class, absent from this census,
      * holds its name.
      */
-    NAME_HELD_BY_OTHER_VEHICLE
+    NAME_HELD_BY_OTHER_VEHICLE,
+    /**
+     * The vehicle has no row of its own; the ship type that held its game UUID was merged into
+     * another (REQ-DATA-042).
+     */
+    MERGED_AWAY
   }
 
   /** The identity key that found a vehicle's stored ship type. */
