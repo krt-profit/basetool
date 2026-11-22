@@ -1013,6 +1013,55 @@ class OrgUnitBankPageControllerMvcTest {
                 .string(Matchers.not(Matchers.containsString("org-unit-bank-request-detail"))));
   }
 
+  /**
+   * REQ-BANK-041: an open approval offers the approver both decisions, and the rejection dialog
+   * posts to the approver's own reject endpoint, not to the bank staff's.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void orgUnitBank_openApprovalOffersGrantAndReject() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest(null, null, null)));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-grant-approval-btn")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-reject-approval-btn")))
+        .andExpect(content().string(Matchers.containsString("id=\"bank-reject-request-modal\"")))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.containsString(
+                        "data-endpoint=\"/api/proxy/org-units/bank/requests/{id}/reject\"")));
+  }
+
+  /**
+   * REQ-BANK-041: a granted approval is settled, so its row offers neither the grant nor the
+   * rejection.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void orgUnitBank_grantedApprovalOffersNoRejection() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(approvedRequest()));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-granted")))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.not(Matchers.containsString("org-unit-bank-reject-approval-btn"))));
+  }
+
   /** A row carrying neither Begruendung nor Notiz stays flat: no chevron, no empty sub-row. */
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})

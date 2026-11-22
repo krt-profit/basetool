@@ -57,8 +57,9 @@ public enum NotificationType {
   BANK_BOOKING_REQUEST_CONFIRMED,
 
   /**
-   * A bank employee rejected the requester's booking request (REQ-BANK-026). The default rule
-   * notifies the requester; the reason is rendered in the text.
+   * A bank employee or the request's approver rejected the requester's booking request
+   * (REQ-BANK-026, REQ-BANK-041). The default rule notifies the requester; the reason is rendered
+   * in the text.
    */
   BANK_BOOKING_REQUEST_REJECTED,
 
@@ -70,9 +71,10 @@ public enum NotificationType {
   BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED,
 
   /**
-   * A bank employee rejected a booking request on an account the recipient is the responsible
-   * holder of (REQ-BANK-034). Resolved via the {@code ACCOUNT_RESPONSIBLE} selector; unlike {@link
-   * #BANK_BOOKING_REQUEST_REJECTED} it renders account-centric text.
+   * A bank employee or the request's approver rejected a booking request on an account the
+   * recipient is the responsible holder of (REQ-BANK-034). Resolved via the {@code
+   * ACCOUNT_RESPONSIBLE} selector; unlike {@link #BANK_BOOKING_REQUEST_REJECTED} it renders
+   * account-centric text.
    */
   BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED,
 

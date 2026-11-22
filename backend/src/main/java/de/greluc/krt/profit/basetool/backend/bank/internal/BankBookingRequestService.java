@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
-import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestUpdatedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -54,6 +53,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,6 +74,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Transactional(readOnly = true)
 public class BankBookingRequestService {
+
+  private static final String NO_APPROVAL_REQUIRED =
+      "This request does not require the responsible holder's approval";
 
   private final BankBookingRequestRepository requestRepository;
   private final BankAccountRepository accountRepository;
@@ -96,6 +99,7 @@ public class BankBookingRequestService {
   private final BankLinkedRequestLiveSync linkedLiveSync;
   private final NotificationCauseCollector notificationCauses;
   private final BankRequestConfirmation confirmation;
+  private final BankRequestRejection rejection;
 
   /**
    * Persists, audits and announces a pending request for the explicit applicant in the draft.
@@ -766,27 +770,60 @@ public class BankBookingRequestService {
     if (accountId == null ? !rights.staff() : !rights.canSee(accountId)) {
       throw new AccessDeniedException("The caller may not see the request");
     }
-    UUID decider = authHelperService.currentUserId().orElse(null);
-    request.setStatus(BankBookingRequestStatus.REJECTED);
-    request.setRejectReason(reason);
-    request.setDecidedBy(decider);
-    request.setDeciderHandle(creation.resolveHandle(decider));
-    request.setDecidedAt(Instant.now());
-    bankAuditService.record(
-        BankAuditEventType.BOOKING_REQUEST_REJECTED,
-        accountId,
-        null,
-        request.getRequestedBy(),
-        "rejected request " + request.shortId());
-    var event =
-        new BankBookingRequestRejectedEvent(
-            request.getId(),
-            accountId,
-            request.accountNo(),
-            request.getAmount(),
-            reason,
-            request.getRequestedBy(),
-            decider);
+    return rejectLocked(request, reason, linked);
+  }
+
+  /**
+   * Rejects a pending request on behalf of its required approver (REQ-BANK-041): instead of
+   * granting the approval, the approver declines the request with a reason; no money moves. The
+   * request flips to {@code REJECTED} exactly as on a bank employee's rejection.
+   *
+   * @param requestId the request to reject
+   * @param reason the rejection reason
+   * @param version the request's version as the approver read it
+   * @param requireApprover fails with an {@link AccessDeniedException} unless the caller approves
+   *     the locked request
+   * @return the rejected request
+   * @throws NotFoundException when the request does not exist
+   * @throws AccessDeniedException when the caller may not approve the request
+   * @throws ObjectOptimisticLockingFailureException when the request changed since it was read
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when already decided
+   * @throws BadRequestException when the request needs no approval
+   */
+  @NotNull
+  @Transactional
+  public BankBookingRequestDto rejectAsApprover(
+      @NotNull UUID requestId,
+      @NotNull String reason,
+      long version,
+      @NotNull Consumer<BankBookingRequest> requireApprover) {
+    final BankLinkedDecisions.Prepared linked = linkedDecisions.forApproverRejection(requestId);
+    lockPurposeOwner(requestId);
+    BankBookingRequest request = lockRequest(requestId);
+    requireApprover.accept(request);
+    requireVersion(request, version);
+    request.requirePending();
+    if (!request.isRequiresOwnerApproval()) {
+      throw new BadRequestException(NO_APPROVAL_REQUIRED);
+    }
+    return rejectLocked(request, reason, linked);
+  }
+
+  /**
+   * Flips a locked, pending and authorized request to {@code REJECTED}, audits it and applies its
+   * synchronous outcome.
+   *
+   * @param request the locked request
+   * @param reason the rejection reason
+   * @param linked the prepared linked handler, if any
+   * @return the rejected request
+   */
+  @NotNull
+  private BankBookingRequestDto rejectLocked(
+      @NotNull BankBookingRequest request,
+      @NotNull String reason,
+      @Nullable BankLinkedDecisions.Prepared linked) {
+    var event = rejection.record(request, reason, authHelperService.currentUserId().orElse(null));
     if (linked != null) {
       notificationCauses.appendPreferred(request.getId(), event);
       linked.complete(new BankLinkedOutcome.Rejected(request.getId()));
@@ -821,8 +858,7 @@ public class BankBookingRequestService {
     }
     BankAccount account = request.getAccount();
     if (account == null || (granted && !request.isRequiresOwnerApproval())) {
-      throw new BadRequestException(
-          "This request does not require the responsible holder's approval");
+      throw new BadRequestException(NO_APPROVAL_REQUIRED);
     }
     UUID actor = authHelperService.currentUserId().orElse(null);
     request.setOwnerApprovalGranted(granted);
