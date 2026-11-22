@@ -19,15 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.api;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipManufacturerWords;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -60,9 +58,6 @@ import org.jetbrains.annotations.Unmodifiable;
  */
 public final class ShipTypeMatcher {
 
-  /** Strips everything outside {@code [a-z0-9]} for the normalised match form. */
-  private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9]");
-
   private ShipTypeMatcher() {}
 
   /**
@@ -73,7 +68,7 @@ public final class ShipTypeMatcher {
    * @return the populated lookup index
    */
   public static @NotNull ShipTypeIndex buildIndex(@NotNull List<ShipType> shipTypes) {
-    return buildIndex(shipTypes, ShipTypeLinks.NONE, ManufacturerWords.of(shipTypes));
+    return buildIndex(shipTypes, ShipTypeLinks.NONE, ShipManufacturerWords.of(shipTypes));
   }
 
   /**
@@ -86,7 +81,7 @@ public final class ShipTypeMatcher {
    */
   public static @NotNull ShipTypeIndex buildIndex(
       @NotNull List<ShipType> shipTypes, @NotNull ShipTypeLinks links) {
-    return buildIndex(shipTypes, links, ManufacturerWords.NONE);
+    return buildIndex(shipTypes, links, ShipManufacturerWords.NONE);
   }
 
   /**
@@ -100,7 +95,7 @@ public final class ShipTypeMatcher {
   private static @NotNull ShipTypeIndex buildIndex(
       @NotNull List<ShipType> shipTypes,
       @NotNull ShipTypeLinks links,
-      @NotNull ManufacturerWords words) {
+      @NotNull ShipManufacturerWords words) {
     List<ShipType> live = new ArrayList<>();
     List<ShipType> retired = new ArrayList<>();
     for (ShipType shipType : shipTypes) {
@@ -305,10 +300,7 @@ public final class ShipTypeMatcher {
    * @return the normalised form (never null; empty string for null/empty input)
    */
   public static @NotNull String normalizeForMatching(@Nullable String name) {
-    if (name == null) {
-      return "";
-    }
-    return NON_ALNUM.matcher(name.toLowerCase(Locale.ROOT)).replaceAll("");
+    return ShipManufacturerWords.normalize(name);
   }
 
   /**
@@ -385,14 +377,14 @@ public final class ShipTypeMatcher {
     private final Map<String, List<ShipType>> bySameShip = new HashMap<>();
 
     /** The manufacturer words a short name drops. */
-    private final ManufacturerWords words;
+    private final ShipManufacturerWords words;
 
     /**
      * Prepares an empty partition.
      *
      * @param words the manufacturer words a short name drops
      */
-    private Keys(@NotNull ManufacturerWords words) {
+    private Keys(@NotNull ShipManufacturerWords words) {
       this.words = words;
       this.shortNames = words.isEmpty() ? names : new ShipNameKeys();
     }
@@ -408,7 +400,7 @@ public final class ShipTypeMatcher {
     private static @NotNull Keys of(
         @NotNull List<ShipType> shipTypes,
         @NotNull ShipTypeLinks links,
-        @NotNull ManufacturerWords words) {
+        @NotNull ShipManufacturerWords words) {
       Keys keys = new Keys(words);
       shipTypes.forEach(keys::add);
       links
@@ -643,133 +635,5 @@ public final class ShipTypeMatcher {
      * @param tokens its alphanumeric tokens
      */
     private record TokenView(@NotNull ShipType shipType, @NotNull Set<String> tokens) {}
-  }
-
-  /**
-   * The words a ship type's name opens with when it names the ship's manufacturer, such as {@code
-   * "Esperia"} in {@code "Esperia Talon"} or {@code "RSI"} in {@code "RSI Zeus Mk II ES"}
-   * (REQ-HANGAR-019).
-   *
-   * <p>Each manufacturer of a ship type contributes the first word of its name, the initials of a
-   * name of two or more words ({@code "Roberts Space Industries"} gives {@code "rsi"}, {@code
-   * "Consolidated Outland"} gives {@code "co"} for {@code "C.O."}), its nickname and its
-   * abbreviation. Words compare as {@link ShipTypeMatcher#normalizeForMatching} folds them. The set
-   * is built from every manufacturer of the snapshot, so a ship type linked to the wrong
-   * manufacturer or to none still loses its leading manufacturer word.
-   */
-  private static final class ManufacturerWords {
-
-    /** No manufacturer words: every name is its own short name. */
-    static final ManufacturerWords NONE = new ManufacturerWords(Set.of());
-
-    /** Splits a name into words at whitespace. */
-    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
-
-    /** Words a manufacturer's initials skip, as in "Musashi Industrial and Starflight Concern". */
-    private static final Set<String> NOT_INITIALLED = Set.of("and", "of", "the");
-
-    /** The normalised manufacturer words. */
-    private final Set<String> words;
-
-    /**
-     * Wraps a word set.
-     *
-     * @param words the normalised manufacturer words
-     */
-    private ManufacturerWords(@NotNull Set<String> words) {
-      this.words = words;
-    }
-
-    /**
-     * Collects the words of every manufacturer the ship types carry.
-     *
-     * @param shipTypes a snapshot of the ship types
-     * @return the manufacturer words
-     */
-    @NotNull
-    static ManufacturerWords of(@NotNull Collection<ShipType> shipTypes) {
-      Set<Manufacturer> manufacturers = Collections.newSetFromMap(new IdentityHashMap<>());
-      for (ShipType shipType : shipTypes) {
-        Manufacturer manufacturer = shipType.getManufacturer();
-        if (manufacturer != null) {
-          manufacturers.add(manufacturer);
-        }
-      }
-      Set<String> words = new HashSet<>();
-      for (Manufacturer manufacturer : manufacturers) {
-        List<String> nameWords = words(manufacturer.getName());
-        if (!nameWords.isEmpty()) {
-          words.add(nameWords.getFirst());
-        }
-        List<String> initialled =
-            nameWords.stream().filter(word -> !NOT_INITIALLED.contains(word)).toList();
-        if (initialled.size() > 1) {
-          StringBuilder initials = new StringBuilder();
-          initialled.forEach(word -> initials.append(word.charAt(0)));
-          words.add(initials.toString());
-        }
-        addWord(words, manufacturer.getNickname());
-        addWord(words, manufacturer.getAbbreviation());
-      }
-      return words.isEmpty() ? NONE : new ManufacturerWords(Set.copyOf(words));
-    }
-
-    /**
-     * Whether no manufacturer word is known, so every short name equals its name.
-     *
-     * @return {@code true} without a word
-     */
-    boolean isEmpty() {
-      return words.isEmpty();
-    }
-
-    /**
-     * Drops the leading manufacturer word of a ship name.
-     *
-     * @param name the ship name
-     * @return the name without its first word when that word names a manufacturer and more words
-     *     follow, else the trimmed name
-     */
-    @NotNull
-    String strip(@NotNull String name) {
-      String trimmed = name.strip();
-      String[] headAndRest = WHITESPACE.split(trimmed, 2);
-      if (headAndRest.length < 2
-          || !words.contains(ShipTypeMatcher.normalizeForMatching(headAndRest[0]))) {
-        return trimmed;
-      }
-      return headAndRest[1];
-    }
-
-    /**
-     * Splits a manufacturer name into its normalised words, dropping words that fold to nothing.
-     *
-     * @param name the manufacturer name, or {@code null}
-     * @return the words in order, empty for a {@code null} or blank name
-     */
-    @NotNull
-    private static List<String> words(@Nullable String name) {
-      if (name == null || name.isBlank()) {
-        return List.of();
-      }
-      return WHITESPACE
-          .splitAsStream(name.strip())
-          .map(ShipTypeMatcher::normalizeForMatching)
-          .filter(word -> !word.isEmpty())
-          .toList();
-    }
-
-    /**
-     * Adds the normalised form of a word unless it folds to nothing.
-     *
-     * @param words the word set
-     * @param word the word, or {@code null}
-     */
-    private static void addWord(@NotNull Set<String> words, @Nullable String word) {
-      String normalized = ShipTypeMatcher.normalizeForMatching(word);
-      if (!normalized.isEmpty()) {
-        words.add(normalized);
-      }
-    }
   }
 }
