@@ -22,7 +22,7 @@
 > REQ-UI-003, REQ-UI-006, REQ-UI-007) ·
 > [0378](../adr/0378-navigation-and-list-surfaces-have-distinct-edges.md) (navigation, list and dialog
 > composition, REQ-UI-007, REQ-UI-013, REQ-UI-028) ·
-> **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
+> **Next free id:** `REQ-UI-041` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
 > read at the design system's latest `main` ([ADR-0259](../adr/0259-the-design-system-submodule-follows-its-main.md)).
@@ -1528,6 +1528,48 @@ entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsGateTest` an
 `AnonymousSurfaceE2eTest`. Monitoring: `/licenses` is a `blackbox-public-surface` target
 (`REQ-OBS-012`).
 
+### REQ-UI-040 — The Impressum names the operator and the reporting channel, and every login page links it
+
+The Impressum is the operator disclosure of § 5 DDG and § 18 Abs. 1 MStV. Whether § 5 DDG reaches a
+free, ad-free members' tool („geschäftsmäßig, in der Regel gegen Entgelt") is open; § 18 Abs. 1
+MStV reaches it in any case, because the Basetool serves an organisation and not only personal or
+family purposes. The page therefore carries the full § 5 disclosure.
+
+- **Where.** `/impressum`, titled „Impressum" / "Legal notice". Linked from the footer of every
+  page, from the landing page's legal links, from the legal links at the end of the phone menu
+  sheet (REQ-UI-026) and from every page the Keycloak login theme renders itself. **Public**
+  (`REQ-SEC-052`) and a legal page for both session gates.
+- **What, in this order.** The statutes it answers (§ 5 DDG, § 18 Abs. 1 MStV); the provider with
+  a summonable address including the country; telephone and email — the telephone is the second
+  fast channel beside email that § 5 Abs. 1 Nr. 2 DDG asks for (EuGH C-298/07); the single point of
+  contact under Art. 11 and 12 DSA with its languages (German, English); how to report illegal
+  content, with the four elements of Art. 16 Abs. 2 DSA; copyright and licences — the code under
+  GPL-3.0-only with a link to its source, the licence page (REQ-UI-021), the DAS KARTELL name and
+  logo outside the GPL, Star Citizen content with Cloud Imperium as the Fan Kit band below the card
+  states (REQ-UI-018).
+- **The DSA sections are a precaution.** Whether a free hobby service is an information-society
+  service („normally provided for remuneration") is open; the sections cost a few sentences and
+  leave nothing to argue about.
+- **What it does not carry.** No „Vertreten durch" (a natural person has no representative); no
+  consumer-dispute statement (§ 36 VSBG binds traders, and only above ten employees); no link to
+  the EU ODR platform (Regulation (EU) 2024/3228 repealed it); no liability disclaimer — it
+  excludes nothing, and the liability privileges are in Art. 4–6 DSA, not in §§ 7–10 DDG; no
+  „Verantwortlich nach § 18 Abs. 2 MStV" (the Basetool has no journalistic-editorial content); no
+  VAT or business identification number (the operator holds none for this service); no generator
+  credit.
+- **Login pages.** Every page template of `keycloak-theme/krt-theme/login/` imports `krt-legal.ftl`
+  and calls `<@legal.links/>`, which links `impressum` and `privacy` below the theme property
+  `krtHomeUrl`. Keycloak answers on the app origin (ADR-0166), so the root-relative links reach the
+  frontend. A page the theme takes from its parent unchanged carries no links.
+- **Nothing on it mutates**, so there is no live-update wiring (`REQ-FE-001…010` do not apply).
+
+Tests: `ImpressumControllerTest` (the disclosure, the DSA contact point, the notice fields, the
+source and licence links, the English title, none of the boilerplate), `KeycloakThemeLegalLinksTest`
+(every theme page renders the macro, the macro's links, both bundles' labels), and the public-page
+entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `GateExemptPageChromeMvcTest` and
+`AnonymousSurfaceE2eTest`. Monitoring: `/impressum` is a `blackbox-public-surface` target
+(`REQ-OBS-012`).
+
 ### REQ-UI-023 — A page ships no developer text and no inline page CSS
 
 A rendered page carries what the browser needs and nothing a developer wrote for another developer.
@@ -2977,6 +3019,37 @@ switch) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Alt+0 the dash
 greyed or empty slot, rest while a dialog is open and in admin mode, the profile switch, the
 „Tastenkürzel" dialog) · `DialogA11yE2eTest` (the dialog contract) · **Related:** REQ-UI-026,
 REQ-UI-032, REQ-UI-033, REQ-UI-034, ADR-0297
+
+### REQ-UI-036 — A list the user builds row by row offers its add action at both ends
+
+Where a form builds a list row by row — the materials and the items of an order
+(`/orders/create`, the order edit dialog) and the goods of a refinery order (create and detail
+page) — the add action is the section's emphasized secondary action and never looks like one of the
+fields above it.
+
+- **Below the last row:** a full-width `.btn.btn-outline.btn-add-line` — the design system's orange
+  outline, dashed at rest and solid on hover, on a faint orange tint, with the sprite's `plus` icon
+  left of the label („Material hinzufügen", „Item hinzufügen"). It never takes the filled orange of
+  `.btn--cta`, which stays the form's one primary action, nor the gray `.btn-ghost` look of the
+  fields or the dashed gray frame of a computed field (`.field-computed`). The labels carry no „+"
+  character.
+- **In the section head:** the same action again as a compact `.btn.btn-outline.btn-xs` with the
+  `plus` icon and a short label („Material", „Item") at the end of the `.form-section__head` (in the
+  edit dialog, beside the section heading), so a long list grows without scrolling to its end. Its
+  accessible name and tooltip are the full label (WCAG 2.5.3). Both buttons run one trigger and
+  carry their own `data-testid`.
+- **The focus follows the new row:** after a click on either button the new row is scrolled to the
+  middle of its scroll area — without animation under `prefers-reduced-motion` — and its first
+  enabled, editable and rendered control takes the focus (`kernel/krt-row-focus.js`). Rows an
+  import or a prefill adds leave the focus where it is.
+- Where the user may not edit the list (a refinery order without the edit right), neither button
+  renders.
+
+**Enforced by:** `:frontend:testRowFocusJs` (scroll, first editable control, reduced motion, an
+absent row) · `OrdersCreateFormPatternRenderTest` (both add buttons of the material and the item
+form, their classes, icon and labels) · `RefineryOrderDetailPatternRenderTest` (both add buttons
+for the owner, none without the edit right) · `OrdersCreateMaterialRowsE2eTest` (each button adds a
+row and the focus lands in it) · **Related:** REQ-UI-027, REQ-UI-028
 
 ### REQ-UI-037 — Number fields use the separators of the page language while typing
 

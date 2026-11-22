@@ -186,6 +186,7 @@
       "kernel/krt-palette-view.js",
       "kernel/krt-palette.js",
       "kernel/krt-reorder.js",
+      "kernel/krt-row-focus.js",
       "kernel/krt-search.js",
       "kernel/krt-searchable-select.js",
       "kernel/krt-shortcuts.js",

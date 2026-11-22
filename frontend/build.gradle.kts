@@ -1069,6 +1069,19 @@ val testLocalisedNameJs =
     )
   }
 
+val testRowFocusJs =
+  registerNodeScriptTest(
+    "testRowFocusJs",
+    "Regression tests for the focus on an added form row: the scroll, the first editable control and reduced motion.",
+    "scripts/krt-row-focus.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-row-focus.js"),
+    )
+  }
+
 val testNotificationBellLabelJs =
   registerNodeScriptTest(
     "testNotificationBellLabelJs",
@@ -1321,6 +1334,7 @@ tasks.named("check").configure {
     testSearchJs,
     testNumberFormatJs,
     testLocalisedNameJs,
+    testRowFocusJs,
     testNotificationBellLabelJs,
     testBlueprintStatsJs,
     testCatalogueAdminJs,

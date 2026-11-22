@@ -25,8 +25,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
- * Static Thymeleaf page controller for the legal imprint ({@code /impressum}). Required by German
- * law (TMG §5) and renders a fixed template without backend data.
+ * Static Thymeleaf page controller for the Impressum ({@code /impressum}), the operator disclosure
+ * of § 5 DDG and § 18 Abs. 1 MStV with the DSA contact point (REQ-UI-040). Renders a fixed template
+ * without backend data.
  */
 @Controller
 @UsesLayoutModel

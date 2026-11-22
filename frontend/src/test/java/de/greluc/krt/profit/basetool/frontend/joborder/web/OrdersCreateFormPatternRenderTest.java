@@ -191,6 +191,43 @@ class OrdersCreateFormPatternRenderTest {
         .doesNotContain("data-testid=\"order-material-select\"", "id=\"item-lines\"");
   }
 
+  /**
+   * The material and the item form each offer their add action as an outline button below the list
+   * and as a compact one in the section head, with the plus icon and no „+" in the label
+   * (REQ-UI-036).
+   */
+  @Test
+  @WithMockUser
+  void addActionsSitBelowTheListAndInTheSectionHead() throws Exception {
+    List<String> forms = forms(render("/orders/create"));
+
+    assertThat(forms.get(0))
+        .containsPattern(
+            "class=\"btn btn-outline btn-xs\" data-trigger=\"orders-add-material\""
+                + " data-testid=\"order-add-material-head\"[^>]*aria-label=\"Material hinzufügen\""
+                + "[^>]*>\\s*<svg class=\"krt-icon\"[^>]*><use href=\"#krt-icon-plus\"[^<]*</svg>"
+                + " <span>Material</span>")
+        .containsPattern(
+            "class=\"btn btn-outline btn-add-line\" data-trigger=\"orders-add-material\""
+                + " data-testid=\"order-add-material\">\\s*<svg class=\"krt-icon\"[^>]*>"
+                + "<use href=\"#krt-icon-plus\"[^<]*</svg> <span>Material hinzufügen</span>")
+        .doesNotContain("+ Material", "orders-create__add");
+    assertThat(forms.get(0).split("data-trigger=\"orders-add-material\"", -1)).hasSize(3);
+
+    assertThat(forms.get(1))
+        .containsPattern(
+            "class=\"btn btn-outline btn-xs\" data-trigger=\"orders-add-item\""
+                + " data-testid=\"order-add-item-head\"[^>]*aria-label=\"Item hinzufügen\""
+                + "[^>]*>\\s*<svg class=\"krt-icon\"[^>]*><use href=\"#krt-icon-plus\"[^<]*</svg>"
+                + " <span>Item</span>")
+        .containsPattern(
+            "class=\"btn btn-outline btn-add-line\" data-trigger=\"orders-add-item\""
+                + " data-testid=\"order-add-item\">\\s*<svg class=\"krt-icon\"[^>]*>"
+                + "<use href=\"#krt-icon-plus\"[^<]*</svg> <span>Item hinzufügen</span>")
+        .doesNotContain("+ Item", "orders-create__add");
+    assertThat(forms.get(1).split("data-trigger=\"orders-add-item\"", -1)).hasSize(3);
+  }
+
   /** Opens the native aUEC form from the link rendered for browsers without JavaScript. */
   @Test
   @WithMockUser

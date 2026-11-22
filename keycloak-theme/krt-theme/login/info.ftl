@@ -1,4 +1,5 @@
 <#import "template.ftl" as layout>
+<#import "krt-legal.ftl" as legal>
 <@layout.registrationLayout displayMessage=false; section>
     <#if section = "header">
         <#if messageHeader??>
@@ -23,6 +24,7 @@
             </div>
             <script src="${url.resourcesPath}/js/krt-close-tab.js" defer></script>
         </#if>
+        <@legal.links/>
     </div>
     </#if>
 </@layout.registrationLayout>
