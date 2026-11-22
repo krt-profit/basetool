@@ -392,6 +392,9 @@ web, naming its client (REQ-AUDIT-005):
     *after* the updates so the marker is not scrubbed by them. The payload carries the per-table row
     counts and the number of spellings matched, and never the name that was removed — writing it
     back would undo the erasure in the very row that records it.
+  - `NAME_RETENTION_APPLIED` — the daily name retention (REQ-DATA-047) removed names and free
+    texts past three years. Written only when a row changed, so an idle day leaves no row; the
+    payload carries the cutoff and the per-area row counts, never a removed text.
 
   The bank trail gains the same `HANDLE_SNAPSHOTS_ANONYMISED` marker, and
   `CARTEL_APPROVAL_TIERS_CLEARED` for the unrelated approval-tier reset.

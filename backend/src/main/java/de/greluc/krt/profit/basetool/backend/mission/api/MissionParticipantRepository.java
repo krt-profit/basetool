@@ -177,4 +177,29 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
       "SELECT p.user.id FROM MissionParticipant p WHERE p.mission.id = :missionId"
           + " AND p.user IS NOT NULL AND p.startTime IS NULL")
   Set<UUID> findNotCheckedInUserIdsByMission(@Param("missionId") UUID missionId);
+
+  /**
+   * Removes the name of every external participant of a mission that ended before the cutoff, for
+   * the name retention (REQ-DATA-047). The mission ends at its actual end, else its planned end,
+   * else its creation; on a settled operation the participant trigger moves the payout mark with
+   * the name (V441).
+   *
+   * @param cutoff the oldest mission end whose external names are kept
+   * @return the number of participants whose name was removed
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE mission_participant participant
+          SET guest_name = NULL, version = participant.version + 1
+          FROM mission
+          WHERE mission.id = participant.mission_id
+            AND participant.user_id IS NULL
+            AND participant.guest_name IS NOT NULL
+            AND COALESCE(mission.actual_end_time, mission.planned_end_time, mission.created_at)
+                < :cutoff
+          """,
+      nativeQuery = true)
+  int clearExternalNamesEndedBefore(@Param("cutoff") Instant cutoff);
 }

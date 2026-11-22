@@ -441,4 +441,24 @@ public interface MissionRepository
       """)
   List<Mission> findOverdueWithoutEnd(
       @Param("notBefore") Instant notBefore, @Param("cutoff") Instant cutoff, Limit limit);
+
+  /**
+   * Removes the external party lead's name of every mission that ended before the cutoff, for the
+   * name retention (REQ-DATA-047). The mission ends at its actual end, else its planned end, else
+   * its creation.
+   *
+   * @param cutoff the oldest mission end whose external party lead is kept
+   * @return the number of missions whose external party lead was removed
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE mission
+          SET party_lead_guest_name = NULL
+          WHERE party_lead_guest_name IS NOT NULL
+            AND COALESCE(actual_end_time, planned_end_time, created_at) < :cutoff
+          """,
+      nativeQuery = true)
+  int clearExternalPartyLeadsEndedBefore(@Param("cutoff") Instant cutoff);
 }

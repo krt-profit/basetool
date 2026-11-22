@@ -1478,11 +1478,11 @@ nothing, so the alert stays silent on a host without one.
   `basetool_scheduled_job_duration_seconds{task}` timer,
   `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge,
   `basetool_scheduled_job_enabled{task}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the fourteen
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the fifteen
   wrapped jobs (`user_sync`, `notification_retention`, `notification_timed`, `default_blueprint_provisioning`,
   `rejected_registration_retention`, `audit_retention`,
   `bank_ledger_integrity`, `job_order_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`,
-  `exchange_registry_reconcile`, `exchange_change_retention`, `exchange_connection_retention`) via `TaskMetrics` (`record`
+  `exchange_registry_reconcile`, `exchange_change_retention`, `exchange_connection_retention`, `name_retention`) via `TaskMetrics` (`record`
   / `recordCounting`). The on-demand `exchange_bulk_undo` job — an admin's undo of one client for
   every member (REQ-XCH-034) — records the same executions, duration and items (members processed)
   but publishes no enabled or last-success staleness signal, since it only runs when an admin starts
@@ -1500,7 +1500,7 @@ nothing, so the alert stays silent on a host without one.
   `app.keycloak.sync.cron`), `ExternalSyncStale` (the catalogue syncs, more than 48 h),
   `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning` /
   `rejected_registration_retention` / `audit_retention` / `exchange_change_retention` /
-  `exchange_connection_retention`, > 26 h),
+  `exchange_connection_retention` / `name_retention`, > 26 h),
   `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
   violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
   `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for

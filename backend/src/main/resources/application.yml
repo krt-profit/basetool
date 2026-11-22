@@ -157,6 +157,11 @@ app:
       enabled: ${APP_REGISTRATIONS_REJECTED_RETENTION_ENABLED:true}
       max-age: ${APP_REGISTRATIONS_REJECTED_RETENTION_MAX_AGE:P90D}
       interval: ${APP_REGISTRATIONS_REJECTED_RETENTION_INTERVAL:PT24H}
+  privacy:
+    name-retention:
+      enabled: ${APP_PRIVACY_NAME_RETENTION_ENABLED:true}
+      max-age: ${APP_PRIVACY_NAME_RETENTION_MAX_AGE:P1095D}
+      interval: ${APP_PRIVACY_NAME_RETENTION_INTERVAL:PT24H}
   notifications:
     retention:
       enabled: ${APP_NOTIFICATIONS_RETENTION_ENABLED:true}

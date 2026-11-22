@@ -367,6 +367,7 @@ The single table every other statement about retention must agree with.
 | Backups                                 | Up to ~6 months (7d/4w/6m)                                                     | `restic forget` (REQ-OPS-008)                                              | `BASETOOL_KEEP_DAILY` / `_WEEKLY` / `_MONTHLY` in `scripts/backup.sh` |
 | Bank booking history (handle snapshots) | Kept beyond account deletion under Art. 6(1)(f), subject to an Art. 17 request | —                                                                          | —                                                       |
 | Audit trail handle snapshots            | Outlive the account, but only to the 24-month ceiling above                    | `AuditRetentionTask` (REQ-AUDIT-006)                                       | `app.audit.retention.max-age`                           |
+| Approval reasons; names of external participants and party leads | **3 years** after the decision or the mission's end; the records stay | `NameRetentionTask` (REQ-DATA-047) | `app.privacy.name-retention.max-age` |
 | Erasure requests (`deletion_request`)   | Life of the account; removed with it when carried out                          | `ON DELETE CASCADE` (REQ-SEC-061)                                          | —                                                       |
 
 **Every number in this table is also a sentence in the privacy policy**, with two exceptions: the
