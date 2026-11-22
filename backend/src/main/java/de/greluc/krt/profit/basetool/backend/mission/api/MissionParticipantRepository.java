@@ -80,12 +80,16 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
   List<MissionParticipant> findByPlannedMissionJobTypeId(UUID jobTypeId);
 
   /**
-   * Bulk-clears the {@code user} reference on every mission participant linked to the given user;
-   * used by the user-delete flow so mission history (guest name, status) survives but the personal
-   * link is removed.
+   * Bulk-clears the {@code user} reference and the free-text comment on every mission participant
+   * linked to the given user, for the account deletion: the participation with its times and job
+   * wishes stays for the payout split, the link and the member's own text go (REQ-DATA-008).
+   *
+   * @param userId the departing member's {@code app_user.id}
    */
   @Modifying
-  @Query("UPDATE MissionParticipant mp SET mp.user = null WHERE mp.user.id = :userId")
+  @Query(
+      "UPDATE MissionParticipant mp SET mp.user = null, mp.comment = null"
+          + " WHERE mp.user.id = :userId")
   void unlinkUser(@Param("userId") UUID userId);
 
   /**

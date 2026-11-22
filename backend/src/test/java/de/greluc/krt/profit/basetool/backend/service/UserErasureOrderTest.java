@@ -59,8 +59,11 @@ class UserErasureOrderTest {
           "DELETE:NotificationUserErasure",
           "REASSIGN:MissionOwnerReassignment",
           "REASSIGN:RefineryOwnerReassignment",
+          "UNLINK:OperationPayoutMemberUnlink",
           "UNLINK:MissionMemberUnlink",
           "UNLINK:JobOrderMemberUnlink",
+          "UNLINK:BlueprintAliasAuthorUnlink",
+          "UNLINK:MaterialAliasAuthorUnlink",
           "UNLINK:SupplyUserErasure");
 
   @Autowired private UserDeletionService userDeletionService;

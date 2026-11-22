@@ -1,6 +1,6 @@
 # Processors and recipients (Art. 28 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-10-17.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-22.
 
 Every third party that can reach personal data, what role it plays, and what has to be in place for
 it. A party is a **processor** when it processes on the controller's instructions (Art. 28 — a data
@@ -31,23 +31,21 @@ either a missing contract or a missing paragraph in the privacy policy.
 
 ### Outbound e-mail relay
 
-- **Role:** processor, **once the transactional e-mail channel is switched on**.
-- **Status: not active.** The channel exists in code (REQ-NOTIF-013 and its two consumers) but no
-  SMTP host is configured (the backend's `SPRING_MAIL_HOST` defaults to empty in
-  `quadlet/env.d/backend.env.tmpl`), so `MailService` drops every message and no personal data
-  leaves this way. The `MailDroppedConfigDrift` alert is correspondingly silent today and starts protecting the
-  moment mail is enabled.
-- **What activation would send:** the approval or refusal decision to the applicant's own e-mail
-  address, and a notice to every admin's e-mail address **carrying the new registrant's handle**.
-- **Before setting `SPRING_MAIL_HOST` in production, all three must happen:**
-  1. a processing agreement with the relay provider,
-  2. the relay named as a recipient in the privacy policy,
-  3. the privacy policy's notification section corrected — it currently states that notifications are
-     *not* dispatched by e-mail or to third parties, which is true only while the channel is off.
-- **Last confirmed inactive:** 2026-09-15, by the controller. Activation is **not currently
-  planned**, which is why the privacy policy carries no e-mail section: writing one for a channel
-  that does not run would describe a processing that does not happen. The checklist above is what
-  turns that from an omission into a deferred decision.
+- **Role:** processor. Delivers every e-mail the platform sends: Keycloak's address confirmation and
+  password reset, and the backend's transactional channel (REQ-NOTIF-013).
+- **Provider:** Lettermint B.V., Willemsvaart 16 B, 8019 AB Zwolle, Netherlands. SMTP relay
+  `smtp.lettermint.co`; Keycloak's realm e-mail settings and the backend's `SPRING_MAIL_*` point at it.
+- **Reaches:** the recipient's e-mail address, the message content (confirmation and reset links, the
+  approval or refusal decision with its reason, the admin notice carrying the new registrant's
+  handle) and delivery events. Kept by the provider for 28 days; its logs at most 14 days.
+- **Location:** EU only (sub-processors UpCloud, Netherlands; OVH, Germany; Postmastery,
+  Netherlands) — no third-country transfer.
+- **Named in the privacy policy:** yes, with address, in the e-mail section and among the recipients.
+- **Processing agreement:** the provider's data processing agreement is part of its terms and applies
+  with the account. The accepted version is filed outside this repository.
+- **Before the relay carries production mail:** the sending domain's SPF, DKIM and DMARC records are
+  in place, Keycloak and the backend point at the relay, and the previous mailbox's app password is
+  revoked. The `MailDroppedConfigDrift` alert covers a backend left without an SMTP host.
 
 ---
 

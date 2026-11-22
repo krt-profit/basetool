@@ -34,7 +34,7 @@
 | **Keycloak** | — | *Inside* the boundary as a deployed component, but *outside* the applications: they never see a credential | See §5 |
 | **UEX** | out | Commodity and item prices, the universe's locations, vehicles, refinery methods and yields (`catalogue/internal/UexClient`) | Third-party game-economy data |
 | **Star Citizen wiki** | out | Versioned game reference data synchronised by the backend (`catalogue.internal.ScWikiClient`) | Third-party game data |
-| **SMTP relay** | out | Transactional account mails — approval and rejection notices (`REQ-NOTIF-013/-014`); a no-op unless `SPRING_MAIL_HOST` is set | Mail delivery is not something to host |
+| **SMTP relay** | out | Lettermint (EU, [processors.md](../privacy/processors.md#outbound-e-mail-relay)): Keycloak's address confirmation and password reset, and the backend's approval and rejection notices (`REQ-NOTIF-013/-014`, a no-op unless `SPRING_MAIL_HOST` is set) | Mail delivery is not something to host |
 | **Let's Encrypt** | out | ACME HTTP-01 for the three public names | Certificate authority |
 | **GHCR / GitHub / Sigstore** | out | Signed images, the promotable config and provider-JAR bundles, provenance and attestations; the host verifies every digest against Sigstore before applying it (`REQ-OPS-015`) | Build and distribution |
 | **Nextcloud (WebDAV)** | out | The nightly encrypted restic backup | Off-site storage, deliberately not on the same host or provider account |

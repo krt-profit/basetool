@@ -24,7 +24,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -62,4 +64,15 @@ public interface BlueprintExternalAliasRepository
    * @return the aliases
    */
   List<BlueprintExternalAlias> findAllByProductKey(String productKey);
+
+  /**
+   * Clears the author stamp on every alias the given member taught, for the account deletion; the
+   * alias itself keeps resolving the name.
+   *
+   * @param author the departing member's {@code app_user.id} as stored in {@code created_by}
+   * @return the number of aliases whose author was cleared
+   */
+  @Modifying
+  @Query("UPDATE BlueprintExternalAlias a SET a.createdBy = null WHERE a.createdBy = :author")
+  int clearAuthor(@Param("author") String author);
 }
