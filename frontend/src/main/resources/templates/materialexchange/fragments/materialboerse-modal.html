@@ -6,32 +6,15 @@
         <th:block th:ref="mb-modal-body">
             <div class="krt-modal-body">
                 <div class="mb-modal-picker" data-mb-picker hidden>
-                    <div class="mb-modal-kind" data-mb-kind role="radiogroup"
-                         th:aria-label="#{materialboerse.modal.kind.label}">
-                        <label class="mb-modal-kind__opt">
-                            <input type="radio" name="mb-release-kind" value="MATERIAL"
-                                   data-mb-kind-radio checked/>
-                            <span th:text="#{materialboerse.modal.kind.material}">Material</span>
-                        </label>
-                        <label class="mb-modal-kind__opt">
-                            <input type="radio" name="mb-release-kind" value="ITEM" data-mb-kind-radio/>
-                            <span th:text="#{materialboerse.modal.kind.item}">Item</span>
-                        </label>
-                    </div>
-                    <label class="form-label-sm" th:text="#{materialboerse.modal.material.label}">Material</label>
-                    <div class="krt-combobox" data-mb-combobox>
-                        <input class="krt-combobox__input" type="text" data-mb-picker-input autocomplete="off"
-                               th:placeholder="#{materialboerse.modal.material.placeholder}"/>
-                        <ul class="krt-combobox__listbox" role="listbox" data-mb-picker-list hidden></ul>
-                    </div>
+                    <th:block th:replace="~{kernel/fragments/components :: segmented(name='mb-release-kind', labelKey='materialboerse.modal.kind.label',
+                        variant='krt-segmented--block', selected='MATERIAL',
+                        options=${ {{value: 'MATERIAL', labelKey: 'materialboerse.modal.kind.material'}, {value: 'ITEM', labelKey: 'materialboerse.modal.kind.item'}} })}"></th:block>
+                    <label class="form-label-sm" for="mb-release-row" th:text="#{materialboerse.modal.material.label}">Material oder Item</label>
+                    <select id="mb-release-row" data-mb-row-select data-testid="mb-release-picker"></select>
                 </div>
                 <div class="mb-modal-picker" data-mb-item-picker hidden>
-                    <label class="form-label-sm" th:text="#{materialboerse.modal.item.label}">Item</label>
-                    <div class="krt-combobox" data-mb-item-combobox>
-                        <input class="krt-combobox__input" type="text" data-mb-item-picker-input autocomplete="off"
-                               th:placeholder="#{materialboerse.modal.item.placeholder}"/>
-                        <ul class="krt-combobox__listbox" role="listbox" data-mb-item-picker-list hidden></ul>
-                    </div>
+                    <label class="form-label-sm" for="mb-item" th:text="#{materialboerse.modal.item.label}">Item</label>
+                    <select id="mb-item" data-mb-item-select data-testid="mb-item-picker"></select>
                 </div>
                 <div class="facts-bar mb-modal-facts" data-mb-facts>
                     <span><span class="fact-k" th:text="#{materialboerse.facts.material}">Material</span><span class="fact-v" data-mb-fact-material>—</span></span>
@@ -85,6 +68,7 @@
             submitRelease: /*[[#{materialboerse.modal.submit.release}]]*/ 'Freigeben',
             submitSave: /*[[#{materialboerse.modal.submit.save}]]*/ 'Speichern',
             itemReleased: /*[[#{materialboerse.toast.itemReleased}]]*/ 'Item auf die Börse gestellt.',
+            itemPickerPlaceholder: /*[[#{materialboerse.modal.item.placeholder}]]*/ 'Item suchen …',
             itemPickerEmpty: /*[[#{materialboerse.modal.item.empty}]]*/ 'Keine passenden Items gefunden.',
             quantityInvalid: /*[[#{materialboerse.modal.quantity.invalid}]]*/ 'Bitte eine Menge angeben.',
             amountMax: /*[[#{materialboerse.modal.offeredAmount.max}]]*/ 'max. {0} verfügbar',
@@ -94,6 +78,7 @@
             remarkSaved: /*[[#{materialboerse.toast.remarkSaved}]]*/ 'Bemerkung gespeichert.',
             error: /*[[#{notification.error.save}]]*/ 'Fehler.',
             charCounter: /*[[#{materialboerse.modal.remark.counter}]]*/ '{0} / 20.000',
+            pickerPlaceholder: /*[[#{materialboerse.modal.material.placeholder}]]*/ 'Lager-Posten suchen …',
             pickerEmpty: /*[[#{materialboerse.modal.material.empty}]]*/ 'Keine freigebbaren Lager-Posten gefunden.',
             pickerAlready: /*[[#{materialboerse.modal.material.already}]]*/ 'bereits auf der Börse',
             pickerStolen: /*[[#{inventory.stolen.chip}]]*/ 'Gestohlen',
