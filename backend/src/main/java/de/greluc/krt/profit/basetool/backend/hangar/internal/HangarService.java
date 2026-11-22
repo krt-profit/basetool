@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedShipTypes;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
@@ -173,6 +174,8 @@ public class HangarService {
    * @param owningOrgUnit the stamped org unit, or {@code null} for an ownerless personal ship
    * @return the persisted ship
    * @throws BadRequestException when the ship type or location id is missing or invalid
+   * @throws de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeNotOfferedException when
+   *     the pickers do not offer the ship type (REQ-P4K-080)
    */
   private @NotNull Ship create(
       @NotNull User user, @NotNull ShipRequestDto dto, @Nullable OrgUnit owningOrgUnit) {
@@ -184,9 +187,10 @@ public class HangarService {
     ship.setOwner(user);
     ship.setOwningOrgUnit(owningOrgUnit);
     ship.setShipType(
-        shipTypeRepository
-            .findById(dto.shipTypeId())
-            .orElseThrow(() -> new BadRequestException("ShipType not found")));
+        OfferedShipTypes.requireOffered(
+            shipTypeRepository
+                .findById(dto.shipTypeId())
+                .orElseThrow(() -> new BadRequestException("ShipType not found"))));
     if (dto.locationId() != null) {
       ship.setLocation(
           OfferedLocations.requireOffered(
@@ -342,6 +346,8 @@ public class HangarService {
    *     version is stale
    * @throws BadRequestException when the ship type or location id is missing/invalid, or the ship's
    *     origin is locked and the payload names another origin than {@code PLEDGE}
+   * @throws de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeNotOfferedException when
+   *     the ship type changes to one the pickers do not offer (REQ-P4K-080)
    */
   @Transactional
   public Ship updateShip(@NotNull UUID userId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
@@ -378,9 +384,11 @@ public class HangarService {
     ship.setFitted(dto.fitted());
 
     ship.setShipType(
-        shipTypeRepository
-            .findById(dto.shipTypeId())
-            .orElseThrow(() -> new BadRequestException("ShipType not found")));
+        OfferedShipTypes.requireOfferedOrCurrent(
+            shipTypeRepository
+                .findById(dto.shipTypeId())
+                .orElseThrow(() -> new BadRequestException("ShipType not found")),
+            ship.getShipType()));
 
     if (dto.locationId() != null) {
       ship.setLocation(

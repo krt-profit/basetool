@@ -101,14 +101,14 @@ VALUES ('5a4d0000-0000-4000-8000-000000001201', 0, now(), now(), 'Sandbox City H
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO ship_type (id, version, created_at, updated_at, name, manufacturer_id, hidden, scu,
-                       uex_vehicle_id, class_name, name_full)
+                       uex_vehicle_id, class_name, name_full, p4k_uuid)
 VALUES ('5a4d0000-0000-4000-8000-000000001301', 0, now(), now(), 'Sandbox Hauler',
         '5a4d0000-0000-4000-8000-000000001001', false, 64, 990101, 'SBXM_Hauler',
-        'Sandbox Manufacturer Hauler'),
+        'Sandbox Manufacturer Hauler', '5a4d0000-0000-4000-8000-000000001391'),
        ('5a4d0000-0000-4000-8000-000000001302', 0, now(), now(), 'Sandbox Miner',
         '5a4d0000-0000-4000-8000-000000001001', false, 32, 990102, 'SBXM_Miner',
-        'Sandbox Manufacturer Miner')
-ON CONFLICT (id) DO NOTHING;
+        'Sandbox Manufacturer Miner', '5a4d0000-0000-4000-8000-000000001392')
+ON CONFLICT (id) DO UPDATE SET p4k_uuid = EXCLUDED.p4k_uuid;
 
 INSERT INTO material (id, version, created_at, updated_at, name, type, quantity_type, code,
                       id_commodity, refined_material_id, is_raw, is_refined, is_visible, scwiki_key)

@@ -138,6 +138,7 @@ class FeatureExpansionTest {
     manufacturerRepository.save(aegis);
 
     fighter = new ShipType();
+    fighter.setP4kUuid(UUID.randomUUID());
     fighter.setName("FighterExp");
     fighter.setManufacturer(aegis);
     fighter = shipTypeRepository.save(fighter);

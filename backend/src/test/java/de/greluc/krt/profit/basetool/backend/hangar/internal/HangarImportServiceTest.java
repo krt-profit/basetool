@@ -1617,11 +1617,83 @@ class HangarImportServiceTest {
     return hangarImportService.importShips(userId, file, List.of());
   }
 
+  /**
+   * Builds a ship type the game files list, which the pickers offer.
+   *
+   * @param name its name
+   * @return the ship type, with an id and a P4K GUID of its own
+   */
   private static ShipType shipTypeWithName(String name) {
     ShipType type = new ShipType();
     type.setId(UUID.randomUUID());
     type.setName(name);
+    type.setP4kUuid(UUID.randomUUID());
     return type;
+  }
+
+  /**
+   * Builds a ship type only UEX lists, such as a concept ship, which the pickers do not offer.
+   *
+   * @param name its name
+   * @return the ship type, with an id and no P4K GUID
+   */
+  private static ShipType conceptShipType(String name) {
+    ShipType type = shipTypeWithName(name);
+    type.setP4kUuid(null);
+    return type;
+  }
+
+  @Test
+  void importShips_aTypeTheGameFilesDoNotList_addsNoShipAndReportsTheName() {
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    ShipType kraken = conceptShipType("Kraken");
+    ShipType aurora = shipTypeWithName("aurora mr");
+    String json =
+        """
+        [
+          {"name":"Kraken","shipname":"","type":"ship"},
+          {"name":"aurora mr","shipname":"","type":"ship"}
+        ]
+        """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(kraken, aurora));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    FleetviewImportResponseDto result = importShips(userId, multipartFile(json));
+
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedShips()).containsExactly("Kraken");
+    assertThat(result.skippedCount()).isEqualTo(1);
+    verify(shipRepository, times(1)).save(argThat(ship -> ship.getShipType() == aurora));
+  }
+
+  @Test
+  void importShips_anExistingShipOfATypeTheGameFilesDoNotList_isMatchedButNoneIsAdded() {
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    ShipType kraken = conceptShipType("Kraken");
+    String json =
+        """
+        [
+          {"name":"Kraken","shipname":"","type":"ship"},
+          {"name":"Kraken","shipname":"","type":"ship"}
+        ]
+        """;
+
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(kraken));
+    when(shipRepository.lockAllOwnedByOrderById(userId)).thenReturn(imported(owned(kraken, 1)));
+
+    FleetviewImportResponseDto result = importShips(userId, multipartFile(json));
+
+    assertThat(result.importedCount()).isZero();
+    assertThat(result.duplicateCount()).isEqualTo(1);
+    assertThat(result.skippedShips()).containsExactly("Kraken");
+    verify(shipRepository, never()).save(any(Ship.class));
   }
 
   private static ShipType shipTypeWithSlugs(String name, String uexSlug, String scwikiSlug) {

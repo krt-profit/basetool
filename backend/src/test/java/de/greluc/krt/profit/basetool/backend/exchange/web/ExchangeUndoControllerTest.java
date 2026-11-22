@@ -1209,7 +1209,11 @@ class ExchangeUndoControllerTest {
 
   private @NotNull UUID shipType(@NotNull String name) {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO ship_type (id, name) VALUES (?, ?)", id, name + " " + id);
+    jdbc.update(
+        "INSERT INTO ship_type (id, name, p4k_uuid) VALUES (?, ?, ?)",
+        id,
+        name + " " + id,
+        UUID.randomUUID());
     shipTypes.add(id);
     return id;
   }

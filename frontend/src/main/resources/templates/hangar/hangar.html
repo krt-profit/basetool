@@ -134,6 +134,7 @@
                                         <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
                                         <span th:replace="~{catalogue/fragments/manufacturer-mark :: mark(${ship.shipType?.manufacturer})}"></span>
                                         <span th:if="${ship.shipType != null and ship.shipType.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
+                                        <span th:if="${ship.shipType != null and ship.shipType.notInGame and !ship.shipType.noLongerInGame}" class="chip chip--warning" data-testid="not-in-game" th:text="#{catalogue.notInGame}">Nicht im Spiel</span>
                                         <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
                                               class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
                                         <th:block th:replace="~{hangar/fragments/ship-meta :: shipMeta(${ship})}"></th:block>
@@ -173,6 +174,7 @@
                                         th:data-id="${ship.id}"
                                         th:data-name="${ship.name}"
                                         th:data-type="${ship.shipType != null ? ship.shipType.id : ''}"
+                                        th:data-type-name="${typeName}"
                                         th:data-ins="${ship?.insurance}"
                                         th:data-loc="${ship.location != null ? ship.location.id : ''}"
                                         th:data-fitted="${ship.fitted}"
@@ -259,6 +261,7 @@
                                         <span class="hangar-tree__name">
                                             <span class="cell-title" th:text="${item.shipType.displayName(#locale)}">Cutlass Black</span>
                                             <span th:if="${item.shipType.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
+                                            <span th:if="${item.shipType.notInGame and !item.shipType.noLongerInGame}" class="chip chip--warning" data-testid="not-in-game" th:text="#{catalogue.notInGame}">Nicht im Spiel</span>
                                             <span class="cell-sub" th:if="${item.shipType.manufacturer != null}"
                                                   th:text="${item.shipType.manufacturer.displayName(#locale)}">Drake</span>
                                             <span th:replace="~{catalogue/fragments/manufacturer-mark :: mark(${item.shipType.manufacturer})}"></span>
@@ -394,7 +397,7 @@
                 <span id="import-res-updated">0</span>
             </div>
             <div class="stat-row">
-                <span th:text="#{hangar.import.result.skipped}">Nicht erkannt</span>
+                <span th:text="#{hangar.import.result.skipped}">Nicht erkannt oder nicht im Spiel</span>
                 <span id="import-res-skipped">0</span>
             </div>
             <div class="stat-row">
@@ -413,7 +416,7 @@
                      th:data-count="#{hangar.import.result.ambiguous_count}"></div>
             </div>
             <div id="import-skip-section" hidden>
-                <p class="import-list-title" th:text="#{hangar.import.result.skipped_list}">Nicht erkannte Schiffe</p>
+                <p class="import-list-title" th:text="#{hangar.import.result.skipped_list}">Nicht erkannte oder nicht spielbare Schiffe</p>
                 <div id="import-skip-list" class="skip-list"></div>
             </div>
             <div id="import-dup-section" hidden>

@@ -39,6 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -92,6 +94,7 @@ class MissionTemplateHttpTest {
   @Autowired private PlatformTransactionManager transactionManager;
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private FrequencyTypeRepository frequencyTypes;
+  @Autowired private ShipTypeRepository shipTypes;
 
   private MockMvc mvc;
 
@@ -394,6 +397,66 @@ class MissionTemplateHttpTest {
     mvc.perform(get(PATH).with(admin()).param("owningOrgUnitId", owner.toString()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content").isEmpty());
+  }
+
+  @Test
+  void aUnitTypeTheGameFilesDoNotListIsRefusedUnlessTheTemplateAlreadyHoldsIt() throws Exception {
+    UUID owner = createOwner();
+    ShipType concept = saveShipType("Template concept ship", null);
+    ShipType listed = saveShipType("Template listed ship", UUID.randomUUID());
+    String withUnit =
+        """
+        {"owningOrgUnitId":"%s","name":"Fleet","objectives":[],"steps":[],
+         "units":[{"name":"Hauler","shipTypeId":"%s"}]}
+        """;
+
+    mvc.perform(
+            post(PATH)
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(withUnit.formatted(owner, concept.getId())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("CATALOGUE_SHIP_TYPE_NOT_OFFERED"));
+
+    MvcResult saved =
+        mvc.perform(
+                post(PATH)
+                    .with(admin())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(withUnit.formatted(owner, listed.getId())))
+            .andExpect(status().isCreated())
+            .andReturn();
+    String id = JsonPath.read(saved.getResponse().getContentAsString(), "$.id");
+    Number version = JsonPath.read(saved.getResponse().getContentAsString(), "$.version");
+    listed.setP4kUuid(null);
+    shipTypes.saveAndFlush(listed);
+
+    mvc.perform(
+            put(PATH + "/{id}", id)
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"version":%s,"name":"Fleet","objectives":[],"steps":[],
+                     "units":[{"name":"Hauler renamed","shipTypeId":"%s"}]}
+                    """
+                        .formatted(version, listed.getId())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.units[0].name").value("Hauler renamed"));
+  }
+
+  /**
+   * Saves a ship type for a template unit.
+   *
+   * @param name its name
+   * @param p4kUuid its P4K GUID, or {@code null} for one the game files do not list
+   * @return the ship type
+   */
+  private ShipType saveShipType(String name, UUID p4kUuid) {
+    ShipType shipType = new ShipType();
+    shipType.setName(name + " " + UUID.randomUUID());
+    shipType.setP4kUuid(p4kUuid);
+    return shipTypes.saveAndFlush(shipType);
   }
 
   @Test

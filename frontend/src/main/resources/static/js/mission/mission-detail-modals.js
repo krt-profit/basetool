@@ -23,6 +23,7 @@ import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { selectCurrentValue } from '/js/kernel/krt-current-option.js';
 import { missionHooks } from '/js/mission/mission-hooks.js';
 
 missionHooks.modalOpen = function (overlay) {
@@ -646,7 +647,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('edit-unit-ship')
                     );
                     if (editTypeSelect && editShipSelect) {
-                        editTypeSelect.value = shiptypeVal;
+                        selectCurrentValue(
+                            editTypeSelect,
+                            shiptypeVal,
+                            this.getAttribute('data-shiptype-name') || '',
+                        );
                         editTypeSelect.dispatchEvent(new Event('change'));
                         if (shipVal) {
                             editShipSelect.value = shipVal;

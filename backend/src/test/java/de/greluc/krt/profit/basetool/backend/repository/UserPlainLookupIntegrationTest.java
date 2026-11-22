@@ -86,6 +86,7 @@ class UserPlainLookupIntegrationTest {
       userId = userRepository.save(user).getId();
       ShipType type = new ShipType();
       type.setName("Plain lookup " + UUID.randomUUID());
+      type.setP4kUuid(UUID.randomUUID());
       shipTypeId = shipTypeRepository.save(type).getId();
     });
   }

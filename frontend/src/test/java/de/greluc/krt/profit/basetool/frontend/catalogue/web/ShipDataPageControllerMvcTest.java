@@ -124,7 +124,8 @@ class ShipDataPageControllerMvcTest {
             null,
             false,
             shipTypeNameDe,
-            shipTypeDescriptionEn != null);
+            shipTypeDescriptionEn != null,
+            false);
     List<ManufacturerDto> manufacturers = empty ? List.of() : List.of(manufacturer);
     List<ShipTypeDto> shipTypes = empty ? List.of() : List.of(shipType);
     PageResponse<ManufacturerDto> manufacturersPage =

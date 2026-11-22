@@ -81,6 +81,7 @@ class HangarUserEndpointsSecurityTest {
     orgUnitMembershipRepository.save(iridiumMembership);
 
     shipType = new ShipType();
+    shipType.setP4kUuid(UUID.randomUUID());
     shipType.setName("Aurora");
     shipTypeRepository.save(shipType);
   }

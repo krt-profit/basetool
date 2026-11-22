@@ -201,7 +201,7 @@ function initMemberHangar() {
     /**
      * Chooses a ship type in the picker with its manufacturer filter cleared; bound below.
      *
-     * @type {(shipTypeId: string) => void}
+     * @type {(shipTypeId: string, shipTypeName?: string) => void}
      */
     let chooseShipType = () => {};
 
@@ -238,7 +238,10 @@ function initMemberHangar() {
         modalTitle.textContent = shipForm.getAttribute('data-title-edit');
         assignFormAction(shipForm, safeSameOriginUrl(action, shipForm.action));
         field('member-ship-name').value = btn.getAttribute('data-name') ?? '';
-        chooseShipType(btn.getAttribute('data-type') ?? '');
+        chooseShipType(
+            btn.getAttribute('data-type') ?? '',
+            btn.getAttribute('data-type-name') ?? '',
+        );
         field('member-ship-location').value = btn.getAttribute('data-loc') || '';
         field('member-ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
         field('member-ship-version').value = btn.getAttribute('data-version') ?? '';

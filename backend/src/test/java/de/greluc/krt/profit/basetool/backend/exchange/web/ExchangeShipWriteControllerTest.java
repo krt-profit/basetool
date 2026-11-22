@@ -655,6 +655,32 @@ class ExchangeShipWriteControllerTest {
   }
 
   @Test
+  void aTypeTheGameFilesDoNotListCreatesNoShipButAShipKeepingItStillUpdates() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID kraken = shipType("Kraken", null);
+    UUID concept = ship(member, "Concept", kraken, "LTI");
+    UUID flyable = ship(member, "Flyable", cutlass, "LTI");
+
+    change(
+            ops(
+                upsert("vk-1", null, null, kraken, null, "{\"kind\":\"LTI\"}", null),
+                upsert("vk-2", flyable, 0L, kraken, "Flyable", "{\"kind\":\"LTI\"}", null),
+                upsert("vk-3", concept, 0L, kraken, "Renamed", "{\"kind\":\"LTI\"}", null)))
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.results[0].result").value("unmatched"))
+        .andExpect(jsonPath("$.results[0].reason").value("UNMATCHED"))
+        .andExpect(jsonPath("$.results[1].result").value("unmatched"))
+        .andExpect(jsonPath("$.results[1].reason").value("UNMATCHED"));
+
+    assertThat(ships(member)).isEqualTo(2);
+    assertThat(jdbc.queryForObject("SELECT name FROM ship WHERE id = ?", String.class, concept))
+        .isEqualTo("Renamed");
+    assertThat(
+            jdbc.queryForObject("SELECT ship_type_id FROM ship WHERE id = ?", UUID.class, flyable))
+        .isEqualTo(cutlass);
+  }
+
+  @Test
   void anotherMembersShipIsNeverLockedSoItsOwnersConcurrentEditDoesNotHoldUpTheBatch()
       throws Exception {
     UUID cutlass = shipType("Cutlass Black");
@@ -856,8 +882,23 @@ class ExchangeShipWriteControllerTest {
   }
 
   private @NotNull UUID shipType(@NotNull String name) {
+    return shipType(name, UUID.randomUUID());
+  }
+
+  /**
+   * Inserts a ship type.
+   *
+   * @param name its name
+   * @param p4kUuid its P4K GUID, or {@code null} for one the game files do not list
+   * @return its id
+   */
+  private @NotNull UUID shipType(@NotNull String name, @Nullable UUID p4kUuid) {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO ship_type (id, name) VALUES (?, ?)", id, name + " " + id);
+    jdbc.update(
+        "INSERT INTO ship_type (id, name, p4k_uuid) VALUES (?, ?, ?)",
+        id,
+        name + " " + id,
+        p4kUuid);
     shipTypes.add(id);
     return id;
   }

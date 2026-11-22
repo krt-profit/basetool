@@ -266,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Chooses a ship type in the picker with its manufacturer filter cleared; bound below.
      *
-     * @type {(shipTypeId: string) => void}
+     * @type {(shipTypeId: string, shipTypeName?: string) => void}
      */
     let chooseShipType = () => {};
 
@@ -301,7 +301,10 @@ document.addEventListener('DOMContentLoaded', () => {
         modalTitle.textContent = form.getAttribute('data-title-edit');
         assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
         shipField('ship-name').value = btn.getAttribute('data-name') ?? '';
-        chooseShipType(btn.getAttribute('data-type') ?? '');
+        chooseShipType(
+            btn.getAttribute('data-type') ?? '',
+            btn.getAttribute('data-type-name') ?? '',
+        );
         setInsurance(btn.getAttribute('data-ins'));
         shipField('ship-location').value = btn.getAttribute('data-loc') || '';
         shipField('ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';

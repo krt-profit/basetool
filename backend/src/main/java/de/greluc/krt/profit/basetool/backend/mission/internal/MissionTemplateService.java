@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedShipTypes;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -100,7 +102,7 @@ public class MissionTemplateService {
   @Transactional
   public MissionTemplateDto create(CreateMissionTemplateRequest request) {
     OrgUnit owner = requireOwner(request.owningOrgUnitId());
-    MissionTemplatePlan plan = normalize(request.plan());
+    MissionTemplatePlan plan = normalize(request.plan(), Set.of());
     MissionTemplate template = new MissionTemplate(owner, request.name().strip(), plan);
     templates.save(template);
     flush();
@@ -131,7 +133,7 @@ public class MissionTemplateService {
     MissionTemplate template = requireTemplate(templates.lock(id));
     OptimisticLock.checkRequired(
         template.getVersion(), request.version(), MissionTemplate.class, id);
-    MissionTemplatePlan plan = normalize(request.plan());
+    MissionTemplatePlan plan = normalize(request.plan(), shipTypeIdsOf(template.getUnits()));
     if (template.replace(request.name().strip(), plan)) {
       flush();
       recordChange(template, AuditEventType.MISSION_TEMPLATE_UPDATED);
@@ -235,14 +237,24 @@ public class MissionTemplateService {
     return managerUnits.contains(owner) || accessGate.canActAsOfficerIn(owner);
   }
 
-  private MissionTemplatePlan normalize(MissionTemplatePlan plan) {
-    Set<UUID> shipTypeIds =
-        plan.units().stream()
-            .map(MissionTemplatePlan.Unit::shipTypeId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-    if (!shipTypeIds.isEmpty() && shipTypes.findAllById(shipTypeIds).size() != shipTypeIds.size()) {
-      throw new NotFoundException("ShipType not found");
+  /**
+   * Normalizes a submitted plan and checks its ship types: each exists, and each the template does
+   * not already hold is one the pickers offer (REQ-P4K-080).
+   *
+   * @param plan the submitted plan
+   * @param heldShipTypeIds the ship types the template's stored units name, empty for a new one
+   * @return the normalized plan
+   */
+  private MissionTemplatePlan normalize(MissionTemplatePlan plan, Set<UUID> heldShipTypeIds) {
+    Set<UUID> shipTypeIds = shipTypeIdsOf(plan.units());
+    if (!shipTypeIds.isEmpty()) {
+      List<ShipType> found = shipTypes.findAllById(shipTypeIds);
+      if (found.size() != shipTypeIds.size()) {
+        throw new NotFoundException("ShipType not found");
+      }
+      found.stream()
+          .filter(shipType -> !heldShipTypeIds.contains(shipType.getId()))
+          .forEach(OfferedShipTypes::requireOffered);
     }
     return new MissionTemplatePlan(
         StringNormalization.trimToNull(plan.description()),
@@ -269,6 +281,13 @@ public class MissionTemplateService {
                     row.highValueUnit(),
                     MissionUnitFrequency.normalize(row.frequency())))
             .toList());
+  }
+
+  private static Set<UUID> shipTypeIdsOf(List<MissionTemplatePlan.Unit> units) {
+    return units.stream()
+        .map(MissionTemplatePlan.Unit::shipTypeId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
   }
 
   @Contract("null -> null; !null -> !null")

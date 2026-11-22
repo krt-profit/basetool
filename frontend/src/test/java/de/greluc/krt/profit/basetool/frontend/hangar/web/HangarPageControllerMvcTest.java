@@ -111,6 +111,47 @@ class HangarPageControllerMvcTest {
             "4.10.2-LIVE");
   }
 
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void aShipOfATypeTheGameFilesDoNotList_showsTheNoticeAndItsTypeForTheEditDialog()
+      throws Exception {
+    UUID typeId = UUID.randomUUID();
+    ShipTypeDto concept =
+        new ShipTypeDto(
+            typeId, "Kraken", null, null, BigDecimal.ZERO, false, null, false, null, false, true);
+    ShipDto ship =
+        new ShipDto(
+            UUID.randomUUID(),
+            "Pledged Kraken",
+            concept,
+            "LTI",
+            null,
+            false,
+            null,
+            null,
+            0L,
+            0L,
+            null,
+            null,
+            null,
+            false);
+    when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/hangar").header("Accept-Language", "de"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-testid=\"not-in-game\"", "Nicht im Spiel")
+        .contains("data-type=\"" + typeId + "\"", "data-type-name=\"Kraken\"")
+        .doesNotContain("data-testid=\"no-longer-in-game\"");
+  }
+
   private MockMvc mockMvc;
 
   @Autowired private WebApplicationContext context;

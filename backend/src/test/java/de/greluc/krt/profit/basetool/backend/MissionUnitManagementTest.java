@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
@@ -93,6 +94,7 @@ class MissionUnitManagementTest {
     userRepository.save(officerUser);
 
     ShipType st = new ShipType();
+    st.setP4kUuid(UUID.randomUUID());
     st.setName("Fighter");
     shipTypeRepository.save(st);
 
@@ -331,6 +333,72 @@ class MissionUnitManagementTest {
         ship.getShipType().getName(),
         created.getName(),
         "blank display name must fall back to the ship type name");
+  }
+
+  /** A unit typed without a ship by a type the game files do not list is refused (REQ-P4K-080). */
+  @Test
+  void aUnitTypedByATypeTheGameFilesDoNotList_isRefused() {
+    ShipType concept = conceptShipType();
+
+    assertThrows(
+        ShipTypeNotOfferedException.class,
+        () ->
+            missionStructureService.addUnitToMission(
+                mission.getId(), "Concept unit", concept.getId(), null, false, null, null, null));
+    assertThrows(
+        ShipTypeNotOfferedException.class,
+        () ->
+            missionStructureService.updateMissionUnit(
+                mission.getId(),
+                unit.getId(),
+                null,
+                "Initial Unit",
+                concept.getId(),
+                null,
+                false,
+                null,
+                null,
+                null));
+  }
+
+  /** A unit keeping a type the game files do not list stays editable (REQ-P4K-080). */
+  @Test
+  void aUnitKeepingATypeTheGameFilesDoNotList_staysEditable() {
+    ShipType concept = conceptShipType();
+    unit.setShip(null);
+    unit.setShipType(concept);
+
+    Mission updated =
+        missionStructureService.updateMissionUnit(
+            mission.getId(),
+            unit.getId(),
+            null,
+            "Renamed concept unit",
+            concept.getId(),
+            null,
+            false,
+            null,
+            null,
+            null);
+
+    MissionUnit kept =
+        updated.getAssignedUnits().stream()
+            .filter(u -> u.getId().equals(unit.getId()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals(concept.getId(), kept.getShipType().getId());
+    assertEquals("Renamed concept unit", kept.getName());
+  }
+
+  /**
+   * Saves a ship type only UEX lists, which the pickers do not offer.
+   *
+   * @return the ship type
+   */
+  private ShipType conceptShipType() {
+    ShipType concept = new ShipType();
+    concept.setName("Unit management concept ship");
+    return shipTypeRepository.save(concept);
   }
 
   /** Without name, ship, and ship type there is nothing to call the unit — rejected. */

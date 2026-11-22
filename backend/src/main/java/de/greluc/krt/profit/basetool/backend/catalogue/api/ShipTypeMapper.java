@@ -45,5 +45,6 @@ public interface ShipTypeMapper {
       expression = "java(shipType.getDescriptionEn() != null)")
   @Mapping(target = "catalogueFacts", expression = "java(ShipCatalogueFacts.of(shipType))")
   @Mapping(target = "noLongerInGame", expression = "java(shipType.isP4kRetired())")
+  @Mapping(target = "notInGame", expression = "java(OfferedShipTypes.isNotInGame(shipType))")
   ShipTypeDto toDto(ShipType shipType);
 }

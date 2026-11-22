@@ -158,6 +158,7 @@
       "kernel/krt-chrome.js",
       "kernel/krt-client-error.js",
       "kernel/krt-combobox-sources.js",
+      "kernel/krt-current-option.js",
       "kernel/krt-exact-whole-input.js",
       "kernel/krt-fetch.js",
       "kernel/krt-filter-chips.js",

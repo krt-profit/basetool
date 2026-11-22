@@ -53,18 +53,17 @@ public class ShipTypeService {
   private final AuditRecorder auditRecorder;
 
   /**
-   * Returns cached page result.
+   * Pages every ship type, or only those the pickers offer (REQ-P4K-080); cached.
    *
    * @param pageable page request
-   * @param includeHidden true to include ship types marked hidden
+   * @param includeHidden true for every ship type, false for the offered ones only
    * @return cached page of ship type read models
    */
   @Cacheable(cacheNames = CacheConfig.SHIP_TYPES_CACHE)
   public Page<ShipTypeDto> getAllShipTypes(@NotNull Pageable pageable, boolean includeHidden) {
     return (includeHidden
             ? shipTypeRepository.findAll(pageable)
-            : shipTypeRepository.findByHiddenFalseAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
-                pageable))
+            : shipTypeRepository.findOffered(pageable))
         .map(shipTypeMapper::toDto);
   }
 
@@ -73,7 +72,7 @@ public class ShipTypeService {
    * the search term would make the cache key unbounded.
    *
    * @param query the search fragment, already stripped and non-blank
-   * @param includeHidden true to include ship types marked hidden
+   * @param includeHidden true to search every ship type, false for the offered ones only
    * @param pageable page request
    * @return paged matching ship type read models
    */
@@ -81,7 +80,7 @@ public class ShipTypeService {
       @NotNull String query, boolean includeHidden, @NotNull Pageable pageable) {
     return (includeHidden
             ? shipTypeRepository.findByNameContainingIgnoreCase(query, pageable)
-            : shipTypeRepository.searchPickableByName(query, pageable))
+            : shipTypeRepository.searchOfferedByName(query, pageable))
         .map(shipTypeMapper::toDto);
   }
 

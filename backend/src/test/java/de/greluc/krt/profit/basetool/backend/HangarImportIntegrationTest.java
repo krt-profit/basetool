@@ -99,10 +99,12 @@ class HangarImportIntegrationTest {
     orgUnitMembershipRepository.save(iridiumMembership);
 
     type135c = new ShipType();
+    type135c.setP4kUuid(UUID.randomUUID());
     type135c.setName("135c");
     type135c = shipTypeRepository.save(type135c);
 
     typeZeus = new ShipType();
+    typeZeus.setP4kUuid(UUID.randomUUID());
     typeZeus.setName("zeus mk ii mr");
     typeZeus = shipTypeRepository.save(typeZeus);
   }
@@ -146,9 +148,11 @@ class HangarImportIntegrationTest {
   void importFleetview_ambiguousName_isOfferedAndTheRepeatedImportTakesTheChoice()
       throws Exception {
     ShipType mkI = new ShipType();
+    mkI.setP4kUuid(UUID.randomUUID());
     mkI.setName("Choicetest Hornet Mk I");
     mkI = shipTypeRepository.save(mkI);
     ShipType mkII = new ShipType();
+    mkII.setP4kUuid(UUID.randomUUID());
     mkII.setName("Choicetest Hornet Mk II");
     mkII = shipTypeRepository.save(mkII);
     MockMultipartFile file =

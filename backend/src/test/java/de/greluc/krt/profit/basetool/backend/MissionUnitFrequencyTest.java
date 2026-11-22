@@ -91,6 +91,7 @@ class MissionUnitFrequencyTest {
 
     shipType = new ShipType();
     shipType.setName("Fighter");
+    shipType.setP4kUuid(UUID.randomUUID());
     shipTypeRepository.save(shipType);
 
     ship = new Ship();

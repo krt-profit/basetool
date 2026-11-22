@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedShipTypes;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
@@ -161,7 +162,7 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
     UUID locationId = before.location();
     if (shipType == null
         || before.insurance() == null
-        || !shipTypeRepository.existsById(shipType)
+        || !restorableType(shipType, ship.orElse(null))
         || (locationId != null && !restorablePlace(locationId, ship.orElse(null)))) {
       return false;
     }
@@ -195,6 +196,21 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
       shipCommands.changeShipOrgUnit(member, shipId, unit.id(), unitVersion);
     }
     return true;
+  }
+
+  /**
+   * Whether an undo may give a ship back a ship type: the type still exists and is the ship's
+   * current one or one the pickers offer (REQ-P4K-080).
+   *
+   * @param shipTypeId the ship type the earlier state names
+   * @param current the ship as it is now, or {@code null} when it is gone
+   * @return {@code true} when the hangar would accept the ship type
+   */
+  private boolean restorableType(@NotNull UUID shipTypeId, @Nullable Ship current) {
+    if (current != null && shipTypeId.equals(current.getShipType().getId())) {
+      return true;
+    }
+    return shipTypeRepository.findById(shipTypeId).filter(OfferedShipTypes::isOffered).isPresent();
   }
 
   /**

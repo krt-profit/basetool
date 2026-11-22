@@ -118,6 +118,7 @@ class MissionStructureShipNoticeTest {
     ShipType type = new ShipType();
     type.setId(UUID.randomUUID());
     type.setName(typeName);
+    type.setP4kUuid(UUID.randomUUID());
     Ship ship = new Ship();
     ship.setId(UUID.randomUUID());
     ship.setOwner(owner);

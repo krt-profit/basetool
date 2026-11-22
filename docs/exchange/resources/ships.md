@@ -111,6 +111,7 @@ batch may update or remove a ship only once. How an op that is not applied is re
 | `upsert` that changes nothing on an already linked ship | `unchanged` | — |
 | `remove` of a ship that is already gone | `unchanged` | — |
 | A `shipId` the member does not own or the server never had, or a ship type that matches nothing | `unmatched` | `UNMATCHED` |
+| `upsert` that would create a ship of, or change a ship to, a ship type the Basetool does not offer: one the game files do not list, or one it hid or retired | `unmatched` | `UNMATCHED` |
 | A ship type that matches several | `ambiguous` | `AMBIGUOUS` |
 | A place without a warehouse location | `rejected` | `LOCATION_UNKNOWN` |
 | `link` or `upsert` of a ship this installation links to another id | `rejected` | `LINK_TARGET_TAKEN` |

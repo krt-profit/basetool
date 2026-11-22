@@ -597,7 +597,11 @@ the member to choose in the result dialog instead of skipping it.
   reports the names left open again. A choice applies only when it names one of the name's current
   options. The import matches before it creates (REQ-HANGAR-015), so the repeated run finds the
   ships the first run created and creates only the chosen ones.
-- **Unknown names** that find no ship stay under „Nicht erkannt".
+- **Unknown names** that find no ship stay under „Nicht erkannt oder nicht im Spiel".
+- **Only offered ship types add ships** (REQ-P4K-080). The name stages run on the ship types the
+  pickers offer and on those the member's importable hangar ships already have. An entry matching
+  an existing ship of a type the pickers no longer offer updates it; one that would add a ship of
+  such a type adds none and is listed under „Nicht erkannt oder nicht im Spiel" by its name.
 - **Audit and live update.** `HANGAR_IMPORTED` (REQ-HANGAR-004) adds the count `ambiguous`, never a
   name. The list refreshes in place when the dialog closes after a run that created or updated
   ships (REQ-FE-001).

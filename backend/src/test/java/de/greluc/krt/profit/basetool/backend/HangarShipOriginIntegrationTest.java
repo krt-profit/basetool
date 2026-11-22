@@ -90,6 +90,7 @@ class HangarShipOriginIntegrationTest {
     owner = saveUser("origin-owner");
     stranger = saveUser("origin-stranger");
     ShipType type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setName(TYPE_NAME);
     probe = shipTypeRepository.save(type);
   }

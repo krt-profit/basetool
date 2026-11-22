@@ -101,6 +101,7 @@ class HangarModuleContractTest {
     insider = member("hgr-insider", home);
     outsider = member("hgr-outsider", squadron("HgrForeign-" + tag, "G" + tag));
     type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setName("Hgr Cutlass " + tag);
     type = shipTypeRepository.saveAndFlush(type);
   }
