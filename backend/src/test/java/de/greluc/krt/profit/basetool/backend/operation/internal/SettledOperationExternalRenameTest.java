@@ -40,7 +40,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Holds the payout freeze of a settled operation to its exception for external names (V440,
+ * Holds the payout freeze of a settled operation to its exception for external names (V441,
  * REQ-MISSION-034): renaming or removing the name moves the paid mark with the payout key, while a
  * rename that would merge two payout rows and every other roster change stay frozen.
  */
