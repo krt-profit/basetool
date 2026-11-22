@@ -2,6 +2,117 @@
 
 ## [Unreleased]
 
+## [v1.26.7](https://github.com/krt-profit/basetool/releases/tag/v1.26.7) - 2026-11-22
+
+### Added
+
+- **Bank – Anträge an unsere Konten.** Neben „Freigabe erteilen" gibt es jetzt „Ablehnen": Wer einen
+  Antrag freigeben muss, kann ihn mit Begründung ablehnen. Der Antrag gilt dann als abgelehnt, und
+  der Antragsteller erfährt den Grund.
+
+### Changed
+
+- **Impressum.** Neu gefasst nach § 5 DDG und § 18 Abs. 1 MStV: mit Land, zentraler Kontaktstelle
+  nach dem Digital Services Act, Meldeweg für rechtswidrige Inhalte und Lizenzhinweisen; die
+  veralteten Haftungs- und Streitbeilegungstexte entfallen. Auf Englisch heißt die Seite jetzt
+  „Legal notice“.
+
+- **Anmeldung.** Die Anmeldeseiten verlinken Impressum und Datenschutzerklärung.
+
+- **Aufträge und Raffinerieaufträge.** „Material hinzufügen" und „Item hinzufügen" sind jetzt orange
+  umrandet und stehen zusätzlich kompakt im Abschnittskopf, damit sie auch in langen Listen nicht
+  untergehen. Nach dem Klick springt der Cursor direkt in die neue Zeile.
+
+- **Hangar.** Der Herstellerfilter im Dialog „Schiff hinzufügen" zeigt nur noch Hersteller, die
+  auch auswählbare Schiffe bauen. Waffen- und Komponentenhersteller ohne Schiff fallen weg; das gilt
+  auch im Mitglieder-Hangar der Admins.
+
+- **Materialbörse.** „Material suchen", „Item suchen", „Material anbieten" und „Item anbieten" wählen
+  Material und Item jetzt über das Such-Dropdown wie bei Aufträgen, Lager und Raffinerie; die Liste
+  erscheint nicht mehr als lose Aufzählung im Fenster. Material oder Item wählst du über einen
+  Umschalter im Seitendesign statt über Radio-Buttons.
+
+- **Schiffsauswahl.** Profitberechnung, Hangar, Einsätze und Einsatzvorlagen bieten nur noch Schiffe
+  an, die in den Spieldaten stehen. Konzeptschiffe wie Hull D, Hull E oder Kraken und alte
+  Doppeleinträge ohne Herstellerkürzel fallen weg.
+
+- **Bestehende Schiffe.** Ein Hangar-Schiff oder eine Einsatz-Einheit mit einem solchen Typ bleibt
+  erhalten, zeigt „Nicht im Spiel“ und lässt sich weiter bearbeiten, solange der Typ bleibt.
+
+- **Hangar-Import.** Der Import legt keine Konzeptschiffe mehr neu an und listet sie unter „Nicht
+  erkannt oder nicht im Spiel“; vorhandene Schiffe aktualisiert er weiter.
+
+- **Datenschutzerklärung.** Neu gefasst nach dem heutigen Stand von Tool und Recht: alle Bereiche,
+  Cookies, Protokolle und Fristen einzeln beschrieben, Versand über Lettermint, Rechte mit
+  hervorgehobenem Widerspruchsrecht. Veraltete Musterpassagen (Einwilligungswiderruf, `XSRF-TOKEN`,
+  Provider-Logdateien) entfallen.
+
+### Fixed
+
+- **Server.** Der Testserver nimmt auch nach einem Neustart keine ICMP-Redirects an. Der Schutz gilt
+  jetzt für jede Netzwerkschnittstelle, auch für eine, die beim Start umbenannt wird.
+
+- **Überwachung.** Der podman-Exporter liefert seine Image-Metriken wieder ohne Fehler. Zeigt ein
+  neuer Image-Digest auf ein Image, das der Server schon hat, behält das Image nach dem Deploy und
+  der wöchentlichen Bereinigung nur noch einen Namen statt zweier, die der Exporter doppelt meldete.
+
+- **Überwachung.** Der podman-Exporter übernimmt neue und entfernte Images sofort statt erst bei
+  seinem nächsten Neustart. Podman schreibt seine Ereignisse für den Dienstbenutzer dafür in eine
+  Datei, die der Exporter lesen kann; das Journal des Systems war für ihn nicht lesbar.
+
+- **Katalog.** Der UEX-Sync läuft wieder vollständig durch. Seit dem Zusammenführen der Constellation
+  Mk IV Phoenix mit ihrer Emerald-Edition verwarf er die Phoenix bei jedem Lauf und brach danach
+  ab, sodass Gegenstände, Preise und Raffinerie-Daten von UEX nicht mehr aktualisiert wurden.
+
+- **Katalog.** Ein einzelnes Schiff, das der UEX-Sync nicht zuordnen kann, hält Gegenstände, Preise
+  und Raffinerie-Daten von UEX nicht mehr auf; der Lauf meldet das Schiff weiterhin als
+  unvollständig. Eine veraltete Spiel-UUID bei UEX blockiert ein Schiff nicht mehr, dessen Kennung der
+  P4K-Import bestätigt. Eine zusammengeführte Edition übernimmt nie mehr das UEX-Listing oder den
+  Wiki-Eintrag ihres Schiffs, und ihr Wiki-Eintrag legt keinen neuen Schiffstyp an.
+
+- **P4K-Import.** Ein Schiff, dessen alter Spiel-Eintrag verschwunden ist, zieht beim Import wieder
+  auf seinen Nachfolger um, auch wenn einzelne neue Lackierungen noch keinen Gegenstand haben oder
+  seine Beschreibung von der neuen abweicht; die Beschreibung bleibt erhalten. Bisher blieb es dann
+  als „Nicht mehr im Spiel“ stehen und fehlte in der Schiffsauswahl, etwa die Hammerhead und die
+  Constellation Andromeda seit dem Import vom 18. November.
+
+- **Externe Teilnehmer in abgerechneten Operationen.** Der Name eines externen Teilnehmers lässt
+  sich auch nach der Auszahlung ändern oder entfernen, etwa auf einen Löschantrag hin. Der
+  Auszahlungsvermerk bleibt erhalten.
+
+- **Doppelte Schiffstypen.** Alte Einträge wie „Aurora CL“, „Skylark“ oder „Constellation Mk V
+  Centaurus“ führt der nächste Spieldaten-Import mit dem echten Schiff („RSI Aurora Mk I CL“, „RSI
+  Skylark“, …) zusammen. Hangar-Schiffe und Einsatz-Einheiten wandern dabei mit.
+
+### Security
+
+- **Datenschutz bei Protokollen.** Das Zugriffsprotokoll des Servers speichert Adressen und Referrer
+  ohne Abfrageparameter, Suchbegriffe wie Namen aus der Personensuche landen dort nicht mehr. Die
+  Anwendung schreibt keine IP-Adressen mehr in ihre Protokolle, und Traces enthalten auch in der
+  vollständigen Adresse keine Kennungen mehr.
+
+- **Aufbewahrung.** Alle Protokolldateien auf dem Server werden höchstens 31 Tage aufbewahrt: Die
+  Fehlerprotokolle der Anwendung 30 statt 60 Tage, die Systemprotokolle mit ihrer Kopie des
+  Zugriffsprotokolls 28 Tage statt bis zu fünf Wochen.
+
+- **Datenschutz bei Protokollen.** Fehlerzeilen des Webservers gelangen ohne Suchbegriffe in den
+  zentralen Protokollspeicher, und Protokolle des Anmeldedienstes ohne E-Mail-Adressen und
+  Discord-Namen. Zähler der Anfragebegrenzung im Schnittstellen-Gateway verfallen nach einer Stunde.
+
+- **Datensicherung.** Ereignisprotokoll und Anmeldesitzungen des Anmeldedienstes werden nicht mehr
+  mitgesichert.
+
+- **Kontolöschung.** Beim Löschen eines Kontos werden auch der eigene Kommentar zur
+  Einsatzteilnahme und die Kontokennung in Auszahlungsvermerken und angelernten Import-Namen
+  entfernt. Auszahlungsvermerke bleiben an der Teilnahme des gelöschten Kontos stehen.
+
+- **Aufbewahrung von Namen.** Drei Jahre nach dem Vorgang werden Namen und Freitexte automatisch
+  entfernt: Begründungen von Freigabeentscheidungen, Namen externer Teilnehmer und Gruppenleiter,
+  Notizen und Spielernamen in Buchungsanträgen sowie Namen in Geldvorgängen und Übergaben
+  abgeschlossener Aufträge. Die Einträge selbst bleiben. Neue Variablen
+  `APP_PRIVACY_NAME_RETENTION_ENABLED`, `APP_PRIVACY_NAME_RETENTION_MAX_AGE` und
+  `APP_PRIVACY_NAME_RETENTION_INTERVAL`.
+
 ## [v1.26.6](https://github.com/krt-profit/basetool/releases/tag/v1.26.6) - 2026-11-21
 
 ### Changed

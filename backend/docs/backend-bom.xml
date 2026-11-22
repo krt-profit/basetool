@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:3035b0c5-d680-46ef-9852-b7b1520de2f1" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:04133b60-b3ce-48b1-a7c6-b9ce495a8920" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-11-21T09:45:14Z</timestamp>
+    <timestamp>2026-11-22T19:10:34Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -11,15 +11,15 @@
         </component>
       </components>
     </tools>
-    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.6?project_path=%3Abackend">
+    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.7?project_path=%3Abackend">
       <group>de.greluc.krt.profit.basetool</group>
       <name>backend</name>
-      <version>1.26.6</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.6?project_path=%3Abackend</purl>
+      <version>1.26.7</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.7?project_path=%3Abackend</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/44890923169</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/45055984071</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -90,19 +90,19 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.24.0?type=jar">
       <group>com.aayushatharva.brotli4j</group>
       <name>brotli4j</name>
-      <version>1.23.0</version>
+      <version>1.24.0</version>
       <hashes>
-        <hash alg="MD5">8a0578e7bd8cb161185aae98d8f176fa</hash>
-        <hash alg="SHA-1">eec13740c1ee09cbe9c6e836f17ee2c984a10333</hash>
-        <hash alg="SHA-256">5fcf13ad78d07319cc507465dcf61cbc3efee9f45c9ae1c42a9902414696bc0b</hash>
-        <hash alg="SHA-512">579f7fe00eb5d2ce09d975980babb186335791ee3b035d2e99c13abcbbe3daf1588d53a1892c70bdbe0df7e565a597c1058222c6bc93484e22c963351edbf38c</hash>
-        <hash alg="SHA3-256">6f962fd8decc413cf8d6e411d7f98475e1b080fed8fd56af1039e24fe05465ec</hash>
-        <hash alg="SHA3-512">c3be55e02bd46b5c5784f1560277ec2dbb3c4792bd89a8d02a6a7cb9120cbd6f1d26a1b2f8b617362e8fae612772a5d8fa9e603b76b0c450955ee4256963de16</hash>
-        <hash alg="SHA-384">f968ede93edec24e403b3177dca8884d8f6709974b35ab8ea7d440dd6ee5f1c7bb9ab109154b53691cad1ebcc4c33929</hash>
-        <hash alg="SHA3-384">262a46c422b4b744bfeb58d54e6a20bdf5e853795ab9747785c9fde0576b614a9b18bb0b078dbb73c61a518c2244a68b</hash>
+        <hash alg="MD5">bb61a60c94620ac985d71a583553168d</hash>
+        <hash alg="SHA-1">53450e3535c7ff0e0287cfb495fd1d313fd0f2a9</hash>
+        <hash alg="SHA-256">cd0ac4425d2c8449723c93d66ec4379faf1093eb6609ede83e49947f90a772e8</hash>
+        <hash alg="SHA-512">1ad745f76aace4134c5ee7fd1a2fdb70c639fb89aca8a64dd84aa9ffff8576a4798dd94acdc5488540186ddb446962f0ffc0f368ccd2b3d4e3955a3f317b36b9</hash>
+        <hash alg="SHA3-256">4b554317bac97b3e33a4f0d65b46140fcbfa9e34524a3901e329a92890d6e239</hash>
+        <hash alg="SHA3-512">bcdda5c290b4da3c689dc2d9a9a125d47fc56581bf17e6aa6d09a0cd761b460a095252272b6e324d4b2913d4d67ec5f915a4573ce87898467723aaa789a7c776</hash>
+        <hash alg="SHA-384">5d304f072a0f9f8a799554d76ec1011d9c5e138e60342442a648436b85bb4221f70d9d7c2245dbcc34be556dfd22f06a</hash>
+        <hash alg="SHA3-384">5c59cb4fca50679600fec1593d328cafb7ca027b4a587d5deb508dbef98af9b703529acb29073a01a3bd84567afd9297</hash>
       </hashes>
       <licenses>
         <license>
@@ -110,25 +110,25 @@
           <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
       </licenses>
-      <purl>pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar</purl>
+      <purl>pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.24.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.aayushatharva.brotli4j/service@1.24.0?type=jar">
       <group>com.aayushatharva.brotli4j</group>
       <name>service</name>
-      <version>1.23.0</version>
+      <version>1.24.0</version>
       <hashes>
-        <hash alg="MD5">034392efa0a6d8f43a35818f9eea20a0</hash>
-        <hash alg="SHA-1">872c4907f6b97765dcad9693f2b1ae118b8bc435</hash>
-        <hash alg="SHA-256">7f298d44dbb7688419f0179ee1dfa0e4436633272b05d38a5faf3a2b8d08697b</hash>
-        <hash alg="SHA-512">114012480fc387de7607fc311ab265c59679a772a8df03d9047df0f17ecc450221285be75999ade8789a35dcc337771e481223e7f7091b0cf9e8e7628e577538</hash>
-        <hash alg="SHA3-256">2d7d4c3f0ab61650b33e7c0333d65812ca55c14af93b89d346fe330155508250</hash>
-        <hash alg="SHA3-512">e66d229962b72be498eefd71aadac9e97219731b12296c32bd2fe887652c9c5aa4ae1efa7c57334a268113d775b0c73ef1dce72bc3fb742fa6bb98bb3f5f577e</hash>
-        <hash alg="SHA-384">74b5dd53743b8a620b40cbb24b01f559242b22225c77f6c85243abd2f45e77716fae8ee7591cb927fc2a44be99f91ad5</hash>
-        <hash alg="SHA3-384">c98f7a03583227a67df43def68d223a10e5d50fa70426cba5c470787ddd6e5c0a99c6c16f2f1a327615e72987cbd7599</hash>
+        <hash alg="MD5">3028379664b5436638fdbb60748d92ce</hash>
+        <hash alg="SHA-1">3186b092c7427b48b81ec1965705781d04e3d7cb</hash>
+        <hash alg="SHA-256">2fee8a977d617c4904f3260eca8a294927ec5364026478f82014484e96e8bfa5</hash>
+        <hash alg="SHA-512">f36ba8a6848d2adaa42771195b137695e9a7dbb19e1946701331ea58e0c9b993dc3dcc140d9a6e04cbf5d83230b76b5f2803ddbe840bb38ccf62e6857500fb3d</hash>
+        <hash alg="SHA3-256">34b9ac381b590001723517fe367b9922d1dcfaa7898e7019a29d181cb0cdedef</hash>
+        <hash alg="SHA3-512">de39dfd726d68c716d0f402db1f05fe13d48499a671f3405fb2162497e960b268dcfcf8f5b5c6e892a990f2caacb4a778e07178d76231fc7a28e55bc8519846a</hash>
+        <hash alg="SHA-384">2804c25728b7bcf466423362b71c972d4e6f00b5ead5850756cb2048ab81a15349fce8c3ae36b14062120b6d07111f6a</hash>
+        <hash alg="SHA3-384">3e7f3410081cc09cce6a62711152b461ded34b051e599dd46901e8849798ffa105e72cea4cdcff38ad6c4a5e0b31e69f</hash>
       </hashes>
       <licenses>
         <license>
@@ -136,7 +136,7 @@
           <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
       </licenses>
-      <purl>pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar</purl>
+      <purl>pkg:maven/com.aayushatharva.brotli4j/service@1.24.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -412,20 +412,20 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.github.librepdf/openpdf@3.0.6?type=jar">
       <group>com.github.librepdf</group>
       <name>openpdf</name>
-      <version>3.0.5</version>
+      <version>3.0.6</version>
       <description>Open and Free PDF library. It uses the new package name `org.openpdf`.</description>
       <hashes>
-        <hash alg="MD5">1e8e56e03e1eacc7e7858d34e0500429</hash>
-        <hash alg="SHA-1">4d8174b818f61820f318a578f060cf3e2846ec7f</hash>
-        <hash alg="SHA-256">2a70c6024bb10b6192b4b91d8bb581de24b776a799a30ef5b87748e54aca2144</hash>
-        <hash alg="SHA-512">aabe8ca4eea976a3d7b27af500a32a03dcd46b36a453706b8b3c0b0d81be9c484a0bd7f5dd9afd8c87fc793582262c35b706d77d68f36abcd2bb935cbe88f2f9</hash>
-        <hash alg="SHA3-256">bafa6416c25cc63c85942d620b9839e497d80083f0d8e044666ddc76d9a2ab4d</hash>
-        <hash alg="SHA3-512">ad7ac24f895c5354d8a03d243ddef3319ff7666165930944e5226a5d884e5dc70d5fccaf2e6b621420fd55103f9e8172952de4b5ad77e6a07ee7164e9ec79e0e</hash>
-        <hash alg="SHA-384">e430c90b41676fbc433511fb94d620558de0867ba4e9a9360fa93fa9e39d4985963b48269299a82c7c77a522958e635c</hash>
-        <hash alg="SHA3-384">d0eb665bae81c9024f091002d84a369d67f58e9b2526b2e675761cdfac8e2cc795e0cf953fec92869656630a35ac8b31</hash>
+        <hash alg="MD5">47844bb5a8706af1f26b55a8c24156dc</hash>
+        <hash alg="SHA-1">1efc7cc8ebc7831d954bb591fbed2af8345ba94e</hash>
+        <hash alg="SHA-256">633748b90f77d728897b9d35a0ce9a7336caf6701791a1c4be70b172b896f05e</hash>
+        <hash alg="SHA-512">67261ca82dc4d270381e40211b4a9325e64837536b85f832117ef5bc0855f4bf292ef3da30036dd1e71a2dd8196fc3e46b56a51b65c1599257ed7012d2bb86ee</hash>
+        <hash alg="SHA3-256">78e0732a7d7a56b94232b716b328550a511c122750caf67cbb544a28ff6e5264</hash>
+        <hash alg="SHA3-512">31622dcb6e1647b8e26d7a15f5c16d0e0b6009f95ba56282c76aa9eb4f16efe1613ce37e79444836a1d51e8f6e3e9935b816b375cd63caadeb993a4f824a909d</hash>
+        <hash alg="SHA-384">d18854b92ad4300f025a7a8b1852a5b44eadabf283cc8182953c968cacb4ed356830fed379d87aed0f571c6adb21a199</hash>
+        <hash alg="SHA3-384">b42b7c8a3a7c93045b60383d70d0ecd3f54647273f2641b94803ca175e3044572d147ab6e9df0f289f2bf672ba6ef96b</hash>
       </hashes>
       <licenses>
         <license>
@@ -437,7 +437,7 @@
           <url>https://www.mozilla.org/en-US/MPL/2.0/</url>
         </license>
       </licenses>
-      <purl>pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar</purl>
+      <purl>pkg:maven/com.github.librepdf/openpdf@3.0.6?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -850,21 +850,21 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.7?project_path=%3Alogging-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>logging-support</name>
-      <version>1.26.6</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support</purl>
+      <version>1.26.7</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.7?project_path=%3Alogging-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.7?project_path=%3Atechnical-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>technical-support</name>
-      <version>1.26.6</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support</purl>
+      <version>1.26.7</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.7?project_path=%3Atechnical-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -6287,10 +6287,10 @@
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/ch.qos.logback/logback-core@1.6.6?type=jar"/>
-    <dependency ref="pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar">
-      <dependency ref="pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar"/>
+    <dependency ref="pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.24.0?type=jar">
+      <dependency ref="pkg:maven/com.aayushatharva.brotli4j/service@1.24.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar"/>
+    <dependency ref="pkg:maven/com.aayushatharva.brotli4j/service@1.24.0?type=jar"/>
     <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar"/>
     <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar"/>
     <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar">
@@ -6319,8 +6319,8 @@
       <dependency ref="pkg:maven/com.google.errorprone/error_prone_annotations@2.52.0?type=jar"/>
       <dependency ref="pkg:maven/org.jspecify/jspecify@1.0.1?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar">
-      <dependency ref="pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar"/>
+    <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.6?type=jar">
+      <dependency ref="pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.24.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-28?type=jar"/>
     <dependency ref="pkg:maven/com.google.errorprone/error_prone_annotations@2.52.0?type=jar"/>
@@ -6353,14 +6353,14 @@
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.4.0?type=jar"/>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.6?project_path=%3Abackend">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.7?project_path=%3Abackend">
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.3.1?type=jar"/>
-      <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar"/>
+      <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.6?type=jar"/>
       <dependency ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-28?type=jar"/>
       <dependency ref="pkg:maven/com.google.guava/guava@33.8.0-jre?type=jar"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.7?project_path=%3Alogging-support"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.7?project_path=%3Atechnical-support"/>
       <dependency ref="pkg:maven/io.micrometer/micrometer-registry-prometheus@1.18.0?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
       <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.2?type=jar"/>
@@ -6383,11 +6383,11 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-web@4.2.0?type=jar"/>
       <dependency ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.3.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.7?project_path=%3Alogging-support">
       <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.6.6?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.7?project_path=%3Atechnical-support">
       <dependency ref="pkg:maven/io.micrometer/micrometer-observation@1.18.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.lettuce/lettuce-core@7.8.0.RELEASE?type=jar">
