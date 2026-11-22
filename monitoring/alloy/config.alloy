@@ -104,6 +104,16 @@ loki.process "keycloak_mask" {
 		expression = "ipAddress=(\"[^\"]*\"|\\S+)"
 		replace    = "***"
 	}
+
+	stage.replace {
+		expression = "identity_provider_identity=(\"[^\"]*\"|\\S+)"
+		replace    = "***"
+	}
+
+	stage.replace {
+		expression = "([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
+		replace    = "***"
+	}
 }
 
 local.file_match "host_auth" {
@@ -322,6 +332,31 @@ loki.process "container_mask" {
 		stage.replace {
 			expression = "ipAddress=(\"[^\"]*\"|\\S+)"
 			replace    = "***"
+		}
+
+		stage.replace {
+			expression = "identity_provider_identity=(\"[^\"]*\"|\\S+)"
+			replace    = "***"
+		}
+	}
+
+	// nginx error lines quote the full request and its referrer, query strings included.
+	stage.match {
+		selector = "{app=\"edge\"}"
+
+		stage.replace {
+			expression = "request: \"\\S+ [^?\" ]*(\\?[^\" ]*)"
+			replace    = "?***"
+		}
+
+		stage.replace {
+			expression = "upstream: \"[^?\"]*(\\?[^\"]*)\""
+			replace    = "?***"
+		}
+
+		stage.replace {
+			expression = "referrer: \"[^?\"]*(\\?[^\"]*)\""
+			replace    = "?***"
 		}
 	}
 }

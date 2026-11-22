@@ -39,7 +39,7 @@ fixture() {
 
 run_checker() {
   set +e
-  LAST_OUTPUT="$("$PYTHON" "$CHECKER" --config "$1" 2>&1)"
+  LAST_OUTPUT="$("$PYTHON" "$CHECKER" --config "$1" "${@:2}" 2>&1)"
   LAST_STATUS=$?
   set -e
 }
@@ -72,7 +72,7 @@ loki.process "mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "a well-formed mask passes" 0 "Alloy log masking OK"
 
 FIX="$(
@@ -85,7 +85,7 @@ loki.process "mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "a \${1} back-reference is caught" 1 "expands no back-references"
 
 FIX="$(
@@ -98,7 +98,7 @@ loki.process "mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "a second capture group is caught on its own" 1 "has 2 capturing groups"
 
 FIX="$(
@@ -111,7 +111,7 @@ loki.process "mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "the pattern that shipped to production is caught" 1 "2 problem(s)"
 
 FIX="$(
@@ -124,7 +124,7 @@ loki.process "mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "(?:...) and the (?i) flag are not counted as groups" 0 "Alloy log masking OK"
 
 FIX="$(
@@ -137,7 +137,7 @@ loki.process "mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "an escaped or bracketed parenthesis is not a group" 0 "Alloy log masking OK"
 
 FIX="$(
@@ -150,7 +150,7 @@ loki.process "mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "a named capture group is counted" 1 "has 2 capturing groups"
 
 FIX="$(
@@ -167,7 +167,7 @@ loki.process "container_mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "a stage nested inside stage.match is checked" 1 "uname="
 
 FIX="$(
@@ -185,7 +185,7 @@ loki.process "mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "a regex quantifier brace does not hide the next stage" 1 "uname="
 
 FIX="$(
@@ -195,8 +195,21 @@ loki.process "mask" {
 }
 ALLOY
 )"
-run_checker "$FIX"
+run_checker "$FIX" --syntax-only
 assert_run "a config with no stage.replace fails loudly" 2 "contains no stage.replace"
+
+FIX="$(
+  fixture <<'ALLOY'
+loki.process "keycloak_mask" {
+	stage.replace {
+		expression = "identity_provider_identity=(\"[^\"]*\"|\\S+)"
+		replace    = "***"
+	}
+}
+ALLOY
+)"
+run_checker "$FIX"
+assert_run "a missing required mask is caught" 1 "no stage.replace masks '@[A-Za-z0-9.-]+'"
 
 run_checker "/nonexistent/config.alloy"
 assert_run "a missing config fails loudly" 2 "does not exist"
