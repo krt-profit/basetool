@@ -99,16 +99,17 @@ class MaterialboardItemWithoutBlueprintE2eTest {
         page -> {
           page.locator("[data-testid='mb-create-offer']").click();
           page.locator("[data-mb-open-release]").first().click();
-          Locator pickerInput = page.locator("#mb-modal [data-mb-picker-input]");
+          Locator pickerInput = page.getByTestId("mb-release-picker");
           assertThat(pickerInput).isVisible(VISIBLE);
-          page.locator("#mb-modal [data-mb-kind-radio][value=\"ITEM\"]").check();
+          page.getByTestId("segment-mb-release-kind-item").click();
           page.waitForResponse(
               response ->
                   response.url().contains("/materialboerse/releasable-items")
+                      && response.url().contains("kind=ITEM")
                       && response.url().contains("q="),
               () -> pickerInput.fill(STOCKED_ITEM));
           Locator option =
-              page.locator("#mb-modal [data-mb-picker-list] .krt-combobox__option")
+              page.locator("#mb-modal .krt-combobox:has(#mb-release-row) .krt-combobox__option")
                   .filter(new Locator.FilterOptions().setHasText(STOCKED_ITEM))
                   .first();
           assertThat(option).isVisible(VISIBLE);
@@ -131,7 +132,7 @@ class MaterialboardItemWithoutBlueprintE2eTest {
         page -> {
           page.locator("[data-testid='mb-create-offer']").click();
           page.locator("[data-mb-open-item]").first().click();
-          Locator pickerInput = page.locator("#mb-modal [data-mb-item-picker-input]");
+          Locator pickerInput = page.getByTestId("mb-item-picker");
           assertThat(pickerInput).isVisible(VISIBLE);
           page.waitForResponse(
               response ->
@@ -139,7 +140,7 @@ class MaterialboardItemWithoutBlueprintE2eTest {
                       && response.url().contains("q="),
               () -> pickerInput.fill(LISTED_ITEM));
           Locator option =
-              page.locator("#mb-modal [data-mb-item-picker-list] .krt-combobox__option")
+              page.locator("#mb-modal .krt-combobox:has(#mb-item) .krt-combobox__option")
                   .filter(new Locator.FilterOptions().setHasText(LISTED_ITEM))
                   .first();
           assertThat(option).isVisible(VISIBLE);

@@ -344,7 +344,7 @@ leadership/organisation/leitung.html head-own <title>Leitung - Profit Basetool</
 leadership/organisation/leitung.html body <body data-nav-mode="drawer">
 leadership/organisation/leitung.html parts chrome:98ac1f0a3ab71f90 x-content toast:a1359ecc4bd4b21d x-tail
 materialexchange/materialboerse.html html <html lang="de">
-materialexchange/materialboerse.html head-fixed 23cbf823679d0216
+materialexchange/materialboerse.html head-fixed af656fc1d189b751
 materialexchange/materialboerse.html head-own <title>Materialbörse - Profit Basetool</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/materialexchange/materialboerse.css"/><link rel="stylesheet" href="/css/pages/materialexchange/materialboerse.css"/>
 materialexchange/materialboerse.html body <body data-nav-mode="drawer">
 materialexchange/materialboerse.html parts chrome:98ac1f0a3ab71f90 x-content toast:a1359ecc4bd4b21d x-tail
