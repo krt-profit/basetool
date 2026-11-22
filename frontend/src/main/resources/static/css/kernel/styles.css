@@ -2067,6 +2067,16 @@
         border-color: var(--color-accent-light);
     }
 
+    .btn-add-line {
+        width: 100%;
+        border-style: dashed;
+        background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
+    }
+
+    .btn-add-line:hover {
+        border-style: solid;
+    }
+
     .btn-ghost {
         background-color: var(--control-bg);
         color: var(--control-fg);

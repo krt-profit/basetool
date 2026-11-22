@@ -36,9 +36,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Drives the material rows of the {@code /orders/create} form (REQ-UI-027): rows are removed only
- * while another remains, the remaining rows are renumbered without a gap, the comment counter
- * follows the text, and the scmdb import opens as a dialog.
+ * Drives the material rows of the {@code /orders/create} form (REQ-UI-027, REQ-UI-036): both add
+ * buttons append a row that takes the focus, rows are removed only while another remains, the
+ * remaining rows are renumbered without a gap, the comment counter follows the text, and the scmdb
+ * import opens as a dialog.
  *
  * <p>Read-only: never submits.
  */
@@ -73,9 +74,10 @@ class OrdersCreateMaterialRowsE2eTest {
   }
 
   /**
-   * Adds two rows, removes the first, checks the amount fields are named {@code materials[0]} and
-   * {@code materials[1]}, removes down to one row whose remove button is then disabled, types a
-   * comment and reads the counter, and opens and closes the scmdb dialog.
+   * Adds a row with the button below the list and one with the button in the section head, each
+   * focusing the new row's material field, removes the first, checks the amount fields are named
+   * {@code materials[0]} and {@code materials[1]}, removes down to one row whose remove button is
+   * then disabled, types a comment and reads the counter, and opens and closes the scmdb dialog.
    */
   @Test
   void materialRowsRemoveRenumberAndCount() {
@@ -95,9 +97,12 @@ class OrdersCreateMaterialRowsE2eTest {
         assertThat(rows).hasCount(1);
         assertThat(removes.first()).isDisabled();
 
-        page.locator("[data-trigger=\"orders-add-material\"]").click();
-        page.locator("[data-trigger=\"orders-add-material\"]").click();
+        page.getByTestId("order-add-material").click();
+        assertThat(rows).hasCount(2);
+        assertThat(rows.last().locator(".krt-combobox__input")).isFocused();
+        page.getByTestId("order-add-material-head").click();
         assertThat(rows).hasCount(3);
+        assertThat(rows.last().locator(".krt-combobox__input")).isFocused();
         assertThat(removes.first()).isEnabled();
 
         removes.first().click();

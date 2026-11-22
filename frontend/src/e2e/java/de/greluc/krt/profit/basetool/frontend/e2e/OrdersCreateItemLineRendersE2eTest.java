@@ -94,7 +94,7 @@ class OrdersCreateItemLineRendersE2eTest {
         E2eSupport.navigate(page, baseUrl + "/orders/create");
 
         page.getByTestId("order-mode-item").check();
-        page.locator("[data-trigger=\"orders-add-item\"]").click();
+        page.getByTestId("order-add-item").click();
 
         assertThat(page.locator("#item-lines .oc-line-fields").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));

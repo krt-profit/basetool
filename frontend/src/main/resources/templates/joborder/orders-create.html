@@ -64,6 +64,8 @@
                         <button type="button" class="btn btn-ghost btn-xs" data-trigger="open-modal-display"
                                 data-modal-id="orders-scmdb-modal" data-testid="orders-scmdb-open"
                                 th:text="#{orders.create.scmdb.open}">Aus scmdb importieren</button>
+                        <button type="button" class="btn btn-outline btn-xs" data-trigger="orders-add-material" data-testid="order-add-material-head"
+                                th:attr="aria-label=#{orders.create.addMaterial},title=#{orders.create.addMaterial}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{orders.create.addMaterial.short}">Material</span></button>
                     </legend>
 
                     <div class="material-grid material-grid--head" aria-hidden="true">
@@ -101,7 +103,7 @@
                         </div>
                     </div>
 
-                    <button type="button" class="btn btn-ghost orders-create__add" data-trigger="orders-add-material" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
+                    <button type="button" class="btn btn-outline btn-add-line" data-trigger="orders-add-material" data-testid="order-add-material"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{orders.create.addMaterial}">Material hinzufügen</span></button>
                 </fieldset>
 
                 <fieldset class="form-section">
@@ -147,11 +149,16 @@
                 </fieldset>
 
                 <fieldset class="form-section">
-                    <legend class="form-section__head" th:text="${requesterItemEdit == true} ? #{orders.create.items.title} : |2 · #{orders.create.items.title}|">2 · Items</legend>
+                    <legend class="form-section__head">
+                        <span th:text="${requesterItemEdit == true} ? #{orders.create.items.title} : |2 · #{orders.create.items.title}|">2 · Items</span>
+                        <span class="grow"></span>
+                        <button type="button" class="btn btn-outline btn-xs" data-trigger="orders-add-item" data-testid="order-add-item-head"
+                                th:attr="aria-label=#{orders.create.item.add},title=#{orders.create.item.add}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{orders.create.item.add.short}">Item</span></button>
+                    </legend>
                     <div th:if="${!hasOrderableItems}" class="alert alert-danger" role="alert"
                          th:text="#{orders.create.item.noItems}">Keine bestellbaren Items verfügbar.</div>
                     <div id="item-lines"></div>
-                    <button type="button" class="btn btn-ghost orders-create__add" data-trigger="orders-add-item" th:text="#{orders.create.item.add}">+ Item hinzufügen</button>
+                    <button type="button" class="btn btn-outline btn-add-line" data-trigger="orders-add-item" data-testid="order-add-item"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{orders.create.item.add}">Item hinzufügen</span></button>
                 </fieldset>
 
                 <fieldset class="form-section">

@@ -39,6 +39,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { krtFocusNewRow } from '/js/kernel/krt-row-focus.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 /** @type {WeakSet<Element>} */
@@ -199,8 +200,12 @@ function initMaterialEditor() {
     localizeOrderDates(document);
 
     const materialsContainer = document.getElementById('materials-container');
-    const addMaterialBtn = document.getElementById('add-material-btn');
-    if (addMaterialBtn && materialsContainer && !boundOrderControls.has(materialsContainer)) {
+    const addMaterialButtons = document.querySelectorAll('[data-role="od-add-material"]');
+    if (
+        addMaterialButtons.length > 0 &&
+        materialsContainer &&
+        !boundOrderControls.has(materialsContainer)
+    ) {
         boundOrderControls.add(materialsContainer);
         /**
          * Raises the amount input's minimum to the line's handed-over amount, when it has one.
@@ -255,7 +260,11 @@ function initMaterialEditor() {
             }
         }
 
-        addMaterialBtn.addEventListener('click', () => {
+        /** Appends an empty material row from the row template and focuses it. */
+        function addEditMaterialRow() {
+            if (!materialsContainer) {
+                return;
+            }
             const nextIndex = materialsContainer.querySelectorAll('.material-row').length;
             const rowTemplate = /** @type {HTMLTemplateElement | null} */ (
                 document.getElementById('edit-material-row-template')
@@ -274,6 +283,10 @@ function initMaterialEditor() {
             const newRow = /** @type {Element} */ (materialsContainer.lastElementChild);
             krtEnhanceComboboxes(newRow);
             refreshEditMaterialUnit(newRow);
+            krtFocusNewRow(newRow);
+        }
+        addMaterialButtons.forEach((button) => {
+            button.addEventListener('click', addEditMaterialRow);
         });
 
         materialsContainer.addEventListener('change', (e) => {

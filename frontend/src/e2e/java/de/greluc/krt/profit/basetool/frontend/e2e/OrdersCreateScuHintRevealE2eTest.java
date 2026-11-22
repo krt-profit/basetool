@@ -97,7 +97,7 @@ class OrdersCreateScuHintRevealE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/orders/create");
 
-        page.locator("[data-trigger=\"orders-add-material\"]").click();
+        page.getByTestId("order-add-material").click();
         Locator row = page.locator("#materials-container .material-row").last();
 
         Object catalog =

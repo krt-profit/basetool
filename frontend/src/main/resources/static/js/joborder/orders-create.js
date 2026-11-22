@@ -30,6 +30,7 @@ import { toGameItemOption } from '/js/kernel/krt-catalog-search.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
 import { formatParts, separatorsFor } from '/js/kernel/krt-number-format.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
+import { krtFocusNewRow } from '/js/kernel/krt-row-focus.js';
 
 /** @typedef {ApiDto<'MaterialDto'> & {id: string}} OrderMaterial */
 /** @typedef {ApiDto<'BlueprintReferenceDto'> & {id: string}} OrderBlueprint */
@@ -491,6 +492,11 @@ async function importFromScmdb() {
     }
 }
 
+/**
+ * Appends an empty material row to the material form.
+ *
+ * @returns {HTMLDivElement} the new row
+ */
 function addMaterialRow() {
     const container = /** @type {HTMLElement} */ (document.getElementById('materials-container'));
 
@@ -529,6 +535,7 @@ function addMaterialRow() {
     materialIndex++;
     syncMaterialRemoveButtons();
     refreshMaterialUnit(row);
+    return row;
 }
 
 let itemLineIndex = 0;
@@ -901,9 +908,9 @@ updateMaterialSummary();
 updateItemSummary();
 
 krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
-krtEvents.on('click', 'orders-add-material', addMaterialRow);
+krtEvents.on('click', 'orders-add-material', () => krtFocusNewRow(addMaterialRow()));
 krtEvents.on('click', 'orders-remove-material', removeMaterialRow);
-krtEvents.on('click', 'orders-add-item', () => addItemLine());
+krtEvents.on('click', 'orders-add-item', () => krtFocusNewRow(addItemLine()));
 
 /**
  * Submits an order create or update form and follows the answer's target URL.

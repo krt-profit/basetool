@@ -22,7 +22,7 @@
 > REQ-UI-003, REQ-UI-006, REQ-UI-007) ·
 > [0378](../adr/0378-navigation-and-list-surfaces-have-distinct-edges.md) (navigation, list and dialog
 > composition, REQ-UI-007, REQ-UI-013, REQ-UI-028) ·
-> **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
+> **Next free id:** `REQ-UI-041` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
 > read at the design system's latest `main` ([ADR-0259](../adr/0259-the-design-system-submodule-follows-its-main.md)).
@@ -2977,6 +2977,37 @@ switch) · `NavigationShortcutsE2eTest` (Alt+1 opens favourite 1, Alt+0 the dash
 greyed or empty slot, rest while a dialog is open and in admin mode, the profile switch, the
 „Tastenkürzel" dialog) · `DialogA11yE2eTest` (the dialog contract) · **Related:** REQ-UI-026,
 REQ-UI-032, REQ-UI-033, REQ-UI-034, ADR-0297
+
+### REQ-UI-036 — A list the user builds row by row offers its add action at both ends
+
+Where a form builds a list row by row — the materials and the items of an order
+(`/orders/create`, the order edit dialog) and the goods of a refinery order (create and detail
+page) — the add action is the section's emphasized secondary action and never looks like one of the
+fields above it.
+
+- **Below the last row:** a full-width `.btn.btn-outline.btn-add-line` — the design system's orange
+  outline, dashed at rest and solid on hover, on a faint orange tint, with the sprite's `plus` icon
+  left of the label („Material hinzufügen", „Item hinzufügen"). It never takes the filled orange of
+  `.btn--cta`, which stays the form's one primary action, nor the gray `.btn-ghost` look of the
+  fields or the dashed gray frame of a computed field (`.field-computed`). The labels carry no „+"
+  character.
+- **In the section head:** the same action again as a compact `.btn.btn-outline.btn-xs` with the
+  `plus` icon and a short label („Material", „Item") at the end of the `.form-section__head` (in the
+  edit dialog, beside the section heading), so a long list grows without scrolling to its end. Its
+  accessible name and tooltip are the full label (WCAG 2.5.3). Both buttons run one trigger and
+  carry their own `data-testid`.
+- **The focus follows the new row:** after a click on either button the new row is scrolled to the
+  middle of its scroll area — without animation under `prefers-reduced-motion` — and its first
+  enabled, editable and rendered control takes the focus (`kernel/krt-row-focus.js`). Rows an
+  import or a prefill adds leave the focus where it is.
+- Where the user may not edit the list (a refinery order without the edit right), neither button
+  renders.
+
+**Enforced by:** `:frontend:testRowFocusJs` (scroll, first editable control, reduced motion, an
+absent row) · `OrdersCreateFormPatternRenderTest` (both add buttons of the material and the item
+form, their classes, icon and labels) · `RefineryOrderDetailPatternRenderTest` (both add buttons
+for the owner, none without the edit right) · `OrdersCreateMaterialRowsE2eTest` (each button adds a
+row and the focus lands in it) · **Related:** REQ-UI-027, REQ-UI-028
 
 ### REQ-UI-037 — Number fields use the separators of the page language while typing
 
