@@ -79,9 +79,8 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
     if (isSsoAlreadyAttempted(request)) {
       log.info(
           "[SSO] Silent re-auth already attempted and failed, falling back to interactive login."
-              + " URI={} | remoteAddr={}",
-          uri,
-          request.getRemoteAddr());
+              + " URI={}",
+          uri);
       clearSsoAttemptedCookie(response);
       response.sendRedirect(request.getContextPath() + OAUTH2_AUTHORIZATION_BASE);
       return;
@@ -89,9 +88,8 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     log.info(
         "[SSO] No active session found, attempting silent Keycloak SSO re-authentication. URI={} |"
-            + " remoteAddr={} | session={}",
+            + " session={}",
         uri,
-        request.getRemoteAddr(),
         SessionIdFingerprint.of(request.getSession(false)));
 
     setSsoAttemptedCookie(response);
@@ -144,10 +142,8 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
     String reauthUrl = request.getContextPath() + OAUTH2_AUTHORIZATION_BASE;
     log.info(
         "[SSO] Background request without an active session — answering 401 + X-Reauthenticate"
-            + " instead of redirecting (preserves the saved OAuth2 request). URI={} |"
-            + " remoteAddr={}",
-        request.getRequestURI(),
-        request.getRemoteAddr());
+            + " instead of redirecting (preserves the saved OAuth2 request). URI={}",
+        request.getRequestURI());
     response.setStatus(HttpStatus.UNAUTHORIZED.value());
     response.setHeader(REAUTHENTICATE_HEADER, reauthUrl);
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);

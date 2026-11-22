@@ -6,33 +6,16 @@
         <th:block th:ref="mg-modal-body">
             <div class="krt-modal-body">
                 <div class="mb-modal-picker" data-mg-picker hidden>
-                    <div class="mb-modal-kind" data-mg-kind role="radiogroup"
-                         th:aria-label="#{materialgesuch.modal.kind.label}">
-                        <label class="mb-modal-kind__opt">
-                            <input type="radio" name="mg-request-kind" value="MATERIAL"
-                                   data-mg-kind-radio checked/>
-                            <span th:text="#{materialboerse.modal.kind.material}">Material</span>
-                        </label>
-                        <label class="mb-modal-kind__opt">
-                            <input type="radio" name="mg-request-kind" value="ITEM" data-mg-kind-radio/>
-                            <span th:text="#{materialboerse.modal.kind.item}">Item</span>
-                        </label>
-                    </div>
+                    <th:block th:replace="~{kernel/fragments/components :: segmented(name='mg-request-kind', labelKey='materialgesuch.modal.kind.label',
+                        variant='krt-segmented--block', selected='MATERIAL',
+                        options=${ {{value: 'MATERIAL', labelKey: 'materialboerse.modal.kind.material'}, {value: 'ITEM', labelKey: 'materialboerse.modal.kind.item'}} })}"></th:block>
                     <div data-mg-material-block>
-                        <label class="form-label-sm" th:text="#{materialgesuch.modal.material.label}">Material</label>
-                        <div class="krt-combobox" data-mg-combobox>
-                            <input class="krt-combobox__input" type="text" data-mg-picker-input autocomplete="off"
-                                   th:placeholder="#{materialgesuch.modal.material.placeholder}"/>
-                            <ul class="krt-combobox__listbox" role="listbox" data-mg-picker-list hidden></ul>
-                        </div>
+                        <label class="form-label-sm" for="mg-material" th:text="#{materialgesuch.modal.material.label}">Material</label>
+                        <select id="mg-material" data-mg-material-select data-testid="mg-material-picker"></select>
                     </div>
                     <div data-mg-item-block hidden>
-                        <label class="form-label-sm" th:text="#{materialgesuch.modal.item.label}">Item</label>
-                        <div class="krt-combobox" data-mg-item-combobox>
-                            <input class="krt-combobox__input" type="text" data-mg-item-picker-input autocomplete="off"
-                                   th:placeholder="#{materialgesuch.modal.item.placeholder}"/>
-                            <ul class="krt-combobox__listbox" role="listbox" data-mg-item-picker-list hidden></ul>
-                        </div>
+                        <label class="form-label-sm" for="mg-item" th:text="#{materialgesuch.modal.item.label}">Item</label>
+                        <select id="mg-item" data-mg-item-select data-testid="mg-item-picker"></select>
                     </div>
                 </div>
                 <div class="facts-bar mb-modal-facts" data-mg-subject-facts hidden>
@@ -87,7 +70,9 @@
             updated: /*[[#{materialgesuch.toast.updated}]]*/ 'Gesuch aktualisiert.',
             error: /*[[#{notification.error.save}]]*/ 'Fehler.',
             charCounter: /*[[#{materialboerse.modal.remark.counter}]]*/ '{0} / 20.000',
+            materialPickerPlaceholder: /*[[#{materialgesuch.modal.material.placeholder}]]*/ 'Material suchen ...',
             materialPickerEmpty: /*[[#{materialgesuch.modal.material.empty}]]*/ 'Keine Materialien gefunden.',
+            itemPickerPlaceholder: /*[[#{materialgesuch.modal.item.placeholder}]]*/ 'Item suchen ...',
             itemPickerEmpty: /*[[#{materialgesuch.modal.item.empty}]]*/ 'Keine passenden Items gefunden.',
             subjectRequired: /*[[#{materialgesuch.modal.subject.required}]]*/ 'Bitte ein Material oder Item wählen.',
             quantityInvalid: /*[[#{materialgesuch.modal.quantity.invalid}]]*/ 'Bitte eine Menge größer als 0 angeben.',

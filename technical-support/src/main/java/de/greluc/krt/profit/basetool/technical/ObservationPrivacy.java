@@ -29,8 +29,9 @@ import java.util.regex.Pattern;
  * Scrubs the {@code uri} and {@code http.url} observation key-values before they become metric tags
  * or span attributes (REQ-OBS-006).
  *
- * <p>Cuts query strings from both and collapses UUID and numeric path segments in {@code uri} to
- * {@code {id}}; all other key-values pass through unchanged.
+ * <p>Cuts query strings from both and collapses UUID and numeric path segments in both to {@code
+ * {id}}, so neither a metric tag nor a span attribute carries an entity or account id; all other
+ * key-values pass through unchanged.
  */
 public final class ObservationPrivacy {
 
@@ -54,7 +55,7 @@ public final class ObservationPrivacy {
     List<KeyValue> lowReplacements = new ArrayList<>();
     for (KeyValue kv : context.getLowCardinalityKeyValues()) {
       if (isUrlKey(kv.getKey())) {
-        String scrubbed = scrub(kv.getValue(), true);
+        String scrubbed = scrub(kv.getValue());
         if (!scrubbed.equals(kv.getValue())) {
           lowReplacements.add(KeyValue.of(kv.getKey(), scrubbed));
         }
@@ -65,7 +66,7 @@ public final class ObservationPrivacy {
     List<KeyValue> highReplacements = new ArrayList<>();
     for (KeyValue kv : context.getHighCardinalityKeyValues()) {
       if (isUrlKey(kv.getKey())) {
-        String scrubbed = scrub(kv.getValue(), false);
+        String scrubbed = scrub(kv.getValue());
         if (!scrubbed.equals(kv.getValue())) {
           highReplacements.add(KeyValue.of(kv.getKey(), scrubbed));
         }
@@ -86,13 +87,12 @@ public final class ObservationPrivacy {
   }
 
   /**
-   * Cuts the query string and optionally collapses UUID and numeric path segments to {@code {id}}.
+   * Cuts the query string and collapses UUID and numeric path segments to {@code {id}}.
    *
    * @param value the raw key-value content; may be {@code null}
-   * @param normalizeIds {@code true} for the {@code uri} tag, {@code false} for {@code http.url}
    * @return the scrubbed value, or the input unchanged when nothing matched
    */
-  public static String scrub(String value, boolean normalizeIds) {
+  public static String scrub(String value) {
     if (value == null || value.isEmpty()) {
       return value;
     }
@@ -101,10 +101,7 @@ public final class ObservationPrivacy {
     if (queryStart >= 0) {
       result = result.substring(0, queryStart);
     }
-    if (normalizeIds) {
-      result = UUID_SEGMENT.matcher(result).replaceAll("/{id}");
-      result = NUMERIC_SEGMENT.matcher(result).replaceAll("/{id}");
-    }
-    return result;
+    result = UUID_SEGMENT.matcher(result).replaceAll("/{id}");
+    return NUMERIC_SEGMENT.matcher(result).replaceAll("/{id}");
   }
 }

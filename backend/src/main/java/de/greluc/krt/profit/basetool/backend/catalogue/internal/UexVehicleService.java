@@ -64,10 +64,11 @@ import org.springframework.util.StringUtils;
  * shared name is the name of a row holding another listing of that name, or whose id a ship-type
  * merge left behind (REQ-DATA-042). A found row that holds an unfetched UEX vehicle id of a partial
  * fetch, or another game UUID, is not written; a game UUID several UEX vehicles carry is no
- * evidence either way. A row found by its own UEX vehicle id, or by an id a merge into it left
- * behind, whose game UUID is its P4K GUID keeps that UUID, and a differing UEX one is reported as a
- * disagreement (REQ-DATA-041). A row that takes a listing a merge left behind hands the merge the
- * listing it gives up, which is then that row's secondary listing (REQ-DATA-043).
+ * evidence either way. A row whose game UUID is its P4K GUID keeps that UUID, and a differing UEX
+ * one is reported as a disagreement (REQ-DATA-041), unless another fetched listing holds the row
+ * and no merge into the row left this vehicle's id behind; then the differing UUID still blocks the
+ * write. A row that takes a listing a merge left behind hands the merge the listing it gives up,
+ * which is then that row's secondary listing (REQ-DATA-043).
  *
  * <p>On a row with a P4K GUID the manufacturer, cargo, maximum crew and mass are written only while
  * empty; a differing UEX value is reported as {@link SyncEventType#P4K_DISAGREEMENT} (REQ-P4K-031).
@@ -225,7 +226,8 @@ public class UexVehicleService {
       ShipType candidate = existingOpt.orElseThrow();
       Integer held = candidate.getUexVehicleId();
       boolean heldByAnother = held != null && !dto.id().equals(held);
-      if (heldByAnother && census.containsId(held) && !listings.takesOver(candidate, dto)) {
+      boolean contested = heldByAnother && census.containsId(held);
+      if (contested && !listings.takesOver(candidate, dto)) {
         return VehicleOutcome.SECONDARY;
       }
       boolean leftBehind =
@@ -238,7 +240,7 @@ public class UexVehicleService {
               && externalUuid != null
               && !census.sharedUuid(externalUuid)
               && !candidate.getExternalUuid().equals(externalUuid)
-              && !((foundById || leftBehind) && isP4kConfirmed(candidate));
+              && !((!contested || leftBehind) && isP4kConfirmed(candidate));
       if (sourceConflict || uuidConflict) {
         syncReportService.logUexEvent(
             runId,

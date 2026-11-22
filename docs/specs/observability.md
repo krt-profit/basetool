@@ -567,6 +567,12 @@ silent-SSO entry point logged the raw id at `INFO` in every profile, and `Sessio
 `DEBUG` in dev/test. **Enforced by:** `SessionIdFingerprintTest`, `SsoReAuthenticationEntryPointTest`
 and `SessionDebugFilterTest` (the raw id appears in no captured line).
 
+**No client IP address either.** The edge access log already holds the address for the 31 days of
+REQ-OBS-010, so an application line never repeats it; the privacy policy states that the
+applications log no IP address. Until 2026-11-22 the silent-SSO entry point logged `remoteAddr` at
+`INFO` on all three of its paths. **Enforced by:** `SsoReAuthenticationEntryPointTest`
+(`commence_neverLogsTheClientIpAddress`, one case per path).
+
 **Structured masking happens before JSON serialization.** The logging encoder uses the library's
 masking generator for complete credential fields and decoded string values, so quotes, backslashes,
 control escapes and Unicode cannot break the emitted JSON or leave an escaped credential suffix.
@@ -1108,11 +1114,13 @@ Tracing on the OTel SDK) behind a hard master gate:
 - **No user-identifying span data:** span names and the low-cardinality `uri` attribute use
   templated routes (`/api/v1/locations/{id}`). Each module's `ObservationPrivacyFilter`
   scrubs every URL-carrying observation key-value before it becomes a metric tag or span
-  attribute: query strings (user search text!) are always cut, and on the metric-facing
-  `uri` tag UUID/numeric path segments are collapsed to `{id}` (cardinality guard for
-  hand-assembled client URIs). The `http.url` attribute thus carries the query-stripped raw
-  path — entity ids at most; attributes must never carry usernames, e-mails, `sub` UUIDs,
-  IPs or tokens (mirror of REQ-OBS-006).
+  attribute: query strings (user search text!) are always cut, and UUID/numeric path segments
+  are collapsed to `{id}` on both the metric-facing `uri` tag (cardinality guard for
+  hand-assembled client URIs) and the `http.url` span attribute, because a raw path can name an
+  account (`/admin/members/{id}`). Attributes must never carry usernames, e-mails, `sub`
+  UUIDs, entity ids, IPs or tokens (mirror of REQ-OBS-006); the privacy policy's tracing
+  paragraph states exactly this (`ObservationPrivacy`, `TechnicalContractsTest`,
+  `ObservationPrivacyFilterTest` in each module).
 - **Logs↔traces:** while a span is active, `traceId`/`spanId` join the MDC and are emitted
   by the prod JSON appenders as first-class fields for Grafana's derived-field links. The
   correlation-id system (REQ-OBS-001/-002) is untouched — `traceId` is an additional field,
@@ -1205,7 +1213,13 @@ abuse detection:
 - **Edge access/error log** (`app="edge"`) — the native edge's stdout since ADR-0162, one stream for
   all public vhosts, client IPs included (edge 4xx/5xx rates, scan/probe detection; per-vhost
   questions are answered from the line's own host field, since NPM's per-proxy-host files are gone).
-  Until 2026-09-20 this was the NPM access-log file tail.
+  Until 2026-09-20 this was the NPM access-log file tail. The access log uses the `krt_no_query`
+  format (`docker/edge/nginx.conf`): the combined layout with the query string and fragment cut
+  from the request target and the referrer, plus `$host` at the end, so a search term — the admin
+  person search sends a name as `?q=` — never reaches the log. `scripts/check-edge-nginx.sh` fails
+  when an `access_log` uses another format or the format names `$request`, `$request_uri`, `$args`,
+  `$query_string` or `$http_referer`. The error log still quotes a refused request in full; it is
+  written only for the rare request the rate limiter rejects.
 - **SSH / host-auth logs** (`app="host-auth"`) — Debian's `/var/log/auth.log` or, on the RHEL
   family, `/var/log/secure`; `config.alloy` tails both names under `/hostlog`, and on a given host
   exactly one exists (REQ-OBS-019): failed-auth spikes, invalid users, sudo failures, successful
@@ -1250,6 +1264,19 @@ Binding conditions on this retention:
   size cap. The bootstrap role sets `MaxRetentionSec=31d` and an explicit `SystemMaxUse=4G`
   (`tasks/27-observability.yml`); a size cap that binds first deletes sooner, which stays inside the
   approved retention.
+- **Every host-side file copy is held inside the 31 days as well** (since 2026-11-22). rsyslog's
+  `imjournal` copies the whole journal into `/var/log/messages` — the edge's access log and
+  HAProxy's connection log with every client address among it — and writes `/var/log/secure`,
+  `cron` and `maillog`; `fail2ban.log` inherits the same defaults. The role sets the global
+  `/etc/logrotate.conf` defaults to `weekly` with `rotate 3`
+  (`basetool_host_logrotate_weekly_generations`), so the current week plus three rotated ones hold
+  at most 28 days; before, the RHEL default of four generations kept five weeks. The applications'
+  file logs under `/var/log/basetool/<app>` keep at most 30 rolled days on every appender, the error
+  logs included (`maxHistory`, **Enforced by:** `LogFileRetentionTest`). Keycloak's file log is
+  size-rotated by Quarkus (six files of 10 MB), which at today's volume reaches back two days.
+  SSH answers only over the tailnet (the public address does not answer on port 22), so `btmp`,
+  `wtmp` and the audit log hold administrator logins only and are outside this condition; if SSH is
+  ever opened to the internet, they come under it.
 - **Admin-only access** — these streams are readable only through Grafana behind Keycloak OIDC
   restricted to the client role `grafana-admin` (REQ-OBS-008).
 - **Privacy-policy linkage (mandatory):** the decision is conditioned on the privacy policy covering
@@ -1598,7 +1625,9 @@ nothing, so the alert stays silent on a host without one.
 - `basetool_catalogue_attempt_last_complete_timestamp_seconds{source,aggregate}` moves only after
   `SUCCESS` or `UNCHANGED`. Source `CATALOGUE` freshness therefore means all required slices were
   applied, not merely that a scheduler callback returned. Partial or failed Wiki slices continue
-  independently but make the umbrella job fail; UEX preserves its fail-fast ordering. The existing
+  independently but make the umbrella job fail; UEX preserves its fail-fast ordering, except that a
+  partially applied vehicle slice lets the later slices run before the umbrella job fails naming it
+  (REQ-DATA-043). The existing
   scheduled-job freshness metrics and `ExternalSyncStale` now use that complete-source outcome.
   Dashboard `07` shows current outcomes, active sources, complete-apply age and attempt counts.
   `./gradlew testPrometheusRules` checks the alert syntax and every rule-test case using the exact

@@ -15,17 +15,16 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
-import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
-import {
-    itemIdentityOf,
-    itemOptionsUrl,
-    renderItemOption,
-} from '/js/materialexchange/exchange-item-options.js';
+import { bindExchangePicker } from '/js/materialexchange/exchange-picker.js';
+import { exchangeItemSource, itemIdentityOf } from '/js/materialexchange/exchange-item-options.js';
 
 /** @import { ExchangeItemOption } from '/js/materialexchange/exchange-item-options.js' */
+/** @import { ExchangePickerSource } from '/js/materialexchange/exchange-picker.js' */
+
+/** @typedef {ApiDto<'MaterialExchangeReleasableItemDto'>} ReleasableRow */
 
 function initMaterialboerseRelease() {
     /**
@@ -68,6 +67,7 @@ function initMaterialboerseRelease() {
 
     const SERIALIZE_KEY = 'materialboerse';
     const MATERIALBOARD_TOPIC = 'materialboard';
+    const KIND_RADIO = 'input[name="mb-release-kind"]';
     /** @type {MaterialReleaseState} */
     let state = {
         mode: null,
@@ -81,37 +81,8 @@ function initMaterialboerseRelease() {
         onDone: null,
         onCancel: null,
     };
-    /**
-     * One releasable stock row of the material picker.
-     *
-     * @typedef {object} MaterialPickerItem
-     * @property {string} inventoryItemId the inventory entry
-     * @property {string} kind `MATERIAL` or `ITEM`
-     * @property {string} materialName the material or item name
-     * @property {string | null} [materialNameDe] the material's or item's German name
-     * @property {number | string} quality the quality tier
-     * @property {number | string} amount the stock
-     * @property {string} quantityType `SCU` or `PIECE`
-     * @property {string} [locationName] the entry's location
-     * @property {boolean} [alreadyReleased] whether the entry already has an offer
-     * @property {boolean} [stolen] whether the entry is stolen stock
-     */
-
-    /** @type {MaterialPickerItem[]} */
-    let pickerItems = [];
-    /** @type {ExchangeItemOption[]} */
-    let itemOptions = [];
     /** @type {HTMLElement | null} */
     let lastFocused = null;
-    let pickerSeq = 0;
-    /** @type {number | null} */
-    let pickerSearchTimer = null;
-    let itemPickerSeq = 0;
-    /** @type {number | null} */
-    let itemPickerSearchTimer = null;
-    const PICKER_SEARCH_DEBOUNCE_MS = 200;
-    let pickerListOpen = false;
-    let itemPickerListOpen = false;
     let pickerKind = 'MATERIAL';
 
     /**
@@ -297,6 +268,119 @@ function initMaterialboerseRelease() {
     }
 
     /**
+     * Labels a releasable stock row with its name, quality, stock, location and markers, so rows
+     * of the same material stay apart in the picker.
+     *
+     * @param {ReleasableRow} row the stock row
+     * @returns {string} the option label
+     */
+    function rowLabel(row) {
+        const parts = [localisedName(row.materialName, row.materialNameDe)];
+        if (row.kind !== 'ITEM') {
+            parts.push(`Q ${row.quality}`);
+        }
+        parts.push(formatAmount(row.amount, row.quantityType));
+        if (row.locationName) {
+            parts.push(row.locationName);
+        }
+        if (row.alreadyReleased) {
+            parts.push(i18n.pickerAlready || '');
+        }
+        if (row.stolen) {
+            parts.push(i18n.pickerStolen || '');
+        }
+        return parts.join(' · ');
+    }
+
+    /**
+     * The caller's releasable stock rows of the chosen kind; the kind is applied server-side
+     * before the row cap (REQ-MARKET-002).
+     *
+     * @type {ExchangePickerSource<ReleasableRow>}
+     */
+    const releasableRowSource = {
+        url: (query) =>
+            `/materialboerse/releasable-items?kind=${encodeURIComponent(pickerKind)}${
+                query ? `&q=${encodeURIComponent(query)}` : ''
+            }`,
+        rows: (body) => (Array.isArray(body) ? body : []),
+        value: (row) => row.inventoryItemId ?? '',
+        label: rowLabel,
+    };
+
+    /**
+     * Shows or hides the quality fact — item rows (stock-backed item offers) have no quality.
+     *
+     * @param {boolean} show true to show
+     */
+    function toggleQualityFact(show) {
+        toggle('[data-mb-fact-quality-wrap]', show);
+    }
+
+    /** Drops the picked stock row: its facts and its amount ceiling. */
+    function resetRowPick() {
+        state.itemId = null;
+        state.quantityType = null;
+        setFacts(null, null);
+        toggleQualityFact(pickerKind === 'MATERIAL');
+        setAmountField('', null);
+    }
+
+    /**
+     * Takes over a picked stock row — its facts and its amount ceiling — or drops the pick.
+     *
+     * @param {ReleasableRow | null} row the picked row, or null
+     */
+    function pickRow(row) {
+        if (!row) {
+            resetRowPick();
+            return;
+        }
+        const isItem = row.kind === 'ITEM';
+        state.itemId = row.inventoryItemId ?? null;
+        state.quantityType = row.quantityType ?? null;
+        setFacts(localisedName(row.materialName, row.materialNameDe), isItem ? null : row.quality);
+        toggleQualityFact(!isItem);
+        setAmountField(row.amount, row.amount);
+    }
+
+    /**
+     * Takes over a picked item, or drops the pick.
+     *
+     * @param {ExchangeItemOption | null} option the picked item, or null
+     */
+    function pickItemOption(option) {
+        const identity = itemIdentityOf(option);
+        state.productKey = identity.productKey;
+        state.gameItemId = identity.gameItemId;
+    }
+
+    const rowPicker = bindExchangePicker(
+        /** @type {HTMLSelectElement} */ (q('[data-mb-row-select]')),
+        releasableRowSource,
+        { placeholder: i18n.pickerPlaceholder, noResults: i18n.pickerEmpty },
+        pickRow,
+    );
+    const itemPicker = bindExchangePicker(
+        /** @type {HTMLSelectElement} */ (q('[data-mb-item-select]')),
+        exchangeItemSource,
+        { placeholder: i18n.itemPickerPlaceholder, noResults: i18n.itemPickerEmpty },
+        pickItemOption,
+    );
+
+    /**
+     * Applies the Material/Item segment (REQ-MARKET-002): drops any picked row; the next search
+     * lists only rows of that kind.
+     *
+     * @param {string} kind the chosen row kind ('MATERIAL' or 'ITEM'); anything else falls back to 'MATERIAL'.
+     */
+    function setPickerKind(kind) {
+        pickerKind = kind === 'ITEM' ? 'ITEM' : 'MATERIAL';
+        rowPicker.clear();
+        resetRowPick();
+    }
+
+    /**
      * Opens the modal. The context's quantityType drives the SCU/PIECE unit; for `edit`, amount is
      * the current offered quantity and available is the item's total stock (the ceiling); for
      * `lager` and `new` amount is the item's stock (the default and the maximum).
@@ -331,8 +415,6 @@ function initMaterialboerseRelease() {
             onDone,
             onCancel,
         };
-        pickerListOpen = false;
-        itemPickerListOpen = false;
         const isNew = mode === 'new';
         const isEdit = mode === 'edit';
         const isItem = mode === 'item';
@@ -371,30 +453,24 @@ function initMaterialboerseRelease() {
         if (isNew) {
             pickerKind = 'MATERIAL';
             const materialRadio = /** @type {HTMLInputElement | null} */ (
-                modal.querySelector('[data-mb-kind-radio][value="MATERIAL"]')
+                modal.querySelector(`${KIND_RADIO}[value="MATERIAL"]`)
             );
             if (materialRadio) {
                 materialRadio.checked = true;
             }
-            loadPicker('');
+            rowPicker.clear();
         } else if (isItem) {
-            /** @type {HTMLInputElement | null} */
-            const itemInput = q('[data-mb-item-picker-input]');
-            if (itemInput) {
-                itemInput.value = '';
-            }
-            loadItemPicker('');
+            itemPicker.clear();
         }
 
         lastFocused = /** @type {HTMLElement | null} */ (document.activeElement);
         krtModal.open(modal);
-        const first = isNew
-            ? q('[data-mb-picker-input]')
-            : isItem
-              ? q('[data-mb-item-picker-input]')
-              : ta;
-        if (first) {
-            first.focus();
+        if (isNew) {
+            rowPicker.focus();
+        } else if (isItem) {
+            itemPicker.focus();
+        } else {
+            ta.focus();
         }
     }
 
@@ -443,252 +519,6 @@ function initMaterialboerseRelease() {
             onDone: null,
             onCancel: null,
         };
-    }
-
-    /**
-     * Loads the releasable stock rows, optionally filtered by a search text.
-     *
-     * @param {string} query the search text; empty for all
-     */
-    function loadPicker(query) {
-        const seq = ++pickerSeq;
-        const url = `/materialboerse/releasable-items?kind=${encodeURIComponent(
-            pickerKind,
-        )}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
-        krtFetch
-            .getJson(url)
-            .then((items) => {
-                if (seq !== pickerSeq) {
-                    return;
-                }
-                pickerItems = Array.isArray(items) ? items : [];
-                renderPicker();
-            })
-            .catch(() => {
-                if (seq !== pickerSeq) {
-                    return;
-                }
-                pickerItems = [];
-                renderPicker();
-            });
-    }
-
-    /**
-     * Debounces a server-side picker search so every keystroke does not fire its own request.
-     *
-     * @param {string} query the search text
-     */
-    function searchPicker(query) {
-        if (pickerSearchTimer) {
-            clearTimeout(pickerSearchTimer);
-        }
-        pickerSearchTimer = setTimeout(() => {
-            loadPicker(query);
-        }, PICKER_SEARCH_DEBOUNCE_MS);
-    }
-
-    /**
-     * Reveals the already rendered material picker dropdown.
-     */
-    function openPickerList() {
-        pickerListOpen = true;
-        const list = q('[data-mb-picker-list]');
-        if (list) {
-            list.hidden = false;
-        }
-    }
-
-    /** Closes the material picker dropdown so it stops covering the fields beneath it. */
-    function closePickerList() {
-        pickerListOpen = false;
-        const list = q('[data-mb-picker-list]');
-        if (list) {
-            list.hidden = true;
-        }
-    }
-
-    /**
-     * Applies the Material/Item radio selection (REQ-MARKET-002): clears any picked row and reloads
-     * the picker, still closed, filtered to that kind.
-     *
-     * @param {string} kind the chosen row kind ('MATERIAL' or 'ITEM'); anything else falls back to 'MATERIAL'.
-     */
-    function setPickerKind(kind) {
-        pickerKind = kind === 'ITEM' ? 'ITEM' : 'MATERIAL';
-        state.itemId = null;
-        state.quantityType = null;
-        /** @type {HTMLInputElement | null} */
-        const input = q('[data-mb-picker-input]');
-        if (input) {
-            input.value = '';
-        }
-        setFacts(null, null);
-        toggleQualityFact(pickerKind === 'MATERIAL');
-        setAmountField('', null);
-        closePickerList();
-        loadPicker('');
-    }
-
-    function renderPicker() {
-        const list = q('[data-mb-picker-list]');
-        if (!list) {
-            return;
-        }
-        if (!pickerItems.length) {
-            krtHtml.set(
-                list,
-                krtHtml`<li class="krt-combobox__notice">${i18n.pickerEmpty || ''}</li>`,
-            );
-            list.hidden = !pickerListOpen;
-            return;
-        }
-        const html = pickerItems.map((it) => {
-            const isItem = it.kind === 'ITEM';
-            const label = localisedName(it.materialName, it.materialNameDe);
-            let meta =
-                (isItem ? '' : `Q ${it.quality} · `) + formatAmount(it.amount, it.quantityType);
-            if (it.locationName) {
-                meta += ` · ${it.locationName}`;
-            }
-            if (it.alreadyReleased) {
-                meta += ` · ${i18n.pickerAlready || ''}`;
-            }
-            const stolenChip = it.stolen
-                ? krtHtml`<span class="chip chip--danger" data-testid="stolen-chip">${
-                      i18n.pickerStolen || ''
-                  }</span> `
-                : '';
-            return krtHtml`<li class="krt-combobox__option" role="option" data-item-id="${
-                it.inventoryItemId
-            }" data-kind="${it.kind}" data-material="${label}" data-quantity-type="${
-                it.quantityType
-            }" data-quality="${isItem ? '' : it.quality}" data-amount="${it.amount}"><strong>${
-                label
-            }</strong> ${stolenChip}<small>${meta}</small></li>`;
-        });
-        krtHtml.set(list, html);
-        list.hidden = !pickerListOpen;
-    }
-
-    /**
-     * Shows or hides the quality fact — item rows (stock-backed item offers) have no quality.
-     *
-     * @param {boolean} show true to show
-     */
-    function toggleQualityFact(show) {
-        toggle('[data-mb-fact-quality-wrap]', show);
-    }
-
-    /**
-     * Takes over a picked stock row: its facts, its amount ceiling and its name.
-     *
-     * @param {Element} li the clicked picker option
-     */
-    function pickItem(li) {
-        state.itemId = li.getAttribute('data-item-id');
-        state.quantityType = li.getAttribute('data-quantity-type');
-        const isItem = li.getAttribute('data-kind') === 'ITEM';
-        const amount = li.getAttribute('data-amount');
-        setFacts(li.getAttribute('data-material'), isItem ? null : li.getAttribute('data-quality'));
-        toggleQualityFact(!isItem);
-        setAmountField(amount, amount);
-        /** @type {HTMLInputElement | null} */
-        const input = q('[data-mb-picker-input]');
-        if (input) {
-            input.value = li.getAttribute('data-material') ?? '';
-        }
-        closePickerList();
-    }
-
-    /**
-     * Loads the items the dialog can list, optionally filtered by a search text.
-     *
-     * @param {string} query the search text; empty for all
-     */
-    function loadItemPicker(query) {
-        const seq = ++itemPickerSeq;
-        krtFetch
-            .getJson(itemOptionsUrl(query))
-            .then((items) => {
-                if (seq !== itemPickerSeq) {
-                    return;
-                }
-                itemOptions = Array.isArray(items) ? items : [];
-                renderItemPicker();
-            })
-            .catch(() => {
-                if (seq !== itemPickerSeq) {
-                    return;
-                }
-                itemOptions = [];
-                renderItemPicker();
-            });
-    }
-
-    /**
-     * Debounces a server-side item search so every keystroke does not fire a request.
-     *
-     * @param {string} query the search text
-     */
-    function searchItemPicker(query) {
-        if (itemPickerSearchTimer) {
-            clearTimeout(itemPickerSearchTimer);
-        }
-        itemPickerSearchTimer = setTimeout(() => {
-            loadItemPicker(query);
-        }, PICKER_SEARCH_DEBOUNCE_MS);
-    }
-
-    /** Opens the item picker dropdown on an explicit user gesture. */
-    function openItemPickerList() {
-        itemPickerListOpen = true;
-        const list = q('[data-mb-item-picker-list]');
-        if (list) {
-            list.hidden = false;
-        }
-    }
-
-    /** Closes the item picker dropdown so it stops covering the fields beneath it. */
-    function closeItemPickerList() {
-        itemPickerListOpen = false;
-        const list = q('[data-mb-item-picker-list]');
-        if (list) {
-            list.hidden = true;
-        }
-    }
-
-    function renderItemPicker() {
-        const list = q('[data-mb-item-picker-list]');
-        if (!list) {
-            return;
-        }
-        if (!itemOptions.length) {
-            krtHtml.set(
-                list,
-                krtHtml`<li class="krt-combobox__notice">${i18n.itemPickerEmpty || ''}</li>`,
-            );
-            list.hidden = !itemPickerListOpen;
-            return;
-        }
-        krtHtml.set(list, itemOptions.map(renderItemOption));
-        list.hidden = !itemPickerListOpen;
-    }
-
-    /**
-     * Takes over a picked item.
-     *
-     * @param {Element} li the clicked picker option
-     */
-    function pickItemOption(li) {
-        const identity = itemIdentityOf(li);
-        state.productKey = identity.productKey;
-        state.gameItemId = identity.gameItemId;
-        /** @type {HTMLInputElement | null} */
-        const input = q('[data-mb-item-picker-input]');
-        if (input) {
-            input.value = li.getAttribute('data-name') ?? '';
-        }
-        closeItemPickerList();
     }
 
     function submit() {
@@ -792,18 +622,6 @@ function initMaterialboerseRelease() {
 
     document.addEventListener('click', (e) => {
         const target = /** @type {Element} */ (e.target);
-        if (!isModalOpen()) {
-            if (
-                target.closest('[data-mb-picker-list] .krt-combobox__option') ||
-                target.closest('[data-mb-item-picker-list] .krt-combobox__option')
-            ) {
-                return;
-            }
-        }
-        if (!target.closest('[data-mb-combobox]') && !target.closest('[data-mb-item-combobox]')) {
-            closePickerList();
-            closeItemPickerList();
-        }
         if (target.closest('[data-mb-modal-close], .mb-modal-close') || target === modal) {
             cancel();
             return;
@@ -812,32 +630,12 @@ function initMaterialboerseRelease() {
             submit();
             return;
         }
-        if (target.closest('[data-mb-amount-max]')) {
-            if (state.available != null) {
-                /** @type {HTMLInputElement | null} */
-                const input = q('[data-mb-amount]');
-                if (input) {
-                    input.value = String(state.available);
-                }
+        if (target.closest('[data-mb-amount-max]') && state.available != null) {
+            /** @type {HTMLInputElement | null} */
+            const input = q('[data-mb-amount]');
+            if (input) {
+                input.value = String(state.available);
             }
-            return;
-        }
-        if (target.closest('[data-mb-picker-input]')) {
-            openPickerList();
-            return;
-        }
-        if (target.closest('[data-mb-item-picker-input]')) {
-            openItemPickerList();
-            return;
-        }
-        const li = target.closest('[data-mb-picker-list] .krt-combobox__option');
-        if (li) {
-            pickItem(li);
-            return;
-        }
-        const pli = target.closest('[data-mb-item-picker-list] .krt-combobox__option');
-        if (pli) {
-            pickItemOption(pli);
         }
     });
 
@@ -845,12 +643,6 @@ function initMaterialboerseRelease() {
         const target = /** @type {HTMLInputElement} */ (e.target);
         if (target.matches('[data-mb-remark]')) {
             updateCharCount();
-        } else if (target.matches('[data-mb-picker-input]')) {
-            openPickerList();
-            searchPicker(target.value);
-        } else if (target.matches('[data-mb-item-picker-input]')) {
-            openItemPickerList();
-            searchItemPicker(target.value);
         } else if (target.matches('[data-mb-item-qty]')) {
             toggle('[data-mb-qty-error]', false);
         }
@@ -858,7 +650,7 @@ function initMaterialboerseRelease() {
 
     document.addEventListener('change', (e) => {
         const target = /** @type {HTMLInputElement} */ (e.target);
-        if (target.matches('[data-mb-kind-radio]')) {
+        if (modal.contains(target) && target.matches(KIND_RADIO)) {
             setPickerKind(target.value);
         }
     });
@@ -867,14 +659,8 @@ function initMaterialboerseRelease() {
         if (!isModalOpen()) {
             return;
         }
-        if (e.key === 'Escape') {
-            if (pickerListOpen || itemPickerListOpen) {
-                e.preventDefault();
-                closePickerList();
-                closeItemPickerList();
-            } else {
-                cancel();
-            }
+        if (e.key === 'Escape' && !e.defaultPrevented) {
+            cancel();
         } else if (e.key === 'Tab') {
             trapFocus(e);
         }

@@ -76,7 +76,7 @@ class MaterialboardPickerServerSearchE2eTest {
   /**
    * Opens the release dialog and types into the material picker, asserting the keystroke drives a
    * server-side {@code releasable-items?q=…} query rather than a purely client-side filter of the
-   * initial, alphabetically-capped list. The initial modal-open request carries no {@code q}, so
+   * initial, alphabetically-capped list. A request for the unfiltered list carries no {@code q}, so
    * the predicate specifically waits for the typed query.
    */
   @Test
@@ -96,7 +96,7 @@ class MaterialboardPickerServerSearchE2eTest {
 
         page.locator("[data-testid='mb-create-offer']").click();
         page.locator("[data-mb-open-release]").first().click();
-        assertThat(page.locator("#mb-modal [data-mb-picker-input]"))
+        assertThat(page.getByTestId("mb-release-picker"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
         Request search =
@@ -104,7 +104,7 @@ class MaterialboardPickerServerSearchE2eTest {
                 request ->
                     request.url().contains("/materialboerse/releasable-items")
                         && request.url().contains("q="),
-                () -> page.locator("#mb-modal [data-mb-picker-input]").fill("savrilium"));
+                () -> page.getByTestId("mb-release-picker").fill("savrilium"));
         assertTrue(
             search.url().contains("q=savrilium"),
             "picker search must send the typed fragment to the server, got: " + search.url());

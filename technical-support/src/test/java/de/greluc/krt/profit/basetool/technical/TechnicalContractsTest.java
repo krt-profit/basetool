@@ -58,7 +58,7 @@ class TechnicalContractsTest {
   }
 
   @Test
-  void scrubsOnlyRequestTargetKeysAtTheAppropriateCardinality() {
+  void scrubsOnlyRequestTargetKeysAndCollapsesIdsAtBothCardinalities() {
     var context = new Observation.Context();
     context.addLowCardinalityKeyValue(KeyValue.of("uri", "/api/42?token=synthetic"));
     context.addLowCardinalityKeyValue(KeyValue.of("method", "GET"));
@@ -69,18 +69,18 @@ class TechnicalContractsTest {
     assertEquals("/api/{id}", context.getLowCardinalityKeyValue("uri").getValue());
     assertEquals("/api/{id}", context.getLowCardinalityKeyValue("http.url").getValue());
     assertEquals("GET", context.getLowCardinalityKeyValue("method").getValue());
-    assertEquals("/api/42", context.getHighCardinalityKeyValue("http.url").getValue());
+    assertEquals("/api/{id}", context.getHighCardinalityKeyValue("http.url").getValue());
     assertEquals("unchanged", context.getHighCardinalityKeyValue("trace").getValue());
   }
 
   @Test
   void retainsEmptyAndStableUrlsAndCollapsesUuidSegments() {
-    assertNull(ObservationPrivacy.scrub(null, true));
-    assertEquals("", ObservationPrivacy.scrub("", true));
-    assertEquals("/api/static", ObservationPrivacy.scrub("/api/static", true));
+    assertNull(ObservationPrivacy.scrub(null));
+    assertEquals("", ObservationPrivacy.scrub(""));
+    assertEquals("/api/static", ObservationPrivacy.scrub("/api/static"));
     assertEquals(
         "/api/{id}/child/{id}",
-        ObservationPrivacy.scrub("/api/12345678-abcd-abcd-abcd-123456789abc/child/23", true));
+        ObservationPrivacy.scrub("/api/12345678-abcd-abcd-abcd-123456789abc/child/23"));
     var context = new Observation.Context();
     context.addLowCardinalityKeyValue(KeyValue.of("uri", "/api/static"));
     context.addHighCardinalityKeyValue(KeyValue.of("http.url", "/api/static"));

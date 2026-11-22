@@ -3,11 +3,12 @@
  * Copyright (C) 2026 Lucas Greuloch
  * SPDX-License-Identifier: GPL-3.0-only
  *
- * The item picker entries the Materialbörse offer and request dialogs share (ADR-0372).
+ * The item picker search the Materialbörse offer and request dialogs share (ADR-0372).
  */
 
-import { krtHtml } from '/js/kernel/krt-html.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
+
+/** @import { ExchangePickerSource } from '/js/materialexchange/exchange-picker.js' */
 
 /**
  * One entry of an item picker: a blueprint product or a stocked item no blueprint produces. Exactly
@@ -30,39 +31,31 @@ import { localisedName } from '/js/kernel/krt-localised-name.js';
  */
 
 /**
- * Builds the relay URL the item pickers search.
+ * The item relay search; an option is labelled with the item name and its manufacturer, and its
+ * value is prefixed by the identity kind so a product key and a catalogue id never collide.
  *
- * @param {string} query the search text; empty for the first items
- * @returns {string} the URL
+ * @type {ExchangePickerSource<ExchangeItemOption>}
  */
-export function itemOptionsUrl(query) {
-    return `/materialboerse/item-options${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-}
+export const exchangeItemSource = {
+    url: (query) => `/materialboerse/item-options${query ? `?q=${encodeURIComponent(query)}` : ''}`,
+    rows: (body) => (Array.isArray(body) ? body : []),
+    value: (option) =>
+        option.productKey ? `product:${option.productKey}` : `item:${option.gameItemId ?? ''}`,
+    label: (option) => {
+        const manufacturer = localisedName(option.manufacturerName, option.manufacturerNameDe);
+        return manufacturer ? `${option.name} · ${manufacturer}` : option.name;
+    },
+};
 
 /**
- * Renders one picker entry with the item's identity on the element.
+ * Reads the identity a picked entry carries.
  *
- * @param {ExchangeItemOption} option the entry
- * @returns {KrtHtml} the option markup
+ * @param {ExchangeItemOption | null} option the picked entry, or null when none is picked
+ * @returns {ExchangeItemIdentity} the identity; both fields null without a pick
  */
-export function renderItemOption(option) {
-    const manufacturer = localisedName(option.manufacturerName, option.manufacturerNameDe);
-    return krtHtml`<li class="krt-combobox__option" role="option" data-product-key="${
-        option.productKey ?? ''
-    }" data-game-item-id="${option.gameItemId ?? ''}" data-name="${option.name}"><strong>${
-        option.name
-    }</strong>${manufacturer ? krtHtml` <small>${manufacturer}</small>` : ''}</li>`;
-}
-
-/**
- * Reads the identity a rendered entry carries.
- *
- * @param {Element} li the picked entry
- * @returns {ExchangeItemIdentity} the identity
- */
-export function itemIdentityOf(li) {
+export function itemIdentityOf(option) {
     return {
-        productKey: li.getAttribute('data-product-key') || null,
-        gameItemId: li.getAttribute('data-game-item-id') || null,
+        productKey: option?.productKey || null,
+        gameItemId: option?.gameItemId || null,
     };
 }

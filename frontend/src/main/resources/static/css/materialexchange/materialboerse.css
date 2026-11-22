@@ -7,39 +7,11 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .mb-modal-kind {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 10px;
-    }
-    .mb-modal-kind__opt {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        min-height: var(--touch-target);
-        padding: 6px 12px;
-        font-family: var(--font-body);
-        font-size: 12px;
-        color: var(--color-gray-1);
-        border: 1px solid var(--color-gray-3);
-        cursor: pointer;
-        user-select: none;
-    }
-    .mb-modal-kind__opt:hover {
-        border-color: var(--color-primary);
-    }
-    .mb-modal-kind__opt:has(input:checked) {
-        color: var(--color-primary);
-        border-color: var(--color-primary);
-        box-shadow: var(--glow-primary);
-    }
-    .mb-modal-kind__opt input[type='radio'] {
-        flex: none;
-        margin: 0;
-        accent-color: var(--color-primary);
-    }
     .mb-modal-picker {
         margin-bottom: 14px;
+    }
+    .mb-modal-picker > .krt-segmented {
+        margin-bottom: var(--space-3);
     }
     .mb-modal-facts {
         margin-bottom: 14px;
