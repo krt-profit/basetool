@@ -196,6 +196,24 @@
       $FileCreateMode 0640
   notify: Reload rsyslog
 
+- name: Rotate the files rsyslog copies out of the journal weekly
+  ansible.builtin.lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^\s*(daily|weekly|monthly|yearly)\s*$'
+    line: "weekly"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Keep them, with the journal, inside the 31-day log retention
+  ansible.builtin.lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^\s*rotate\s'
+    line: "rotate {{ basetool_host_logrotate_weekly_generations }}"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Hand the existing auth log to adm as well
   ansible.builtin.file:
     path: /var/log/secure

@@ -88,7 +88,9 @@ public class UexScheduler {
   }
 
   /**
-   * Runs the full UEX sync sweep in dependency order; the first failing step aborts the rest.
+   * Runs the full UEX sync sweep in dependency order; the first failing step aborts the rest. A
+   * partially applied vehicle slice does not stop the later slices: the sweep fails naming it once
+   * they have run.
    *
    * <p>A {@code finally} block evicts the master-data caches via {@link
    * MasterDataCacheEvictionService#evictUexSyncedMasterData()} and reconciles the refinery terminal
@@ -114,7 +116,8 @@ public class UexScheduler {
       runStep(SyncAggregate.STAR_SYSTEM, uexStarSystemService::fetchAndProcessStarSystems);
       runStep(SyncAggregate.COMMODITY, uexCommodityService::fetchAndProcessCommoditiesPrices);
       runStep(SyncAggregate.MANUFACTURER, uexManufacturerService::syncManufacturers);
-      runStep(SyncAggregate.SHIP_TYPE, uexVehicleService::syncVehicles);
+      final SyncRunService.Result shipTypes =
+          runSlice(SyncAggregate.SHIP_TYPE, uexVehicleService::syncVehicles);
       SyncRunService.Result items =
           syncRuns.run(
               SyncSourceSystem.UEX, SyncAggregate.GAME_ITEM, null, uexItemSyncService::syncItems);
@@ -125,6 +128,7 @@ public class UexScheduler {
       }
       runStep(SyncAggregate.REFINING_METHOD, uexRefinerySyncService::syncRefiningMethods);
       runStep(SyncAggregate.REFINERY_YIELD, uexRefinerySyncService::syncRefineryYields);
+      requireComplete(SyncAggregate.SHIP_TYPE, shipTypes);
     } finally {
       try {
         uexUniverseSyncService.reconcileRefineryTerminalFlags();
@@ -138,16 +142,18 @@ public class UexScheduler {
   }
 
   private void runStep(SyncAggregate aggregate, Runnable task) {
-    requireComplete(
+    requireComplete(aggregate, runSlice(aggregate, task));
+  }
+
+  private SyncRunService.Result runSlice(SyncAggregate aggregate, Runnable task) {
+    return syncRuns.run(
+        SyncSourceSystem.UEX,
         aggregate,
-        syncRuns.run(
-            SyncSourceSystem.UEX,
-            aggregate,
-            null,
-            () -> {
-              task.run();
-              return 0;
-            }));
+        null,
+        () -> {
+          task.run();
+          return 0;
+        });
   }
 
   private static void requireComplete(SyncAggregate aggregate, SyncRunService.Result result) {

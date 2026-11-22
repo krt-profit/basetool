@@ -23,6 +23,7 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
@@ -35,8 +36,9 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * E2E coverage for the Materialbörse Gesuche tab (REQ-MARKET-015): the tab swaps the create menu,
- * the request modal opens visibly with its picker closed, the Material/Item radio switches the
- * combobox, and quality and quantity fields are present for both kinds.
+ * the request modal opens visibly with its picker closed, Escape closes an open picker list without
+ * closing the modal, the Material/Item segment switches the combobox, and quality and quantity
+ * fields are present for both kinds.
  */
 @Tag("e2e")
 class MaterialboardRequestModalE2eTest {
@@ -113,22 +115,35 @@ class MaterialboardRequestModalE2eTest {
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator("#mg-modal [data-mg-item-block]"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
-        assertThat(page.locator("#mg-modal [data-mg-picker-list]"))
+        assertThat(page.locator("#mg-modal input[name='mg-request-kind'][value='MATERIAL']"))
+            .isChecked();
+        Locator materialList =
+            page.locator("#mg-modal .krt-combobox:has(#mg-material) .krt-combobox__listbox");
+        assertThat(materialList)
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
-        page.locator("#mg-modal [data-mg-picker-input]").click();
-        assertThat(page.locator("#mg-modal [data-mg-picker-list]"))
+        page.getByTestId("mg-material-picker").click();
+        assertThat(materialList)
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+        page.keyboard().press("Escape");
+        assertThat(materialList)
+            .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
+        assertThat(page.locator("#mg-modal")).isVisible();
 
         assertThat(page.locator("#mg-modal [data-mg-min-quality]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator("#mg-modal [data-mg-qty]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        page.locator("#mg-modal [data-mg-kind-radio][value='ITEM']").check();
+        String materialTitle = page.locator("#mg-modal-title").textContent();
+        page.getByTestId("segment-mg-request-kind-item").click();
+        assertThat(page.locator("#mg-modal-title")).not().hasText(materialTitle);
+        assertThat(page.locator("#mg-modal input[name='mg-request-kind'][value='ITEM']"))
+            .isChecked();
         assertThat(page.locator("#mg-modal [data-mg-item-block]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator("#mg-modal [data-mg-material-block]"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
+        assertThat(page.getByTestId("mg-item-picker")).isVisible();
 
         page.locator("#mg-modal [data-mg-modal-close]").first().click();
         assertThat(page.locator("#mg-modal"))

@@ -1528,6 +1528,48 @@ entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsGateTest` an
 `AnonymousSurfaceE2eTest`. Monitoring: `/licenses` is a `blackbox-public-surface` target
 (`REQ-OBS-012`).
 
+### REQ-UI-040 — The Impressum names the operator and the reporting channel, and every login page links it
+
+The Impressum is the operator disclosure of § 5 DDG and § 18 Abs. 1 MStV. Whether § 5 DDG reaches a
+free, ad-free members' tool („geschäftsmäßig, in der Regel gegen Entgelt") is open; § 18 Abs. 1
+MStV reaches it in any case, because the Basetool serves an organisation and not only personal or
+family purposes. The page therefore carries the full § 5 disclosure.
+
+- **Where.** `/impressum`, titled „Impressum" / "Legal notice". Linked from the footer of every
+  page, from the landing page's legal links, from the legal links at the end of the phone menu
+  sheet (REQ-UI-026) and from every page the Keycloak login theme renders itself. **Public**
+  (`REQ-SEC-052`) and a legal page for both session gates.
+- **What, in this order.** The statutes it answers (§ 5 DDG, § 18 Abs. 1 MStV); the provider with
+  a summonable address including the country; telephone and email — the telephone is the second
+  fast channel beside email that § 5 Abs. 1 Nr. 2 DDG asks for (EuGH C-298/07); the single point of
+  contact under Art. 11 and 12 DSA with its languages (German, English); how to report illegal
+  content, with the four elements of Art. 16 Abs. 2 DSA; copyright and licences — the code under
+  GPL-3.0-only with a link to its source, the licence page (REQ-UI-021), the DAS KARTELL name and
+  logo outside the GPL, Star Citizen content with Cloud Imperium as the Fan Kit band below the card
+  states (REQ-UI-018).
+- **The DSA sections are a precaution.** Whether a free hobby service is an information-society
+  service („normally provided for remuneration") is open; the sections cost a few sentences and
+  leave nothing to argue about.
+- **What it does not carry.** No „Vertreten durch" (a natural person has no representative); no
+  consumer-dispute statement (§ 36 VSBG binds traders, and only above ten employees); no link to
+  the EU ODR platform (Regulation (EU) 2024/3228 repealed it); no liability disclaimer — it
+  excludes nothing, and the liability privileges are in Art. 4–6 DSA, not in §§ 7–10 DDG; no
+  „Verantwortlich nach § 18 Abs. 2 MStV" (the Basetool has no journalistic-editorial content); no
+  VAT or business identification number (the operator holds none for this service); no generator
+  credit.
+- **Login pages.** Every page template of `keycloak-theme/krt-theme/login/` imports `krt-legal.ftl`
+  and calls `<@legal.links/>`, which links `impressum` and `privacy` below the theme property
+  `krtHomeUrl`. Keycloak answers on the app origin (ADR-0166), so the root-relative links reach the
+  frontend. A page the theme takes from its parent unchanged carries no links.
+- **Nothing on it mutates**, so there is no live-update wiring (`REQ-FE-001…010` do not apply).
+
+Tests: `ImpressumControllerTest` (the disclosure, the DSA contact point, the notice fields, the
+source and licence links, the English title, none of the boilerplate), `KeycloakThemeLegalLinksTest`
+(every theme page renders the macro, the macro's links, both bundles' labels), and the public-page
+entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `GateExemptPageChromeMvcTest` and
+`AnonymousSurfaceE2eTest`. Monitoring: `/impressum` is a `blackbox-public-surface` target
+(`REQ-OBS-012`).
+
 ### REQ-UI-023 — A page ships no developer text and no inline page CSS
 
 A rendered page carries what the browser needs and nothing a developer wrote for another developer.

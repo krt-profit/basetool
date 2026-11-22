@@ -254,4 +254,33 @@ class SsoReAuthenticationEntryPointTest {
       logger.detachAppender(appender);
     }
   }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"first-attempt", "second-attempt", "background"})
+  void commence_neverLogsTheClientIpAddress(String path) throws Exception {
+    String clientIp = "203.0.113.45";
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/dashboard");
+    request.setRemoteAddr(clientIp);
+    switch (path) {
+      case "second-attempt" ->
+          request.setCookies(new Cookie(SsoReAuthenticationEntryPoint.SSO_ATTEMPTED_COOKIE, "1"));
+      case "background" -> request.addHeader("Sec-Fetch-Mode", "cors");
+      default -> {}
+    }
+    Logger logger = (Logger) LoggerFactory.getLogger(SsoReAuthenticationEntryPoint.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      entryPoint.commence(request, new MockHttpServletResponse(), authException);
+
+      assertFalse(appender.list.isEmpty(), "the " + path + " path must have been logged");
+      assertTrue(
+          appender.list.stream().noneMatch(e -> e.getFormattedMessage().contains(clientIp)),
+          "the client IP address must not be logged on the " + path + " path");
+    } finally {
+      logger.detachAppender(appender);
+    }
+  }
 }

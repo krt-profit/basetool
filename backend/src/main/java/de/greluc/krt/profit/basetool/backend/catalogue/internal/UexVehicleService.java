@@ -64,8 +64,11 @@ import org.springframework.util.StringUtils;
  * shared name is the name of a row holding another listing of that name, or whose id a ship-type
  * merge left behind (REQ-DATA-042). A found row that holds an unfetched UEX vehicle id of a partial
  * fetch, or another game UUID, is not written; a game UUID several UEX vehicles carry is no
- * evidence either way. A row found by its own UEX vehicle id whose game UUID is its P4K GUID keeps
- * that UUID, and a differing UEX one is reported as a disagreement (REQ-DATA-041).
+ * evidence either way. A row whose game UUID is its P4K GUID keeps that UUID, and a differing UEX
+ * one is reported as a disagreement (REQ-DATA-041), unless another fetched listing holds the row
+ * and no merge into the row left this vehicle's id behind; then the differing UUID still blocks the
+ * write. A row that takes a listing a merge left behind hands the merge the listing it gives up,
+ * which is then that row's secondary listing (REQ-DATA-043).
  *
  * <p>On a row with a P4K GUID the manufacturer, cargo, maximum crew and mass are written only while
  * empty; a differing UEX value is reported as {@link SyncEventType#P4K_DISAGREEMENT} (REQ-P4K-031).
@@ -87,6 +90,10 @@ public class UexVehicleService {
 
   private final UexClient uexClient;
   private final ShipTypeRepository shipTypeRepository;
+
+  /** Knows the UEX vehicle ids a ship-type merge left behind (REQ-DATA-043). */
+  private final ShipTypeRedirectRepository shipTypeRedirects;
+
   private final ManufacturerRepository manufacturerRepository;
   private final ManufacturerUexCompanyRepository manufacturerAliasRepository;
   private final SyncReportService syncReportService;
@@ -219,16 +226,21 @@ public class UexVehicleService {
       ShipType candidate = existingOpt.orElseThrow();
       Integer held = candidate.getUexVehicleId();
       boolean heldByAnother = held != null && !dto.id().equals(held);
-      if (heldByAnother && census.containsId(held) && !listings.takesOver(candidate, dto)) {
+      boolean contested = heldByAnother && census.containsId(held);
+      if (contested && !listings.takesOver(candidate, dto)) {
         return VehicleOutcome.SECONDARY;
       }
+      boolean leftBehind =
+          !foundById
+              && shipTypeRedirects.existsByCanonicalShipTypeIdAndUexVehicleId(
+                  candidate.getId(), dto.id());
       boolean sourceConflict = heldByAnother && !census.complete() && !census.containsId(held);
       boolean uuidConflict =
           candidate.getExternalUuid() != null
               && externalUuid != null
               && !census.sharedUuid(externalUuid)
               && !candidate.getExternalUuid().equals(externalUuid)
-              && !(foundById && isP4kConfirmed(candidate));
+              && !((!contested || leftBehind) && isP4kConfirmed(candidate));
       if (sourceConflict || uuidConflict) {
         syncReportService.logUexEvent(
             runId,
@@ -238,6 +250,9 @@ public class UexVehicleService {
             dto.name(),
             "UEX vehicle " + dto.id() + " conflicts with an existing source id or game UUID.");
         return VehicleOutcome.SKIPPED;
+      }
+      if (leftBehind) {
+        shipTypeRedirects.handOverUexVehicleId(candidate.getId(), dto.id(), held);
       }
     }
 

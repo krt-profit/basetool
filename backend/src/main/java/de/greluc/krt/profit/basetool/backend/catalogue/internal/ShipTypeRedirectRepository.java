@@ -90,4 +90,54 @@ public interface ShipTypeRedirectRepository extends JpaRepository<ShipTypeRedire
           """,
       nativeQuery = true)
   int repoint(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
+
+  /**
+   * Tells whether a merge into a ship type left a UEX vehicle id behind (REQ-DATA-043).
+   *
+   * @param canonicalShipTypeId the ship type that stayed
+   * @param uexVehicleId the UEX vehicle id
+   * @return whether a redirect into the ship type keeps that id as left behind
+   */
+  boolean existsByCanonicalShipTypeIdAndUexVehicleId(
+      UUID canonicalShipTypeId, Integer uexVehicleId);
+
+  /**
+   * Tells whether a ship type merged away held a Wiki vehicle's game UUID, which makes that vehicle
+   * part of the ship type it was merged into (REQ-DATA-042).
+   *
+   * @param wikiUuid the Wiki vehicle's game UUID
+   * @return whether the snapshot of a merged row carries it as its {@code external_uuid}
+   */
+  @Query(
+      value =
+          """
+          SELECT EXISTS (SELECT 1 FROM ship_type_redirect
+                         WHERE retired_snapshot -> 'retiredShipType' ->> 'external_uuid'
+                               = CAST(:wikiUuid AS text))
+          """,
+      nativeQuery = true)
+  boolean isMergedWikiUuid(@Param("wikiUuid") UUID wikiUuid);
+
+  /**
+   * Hands the left-behind UEX vehicle id of the merges into a ship type over when the ship type
+   * takes that listing: the redirects then keep the listing the ship type gives up (REQ-DATA-043).
+   *
+   * @param survivorId the ship type that stayed
+   * @param taken the left-behind UEX vehicle id the ship type takes
+   * @param released the UEX vehicle id the ship type gives up, or {@code null} when it held none
+   * @return the number of redirects changed
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          UPDATE ship_type_redirect SET uex_vehicle_id = :released,
+            version = version + 1, updated_at = CURRENT_TIMESTAMP
+          WHERE canonical_id = :survivorId AND uex_vehicle_id = :taken
+          """,
+      nativeQuery = true)
+  int handOverUexVehicleId(
+      @Param("survivorId") UUID survivorId,
+      @Param("taken") int taken,
+      @Param("released") @Nullable Integer released);
 }

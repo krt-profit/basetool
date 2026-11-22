@@ -1,4 +1,5 @@
 <#import "template.ftl" as layout>
+<#import "krt-legal.ftl" as legal>
 <@layout.registrationLayout displayMessage=true displayInfo=realm.password && realm.registrationAllowed && !registrationDisabled; section>
     <#if section = "header">
         ${msg("loginAccountTitle")}
@@ -55,6 +56,7 @@
                     </#list>
                 </div>
             </#if>
+            <@legal.links/>
         </div>
     </#if>
 </@layout.registrationLayout>

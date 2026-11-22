@@ -1,6 +1,6 @@
 # Record of processing activities (Art. 30 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-02.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-22.
 
 Art. 30 GDPR requires a controller to maintain a record of its processing activities. The small-
 organisation exemption in **Art. 30(5) does not apply**: it is available only where processing is
@@ -138,13 +138,17 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Purpose:** stability, security, and abuse defence.
 - **Data:** per request one access-log line with method, path, status and duration plus a pseudonymous
   account id and context ids; **no names, e-mail addresses or tokens — these are masked at the
-  logging layer** (`PiiMaskingPatternLayout` / `PiiMaskingLogstashEncoder`). IP addresses and
-  usernames are kept, deliberately, in the edge access log (native nginx, ADR-0162), the host
-  authentication log and the host security logs (auditd file integrity, fail2ban bans). Keycloak's
+  logging layer** (`PiiMaskingPatternLayout` / `PiiMaskingLogstashEncoder`), and no application line
+  carries a client IP (REQ-OBS-004). IP addresses and usernames are kept, deliberately, in the edge
+  access log (native nginx, ADR-0162; the `krt_no_query` format logs path and referrer without their
+  query string, REQ-OBS-010), HAProxy's connection log, the host authentication log and the host
+  security logs (auditd file integrity, fail2ban bans). rsyslog copies the journal, edge and
+  HAProxy lines included, into `/var/log/messages`, held by logrotate to at most 28 days. Keycloak's
   own log output is shipped with its `username=` and `ipAddress=` fields masked by the log shipper
-  (`monitoring/alloy/config.alloy`, gated by `scripts/check-alloy-log-masking.py`). Metrics are aggregate counters with no
-  personal data. Traces carry the path with ids reduced to placeholders and no account id
-  (`ObservationPrivacyFilter`).
+  (`monitoring/alloy/config.alloy`, gated by `scripts/check-alloy-log-masking.py`); its file on the
+  host keeps them, size-rotated over about two days. Metrics are aggregate counters with no
+  personal data. Traces carry the path with ids reduced to placeholders in both the `uri` tag and
+  the `http.url` attribute, and no account id (`ObservationPrivacy`, REQ-OBS-009).
 - **Legal basis:** Art. 6(1)(f).
 - **Keycloak's own event store** (login and admin events) is a separate record from the log stream
   above, and it is **enabled in production** — verified against the realm on 2026-09-16:
@@ -344,7 +348,8 @@ The single table every other statement about retention must agree with.
 | Read notifications                      | **90 days** after being read                                                   | `NotificationRetentionTask` (REQ-NOTIF-009)                                | `app.notifications.retention.max-age`                   |
 | Unread notifications                    | **180 days** after being raised                                                | `NotificationRetentionTask` (REQ-NOTIF-009)                                | `app.notifications.retention.unread-max-age`            |
 | Activity + bank audit trail             | **24 months** after the recorded activity                                      | `AuditRetentionTask` (REQ-AUDIT-006), plus the admin purge (REQ-AUDIT-004) | `app.audit.retention.max-age`                           |
-| Application + platform logs             | **31 days**                                                                    | Loki compactor retention                                                   | `retention_period` in `monitoring/loki/loki-config.yml` |
+| Application + platform logs             | **31 days**                                                                    | Loki compactor retention; journald `MaxRetentionSec`                       | `retention_period` in `monitoring/loki/loki-config.yml`; `basetool_host_journal_max_retention` |
+| Host file copies of the logs            | At most **30 days** (app file logs), **28 days** (rsyslog files, `fail2ban.log`); Keycloak's file log size-rotated (6 × 10 MB) | logback `maxHistory` (`LogFileRetentionTest`); logrotate `weekly` + `rotate 3` (REQ-OBS-010) | `logback-spring.xml` of each app; `basetool_host_logrotate_weekly_generations` |
 | Traces                                  | **14 days**                                                                    | Tempo retention                                                            | `block_retention` in `monitoring/tempo/tempo.yaml`      |
 | Keycloak realm events (login + admin)   | **30 days**                                                                    | Keycloak realm event expiration                                            | `events/config` + the `adminEventsExpiration` attribute |
 | Metrics (no personal data)              | 180 days                                                                       | Prometheus TSDB retention                                                  | `--storage.tsdb.retention.time` in `docker-compose.monitoring.yml` (→ `quadlet/systemd/prometheus.container`) |

@@ -44,6 +44,7 @@ class ShipTypeMergeServiceTest {
 
   @Autowired private ShipTypeMergeService merges;
   @Autowired private ShipTypeRepository ships;
+  @Autowired private ShipTypeRedirectRepository redirects;
   @Autowired private EntityManager entityManager;
   @Autowired private JdbcTemplate jdbc;
 
@@ -109,6 +110,78 @@ class ShipTypeMergeServiceTest {
 
     assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID)).isTrue();
     assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID + 1)).isFalse();
+  }
+
+  @Test
+  void aSurvivorTakingTheListingAMergeLeftBehindLeavesItsOwnBehindInstead() {
+    ShipType survivor = shipType("RSI Constellation Mk IV Phoenix", UUID.randomUUID(), null);
+    survivor.setUexVehicleId(TWIN_UEX_ID + 1);
+    survivor = ships.saveAndFlush(survivor);
+    ShipType twin = ships.saveAndFlush(wikiTwin("Constellation Mk IV Phoenix", null));
+    merges.merge(
+        twin.getId(),
+        survivor.getId(),
+        survivor.getP4kUuid(),
+        ShipTypeMergeReason.SUPERSEDED_BY_GS_RECORD);
+    entityManager.flush();
+    UUID survivorId = survivor.getId();
+
+    assertThat(redirects.existsByCanonicalShipTypeIdAndUexVehicleId(survivorId, TWIN_UEX_ID))
+        .isTrue();
+    assertThat(redirects.handOverUexVehicleId(survivorId, TWIN_UEX_ID, TWIN_UEX_ID + 1)).isOne();
+
+    assertThat(redirects.existsByCanonicalShipTypeIdAndUexVehicleId(survivorId, TWIN_UEX_ID))
+        .isFalse();
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID)).isFalse();
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID + 1)).isTrue();
+  }
+
+  @Test
+  void anEditionMergedFirstLeavesItsListingBehindForTheShipsOwnListing() {
+    UUID survivorGuid = UUID.randomUUID();
+    UUID editionWiki = UUID.randomUUID();
+    UUID baseWiki = UUID.randomUUID();
+    ShipType survivor =
+        ships.saveAndFlush(shipType("RSI Constellation Mk IV Phoenix", survivorGuid, null));
+    ShipType edition =
+        shipType("RSI Constellation Mk IV Phoenix Emerald", UUID.randomUUID(), editionWiki);
+    edition.setUexVehicleId(TWIN_UEX_ID);
+    edition = ships.saveAndFlush(edition);
+    ShipType base = shipType("Constellation Mk IV Phoenix", UUID.randomUUID(), baseWiki);
+    base.setUexVehicleId(TWIN_UEX_ID + 1);
+    base = ships.saveAndFlush(base);
+
+    merges.merge(
+        edition.getId(), survivor.getId(), survivorGuid, ShipTypeMergeReason.EDITION_OF_BASE);
+    merges.merge(
+        base.getId(), survivor.getId(), survivorGuid, ShipTypeMergeReason.SUPERSEDED_BY_GS_RECORD);
+    entityManager.flush();
+    entityManager.clear();
+
+    ShipType merged = ships.findById(survivor.getId()).orElseThrow();
+    assertThat(merged.getUexVehicleId()).isEqualTo(TWIN_UEX_ID + 1);
+    assertThat(merged.getExternalUuid()).isEqualTo(baseWiki);
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID)).isTrue();
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID + 1)).isFalse();
+    assertThat(redirects.isMergedWikiUuid(editionWiki)).isTrue();
+    assertThat(redirects.isMergedWikiUuid(UUID.randomUUID())).isFalse();
+  }
+
+  @Test
+  void anEditionWhoseWikiUuidIsTheSurvivorsGuidHandsItOver() {
+    UUID survivorGuid = UUID.randomUUID();
+    ShipType survivor = ships.saveAndFlush(shipType("Aegis Hammerhead", survivorGuid, null));
+    ShipType edition =
+        ships.saveAndFlush(
+            shipType("Aegis Hammerhead Best In Show Edition", UUID.randomUUID(), survivorGuid));
+
+    merges.merge(
+        edition.getId(), survivor.getId(), survivorGuid, ShipTypeMergeReason.EDITION_OF_BASE);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(ships.findById(survivor.getId()).orElseThrow().getExternalUuid())
+        .isEqualTo(survivorGuid);
   }
 
   @Test

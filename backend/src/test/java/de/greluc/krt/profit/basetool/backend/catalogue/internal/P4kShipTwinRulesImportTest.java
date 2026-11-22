@@ -202,6 +202,8 @@ class P4kShipTwinRulesImportTest {
     assertThat(jdbc.queryForObject("SELECT ship_type_id FROM ship WHERE id = ?", UUID.class, ship))
         .isEqualTo(survivor.getId());
     assertThat(merges(runId)).singleElement().extracting(P4kImportChange::getGuid).isEqualTo(BASE);
+    assertThat(ships.findById(survivor.getId()).orElseThrow().getUexVehicleId()).isNull();
+    assertThat(ships.isMergedUexVehicleId(DEPARTED_UEX_ID)).isTrue();
   }
 
   @Test
