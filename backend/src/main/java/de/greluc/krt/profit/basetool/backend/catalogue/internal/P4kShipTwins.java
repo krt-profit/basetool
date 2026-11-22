@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipManufacturerWords;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kClosedSet;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
@@ -45,10 +46,11 @@ import org.springframework.util.StringUtils;
  * Merges a second ship type of a game ship into the row of its P4K record (REQ-P4K-053). A row
  * without a P4K GUID is merged into the unretired row whose GUID is its Wiki UUID; else into the
  * single row holding a same-name record of its own record's variant group; else into the single row
- * whose name is its Wiki in-game name or, for a row only UEX wrote, its UEX full name. A row whose
- * GUID left a complete catalogue is merged into the row holding the record that succeeds it, and a
- * row whose record a {@code _GS} record of the same in-game name supersedes into the row holding
- * that record. The twins are found before the run decides which rows move to their base or
+ * whose name is its Wiki in-game name or, for a row only UEX wrote, its UEX full name; else into
+ * the single row one of whose names agrees with its name once each drops its manufacturer word. A
+ * row whose GUID left a complete catalogue is merged into the row holding the record that succeeds
+ * it, and a row whose record a {@code _GS} record of the same in-game name supersedes into the row
+ * holding that record. The twins are found before the run decides which rows move to their base or
  * successor (REQ-P4K-051), since a twin's identity would block such a move, and are merged once it
  * has: a row that moves keeps its own Wiki identity.
  */
@@ -147,7 +149,8 @@ class P4kShipTwins {
 
   /**
    * Finds the row a ship type without a P4K GUID copies, by its Wiki UUID, its record's variant
-   * group and name, its Wiki in-game name, or, for a row only UEX wrote, its UEX full name.
+   * group and name, its Wiki in-game name, for a row only UEX wrote its UEX full name, or its name
+   * without the manufacturer word.
    *
    * @param row the ship type
    * @param catalogue the catalogue's ships
@@ -179,11 +182,44 @@ class P4kShipTwins {
             catalogue,
             holders,
             ShipTypeMergeReason.WIKI_GAME_NAME_IS_P4K_NAME);
-    if (byGameName != null || row.getSourceSystems() != GameItemSourceSystem.UEX_ONLY) {
+    if (byGameName != null) {
       return byGameName;
     }
-    return named(
-        row, row.getNameFull(), catalogue, holders, ShipTypeMergeReason.UEX_FULL_NAME_IS_P4K_NAME);
+    if (row.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
+      Twin byFullName =
+          named(
+              row,
+              row.getNameFull(),
+              catalogue,
+              holders,
+              ShipTypeMergeReason.UEX_FULL_NAME_IS_P4K_NAME);
+      if (byFullName != null) {
+        return byFullName;
+      }
+    }
+    return shortNamed(row, catalogue, holders);
+  }
+
+  /**
+   * Finds the single row one of whose names, English or German, agrees with a ship type's name once
+   * each drops its leading manufacturer word, as "Aurora CL" agrees with the German "RSI Aurora CL"
+   * of "RSI Aurora Mk I CL".
+   *
+   * @param row the ship type
+   * @param catalogue the catalogue's ships
+   * @param holders the rows holding a GUID
+   * @return the twin, or {@code null} when no single row agrees
+   */
+  @Nullable
+  private static Twin shortNamed(
+      @NotNull ShipType row, @NotNull Catalogue catalogue, @NotNull Holders holders) {
+    List<ShipType> agreeing = holders.shortNamed(row.getName());
+    ShipType survivor = agreeing.size() == 1 ? agreeing.getFirst() : null;
+    P4kShipDto record = survivor == null ? null : settledRecord(survivor, catalogue, holders);
+    return survivor == null || record == null
+        ? null
+        : new Twin(
+            row, survivor, record, ShipTypeMergeReason.NAME_WITHOUT_MANUFACTURER_IS_P4K_NAME);
   }
 
   /**
@@ -620,9 +656,15 @@ class P4kShipTwins {
    *
    * @param byGuid the rows by GUID
    * @param byName the rows by folded name
+   * @param byShortName the rows by the key of their English and German names without the
+   *     manufacturer word, each row once per key
+   * @param words the manufacturer words of the stored ship types
    */
   private record Holders(
-      @NotNull Map<UUID, ShipType> byGuid, @NotNull Map<String, List<ShipType>> byName) {
+      @NotNull Map<UUID, ShipType> byGuid,
+      @NotNull Map<String, List<ShipType>> byName,
+      @NotNull Map<String, List<ShipType>> byShortName,
+      @NotNull ShipManufacturerWords words) {
 
     /**
      * Indexes the rows that can take a twin.
@@ -633,8 +675,10 @@ class P4kShipTwins {
      */
     @NotNull
     static Holders of(@NotNull List<ShipType> stored, @NotNull Set<UUID> retiring) {
+      ShipManufacturerWords words = ShipManufacturerWords.of(stored);
       Map<UUID, ShipType> byGuid = new HashMap<>();
       Map<String, List<ShipType>> byName = new HashMap<>();
+      Map<String, List<ShipType>> byShortName = new HashMap<>();
       for (ShipType row : stored) {
         UUID guid = row.getP4kUuid();
         if (guid != null && !row.isP4kRetired() && !retiring.contains(row.getId())) {
@@ -643,9 +687,27 @@ class P4kShipTwins {
           if (name != null && !name.isEmpty()) {
             byName.computeIfAbsent(name, _ -> new ArrayList<>()).add(row);
           }
+          Set<String> shortKeys = new HashSet<>();
+          shortKeys.add(words.shortKey(row.getName()));
+          shortKeys.add(words.shortKey(row.getNameDe()));
+          shortKeys.remove("");
+          shortKeys.forEach(
+              key -> byShortName.computeIfAbsent(key, _ -> new ArrayList<>()).add(row));
         }
       }
-      return new Holders(byGuid, byName);
+      return new Holders(byGuid, byName, byShortName, words);
+    }
+
+    /**
+     * Returns the rows one of whose names agrees with a name once each drops its manufacturer word.
+     *
+     * @param name the name, or {@code null}
+     * @return the rows, empty when none or no name
+     */
+    @NotNull
+    List<ShipType> shortNamed(@Nullable String name) {
+      String key = words.shortKey(name);
+      return key.isEmpty() ? List.of() : byShortName.getOrDefault(key, List.of());
     }
 
     /**
