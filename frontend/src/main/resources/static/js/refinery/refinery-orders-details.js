@@ -28,6 +28,7 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { krtFocusNewRow } from '/js/kernel/krt-row-focus.js';
 import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
 
 /**
@@ -516,9 +517,14 @@ function setStartedAtNow() {
     updateEndsAt();
 }
 
+/**
+ * Appends an empty goods row cloned from the first one, with fresh ids, names and a new picker.
+ *
+ * @returns {HTMLElement | null} the new row, or null when the page has no goods container
+ */
 function addMaterialRow() {
     const container = document.getElementById('materials-container');
-    if (!container) return;
+    if (!container) return null;
     const entries = container.querySelectorAll('.material-entry');
     const count = entries.length;
 
@@ -615,6 +621,7 @@ function addMaterialRow() {
 
     container.appendChild(template);
     krtEnhanceComboboxes(template);
+    return template;
 }
 
 /**
@@ -880,7 +887,7 @@ krtEvents.on('click', 'rod-set-started-now', (el) => {
 });
 krtEvents.on('change', 'rod-update-method', updateMethodRatings);
 krtEvents.on('click', 'rod-add-material', (el) => {
-    addMaterialRow();
+    krtFocusNewRow(addMaterialRow());
     markRefinerySectionChanged(el);
 });
 krtEvents.on('click', 'rod-remove-material', (el) => {

@@ -90,10 +90,6 @@
     .material-row__amount .scu-hint {
         margin-left: 0;
     }
-    .orders-create__add {
-        width: 100%;
-        border-style: dashed;
-    }
     .orders-create__counter {
         margin-top: var(--space-1);
         text-align: right;

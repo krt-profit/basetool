@@ -394,6 +394,16 @@
     .od-modal-section {
         margin: var(--space-6) 0 var(--space-3);
     }
+    .od-modal-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2) var(--space-3);
+    }
+    .od-modal-head > h3 {
+        margin: 0;
+    }
     .od-modal-lead {
         margin: 0 0 var(--space-4);
     }
@@ -445,6 +455,9 @@
         width: 100%;
         margin-top: var(--space-3);
         border-style: dashed;
+    }
+    .od-lines ~ .btn-add-line {
+        margin-top: var(--space-3);
     }
 
     .od-prod-entry {

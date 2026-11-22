@@ -147,10 +147,6 @@
     .rod-good__scu {
         color: var(--color-gray-2-text);
     }
-    .rod-add {
-        width: 100%;
-        border-style: dashed;
-    }
     .rod-status {
         display: flex;
         flex-direction: column;

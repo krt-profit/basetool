@@ -75,6 +75,9 @@ class RefineryOrderDetailPatternRenderTest {
   /** The owner of the order, who views it. */
   private static final UUID OWNER = UUID.fromString("00000000-0000-0000-0000-00000000bbbb");
 
+  /** A member who neither owns the order nor holds the logistician capability. */
+  private static final UUID OTHER_MEMBER = UUID.fromString("00000000-0000-0000-0000-00000000cccc");
+
   /** The order under test. */
   private static final UUID ORDER_ID = UUID.fromString("00000000-0000-0000-0000-000000001042");
 
@@ -100,12 +103,22 @@ class RefineryOrderDetailPatternRenderTest {
    * @return the authentication
    */
   private static @NotNull OAuth2AuthenticationToken ownerToken() {
+    return memberToken(OWNER);
+  }
+
+  /**
+   * A member token for a user.
+   *
+   * @param subject the user's id
+   * @return the authentication
+   */
+  private static @NotNull OAuth2AuthenticationToken memberToken(@NotNull UUID subject) {
     OidcIdToken idToken =
         new OidcIdToken(
             "token-value",
             Instant.now(),
             Instant.now().plusSeconds(3600),
-            Map.of(IdTokenClaimNames.SUB, OWNER.toString(), "preferred_username", "owner"));
+            Map.of(IdTokenClaimNames.SUB, subject.toString(), "preferred_username", "member"));
     OidcUser user =
         new DefaultOidcUser(
             Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")), idToken);
@@ -170,6 +183,27 @@ class RefineryOrderDetailPatternRenderTest {
       @Nullable Long durationMinutes,
       @Nullable RefineryOrderProvenanceDto provenance)
       throws Exception {
+    return render(status, startedAt, durationMinutes, provenance, ownerToken());
+  }
+
+  /**
+   * Stubs the order read with its provenance and renders the detail page in German for a viewer.
+   *
+   * @param status the order status
+   * @param startedAt the start of the run, or {@code null}
+   * @param durationMinutes the duration, or {@code null}
+   * @param provenance the order's provenance, or {@code null}
+   * @param viewer the member who opens the page
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private @NotNull String render(
+      @NotNull RefineryOrderStatus status,
+      @Nullable Instant startedAt,
+      @Nullable Long durationMinutes,
+      @Nullable RefineryOrderProvenanceDto provenance,
+      @NotNull OAuth2AuthenticationToken viewer)
+      throws Exception {
     RefineryGoodDto good =
         new RefineryGoodDto(
             UUID.randomUUID(),
@@ -206,9 +240,7 @@ class RefineryOrderDetailPatternRenderTest {
         .thenReturn(order);
     return mockMvc
         .perform(
-            get("/refinery-orders/" + ORDER_ID)
-                .locale(Locale.GERMAN)
-                .with(authentication(ownerToken())))
+            get("/refinery-orders/" + ORDER_ID).locale(Locale.GERMAN).with(authentication(viewer)))
         .andExpect(status().isOk())
         .andReturn()
         .getResponse()
@@ -259,6 +291,38 @@ class RefineryOrderDetailPatternRenderTest {
     String outsideDialog = main.substring(0, main.indexOf("id=\"storeModal\""));
     assertThat(outsideDialog.split("btn--cta", -1)).hasSize(2);
     assertThat(outsideDialog).doesNotContainPattern("class=\"[^\"]*krtm-");
+  }
+
+  /**
+   * The owner adds goods from an outline button below the list and from a compact one in the
+   * section head, both with the plus icon and the full label as accessible name (REQ-UI-036).
+   */
+  @Test
+  void theOwnerAddsGoodsBelowTheListAndFromTheSectionHead() throws Exception {
+    String html = render(RefineryOrderStatus.OPEN, null, null);
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+
+    assertThat(main)
+        .containsPattern(
+            "class=\"btn btn-outline btn-xs\" data-testid=\"refinery-detail-add-material-head\""
+                + "[^>]*aria-label=\"Material hinzufügen\"[^>]*>\\s*<svg class=\"krt-icon\"[^>]*>"
+                + "<use href=\"#krt-icon-plus\"[^<]*</svg> <span>Material</span>")
+        .containsPattern(
+            "class=\"btn btn-outline btn-add-line\" data-testid=\"refinery-detail-add-material\""
+                + "[^>]*>\\s*<svg class=\"krt-icon\"[^>]*><use href=\"#krt-icon-plus\"[^<]*</svg>"
+                + " <span>Material hinzufügen</span>")
+        .doesNotContain("btn-ghost rod-add");
+    assertThat(main.split("data-trigger=\"rod-add-material\"", -1)).hasSize(3);
+  }
+
+  /** A member who may not edit the order sees no add button for its goods (REQ-UI-036). */
+  @Test
+  void aMemberWithoutTheEditRightSeesNoAddButton() throws Exception {
+    String html = render(RefineryOrderStatus.OPEN, null, null, null, memberToken(OTHER_MEMBER));
+
+    assertThat(html)
+        .contains("3 · Materialien")
+        .doesNotContain("data-trigger=\"rod-add-material\"");
   }
 
   /** A running run keeps the store action hidden until its end and shows the running badge. */

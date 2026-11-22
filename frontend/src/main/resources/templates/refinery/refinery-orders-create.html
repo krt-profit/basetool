@@ -123,7 +123,12 @@
             </fieldset>
 
             <fieldset class="form-section">
-                <legend class="form-section__head" th:text="|3 · #{refineryorder.form.materials.title}|">3 · Materialien</legend>
+                <legend class="form-section__head">
+                    <span th:text="|3 · #{refineryorder.form.materials.title}|">3 · Materialien</span>
+                    <span class="grow"></span>
+                    <button type="button" class="btn btn-outline btn-xs" data-testid="refinery-add-material-head" data-trigger="rfc-add-material"
+                            th:attr="aria-label=#{refineryorder.form.material.add},title=#{refineryorder.form.material.add}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{refineryorder.form.material.add.short}">Material</span></button>
+                </legend>
                 <div class="rod-good rod-good--head" aria-hidden="true">
                     <span class="rod-req" th:text="#{refineryorder.goods.input}">Eingang (Erz)</span>
                     <span class="rod-req" th:text="#{refineryorder.form.material.quality}">Qualität</span>
@@ -188,7 +193,7 @@
                         </div>
                     </div>
                 </div>
-                <button type="button" class="btn btn-ghost rod-add" data-testid="refinery-add-material" data-trigger="rfc-add-material"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{refineryorder.form.material.add}">Material hinzufügen</span></button>
+                <button type="button" class="btn btn-outline btn-add-line" data-testid="refinery-add-material" data-trigger="rfc-add-material"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{refineryorder.form.material.add}">Material hinzufügen</span></button>
             </fieldset>
 
             <fieldset class="form-section">
