@@ -23,6 +23,7 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
@@ -105,11 +106,13 @@ class MaterialboardReleaseModalOpensE2eTest {
         assertThat(page.locator("#mb-modal [data-mb-picker]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        assertThat(page.locator("#mb-modal [data-mb-picker-list]"))
-            .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
-        page.locator("#mb-modal [data-mb-picker-input]").click();
-        assertThat(page.locator("#mb-modal [data-mb-picker-list]"))
-            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+        assertThat(page.locator("#mb-modal input[name='mb-release-kind'][value='MATERIAL']"))
+            .isChecked();
+        Locator rowList =
+            page.locator("#mb-modal .krt-combobox:has(#mb-release-row) .krt-combobox__listbox");
+        assertThat(rowList).isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
+        page.getByTestId("mb-release-picker").click();
+        assertThat(rowList).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
         page.locator("#mb-modal [data-mb-modal-close]").first().click();
         assertThat(page.locator("#mb-modal"))

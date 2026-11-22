@@ -15,17 +15,27 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
-import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
-import {
-    itemIdentityOf,
-    itemOptionsUrl,
-    renderItemOption,
-} from '/js/materialexchange/exchange-item-options.js';
+import { bindExchangePicker } from '/js/materialexchange/exchange-picker.js';
+import { exchangeItemSource, itemIdentityOf } from '/js/materialexchange/exchange-item-options.js';
 
 /** @import { ExchangeItemOption } from '/js/materialexchange/exchange-item-options.js' */
+/** @import { ExchangePickerSource } from '/js/materialexchange/exchange-picker.js' */
+
+/**
+ * The catalogue material search of a material request.
+ *
+ * @type {ExchangePickerSource<ApiDto<'MaterialDto'>>}
+ */
+const requestMaterialSource = {
+    url: (query) =>
+        `/materialboerse/request-materials${query ? `?q=${encodeURIComponent(query)}` : ''}`,
+    rows: (page) => (page && Array.isArray(page.content) ? page.content : []),
+    value: (material) => material.id ?? '',
+    label: (material) => localisedName(material.name, material.nameDe),
+};
 
 function initMaterialgesuchModal() {
     /**
@@ -66,6 +76,7 @@ function initMaterialgesuchModal() {
 
     const SERIALIZE_KEY = 'materialgesuch';
     const MATERIALBOARD_TOPIC = 'materialboard';
+    const KIND_RADIO = 'input[name="mg-request-kind"]';
     /** @type {MaterialRequestState} */
     let state = {
         mode: null,
@@ -81,19 +92,6 @@ function initMaterialgesuchModal() {
     };
     /** @type {HTMLElement | null} */
     let lastFocused = null;
-    const PICKER_SEARCH_DEBOUNCE_MS = 200;
-    let materialSeq = 0;
-    /** @type {number | null} */
-    let materialTimer = null;
-    let materialListOpen = false;
-    /** @type {Array<{ id: string, name: string, nameDe?: string | null, quantityType: string }>} */
-    let materialItems = [];
-    let itemSeq = 0;
-    /** @type {number | null} */
-    let itemTimer = null;
-    let itemListOpen = false;
-    /** @type {ExchangeItemOption[]} */
-    let itemOptions = [];
 
     /**
      * Fills the `{0}` placeholder of a localized template.
@@ -188,6 +186,41 @@ function initMaterialgesuchModal() {
     }
 
     /**
+     * Takes over a picked material, or drops the pick: its id and its unit.
+     *
+     * @param {ApiDto<'MaterialDto'> | null} material the picked material, or null
+     */
+    function pickMaterial(material) {
+        state.materialId = material?.id ?? null;
+        state.quantityType = material?.quantityType === 'PIECE' ? 'PIECE' : 'SCU';
+        applyQuantityUnit();
+    }
+
+    /**
+     * Takes over a picked item, or drops the pick.
+     *
+     * @param {ExchangeItemOption | null} option the picked item, or null
+     */
+    function pickItem(option) {
+        const identity = itemIdentityOf(option);
+        state.productKey = identity.productKey;
+        state.gameItemId = identity.gameItemId;
+    }
+
+    const materialPicker = bindExchangePicker(
+        /** @type {HTMLSelectElement} */ (q('[data-mg-material-select]')),
+        requestMaterialSource,
+        { placeholder: i18n.materialPickerPlaceholder, noResults: i18n.materialPickerEmpty },
+        pickMaterial,
+    );
+    const itemPicker = bindExchangePicker(
+        /** @type {HTMLSelectElement} */ (q('[data-mg-item-select]')),
+        exchangeItemSource,
+        { placeholder: i18n.itemPickerPlaceholder, noResults: i18n.itemPickerEmpty },
+        pickItem,
+    );
+
+    /**
      * Opens the modal. For `new` the context carries the kind; for `edit` the request's fields.
      *
      * @param {string} mode `new` or `edit`
@@ -220,37 +253,29 @@ function initMaterialgesuchModal() {
             onDone,
             onCancel,
         };
-        materialListOpen = false;
-        itemListOpen = false;
 
-        setText(
-            '#mg-modal-title',
-            isEdit
-                ? i18n.editTitle
-                : state.kind === 'ITEM'
-                  ? i18n.itemRequestTitle
-                  : i18n.requestTitle,
-        );
+        if (isEdit) {
+            setText('#mg-modal-title', i18n.editTitle);
+        } else {
+            applyNewRequestTitle();
+        }
         setText('[data-mg-submit-label]', isEdit ? i18n.submitSave : i18n.submitCreate);
         toggle('[data-mg-picker]', !isEdit);
         toggle('[data-mg-subject-facts]', isEdit);
         toggle('[data-mg-quality-error]', false);
         toggle('[data-mg-qty-error]', false);
+        setKindRadio(state.kind);
 
         if (isEdit) {
             setText('[data-mg-fact-subject]', ctx.subject || '—');
-            setKindRadio(state.kind);
             setValue('[data-mg-min-quality]', ctx.minQuality != null ? ctx.minQuality : '');
             setValue('[data-mg-qty]', ctx.amount != null ? ctx.amount : '');
         } else {
-            setKindRadio(state.kind);
             applyKindBlocks();
-            setValue('[data-mg-picker-input]', '');
-            setValue('[data-mg-item-picker-input]', '');
+            materialPicker.clear();
+            itemPicker.clear();
             setValue('[data-mg-min-quality]', '');
             setValue('[data-mg-qty]', '');
-            loadMaterialPicker('');
-            loadItemPicker('');
         }
         applyQuantityUnit();
 
@@ -260,13 +285,12 @@ function initMaterialgesuchModal() {
 
         lastFocused = /** @type {HTMLElement | null} */ (document.activeElement);
         krtModal.open(modal);
-        const first = isEdit
-            ? q('[data-mg-qty]')
-            : state.kind === 'ITEM'
-              ? q('[data-mg-item-picker-input]')
-              : q('[data-mg-picker-input]');
-        if (first) {
-            first.focus();
+        if (isEdit) {
+            q('[data-mg-qty]')?.focus();
+        } else if (state.kind === 'ITEM') {
+            itemPicker.focus();
+        } else {
+            materialPicker.focus();
         }
     }
 
@@ -285,20 +309,28 @@ function initMaterialgesuchModal() {
     }
 
     /**
-     * Checks the kind radio with the value.
+     * Checks the kind segment with the value.
      *
      * @param {string} kind `MATERIAL` or `ITEM`
      */
     function setKindRadio(kind) {
         const radio = /** @type {HTMLInputElement | null} */ (
-            modal.querySelector(`[data-mg-kind-radio][value="${kind}"]`)
+            modal.querySelector(`${KIND_RADIO}[value="${kind}"]`)
         );
         if (radio) {
             radio.checked = true;
         }
     }
 
-    /** Shows the material combobox for a MATERIAL request, the item combobox for an ITEM request. */
+    /** Titles a new-request dialog by the current request kind. */
+    function applyNewRequestTitle() {
+        setText(
+            '#mg-modal-title',
+            state.kind === 'ITEM' ? i18n.itemRequestTitle : i18n.requestTitle,
+        );
+    }
+
+    /** Shows the material picker for a MATERIAL request, the item picker for an ITEM request. */
     function applyKindBlocks() {
         const isItem = state.kind === 'ITEM';
         toggle('[data-mg-material-block]', !isItem);
@@ -306,7 +338,7 @@ function initMaterialgesuchModal() {
     }
 
     /**
-     * Switches the request kind and resets the pick.
+     * Switches the request kind and drops the pick.
      *
      * @param {string} kind `ITEM` for an item request, anything else for a material request
      */
@@ -316,10 +348,11 @@ function initMaterialgesuchModal() {
         state.productKey = null;
         state.gameItemId = null;
         state.quantityType = 'SCU';
+        materialPicker.clear();
+        itemPicker.clear();
+        applyNewRequestTitle();
         applyKindBlocks();
         applyQuantityUnit();
-        closeMaterialList();
-        closeItemList();
     }
 
     function hide() {
@@ -349,189 +382,6 @@ function initMaterialgesuchModal() {
         if (onDone) {
             return onDone(body);
         }
-    }
-
-    /**
-     * Loads the materials matching a query into the material picker.
-     *
-     * @param {string} query the search text; empty for the unfiltered list
-     */
-    function loadMaterialPicker(query) {
-        const seq = ++materialSeq;
-        const url = `/materialboerse/request-materials${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        krtFetch
-            .getJson(url)
-            .then((page) => {
-                if (seq !== materialSeq) {
-                    return;
-                }
-                materialItems = page && Array.isArray(page.content) ? page.content : [];
-                renderMaterialPicker();
-            })
-            .catch(() => {
-                if (seq !== materialSeq) {
-                    return;
-                }
-                materialItems = [];
-                renderMaterialPicker();
-            });
-    }
-
-    /**
-     * Reloads the material picker after the typing pause.
-     *
-     * @param {string} query the search text
-     */
-    function searchMaterialPicker(query) {
-        if (materialTimer) {
-            clearTimeout(materialTimer);
-        }
-        materialTimer = setTimeout(() => {
-            loadMaterialPicker(query);
-        }, PICKER_SEARCH_DEBOUNCE_MS);
-    }
-
-    function openMaterialList() {
-        materialListOpen = true;
-        const list = q('[data-mg-picker-list]');
-        if (list) {
-            list.hidden = false;
-        }
-    }
-
-    function closeMaterialList() {
-        materialListOpen = false;
-        const list = q('[data-mg-picker-list]');
-        if (list) {
-            list.hidden = true;
-        }
-    }
-
-    function renderMaterialPicker() {
-        const list = q('[data-mg-picker-list]');
-        if (!list) {
-            return;
-        }
-        if (!materialItems.length) {
-            krtHtml.set(
-                list,
-                krtHtml`<li class="krt-combobox__notice">${i18n.materialPickerEmpty || ''}</li>`,
-            );
-            list.hidden = !materialListOpen;
-            return;
-        }
-        const html = materialItems.map((it) => {
-            const unit =
-                it.quantityType === 'PIECE'
-                    ? krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
-                    : i18n.unitScu || 'SCU';
-            const label = localisedName(it.name, it.nameDe);
-            return krtHtml`<li class="krt-combobox__option" role="option" data-material-id="${
-                it.id
-            }" data-name="${label}" data-quantity-type="${
-                it.quantityType
-            }"><strong>${label}</strong> <small>${unit}</small></li>`;
-        });
-        krtHtml.set(list, html);
-        list.hidden = !materialListOpen;
-    }
-
-    /**
-     * Takes over a picked material: its id, its unit and its name.
-     *
-     * @param {Element} li the clicked picker option
-     */
-    function pickMaterial(li) {
-        state.materialId = li.getAttribute('data-material-id');
-        state.quantityType = li.getAttribute('data-quantity-type') === 'PIECE' ? 'PIECE' : 'SCU';
-        setValue('[data-mg-picker-input]', li.getAttribute('data-name'));
-        applyQuantityUnit();
-        closeMaterialList();
-    }
-
-    /**
-     * Loads the items matching a query into the item picker.
-     *
-     * @param {string} query the search text; empty for the unfiltered list
-     */
-    function loadItemPicker(query) {
-        const seq = ++itemSeq;
-        krtFetch
-            .getJson(itemOptionsUrl(query))
-            .then((items) => {
-                if (seq !== itemSeq) {
-                    return;
-                }
-                itemOptions = Array.isArray(items) ? items : [];
-                renderItemPicker();
-            })
-            .catch(() => {
-                if (seq !== itemSeq) {
-                    return;
-                }
-                itemOptions = [];
-                renderItemPicker();
-            });
-    }
-
-    /**
-     * Reloads the item picker after the typing pause.
-     *
-     * @param {string} query the search text
-     */
-    function searchItemPicker(query) {
-        if (itemTimer) {
-            clearTimeout(itemTimer);
-        }
-        itemTimer = setTimeout(() => {
-            loadItemPicker(query);
-        }, PICKER_SEARCH_DEBOUNCE_MS);
-    }
-
-    function openItemList() {
-        itemListOpen = true;
-        const list = q('[data-mg-item-picker-list]');
-        if (list) {
-            list.hidden = false;
-        }
-    }
-
-    function closeItemList() {
-        itemListOpen = false;
-        const list = q('[data-mg-item-picker-list]');
-        if (list) {
-            list.hidden = true;
-        }
-    }
-
-    function renderItemPicker() {
-        const list = q('[data-mg-item-picker-list]');
-        if (!list) {
-            return;
-        }
-        if (!itemOptions.length) {
-            krtHtml.set(
-                list,
-                krtHtml`<li class="krt-combobox__notice">${i18n.itemPickerEmpty || ''}</li>`,
-            );
-            list.hidden = !itemListOpen;
-            return;
-        }
-        krtHtml.set(list, itemOptions.map(renderItemOption));
-        list.hidden = !itemListOpen;
-    }
-
-    /**
-     * Takes over a picked item.
-     *
-     * @param {Element} li the clicked picker option
-     */
-    function pickItemOption(li) {
-        const identity = itemIdentityOf(li);
-        state.productKey = identity.productKey;
-        state.gameItemId = identity.gameItemId;
-        setValue('[data-mg-item-picker-input]', li.getAttribute('data-name'));
-        closeItemList();
     }
 
     /** Reads the optional min-quality field; returns undefined when blank, null on an invalid value. */
@@ -660,42 +510,12 @@ function initMaterialgesuchModal() {
 
     document.addEventListener('click', (e) => {
         const target = /** @type {Element} */ (e.target);
-        if (!isModalOpen()) {
-            if (
-                target.closest('[data-mg-picker-list] .krt-combobox__option') ||
-                target.closest('[data-mg-item-picker-list] .krt-combobox__option')
-            ) {
-                return;
-            }
-        }
-        if (!target.closest('[data-mg-combobox]') && !target.closest('[data-mg-item-combobox]')) {
-            closeMaterialList();
-            closeItemList();
-        }
         if (target.closest('[data-mg-modal-close], .mg-modal-close') || target === modal) {
             cancel();
             return;
         }
         if (target.closest('[data-mg-modal-submit]')) {
             submit();
-            return;
-        }
-        if (target.closest('[data-mg-picker-input]')) {
-            openMaterialList();
-            return;
-        }
-        if (target.closest('[data-mg-item-picker-input]')) {
-            openItemList();
-            return;
-        }
-        const li = target.closest('[data-mg-picker-list] .krt-combobox__option');
-        if (li) {
-            pickMaterial(li);
-            return;
-        }
-        const pli = target.closest('[data-mg-item-picker-list] .krt-combobox__option');
-        if (pli) {
-            pickItemOption(pli);
         }
     });
 
@@ -703,12 +523,6 @@ function initMaterialgesuchModal() {
         const target = /** @type {HTMLInputElement} */ (e.target);
         if (target.matches('[data-mg-remark]')) {
             updateCharCount();
-        } else if (target.matches('[data-mg-picker-input]')) {
-            openMaterialList();
-            searchMaterialPicker(target.value);
-        } else if (target.matches('[data-mg-item-picker-input]')) {
-            openItemList();
-            searchItemPicker(target.value);
         } else if (target.matches('[data-mg-qty]')) {
             toggle('[data-mg-qty-error]', false);
         } else if (target.matches('[data-mg-min-quality]')) {
@@ -718,7 +532,7 @@ function initMaterialgesuchModal() {
 
     document.addEventListener('change', (e) => {
         const target = /** @type {HTMLInputElement} */ (e.target);
-        if (target.matches('[data-mg-kind-radio]')) {
+        if (modal.contains(target) && target.matches(KIND_RADIO)) {
             setKind(target.value);
         }
     });
@@ -727,14 +541,8 @@ function initMaterialgesuchModal() {
         if (!isModalOpen()) {
             return;
         }
-        if (e.key === 'Escape') {
-            if (materialListOpen || itemListOpen) {
-                e.preventDefault();
-                closeMaterialList();
-                closeItemList();
-            } else {
-                cancel();
-            }
+        if (e.key === 'Escape' && !e.defaultPrevented) {
+            cancel();
         } else if (e.key === 'Tab') {
             trapFocus(e);
         }
