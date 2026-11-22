@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:3035b0c5-d680-46ef-9852-b7b1520de2f1",
+  "serialNumber" : "urn:uuid:04133b60-b3ce-48b1-a7c6-b9ce495a8920",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-11-21T09:45:14Z",
+    "timestamp" : "2026-11-22T19:10:34Z",
     "tools" : {
       "components" : [
         {
@@ -17,16 +17,16 @@
     },
     "component" : {
       "type" : "application",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.6?project_path=%3Abackend",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.7?project_path=%3Abackend",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "backend",
-      "version" : "1.26.6",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.6?project_path=%3Abackend",
+      "version" : "1.26.7",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.7?project_path=%3Abackend",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/44890923169"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/45055984071"
         },
         {
           "type" : "vcs",
@@ -166,42 +166,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar",
+      "bom-ref" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.24.0?type=jar",
       "group" : "com.aayushatharva.brotli4j",
       "name" : "brotli4j",
-      "version" : "1.23.0",
+      "version" : "1.24.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "8a0578e7bd8cb161185aae98d8f176fa"
+          "content" : "bb61a60c94620ac985d71a583553168d"
         },
         {
           "alg" : "SHA-1",
-          "content" : "eec13740c1ee09cbe9c6e836f17ee2c984a10333"
+          "content" : "53450e3535c7ff0e0287cfb495fd1d313fd0f2a9"
         },
         {
           "alg" : "SHA-256",
-          "content" : "5fcf13ad78d07319cc507465dcf61cbc3efee9f45c9ae1c42a9902414696bc0b"
+          "content" : "cd0ac4425d2c8449723c93d66ec4379faf1093eb6609ede83e49947f90a772e8"
         },
         {
           "alg" : "SHA-512",
-          "content" : "579f7fe00eb5d2ce09d975980babb186335791ee3b035d2e99c13abcbbe3daf1588d53a1892c70bdbe0df7e565a597c1058222c6bc93484e22c963351edbf38c"
+          "content" : "1ad745f76aace4134c5ee7fd1a2fdb70c639fb89aca8a64dd84aa9ffff8576a4798dd94acdc5488540186ddb446962f0ffc0f368ccd2b3d4e3955a3f317b36b9"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "6f962fd8decc413cf8d6e411d7f98475e1b080fed8fd56af1039e24fe05465ec"
+          "content" : "4b554317bac97b3e33a4f0d65b46140fcbfa9e34524a3901e329a92890d6e239"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "c3be55e02bd46b5c5784f1560277ec2dbb3c4792bd89a8d02a6a7cb9120cbd6f1d26a1b2f8b617362e8fae612772a5d8fa9e603b76b0c450955ee4256963de16"
+          "content" : "bcdda5c290b4da3c689dc2d9a9a125d47fc56581bf17e6aa6d09a0cd761b460a095252272b6e324d4b2913d4d67ec5f915a4573ce87898467723aaa789a7c776"
         },
         {
           "alg" : "SHA-384",
-          "content" : "f968ede93edec24e403b3177dca8884d8f6709974b35ab8ea7d440dd6ee5f1c7bb9ab109154b53691cad1ebcc4c33929"
+          "content" : "5d304f072a0f9f8a799554d76ec1011d9c5e138e60342442a648436b85bb4221f70d9d7c2245dbcc34be556dfd22f06a"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "262a46c422b4b744bfeb58d54e6a20bdf5e853795ab9747785c9fde0576b614a9b18bb0b078dbb73c61a518c2244a68b"
+          "content" : "5c59cb4fca50679600fec1593d328cafb7ca027b4a587d5deb508dbef98af9b703529acb29073a01a3bd84567afd9297"
         }
       ],
       "licenses" : [
@@ -212,7 +212,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar",
+      "purl" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.24.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -223,42 +223,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
+      "bom-ref" : "pkg:maven/com.aayushatharva.brotli4j/service@1.24.0?type=jar",
       "group" : "com.aayushatharva.brotli4j",
       "name" : "service",
-      "version" : "1.23.0",
+      "version" : "1.24.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "034392efa0a6d8f43a35818f9eea20a0"
+          "content" : "3028379664b5436638fdbb60748d92ce"
         },
         {
           "alg" : "SHA-1",
-          "content" : "872c4907f6b97765dcad9693f2b1ae118b8bc435"
+          "content" : "3186b092c7427b48b81ec1965705781d04e3d7cb"
         },
         {
           "alg" : "SHA-256",
-          "content" : "7f298d44dbb7688419f0179ee1dfa0e4436633272b05d38a5faf3a2b8d08697b"
+          "content" : "2fee8a977d617c4904f3260eca8a294927ec5364026478f82014484e96e8bfa5"
         },
         {
           "alg" : "SHA-512",
-          "content" : "114012480fc387de7607fc311ab265c59679a772a8df03d9047df0f17ecc450221285be75999ade8789a35dcc337771e481223e7f7091b0cf9e8e7628e577538"
+          "content" : "f36ba8a6848d2adaa42771195b137695e9a7dbb19e1946701331ea58e0c9b993dc3dcc140d9a6e04cbf5d83230b76b5f2803ddbe840bb38ccf62e6857500fb3d"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "2d7d4c3f0ab61650b33e7c0333d65812ca55c14af93b89d346fe330155508250"
+          "content" : "34b9ac381b590001723517fe367b9922d1dcfaa7898e7019a29d181cb0cdedef"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "e66d229962b72be498eefd71aadac9e97219731b12296c32bd2fe887652c9c5aa4ae1efa7c57334a268113d775b0c73ef1dce72bc3fb742fa6bb98bb3f5f577e"
+          "content" : "de39dfd726d68c716d0f402db1f05fe13d48499a671f3405fb2162497e960b268dcfcf8f5b5c6e892a990f2caacb4a778e07178d76231fc7a28e55bc8519846a"
         },
         {
           "alg" : "SHA-384",
-          "content" : "74b5dd53743b8a620b40cbb24b01f559242b22225c77f6c85243abd2f45e77716fae8ee7591cb927fc2a44be99f91ad5"
+          "content" : "2804c25728b7bcf466423362b71c972d4e6f00b5ead5850756cb2048ab81a15349fce8c3ae36b14062120b6d07111f6a"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "c98f7a03583227a67df43def68d223a10e5d50fa70426cba5c470787ddd6e5c0a99c6c16f2f1a327615e72987cbd7599"
+          "content" : "3e7f3410081cc09cce6a62711152b461ded34b051e599dd46901e8849798ffa105e72cea4cdcff38ad6c4a5e0b31e69f"
         }
       ],
       "licenses" : [
@@ -269,7 +269,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
+      "purl" : "pkg:maven/com.aayushatharva.brotli4j/service@1.24.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -815,43 +815,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
+      "bom-ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.6?type=jar",
       "group" : "com.github.librepdf",
       "name" : "openpdf",
-      "version" : "3.0.5",
+      "version" : "3.0.6",
       "description" : "Open and Free PDF library. It uses the new package name `org.openpdf`.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "1e8e56e03e1eacc7e7858d34e0500429"
+          "content" : "47844bb5a8706af1f26b55a8c24156dc"
         },
         {
           "alg" : "SHA-1",
-          "content" : "4d8174b818f61820f318a578f060cf3e2846ec7f"
+          "content" : "1efc7cc8ebc7831d954bb591fbed2af8345ba94e"
         },
         {
           "alg" : "SHA-256",
-          "content" : "2a70c6024bb10b6192b4b91d8bb581de24b776a799a30ef5b87748e54aca2144"
+          "content" : "633748b90f77d728897b9d35a0ce9a7336caf6701791a1c4be70b172b896f05e"
         },
         {
           "alg" : "SHA-512",
-          "content" : "aabe8ca4eea976a3d7b27af500a32a03dcd46b36a453706b8b3c0b0d81be9c484a0bd7f5dd9afd8c87fc793582262c35b706d77d68f36abcd2bb935cbe88f2f9"
+          "content" : "67261ca82dc4d270381e40211b4a9325e64837536b85f832117ef5bc0855f4bf292ef3da30036dd1e71a2dd8196fc3e46b56a51b65c1599257ed7012d2bb86ee"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "bafa6416c25cc63c85942d620b9839e497d80083f0d8e044666ddc76d9a2ab4d"
+          "content" : "78e0732a7d7a56b94232b716b328550a511c122750caf67cbb544a28ff6e5264"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "ad7ac24f895c5354d8a03d243ddef3319ff7666165930944e5226a5d884e5dc70d5fccaf2e6b621420fd55103f9e8172952de4b5ad77e6a07ee7164e9ec79e0e"
+          "content" : "31622dcb6e1647b8e26d7a15f5c16d0e0b6009f95ba56282c76aa9eb4f16efe1613ce37e79444836a1d51e8f6e3e9935b816b375cd63caadeb993a4f824a909d"
         },
         {
           "alg" : "SHA-384",
-          "content" : "e430c90b41676fbc433511fb94d620558de0867ba4e9a9360fa93fa9e39d4985963b48269299a82c7c77a522958e635c"
+          "content" : "d18854b92ad4300f025a7a8b1852a5b44eadabf283cc8182953c968cacb4ed356830fed379d87aed0f571c6adb21a199"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "d0eb665bae81c9024f091002d84a369d67f58e9b2526b2e675761cdfac8e2cc795e0cf953fec92869656630a35ac8b31"
+          "content" : "b42b7c8a3a7c93045b60383d70d0ecd3f54647273f2641b94803ca175e3044572d147ab6e9df0f289f2bf672ba6ef96b"
         }
       ],
       "licenses" : [
@@ -868,7 +868,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
+      "purl" : "pkg:maven/com.github.librepdf/openpdf@3.0.6?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -1687,11 +1687,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.7?project_path=%3Alogging-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "logging-support",
-      "version" : "1.26.6",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support",
+      "version" : "1.26.7",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.7?project_path=%3Alogging-support",
       "modified" : false,
       "properties" : [
         {
@@ -1702,11 +1702,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.7?project_path=%3Atechnical-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "technical-support",
-      "version" : "1.26.6",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support",
+      "version" : "1.26.7",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.7?project_path=%3Atechnical-support",
       "modified" : false,
       "properties" : [
         {
@@ -12501,13 +12501,13 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar",
+      "ref" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.24.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar"
+        "pkg:maven/com.aayushatharva.brotli4j/service@1.24.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
+      "ref" : "pkg:maven/com.aayushatharva.brotli4j/service@1.24.0?type=jar",
       "dependsOn" : [ ]
     },
     {
@@ -12566,9 +12566,9 @@
       ]
     },
     {
-      "ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
+      "ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.6?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar"
+        "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.24.0?type=jar"
       ]
     },
     {
@@ -12645,15 +12645,15 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.6?project_path=%3Abackend",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.26.7?project_path=%3Abackend",
       "dependsOn" : [
         "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.3.1?type=jar",
-        "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
+        "pkg:maven/com.github.librepdf/openpdf@3.0.6?type=jar",
         "pkg:maven/com.github.luben/zstd-jni@1.5.7-28?type=jar",
         "pkg:maven/com.google.guava/guava@33.8.0-jre?type=jar",
-        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support",
-        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.7?project_path=%3Alogging-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.7?project_path=%3Atechnical-support",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.18.0?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
         "pkg:maven/org.flywaydb/flyway-core@13.12.2?type=jar",
@@ -12678,14 +12678,14 @@
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.6?project_path=%3Alogging-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.26.7?project_path=%3Alogging-support",
       "dependsOn" : [
         "pkg:maven/ch.qos.logback/logback-classic@1.6.6?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.6?project_path=%3Atechnical-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/technical-support@1.26.7?project_path=%3Atechnical-support",
       "dependsOn" : [
         "pkg:maven/io.micrometer/micrometer-observation@1.18.0?type=jar"
       ]
