@@ -133,7 +133,8 @@ public class AdminAuditLogPageController {
                   "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED",
                   "CARTEL_APPROVAL_TIERS_SET",
                   "CARTEL_APPROVAL_TIERS_CLEARED",
-                  "HANDLE_SNAPSHOTS_ANONYMISED")),
+                  "HANDLE_SNAPSHOTS_ANONYMISED",
+                  "NAME_RETENTION_APPLIED")),
           Map.entry(
               "INVENTORY",
               List.of(
