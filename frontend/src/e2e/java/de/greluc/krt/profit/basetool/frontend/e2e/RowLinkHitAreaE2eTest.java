@@ -277,7 +277,7 @@ class RowLinkHitAreaE2eTest {
       moveTo(page, "#row-button [data-probe-control]");
       List<String> controlHover = cue(page, "row-button");
       page.mouse().move(0, 0);
-      page.keyboard().press("Tab");
+      focusByKeyboard(page, "#row-plain a.row-link");
       List<String> focus = cue(page, "row-plain");
       SoftAssertions.assertSoftly(soft -> {
         soft.assertThat(rest).as("at rest").containsExactly(gray, TRANSPARENT);
@@ -320,6 +320,20 @@ class RowLinkHitAreaE2eTest {
   }
 
   /**
+   * Gives an element focus the way a keyboard user reaches it, so that it matches {@code
+   * :focus-visible} on every engine: a Tab puts the page into keyboard modality, then the focus
+   * moves on to the element. Playwright's WebKit, like Safari, skips links on Tab, so the Tab alone
+   * does not reach a link there.
+   *
+   * @param page the fixture page
+   * @param selector the element to focus
+   */
+  private static void focusByKeyboard(@NotNull Page page, @NotNull String selector) {
+    page.keyboard().press("Tab");
+    page.locator(selector).focus();
+  }
+
+  /**
    * The probe results of an evaluation that returns an array of strings.
    *
    * @param evaluated the evaluation result
@@ -343,7 +357,8 @@ class RowLinkHitAreaE2eTest {
   }
 
   /**
-   * The computed chevron colour and title decoration colour of one row.
+   * The settled chevron colour and title decoration colour of one row, read once the last pointer
+   * or focus change has been styled and its colour transitions have finished.
    *
    * @param page the fixture page
    * @param rowId the row's id
@@ -353,10 +368,17 @@ class RowLinkHitAreaE2eTest {
     return results(
         page.evaluate(
             """
-            id => [
-              getComputedStyle(document.querySelector('#' + id + ' .row-chevron')).color,
-              getComputedStyle(document.querySelector('#' + id + ' .cell-title')).textDecorationColor
-            ]
+            async id => {
+              // Firefox and WebKit apply a hover or focus change on the next frame and start the
+              // 0.001 ms reduced-motion transition there; read before that and the old colour shows.
+              await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+              document.getAnimations().forEach(animation => animation.finish());
+              return [
+                getComputedStyle(document.querySelector('#' + id + ' .row-chevron')).color,
+                getComputedStyle(document.querySelector('#' + id + ' .cell-title'))
+                  .textDecorationColor
+              ];
+            }
             """,
             rowId));
   }
