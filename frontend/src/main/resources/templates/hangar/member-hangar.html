@@ -93,6 +93,8 @@
                                            th:aria-label="#{hangar.bulk.select(${named ? ship.name : hull})}"></label>
                                     <span class="hangar-row__name">
                                         <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
+                                        <span th:if="${ship.shipType != null and ship.shipType.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
+                                        <span th:if="${ship.shipType != null and ship.shipType.notInGame and !ship.shipType.noLongerInGame}" class="chip chip--warning" data-testid="not-in-game" th:text="#{catalogue.notInGame}">Nicht im Spiel</span>
                                         <span th:if="${ship.relocationPending}" class="chip chip--warning" data-testid="relocation-pending-chip"
                                               th:title="#{patchChange.relocationPending.title}" th:text="#{patchChange.relocationPending.chip}">Umzug ausstehend</span>
                                         <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
@@ -133,6 +135,7 @@
                                         th:data-action="@{/admin/members/{id}/hangar/{ship}/update(id=${memberId},ship=${ship.id})}"
                                         th:data-name="${ship.name}"
                                         th:data-type="${ship.shipType != null ? ship.shipType.id : ''}"
+                                        th:data-type-name="${typeName}"
                                         th:data-ins="${ship.insurance}"
                                         th:data-loc="${ship.location != null ? ship.location.id : ''}"
                                         th:data-fitted="${ship.fitted}"

@@ -259,6 +259,7 @@ class HangarServiceTest {
     ship.setOwner(owner);
 
     ShipType type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setId(typeId);
 
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
@@ -282,6 +283,7 @@ class HangarServiceTest {
     User owner = new User();
     owner.setId(userId);
     ShipType type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setId(typeId);
     Ship ship = new Ship();
     ship.setId(shipId);
@@ -335,6 +337,7 @@ class HangarServiceTest {
     User owner = new User();
     owner.setId(userId);
     ShipType type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setName("Cutlass Black");
     Ship ship = new Ship();
     ship.setId(shipId);
@@ -406,6 +409,7 @@ class HangarServiceTest {
     UUID member = UUID.randomUUID();
     UUID shipId = UUID.randomUUID();
     ShipType type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setName("Cutlass Black");
     Ship ship = new Ship();
     ship.setId(shipId);
@@ -439,6 +443,7 @@ class HangarServiceTest {
     Ship ship = new Ship();
     ship.setId(shipId);
     ShipType type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setName("Cutlass Black");
     ship.setShipType(type);
     when(userService.currentActor()).thenReturn(ACTOR);
@@ -458,6 +463,7 @@ class HangarServiceTest {
     UUID picked = UUID.randomUUID();
     Ship ship = new Ship();
     ShipType type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setName("Cutlass Black");
     ship.setShipType(type);
     when(userService.currentActor()).thenReturn(ACTOR);
@@ -588,9 +594,9 @@ class HangarServiceTest {
         new de.greluc.krt.profit.basetool.backend.identity.api.User();
     user.setId(userId);
 
-    de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType shipType =
-        new de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType();
+    ShipType shipType = new ShipType();
     shipType.setId(shipTypeId);
+    shipType.setP4kUuid(UUID.randomUUID());
 
     de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
         new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
@@ -634,9 +640,9 @@ class HangarServiceTest {
     de.greluc.krt.profit.basetool.backend.identity.api.User user =
         new de.greluc.krt.profit.basetool.backend.identity.api.User();
     user.setId(userId);
-    de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType shipType =
-        new de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType();
+    ShipType shipType = new ShipType();
     shipType.setId(shipTypeId);
+    shipType.setP4kUuid(UUID.randomUUID());
 
     org.mockito.Mockito.when(userRepository.findPlainById(userId))
         .thenReturn(java.util.Optional.of(user));
@@ -669,6 +675,7 @@ class HangarServiceTest {
         .thenReturn(new ScopePredicate(false, squadronId, Set.of()));
 
     ShipType fighter = new ShipType();
+    fighter.setP4kUuid(UUID.randomUUID());
     fighter.setId(UUID.randomUUID());
     fighter.setName("Fighter");
 
@@ -707,6 +714,7 @@ class HangarServiceTest {
     when(requestScopeResolver.currentUnitOverviewScope())
         .thenReturn(new ScopePredicate(false, null, Set.of(reachedUnit, foreignUnit)));
     ShipType fighter = new ShipType();
+    fighter.setP4kUuid(UUID.randomUUID());
     fighter.setId(UUID.randomUUID());
     when(shipRepository.countShipsByType(
             eq(false), isNull(), eq(Set.of(reachedUnit, foreignUnit)), isNull(), eq(pageable)))
@@ -810,6 +818,7 @@ class HangarServiceTest {
     User user = new User();
     user.setId(userId);
     ShipType shipType = new ShipType();
+    shipType.setP4kUuid(UUID.randomUUID());
     shipType.setId(shipTypeId);
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findById(shipTypeId)).thenReturn(Optional.of(shipType));
@@ -868,6 +877,7 @@ class HangarServiceTest {
     User owner = new User();
     owner.setId(UUID.randomUUID());
     ShipType type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setId(UUID.randomUUID());
     Ship ship = new Ship();
     ship.setId(UUID.randomUUID());
@@ -1020,6 +1030,7 @@ class HangarServiceTest {
     User user = new User();
     user.setId(userId);
     ShipType type = new ShipType();
+    type.setP4kUuid(UUID.randomUUID());
     type.setId(shipTypeId);
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findById(shipTypeId)).thenReturn(Optional.of(type));

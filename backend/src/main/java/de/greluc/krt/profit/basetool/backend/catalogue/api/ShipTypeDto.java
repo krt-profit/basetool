@@ -38,6 +38,8 @@ import org.jetbrains.annotations.Nullable;
  *     (REQ-P4K-013)
  * @param nameDe its German name, or {@code null} (REQ-P4K-023)
  * @param descriptionInEnglish whether its description is the English source variant (REQ-P4K-023)
+ * @param notInGame whether the game files do not list it, so the pickers never offer it and an
+ *     existing ship of the type shows the "not in the game" notice (REQ-P4K-080)
  */
 public record ShipTypeDto(
     UUID id,
@@ -49,10 +51,11 @@ public record ShipTypeDto(
     @Nullable ShipCatalogueFacts catalogueFacts,
     boolean noLongerInGame,
     @Nullable String nameDe,
-    boolean descriptionInEnglish) {
+    boolean descriptionInEnglish,
+    boolean notInGame) {
 
   /**
-   * Creates a ship type without a German name.
+   * Creates a ship type the game files list, without a German name.
    *
    * @param id the ship type's id
    * @param name its name
@@ -82,6 +85,7 @@ public record ShipTypeDto(
         catalogueFacts,
         noLongerInGame,
         null,
+        false,
         false);
   }
 

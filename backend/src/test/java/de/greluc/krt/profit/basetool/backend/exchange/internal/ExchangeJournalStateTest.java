@@ -281,7 +281,7 @@ class ExchangeJournalStateTest {
       UUID shipId = UUID.randomUUID();
       when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.empty());
       when(ships.existsById(shipId)).thenReturn(false);
-      when(types.existsById(typeId)).thenReturn(true);
+      when(types.findById(typeId)).thenReturn(Optional.of(shipType(true)));
       when(locations.findById(locationId)).thenReturn(Optional.of(place(false, false)));
       String before = json(ExchangeShipJournal.State.of(ship(unitId)).toJournal());
 
@@ -306,7 +306,7 @@ class ExchangeJournalStateTest {
       UUID shipId = UUID.randomUUID();
       when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.empty());
       when(ships.existsById(shipId)).thenReturn(false);
-      when(types.existsById(typeId)).thenReturn(true);
+      when(types.findById(typeId)).thenReturn(Optional.of(shipType(true)));
       when(locations.findById(locationId))
           .thenReturn(Optional.of(place(!referenceOnly, referenceOnly)));
       String before = json(ExchangeShipJournal.State.of(ship(null)).toJournal());
@@ -326,7 +326,6 @@ class ExchangeJournalStateTest {
       Ship current = ship(null);
       UUID shipId = UUID.randomUUID();
       when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.of(current));
-      when(types.existsById(typeId)).thenReturn(true);
       String before = json(ExchangeShipJournal.State.of(ship(null)).toJournal());
 
       String reason =
@@ -351,7 +350,6 @@ class ExchangeJournalStateTest {
       current.setOriginLocked(true);
       UUID shipId = UUID.randomUUID();
       when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.of(current));
-      when(types.existsById(typeId)).thenReturn(true);
       Ship earlier = ship(null);
       earlier.setOrigin(ShipOrigin.IN_GAME);
       String before = json(ExchangeShipJournal.State.of(earlier).toJournal());
@@ -365,6 +363,37 @@ class ExchangeJournalStateTest {
               MEMBER,
               shipId,
               new ShipRequestDto("Kestrel", typeId, "LTI", locationId, true, null, null, null));
+    }
+
+    @Test
+    void aRemovedShipWhoseEarlierTypeNoPickerOffersIsGone() {
+      latestChangeIsTheClients(ExchangeResource.SHIP);
+      UUID shipId = UUID.randomUUID();
+      when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.empty());
+      when(ships.existsById(shipId)).thenReturn(false);
+      when(types.findById(typeId)).thenReturn(Optional.of(shipType(false)));
+      String before = json(ExchangeShipJournal.State.of(ship(null)).toJournal());
+
+      String reason =
+          journal.restore(
+              scope(Set.of()),
+              List.of(entry(ExchangeJournalAction.SHIP_REMOVE, shipId.toString(), before, null)));
+
+      assertThat(reason).isEqualTo(ExchangeUndoService.GONE);
+      verify(commands, never()).addShipForClient(any(), any());
+    }
+
+    /**
+     * A ship type with the journal's ship type id.
+     *
+     * @param inGame whether the game files list it, so the pickers offer it (REQ-P4K-080)
+     * @return the ship type
+     */
+    private ShipType shipType(boolean inGame) {
+      ShipType shipType = new ShipType();
+      shipType.setId(typeId);
+      shipType.setP4kUuid(inGame ? UUID.randomUUID() : null);
+      return shipType;
     }
 
     /**
@@ -385,7 +414,7 @@ class ExchangeJournalStateTest {
       latestChangeIsTheClients(ExchangeResource.SHIP);
       UUID shipId = UUID.randomUUID();
       when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.empty());
-      when(types.existsById(typeId)).thenReturn(true);
+      when(types.findById(typeId)).thenReturn(Optional.of(shipType(true)));
       String older =
           "{\"shipType\":\""
               + typeId

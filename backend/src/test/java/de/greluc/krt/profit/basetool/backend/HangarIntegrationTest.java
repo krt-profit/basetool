@@ -116,6 +116,7 @@ class HangarIntegrationTest {
     saveIridiumMembership(adminUser);
 
     fighter = new ShipType();
+    fighter.setP4kUuid(UUID.randomUUID());
     fighter.setName("Fighter");
     fighter = shipTypeRepository.save(fighter);
   }
@@ -412,9 +413,11 @@ class HangarIntegrationTest {
   @Test
   void testSquadronOverviewPaginatesAndFiltersAcrossAllTypes() throws Exception {
     ShipType cutlass = new ShipType();
+    cutlass.setP4kUuid(UUID.randomUUID());
     cutlass.setName("Cutlass Black");
     cutlass = shipTypeRepository.save(cutlass);
     ShipType cutter = new ShipType();
+    cutter.setP4kUuid(UUID.randomUUID());
     cutter.setName("Cutter");
     cutter = shipTypeRepository.save(cutter);
 

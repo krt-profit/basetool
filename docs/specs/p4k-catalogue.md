@@ -438,7 +438,8 @@ A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, R
 set. The pickers that filter it: the Lager, Materialbörse and item-order item pickers
 (`GameItemRepository.findStockable`, `findStockedWithoutBlueprint`,
 `BlueprintRepository.findOrderableItems`), the blueprint pickers,
-the ship-type, manufacturer and material pickers and searches. A game item an admin hid as not
+the ship-type, manufacturer and material pickers and searches; the ship-type pickers also leave
+out a ship type the P4K never matched (REQ-P4K-080). A game item an admin hid as not
 obtainable leaves the same item pickers and is refused on the same writes, without being retired
 (REQ-P4K-048). A blueprint recipe leaves the product
 search, the product-key resolution of a new personal blueprint, default blueprint, Materialbörse
@@ -1955,6 +1956,50 @@ names no brand. Otherwise the manufacturer GUID decides, as before. A change is 
 **Enforced by:** `P4kShipBrandImportTest` · **Code:** `P4kShipBrands`,
 `P4kImportContext#shipManufacturer` · **ADR:**
 [ADR-0394](../adr/0394-the-p4k-import-resolves-manufacturer-families-and-borrowed-names-itself.md)
+
+### REQ-P4K-080 — only a ship type the game files list is offered and set anew
+
+A ship type is offered when the game files list it: it holds a P4K GUID and is neither hidden nor
+retired (REQ-P4K-013). A row only UEX or the Wiki wrote, such as a concept ship, an edition or
+module the game carries as no vehicle of its own, or a stale second row of a game ship, is offered
+by no picker and no search used to create a new reference. The pickers read the ship-type list
+(`/api/v1/ship-types` without `includeHidden`), so the rule reaches the profit calculation, the
+hangar, the mission units and the mission templates at once. UEX's `is_concept` decides nothing.
+
+Every write that sets a ship type anew refuses one that is not offered with `400` and code
+`CATALOGUE_SHIP_TYPE_NOT_OFFERED`: a hangar ship created or changed to it, by the member, an admin
+or an Exchange client; a mission unit given it without a ship; a mission template unit naming a
+type the template did not hold. A write that keeps an entry's current type passes, and a mission
+unit takes the type of the ship assigned to it. The Exchange plans an `upsert` that would create a
+ship of such a type, or change a ship to it, as `unmatched` instead of failing the batch, and its
+undo restores a ship only with its current or an offered type. The hangar import resolves entries
+against the offered types and the types the member's importable ships already have: an entry
+matching an existing ship updates it, and one that would add a ship of a type not offered is
+reported among the skipped names.
+
+Existing references stay. A hangar ship, mission unit or template unit keeps its type and stays
+editable while it keeps it; its edit dialog shows the current type as an option of its own.
+`ShipTypeDto.notInGame` makes the hangar, the admin's view of a member's hangar, the unit overview
+and the mission units show "Nicht im Spiel" beside such a type.
+
+**Acceptance**
+
+- [x] A ship type without a P4K GUID is absent from the ship-type list and search, and its DTO
+  carries `notInGame`.
+- [x] Creating a hangar ship or a mission unit of such a type, or changing one to it, is refused
+  with `400` `CATALOGUE_SHIP_TYPE_NOT_OFFERED`; an edit that keeps the type passes.
+- [x] A mission template saved with a new unit of such a type is refused; one keeping it passes.
+- [x] A hangar import updates an existing ship of such a type, adds none, and reports the entry as
+  skipped.
+- [x] An Exchange `upsert` creating a ship of such a type is `unmatched`; one updating a ship that
+  keeps it applies.
+
+**Enforced by:** `OfferedShipTypesTest`, `P4kStampedRowVisibilityTest`,
+`HangarOfferedShipTypeIntegrationTest`, `HangarImportServiceTest`, `MissionUnitManagementTest`,
+`MissionTemplateHttpTest`, `ExchangeShipWriteControllerTest`, `ExchangeJournalStateTest`,
+`HangarPageControllerMvcTest`, `GlobalExceptionHandlerTest` · **Code:** `OfferedShipTypes`,
+`OfferedShipTypeJpql`, `ShipTypeNotOfferedException`, `kernel/krt-current-option.js` · **ADR:**
+[ADR-0404](../adr/0404-only-a-ship-type-the-game-files-list-is-offered-and-set-anew.md)
 
 ## Game texts
 

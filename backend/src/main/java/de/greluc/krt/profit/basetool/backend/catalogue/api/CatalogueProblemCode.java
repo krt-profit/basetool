@@ -47,6 +47,12 @@ public enum CatalogueProblemCode implements ProblemCode {
   /** A write would set or keep a blueprint the P4K retired on an entry (REQ-P4K-013). */
   CATALOGUE_BLUEPRINT_RETIRED(HttpStatus.BAD_REQUEST),
 
+  /**
+   * A write would set a ship type no picker offers: one the game files do not list, a hidden or a
+   * retired one (REQ-P4K-080).
+   */
+  CATALOGUE_SHIP_TYPE_NOT_OFFERED(HttpStatus.BAD_REQUEST),
+
   /** The P4K upload gate refused the catalogue (REQ-P4K-001, REQ-P4K-002). */
   P4K_UPLOAD_REJECTED(HttpStatus.BAD_REQUEST);
 

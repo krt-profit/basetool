@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedShipTypes;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
@@ -100,7 +101,8 @@ public class MissionStructureService {
    * Adds a unit (top-level team grouping) to a mission.
    *
    * <p>At least one of name, ship or ship type must be present; a blank name is derived from the
-   * ship or ship type.
+   * ship or ship type. A ship type chosen without a ship must be one the pickers offer
+   * (REQ-P4K-080).
    */
   @Transactional
   public Mission addUnitToMission(
@@ -177,7 +179,8 @@ public class MissionStructureService {
     if (shipTypeId != null) {
       ShipType shipType =
           Entities.require(shipTypeRepository.findById(shipTypeId), "ShipType not found");
-      missionUnit.setShipType(shipType);
+      missionUnit.setShipType(
+          shipId == null ? OfferedShipTypes.requireOffered(shipType) : shipType);
     } else {
       missionUnit.setShipType(null);
     }
@@ -258,7 +261,8 @@ public class MissionStructureService {
 
   /**
    * Updates a unit from the edit form, rejecting a stale {@code expectedVersion} with a 409; only
-   * the unit row is written.
+   * the unit row is written. A ship type chosen without a ship must be the unit's current one or
+   * one the pickers offer (REQ-P4K-080).
    *
    * @param missionId owning mission
    * @param unitId the unit to update
@@ -328,7 +332,10 @@ public class MissionStructureService {
     if (shipTypeId != null) {
       ShipType shipType =
           Entities.require(shipTypeRepository.findById(shipTypeId), "ShipType not found");
-      missionUnit.setShipType(shipType);
+      missionUnit.setShipType(
+          shipId == null
+              ? OfferedShipTypes.requireOfferedOrCurrent(shipType, missionUnit.getShipType())
+              : shipType);
     } else {
       missionUnit.setShipType(null);
     }

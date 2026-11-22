@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.AMBIGUOUS;
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.REJECTED;
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.UNCHANGED;
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.UNMATCHED;
@@ -27,13 +26,10 @@ import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOp
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeShipJournal.State;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitChoice;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeRefDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
@@ -77,9 +73,6 @@ public class ExchangeShipWriteService
   /** The reason of a ship the member does not own or the server does not know. */
   static final String UNMATCHED_REASON = ExchangeReasons.UNMATCHED;
 
-  /** The reason of a ship type that matches several catalogue entries. */
-  static final String AMBIGUOUS_REASON = ExchangeReasons.AMBIGUOUS;
-
   /** The refusal of a place without a Lager location. */
   static final String LOCATION_UNKNOWN = ExchangeReasons.LOCATION_UNKNOWN;
 
@@ -101,9 +94,9 @@ public class ExchangeShipWriteService
   /** The refusal of another origin than {@code PLEDGE} for a ship an import locked. */
   static final String ORIGIN_LOCKED = "ORIGIN_LOCKED";
 
-  private final ExchangeResolveService resolveService;
   private final ExchangeLocationResolver locationResolver;
   private final ShipRepository shipRepository;
+  private final ExchangeShipTypeResolution shipTypeResolution;
   private final ExchangeShipLinkRepository linkRepository;
   private final ShipCommands shipCommands;
   private final ExchangeChangeRepository changeRepository;
@@ -233,7 +226,7 @@ public class ExchangeShipWriteService
   public @NotNull List<Planned<Change>> plan(
       @NotNull ExchangeCaller caller, @NotNull ExchangeShipChangeSet changeSet) {
     List<ExchangeShipChangeSet.Op> ops = changeSet.ops();
-    Map<Integer, ShipTypeMatch> types = resolveTypes(ops);
+    Map<Integer, ExchangeShipTypeResolution.Match> types = resolveTypes(ops);
     Links links = new Links(caller);
     Set<UUID> touched = new HashSet<>();
     Set<UUID> memberships =
@@ -302,7 +295,7 @@ public class ExchangeShipWriteService
   private @NotNull Planned<Change> planUpsert(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeShipChangeSet.Op op,
-      @NotNull ShipTypeMatch type,
+      @NotNull ExchangeShipTypeResolution.Match type,
       @NotNull Links links,
       @NotNull Set<UUID> touched,
       @NotNull Set<UUID> memberships) {
@@ -321,6 +314,9 @@ public class ExchangeShipWriteService
     }
     UnitTarget unit = unitTarget(op);
     if (op.shipId() == null) {
+      if (!type.acceptableFor(null)) {
+        return ExchangeChangeSetAdapter.skip(UNMATCHED, UNMATCHED_REASON);
+      }
       if (!unitAllowed(unit, memberships)) {
         return ExchangeChangeSetAdapter.skip(REJECTED, ORG_UNIT_NOT_ALLOWED);
       }
@@ -360,6 +356,9 @@ public class ExchangeShipWriteService
     }
     if (op.version() == null || !op.version().equals(ship.getVersion())) {
       return staleVersion(caller, ownedId);
+    }
+    if (!type.acceptableFor(ship)) {
+      return ExchangeChangeSetAdapter.skip(UNMATCHED, UNMATCHED_REASON);
     }
     String linked = links.externalOf(ownedId);
     if (linked != null && !linked.equals(externalId)) {
@@ -423,7 +422,7 @@ public class ExchangeShipWriteService
       @NotNull ExchangeShipChangeSet.Op op,
       @NotNull String externalId,
       @Nullable UUID shipId,
-      @NotNull ShipTypeMatch type,
+      @NotNull ExchangeShipTypeResolution.Match type,
       @NotNull String insurance,
       @Nullable UUID locationId,
       @NotNull Links links,
@@ -441,6 +440,9 @@ public class ExchangeShipWriteService
       return patchChange == null
           ? ExchangeChangeSetAdapter.skip(REJECTED, REMOVED_ELSEWHERE)
           : ExchangeChangeSetAdapter.removedByPatch(patchChange);
+    }
+    if (!type.acceptableFor(null)) {
+      return ExchangeChangeSetAdapter.skip(UNMATCHED, UNMATCHED_REASON);
     }
     UnitTarget unit = unitTarget(op);
     if (!unitAllowed(unit, memberships)) {
@@ -641,7 +643,7 @@ public class ExchangeShipWriteService
    * @param ops the ops
    * @return the ship type, or the result that ends the op, by op index
    */
-  private @NotNull Map<Integer, ShipTypeMatch> resolveTypes(
+  private @NotNull Map<Integer, ExchangeShipTypeResolution.Match> resolveTypes(
       @NotNull List<ExchangeShipChangeSet.Op> ops) {
     List<Integer> indexes = new ArrayList<>();
     List<ExchangeItemRef> refs = new ArrayList<>();
@@ -651,24 +653,8 @@ public class ExchangeShipWriteService
         refs.add(require(ops.get(i).shipType(), "shipType"));
       }
     }
-    Map<Integer, ShipTypeMatch> byIndex = new HashMap<>();
-    if (refs.isEmpty()) {
-      return byIndex;
-    }
-    ExchangeResolveResponse response =
-        resolveService.resolve(new ExchangeResolveRequest(ExchangeCatalogKind.SHIP_TYPE, refs));
-    for (ExchangeResolveResponse.Result result : response.results()) {
-      int index = indexes.get(result.index());
-      byIndex.put(
-          index,
-          switch (result.status()) {
-            case RESOLVED ->
-                new ShipTypeMatch(
-                    UUID.fromString(Objects.requireNonNull(result.ref()).bt()), null, null);
-            case AMBIGUOUS -> new ShipTypeMatch(null, AMBIGUOUS, AMBIGUOUS_REASON);
-            case UNMATCHED -> new ShipTypeMatch(null, UNMATCHED, UNMATCHED_REASON);
-          });
-    }
+    Map<Integer, ExchangeShipTypeResolution.Match> byIndex = new HashMap<>();
+    shipTypeResolution.resolve(refs).forEach((ref, match) -> byIndex.put(indexes.get(ref), match));
     return byIndex;
   }
 
@@ -970,14 +956,4 @@ public class ExchangeShipWriteService
    * @param before the ship's state before
    */
   private record Remove(@NotNull UUID shipId, @NotNull State before) implements Change {}
-
-  /**
-   * A resolved ship type, or the result that ends the op.
-   *
-   * @param shipTypeId the ship type, or {@code null}
-   * @param result the result that ends the op, or {@code null}
-   * @param reason the reason of that result, or {@code null}
-   */
-  private record ShipTypeMatch(
-      @Nullable UUID shipTypeId, @Nullable String result, @Nullable String reason) {}
 }

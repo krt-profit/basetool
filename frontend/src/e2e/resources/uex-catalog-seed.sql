@@ -18,10 +18,10 @@ VALUES ('33333333-3333-3333-3333-333333333333', 0, now(), now(), 'E2E Manufactur
         false)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO ship_type (id, version, created_at, updated_at, name, manufacturer_id, hidden)
+INSERT INTO ship_type (id, version, created_at, updated_at, name, manufacturer_id, hidden, p4k_uuid)
 VALUES ('44444444-4444-4444-4444-444444444444', 0, now(), now(), 'E2E Ship Type',
-        '33333333-3333-3333-3333-333333333333', false)
-ON CONFLICT (id) DO NOTHING;
+        '33333333-3333-3333-3333-333333333333', false, '44444444-4444-4444-4444-4444444444a4')
+ON CONFLICT (id) DO UPDATE SET p4k_uuid = EXCLUDED.p4k_uuid;
 
 INSERT INTO refining_method (id, version, created_at, updated_at, name)
 VALUES ('55555555-5555-5555-5555-555555555555', 0, now(), now(), 'E2E Refining Method')

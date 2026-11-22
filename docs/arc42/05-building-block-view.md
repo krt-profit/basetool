@@ -239,7 +239,8 @@ reports and the review list; its wire format and streaming reader are `catalogue
 `StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038).
 `GameItemAdminService` serves the admin's hide of a game item as not obtainable, a state of its own
 that the item pickers and `SelectableGameItems` read beside the P4K retirement (REQ-P4K-048,
-ADR-0373). The shops
+ADR-0373). `OfferedShipTypes` is the one rule which ship types the pickers offer and every write
+may set anew: a P4K GUID, neither hidden nor retired (REQ-P4K-080, ADR-0404). The shops
 (`Shop`, `ShopItem`) are imported by `P4kShopReconciler`, `P4kShopLinker` links each to a UEX
 terminal at or around its place (`ShopPlaces`) by name, tie-break or alias (`ShopTerminalNames`,
 `ShopTerminalTieBreaks`, `ShopTerminalAliases`), and `ShopAdminService` serves the admin's

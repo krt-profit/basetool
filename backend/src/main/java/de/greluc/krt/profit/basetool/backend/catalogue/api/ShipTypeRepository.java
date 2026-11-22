@@ -234,13 +234,14 @@ public interface ShipTypeRepository
   boolean existsByManufacturerId(UUID manufacturerId);
 
   /**
-   * Pages the ship types the pickers offer: not hidden, not stamped by the P4K sweep and not hidden
-   * through a P4K review case (REQ-P4K-013).
+   * Pages the ship types the pickers offer: listed by the P4K, not hidden, not stamped by the P4K
+   * sweep and not hidden through a P4K review case (REQ-P4K-013, REQ-P4K-080).
    *
    * @param pageable page request
-   * @return paged pickable ship types
+   * @return paged offered ship types
    */
-  Page<ShipType> findByHiddenFalseAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(Pageable pageable);
+  @Query("SELECT s FROM ShipType s WHERE" + OfferedShipTypeJpql.OFFERED_SHIP)
+  Page<ShipType> findOffered(Pageable pageable);
 
   /**
    * Pages every ship type, hidden ones included, whose name contains {@code name}
@@ -253,20 +254,19 @@ public interface ShipTypeRepository
   Page<ShipType> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
   /**
-   * Pages the non-hidden ship types whose name contains {@code name} case-insensitively; LIKE
+   * Pages the offered ship types whose name contains {@code name} case-insensitively; LIKE
    * wildcards in {@code name} match literally.
    *
    * @param name the search fragment
    * @param pageable page request
-   * @return paged matching ship types the pickers offer (REQ-P4K-013)
+   * @return paged matching ship types the pickers offer (REQ-P4K-013, REQ-P4K-080)
    */
   @Query(
-      """
-      SELECT s FROM ShipType s WHERE s.hidden = false AND s.p4kDeletedAt IS NULL
-      AND s.p4kHiddenAt IS NULL
-      AND LOWER(s.name) LIKE LOWER(CONCAT('%', :#{escape([0])}, '%')) ESCAPE :#{escapeCharacter()}
-      """)
-  Page<ShipType> searchPickableByName(String name, Pageable pageable);
+      "SELECT s FROM ShipType s WHERE"
+          + OfferedShipTypeJpql.OFFERED_SHIP
+          + "AND LOWER(s.name) LIKE LOWER(CONCAT('%', :#{escape([0])}, '%'))"
+          + " ESCAPE :#{escapeCharacter()}")
+  Page<ShipType> searchOfferedByName(String name, Pageable pageable);
 
   /**
    * The UEX vehicle id and local id of every ship type that carries one, in one query — the item

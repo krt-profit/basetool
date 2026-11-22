@@ -51,7 +51,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * A row the P4K stamped or an admin hid leaves every picker, while an existing reference keeps
- * rendering with the "no longer in the game" notice (REQ-P4K-013).
+ * rendering with the "no longer in the game" notice (REQ-P4K-013); a ship type the P4K never
+ * matched leaves the ship pickers too (REQ-P4K-080).
  */
 @SpringBootTest
 @Transactional
@@ -121,11 +122,11 @@ class P4kStampedRowVisibilityTest {
 
     assertThat(
             shipTypeRepository
-                .searchPickableByName("Sweep ", PageRequest.of(0, 100))
+                .searchOfferedByName("Sweep ", PageRequest.of(0, 100))
                 .map(ShipType::getId)
                 .getContent())
         .hasSize(19);
-    assertThat(shipTypeRepository.searchPickableByName("Known ship", PageRequest.of(0, 100)))
+    assertThat(shipTypeRepository.searchOfferedByName("Known ship", PageRequest.of(0, 100)))
         .extracting(ShipType::getId)
         .doesNotContain(gone.getId())
         .isEmpty();
@@ -137,6 +138,29 @@ class P4kStampedRowVisibilityTest {
           assertThat(c.getGuid()).isEqualTo(gone.getP4kUuid());
           assertThat(c.isStillLiveElsewhere()).isTrue();
         });
+  }
+
+  @Test
+  void aShipTypeTheP4kNeverMatched_leavesTheShipPickers_andCarriesTheNotInGameNotice() {
+    ShipType listed = new ShipType();
+    listed.setName("Offered visibility listed ship");
+    listed.setP4kUuid(UUID.randomUUID());
+    ShipType uexOnly = new ShipType();
+    uexOnly.setName("Offered visibility concept ship");
+    uexOnly.setIsConcept(true);
+    shipTypeRepository.saveAndFlush(listed);
+    shipTypeRepository.saveAndFlush(uexOnly);
+
+    assertThat(shipTypeRepository.searchOfferedByName("Offered visibility", PageRequest.of(0, 10)))
+        .extracting(ShipType::getId)
+        .containsExactly(listed.getId());
+    assertThat(shipTypeRepository.findOffered(PageRequest.of(0, 1000)).getContent())
+        .extracting(ShipType::getId)
+        .contains(listed.getId())
+        .doesNotContain(uexOnly.getId());
+    assertThat(shipTypeMapper.toDto(uexOnly).notInGame()).isTrue();
+    assertThat(shipTypeMapper.toDto(uexOnly).noLongerInGame()).isFalse();
+    assertThat(shipTypeMapper.toDto(listed).notInGame()).isFalse();
   }
 
   @Test

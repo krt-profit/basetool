@@ -293,11 +293,11 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   `identity.api.IdentityProblemCode` (`LAST_ADMIN`, `UNKNOWN_ROLE_PERMISSION`, REQ-SEC-088) and
   `catalogue.api.CatalogueProblemCode` (`P4K_UPLOAD_REJECTED`, REQ-P4K-001;
   `LOCATION_NOT_OFFERED`, REQ-P4K-039; `CATALOGUE_ITEM_RETIRED`, `CATALOGUE_MATERIAL_RETIRED` and
-  `CATALOGUE_BLUEPRINT_RETIRED`, REQ-P4K-013) and
+  `CATALOGUE_BLUEPRINT_RETIRED`, REQ-P4K-013; `CATALOGUE_SHIP_TYPE_NOT_OFFERED`, REQ-P4K-080) and
   `patchchange.api.PatchChangeProblemCode` (`HOME_LOCATION_REQUIRED`, REQ-PATCH-020;
   `RELOCATION_PENDING`, REQ-PATCH-023; `HOME_LOCATION_NOT_ASKED`, `HOME_LOCATION_ALREADY_CHOSEN`,
   `HOME_LOCATION_NOT_OFFERED`, REQ-PATCH-052; `HOME_LOCATION_PHASE_CHANGED`, REQ-PATCH-062). Names
-  and wire values did not change when they left `CoreProblemCode`; the registry holds 98 codes
+  and wire values did not change when they left `CoreProblemCode`; the registry holds 99 codes
   across the fourteen enums. Two are
   **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039) and
   `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109). `APP_UPDATE_REQUIRED` left the registry with the app

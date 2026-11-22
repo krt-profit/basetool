@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.hangar.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedShipTypes;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
@@ -40,6 +41,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -70,7 +72,9 @@ import tools.jackson.databind.ObjectMapper;
  * over create ships. A ship bought in-game is never matched. A matched ship takes the entry's
  * production status and pledge data; existing ships are never deleted (REQ-HANGAR-015). Every
  * created or matched ship is locked to the origin {@code PLEDGE}, outside its version
- * (REQ-HANGAR-017). Unmatched names are reported in {@code skippedShips}.
+ * (REQ-HANGAR-017). Only a ship type the pickers offer creates ships; one the member's hangar
+ * already holds is matched but adds none (REQ-P4K-080). Unmatched names and the entries no ship
+ * could be created for are reported in {@code skippedShips}.
  */
 @Service
 @RequiredArgsConstructor
@@ -112,8 +116,6 @@ public class HangarImportService {
 
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
 
-    ShipTypeMatcher.ShipTypeIndex index = ShipTypeMatcher.buildIndex(shipTypeRepository.findAll());
-
     Map<UUID, List<Ship>> hangarByTypeId = new HashMap<>();
     if (!entries.isEmpty()) {
       for (Ship ship : shipRepository.lockAllOwnedByOrderById(userId)) {
@@ -126,9 +128,13 @@ public class HangarImportService {
       }
     }
 
+    ShipTypeMatcher.ShipTypeIndex index =
+        ShipTypeMatcher.buildIndex(importableShipTypes(hangarByTypeId.keySet()));
+
     ImportEntryResolver.Resolution resolution =
         ImportEntryResolver.resolve(entries, index, hangarByTypeId.keySet(), choices);
 
+    Set<String> skippedShips = new LinkedHashSet<>(resolution.unmatched());
     ImportTally tally = new ImportTally();
     for (Map.Entry<UUID, List<FleetExportParser.FleetImportEntry>> e :
         resolution.entriesByShipType().entrySet()) {
@@ -151,19 +157,22 @@ public class HangarImportService {
           tally.matched(claimed, applyImported(claimed, entry));
         }
       }
-      for (FleetExportParser.FleetImportEntry entry : toCreate) {
-        createShip(user, shipType, entry, tally);
-      }
-      if (!toCreate.isEmpty()) {
-        log.info(
-            "Hangar import: created {} ship(s) of type '{}' for user {}",
-            toCreate.size(),
-            shipType.getName(),
-            userId);
+      if (OfferedShipTypes.isOffered(shipType)) {
+        for (FleetExportParser.FleetImportEntry entry : toCreate) {
+          createShip(user, shipType, entry, tally);
+        }
+        if (!toCreate.isEmpty()) {
+          log.info(
+              "Hangar import: created {} ship(s) of type '{}' for user {}",
+              toCreate.size(),
+              shipType.getName(),
+              userId);
+        }
+      } else {
+        toCreate.forEach(entry -> skippedShips.add(entry.name()));
       }
     }
 
-    List<String> skippedShips = resolution.unmatched();
     List<AmbiguousShipDto> ambiguousShips = resolution.ambiguous();
     log.info(
         "Hangar import for user {}: imported={}, updated={}, alreadyPresent={}, skipped={},"
@@ -193,10 +202,25 @@ public class HangarImportService {
         tally.created,
         skippedShips.size(),
         tally.alreadyPresent,
-        skippedShips,
+        List.copyOf(skippedShips),
         List.of(),
         tally.updated,
         ambiguousShips);
+  }
+
+  /**
+   * Returns the ship types an import may resolve an entry to: those the pickers offer, and those
+   * the member's importable hangar ships already have, which an entry may update but never add
+   * another ship of (REQ-P4K-080).
+   *
+   * @param heldShipTypeIds the ship types of the member's importable hangar ships
+   * @return the ship types the import's lookup index holds
+   */
+  private @NotNull List<ShipType> importableShipTypes(@NotNull Set<UUID> heldShipTypeIds) {
+    return shipTypeRepository.findAll().stream()
+        .filter(shipType ->
+            OfferedShipTypes.isOffered(shipType) || heldShipTypeIds.contains(shipType.getId()))
+        .toList();
   }
 
   /**

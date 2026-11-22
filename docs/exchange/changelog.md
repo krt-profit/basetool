@@ -3,6 +3,14 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-22
+
+- **Changed: a ship type the Basetool does not offer creates no ship.** An `upsert` that would
+  create a ship of a ship type the game files do not list, such as a concept ship, or of one the
+  Basetool hid or retired, or that would change a ship to such a type, is `unmatched` `UNMATCHED`.
+  An `upsert` of a ship that keeps its current type still applies ([ships](resources/ships.md)).
+  No schema changes.
+
 ## 2026-11-20
 
 - **New: `name` on a transfer's `targetAccount`.** The destination account of a transfer carries its

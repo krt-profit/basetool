@@ -725,6 +725,7 @@ public class GlobalExceptionHandler {
     m.put("CATALOGUE_ITEM_RETIRED", "error.catalogue.itemRetired");
     m.put("CATALOGUE_MATERIAL_RETIRED", "error.catalogue.materialRetired");
     m.put("CATALOGUE_BLUEPRINT_RETIRED", "error.catalogue.blueprintRetired");
+    m.put("CATALOGUE_SHIP_TYPE_NOT_OFFERED", "error.catalogue.shipTypeNotOffered");
     m.put("SUPPLY_DISABLED", "error.supply.disabled");
     m.put("SUPPLY_UNIT_CANNOT_RAISE", "error.supply.unitCannotRaise");
     m.put("SUPPLY_UNIT_CANNOT_RECEIVE", "error.supply.unitCannotReceive");

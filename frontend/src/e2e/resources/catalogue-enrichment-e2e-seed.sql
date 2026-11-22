@@ -7,10 +7,12 @@ ON CONFLICT (id) DO UPDATE SET wiki_mining_data = EXCLUDED.wiki_mining_data;
 
 INSERT INTO ship_type (id, version, created_at, updated_at, name, manufacturer_id, hidden,
                        vehicle_inventory_scu, ore_capacity, max_medical_tier, health, shield_hp,
-                       scwiki_game_version_seen)
+                       scwiki_game_version_seen, p4k_uuid)
 VALUES ('0e2e0000-0000-4000-8000-000000009201', 0, now(), now(), 'E2E Catalogue Ship Type',
-        '33333333-3333-3333-3333-333333333333', false, 0.71, 32, 2, 1500, 600, 'E2E-BUILD-A')
+        '33333333-3333-3333-3333-333333333333', false, 0.71, 32, 2, 1500, 600, 'E2E-BUILD-A',
+        '0e2e0000-0000-4000-8000-000000009291')
 ON CONFLICT (id) DO UPDATE SET vehicle_inventory_scu = EXCLUDED.vehicle_inventory_scu,
+    p4k_uuid = EXCLUDED.p4k_uuid,
     version = COALESCE(ship_type.version, 0), updated_at = now(),
     ore_capacity = EXCLUDED.ore_capacity, max_medical_tier = EXCLUDED.max_medical_tier,
     health = EXCLUDED.health, shield_hp = EXCLUDED.shield_hp,

@@ -28,9 +28,10 @@ import java.util.List;
  * corrective action (e.g. run a UEX sync or rename ships manually).
  *
  * @param importedCount ships created
- * @param skippedCount distinct ship names that matched no ship type
+ * @param skippedCount distinct ship names that matched no ship type the pickers offer, or no ship
+ *     could be added for (REQ-P4K-080)
  * @param duplicateCount upload entries matched to a ship already in the hangar
- * @param skippedShips the unmatched ship names
+ * @param skippedShips those ship names
  * @param duplicateShips reserved, always empty
  * @param updatedCount matched ships whose production status or pledge data changed
  * @param ambiguousShips the distinct ship names that may mean several ships and carried no choice,

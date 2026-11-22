@@ -89,6 +89,7 @@ class ShipInsuranceTest {
     orgUnitMembershipRepository.save(iridiumMembership);
 
     shipType = new ShipType();
+    shipType.setP4kUuid(UUID.randomUUID());
     shipType.setName("Test Ship Type");
     shipTypeRepository.save(shipType);
   }

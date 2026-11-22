@@ -618,6 +618,28 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void shipTypeNotOffered400_mapsToDedicatedKey_notUnexpected() {
+    BackendServiceException ex =
+        new BackendServiceException(
+            "concept ship",
+            null,
+            400,
+            "CATALOGUE_SHIP_TYPE_NOT_OFFERED",
+            "corr-ship",
+            List.of(),
+            null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+    assertEquals("CATALOGUE_SHIP_TYPE_NOT_OFFERED", body.get("code"));
+    assertEquals("error.catalogue.shipTypeNotOffered", body.get("message"));
+  }
+
+  @Test
   void noResourceFound_setsModelAttributes_andReturnsErrorView() {
     Model model = new ConcurrentModel();
 
