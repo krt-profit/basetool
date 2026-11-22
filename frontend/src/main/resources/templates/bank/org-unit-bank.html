@@ -445,17 +445,25 @@
                                         <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
                                               class="chip chip--success" data-testid="org-unit-bank-foreign-granted"
                                               th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
-                                        <form th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() == 'PENDING'}"
-                                              class="bank-ajax-form no-track bank-inline-form" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
-                                              th:attr="data-server-request-sync=${r.linked() != null ? 'true' : null}"
-                                              data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST">
-                                            <input type="hidden" name="_id" th:value="${r.id()}">
-                                            <input type="hidden" name="version" th:value="${r.version()}">
-                                            <button type="submit" class="btn btn-xs btn-success"
-                                                    data-testid="org-unit-bank-grant-approval-btn"
-                                                    th:text="#{bank.approvalLimit.grant}">Freigabe erteilen</button>
-                                            <span class="bank-field-error" data-error-for="_global"></span>
-                                        </form>
+                                        <div class="ou-approval-actions"
+                                             th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() == 'PENDING'}">
+                                            <form class="bank-ajax-form no-track bank-inline-form" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
+                                                  th:attr="data-server-request-sync=${r.linked() != null ? 'true' : null}"
+                                                  data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST">
+                                                <input type="hidden" name="_id" th:value="${r.id()}">
+                                                <input type="hidden" name="version" th:value="${r.version()}">
+                                                <button type="submit" class="btn btn-xs btn-success"
+                                                        data-testid="org-unit-bank-grant-approval-btn"
+                                                        th:text="#{bank.approvalLimit.grant}">Freigabe erteilen</button>
+                                                <span class="bank-field-error" data-error-for="_global"></span>
+                                            </form>
+                                            <button type="button" class="btn btn-xs btn-ghost"
+                                                    data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
+                                                    data-testid="org-unit-bank-reject-approval-btn"
+                                                    th:with="typeLabel=#{'bank.request.type.' + ${r.type()}},amountLabel=${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')}"
+                                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo() + ' &middot; ' + typeLabel + ' ' + amountLabel + ' aUEC'},data-linked-request=${r.linked() != null ? 'true' : null}"
+                                                    th:text="#{bank.request.action.reject}">Ablehnen</button>
+                                        </div>
                                         <span th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() != 'PENDING'}"
                                               class="text-muted">&ndash;</span>
                                     </td>
@@ -500,6 +508,9 @@
 
     <th:block th:if="${canRequestAny}">
         <th:block th:replace="~{bank/fragments/org-unit-bank-views :: requestModal(refreshKey='orgUnitBank')}"></th:block>
+    </th:block>
+    <th:block th:if="${hasResponsibleAccounts}">
+        <th:block th:replace="~{bank/fragments/bank-reject-modal :: rejectModal(endpoint='/api/proxy/org-units/bank/requests/{id}/reject', refreshTarget='orgUnitBank', livesync='bank/requestQueue,grid orgunit-bank/orgUnitBank')}"></th:block>
     </th:block>
 </main>
 </th:block>

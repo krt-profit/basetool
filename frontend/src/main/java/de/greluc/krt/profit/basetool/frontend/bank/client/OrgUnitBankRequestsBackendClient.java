@@ -21,9 +21,14 @@ package de.greluc.krt.profit.basetool.frontend.bank.client;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestViewDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.CancelBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.bank.model.RejectBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -36,8 +41,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 
 /**
- * Typed backend client of the org-unit booking-request reads ({@code GET
- * /api/v1/bank/org-units/requests**}, REQ-BANK-022, REQ-BANK-041) over {@link BackendApiClient}.
+ * Typed backend client of the org-unit booking requests ({@code /api/v1/bank/org-units/requests**},
+ * REQ-BANK-022, REQ-BANK-041) over {@link BackendApiClient}: the reads, the requester's writes and
+ * the approver's decisions.
  */
 @Service
 @RequiredArgsConstructor
@@ -111,5 +117,80 @@ public class OrgUnitBankRequestsBackendClient {
             response
                 .bodyToMono(BankBookingRequestViewDto.class)
                 .onErrorResume(WebClientResponseException.NotFound.class, _ -> Mono.empty()));
+  }
+
+  /**
+   * Raises a booking request against an overseen org unit's account (REQ-BANK-022).
+   *
+   * @param request the new request
+   * @return the created request, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public BankBookingRequestDto create(@NotNull CreateBankBookingRequest request) {
+    return backendApiClient.post(REQUESTS, request, BankBookingRequestDto.class);
+  }
+
+  /**
+   * Cancels the caller's own pending booking request (REQ-BANK-022).
+   *
+   * @param id the request
+   * @param request the echoed version
+   * @return the cancelled request, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public BankBookingRequestDto cancel(@NotNull UUID id, @NotNull CancelBankBookingRequest request) {
+    return backendApiClient.post(
+        REQUESTS + "/{id}/cancel", request, BankBookingRequestDto.class, id);
+  }
+
+  /**
+   * Corrects the caller's own still-pending, unapproved booking request (REQ-BANK-056).
+   *
+   * @param id the request
+   * @param request the corrected values with the echoed version
+   * @return the updated request, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public BankBookingRequestDto update(@NotNull UUID id, @NotNull UpdateBankBookingRequest request) {
+    return backendApiClient.put(REQUESTS + "/{id}", request, BankBookingRequestDto.class, id);
+  }
+
+  /**
+   * Grants the required approver's in-app approval of an over-limit request (REQ-BANK-041).
+   *
+   * @param id the request
+   * @param body the browser's body with the request's echoed {@code version}
+   * @return the updated request, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public BankBookingRequestDto grantApproval(@NotNull UUID id, @NotNull Map<String, Object> body) {
+    return backendApiClient.post(
+        REQUESTS + "/{id}/owner-approval", body, BankBookingRequestDto.class, id);
+  }
+
+  /**
+   * Revokes a previously granted in-app approval (REQ-BANK-041).
+   *
+   * @param id the request
+   * @return the updated request, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public BankBookingRequestDto revokeApproval(@NotNull UUID id) {
+    return backendApiClient.delete(
+        REQUESTS + "/{id}/owner-approval", BankBookingRequestDto.class, id);
+  }
+
+  /**
+   * Rejects a request as its required approver instead of approving it (REQ-BANK-041).
+   *
+   * @param id the request
+   * @param request the reason and the echoed version
+   * @return the rejected request, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public BankBookingRequestDto rejectAsApprover(
+      @NotNull UUID id, @NotNull RejectBankBookingRequest request) {
+    return backendApiClient.post(
+        REQUESTS + "/{id}/reject", request, BankBookingRequestDto.class, id);
   }
 }

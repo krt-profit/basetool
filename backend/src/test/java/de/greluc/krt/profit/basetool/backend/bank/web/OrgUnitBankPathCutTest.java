@@ -65,7 +65,8 @@ class OrgUnitBankPathCutTest {
       Set.of(
           "GET " + NEW_PREFIX + "/accounts/visible",
           "GET " + NEW_PREFIX + "/requests/page",
-          "GET " + NEW_PREFIX + "/requests/{id}");
+          "GET " + NEW_PREFIX + "/requests/{id}",
+          "POST " + NEW_PREFIX + "/requests/{id}/reject");
 
   /** One wave-4 line of the map: verb, old path, new path. */
   private record Moved(String verb, String oldPath, String newPath) {}

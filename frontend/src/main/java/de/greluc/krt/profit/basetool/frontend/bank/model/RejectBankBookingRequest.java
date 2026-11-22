@@ -22,7 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.bank.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
- * Write payload for a bank employee rejecting a pending booking request (REQ-BANK-023).
+ * Write payload for rejecting a pending booking request, by a bank employee (REQ-BANK-023) or by
+ * the request's required approver (REQ-BANK-041).
  *
  * @param reason the rejection reason shown to the requester
  * @param version the request version the client read

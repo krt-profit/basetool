@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestSer
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankSettingsService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountsQuery;
+import de.greluc.krt.profit.basetool.backend.bank.internal.RejectBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
@@ -685,5 +686,24 @@ public class OrgUnitBankController {
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Approval revoked")})
   public BankBookingRequestDto revokeOwnerApproval(@PathVariable @NotNull UUID id) {
     return orgUnitBankRequestService.revokeOwnerApproval(id);
+  }
+
+  /**
+   * Rejects a request with a reason on behalf of its required approver instead of approving it
+   * (REQ-BANK-041). The seam authorizes the caller as the request's approver; a request that
+   * changed since the echoed version answers 409.
+   *
+   * @param id the request to reject
+   * @param request the rejection reason and the version of the request as the approver read it
+   * @return the rejected request
+   */
+  @PostMapping("/requests/{id}/reject")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Reject a booking request as its required approver")
+  @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Request rejected")})
+  public BankBookingRequestDto rejectAsApprover(
+      @PathVariable @NotNull UUID id,
+      @NotNull @Valid @RequestBody RejectBankBookingRequest request) {
+    return orgUnitBankRequestService.rejectAsApprover(id, request.reason(), request.version());
   }
 }

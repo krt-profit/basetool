@@ -1662,6 +1662,48 @@ class OrgUnitBankAccessServiceTest {
     verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
   }
 
+  /**
+   * REQ-BANK-041: the approver's rejection is decided by the request service under the row lock,
+   * behind a gate that admits the responsible holder of the request's account.
+   */
+  @Test
+  void rejectAsApprover_byResponsibleHolder_delegatesBehindAnAdmittingGate() {
+    UUID requestId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankBookingRequest bookingRequest = new BankBookingRequest();
+    bookingRequest.setAccount(account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN")));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(orgUnitId, MembershipRole.STAFFELLEITER));
+    ArgumentCaptor<Consumer<BankBookingRequest>> gate = ArgumentCaptor.captor();
+    when(bankBookingRequestService.rejectAsApprover(
+            eq(requestId), eq("zu hoch"), eq(3L), gate.capture()))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    BankBookingRequestDto dto = requestService.rejectAsApprover(requestId, "zu hoch", 3L);
+
+    assertThat(dto).isNotNull();
+    gate.getValue().accept(bookingRequest);
+  }
+
+  /** REQ-BANK-041: the rejection gate refuses a member who does not approve the request. */
+  @Test
+  void rejectAsApprover_byNonResponsibleHolder_gateThrowsAccessDenied() {
+    UUID requestId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankBookingRequest bookingRequest = new BankBookingRequest();
+    bookingRequest.setAccount(account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN")));
+    actingAs(TestBankActor.member(UUID.randomUUID()));
+    ArgumentCaptor<Consumer<BankBookingRequest>> gate = ArgumentCaptor.captor();
+    when(bankBookingRequestService.rejectAsApprover(
+            eq(requestId), eq("nein"), eq(3L), gate.capture()))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    requestService.rejectAsApprover(requestId, "nein", 3L);
+
+    assertThrows(AccessDeniedException.class, () -> gate.getValue().accept(bookingRequest));
+  }
+
   @Test
   void createBookingRequest_krtAboveT1_unsetAreaLeadCeiling_routesToBankManagement() {
     UUID accountId = UUID.randomUUID();

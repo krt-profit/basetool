@@ -1119,12 +1119,48 @@ public final class BackendSeeder {
    */
   public String raiseBankDepositRequest(
       String username, String password, String accountId, long amount) {
+    return raiseBankRequest(username, password, accountId, "DEPOSIT", amount, "e2e live-sync");
+  }
+
+  /**
+   * Raises a {@code PENDING} withdrawal booking request via {@code POST
+   * /api/v1/bank/org-units/requests} and returns its id; without a limit for the requester it waits
+   * for the responsible holder's approval (REQ-BANK-041).
+   *
+   * @param username the requester's Keycloak username
+   * @param password the password
+   * @param accountId the debited account
+   * @param amount the whole-aUEC amount ({@code >= 1})
+   * @return the created pending request's id
+   */
+  public String raiseBankWithdrawalRequest(
+      String username, String password, String accountId, long amount) {
+    return raiseBankRequest(username, password, accountId, "WITHDRAWAL", amount, "e2e approval");
+  }
+
+  /**
+   * Raises a {@code PENDING} booking request of the given type and returns its id.
+   *
+   * @param username the requester's Keycloak username
+   * @param password the password
+   * @param accountId the account the request is raised against
+   * @param type the request type ({@code DEPOSIT} or {@code WITHDRAWAL})
+   * @param amount the whole-aUEC amount ({@code >= 1})
+   * @param note the requester's note
+   * @return the created pending request's id
+   */
+  private String raiseBankRequest(
+      String username, String password, String accountId, String type, long amount, String note) {
     String body =
         "{\"sourceAccountId\":\""
             + accountId
-            + "\",\"type\":\"DEPOSIT\",\"amount\":"
+            + "\",\"type\":\""
+            + type
+            + "\",\"amount\":"
             + amount
-            + ",\"note\":\"e2e live-sync\"}";
+            + ",\"note\":\""
+            + note
+            + "\"}";
     return JsonParser.parseString(
             postBody(username, password, "/api/v1/bank/org-units/requests", body))
         .getAsJsonObject()
