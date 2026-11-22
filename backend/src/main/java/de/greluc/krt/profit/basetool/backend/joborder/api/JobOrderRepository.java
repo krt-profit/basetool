@@ -621,4 +621,20 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       o.id, o.displayId) FROM JobOrder o WHERE o.id IN :ids
       """)
   List<JobOrderEarmark> findEarmarks(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Replaces the requester handle of the given orders, for the name retention (REQ-DATA-047).
+   *
+   * @param orderIds the locked orders
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of orders changed
+   */
+  @Modifying
+  @Query(
+      """
+      UPDATE JobOrder o SET o.handle = :sentinel,
+        o.moneyInformationVersion = o.moneyInformationVersion + 1
+      WHERE o.id IN :orderIds AND o.handle <> :sentinel
+      """)
+  int clearHandles(@Param("orderIds") List<UUID> orderIds, @Param("sentinel") String sentinel);
 }

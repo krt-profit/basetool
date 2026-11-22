@@ -57,4 +57,24 @@ interface JobOrderMoneyHolderChangeRepository
           """,
       nativeQuery = true)
   int anonymiseNames(UUID userId, String[] spellings, List<UUID> orderIds, String sentinel);
+
+  /**
+   * Replaces every name of the given orders' holder changes, for the name retention (REQ-DATA-047).
+   *
+   * @param orderIds the locked orders
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of holder changes changed
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE job_order_money_holder_change
+          SET previous_name = CASE WHEN previous_name IS NULL THEN NULL ELSE :sentinel END,
+              name = CASE WHEN name IS NULL THEN NULL ELSE :sentinel END
+          WHERE order_id IN (:orderIds)
+            AND (previous_name <> :sentinel OR name <> :sentinel)
+          """,
+      nativeQuery = true)
+  int clearNames(List<UUID> orderIds, String sentinel);
 }
