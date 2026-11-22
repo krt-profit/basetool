@@ -564,7 +564,13 @@ their expenses (REQ-SEC-042 holds the same for a refinery order's mission link).
   status. The same freeze covers deleting the operation or a linked mission, changing mission actual
   times, modifying the roster or attendance and payout choices, and adding, changing or removing
   mission finance entries or linked refinery figures. Independent changes such as renaming a mission
-  remain available. The existing payout-clear gate can reverse the marks. Ordinary changes can resume
+  remain available. **An external participant's name stays editable**, so a rectification or
+  erasure request can be served on a settled operation (Art. 16/17 GDPR, REQ-SEC-060): renaming it,
+  or removing it, moves the paid mark from `guest_<old>` to `guest_<new>` (or to
+  `deleted_<participantId>` when the name is removed) in the same statement, and the split stays
+  the same. When other rows of the operation still carry the old name, the mark is copied so both
+  keys stay paid. A rename onto a name another external participant of the operation carries would
+  merge two payout rows and stays frozen (V441). The existing payout-clear gate can reverse the marks. Ordinary changes can resume
   once the last current mark is cleared. Required identity unlink and ownership reassignment during
   account erasure retain their own rules (REQ-DATA-008). Authorized payout reviewers see any mark
   without a current row separately. Its opaque key can reverse that operation's mark through the

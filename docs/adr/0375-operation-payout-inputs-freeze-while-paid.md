@@ -25,6 +25,11 @@ marks starts a new basis. Required account erasure can still unlink identities o
 ownership under REQ-DATA-008. The existing reversal gate exposes an opaque status-row key when a
 paid mark has no current payout row. The key can only clear that mark within its operation.
 
+An external participant's name is not a payout input in itself; only the key it forms is. The
+database therefore lets the name change, or be removed, on a settled operation and moves the paid
+mark to the new key in the same statement, so an erasure or rectification request never waits for
+a reversal. A rename that would merge two payout rows stays frozen.
+
 ## Consequences
 
 If amounts need correction after settlement starts, the authorized reviewer must clear all current
