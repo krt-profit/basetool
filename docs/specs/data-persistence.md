@@ -1230,6 +1230,7 @@ The listed crossings:
 | The V296/V297 org-stock trigger functions as V429 replaced them | `exchange_change` (write), `org_unit`, `inventory_item`, `inventory_item_mission_allocation` (read) | A shared row's own write, or the write of its earmarks, names the row in `exchange_change.org_entry_id` (partial index `idx_exchange_change_org_entry`, only the row id, purged with the feed); a lot-level re-announce leaves it `NULL` (REQ-PATCH-057) |
 | `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys`, `#findExchangeOrgLots`, `#findExchangeOrgLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station`, `starmap_object` (read) | Catalogue names and the place's starmap GUID joined into the exchange's stock lots |
 | `PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers` | `app_user` (read) | Grants the default set to every active account in one statement |
+| `OperationPayoutStatusRepository#rekeyDeletedMember` | `mission`, `mission_participant` (read) | Re-keys a deleted member's payout marks to the key of the member's participation (REQ-DATA-008) |
 
 **Acceptance**
 
