@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** A ship type's P4K identity follows the catalogue's base and successor (REQ-P4K-051). */
@@ -41,6 +42,10 @@ class P4kShipIdentityFollowImportTest {
   private static final UUID BASE = UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1d001");
   private static final UUID EDITION = UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1d002");
   private static final UUID DEPARTED = UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1d0ff");
+  private static final UUID ITEMLESS_PAINT =
+      UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1d0aa");
+  private static final String WIKI_TEXT_EN = "A Wiki text about the ship.";
+  private static final String WIKI_TEXT_DE = "Ein Wiki-Text zum Schiff.";
   private static final String BASE_CLASS = "TEST_Follow_Base";
   private static final String NAME = "Follow Test Ship";
 
@@ -79,6 +84,56 @@ class P4kShipIdentityFollowImportTest {
   }
 
   @Test
+  void aShipTypeWhoseGuidLeftFollowsItsSuccessorThoughAPaintOfItHasNoItem() {
+    ShipType ship = ships.saveAndFlush(ship(NAME, DEPARTED, "TEST_Follow_Old"));
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    UUID runId = runs.apply(P4kTestCatalogues.bytes(withItemlessPaintOfBase()), false).runId();
+
+    assertThat(ship.getP4kUuid()).isEqualTo(BASE);
+    assertThat(ship.getP4kDeletedAt()).isNull();
+    assertThat(P4kImportRuns.report(changes, runId))
+        .anyMatch(change -> movedTo(change, DEPARTED, BASE));
+  }
+
+  @Test
+  void anEditionWaitsWhileAPaintOfItsBaseHasNoItem() {
+    ShipType ship = ships.saveAndFlush(ship(NAME, EDITION, "TEST_Follow_Edition"));
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    runs.apply(P4kTestCatalogues.bytes(withItemlessPaintOfBase()), false);
+
+    assertThat(ship.getP4kUuid()).isEqualTo(EDITION);
+  }
+
+  @Test
+  void aShipTypeWhoseGuidLeftKeepsItsOwnDescriptionsWhenItFollowsItsSuccessor() {
+    ShipType departed = ship(NAME, DEPARTED, "TEST_Follow_Old");
+    departed.setDescriptionEn(WIKI_TEXT_EN);
+    departed.setDescriptionDe(WIKI_TEXT_DE);
+    ShipType ship = ships.saveAndFlush(departed);
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    runs.apply(P4kTestCatalogues.bytes(catalogue()), false);
+
+    assertThat(ship.getP4kUuid()).isEqualTo(BASE);
+    assertThat(ship.getDescriptionEn()).isEqualTo(WIKI_TEXT_EN);
+    assertThat(ship.getDescriptionDe()).isEqualTo(WIKI_TEXT_DE);
+  }
+
+  @Test
+  void anEditionWaitsWhileItsDescriptionDiffersFromItsBase() {
+    ShipType edition = ship(NAME, EDITION, "TEST_Follow_Edition");
+    edition.setDescriptionEn(WIKI_TEXT_EN);
+    ShipType ship = ships.saveAndFlush(edition);
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    runs.apply(P4kTestCatalogues.bytes(catalogue()), false);
+
+    assertThat(ship.getP4kUuid()).isEqualTo(EDITION);
+  }
+
+  @Test
   void aSuccessorTwoPlayerRecordsShareFollowsNeither() {
     ShipType ship = ships.saveAndFlush(ship(NAME, DEPARTED, "TEST_Follow_Old"));
     ObjectNode ambiguous = catalogue();
@@ -112,5 +167,19 @@ class P4kShipIdentityFollowImportTest {
   /** Builds the fixture with a player base and a same-name player edition of it. */
   private static ObjectNode catalogue() {
     return P4kTestCatalogues.withEdition(BASE, BASE_CLASS, EDITION, "TEST_Follow_Edition", NAME);
+  }
+
+  /**
+   * Builds the fixture with one more paint, naming the base, whose item the catalogue and the
+   * Basetool lack.
+   *
+   * @return the tree
+   */
+  private static ObjectNode withItemlessPaintOfBase() {
+    ObjectNode root = catalogue();
+    ObjectNode paint = ((ArrayNode) root.get("paints")).addObject();
+    paint.put("itemGuid", ITEMLESS_PAINT.toString());
+    paint.putArray("shipGuids").add(BASE.toString());
+    return root;
   }
 }

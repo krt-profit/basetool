@@ -1810,9 +1810,16 @@ hid or retired through a case is left to that. The move must pass every check of
 repair: a player base with a known vehicle kind and a class name no other record repeats; GUID,
 class name and name held by no other live ship type; every same-name record a variant of the base
 that no other live ship type holds; resolvable paints; a ship loadout with a port tree; base data
-that replaces every stored fact. Its issues are reported as for every other ship. The run writes
-the base data as for a matched ship and reports the move as `CHANGED p4k_uuid`; the sweep then
-finds the GUID listed.
+that replaces every stored fact, with stored descriptions equal to the base's. A departed ship
+type alone is spared two of them, since its own record and its paint links left with its GUID:
+
+- it needs no resolvable paints; a successor paint whose item the Basetool lacks links nothing,
+  as for any other ship (REQ-P4K-041), until an import finds the item;
+- it keeps its descriptions where they differ from the successor's; they describe the same ship,
+  usually come from the SC Wiki, and the P4K only fills a description that is empty.
+
+Its issues are reported as for every other ship. The run writes the base data as for a matched
+ship and reports the move as `CHANGED p4k_uuid`; the sweep then finds the GUID listed.
 
 **Acceptance**
 
@@ -1822,6 +1829,9 @@ finds the GUID listed.
   and the sweep does not stamp it.
 - [x] Two candidate successors, a target another ship type holds and a target two ship types would
   take move nothing.
+- [x] A departed ship type follows its successor though a paint of the successor has no item or
+  its descriptions differ, and keeps them; an edition still waits while a paint of its base has
+  no item or its description differs from the base's.
 
 **Enforced by:** `P4kShipIdentityMovesTest`, `P4kShipIdentityFollowImportTest` · **Code:**
 `P4kShipIdentityMoves`, `P4kShipBaseRepairs` · **ADR:**
