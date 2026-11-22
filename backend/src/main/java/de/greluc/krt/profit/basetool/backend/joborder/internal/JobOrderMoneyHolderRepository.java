@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -170,4 +171,79 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
           """,
       nativeQuery = true)
   int moveLinkedHolders(UUID source, UUID target, List<UUID> orderIds);
+
+  /**
+   * Locks every closed job order whose last change lies before the cutoff and which still carries a
+   * name the name retention removes (REQ-DATA-047): a requester handle, an accountless holder,
+   * recipient or submitted name, a holder-change name, a linked-attempt name or a handover
+   * recipient.
+   *
+   * @param cutoff the oldest last change whose names are kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the locked orders, in id order
+   */
+  @Query(
+      value =
+          """
+          SELECT o.id FROM job_order o
+          WHERE o.status IN ('COMPLETED', 'CANCELLED', 'REJECTED') AND o.updated_at < :cutoff
+            AND (o.handle <> :sentinel
+              OR EXISTS (SELECT 1 FROM job_order_money_holder h WHERE h.order_id = o.id
+                         AND h.merged_into_id IS NULL AND h.accountless_name <> :sentinel)
+              OR EXISTS (SELECT 1 FROM job_order_money_operation p WHERE p.order_id = o.id
+                         AND p.selected_accountless_name IS NOT NULL)
+              OR EXISTS (SELECT 1 FROM job_order_linked_money_attempt a WHERE a.order_id = o.id
+                         AND (a.selected_accountless_name IS NOT NULL
+                              OR a.counterparty_name IS NOT NULL))
+              OR EXISTS (SELECT 1 FROM job_order_money_recipient r WHERE r.order_id = o.id
+                         AND r.accountless_name <> :sentinel)
+              OR EXISTS (SELECT 1 FROM job_order_money_holder_change c WHERE c.order_id = o.id
+                         AND (c.previous_name <> :sentinel OR c.name <> :sentinel))
+              OR EXISTS (SELECT 1 FROM job_order_handover h WHERE h.job_order_id = o.id
+                         AND h.recipient_handle <> :sentinel)
+              OR EXISTS (SELECT 1 FROM job_order_item_handover h WHERE h.job_order_id = o.id
+                         AND h.recipient_handle <> :sentinel))
+          ORDER BY o.id
+          FOR NO KEY UPDATE OF o
+          """,
+      nativeQuery = true)
+  List<UUID> lockOrdersWithNamesBefore(Instant cutoff, String sentinel);
+
+  /**
+   * Replaces every accountless holder name of the given orders, for the name retention.
+   *
+   * @param orderIds the locked orders
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of holders changed
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE job_order_money_holder
+          SET accountless_name = :sentinel, revision = revision + 1
+          WHERE order_id IN (:orderIds) AND merged_into_id IS NULL
+            AND accountless_name <> :sentinel
+          """,
+      nativeQuery = true)
+  int clearNames(List<UUID> orderIds, String sentinel);
+
+  /**
+   * Removes every selected and counterparty name of the given orders' linked money attempts, for
+   * the name retention.
+   *
+   * @param orderIds the locked orders
+   * @return the number of attempts changed
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE job_order_linked_money_attempt
+          SET selected_accountless_name = NULL, counterparty_name = NULL
+          WHERE order_id IN (:orderIds)
+            AND (selected_accountless_name IS NOT NULL OR counterparty_name IS NOT NULL)
+          """,
+      nativeQuery = true)
+  int clearLinkedAttemptNames(List<UUID> orderIds);
 }

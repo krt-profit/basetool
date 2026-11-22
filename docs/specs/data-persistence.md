@@ -2167,3 +2167,43 @@ merged UEX commodity id and the number of moved references.
 `MaterialIdentityReferences`, `UexMergedListings`, `UexCommodityService`,
 `V438__create_material_redirect.sql` · **ADR:**
 [ADR-0396](../adr/0396-the-p4k-import-keys-commodities-by-their-resource-type.md)
+
+### REQ-DATA-047 — names and free texts expire three years after the event
+
+The privacy policy states that names and free texts in long-lived records go three years after the
+event, while the records themselves stay. `NameRetentionTask` (privacy module, daily,
+`app.privacy.name-retention`, `max-age` default `P1095D`, at least one year) asks every
+`platform.api.NameRetentionParticipant` to remove them before the cutoff. Each participant runs in a
+transaction of its own; an area that fails is logged with its label and fails the run after the
+other areas have finished, so `ScheduledJobFailureStreak` sees it and the rest is not held back.
+One `NAME_RETENTION_APPLIED` audit row (domain `ROLE`) records the cutoff and the rows changed per
+area, written only when a row changed.
+
+| Area | Participant | What goes | The event |
+| --- | --- | --- | --- |
+| `approval_reasons` | `ApprovalReasonRetention` | `user_approval_event.reason` | `created_at` |
+| `external_names` | `ExternalNameRetention` | `mission_participant.guest_name` of external participants, `mission.party_lead_guest_name` | the mission's actual end, else its planned end, else its creation |
+| `booking_requests` | `BookingRequestNameRetention` | `bank_booking_request.note`, `reject_reason`, `justification`, `staff_note` cleared; the four handle snapshots set to `HandleAnonymisation.SENTINEL`; recorded as `NAME_RETENTION_APPLIED` in the bank's own trail as well | `decided_at`; a pending request stays |
+| `job_orders` | `JobOrderNameRetention` | in closed orders (`COMPLETED`, `CANCELLED`, `REJECTED`): `job_order.handle`, accountless holder and recipient names, holder-change names and handover recipients set to the sentinel; submitted and linked-attempt names cleared; the orders locked `FOR NO KEY UPDATE` and their live-sync topics published | the order's last change (`updated_at`) |
+
+An external participant whose name goes renders as the deleted-account placeholder of REQ-DATA-008;
+on a settled operation the participant trigger moves the paid mark to `deleted_<participantId>`
+(V441, REQ-MISSION-034), so the split stays. A row already cleared is left alone, so a later run
+changes nothing and the change feed of a booking request is not re-announced every day.
+
+**Acceptance**
+
+- [x] The task asks every participant with the same cutoff, records the audit row only when a row
+  changed, and a failing area fails the run after the others ran (`NameRetentionTaskTest`).
+- [x] Reasons and external names older than the cutoff go, newer ones stay, and a paid mark on a
+  settled operation follows the removed name (`NameRetentionIntegrationTest`).
+- [x] A booking request decided before the cutoff loses its texts and handles, a newer or pending
+  one keeps them, and a second run changes nothing (`BookingRequestNameRetentionTest`).
+- [x] A closed order last changed before the cutoff loses its requester, holder and handover names,
+  a newer or open one keeps them, and a second run changes nothing (`JobOrderNameRetentionTest`).
+- [x] `ScheduledJobStale` covers `name_retention` (`scheduled_job_never_succeeded_12`, `_13`).
+
+**Enforced by:** `NameRetentionTaskTest`, `NameRetentionIntegrationTest`,
+`BookingRequestNameRetentionTest`, `JobOrderNameRetentionTest` · **Code:**
+`NameRetentionTask`, `NameRetentionProperties`, `NameRetentionParticipant`,
+`ApprovalReasonRetention`, `ExternalNameRetention`, `BookingRequestNameRetention`, `JobOrderNameRetention`

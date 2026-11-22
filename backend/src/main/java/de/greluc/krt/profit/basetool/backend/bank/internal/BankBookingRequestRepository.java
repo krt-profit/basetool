@@ -485,4 +485,36 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
          OR r.counterpartyUserId = :userId OR r.ownerApprovalGrantedBy = :userId
       """)
   int anonymiseHandles(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
+
+  /**
+   * Removes the free texts and replaces the handle snapshots of every booking request decided
+   * before the cutoff, for the name retention (REQ-DATA-047); the request itself stays. A request
+   * already cleared is left alone, so a later run changes nothing.
+   *
+   * <p>Bulk update; does not bump {@code version}.
+   *
+   * @param cutoff the oldest decision whose names are kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of requests changed
+   */
+  @Modifying
+  @Query(
+      """
+      UPDATE BankBookingRequest r SET
+        r.note = null, r.rejectReason = null, r.justification = null, r.staffNote = null,
+        r.requesterHandle = :sentinel,
+        r.deciderHandle = CASE WHEN r.deciderHandle IS NULL THEN r.deciderHandle
+                               ELSE :sentinel END,
+        r.counterpartyHandle = CASE WHEN r.counterpartyHandle IS NULL THEN r.counterpartyHandle
+                                    ELSE :sentinel END,
+        r.ownerApprovalGrantedByHandle = CASE WHEN r.ownerApprovalGrantedByHandle IS NULL
+                                              THEN r.ownerApprovalGrantedByHandle
+                                              ELSE :sentinel END
+      WHERE r.decidedAt < :cutoff
+        AND (r.note IS NOT NULL OR r.rejectReason IS NOT NULL OR r.justification IS NOT NULL
+             OR r.staffNote IS NOT NULL OR r.requesterHandle <> :sentinel
+             OR r.deciderHandle <> :sentinel OR r.counterpartyHandle <> :sentinel
+             OR r.ownerApprovalGrantedByHandle <> :sentinel)
+      """)
+  int clearNamesDecidedBefore(@Param("cutoff") Instant cutoff, @Param("sentinel") String sentinel);
 }

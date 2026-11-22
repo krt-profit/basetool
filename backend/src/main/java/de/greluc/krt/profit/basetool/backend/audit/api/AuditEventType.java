@@ -504,6 +504,11 @@ public enum AuditEventType {
    */
   HANDLE_SNAPSHOTS_ANONYMISED(AuditDomain.ROLE),
   /**
+   * The daily name retention removed names and free texts past three years (REQ-DATA-047). Written
+   * only when a row changed; the details carry the cutoff and per-area row counts, never a text.
+   */
+  NAME_RETENTION_APPLIED(AuditDomain.ROLE),
+  /**
    * An admin ran the Personensuche for a name (REQ-SEC-060); the one read recorded in this trail.
    * The payload carries the term's length, the hit count and whether the result was capped, never
    * the term itself.

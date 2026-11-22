@@ -98,4 +98,22 @@ interface JobOrderMoneyRecipientRepository extends JpaRepository<JobOrderMoneyRe
           """,
       nativeQuery = true)
   int retireErasedHolderRecipients(UUID userId, String[] spellings, List<UUID> orderIds);
+
+  /**
+   * Replaces every accountless recipient name of the given orders and retires those recipients, for
+   * the name retention (REQ-DATA-047).
+   *
+   * @param orderIds the locked orders
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of recipients changed
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE job_order_money_recipient SET accountless_name = :sentinel, active = false
+          WHERE order_id IN (:orderIds) AND accountless_name <> :sentinel
+          """,
+      nativeQuery = true)
+  int clearNames(List<UUID> orderIds, String sentinel);
 }

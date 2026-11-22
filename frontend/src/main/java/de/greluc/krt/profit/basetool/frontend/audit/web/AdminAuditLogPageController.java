@@ -133,7 +133,8 @@ public class AdminAuditLogPageController {
                   "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED",
                   "CARTEL_APPROVAL_TIERS_SET",
                   "CARTEL_APPROVAL_TIERS_CLEARED",
-                  "HANDLE_SNAPSHOTS_ANONYMISED")),
+                  "HANDLE_SNAPSHOTS_ANONYMISED",
+                  "NAME_RETENTION_APPLIED")),
           Map.entry(
               "INVENTORY",
               List.of(
@@ -334,6 +335,7 @@ public class AdminAuditLogPageController {
                   "ACCOUNT_DELETION_REQUEST_EXECUTED",
                   "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED",
                   "HANDLE_SNAPSHOTS_ANONYMISED",
+                  "NAME_RETENTION_APPLIED",
                   "PERSONAL_DATA_EXPORTED",
                   "PERSON_SEARCH_PERFORMED",
                   "ROLE_AUDIT_EXPORTED",

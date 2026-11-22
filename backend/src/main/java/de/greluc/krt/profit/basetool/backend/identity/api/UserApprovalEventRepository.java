@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -49,4 +50,17 @@ public interface UserApprovalEventRepository extends JpaRepository<UserApprovalE
   @Modifying
   @Query("UPDATE UserApprovalEvent e SET e.decidedById = null WHERE e.decidedById = :adminId")
   void clearDecidedBy(@Param("adminId") UUID adminId);
+
+  /**
+   * Clears the free-text reason of every decision recorded before the cutoff, for the name
+   * retention (REQ-DATA-047); the decision itself stays.
+   *
+   * @param cutoff the oldest decision whose reason is kept
+   * @return the number of decisions whose reason was cleared
+   */
+  @Modifying
+  @Query(
+      "UPDATE UserApprovalEvent e SET e.reason = null"
+          + " WHERE e.reason IS NOT NULL AND e.createdAt < :cutoff")
+  int clearReasonsBefore(@Param("cutoff") Instant cutoff);
 }

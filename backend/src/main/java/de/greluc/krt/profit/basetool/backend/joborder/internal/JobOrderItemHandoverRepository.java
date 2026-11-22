@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -64,4 +65,23 @@ public interface JobOrderItemHandoverRepository extends JpaRepository<JobOrderIt
       AND h.recipientHandle <> :sentinel
       """)
   int anonymiseRecipientHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
+
+  /**
+   * Replaces the recipient of every handover of the given orders, for the name retention
+   * (REQ-DATA-047).
+   *
+   * @param orderIds the locked orders
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of handovers changed
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE job_order_item_handover SET recipient_handle = :sentinel
+          WHERE job_order_id IN (:orderIds) AND recipient_handle <> :sentinel
+          """,
+      nativeQuery = true)
+  int clearRecipientHandles(
+      @Param("orderIds") List<UUID> orderIds, @Param("sentinel") String sentinel);
 }

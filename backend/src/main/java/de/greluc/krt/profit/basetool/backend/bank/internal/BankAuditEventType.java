@@ -207,5 +207,11 @@ public enum BankAuditEventType {
    * An admin anonymised a member's surviving handle snapshots in the bank's records (REQ-SEC-062).
    * Written after the update; the details carry per-column row counts, never the removed handle.
    */
-  HANDLE_SNAPSHOTS_ANONYMISED
+  HANDLE_SNAPSHOTS_ANONYMISED,
+
+  /**
+   * The daily name retention cleared the notes and handle snapshots of booking requests decided
+   * more than three years ago (REQ-DATA-047); the details carry the count and the cutoff.
+   */
+  NAME_RETENTION_APPLIED
 }

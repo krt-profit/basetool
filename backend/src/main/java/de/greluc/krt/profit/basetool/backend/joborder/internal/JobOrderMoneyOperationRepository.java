@@ -180,4 +180,21 @@ interface JobOrderMoneyOperationRepository extends JpaRepository<JobOrderMoneyOp
           """,
       nativeQuery = true)
   int anonymiseSubmittedNames(UUID userId, String[] spellings, List<UUID> orderIds);
+
+  /**
+   * Removes every submitted accountless name of the given orders' money operations, for the name
+   * retention (REQ-DATA-047).
+   *
+   * @param orderIds the locked orders
+   * @return the number of operations changed
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE job_order_money_operation SET selected_accountless_name = NULL
+          WHERE order_id IN (:orderIds) AND selected_accountless_name IS NOT NULL
+          """,
+      nativeQuery = true)
+  int clearSubmittedNames(List<UUID> orderIds);
 }

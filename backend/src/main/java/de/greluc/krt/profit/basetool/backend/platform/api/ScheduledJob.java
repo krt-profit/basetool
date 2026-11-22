@@ -102,6 +102,12 @@ public enum ScheduledJob {
   EXCHANGE_CONNECTION_RETENTION("exchange_connection_retention"),
 
   /**
+   * The daily removal of names and free texts past the three-year retention ({@code
+   * NameRetentionTask}, REQ-DATA-047).
+   */
+  NAME_RETENTION("name_retention"),
+
+  /**
    * An admin's bulk undo of one exchange client ({@code ExchangeBulkUndoRunner}, REQ-XCH-034); run
    * on demand, never scheduled, so it publishes no enabled gauge.
    */

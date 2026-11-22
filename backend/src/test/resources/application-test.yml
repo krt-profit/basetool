@@ -67,6 +67,9 @@ app:
   registrations:
     rejected-retention:
       enabled: false
+  privacy:
+    name-retention:
+      enabled: false
   notifications:
     retention:
       enabled: false
