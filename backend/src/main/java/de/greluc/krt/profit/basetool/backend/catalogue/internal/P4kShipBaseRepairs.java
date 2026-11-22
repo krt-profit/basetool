@@ -114,7 +114,8 @@ class P4kShipBaseRepairs {
         proposed.stream()
             .filter(
                 repair -> ownsProjectedIdentity(repair, catalogue.ships(), ships, aliases, retired))
-            .filter(repair -> paintsResolve(catalogue, repair.base(), context))
+            .filter(repair ->
+                departs(repair, byGuid) || paintsResolve(catalogue, repair.base(), context))
             .toList();
     if (candidates.isEmpty()) {
       return List.of();
@@ -275,6 +276,21 @@ class P4kShipBaseRepairs {
     return key != null
         && aliases.getOrDefault(key, List.of()).stream()
             .anyMatch(other -> !rowId.equals(other.getId()));
+  }
+
+  /**
+   * Tells whether a repair is the catalogue's own move of a ship type whose GUID left it to the
+   * successor (REQ-P4K-051). Such a move needs no resolvable paints: a successor paint whose item
+   * the Basetool lacks links nothing, as for any other ship (REQ-P4K-041).
+   *
+   * @param repair the proposed correction
+   * @param byGuid the incoming ships by P4K GUID
+   * @return whether no admin queued it and the row's GUID is absent from the catalogue
+   */
+  private static boolean departs(
+      @NotNull Repair repair, @NotNull Map<UUID, List<P4kShipDto>> byGuid) {
+    UUID held = repair.row().getP4kUuid();
+    return repair.selection() == null && held != null && !byGuid.containsKey(held);
   }
 
   /**

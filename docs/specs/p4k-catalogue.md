@@ -1810,9 +1810,11 @@ hid or retired through a case is left to that. The move must pass every check of
 repair: a player base with a known vehicle kind and a class name no other record repeats; GUID,
 class name and name held by no other live ship type; every same-name record a variant of the base
 that no other live ship type holds; resolvable paints; a ship loadout with a port tree; base data
-that replaces every stored fact. Its issues are reported as for every other ship. The run writes
-the base data as for a matched ship and reports the move as `CHANGED p4k_uuid`; the sweep then
-finds the GUID listed.
+that replaces every stored fact. A departed ship type alone needs no resolvable paints: its own
+record and its paint links left with its GUID, and a successor paint whose item the Basetool
+lacks links nothing, as for any other ship (REQ-P4K-041), until an import finds the item. Its
+issues are reported as for every other ship. The run writes the base data as for a matched ship
+and reports the move as `CHANGED p4k_uuid`; the sweep then finds the GUID listed.
 
 **Acceptance**
 
@@ -1822,6 +1824,8 @@ finds the GUID listed.
   and the sweep does not stamp it.
 - [x] Two candidate successors, a target another ship type holds and a target two ship types would
   take move nothing.
+- [x] A departed ship type follows its successor though a paint of the successor has no item; an
+  edition still waits while a paint of its base has none.
 
 **Enforced by:** `P4kShipIdentityMovesTest`, `P4kShipIdentityFollowImportTest` · **Code:**
 `P4kShipIdentityMoves`, `P4kShipBaseRepairs` · **ADR:**
