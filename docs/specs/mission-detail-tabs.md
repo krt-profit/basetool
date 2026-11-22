@@ -570,7 +570,7 @@ their expenses (REQ-SEC-042 holds the same for a refinery order's mission link).
   `deleted_<participantId>` when the name is removed) in the same statement, and the split stays
   the same. When other rows of the operation still carry the old name, the mark is copied so both
   keys stay paid. A rename onto a name another external participant of the operation carries would
-  merge two payout rows and stays frozen (V441). The existing payout-clear gate can reverse the marks. Ordinary changes can resume
+  merge two payout rows and stays frozen (V440). The existing payout-clear gate can reverse the marks. Ordinary changes can resume
   once the last current mark is cleared. Required identity unlink and ownership reassignment during
   account erasure retain their own rules (REQ-DATA-008). Authorized payout reviewers see any mark
   without a current row separately. Its opaque key can reverse that operation's mark through the
