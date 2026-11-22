@@ -14,155 +14,321 @@
     <nav class="card legal-toc" aria-labelledby="privacy-toc-title" data-testid="privacy-toc">
         <h2 id="privacy-toc-title" class="card-title" th:text="#{privacy.toc}">Inhalt</h2>
         <ol class="legal-toc__list">
-            <li>
-                <a href="#privacy-1" th:text="#{privacy.h1_1}">1. Datenschutz auf einen Blick</a>
-                <ol class="legal-toc__sub">
-                    <li><a href="#privacy-1-1" th:text="#{privacy.h2_1_1}">Allgemeine Hinweise</a></li>
-                    <li><a href="#privacy-1-2" th:text="#{privacy.h2_1_2}">Wer ist verantwortlich?</a></li>
-                    <li><a href="#privacy-1-3" th:text="#{privacy.h2_1_3}">Wofür nutzen wir Ihre Daten?</a></li>
-                    <li><a href="#privacy-1-4" th:text="#{privacy.h2_1_4}">Welche Rechte haben Sie?</a></li>
-                </ol>
-            </li>
-            <li>
-                <a href="#privacy-2" th:text="#{privacy.h1_2}">2. Allgemeine Hinweise und Pflichtinformationen</a>
-                <ol class="legal-toc__sub">
-                    <li><a href="#privacy-2-1" th:text="#{privacy.h2_2_1}">Verantwortliche Stelle</a></li>
-                    <li><a href="#privacy-2-2" th:text="#{privacy.h2_2_2}">Speicherdauer</a></li>
-                    <li><a href="#privacy-2-3" th:text="#{privacy.h2_2_3}">Ihre Rechte als Betroffener</a></li>
-                    <li><a href="#privacy-2-4" th:text="#{privacy.h2_2_4}">Widerruf Ihrer Einwilligung</a></li>
-                    <li><a href="#privacy-2-5" th:text="#{privacy.h2_2_5}">Beschwerderecht</a></li>
-                </ol>
-            </li>
-            <li>
-                <a href="#privacy-3" th:text="#{privacy.h1_3}">3. Datenerfassung auf dieser Website</a>
-                <ol class="legal-toc__sub">
-                    <li><a href="#privacy-3-1" th:text="#{privacy.h2_3_1}">Externes Hosting</a></li>
-                    <li><a href="#privacy-3-2" th:text="#{privacy.h2_3_2}">Cookies</a></li>
-                    <li><a href="#privacy-3-3" th:text="#{privacy.h2_3_3}">Server-Log-Dateien</a></li>
-                    <li><a href="#privacy-3-4" th:text="#{privacy.h2_3_4}">Mitgliederkonto</a></li>
-                    <li><a href="#privacy-3-5" th:text="#{privacy.h2_3_5}">Anmeldung über Discord</a></li>
-                    <li><a href="#privacy-3-6" th:text="#{privacy.h2_3_6}">Benachrichtigungen und Live-Funktionen</a></li>
-                    <li><a href="#privacy-3-7" th:text="#{privacy.h2_3_7}">Begleitende Desktop-Anwendung</a></li>
-                    <li><a href="#privacy-3-10" th:text="#{privacy.h2_3_10}">Verbundene Anwendungen</a></li>
-                    <li><a href="#privacy-3-8" th:text="#{privacy.h2_3_8}">Sicherheits-Monitoring</a></li>
-                </ol>
-            </li>
+            <li><a href="#privacy-1" th:text="#{privacy.s1.title}">1. Datenschutz auf einen Blick</a></li>
+            <li><a href="#privacy-2" th:text="#{privacy.s2.title}">2. Verantwortlicher und Kontakt</a></li>
+            <li><a href="#privacy-3" th:text="#{privacy.s3.title}">3. Rechtsgrundlagen im Überblick</a></li>
+            <li><a href="#privacy-4" th:text="#{privacy.s4.title}">4. Hosting</a></li>
+            <li><a href="#privacy-5" th:text="#{privacy.s5.title}">5. Aufruf der Website und Server-Protokolle</a></li>
+            <li><a href="#privacy-6" th:text="#{privacy.s6.title}">6. Cookies und Speicher im Browser</a></li>
+            <li><a href="#privacy-7" th:text="#{privacy.s7.title}">7. Registrierung, Anmeldung und Mitgliederkonto</a></li>
+            <li><a href="#privacy-8" th:text="#{privacy.s8.title}">8. Anmeldung über Discord</a></li>
+            <li><a href="#privacy-9" th:text="#{privacy.s9.title}">9. E-Mails zu Ihrem Konto</a></li>
+            <li><a href="#privacy-10" th:text="#{privacy.s10.title}">10. Nutzung des Tools</a></li>
+            <li><a href="#privacy-11" th:text="#{privacy.s11.title}">11. Was andere Mitglieder sehen</a></li>
+            <li><a href="#privacy-12" th:text="#{privacy.s12.title}">12. Benachrichtigungen und Live-Funktionen</a></li>
+            <li><a href="#privacy-13" th:text="#{privacy.s13.title}">13. Verbundene Anwendungen</a></li>
+            <li><a href="#privacy-14" th:text="#{privacy.s14.title}">14. Begleitende Desktop-Anwendung (SC Extractor)</a></li>
+            <li><a href="#privacy-15" th:text="#{privacy.s15.title}">15. Personen ohne Konto</a></li>
+            <li><a href="#privacy-16" th:text="#{privacy.s16.title}">16. Sicherheits-Monitoring</a></li>
+            <li><a href="#privacy-17" th:text="#{privacy.s17.title}">17. Datensicherung</a></li>
+            <li><a href="#privacy-18" th:text="#{privacy.s18.title}">18. Empfänger und Speicherdauer</a></li>
+            <li><a href="#privacy-19" th:text="#{privacy.s19.title}">19. Ihre Rechte</a></li>
+            <li><a href="#privacy-20" th:text="#{privacy.s20.title}">20. Widerspruchsrecht nach Art. 21 DSGVO</a></li>
+            <li><a href="#privacy-21" th:text="#{privacy.s21.title}">21. Beschwerderecht bei einer Aufsichtsbehörde</a></li>
+            <li><a href="#privacy-22" th:text="#{privacy.s22.title}">22. Pflicht zur Bereitstellung, automatisierte Entscheidungen</a></li>
+            <li><a href="#privacy-23" th:text="#{privacy.s23.title}">23. Datensicherheit</a></li>
+            <li><a href="#privacy-24" th:text="#{privacy.s24.title}">24. Änderungen dieser Datenschutzerklärung</a></li>
         </ol>
     </nav>
 
     <div class="card legal-doc" data-testid="legal-doc">
-        <h2 id="privacy-1" th:text="#{privacy.h1_1}">1. Datenschutz auf einen Blick</h2>
-
-        <h3 id="privacy-1-1" th:text="#{privacy.h2_1_1}">Allgemeine Hinweise</h3>
-        <p th:text="#{privacy.p_1_1}">Die folgenden Hinweise geben einen einfachen Überblick darüber...</p>
-
-        <h3 id="privacy-1-2" th:text="#{privacy.h2_1_2}">Wer ist verantwortlich für die Datenerfassung auf dieser Website?</h3>
-        <p th:text="#{privacy.p_1_2}">Die Datenverarbeitung auf dieser Website erfolgt durch...</p>
-
-        <h3 id="privacy-1-3" th:text="#{privacy.h2_1_3}">Wofür nutzen wir Ihre Daten?</h3>
-        <p th:text="#{privacy.p_1_3}">Ein Teil der Daten wird erhoben, um eine fehlerfreie Bereitstellung...</p>
-
-        <h3 id="privacy-1-4" th:text="#{privacy.h2_1_4}">Welche Rechte haben Sie bezüglich Ihrer Daten?</h3>
-        <p th:text="#{privacy.p_1_4}">Sie haben jederzeit das Recht, Auskunft über Herkunft...</p>
-
-        <h2 id="privacy-2" th:text="#{privacy.h1_2}">2. Allgemeine Hinweise und Pflichtinformationen</h2>
-
-        <h3 id="privacy-2-1" th:text="#{privacy.h2_2_1}">Verantwortliche Stelle</h3>
-        <p>
-            <span th:text="#{privacy.p_2_1}">Die verantwortliche Stelle für die Datenverarbeitung...</span><br><br>
-            <strong th:text="#{privacy.address.name}">Lucas Greuloch</strong><br>
-            <span th:text="#{privacy.address.street}">Stauffenbergallee 20a</span><br>
-            <span th:text="#{privacy.address.city}">56410 Montabaur</span><br><br>
-            <span th:text="#{privacy.contact.phone}">Telefon: 0170-9677429</span><br>
-            <span th:text="#{privacy.contact.email_label}">E-Mail:</span> <a th:href="'mailto:' + #{privacy.contact.email_value}" th:text="#{privacy.contact.email_value}">lucas.greuloch@gmail.com</a>
-        </p>
-
-        <h3 id="privacy-2-2" th:text="#{privacy.h2_2_2}">Speicherdauer</h3>
-        <p th:text="#{privacy.p_2_2}">Im Falle einer Löschanfrage Ihres Nutzerkontos werden...</p>
-
-        <h3 id="privacy-2-3" th:text="#{privacy.h2_2_3}">Ihre Rechte als Betroffener</h3>
-        <p th:text="#{privacy.p_2_3}">Sie haben im Rahmen der geltenden gesetzlichen Bestimmungen (insb. DSGVO) folgende Rechte:</p>
+        <h2 id="privacy-1" th:text="#{privacy.s1.title}">1. Datenschutz auf einen Blick</h2>
+        <p th:utext="#{privacy.s1.b1}">…</p>
+        <p th:utext="#{privacy.s1.b2}">…</p>
         <ul class="legal-list">
-            <li th:text="#{privacy.list_2_3_1}">Recht auf Auskunft...</li>
-            <li th:text="#{privacy.list_2_3_2}">Recht auf Berichtigung...</li>
-            <li th:text="#{privacy.list_2_3_3}">Recht auf Löschung...</li>
-            <li th:text="#{privacy.list_2_3_4}">Recht auf Einschränkung...</li>
-            <li th:text="#{privacy.list_2_3_5}">Recht auf Datenübertragbarkeit...</li>
-            <li th:text="#{privacy.list_2_3_6}">Widerspruchsrecht...</li>
-            <li th:text="#{privacy.list_2_3_7}">Recht auf Beschwerde...</li>
+            <li th:utext="#{privacy.s1.b3.i1}">…</li>
+            <li th:utext="#{privacy.s1.b3.i2}">…</li>
+            <li th:utext="#{privacy.s1.b3.i3}">…</li>
+            <li th:utext="#{privacy.s1.b3.i4}">…</li>
+            <li th:utext="#{privacy.s1.b3.i5}">…</li>
+            <li th:utext="#{privacy.s1.b3.i6}">…</li>
+            <li th:utext="#{privacy.s1.b3.i7}">…</li>
         </ul>
+        <h2 id="privacy-2" th:text="#{privacy.s2.title}">2. Verantwortlicher und Kontakt</h2>
+        <p th:utext="#{privacy.s2.b1}">…</p>
+        <p th:utext="#{privacy.s2.b2}">…</p>
+        <p th:utext="#{privacy.s2.b3}">…</p>
+        <h2 id="privacy-3" th:text="#{privacy.s3.title}">3. Rechtsgrundlagen im Überblick</h2>
+        <p th:utext="#{privacy.s3.b1}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s3.b2.i1}">…</li>
+            <li th:utext="#{privacy.s3.b2.i2}">…</li>
+            <li th:utext="#{privacy.s3.b2.i3}">…</li>
+            <li th:utext="#{privacy.s3.b2.i4}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s3.b3}">…</p>
+        <h2 id="privacy-4" th:text="#{privacy.s4.title}">4. Hosting</h2>
+        <p th:utext="#{privacy.s4.b1}">…</p>
+        <p th:utext="#{privacy.s4.b2}">…</p>
+        <p th:utext="#{privacy.s4.b3}">…</p>
+        <h2 id="privacy-5" th:text="#{privacy.s5.title}">5. Aufruf der Website und Server-Protokolle</h2>
+        <p th:utext="#{privacy.s5.b1}">…</p>
+        <p th:utext="#{privacy.s5.b2}">…</p>
+        <p th:utext="#{privacy.s5.b3}">…</p>
+        <p th:utext="#{privacy.s5.b4}">…</p>
+        <p th:utext="#{privacy.s5.b5}">…</p>
+        <h2 id="privacy-6" th:text="#{privacy.s6.title}">6. Cookies und Speicher im Browser</h2>
+        <p th:utext="#{privacy.s6.b1}">…</p>
+        <p th:utext="#{privacy.s6.b2}">…</p>
+        <div class="table-responsive">
+            <table class="data-table data-table--stack legal-table">
+                <thead><tr>
+                    <th scope="col" th:utext="#{privacy.s6.b3.h1}">…</th>
+                    <th scope="col" th:utext="#{privacy.s6.b3.h2}">…</th>
+                    <th scope="col" th:utext="#{privacy.s6.b3.h3}">…</th>
+                </tr></thead>
+                <tbody>
+                    <tr><td th:attr="data-label=#{privacy.s6.b3.h1}" th:utext="#{privacy.s6.b3.r1.c1}">…</td><td th:attr="data-label=#{privacy.s6.b3.h2}" th:utext="#{privacy.s6.b3.r1.c2}">…</td><td th:attr="data-label=#{privacy.s6.b3.h3}" th:utext="#{privacy.s6.b3.r1.c3}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s6.b3.h1}" th:utext="#{privacy.s6.b3.r2.c1}">…</td><td th:attr="data-label=#{privacy.s6.b3.h2}" th:utext="#{privacy.s6.b3.r2.c2}">…</td><td th:attr="data-label=#{privacy.s6.b3.h3}" th:utext="#{privacy.s6.b3.r2.c3}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s6.b3.h1}" th:utext="#{privacy.s6.b3.r3.c1}">…</td><td th:attr="data-label=#{privacy.s6.b3.h2}" th:utext="#{privacy.s6.b3.r3.c2}">…</td><td th:attr="data-label=#{privacy.s6.b3.h3}" th:utext="#{privacy.s6.b3.r3.c3}">…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p th:utext="#{privacy.s6.b4}">…</p>
+        <div class="table-responsive">
+            <table class="data-table data-table--stack legal-table">
+                <thead><tr>
+                    <th scope="col" th:utext="#{privacy.s6.b5.h1}">…</th>
+                    <th scope="col" th:utext="#{privacy.s6.b5.h2}">…</th>
+                    <th scope="col" th:utext="#{privacy.s6.b5.h3}">…</th>
+                </tr></thead>
+                <tbody>
+                    <tr><td th:attr="data-label=#{privacy.s6.b5.h1}" th:utext="#{privacy.s6.b5.r1.c1}">…</td><td th:attr="data-label=#{privacy.s6.b5.h2}" th:utext="#{privacy.s6.b5.r1.c2}">…</td><td th:attr="data-label=#{privacy.s6.b5.h3}" th:utext="#{privacy.s6.b5.r1.c3}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s6.b5.h1}" th:utext="#{privacy.s6.b5.r2.c1}">…</td><td th:attr="data-label=#{privacy.s6.b5.h2}" th:utext="#{privacy.s6.b5.r2.c2}">…</td><td th:attr="data-label=#{privacy.s6.b5.h3}" th:utext="#{privacy.s6.b5.r2.c3}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s6.b5.h1}" th:utext="#{privacy.s6.b5.r3.c1}">…</td><td th:attr="data-label=#{privacy.s6.b5.h2}" th:utext="#{privacy.s6.b5.r3.c2}">…</td><td th:attr="data-label=#{privacy.s6.b5.h3}" th:utext="#{privacy.s6.b5.r3.c3}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s6.b5.h1}" th:utext="#{privacy.s6.b5.r4.c1}">…</td><td th:attr="data-label=#{privacy.s6.b5.h2}" th:utext="#{privacy.s6.b5.r4.c2}">…</td><td th:attr="data-label=#{privacy.s6.b5.h3}" th:utext="#{privacy.s6.b5.r4.c3}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s6.b5.h1}" th:utext="#{privacy.s6.b5.r5.c1}">…</td><td th:attr="data-label=#{privacy.s6.b5.h2}" th:utext="#{privacy.s6.b5.r5.c2}">…</td><td th:attr="data-label=#{privacy.s6.b5.h3}" th:utext="#{privacy.s6.b5.r5.c3}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s6.b5.h1}" th:utext="#{privacy.s6.b5.r6.c1}">…</td><td th:attr="data-label=#{privacy.s6.b5.h2}" th:utext="#{privacy.s6.b5.r6.c2}">…</td><td th:attr="data-label=#{privacy.s6.b5.h3}" th:utext="#{privacy.s6.b5.r6.c3}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s6.b5.h1}" th:utext="#{privacy.s6.b5.r7.c1}">…</td><td th:attr="data-label=#{privacy.s6.b5.h2}" th:utext="#{privacy.s6.b5.r7.c2}">…</td><td th:attr="data-label=#{privacy.s6.b5.h3}" th:utext="#{privacy.s6.b5.r7.c3}">…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p th:utext="#{privacy.s6.b6}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s6.b7.i1}">…</li>
+            <li th:utext="#{privacy.s6.b7.i2}">…</li>
+            <li th:utext="#{privacy.s6.b7.i3}">…</li>
+            <li th:utext="#{privacy.s6.b7.i4}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s6.b8}">…</p>
+        <p th:utext="#{privacy.s6.b9}">…</p>
+        <h2 id="privacy-7" th:text="#{privacy.s7.title}">7. Registrierung, Anmeldung und Mitgliederkonto</h2>
+        <p th:utext="#{privacy.s7.b1}">…</p>
+        <p th:utext="#{privacy.s7.b2}">…</p>
+        <p th:utext="#{privacy.s7.b3}">…</p>
+        <p th:utext="#{privacy.s7.b4}">…</p>
+        <p th:utext="#{privacy.s7.b5}">…</p>
+        <p th:utext="#{privacy.s7.b6}">…</p>
+        <h2 id="privacy-8" th:text="#{privacy.s8.title}">8. Anmeldung über Discord</h2>
+        <p th:utext="#{privacy.s8.b1}">…</p>
+        <p th:utext="#{privacy.s8.b2}">…</p>
+        <p th:utext="#{privacy.s8.b3}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s8.b4.i1}">…</li>
+            <li th:utext="#{privacy.s8.b4.i2}">…</li>
+            <li th:utext="#{privacy.s8.b4.i3}">…</li>
+            <li th:utext="#{privacy.s8.b4.i4}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s8.b5}">…</p>
+        <p th:utext="#{privacy.s8.b6}">…</p>
+        <p th:utext="#{privacy.s8.b7}">…</p>
+        <h2 id="privacy-9" th:text="#{privacy.s9.title}">9. E-Mails zu Ihrem Konto</h2>
+        <p th:utext="#{privacy.s9.b1}">…</p>
+        <p th:utext="#{privacy.s9.b2}">…</p>
+        <p th:utext="#{privacy.s9.b3}">…</p>
+        <h2 id="privacy-10" th:text="#{privacy.s10.title}">10. Nutzung des Tools</h2>
+        <p th:utext="#{privacy.s10.b1}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s10.b2.i1}">…</li>
+            <li th:utext="#{privacy.s10.b2.i2}">…</li>
+            <li th:utext="#{privacy.s10.b2.i3}">…</li>
+            <li th:utext="#{privacy.s10.b2.i4}">…</li>
+            <li th:utext="#{privacy.s10.b2.i5}">…</li>
+            <li th:utext="#{privacy.s10.b2.i6}">…</li>
+            <li th:utext="#{privacy.s10.b2.i7}">…</li>
+            <li th:utext="#{privacy.s10.b2.i8}">…</li>
+            <li th:utext="#{privacy.s10.b2.i9}">…</li>
+            <li th:utext="#{privacy.s10.b2.i10}">…</li>
+            <li th:utext="#{privacy.s10.b2.i11}">…</li>
+            <li th:utext="#{privacy.s10.b2.i12}">…</li>
+            <li th:utext="#{privacy.s10.b2.i13}">…</li>
+            <li th:utext="#{privacy.s10.b2.i14}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s10.b3}">…</p>
+        <p th:utext="#{privacy.s10.b4}">…</p>
+        <h2 id="privacy-11" th:text="#{privacy.s11.title}">11. Was andere Mitglieder sehen</h2>
+        <p th:utext="#{privacy.s11.b1}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s11.b2.i1}">…</li>
+            <li th:utext="#{privacy.s11.b2.i2}">…</li>
+            <li th:utext="#{privacy.s11.b2.i3}">…</li>
+            <li th:utext="#{privacy.s11.b2.i4}">…</li>
+            <li th:utext="#{privacy.s11.b2.i5}">…</li>
+            <li th:utext="#{privacy.s11.b2.i6}">…</li>
+            <li th:utext="#{privacy.s11.b2.i7}">…</li>
+            <li th:utext="#{privacy.s11.b2.i8}">…</li>
+            <li th:utext="#{privacy.s11.b2.i9}">…</li>
+            <li th:utext="#{privacy.s11.b2.i10}">…</li>
+            <li th:utext="#{privacy.s11.b2.i11}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s11.b3}">…</p>
+        <h2 id="privacy-12" th:text="#{privacy.s12.title}">12. Benachrichtigungen und Live-Funktionen</h2>
+        <p th:utext="#{privacy.s12.b1}">…</p>
+        <p th:utext="#{privacy.s12.b2}">…</p>
+        <p th:utext="#{privacy.s12.b3}">…</p>
+        <h2 id="privacy-13" th:text="#{privacy.s13.title}">13. Verbundene Anwendungen</h2>
+        <p th:utext="#{privacy.s13.b1}">…</p>
+        <p th:utext="#{privacy.s13.b2}">…</p>
+        <p th:utext="#{privacy.s13.b3}">…</p>
+        <p th:utext="#{privacy.s13.b4}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s13.b5.i1}">…</li>
+            <li th:utext="#{privacy.s13.b5.i2}">…</li>
+            <li th:utext="#{privacy.s13.b5.i3}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s13.b6}">…</p>
+        <p th:utext="#{privacy.s13.b7}">…</p>
+        <p th:utext="#{privacy.s13.b8}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s13.b9.i1}">…</li>
+            <li th:utext="#{privacy.s13.b9.i2}">…</li>
+            <li th:utext="#{privacy.s13.b9.i3}">…</li>
+            <li th:utext="#{privacy.s13.b9.i4}">…</li>
+            <li th:utext="#{privacy.s13.b9.i5}">…</li>
+            <li th:utext="#{privacy.s13.b9.i6}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s13.b10}">…</p>
+        <p th:utext="#{privacy.s13.b11}">…</p>
+        <p th:utext="#{privacy.s13.b12}">…</p>
+        <h2 id="privacy-14" th:text="#{privacy.s14.title}">14. Begleitende Desktop-Anwendung (SC Extractor)</h2>
+        <p th:utext="#{privacy.s14.b1}">…</p>
+        <h2 id="privacy-15" th:text="#{privacy.s15.title}">15. Personen ohne Konto</h2>
+        <p th:utext="#{privacy.s15.b1}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s15.b2.i1}">…</li>
+            <li th:utext="#{privacy.s15.b2.i2}">…</li>
+            <li th:utext="#{privacy.s15.b2.i3}">…</li>
+            <li th:utext="#{privacy.s15.b2.i4}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s15.b3}">…</p>
+        <h2 id="privacy-16" th:text="#{privacy.s16.title}">16. Sicherheits-Monitoring</h2>
+        <p th:utext="#{privacy.s16.b1}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s16.b2.i1}">…</li>
+            <li th:utext="#{privacy.s16.b2.i2}">…</li>
+            <li th:utext="#{privacy.s16.b2.i3}">…</li>
+            <li th:utext="#{privacy.s16.b2.i4}">…</li>
+            <li th:utext="#{privacy.s16.b2.i5}">…</li>
+            <li th:utext="#{privacy.s16.b2.i6}">…</li>
+            <li th:utext="#{privacy.s16.b2.i7}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s16.b3}">…</p>
+        <h2 id="privacy-17" th:text="#{privacy.s17.title}">17. Datensicherung</h2>
+        <p th:utext="#{privacy.s17.b1}">…</p>
+        <h2 id="privacy-18" th:text="#{privacy.s18.title}">18. Empfänger und Speicherdauer</h2>
+        <p th:utext="#{privacy.s18.b1}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s18.b2.i1}">…</li>
+            <li th:utext="#{privacy.s18.b2.i2}">…</li>
+            <li th:utext="#{privacy.s18.b2.i3}">…</li>
+            <li th:utext="#{privacy.s18.b2.i4}">…</li>
+            <li th:utext="#{privacy.s18.b2.i5}">…</li>
+            <li th:utext="#{privacy.s18.b2.i6}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s18.b3}">…</p>
+        <p th:utext="#{privacy.s18.b4}">…</p>
+        <div class="table-responsive">
+            <table class="data-table data-table--stack legal-table">
+                <thead><tr>
+                    <th scope="col" th:utext="#{privacy.s18.b5.h1}">…</th>
+                    <th scope="col" th:utext="#{privacy.s18.b5.h2}">…</th>
+                </tr></thead>
+                <tbody>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r1.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r1.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r2.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r2.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r3.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r3.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r4.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r4.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r5.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r5.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r6.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r6.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r7.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r7.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r8.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r8.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r9.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r9.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r10.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r10.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r11.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r11.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r12.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r12.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r13.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r13.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r14.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r14.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r15.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r15.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r16.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r16.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r17.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r17.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r18.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r18.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r19.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r19.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r20.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r20.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r21.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r21.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r22.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r22.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r23.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r23.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r24.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r24.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r25.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r25.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r26.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r26.c2}">…</td></tr>
+                    <tr><td th:attr="data-label=#{privacy.s18.b5.h1}" th:utext="#{privacy.s18.b5.r27.c1}">…</td><td th:attr="data-label=#{privacy.s18.b5.h2}" th:utext="#{privacy.s18.b5.r27.c2}">…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <h2 id="privacy-19" th:text="#{privacy.s19.title}">19. Ihre Rechte</h2>
+        <p th:utext="#{privacy.s19.b1}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s19.b2.i1}">…</li>
+            <li th:utext="#{privacy.s19.b2.i2}">…</li>
+            <li th:utext="#{privacy.s19.b2.i3}">…</li>
+            <li th:utext="#{privacy.s19.b2.i4}">…</li>
+            <li th:utext="#{privacy.s19.b2.i5}">…</li>
+            <li th:utext="#{privacy.s19.b2.i6}">…</li>
+            <li th:utext="#{privacy.s19.b2.i7}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s19.b3}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s19.b4.i1}">…</li>
+            <li th:utext="#{privacy.s19.b4.i2}">…</li>
+            <li th:utext="#{privacy.s19.b4.i3}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s19.b5}">…</p>
+        <ul class="legal-list">
+            <li th:utext="#{privacy.s19.b6.i1}">…</li>
+            <li th:utext="#{privacy.s19.b6.i2}">…</li>
+            <li th:utext="#{privacy.s19.b6.i3}">…</li>
+            <li th:utext="#{privacy.s19.b6.i4}">…</li>
+            <li th:utext="#{privacy.s19.b6.i5}">…</li>
+            <li th:utext="#{privacy.s19.b6.i6}">…</li>
+            <li th:utext="#{privacy.s19.b6.i7}">…</li>
+        </ul>
+        <p th:utext="#{privacy.s19.b7}">…</p>
+        <h2 id="privacy-20" th:text="#{privacy.s20.title}">20. Widerspruchsrecht nach Art. 21 DSGVO</h2>
+        <div class="legal-callout" role="note">
+            <p th:utext="#{privacy.s20.b1.i1}">…</p>
+            <p th:utext="#{privacy.s20.b1.i2}">…</p>
+        </div>
+        <h2 id="privacy-21" th:text="#{privacy.s21.title}">21. Beschwerderecht bei einer Aufsichtsbehörde</h2>
+        <p th:utext="#{privacy.s21.b1}">…</p>
+        <p th:utext="#{privacy.s21.b2}">…</p>
+        <h2 id="privacy-22" th:text="#{privacy.s22.title}">22. Pflicht zur Bereitstellung, automatisierte Entscheidungen</h2>
+        <p th:utext="#{privacy.s22.b1}">…</p>
+        <p th:utext="#{privacy.s22.b2}">…</p>
+        <h2 id="privacy-23" th:text="#{privacy.s23.title}">23. Datensicherheit</h2>
+        <p th:utext="#{privacy.s23.b1}">…</p>
+        <h2 id="privacy-24" th:text="#{privacy.s24.title}">24. Änderungen dieser Datenschutzerklärung</h2>
+        <p th:utext="#{privacy.s24.b1}">…</p>
 
-        <h3 id="privacy-2-4" th:text="#{privacy.h2_2_4}">Widerruf Ihrer Einwilligung zur Datenverarbeitung</h3>
-        <p th:text="#{privacy.p_2_4}">Viele Datenverarbeitungsvorgänge sind nur mit Ihrer ausdrücklichen...</p>
-
-        <h3 id="privacy-2-5" th:text="#{privacy.h2_2_5}">Beschwerderecht bei der zuständigen Aufsichtsbehörde</h3>
-        <p th:text="#{privacy.p_2_5_1}">Im Falle datenschutzrechtlicher Verstöße steht Ihnen ein Beschwerderecht...</p>
-        <p>
-            <span th:text="#{privacy.p_2_5_2}">Der Landesbeauftragte...</span><br>
-            <span th:text="#{privacy.p_2_5_3}">Hintere Bleiche 34</span><br>
-            <span th:text="#{privacy.p_2_5_4}">55116 Mainz</span><br><br>
-            <span th:text="#{privacy.p_2_5_5}">Telefon: +49 (0) 6131 8920-0</span><br>
-            <span th:text="#{privacy.p_2_5_6}">Telefax: +49 (0) 6131 8920-299</span><br>
-            <span th:text="#{privacy.p_2_5_7}">Webseite: https://www.datenschutz.rlp.de/</span><br>
-            <span th:text="#{privacy.p_2_5_8}">E-Mail: poststelle(at)datenschutz.rlp.de</span>
-        </p>
-
-        <h2 id="privacy-3" th:text="#{privacy.h1_3}">3. Datenerfassung auf dieser Website</h2>
-
-        <h3 id="privacy-3-1" th:text="#{privacy.h2_3_1}">Externes Hosting</h3>
-        <p th:text="#{privacy.p_3_1_1}">Diese Website wird bei einem externen Dienstleister gehostet...</p>
-        <p th:text="#{privacy.p_3_1_2}">Der Einsatz des Hosters erfolgt zum Zwecke der Vertragserfüllung...</p>
-        <p th:utext="#{privacy.p_3_1_3}">Wir setzen folgenden Hoster ein...</p>
-        <p th:text="#{privacy.p_3_1_4}">Wir haben mit unserem Hoster einen Auftragsverarbeitungsvertrag (AVV)...</p>
-
-        <h3 id="privacy-3-2" th:text="#{privacy.h2_3_2}">Cookies</h3>
-        <p th:text="#{privacy.p_3_2_1}">Unsere Internetseiten verwenden ausschließlich technisch notwendige...</p>
-        <p th:utext="#{privacy.p_3_2_2}">Sitzungs-Cookie...</p>
-        <p th:utext="#{privacy.p_3_2_3}">XSRF-TOKEN...</p>
-        <p th:utext="#{privacy.p_3_2_4}">KRT_LOCALE...</p>
-        <p th:utext="#{privacy.p_3_2_6}">SSO_ATTEMPTED...</p>
-        <p th:utext="#{privacy.p_3_2_7}">Keycloak...</p>
-        <p th:utext="#{privacy.p_3_2_8}">Local Storage / Session Storage...</p>
-
-        <h3 id="privacy-3-3" th:text="#{privacy.h2_3_3}">Server-Log-Dateien</h3>
-        <p th:text="#{privacy.p_3_3_1}">Der Provider der Seiten erhebt und speichert automatisch...</p>
-        <p th:text="#{privacy.p_3_3_2}">Die Anwendung selbst protokolliert pro Aufruf nur technische Eckdaten...</p>
-
-        <h3 id="privacy-3-4" th:text="#{privacy.h2_3_4}">Mitgliederkonto und squadronbezogene Daten</h3>
-        <p th:text="#{privacy.p_3_4_1}">Zur Nutzung des Tools führen wir für Sie ein Mitgliederkonto...</p>
-        <p th:utext="#{privacy.p_3_4_2}">Kontodaten...</p>
-        <p th:utext="#{privacy.p_3_4_3}">Nutzungs- und Squadron-Daten...</p>
-        <p th:utext="#{privacy.p_3_4_4}">Sichtbarkeit innerhalb der Organisation...</p>
-        <p th:utext="#{privacy.p_3_4_5}">Angaben zu nicht registrierten Personen...</p>
-
-        <h3 id="privacy-3-5" th:text="#{privacy.h2_3_5}">Anmeldung über Discord</h3>
-        <p th:utext="#{privacy.p_3_5_1}">Für die Anmeldung können Sie sich alternativ mit Ihrem Discord-Konto authentifizieren...</p>
-        <p th:utext="#{privacy.p_3_5_2}">Bei der Anmeldung werden Sie auf die Seiten von Discord weitergeleitet...</p>
-        <p th:utext="#{privacy.p_3_5_3}">Aus diesen Daten speichern wir dauerhaft Ihre Discord-Account-ID...</p>
-        <p th:utext="#{privacy.p_3_5_4}">Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO...</p>
-
-        <h3 id="privacy-3-6" th:text="#{privacy.h2_3_6}">Benachrichtigungen und Live-Funktionen</h3>
-        <p th:text="#{privacy.p_3_6_1}">Innerhalb des Tools stellen wir Ihnen Benachrichtigungen bereit...</p>
-        <p th:text="#{privacy.p_3_6_2}">Einzelne Bereiche bieten eine Echtzeit-Zusammenarbeit...</p>
-
-        <h3 id="privacy-3-7" th:text="#{privacy.h2_3_7}">Begleitende Desktop-Anwendung (Datenimport)</h3>
-        <p th:text="#{privacy.p_3_7_1}">Optional können Sie eine begleitende Desktop-Anwendung verwenden...</p>
-
-        <h3 id="privacy-3-10" th:text="#{privacy.h2_3_10}">Verbundene Anwendungen</h3>
-        <p th:utext="#{privacy.p_3_10_1}">Sie können zugelassene Programme anderer Anbieter mit Ihrem Konto verbinden...</p>
-        <p th:utext="#{privacy.p_3_10_2}">Welche Daten die Anwendung erhält...</p>
-        <p th:utext="#{privacy.p_3_10_3}">Verarbeitung durch die Anwendung...</p>
-        <p th:utext="#{privacy.p_3_10_4}">Was wir zu Ihren Verbindungen speichern...</p>
-        <p th:utext="#{privacy.p_3_10_5}">Trennen und Rückgängigmachen...</p>
-        <p th:utext="#{privacy.p_3_10_6}">Ihr Name bei Logistikern Ihrer Einheiten...</p>
-        <p th:utext="#{privacy.p_3_10_7}">Kartellbank in verbundenen Anwendungen...</p>
-
-        <h3 id="privacy-3-8" th:text="#{privacy.h2_3_8}">Sicherheits-Monitoring und Missbrauchserkennung</h3>
-        <p th:text="#{privacy.p_3_8_1}">Zum Schutz des Betriebs betreiben wir ein internes Sicherheits-Monitoring...</p>
-        <p th:text="#{privacy.p_3_8_2}">Die aus dem Betrieb gewonnenen Kennzahlen und Auswertungen enthalten keine personenbezogenen Daten...</p>
-        <p th:text="#{privacy.p_3_8_3}">Zur Analyse von Fehlern und Antwortzeiten erfassen wir zudem technische Ablaufverfolgungen (Traces)...</p>
-
-        <p class="legal-updated"><em th:text="#{privacy.last_updated}">Stand dieser Datenschutzerklärung: 20.07.2026</em></p>
+        <p class="legal-updated" th:utext="#{privacy.last_updated}">…</p>
     </div>
     <th:block th:replace="~{shell/fragments/fankit :: band}" />
 </main>

@@ -77,13 +77,45 @@ class PrivacyControllerTest {
    * @throws Exception if the request fails
    */
   @ParameterizedTest
-  @CsvSource({"de,Verbundene Anwendungen", "en,Connected applications"})
+  @CsvSource({"de,13. Verbundene Anwendungen", "en,13. Connected applications"})
   void rendersTheConnectedApplicationsSection(String lang, String heading) throws Exception {
     mockMvc
         .perform(get("/privacy").param("lang", lang))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("<h3 id=\"privacy-3-10\">" + heading + "</h3>")))
+        .andExpect(content().string(containsString("<h2 id=\"privacy-13\">" + heading + "</h2>")))
         .andExpect(content().string(containsString("href=\"" + APPROVED_CLIENTS_URL + "\"")));
+  }
+
+  /**
+   * The notice names the e-mail relay as a processor and states the right to object in its own
+   * highlighted box, as Art. 21(4) GDPR requires, in both languages.
+   *
+   * @param lang the language requested through the {@code lang} parameter
+   * @param objection the heading of the objection section in that language
+   * @throws Exception if the request fails
+   */
+  @ParameterizedTest
+  @CsvSource({
+    "de,20. Widerspruchsrecht nach Art. 21 DSGVO",
+    "en,20. Right to object under Art. 21 GDPR"
+  })
+  void namesTheMailRelayAndHighlightsTheRightToObject(String lang, String objection)
+      throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/privacy").param("lang", lang))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("Lettermint B.V.")
+        .contains("<h2 id=\"privacy-20\">" + objection + "</h2>")
+        .containsPattern(
+            "id=\"privacy-20\">[^<]*</h2>\\s*<div class=\"legal-callout\" role=\"note\">")
+        .doesNotContain("XSRF-TOKEN")
+        .doesNotContain("??privacy.");
   }
 
   /**
@@ -114,6 +146,6 @@ class PrivacyControllerTest {
       links++;
       assertThat(html).as("target of #%s", link.group(1)).contains("id=\"" + link.group(1) + "\"");
     }
-    assertThat(links).as("one jump link per section and subsection").isEqualTo(21);
+    assertThat(links).as("one jump link per section").isEqualTo(24);
   }
 }

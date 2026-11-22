@@ -38,6 +38,28 @@
         margin-top: var(--space-1);
     }
 
+    .legal-callout {
+        max-width: var(--measure);
+        margin: 0 0 var(--space-4);
+        padding: var(--space-3) var(--space-4);
+        border: var(--border-hairline);
+        border-left: 3px solid var(--color-primary);
+        background: var(--color-surface-input);
+    }
+
+    .legal-callout p:last-child {
+        margin-bottom: 0;
+    }
+
+    .legal-doc .table-responsive {
+        margin-bottom: var(--space-4);
+    }
+
+    .legal-table th,
+    .legal-table td {
+        vertical-align: top;
+    }
+
     .legal-updated {
         margin-top: var(--space-8);
         color: var(--color-gray-2-text);
