@@ -329,9 +329,12 @@ fails, and it fails as `invalid_grant` / **"Invalid user credentials"**, which r
 password and sends you looking in the wrong place. The realm's own log is what disambiguates it:
 
 ```bash
-sudo -u basetool podman logs --tail 300 keycloak 2>&1 | grep LOGIN_ERROR \
+journalctl CONTAINER_NAME=keycloak -n 300 --no-pager -o cat | grep LOGIN_ERROR \
     | grep -oE 'realmName="[^"]*"|error="[^"]*"' | tail -10
 ```
+
+The container logs through journald, and `podman logs` as `basetool` prints nothing: the system
+account cannot read the system journal (ADR-0403). Read it as the operator.
 
 `error="invalid_user_credentials"` for an account whose password demonstrably works in the Admin
 Console means the second factor, not the password. (`user_temporarily_disabled` would mean the

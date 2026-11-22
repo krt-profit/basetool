@@ -1637,6 +1637,11 @@ HOST_EXPORTERS = {
     "alloy": ("alloy_build_info", "http://127.0.0.1:12345/metrics"),
 }
 
+PODMAN_EXPORTER_METRICS = "http://127.0.0.1:9882/metrics"
+
+# podman's short image id, the form the exporter's ``id`` label carries.
+PODMAN_SHORT_ID_LENGTH = 12
+
 COMPOSE_MONITORING = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docker-compose.monitoring.yml"
 )
@@ -1718,6 +1723,56 @@ def check_host_exporter_versions(ctx: Context) -> str:
     if problems:
         raise CheckFailed("; ".join(problems))
     return "host packages match the compose pins: " + ", ".join(good)
+
+
+def check_podman_exporter_images_current(ctx: Context) -> str:
+    """Every image a running container uses is in the podman exporter's image series.
+
+    The exporter re-reads the image list on each podman image event (ADR-0403). An exporter that
+    cannot read the service user's event log keeps the list it read at start, so the images a
+    deploy pulled never appear in it.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming how many images in use the exporter reports.
+
+    Raises:
+        Skip: when no host access is configured or no container runs.
+        CheckFailed: when the exporter reports no images, or misses an image in use.
+    """
+    listing = ctx.runner.run(f"{ctx.runner.container_cli} ps --format '{{{{.ImageID}}}}'")
+    in_use = {
+        line.strip()[:PODMAN_SHORT_ID_LENGTH] for line in listing.splitlines() if line.strip()
+    }
+    if not in_use:
+        raise Skip("no container runs, so no image is in use")
+
+    exported = set(
+        re.findall(
+            r'[{,]id="([0-9a-f]+)"',
+            ctx.runner.run(
+                f"curl -s --max-time 5 {PODMAN_EXPORTER_METRICS} 2>/dev/null "
+                "| grep '^podman_image_info' || true"
+            ),
+        )
+    )
+    if not exported:
+        raise CheckFailed(
+            f"no podman_image_info series at {PODMAN_EXPORTER_METRICS} -- the podman exporter is "
+            "down or reports no images, so its image list says nothing"
+        )
+
+    missing = sorted(in_use - exported)
+    if missing:
+        raise CheckFailed(
+            f"{len(missing)} of {len(in_use)} image(s) in use are not in the exporter's image "
+            f"list: {', '.join(missing)} -- it is not following podman's image events. The "
+            "service user's `podman info --format '{{.Host.EventLogger}}'` must say file; then "
+            "restart prometheus-podman-exporter.service (ADR-0403)"
+        )
+    return f"the exporter reports all {len(in_use)} image(s) in use"
 
 
 UPDATE_EXCLUDED_RUNTIME = (
@@ -2046,6 +2101,12 @@ CHECKS: tuple[Check, ...] = (
     Check("pasta-maps-host-aliases", "REQ-OPS-022 / ADR-0196", True, check_pasta_maps_host_aliases),
     Check("containers-read-only", "REQ-OPS-014 / ADR-0190", True, check_containers_read_only),
     Check("host-exporter-versions", "REQ-OBS-005 / OPS-SEC-06", True, check_host_exporter_versions),
+    Check(
+        "podman-exporter-images-current",
+        "REQ-OBS-014 / ADR-0403",
+        True,
+        check_podman_exporter_images_current,
+    ),
     Check("security-updates-enabled", "REQ-OPS-032", True, check_security_updates_enabled),
     Check("epel-branch", "REQ-OPS-062", True, check_epel_branch),
     Check("ssh-root-login-refused", "REQ-OPS-052", True, check_ssh_root_login_refused),

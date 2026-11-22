@@ -2710,13 +2710,12 @@ digest an installed unit's `Image=` pins, else the first podman lists, which is 
 added. Nothing is pulled or removed: a unit that still names the dropped digest — a rollback —
 resolves to the same image through the digests the image records.
 
-The exporter reads the image list when it starts, so it reports a dropped name until its next
-restart. By hand on a host, after `podman image list --no-trunc --format '{{.ID}} {{.Names}}'`
+The exporter re-reads the image list on the untag event and stops reporting the dropped name
+(ADR-0403). By hand on a host, after `podman image list --no-trunc --format '{{.ID}} {{.Names}}'`
 showed the pair, as the operator:
 
 ```bash
 cd / && sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) podman image untag <image id> <superseded repo@sha256:…>
-sudo -u basetool XDG_RUNTIME_DIR=/run/user/$(id -u basetool) systemctl --user restart prometheus-podman-exporter.service
 ```
 
 ---
