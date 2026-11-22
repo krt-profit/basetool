@@ -278,8 +278,8 @@ public class HangarPageController {
     List<LocationDto> locations = locationsFuture.join();
     locations.sort(Comparator.comparing(LocationDto::name, String.CASE_INSENSITIVE_ORDER));
 
-    List<ManufacturerDto> manufacturers = manufacturersFuture.join();
-    manufacturers.sort(Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
+    List<ManufacturerDto> manufacturers =
+        ShipPickerManufacturers.ofShipTypes(manufacturersFuture.join(), shipTypes);
 
     List<LocationDto> homeLocations = homeLocationsFuture.join();
 

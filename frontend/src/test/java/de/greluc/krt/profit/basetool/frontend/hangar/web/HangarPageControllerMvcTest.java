@@ -154,6 +154,40 @@ class HangarPageControllerMvcTest {
         .andExpect(view().name("hangar/hangar"));
   }
 
+  /** The ship dialog's manufacturer filter offers only makers of offered ships (REQ-HANGAR-020). */
+  @Test
+  @WithMockUser
+  void theShipDialogOffersOnlyManufacturersOfOfferedShipTypes() throws Exception {
+    ManufacturerDto drake =
+        new ManufacturerDto(
+            UUID.randomUUID(), "Drake Interplanetary", "DRAK", null, null, null, false);
+    ManufacturerDto weaponsOnly =
+        new ManufacturerDto(UUID.randomUUID(), "Behring", "BEHR", null, null, null, false);
+    ShipTypeDto cutlass =
+        new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", drake, null, BigDecimal.ZERO, false);
+    when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 1, List.of()));
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(cutlass), 0, 1000, 1, 1, List.of()));
+    when(backendApiClient.getCached(eq(CachedCatalog.MANUFACTURERS), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(weaponsOnly, drake), 0, 1000, 2, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/hangar"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern(
+            "(?s)<select id=\"ship-manufacturer\".*?<option value=\""
+                + drake.id()
+                + "\">Drake Interplanetary</option>")
+        .doesNotContain(weaponsOnly.id().toString());
+  }
+
   /** The add-ship dialog starts at the member's home location (REQ-PATCH-033). */
   @Test
   @WithMockUser

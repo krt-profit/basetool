@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -166,6 +167,36 @@ class MemberHangarPageControllerTest {
                     matchesPattern(
                         "(?s).*<select id=\"owningOrgUnitId\" name=\"owningOrgUnitId\""
                             + " required=\"required\">\\s*<option value=\"\">.*")));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void shipDialogOffersOnlyManufacturersOfOfferedShipTypes() throws Exception {
+    ManufacturerDto drake =
+        new ManufacturerDto(
+            UUID.randomUUID(), "Drake Interplanetary", "DRAK", null, null, null, false);
+    ManufacturerDto weaponsOnly =
+        new ManufacturerDto(UUID.randomUUID(), "Behring", "BEHR", null, null, null, false);
+    ShipTypeDto cutlass =
+        new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", drake, null, BigDecimal.ZERO, false);
+    when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(cutlass), 0, 1000, 1, 1, List.of()));
+    when(backendApiClient.getCached(eq(CachedCatalog.MANUFACTURERS), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(weaponsOnly, drake), 0, 1000, 2, 1, List.of()));
+
+    mockMvc
+        .perform(get(BASE))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    matchesPattern(
+                        "(?s).*<select id=\"member-ship-manufacturer\".*?<option value=\""
+                            + drake.id()
+                            + "\">Drake Interplanetary</option>.*")))
+        .andExpect(content().string(not(containsString(weaponsOnly.id().toString()))));
   }
 
   @Test
