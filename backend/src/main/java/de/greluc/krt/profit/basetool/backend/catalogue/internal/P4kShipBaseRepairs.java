@@ -176,7 +176,8 @@ class P4kShipBaseRepairs {
   /**
    * Checks the base a ship type moves to: a player ship heading its group, with a known vehicle
    * kind, a class name no other record repeats, and a GUID, class name and name no other live ship
-   * type holds, whose base data can replace every stored fact.
+   * type holds, whose base data can replace every stored fact; a departed ship type keeps its
+   * descriptions.
    *
    * @param row the moving ship type
    * @param base the base record
@@ -211,7 +212,7 @@ class P4kShipBaseRepairs {
                     && (baseGuid.equals(other.getP4kUuid())
                         || sameKey(base.className(), other.getClassName())
                         || sameKey(base.nameEn(), other.getName())))
-        && baseData.canRefreshBase(row, base, context);
+        && baseData.canRefreshBase(row, base, context, variant == null);
   }
 
   /**

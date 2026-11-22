@@ -44,6 +44,8 @@ class P4kShipIdentityFollowImportTest {
   private static final UUID DEPARTED = UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1d0ff");
   private static final UUID ITEMLESS_PAINT =
       UUID.fromString("ab20545b-6dfd-4508-b35c-ff2500b1d0aa");
+  private static final String WIKI_TEXT_EN = "A Wiki text about the ship.";
+  private static final String WIKI_TEXT_DE = "Ein Wiki-Text zum Schiff.";
   private static final String BASE_CLASS = "TEST_Follow_Base";
   private static final String NAME = "Follow Test Ship";
 
@@ -100,6 +102,33 @@ class P4kShipIdentityFollowImportTest {
     P4kImportRuns runs = new P4kImportRuns(imports, jobs);
 
     runs.apply(P4kTestCatalogues.bytes(withItemlessPaintOfBase()), false);
+
+    assertThat(ship.getP4kUuid()).isEqualTo(EDITION);
+  }
+
+  @Test
+  void aShipTypeWhoseGuidLeftKeepsItsOwnDescriptionsWhenItFollowsItsSuccessor() {
+    ShipType departed = ship(NAME, DEPARTED, "TEST_Follow_Old");
+    departed.setDescriptionEn(WIKI_TEXT_EN);
+    departed.setDescriptionDe(WIKI_TEXT_DE);
+    ShipType ship = ships.saveAndFlush(departed);
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    runs.apply(P4kTestCatalogues.bytes(catalogue()), false);
+
+    assertThat(ship.getP4kUuid()).isEqualTo(BASE);
+    assertThat(ship.getDescriptionEn()).isEqualTo(WIKI_TEXT_EN);
+    assertThat(ship.getDescriptionDe()).isEqualTo(WIKI_TEXT_DE);
+  }
+
+  @Test
+  void anEditionWaitsWhileItsDescriptionDiffersFromItsBase() {
+    ShipType edition = ship(NAME, EDITION, "TEST_Follow_Edition");
+    edition.setDescriptionEn(WIKI_TEXT_EN);
+    ShipType ship = ships.saveAndFlush(edition);
+    P4kImportRuns runs = new P4kImportRuns(imports, jobs);
+
+    runs.apply(P4kTestCatalogues.bytes(catalogue()), false);
 
     assertThat(ship.getP4kUuid()).isEqualTo(EDITION);
   }
