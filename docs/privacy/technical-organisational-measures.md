@@ -1,6 +1,6 @@
 # Technical and organisational measures (Art. 32 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-21.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-22.
 
 Art. 32 requires measures appropriate to the risk. This document does not restate them in the
 abstract; each measure names **where it is enforced**, so a reader can check the claim rather than
@@ -78,7 +78,8 @@ measures below are accordingly proportionate rather than exhaustive.
   pass through masking stages in `monitoring/alloy/config.alloy` before they reach Loki; the stages
   themselves are gated by `scripts/check-alloy-log-masking.py` in CI (REQ-OBS-007). The edge access
   log and the host authentication and security logs keep client IPs deliberately, for 31 days
-  (ADR-0072).
+  (ADR-0072); the access log carries no query string, and every host-side file copy is held inside
+  the same 31 days (REQ-OBS-010). No application log line carries a client IP (REQ-OBS-004).
 - **Metrics and traces carry no personal data.** `ObservationPrivacyFilter` cuts query strings and
   reduces UUID and numeric path segments to placeholders before they can become metric tags or span
   attributes (REQ-OBS-006/-009).
