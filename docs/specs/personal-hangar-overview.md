@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-22.
 > **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md), [ADR-0295](../adr/0295-a-hangar-import-matches-ships-by-pledge-and-keeps-pledge-data-private.md), [ADR-0386](../adr/0386-the-coarse-ship-origin-is-exchanged.md)
 
 # Personal hangar overview — pagination & server-side sort/filter
@@ -625,6 +625,30 @@ the member to choose in the result dialog instead of skipping it.
 `ImportEntryResolver`, `HangarImportService#importShips`, `HangarController#importShips`,
 `HangarImportProxyController`, `HangarBackendClient#importShips`, `hangar/hangar-import.js`,
 `templates/hangar/hangar.html`
+
+### REQ-HANGAR-020 — The ship dialogs offer only manufacturers that make an offered ship
+
+The manufacturer filter of the ship dialog of „Meine Schiffe" and of the admin member hangar
+(REQ-HANGAR-011) MUST offer only the manufacturers that make at least one ship type its ship-type
+picker offers, ordered by name. The picker offers the ship types the catalogue lists as in the game
+and not hidden (REQ-P4K-013); a manufacturer of weapons, components or items with no such ship type
+does not appear, and neither does a hidden manufacturer. Every manufacturer the filter offers
+therefore leaves at least one ship type to choose. The Fan Kit marks beside the picker
+(REQ-P4K-022) cover the same manufacturers, which include the maker of every offered ship type the
+catalogue lists.
+
+**Acceptance**
+
+- [x] A catalogue manufacturer without an offered ship type is left out, a ship type without a
+  manufacturer adds none, and the rest are ordered by name ignoring case.
+  *`ShipPickerManufacturersTest`.*
+- [x] Both dialogs render only the manufacturers of the offered ship types.
+  *`HangarPageControllerMvcTest`, `MemberHangarPageControllerTest`.*
+
+**Enforced by:** `ShipPickerManufacturersTest`, `HangarPageControllerMvcTest`,
+`MemberHangarPageControllerTest` · **Code:** `ShipPickerManufacturers`,
+`HangarPageController#viewHangar`, `MemberHangarPageController#viewMemberHangar`,
+`templates/hangar/hangar.html`, `templates/hangar/member-hangar.html`
 
 ## Out of scope
 

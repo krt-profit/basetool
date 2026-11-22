@@ -164,8 +164,8 @@ public class MemberHangarPageController {
     shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
     List<LocationDto> locations = locationsFuture.join();
     locations.sort(Comparator.comparing(LocationDto::name, String.CASE_INSENSITIVE_ORDER));
-    List<ManufacturerDto> manufacturers = manufacturersFuture.join();
-    manufacturers.sort(Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
+    List<ManufacturerDto> manufacturers =
+        ShipPickerManufacturers.ofShipTypes(manufacturersFuture.join(), shipTypes);
 
     model.addAttribute("memberName", memberName(memberFuture.join()));
     model.addAttribute("ownerOptions", unitsFuture.join());
