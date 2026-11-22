@@ -2070,6 +2070,17 @@ confirmable even when the employee cannot see the destination; capability gate o
 > „Wer hat freigegeben?". `BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED` is unchanged and carries no
 > free text (REQ-AUDIT-001); the note never leaves through the exchange.
 >
+> **Amended (owner-approved):** the required approver may also **reject** a flagged request instead
+> of approving it. „Ablehnen" beside „Freigabe erteilen" in „Anträge an unsere Konten" opens the
+> bank's rejection dialog with its mandatory reason and posts to
+> `POST /api/v1/bank/org-units/requests/{id}/reject` (`{ reason, version }`). The request flips to
+> `REJECTED` with the approver as decider, exactly like a bank employee's rejection (REQ-BANK-023):
+> the `BOOKING_REQUEST_REJECTED` audit, the requester's rejection notice with the reason, the
+> „Freigabe nötig" notice cleared, and a linked or purpose-bound request decided like any other
+> rejection. The approver needs the same right as for the grant (`mayApprove` in the active
+> context), the request must still be pending and need approval (400 otherwise), and a stale version
+> answers 409. A rejection is not a grant, so the four-eyes rule (REQ-BANK-062) does not bar it.
+>
 > **Amended by REQ-BANK-042:** approval limits — and the two-step owner approval below — apply to
 > **withdrawal and transfer** requests only (money *leaving* an account). A **deposit** is never
 > subject to an approval limit: `requires_owner_approval` is always `false` and `applicable_limit`
@@ -2172,7 +2183,8 @@ flagged** (amended, ADR-0123), so neither step below runs for them and the reque
 warning. (1) The
 responsible holder may **grant approval in-app** from the „Anträge an unsere Konten" tab — the requests
 raised against the accounts they are responsible for — recorded as `owner_approval_granted` (with
-who/when) and audited (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED` / `…_REVOKED`). (2) The bank employee
+who/when) and audited (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED` / `…_REVOKED`) — or reject the
+request there with a reason (amended above). (2) The bank employee
 sees an explicit warning in the confirmation dialog and must tick a mandatory
 **"Freigabe durch Kontoverantwortlichen erfolgt"** checkbox (pre-filled when (1) happened) before the
 request can be confirmed; ticking it is audited (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`). A
@@ -2238,20 +2250,23 @@ project concurrency rules, not a defect.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (limit resolution incl. the all-members ceiling
 applying to a non-member per-user view-grant holder; `canConfigureApprovalLimits` matrix —
-holder/management/admin yes, employee/member no; set/clear audit; grant/revoke owner approval, incl.
-a non-responsible-holder being rejected; **the no-limit case always flags approval**,
+holder/management/admin yes, employee/member no; set/clear audit; grant/revoke owner approval and
+the approver's rejection (`rejectAsApprover_*`), incl. a non-responsible-holder being refused; **the no-limit case always flags approval**,
 `createBookingRequest_withdrawalNoLimit_alwaysFlagsRequiresOwnerApproval`; **the responsible holder
 is exempt** — `createBookingRequest_byResponsibleHolder_needsNoApproval` (no limit lookup happens at
 all), `createBookingRequest_byResponsibleHolderAboveConfiguredLimit_stillNeedsNoApproval` and
 `createBookingRequest_krtByOlMember_bypassesAmountLadder`),
 `BankBookingRequestServiceTest` (snapshot at create;
+the approver's rejection flips `REJECTED` and refuses an unauthorized caller, a stale version and a
+request that needs no approval, `rejectAsApprover_*`;
 confirm gate 409 + audit; pre-fill is UI-only; the attested confirm without an approver note is
 400 and books nothing, `confirm_attestedOverLimitWithoutApproverNote_isRefusedAndBooksNothing`, a
 recorded approval keeps the note optional,
 `confirm_overLimitWithRecordedApproval_booksWithoutApproverNote`), `DomainProblemContractTest`
 (`BANK_APPROVER_NOTE_REQUIRED` wire contract), `GlobalExceptionHandlerTest` and
 `BankRequestQueuePageControllerMvcTest` (frontend message and the „Wer hat freigegeben?" hint),
-`OrgUnitBankControllerTest`,
+`OrgUnitBankControllerTest`, `OrgUnitBankPageControllerMvcTest` (an open approval offers both
+„Freigabe erteilen" and „Ablehnen", `orgUnitBank_openApprovalOffersGrantAndReject`),
 `BankAccountServiceTest` (the bank-staff detail surface assembles limits read-only — `canEdit`
 forced `false` even for management,
 `getAccountDetail_assemblesApprovalLimitsReadOnlyEvenForManagement`),
@@ -2262,9 +2277,11 @@ swap) · **Code:**
 `bank/internal/BankAccountApprovalLimitRepository`, `bank/internal/BankApprovalLimitService`,
 `bank/internal/OrgUnitBankAccessService` (resolution + authorization), `bank/internal/OrgUnitBankApprovalLimitService`
 (upsert/clear + audit), `bank/internal/BankBookingRequestService`,
+`bank/internal/BankRequestRejection` (the rejection both the bank and the approver record),
 `bank/internal/BankOverLimitConfirmGate` (the confirm gate: checkbox and approver note),
 `db/migration/V193`, frontend
 `templates/bank/fragments/bank-approval-limits.html` + `bank/org-unit-bank.html` + `bank/bank-requests.html` +
+`bank/fragments/bank-reject-modal.html` (the rejection dialog both surfaces share) +
 `static/js/bank/bank.js` (the `data-exempt` short-circuit in the live warning) ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md),
 [ADR-0123](../adr/0123-responsible-holder-exempt-from-approval-limits.md),

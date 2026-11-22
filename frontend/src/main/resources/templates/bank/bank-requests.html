@@ -294,32 +294,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-reject-request-modal', titleKey='bank.request.reject.modal.title', variant='krt-modal--danger', body=~{::bank-reject-request-modal-body})}">
-        <th:block th:ref="bank-reject-request-modal-body">
-            <form class="bank-ajax-form no-track" data-refresh="requestQueue"
-                  data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank"
-                  data-endpoint="/api/proxy/bank/requests/{id}/reject" data-method="POST">
-                <div class="krt-modal-body">
-                    <input type="hidden" name="_id">
-                    <input type="hidden" name="version">
-                    <p class="text-muted"><span data-bank-label="reqlabel">KB-0001 &middot; Einzahlung 5.000</span></p>
-                    <div class="bank-form-row">
-                        <label for="bank-reject-reason" th:text="#{bank.request.field.reason}">Grund</label>
-                        <input type="text" id="bank-reject-reason" name="reason" maxlength="500" required
-                               data-testid="bank-reject-reason" th:placeholder="#{bank.request.field.reason.placeholder}">
-                        <span class="bank-field-error" data-error-for="reason"></span>
-                    </div>
-                    <span class="bank-field-error" data-error-for="_global"></span>
-                </div>
-                <div class="krt-modal-foot">
-                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
-                            data-modal-id="bank-reject-request-modal" th:text="#{general.cancel}">Abbrechen</button>
-                    <button type="submit" class="btn btn-danger" data-testid="bank-reject-submit"
-                            th:text="#{bank.request.action.reject}">Ablehnen</button>
-                </div>
-            </form>
-        </th:block>
-    </th:block>
+    <th:block th:replace="~{bank/fragments/bank-reject-modal :: rejectModal(endpoint='/api/proxy/bank/requests/{id}/reject', refreshTarget='requestQueue', livesync='bank/requestQueue,grid orgunit-bank/orgUnitBank')}"></th:block>
 
     <th:block th:if="${canBook}">
         <th:block th:replace="~{bank/fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'requestQueue', null, true, false, true, true, true)}"></th:block>

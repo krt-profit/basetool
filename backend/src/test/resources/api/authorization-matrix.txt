@@ -70,6 +70,7 @@ PUT /api/v1/bank/org-units/requests/{id} | OrgUnitBankController#updateOwnBookin
 POST /api/v1/bank/org-units/requests/{id}/cancel | OrgUnitBankController#cancelOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/bank/org-units/requests/{id}/owner-approval | OrgUnitBankController#revokeOwnerApproval | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/bank/org-units/requests/{id}/owner-approval | OrgUnitBankController#grantOwnerApproval | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/bank/org-units/requests/{id}/reject | OrgUnitBankController#rejectAsApprover | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/transfer-targets | OrgUnitBankController#listTransferTargets | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/requests | BankRequestController#getQueue | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/requests/{id}/confirm | BankRequestController#confirm | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated

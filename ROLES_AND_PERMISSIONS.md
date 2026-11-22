@@ -1126,6 +1126,7 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 | Submit a **withdrawal / transfer** request on a **visible** requestable account (`OrgUnitBankRequestService#createBookingRequest`, `OrgUnitBankAccessService#canView`) |          ✅          |      ✅      |    (✅)*    |    (✅)*    |   ✅   |
 | Set/remove approval limits per level (`canConfigureApprovalLimits`)                                                                          |          ❌          |      ✅      |     ❌      |     ✅      |   ✅‡  |
 | **Approve/revoke** an over-limit request („Anträge an unsere Konten" tab, account in one's own responsibility)                                |          ❌          |      ✅      |     ❌      |     ❌      |   ✅   |
+| **Reject** an over-limit request with a reason instead of approving it (same tab and right as the approval; the request becomes `REJECTED`)  |          ❌          |      ✅      |     ❌      |     ❌      |   ✅   |
 | **Confirm** an over-limit request (mandatory checkbox, otherwise 409 `BANK_OWNER_APPROVAL_REQUIRED`; without an in-app approval the staff note must name the approver, otherwise 400 `BANK_APPROVER_NOTE_REQUIRED`) |          ❌          |      ❌      | ✅ per flag |     ✅      |   ✅   |
 
 ‡ As in §3.11.2: with a unit selected, an admin sets limits only on that unit's own account; Bank Management's right to the limits does not depend on the selection (REQ-ORG-032).
@@ -1141,8 +1142,8 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 | Function (gate)                                                                         | Member | Bereichsl. Profit | OL | Bank Empl. | Bank Mgmt. | Admin |
 |:----------------------------------------------------------------------------------------|:------:|:-----------------:|:--:|:----------:|:----------:|:-----:|
 | Set/remove the KRT thresholds `T1`/`T2` (`setCartelApprovalTiers`, „KRT-Freigaben" tab) |   ❌    |         ❌         | ❌  |     ❌      |     ✅      |   ✅   |
-| **Approve** a KRT `T1..T2`-band request („Anträge an unsere Konten", `BANK_MANAGEMENT`) |   ❌    |         ❌         | ❌  |     ❌      |     ✅      |   ✅   |
-| **Approve** a KRT `> T2`-band request („Anträge an unsere Konten", `ORGANISATIONSLEITUNG`) |   ❌    |         ❌         | ✅  |     ❌      |     ❌      |   ✅   |
+| **Approve or reject** a KRT `T1..T2`-band request („Anträge an unsere Konten", `BANK_MANAGEMENT`) |   ❌    |         ❌         | ❌  |     ❌      |     ✅      |   ✅   |
+| **Approve or reject** a KRT `> T2`-band request („Anträge an unsere Konten", `ORGANISATIONSLEITUNG`) |   ❌    |         ❌         | ✅  |     ❌      |     ❌      |   ✅   |
 | **Direct** KRT withdrawal/transfer above `T1` (auto-filed as a request, `202`)          |   —    |         —         | —  |   📝 202   |     ✅      |   ✅   |
 
 - **"Mitglieder des Bereichs" audience (REQ-BANK-048):** a Bereichskonto (`AREA`) may additionally open its balance/limit to the **whole area cascade** (Bereichsleitung + all child Staffel/SK members) via the new `AREA_MEMBERS` bucket — alongside the existing Bereich sub-ranks, all-Bereichsleitung (`ALL_MEMBERS`) and individual users. Only the responsible holder / Bank Management / Admin configure it.

@@ -134,7 +134,8 @@ class BankPurposeBoundRequestServiceTest {
             mock(BankLinkedBookings.class),
             mock(BankLinkedRequestLiveSync.class),
             mock(NotificationCauseCollector.class),
-            new BankRequestConfirmation(creation, bankAuditService));
+            new BankRequestConfirmation(creation, bankAuditService),
+            new BankRequestRejection(creation, bankAuditService));
   }
 
   @BeforeEach

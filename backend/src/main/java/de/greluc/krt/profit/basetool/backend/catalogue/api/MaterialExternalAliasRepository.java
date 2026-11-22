@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -62,4 +65,15 @@ public interface MaterialExternalAliasRepository
    * @return all alias rows of that source, in no guaranteed order
    */
   List<MaterialExternalAlias> findBySourceSystem(MaterialExternalAliasSource sourceSystem);
+
+  /**
+   * Clears the author stamp on every alias the given account created, for the account deletion; the
+   * alias itself keeps resolving the name.
+   *
+   * @param author the departing account's {@code app_user.id} as stored in {@code created_by}
+   * @return the number of aliases whose author was cleared
+   */
+  @Modifying
+  @Query("UPDATE MaterialExternalAlias a SET a.createdBy = null WHERE a.createdBy = :author")
+  int clearAuthor(@Param("author") String author);
 }

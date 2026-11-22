@@ -114,6 +114,21 @@ class BankLinkedDecisions {
   }
 
   /**
+   * Prepares the required approver's rejection of a request before acquiring Bank locks
+   * (REQ-BANK-041); the caller authorizes the approver under the request's row lock.
+   *
+   * @param requestId the pending request
+   * @return the prepared decision, or {@code null} for a request without a linked attempt
+   */
+  @Nullable
+  Prepared forApproverRejection(@NotNull UUID requestId) {
+    return attempts
+        .findRequestLink(requestId)
+        .map(link -> prepare(identity(link), Action.REJECT))
+        .orElse(null);
+  }
+
+  /**
    * Prepares reversal of a linked posting before the ledger acquires its resources.
    *
    * @param transactionId the original posting

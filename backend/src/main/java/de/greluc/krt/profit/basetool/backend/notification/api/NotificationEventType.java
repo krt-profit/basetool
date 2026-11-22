@@ -56,8 +56,8 @@ public enum NotificationEventType {
   BANK_BOOKING_REQUEST_CONFIRMED,
 
   /**
-   * A bank employee rejected a booking request (REQ-BANK-026). The default rule notifies the
-   * requester.
+   * A bank employee or the request's approver rejected a booking request (REQ-BANK-026,
+   * REQ-BANK-041). The default rule notifies the requester.
    */
   BANK_BOOKING_REQUEST_REJECTED,
 

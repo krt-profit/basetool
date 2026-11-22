@@ -523,7 +523,9 @@ member data owns its participant: `MaterialExchangeOfferErasure`, `InventoryUser
 `HangarUserErasure`, `PersonalInventoryErasureService`, `PersonalBlueprintUserErasure`
 and `NotificationUserErasure` purge;
 `MissionOwnerReassignment` and `RefineryOwnerReassignment` hand shared aggregates to the
-fallback admin; `MissionMemberUnlink` and `JobOrderMemberUnlink` clear back-references. Every
+fallback admin; `OperationPayoutMemberUnlink`, `MissionMemberUnlink`, `JobOrderMemberUnlink`,
+`BlueprintAliasAuthorUnlink`, `MaterialAliasAuthorUnlink` and `SupplyUserErasure` clear
+back-references. Every
 participant is `MANDATORY` (an `@ObserverSpi`, REQ-AUDIT-007). The order of statements is part of
 the contract: the Materialbörse audits the offers on the member's Lager rows before those rows
 go, and two participants of a phase never share a position. The audit rows
@@ -595,10 +597,20 @@ Concrete handling, in order:
   `mission_ownership.version` (the owner association is excluded from the parent's optimistic lock).
 - **Unlinked / cleared** (reversible or audit-only references): `mission_managers` and
   `job_order_assignees` via the join-table deletes (`removeManager` / `removeAssignee`, also
-  `ON DELETE CASCADE`); `mission_participant.user_id` via `unlinkUser` (set null, the participant row
-  with its status survives); `material_claim.claimed_by_user_id` (V131, FK-less,
+  `ON DELETE CASCADE`); `mission_participant.user_id` and the member's own `comment` via
+  `unlinkUser` (both set null; the participant row with its times, job wishes and payout
+  preference survives for the payout split); `material_claim.claimed_by_user_id` (V131, FK-less,
   audit-only) via `unlinkClaimedByUser` (set null — re-pointing it at the admin would falsely
   attribute the claim, and the claim is a live independent aggregate that must survive).
+- **Re-keyed** (identity held as text, no foreign key): `operation_payout_status.participant_key`
+  holds a member's id as text. `OperationPayoutMemberUnlink` runs before `MissionMemberUnlink`
+  and moves each such mark to `deleted_<participantId>` of the member's first participation in the
+  operation's missions — the key the payout calculation gives that participation once the link is
+  gone, so a paid mark stays on its row — or to `deleted_<statusId>` when the operation holds no
+  participation of the member. `blueprint_external_alias.created_by` and
+  `material_external_alias.created_by` hold the id of the account that taught the alias;
+  `BlueprintAliasAuthorUnlink` and `MaterialAliasAuthorUnlink` set it null, and the alias keeps
+  resolving.
 
 **The deleted-user placeholder.** A participant row whose `user_id` was nulled by `unlinkUser`
 carries no name: `guest_name` — the column that holds an **external** participant's free-text name
@@ -1219,6 +1231,7 @@ The listed crossings:
 | The V296/V297 org-stock trigger functions as V429 replaced them | `exchange_change` (write), `org_unit`, `inventory_item`, `inventory_item_mission_allocation` (read) | A shared row's own write, or the write of its earmarks, names the row in `exchange_change.org_entry_id` (partial index `idx_exchange_change_org_entry`, only the row id, purged with the feed); a lot-level re-announce leaves it `NULL` (REQ-PATCH-057) |
 | `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys`, `#findExchangeOrgLots`, `#findExchangeOrgLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station`, `starmap_object` (read) | Catalogue names and the place's starmap GUID joined into the exchange's stock lots |
 | `PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers` | `app_user` (read) | Grants the default set to every active account in one statement |
+| `OperationPayoutStatusRepository#rekeyDeletedMember` | `mission`, `mission_participant` (read) | Re-keys a deleted member's payout marks to the key of the member's participation (REQ-DATA-008) |
 
 **Acceptance**
 

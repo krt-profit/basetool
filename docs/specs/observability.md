@@ -818,7 +818,9 @@ rule — no blanket "everything is masked" claim:
   `scripts/check-loki-rule-signatures.py`, which holds `JvmNativeThreadExhaustion` to its recorded
   lines too.
 - **Keycloak file log** (`app="keycloak"`) — masked **in the shipper** (Alloy stages scrub
-  `username=` / `ipAddress=` before ingestion). Besides `KeycloakErrorRateHigh`, which counts
+  `username=`, `ipAddress=`, `identity_provider_identity=` — the Discord username on broker events —
+  and every e-mail address before ingestion; the error events Keycloak logs at INFO can carry
+  `email=` and the brokered identity). Besides `KeycloakErrorRateHigh`, which counts
   `ERROR` lines, **`KeycloakBackendTruststoreUnreadable`** (warning) reads this stream: it fires on
   the SPI's `Failed to load the backend truststore` `WARN`, written once per Keycloak start that
   cannot read `KRT_BACKEND_TRUSTSTORE_PATH`, and holds for 30 minutes after it
@@ -853,6 +855,14 @@ cannot pass vacuously. It has to be a gate rather than a convention: neither bro
 its own — the config is valid, `alloy fmt` accepts it, the shipper stays healthy and the stream is
 not silent — so the only detector was a human reading a log export.
 
+**The masks that must exist are gate-enforced too.** The same checker fails when the
+`keycloak_mask` block lacks its `identity_provider_identity=` or e-mail stage, the `keycloak-stdout`
+match lacks `identity_provider_identity=`, or the `edge` match lacks the stages that cut the query
+string from an nginx error line's `request:`, `upstream:` and `referrer:` fields (`REQUIRED_MASKS`).
+The edge access log needs no mask: its `krt_no_query` format never writes a query string
+(REQ-OBS-010). The error log is not formattable in nginx, and every warn line it writes — an upstream
+timeout, a buffered body, a rate-limit refusal — quotes the full request.
+
 > [!warning] Corrected 2026-09-20
 > Eight of the fourteen replace stages were written the regexp-substitution way and had been since
 > they were added, so every masked line read `${1}***${1}***` in place of `username="…"`,
@@ -875,7 +885,8 @@ not silent — so the only detector was a human reading a log export.
   never enters the file at all (the ADR-0095 motive, applied to the identity provider). The
   container keep-regex is **anchored** so `keycloak-dev`, `db-keycloak` and `postgres-exporter-keycloak`
   do not match. It gets its own mapping rule and its own `loki.process` block with the `username=` /
-  `ipAddress=` replaces copied byte-identically from the file mask — without them the console copy
+  `ipAddress=` / `identity_provider_identity=` replaces copied byte-identically from the file mask
+  (e-mail addresses are masked by the shared stage of the app stdout streams) — without them the console copy
   would re-introduce exactly the PII the file mask exists to remove. It is deliberately **not** in
   `KeycloakErrorRateHigh`'s selector, so the console copy cannot double-count the file stream's
   ERRORs. Extending the ADR-0095 stdout pattern to Keycloak is owner-approved; ADR-0095 (or an

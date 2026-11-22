@@ -63,6 +63,9 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
@@ -109,6 +112,7 @@ class UserDeletionEndStateTest {
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
   @Autowired private MissionRepository missionRepository;
+  @Autowired private OperationRepository operationRepository;
   @Autowired private RefineryOrderRepository refineryOrderRepository;
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private ShipRepository shipRepository;
@@ -135,6 +139,8 @@ class UserDeletionEndStateTest {
   private ShipType shipType;
   private Squadron squadron;
   private UUID ruleId;
+  private UUID operationId;
+  private UUID goneParticipantId;
 
   @Test
   void deletingAMember_purgesReassignsAndUnlinksEveryStore_andLeavesAnotherMemberUntouched() {
@@ -148,6 +154,8 @@ class UserDeletionEndStateTest {
     Seeded stayerRows = seed(stayer, tag + "-s", 1, 1, 1, 1, 1);
     UUID missionId = mission(leaver, stayer, tag);
     UUID claimId = claim(leaver, tag);
+    aliases(leaver, tag + "-l");
+    aliases(stayer, tag + "-s");
     entityManager.flush();
     entityManager.clear();
 
@@ -196,6 +204,21 @@ class UserDeletionEndStateTest {
         .as("the participant row survives without its personal link")
         .isEqualTo(2);
     assertThat(
+            jdbc.queryForList(
+                "SELECT comment FROM mission_participant WHERE id = ?",
+                String.class,
+                goneParticipantId))
+        .as("the departing member's own comment goes with the link")
+        .containsExactly((String) null);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT participant_key FROM operation_payout_status WHERE operation_id = ?",
+                String.class,
+                operationId))
+        .as("the payout mark moves to the deleted-account key of the participation")
+        .containsExactlyInAnyOrder("deleted_" + goneParticipantId, stayer.getId().toString());
+    assertThat(authoredAliases(leaver)).as("no alias names the departing member").isZero();
+    assertThat(
             jdbc.queryForObject(
                 "SELECT claimed_by_user_id FROM material_claim WHERE id = ?", UUID.class, claimId))
         .isNull();
@@ -211,6 +234,13 @@ class UserDeletionEndStateTest {
     assertThat(count("job_order_assignees", "user_id", stayerId)).isEqualTo(1);
     assertThat(count("mission_managers", "user_id", stayerId)).isEqualTo(1);
     assertThat(count("mission_participant", "user_id", stayerId)).isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT comment FROM mission_participant WHERE user_id = ?",
+                String.class,
+                stayerId))
+        .isEqualTo("stayer comment " + tag);
+    assertThat(authoredAliases(stayer)).isEqualTo(2);
     assertThat(
             jdbc.queryForList(
                 "SELECT owner_id FROM refinery_order WHERE id = ?",
@@ -485,17 +515,63 @@ class UserDeletionEndStateTest {
     mission.setIsInternal(false);
     mission.getManagers().add(leaver);
     mission.getManagers().add(stayer);
+    Operation operation = new Operation();
+    operation.setName("End Operation " + tag);
+    operation.setStatus(OperationStatus.ACTIVE);
+    operationId = operationRepository.save(operation).getId();
+    mission.setOperationId(operationId);
     MissionParticipant gone = new MissionParticipant();
     gone.setMission(mission);
     gone.setUser(leaver);
+    gone.setComment("leaver comment " + tag);
     mission.getParticipants().add(gone);
     MissionParticipant kept = new MissionParticipant();
     kept.setMission(mission);
     kept.setUser(stayer);
+    kept.setComment("stayer comment " + tag);
     mission.getParticipants().add(kept);
     mission = missionRepository.save(mission);
+    goneParticipantId = gone.getId();
     missionService.updateMissionOwner(mission.getId(), leaver.getId(), 0L);
+    payoutStatus(leaver.getId().toString());
+    payoutStatus(stayer.getId().toString());
     return mission.getId();
+  }
+
+  private void payoutStatus(String participantKey) {
+    jdbc.update(
+        "INSERT INTO operation_payout_status (id, operation_id, participant_key) VALUES (?, ?, ?)",
+        UUID.randomUUID(),
+        operationId,
+        participantKey);
+  }
+
+  private void aliases(User author, String tag) {
+    jdbc.update(
+        "INSERT INTO blueprint_external_alias (id, source_system, external_name, product_key,"
+            + " product_name, created_by) VALUES (?, 'SCMDB', ?, ?, 'End Product', ?)",
+        UUID.randomUUID(),
+        "End Alias " + tag,
+        "end-alias-" + tag,
+        author.getId().toString());
+    jdbc.update(
+        "INSERT INTO material_external_alias (id, material_id, source_system, external_name,"
+            + " created_by) VALUES (?, ?, 'SCWIKI', ?, ?)",
+        UUID.randomUUID(),
+        material.getId(),
+        "End Material Alias " + tag,
+        author.getId().toString());
+  }
+
+  private int authoredAliases(User author) {
+    Integer rows =
+        jdbc.queryForObject(
+            "SELECT (SELECT count(*) FROM blueprint_external_alias WHERE created_by = ?)"
+                + " + (SELECT count(*) FROM material_external_alias WHERE created_by = ?)",
+            Integer.class,
+            author.getId().toString(),
+            author.getId().toString());
+    return rows == null ? 0 : rows;
   }
 
   private UUID claim(User leaver, String tag) {

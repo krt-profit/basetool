@@ -42,7 +42,9 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Legal basis:** Art. 6(1)(b) (providing the requested service) and Art. 6(1)(f) (operating the
   organisation; secure sign-in and membership verification for the Discord path).
 - **Where:** `app_user`, `user_roles`, `org_unit_membership`, `user_approval_event`, and the
-  Keycloak realm (its own database).
+  Keycloak realm (its own database). Address confirmation, password reset and the approval or
+  refusal notice are delivered through the e-mail relay (Lettermint,
+  [processors.md](processors.md#outbound-e-mail-relay)).
 - **Retention:** for the duration of the account; a refused registration is purged automatically
   (REQ-SEC-057). See [Retention](#retention).
 

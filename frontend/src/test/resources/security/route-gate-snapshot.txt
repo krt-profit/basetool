@@ -241,6 +241,7 @@
 /api/proxy/org-units/bank/requests/{id}/cancel POST -> OrgUnitBankProxyController#cancelRequest gate=method:isAuthenticated() layout=no
 /api/proxy/org-units/bank/requests/{id}/owner-approval DELETE -> OrgUnitBankProxyController#revokeOwnerApproval gate=method:isAuthenticated() layout=no
 /api/proxy/org-units/bank/requests/{id}/owner-approval POST -> OrgUnitBankProxyController#grantOwnerApproval gate=method:isAuthenticated() layout=no
+/api/proxy/org-units/bank/requests/{id}/reject POST -> OrgUnitBankProxyController#rejectAsApprover gate=method:isAuthenticated() layout=no
 /api/proxy/purchasing/admin/risk-classes PUT -> PurchasingProxyController#updateRiskClasses gate=method:hasRole('ADMIN') layout=no
 /api/proxy/purchasing/admin/settings PUT -> PurchasingProxyController#updateSettings gate=method:hasRole('ADMIN') layout=no
 /api/proxy/purchasing/deals POST -> PurchasingProxyController#createDeal gate=class:isAuthenticated() layout=no

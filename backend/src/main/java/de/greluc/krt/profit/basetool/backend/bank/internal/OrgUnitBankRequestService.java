@@ -504,6 +504,27 @@ public class OrgUnitBankRequestService {
   }
 
   /**
+   * Rejects a booking request on behalf of its required approver, as the approver read it
+   * (REQ-BANK-041): the request is declined with a reason instead of being approved.
+   *
+   * @param requestId the request to reject
+   * @param reason the rejection reason shown to the requester
+   * @param version the request's version as the approver read it
+   * @return the rejected request
+   * @throws NotFoundException when the request does not exist
+   * @throws AccessDeniedException when the caller may not approve the request
+   * @throws ObjectOptimisticLockingFailureException when the request changed since it was read
+   * @throws BadRequestException when the request needs no approval
+   */
+  @NotNull
+  @Transactional
+  public BankBookingRequestDto rejectAsApprover(
+      @NotNull UUID requestId, @NotNull String reason, long version) {
+    return bankBookingRequestService.rejectAsApprover(
+        requestId, reason, version, this::requireApprover);
+  }
+
+  /**
    * Loads and locks a request and authorizes the caller as its approver through the policy.
    *
    * @param requestId the request
@@ -516,9 +537,19 @@ public class OrgUnitBankRequestService {
     BankBookingRequest request =
         Entities.require(
             bankBookingRequestRepository.findByIdForUpdate(requestId), "Booking request not found");
+    requireApprover(request);
+    return request;
+  }
+
+  /**
+   * Fails unless the caller approves the request in the active context.
+   *
+   * @param request the locked request
+   * @throws AccessDeniedException when the caller may not approve the request
+   */
+  private void requireApprover(@NotNull BankBookingRequest request) {
     if (!policy.mayApprove(accessService.actor(), request, accessService.pin())) {
       throw new AccessDeniedException("The caller may not approve this request");
     }
-    return request;
   }
 }

@@ -45,6 +45,12 @@ enum ShipTypeMergeReason {
   UEX_FULL_NAME_IS_P4K_NAME(false),
 
   /**
+   * The merged row's name agrees with the surviving row's English or German P4K name once each
+   * drops its manufacturer word (REQ-P4K-053).
+   */
+  NAME_WITHOUT_MANUFACTURER_IS_P4K_NAME(false),
+
+  /**
    * The merged row's GUID left a complete catalogue, and the surviving row holds the record that
    * succeeds it (REQ-P4K-053).
    */

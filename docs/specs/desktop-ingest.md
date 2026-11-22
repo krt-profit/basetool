@@ -428,6 +428,11 @@ it cannot be used to slip an oversized body past the guard (`PayloadSizeLimitFil
 > and member itself, per minute and per day (REQ-XCH-023, `ExchangeLimitFilter`, `ExchangeQuotas`);
 > the per-IP front line and the payload cap below cover `/exchange/**`.
 
+**The limiter maps hold no key longer than an hour of idleness.** Both in-memory bucket maps (per IP
+in `RateLimitingFilter`, per client and member in `ExchangeLimitFilter`) are size-capped LRU maps
+from `RateLimitBuckets` and drop a key unused for `RateLimitBuckets.IDLE_EXPIRY` (one hour), as the
+privacy policy states for every rate-limit counter. **Enforced by:** `RateLimitBucketsTest`.
+
 Ingest calls are rate-limited **per `sub` and per source IP** so the new ingress cannot be
 used to hammer the backend import endpoints. The per-`sub` limit (`SubjectRateLimiter`,
 invoked from `IngestService` inside the authenticated context) is the enforceable control —
