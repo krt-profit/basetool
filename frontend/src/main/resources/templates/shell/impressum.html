@@ -11,45 +11,47 @@
 <main class="page--narrow">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{impressum.title})}"></th:block>
     <div class="card legal-doc" data-testid="legal-doc">
-        <p th:text="#{impressum.p1}">Angaben gem\u00e4\u00df \u00a7 5 DDG</p>
+        <p th:text="#{impressum.p1}">Angaben gem&auml;&szlig; &sect; 5 DDG und &sect; 18 Abs. 1 MStV</p>
 
-        <p>
+        <h2 th:text="#{impressum.provider}">Anbieter</h2>
+        <p data-testid="impressum-provider">
             <span th:text="#{impressum.address.name}">Lucas Greuloch</span><br>
             <span th:text="#{impressum.address.street}">Stauffenbergallee 20a</span><br>
             <span th:text="#{impressum.address.city}">56410 Montabaur</span><br>
+            <span th:text="#{impressum.address.country}">Deutschland</span>
         </p>
 
-        <p>
-            <strong th:text="#{impressum.represented_by}">Vertreten durch:</strong><br>
-            <span th:text="#{impressum.address.name}">Lucas Greuloch</span><br>
-        </p>
-
-        <p>
-            <strong th:text="#{impressum.contact}">Kontakt:</strong><br>
-            <span th:text="#{impressum.contact.phone}">Telefon: 0170-9677429</span><br>
+        <h2 th:text="#{impressum.contact}">Kontakt</h2>
+        <p data-testid="impressum-contact">
+            <span th:text="#{impressum.contact.phone_label}">Telefon:</span> <span th:text="#{impressum.contact.phone_value}">+49 170 9677429</span><br>
             <span th:text="#{impressum.contact.email_label}">E-Mail:</span> <a th:href="'mailto:' + #{impressum.contact.email_value}" th:text="#{impressum.contact.email_value}">lucas.greuloch@gmail.com</a>
         </p>
 
-        <p>
-            <strong th:text="#{impressum.dispute}">Verbraucherstreitbeilegung / Universalschlichtungsstelle</strong><br>
-            <span th:text="#{impressum.dispute.text}">Wir nehmen nicht an Streitbeilegungsverfahren...</span>
-        </p>
+        <h2 th:text="#{impressum.dsa}">Zentrale Kontaktstelle nach dem Digital Services Act</h2>
+        <p data-testid="impressum-dsa-contact" th:text="#{impressum.dsa.text}">Die oben genannte E-Mail-Adresse ist die zentrale Kontaktstelle ...</p>
 
-        <p>
-            <strong th:text="#{impressum.liability}">Haftungsausschluss:</strong><br><br>
-            <strong th:text="#{impressum.liability.content}">Haftung f\u00fcr Inhalte</strong><br>
-            <span th:text="#{impressum.liability.content.text}">Die Inhalte unserer Seiten...</span><br><br>
-    
-            <strong th:text="#{impressum.liability.links}">Haftung f\u00fcr Links</strong><br>
-            <span th:text="#{impressum.liability.links.text}">Unser Angebot enth\u00e4lt Links...</span><br><br>
-    
-            <strong th:text="#{impressum.liability.copyright}">Urheberrecht</strong><br>
-            <span th:text="#{impressum.liability.copyright.text}">Die durch die Seitenbetreiber...</span>
-        </p>
+        <h2 th:text="#{impressum.report}">Meldung rechtswidriger Inhalte</h2>
+        <p th:text="#{impressum.report.intro}">Inhalte oder Links im Basetool, die rechtswidrig erscheinen, ...</p>
+        <ul class="legal-list" data-testid="impressum-report-fields">
+            <li th:text="#{impressum.report.location}">die genaue Fundstelle (Link oder Seite und Bereich),</li>
+            <li th:text="#{impressum.report.reason}">eine Begr&uuml;ndung, warum der Inhalt rechtswidrig ist,</li>
+            <li th:text="#{impressum.report.reporter}">Name und E-Mail-Adresse der meldenden Person,</li>
+            <li th:text="#{impressum.report.statement}">die Erkl&auml;rung, dass die Angaben nach bestem Wissen richtig und vollst&auml;ndig sind.</li>
+        </ul>
+        <p th:text="#{impressum.report.handling}">Gemeldete Inhalte werden z&uuml;gig gepr&uuml;ft ...</p>
 
+        <h2 th:text="#{impressum.copyright}">Urheberrecht und Lizenzen</h2>
         <p>
-            <span th:text="#{impressum.credits_prefix}">Erstellt mit</span> <a href="https://impressum-generator.de" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_generator}">Impressum-Generator.de</a><span th:text="#{impressum.credits_middle}">, dem Tool f\u00fcr Impressum und</span> <a href="https://impressum-generator.de/datenschutz-generator" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_privacy}">Datenschutz-Erkl\u00e4rung</a><span th:text="#{impressum.credits_suffix}">. Nach einer Vorlage der</span> <a href="https://www.kanzlei-hasselbach.de/" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_lawyer}">Kanzlei Hasselbach</a><span th:text="#{impressum.credits_end}">.</span>
+            <span th:text="#{impressum.copyright.code}">Der Quellcode des Profit Basetools ist freie Software unter der GNU General Public License, Version 3 (GPL-3.0-only).</span>
+            <a href="https://github.com/krt-profit/basetool" target="_blank" rel="noopener noreferrer"
+               data-testid="impressum-source-link" th:text="#{impressum.copyright.source_link}">Quellcode auf GitHub</a>
         </p>
+        <p>
+            <span th:text="#{impressum.copyright.components}">Die Lizenzen der eingesetzten Open-Source-Komponenten sind auf einer eigenen Seite aufgef&uuml;hrt.</span>
+            <a th:href="@{/licenses}" data-testid="impressum-licenses-link" th:text="#{nav.licenses}">Open-Source-Lizenzen</a>
+        </p>
+        <p th:text="#{impressum.copyright.brand}">Name und Logo von DAS KARTELL sind nicht Teil dieser Lizenz ...</p>
+        <p th:text="#{impressum.copyright.game}">Spielinhalte, Marken und Materialien von Star Citizen geh&ouml;ren Cloud Imperium ...</p>
     </div>
     <th:block th:replace="~{shell/fragments/fankit :: band}" />
 </main>
