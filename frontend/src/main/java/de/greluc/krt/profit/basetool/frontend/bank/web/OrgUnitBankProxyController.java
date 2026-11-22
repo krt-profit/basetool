@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.bank.web;
 
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.bank.client.OrgUnitBankRequestsBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBalanceTargetRequest;
+import de.greluc.krt.profit.basetool.frontend.bank.model.RejectBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.BackendDownloads;
@@ -65,6 +67,9 @@ public class OrgUnitBankProxyController {
   /** The bank domain's backend calls. */
   private final BankBackendClient bankClient;
 
+  /** The org-unit booking-request calls. */
+  private final OrgUnitBankRequestsBackendClient requestsClient;
+
   /**
    * Forwards a new booking request raised by an officer/lead against their overseen org unit's
    * account (REQ-BANK-022). Out-of-scope (403) and closed-account (409) surface inline.
@@ -76,7 +81,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   @ResponseStatus(HttpStatus.CREATED)
   public Object createRequest(@RequestBody @NotNull CreateBankBookingRequest request) {
-    return orEmpty(bankClient.createOrgUnitRequest(request));
+    return orEmpty(requestsClient.create(request));
   }
 
   /**
@@ -90,7 +95,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Object cancelRequest(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull CancelBankBookingRequest request) {
-    return orEmpty(bankClient.cancelOrgUnitRequest(id, request));
+    return orEmpty(requestsClient.cancel(id, request));
   }
 
   /**
@@ -107,7 +112,7 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Object updateRequest(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull UpdateBankBookingRequest request) {
-    return orEmpty(bankClient.updateOrgUnitRequest(id, request));
+    return orEmpty(requestsClient.update(id, request));
   }
 
   /**
@@ -339,7 +344,7 @@ public class OrgUnitBankProxyController {
   public Object grantOwnerApproval(
       @PathVariable @NotNull UUID id,
       @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return orEmpty(bankClient.grantOwnerApproval(id, emptyIfNull(body)));
+    return orEmpty(requestsClient.grantApproval(id, emptyIfNull(body)));
   }
 
   /**
@@ -351,7 +356,22 @@ public class OrgUnitBankProxyController {
   @DeleteMapping("/requests/{id}/owner-approval")
   @PreAuthorize("isAuthenticated()")
   public Object revokeOwnerApproval(@PathVariable @NotNull UUID id) {
-    return orEmpty(bankClient.revokeOwnerApproval(id));
+    return orEmpty(requestsClient.revokeApproval(id));
+  }
+
+  /**
+   * Forwards the required approver rejecting a request with a reason instead of approving it
+   * (REQ-BANK-041).
+   *
+   * @param id the request to reject
+   * @param request the rejection reason and the request's echoed {@code version}
+   * @return the rejected request
+   */
+  @PostMapping("/requests/{id}/reject")
+  @PreAuthorize("isAuthenticated()")
+  public Object rejectAsApprover(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull RejectBankBookingRequest request) {
+    return orEmpty(requestsClient.rejectAsApprover(id, request));
   }
 
   /**

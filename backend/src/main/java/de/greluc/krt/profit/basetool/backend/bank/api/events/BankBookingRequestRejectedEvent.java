@@ -34,7 +34,8 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a bank employee rejects a booking request (REQ-BANK-026).
+ * Domain event published when a bank employee or the request's approver rejects a booking request
+ * (REQ-BANK-026, REQ-BANK-041).
  *
  * <p>Directed at the requester via {@link #contextRecipientUserId()}; {@link #contextAccountId()}
  * lets the {@code ACCOUNT_RESPONSIBLE} selector notify the account's responsible holder
@@ -46,7 +47,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param amount the requested whole-aUEC amount, for rendering
  * @param reason the rejection reason, for rendering
  * @param requesterSub the requesting officer/lead's sub; the directed recipient
- * @param actorSub the rejecting employee's sub
+ * @param actorSub the rejecting member's sub
  */
 public record BankBookingRequestRejectedEvent(
     UUID requestId,

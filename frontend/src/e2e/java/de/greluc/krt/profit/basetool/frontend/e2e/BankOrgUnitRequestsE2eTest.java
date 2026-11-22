@@ -332,6 +332,55 @@ class BankOrgUnitRequestsE2eTest {
   }
 
   /**
+   * REQ-BANK-041: the responsible holder rejects, with a reason, a withdrawal that waits for their
+   * approval from „Anträge an unsere Konten"; the row's decision buttons go without a reload and no
+   * money moves.
+   */
+  @Test
+  void responsibleHolderRejectsARequestAwaitingTheirApproval() {
+    String baseUrl = STACK.baseUrl();
+    long amount = 7005;
+    long balanceBefore = seeder.bankAccountBalance(MGMT_USER, MGMT_PASSWORD, accountId);
+    String requestId =
+        seeder.raiseBankWithdrawalRequest(ADMIN_USER, ADMIN_PASSWORD, accountId, amount);
+    String rejectButton =
+        "[data-testid='org-unit-bank-reject-approval-btn'][data-field-_id='" + requestId + "']";
+
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
+        E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
+        page.locator("[data-testid='org-unit-bank-tab-foreign']")
+            .click(new Locator.ClickOptions().setTimeout(20_000));
+        page.locator(rejectButton).click(new Locator.ClickOptions().setTimeout(20_000));
+        page.locator("[data-testid='bank-reject-reason']").fill("E2E approver rejection");
+        dropFooter(page);
+        page.waitForResponse(
+            r ->
+                r.url().contains("/api/proxy/org-units/bank/requests/" + requestId + "/reject")
+                    && "POST".equals(r.request().method()),
+            new Page.WaitForResponseOptions().setTimeout(60_000),
+            () -> page.locator("[data-testid='bank-reject-submit']").click());
+        assertThat(page.locator(rejectButton)).hasCount(0);
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-unit-bank-approver-reject");
+        throw failure;
+      }
+    }
+
+    assertEquals(
+        "REJECTED",
+        seeder.bookingRequestStatus(ADMIN_USER, ADMIN_PASSWORD, requestId),
+        "the approver rejected the request");
+    assertEquals(
+        balanceBefore,
+        seeder.bankAccountBalance(MGMT_USER, MGMT_PASSWORD, accountId),
+        "a rejection moves no money");
+  }
+
+  /**
    * Asserts that the officer cannot reach the staff queue and a bank employee without an officer or
    * lead role cannot reach the org-unit bank page.
    */

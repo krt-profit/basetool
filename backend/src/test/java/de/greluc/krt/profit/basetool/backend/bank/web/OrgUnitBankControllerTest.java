@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestSer
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankSettingsService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountsQuery;
+import de.greluc.krt.profit.basetool.backend.bank.internal.RejectBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.math.BigDecimal;
@@ -274,6 +275,16 @@ class OrgUnitBankControllerTest {
 
     assertSame(dto, controller.grantOwnerApproval(id, new GrantOwnerApprovalRequest(2L)));
     verify(orgUnitBankRequestService).grantOwnerApproval(id, 2L);
+  }
+
+  @Test
+  void rejectAsApprover_delegatesReasonAndVersionToService() {
+    UUID id = UUID.randomUUID();
+    BankBookingRequestDto dto = requestDto();
+    when(orgUnitBankRequestService.rejectAsApprover(id, "zu hoch", 2L)).thenReturn(dto);
+
+    assertSame(dto, controller.rejectAsApprover(id, new RejectBankBookingRequest("zu hoch", 2L)));
+    verify(orgUnitBankRequestService).rejectAsApprover(id, "zu hoch", 2L);
   }
 
   @Test
