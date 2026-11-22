@@ -185,10 +185,10 @@ rt_exec db-backend sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 -Fc "$POSTGRES_DB"' \
   >"${STAGING}/krt_basetool.dump"
 
-log "dumping Keycloak database (keycloak)"
+log "dumping Keycloak database (keycloak, without the event store and the sessions)"
 # shellcheck disable=SC2016
 rt_exec db-keycloak sh -c \
-  'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -h 127.0.0.1 -p 15433 -Fc "$POSTGRES_DB"' \
+  'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -h 127.0.0.1 -p 15433 -Fc --exclude-table-data=event_entity --exclude-table-data=admin_event_entity --exclude-table-data=offline_user_session --exclude-table-data=offline_client_session "$POSTGRES_DB"' \
   >"${STAGING}/keycloak.dump"
 
 for _vol in edge-certs edge-acme-state edge-acme-webroot; do
