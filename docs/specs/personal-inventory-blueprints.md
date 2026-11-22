@@ -268,7 +268,9 @@ and a global sharer is counted once.
 [`MyBlueprintSharingController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/MyBlueprintSharingController.java) (`/me/blueprint-sharing`),
 [`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintOverviewService.java),
 [`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderItemBlueprintOwnersService.java),
-[`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql) and [`V283__create_member_payout_setting_and_blueprint_sharing.sql`](../../backend/src/main/resources/db/migration/V283__create_member_payout_setting_and_blueprint_sharing.sql).
+[`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql) and [`V283__create_member_payout_setting_and_blueprint_sharing.sql`](../../backend/src/main/resources/db/migration/V283__create_member_payout_setting_and_blueprint_sharing.sql);
+[`V440__drop_legacy_app_user_member_settings.sql`](../../backend/src/main/resources/db/migration/V440__drop_legacy_app_user_member_settings.sql)
+dropped the old `app_user` column.
 
 ### REQ-INV-048 — Craftability of own blueprints from "My Inventory" stock
 

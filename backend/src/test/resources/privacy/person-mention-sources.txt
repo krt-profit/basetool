@@ -90,7 +90,6 @@ target|PURCHASING|purchasing_partner|org_tag|id|null
 target|PURCHASING|purchasing_partner|reputation_note|id|null
 target|REGISTRATION|user_approval_event|reason|id|null
 exempt-column|app_user.approval_status
-exempt-column|app_user.default_payout_preference
 exempt-column|app_user.discord_user_id
 exempt-column|audit_event.client_id
 exempt-column|audit_event.domain
