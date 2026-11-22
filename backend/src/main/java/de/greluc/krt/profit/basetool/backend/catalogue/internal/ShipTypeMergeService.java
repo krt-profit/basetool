@@ -91,7 +91,7 @@ class ShipTypeMergeService {
     Identity identity = Identity.of(retired);
     shipTypes.delete(retired);
     shipTypes.flush();
-    identity.giveTo(survivor, survivorGuid);
+    identity.giveTo(survivor, survivorGuid, reason.handsOverUexListing());
     shipTypes.saveAndFlush(survivor);
     Integer leftUex = identity.uexVehicleId();
     redirects.alias(
@@ -172,13 +172,15 @@ class ShipTypeMergeService {
 
     /**
      * Hands the identities to the survivor: the Wiki identity when the survivor has none or when
-     * the Wiki UUID is the survivor's settled P4K GUID, the UEX identity when the survivor has
-     * none. A value the merged row lacks leaves the survivor's own in place.
+     * the Wiki UUID is the survivor's settled P4K GUID, the UEX identity when the survivor has none
+     * and the merged row's UEX listing is one of the survivor's ship. A value the merged row lacks
+     * leaves the survivor's own in place.
      *
      * @param survivor the ship type that stays
      * @param survivorGuid the P4K GUID the survivor holds once the run is through, or {@code null}
+     * @param uexListing whether the merged row's UEX listing lists the survivor's ship
      */
-    void giveTo(@NotNull ShipType survivor, @Nullable UUID survivorGuid) {
+    void giveTo(@NotNull ShipType survivor, @Nullable UUID survivorGuid, boolean uexListing) {
       boolean wiki = false;
       if (externalUuid != null
           && (survivor.getExternalUuid() == null || externalUuid.equals(survivorGuid))) {
@@ -190,7 +192,7 @@ class ShipTypeMergeService {
         wiki = true;
       }
       boolean uex = false;
-      if (uexVehicleId != null && survivor.getUexVehicleId() == null) {
+      if (uexListing && uexVehicleId != null && survivor.getUexVehicleId() == null) {
         survivor.setUexVehicleId(uexVehicleId);
         fill(uexSlug, survivor::setUexSlug);
         fill(nameFull, survivor::setNameFull);

@@ -65,4 +65,15 @@ enum ShipTypeMergeReason {
 
   /** Whether the merged row may hold a P4K GUID, which then leaves the catalogue with it. */
   @Getter private final boolean mergingP4kRow;
+
+  /**
+   * Tells whether the merged row's UEX listing lists the surviving row's ship. UEX keeps a vanished
+   * edition as a listing of its own, which the merge leaves behind as a secondary listing
+   * (REQ-DATA-043).
+   *
+   * @return {@code false} for {@link #EDITION_OF_BASE}, else {@code true}
+   */
+  boolean handsOverUexListing() {
+    return this != EDITION_OF_BASE;
+  }
 }

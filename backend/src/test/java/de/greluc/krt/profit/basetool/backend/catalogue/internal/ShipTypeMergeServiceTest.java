@@ -137,6 +137,31 @@ class ShipTypeMergeServiceTest {
   }
 
   @Test
+  void anEditionMergedFirstLeavesItsListingBehindForTheShipsOwnListing() {
+    UUID survivorGuid = UUID.randomUUID();
+    ShipType survivor =
+        ships.saveAndFlush(shipType("RSI Constellation Mk IV Phoenix", survivorGuid, null));
+    ShipType edition = shipType("RSI Constellation Mk IV Phoenix Emerald", UUID.randomUUID(), null);
+    edition.setUexVehicleId(TWIN_UEX_ID);
+    edition = ships.saveAndFlush(edition);
+    ShipType base = shipType("Constellation Mk IV Phoenix", UUID.randomUUID(), null);
+    base.setUexVehicleId(TWIN_UEX_ID + 1);
+    base = ships.saveAndFlush(base);
+
+    merges.merge(
+        edition.getId(), survivor.getId(), survivorGuid, ShipTypeMergeReason.EDITION_OF_BASE);
+    merges.merge(
+        base.getId(), survivor.getId(), survivorGuid, ShipTypeMergeReason.SUPERSEDED_BY_GS_RECORD);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(ships.findById(survivor.getId()).orElseThrow().getUexVehicleId())
+        .isEqualTo(TWIN_UEX_ID + 1);
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID)).isTrue();
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID + 1)).isFalse();
+  }
+
+  @Test
   void aRowHoldingAP4kGuidIsNeverMergedAway() {
     ShipType survivor = ships.saveAndFlush(shipType("Aegis Idris-M", UUID.randomUUID(), null));
     ShipType stamped = ships.saveAndFlush(shipType("Idris-M", UUID.randomUUID(), null));

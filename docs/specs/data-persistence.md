@@ -775,7 +775,8 @@ Each writer therefore evicts the caches it can make stale **on completion**, thr
 `MasterDataCacheEvictionService`:
 
 - The eviction runs in a `finally` around the work, so every step that **did** commit is reconciled
-  even when a later step aborts (UEX is fail-fast; SC Wiki swallows per step). The P4K apply gates its
+  even when a later step aborts (UEX is fail-fast except for a partially applied vehicle slice; SC
+  Wiki swallows per step). The P4K apply gates its
   eviction on the reconcile transaction having actually committed (`appliedMasterData`), so a
   rolled-back apply and every PREVIEW run correctly evict nothing.
 - **P4K writes announce through `P4kCatalogueChange`.** Every committed APPLY, whatever it
@@ -1865,12 +1866,13 @@ twin under the short name. So each name step tries the short name first, then th
 - **A game UUID several UEX vehicles carry** is no identity evidence: it neither links a row nor
   conflicts with the `external_uuid` of the row a UEX vehicle id found (REQ-DATA-033).
 - **A game UUID the P4K GUID confirms outranks UEX's.** When a game build gives a vehicle a new
-  UUID, the SC Wiki and the P4K carry it while UEX may still serve the old one. A row found by its
-  own UEX vehicle id, or by a UEX vehicle id a merge into it left behind (REQ-DATA-043), whose
-  `external_uuid` equals its `p4k_uuid` is written and keeps its UUID; the UEX one is reported as a
-  `P4K_DISAGREEMENT` (REQ-P4K-031). This also holds after the Wiki sync
-  moved the row to the new UUID (REQ-DATA-026). A game UUID the P4K does not confirm still blocks
-  the write.
+  UUID, the SC Wiki and the P4K carry it while UEX may still serve the old one. A row whose
+  `external_uuid` equals its `p4k_uuid` is written and keeps its UUID, whichever resolution step
+  found it; the UEX one is reported as a `P4K_DISAGREEMENT` (REQ-P4K-031). This also holds after
+  the Wiki sync moved the row to the new UUID (REQ-DATA-026), and for a listing UEX gave a new id.
+  A game UUID the P4K does not confirm still blocks the write, and so does a confirmed one on a row
+  another listing of the fetch holds, unless a merge into that row left this vehicle's id behind
+  (REQ-DATA-043).
 
 **Acceptance**
 
@@ -1881,7 +1883,10 @@ twin under the short name. So each name step tries the short name first, then th
   nothing; the rows of two UEX ids sharing a game UUID are both written without a conflict
   (`UexVehicleServiceUuidMatchTest`, `UexIdentityCensusTest`).
 - [x] A stale UEX game UUID neither replaces nor blocks a row whose UUID its P4K GUID confirms and is
-  reported; an unconfirmed differing UUID still blocks the write (`UexVehicleServiceUuidMatchTest`).
+  reported, whether the vehicle's own id, its full name or a new UEX id for it finds the row; an
+  unconfirmed differing UUID, and a confirmed one on a row another fetched listing holds, still
+  block the write, as does a partial fetch for a row holding an unlisted id
+  (`UexVehicleServiceUuidMatchTest`).
 
 ### REQ-DATA-042 — two ship types of one game ship merge without breaking references
 
@@ -1896,8 +1901,9 @@ references. The open hangar and template views hear of the change through live s
 
 The survivor takes the Wiki identity of the merged row when it has none, or when the merged row's
 Wiki UUID is the P4K GUID the survivor holds once the caller's run is through, and the UEX identity
-when it has none. Both rows are kept as JSON in `ship_type_redirect`, with the merged row's UEX
-vehicle id when the survivor kept its own (REQ-DATA-043). The merged id stays
+when it has none and the merged row is no vanished edition (`EDITION_OF_BASE`), whose UEX listing
+stays a listing of its own (REQ-DATA-043). Both rows are kept as JSON in `ship_type_redirect`, with
+the merged row's UEX vehicle id when the survivor did not take it. The merged id stays
 resolvable through `findById`, `existsById`, `findAllById` and `getReferenceById` of
 `ShipTypeRepository`. The exchange resolves it as a `bt` reference and names journal entries by it;
 the append-only journal keeps the merged id. A row holding a P4K GUID is merged away only when its
@@ -1927,12 +1933,17 @@ Phoenix. A secondary listing is no rejected write: it neither marks the census i
 suppresses the orphan sweep (REQ-DATA-035). A row holding a UEX id a partial fetch did not list is
 still not written.
 
-A survivor that holds no UEX listing takes the one of the first row merged into it (REQ-DATA-042),
-so it can hold an edition's listing while the listing of its own ship is the one left behind. A
-listing whose id a merge into the row it finds left behind counts as that row's own listing: when
-it takes the row over by the order above, it is written as if found by its own id (REQ-DATA-041),
-and the merge then keeps the listing the row gives up as left behind, or none when the row held
-none.
+A vanished edition merged into its ship's row always leaves its UEX listing behind, whatever order
+the merges of one run take (REQ-DATA-042). A survivor can still hold another listing than its own
+ship's when an earlier merge handed it over, as the Phoenix held the Emerald's 48 while its own 47
+was left behind. A listing whose id a merge into the row it finds left behind counts as that row's
+own listing: when it takes the row over by the order above, it is written as if found by its own
+id (REQ-DATA-041), and the merge then keeps the listing the row gives up as left behind, or none
+when the row held none.
+
+A partially applied vehicle slice does not stop the UEX sweep: the item, price and refinery slices
+still run, and the sweep then fails naming the vehicle slice. An item whose vehicle no ship type
+holds links none until that vehicle is applied.
 
 **Acceptance**
 
@@ -1946,9 +1957,14 @@ none.
   UEX game UUID, in either order; the edition's listing is then left behind and creates no row;
   without the merge's mark the listing is still refused (`UexVehicleServiceUuidMatchTest`,
   `ShipTypeMergeServiceTest`).
+- [x] An edition merged before its ship's row leaves its listing behind, and the ship's own listing
+  reaches the survivor (`ShipTypeMergeServiceTest`).
+- [x] A partially applied vehicle slice lets the later UEX slices run and fails the sweep; a
+  partial slice before it, or a vehicle slice that throws, still stops the sweep
+  (`UexSchedulerTest`).
 
-**Code:** `UexVehicleService`, `UexVehicleListings`, `ShipTypeRedirectRepository` · **ADR:**
-ADR-0392
+**Code:** `UexVehicleService`, `UexVehicleListings`, `ShipTypeRedirectRepository`,
+`ShipTypeMergeService`, `UexScheduler` · **ADR:** ADR-0392
 
 ### REQ-DATA-044 — an item UEX lists twice keeps one row
 

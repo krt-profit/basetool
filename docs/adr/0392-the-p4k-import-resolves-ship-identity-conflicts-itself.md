@@ -82,3 +82,19 @@ name, a variant included, and a vanished edition — class name extending a base
 beginning with the base's in-game name — merges into its ship. The UEX vehicle id a merge leaves
 behind stays known, so UEX keeping such an edition as a listing of its own creates no new ship type
 (REQ-DATA-043).
+
+## Amendment — the UEX vehicle sync settles a merged ship itself (2026-11-22)
+
+The apply of 18 Nov merged the Phoenix Emerald edition into the new `_GS` row of the Phoenix before
+the old Phoenix row. The survivor, holding no UEX listing yet, took the edition's, and the
+Phoenix's own listing was left behind. From then on every UEX run refused that listing: its stale
+UEX game UUID contradicted the row's P4K GUID, which outranked it only on a row found by the
+listing's own id. Because the UEX sweep stopped at the first incomplete slice, the item, price and
+refinery slices stopped with it. @greluc decided on 2026-11-22:
+
+- A vanished edition never hands its UEX listing to the row it merges into; the merge always leaves
+  it behind, whatever order the merges of one run take.
+- A listing whose id a merge into the row it finds left behind is that row's own listing.
+- A P4K-confirmed GUID outranks a differing UEX game UUID on every row a UEX vehicle reaches, unless
+  another listing of the same fetch holds the row and no merge left this vehicle's id behind.
+- A partially applied vehicle slice no longer stops the UEX sweep; the sweep still fails naming it.
