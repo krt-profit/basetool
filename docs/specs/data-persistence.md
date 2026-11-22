@@ -1866,8 +1866,9 @@ twin under the short name. So each name step tries the short name first, then th
   conflicts with the `external_uuid` of the row a UEX vehicle id found (REQ-DATA-033).
 - **A game UUID the P4K GUID confirms outranks UEX's.** When a game build gives a vehicle a new
   UUID, the SC Wiki and the P4K carry it while UEX may still serve the old one. A row found by its
-  own UEX vehicle id whose `external_uuid` equals its `p4k_uuid` is written and keeps its UUID; the
-  UEX one is reported as a `P4K_DISAGREEMENT` (REQ-P4K-031). This also holds after the Wiki sync
+  own UEX vehicle id, or by a UEX vehicle id a merge into it left behind (REQ-DATA-043), whose
+  `external_uuid` equals its `p4k_uuid` is written and keeps its UUID; the UEX one is reported as a
+  `P4K_DISAGREEMENT` (REQ-P4K-031). This also holds after the Wiki sync
   moved the row to the new UUID (REQ-DATA-026). A game UUID the P4K does not confirm still blocks
   the write.
 
@@ -1921,9 +1922,17 @@ A listing that keeps the row takes it over; the other listing then finds its own
 name. A listing that does not is a **secondary listing**: it writes nothing and creates no row. So
 is a listing no step places whose `name` or `name_full`, carried by another listing too, is the
 name of a row holding such a listing, and a listing no step places whose id a ship-type merge left
-behind (REQ-DATA-042), such as the edition 48 Constellation Phoenix Emerald merged into the Phoenix. A secondary listing is no rejected write: it neither marks
-the census incomplete nor suppresses the orphan sweep (REQ-DATA-035). A row holding a UEX id a
-partial fetch did not list is still not written.
+behind (REQ-DATA-042), such as the edition 48 Constellation Phoenix Emerald merged into the
+Phoenix. A secondary listing is no rejected write: it neither marks the census incomplete nor
+suppresses the orphan sweep (REQ-DATA-035). A row holding a UEX id a partial fetch did not list is
+still not written.
+
+A survivor that holds no UEX listing takes the one of the first row merged into it (REQ-DATA-042),
+so it can hold an edition's listing while the listing of its own ship is the one left behind. A
+listing whose id a merge into the row it finds left behind counts as that row's own listing: when
+it takes the row over by the order above, it is written as if found by its own id (REQ-DATA-041),
+and the merge then keeps the listing the row gives up as left behind, or none when the row held
+none.
 
 **Acceptance**
 
@@ -1933,8 +1942,13 @@ partial fetch did not list is still not written.
 - [x] A second listing of a row whose other listing's game UUID confirms its P4K GUID writes nothing,
   creates no row and leaves the sweep running (`UexVehicleServiceUuidMatchTest`).
 - [x] A second listing of a shared name creates no row (`UexVehicleServiceUuidMatchTest`).
+- [x] A listing a merge left behind takes its row back from an edition's listing despite a stale
+  UEX game UUID, in either order; the edition's listing is then left behind and creates no row;
+  without the merge's mark the listing is still refused (`UexVehicleServiceUuidMatchTest`,
+  `ShipTypeMergeServiceTest`).
 
-**Code:** `UexVehicleService`, `UexVehicleListings` · **ADR:** ADR-0392
+**Code:** `UexVehicleService`, `UexVehicleListings`, `ShipTypeRedirectRepository` · **ADR:**
+ADR-0392
 
 ### REQ-DATA-044 — an item UEX lists twice keeps one row
 

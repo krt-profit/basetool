@@ -44,6 +44,7 @@ class ShipTypeMergeServiceTest {
 
   @Autowired private ShipTypeMergeService merges;
   @Autowired private ShipTypeRepository ships;
+  @Autowired private ShipTypeRedirectRepository redirects;
   @Autowired private EntityManager entityManager;
   @Autowired private JdbcTemplate jdbc;
 
@@ -109,6 +110,30 @@ class ShipTypeMergeServiceTest {
 
     assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID)).isTrue();
     assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID + 1)).isFalse();
+  }
+
+  @Test
+  void aSurvivorTakingTheListingAMergeLeftBehindLeavesItsOwnBehindInstead() {
+    ShipType survivor = shipType("RSI Constellation Mk IV Phoenix", UUID.randomUUID(), null);
+    survivor.setUexVehicleId(TWIN_UEX_ID + 1);
+    survivor = ships.saveAndFlush(survivor);
+    ShipType twin = ships.saveAndFlush(wikiTwin("Constellation Mk IV Phoenix", null));
+    merges.merge(
+        twin.getId(),
+        survivor.getId(),
+        survivor.getP4kUuid(),
+        ShipTypeMergeReason.SUPERSEDED_BY_GS_RECORD);
+    entityManager.flush();
+    UUID survivorId = survivor.getId();
+
+    assertThat(redirects.existsByCanonicalShipTypeIdAndUexVehicleId(survivorId, TWIN_UEX_ID))
+        .isTrue();
+    assertThat(redirects.handOverUexVehicleId(survivorId, TWIN_UEX_ID, TWIN_UEX_ID + 1)).isOne();
+
+    assertThat(redirects.existsByCanonicalShipTypeIdAndUexVehicleId(survivorId, TWIN_UEX_ID))
+        .isFalse();
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID)).isFalse();
+    assertThat(ships.isMergedUexVehicleId(TWIN_UEX_ID + 1)).isTrue();
   }
 
   @Test

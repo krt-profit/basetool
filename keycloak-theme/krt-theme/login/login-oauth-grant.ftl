@@ -1,4 +1,5 @@
 <#import "template.ftl" as layout>
+<#import "krt-legal.ftl" as legal>
 <@layout.registrationLayout bodyClass="oauth"; section>
     <#if section = "header">
         ${msg("krtOauthGrantTitle", (client.name?has_content)?then(advancedMsg(client.name), client.clientId))}
@@ -28,6 +29,7 @@
                     <input class="krt-button-secondary" name="cancel" id="kc-cancel" type="submit" value="${msg("krtOauthGrantDeny")}"/>
                 </div>
             </form>
+            <@legal.links/>
         </div>
     </#if>
 </@layout.registrationLayout>

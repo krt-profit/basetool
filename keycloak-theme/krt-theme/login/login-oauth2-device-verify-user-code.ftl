@@ -1,4 +1,5 @@
 <#import "template.ftl" as layout>
+<#import "krt-legal.ftl" as legal>
 <@layout.registrationLayout; section>
     <#if section = "header">
         ${msg("oauth2DeviceVerificationTitle")}
@@ -18,6 +19,7 @@
                     <input class="krt-button" type="submit" value="${msg("doSubmit")}"/>
                 </div>
             </form>
+            <@legal.links/>
         </div>
     </#if>
 </@layout.registrationLayout>

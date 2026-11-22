@@ -32,7 +32,7 @@ public class ObservationPrivacyFilter implements ObservationFilter {
     return ObservationPrivacy.map(context);
   }
 
-  static String scrub(String value, boolean normalizeIds) {
-    return ObservationPrivacy.scrub(value, normalizeIds);
+  static String scrub(String value) {
+    return ObservationPrivacy.scrub(value);
   }
 }

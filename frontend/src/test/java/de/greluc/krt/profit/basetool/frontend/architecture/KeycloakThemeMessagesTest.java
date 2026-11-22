@@ -25,12 +25,10 @@ import java.io.IOException;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.regex.Pattern;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -57,7 +55,8 @@ class KeycloakThemeMessagesTest {
       })
   void noMessageHoldsALoneApostrophe(String bundle) throws IOException {
     Properties messages = new Properties();
-    try (Reader reader = Files.newBufferedReader(resolve(bundle), StandardCharsets.UTF_8)) {
+    try (Reader reader =
+        Files.newBufferedReader(RepositoryPaths.resolve(bundle), StandardCharsets.UTF_8)) {
       messages.load(reader);
     }
     List<String> broken = new ArrayList<>();
@@ -70,17 +69,5 @@ class KeycloakThemeMessagesTest {
     assertThat(broken)
         .as("messages in %s with an apostrophe MessageFormat drops", bundle)
         .isEmpty();
-  }
-
-  /**
-   * Resolves a repository-relative path whether the test runs from the {@code frontend} module or
-   * the repository root.
-   *
-   * @param repositoryRelative the path relative to the repository root
-   * @return the first candidate that exists
-   */
-  private static @NotNull Path resolve(@NotNull String repositoryRelative) {
-    Path fromModule = Path.of("..").resolve(repositoryRelative);
-    return Files.exists(fromModule) ? fromModule : Path.of(repositoryRelative);
   }
 }
