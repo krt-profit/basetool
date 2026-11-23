@@ -2347,6 +2347,11 @@ idempotently. It seeds an active Profit area with Sandbox Squadron as a child an
 the hierarchy. The two smoke-test accounts exercise the permitted and withheld org-demand
 responses. It publishes loopback ports only ([`docs/exchange/sandbox.md`](../exchange/sandbox.md)).
 
+The seed also carries the job-order family: the account `sandbox-logistician`, a member of IRIDIUM
+with the Logistician flag; an in-progress aUEC order of IRIDIUM with a requester handover and an
+assignee note of `sandbox-member`; an aUEC order closed relative to the seed time, inside the
+7-day window; and both job-order switches on.
+
 The E2E stack runs the same Keycloak image and the ingest gateway (ADR-0225): the same generator
 writes the E2E realm (`frontend/src/e2e/resources/realm-export.e2e.json`) from the same base with the
 E2E accounts, production's realm settings and login theme, and the third-party client
@@ -2426,9 +2431,24 @@ admin suspension), `ExchangeSyncE2eTest` (corpus round trip, confirmed mass chan
 - [x] The seed grants `sandbox-client` every capability the registry knows, the bank scopes
       included, and switches the exchange and the bank route family on (REQ-BXCH-006).
       *`SandboxSeedCapabilitiesTest` compares the seeded capabilities with `ExchangeCapability`.*
+- [x] Third parties try the whole job-order family, writes included (REQ-OXCH-001…010). The realm
+      and the seed carry `sandbox-logistician` (`5a4d0000-0000-4000-8000-000000000004`), a member
+      of IRIDIUM with the Logistician flag, so its create options offer IRIDIUM as requesting and
+      the eligible Profit units as responsible; `sandbox-member` and `sandbox-member-2` keep their
+      roles and get empty create options. The seed adds two aUEC orders requested by IRIDIUM for
+      the Profit area: one in progress with a provision and a handover to the requester, so
+      `netHandedOver` and `remaining` are not trivial and a cancel answers
+      `JOB_ORDER_MONEY_STARTED`, on which `sandbox-member` is an assignee with a note; and one
+      cancelled a day before the seed runs, so it lies inside the 7-day window after every fresh
+      seed. It switches the job-order family and its writes on; `sandbox-client` holds both
+      job-order scopes since it holds every capability. *`SandboxSeedJobOrdersTest` applies the seed
+      to the migrated schema in a rolled-back transaction and checks the create options, the aUEC
+      read, the assignee's own note, the window, two refusals and a second run;
+      `SandboxSeedCapabilitiesTest` checks both switches; `build-sandbox-realm.py --check` holds the
+      realm to its generator, which lists the account among the device-grant accounts.*
 
 **Status:** built — local sandbox, the image pipeline, its smoke job and the E2E stack with the
-gateway, WP 2.3 (#2099)
+gateway, WP 2.3 (#2099); the job-order account, seed and switches (#3653)
 
 ### REQ-XCH-030 — Exchange writes appear live
 

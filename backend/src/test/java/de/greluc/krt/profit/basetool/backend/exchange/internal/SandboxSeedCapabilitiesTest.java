@@ -34,7 +34,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The sandbox seed grants {@code sandbox-client} every capability and switches the bank route
- * family on, as the sandbox page promises (REQ-XCH-029).
+ * family, the job-order family and the job-order writes on, as the sandbox page promises
+ * (REQ-XCH-029).
  */
 class SandboxSeedCapabilitiesTest {
 
@@ -57,6 +58,13 @@ class SandboxSeedCapabilitiesTest {
   void theSeedSwitchesTheBankRouteFamilyOn() throws IOException {
     assertThat(Files.readString(SEED))
         .containsPattern("(?s)UPDATE exchange_settings\\s+SET[^;]*bank_enabled = true");
+  }
+
+  @Test
+  void theSeedSwitchesTheJobOrderFamilyAndItsWritesOn() throws IOException {
+    assertThat(Files.readString(SEED))
+        .containsPattern("(?s)UPDATE exchange_settings\\s+SET[^;]*job_orders_enabled = true")
+        .containsPattern("(?s)UPDATE exchange_settings\\s+SET[^;]*job_order_writes_enabled = true");
   }
 
   /**

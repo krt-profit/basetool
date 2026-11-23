@@ -1760,6 +1760,23 @@
         {
           "temporary": false,
           "type": "password",
+          "value": "sandbox-logistician-pw-do-not-use-in-prod"
+        }
+      ],
+      "email": "sandbox-logistician@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "id": "5a4d0000-0000-4000-8000-000000000004",
+      "realmRoles": [
+        "default-roles-basetool"
+      ],
+      "username": "sandbox-logistician"
+    },
+    {
+      "credentials": [
+        {
+          "temporary": false,
+          "type": "password",
           "value": "sandbox-load-01-pw-do-not-use-in-prod"
         }
       ],

@@ -130,7 +130,8 @@ Run them from the repository root. `up` pulls the public sandbox images, starts 
 until every service is healthy and applies the seed; with the images already pulled it takes about
 a minute. `reset` is `down` followed by `up`. `down` removes the containers **and the volumes**, so
 the next start is a clean sandbox. `up` on a running sandbox keeps its data and applies the seed
-again, which adds nothing that is already there but turns the exchange switch back on.
+again, which adds nothing that is already there but turns the exchange, bank and job-order
+switches back on.
 
 To build the images from your checkout instead, add `--build` (Linux, macOS) or `-Build`
 (Windows). The first build takes several minutes. Locally built images are tagged `local`. They are
@@ -361,6 +362,7 @@ Discord.
 | `sandbox-member` | `sandbox-member-pw-do-not-use-in-prod` | `5a4d0000-0000-4000-8000-000000000001` | a member of two squadrons, IRIDIUM and Sandbox Squadron, with data |
 | `sandbox-member-2` | `sandbox-member-2-pw-do-not-use-in-prod` | `5a4d0000-0000-4000-8000-000000000002` | a member of IRIDIUM only, for isolation checks |
 | `sandbox-admin` | `sandbox-admin-pw-do-not-use-in-prod` | `5a4d0000-0000-4000-8000-000000000003` | an administrator, for the registry page in the web frontend |
+| `sandbox-logistician` | `sandbox-logistician-pw-do-not-use-in-prod` | `5a4d0000-0000-4000-8000-000000000004` | a member of IRIDIUM with the Logistician flag, for the [job-order](#job-orders) writes |
 | `sandbox-load-01` … `sandbox-load-16` | `sandbox-load-NN-pw-do-not-use-in-prod` | `5a4d0000-0000-4000-8000-0000000002NN` | members of IRIDIUM without data, for our load test (`scripts/sandbox-load.py`); you do not need them |
 
 All of them are approved and have accepted the Terms of Use version of your checkout, which is why
@@ -373,7 +375,8 @@ account check; the others have none.
 one: public, device grant only, consent required, DPoP-bound tokens, no redirect URI, every
 `exchange.*` scope and `offline_access` optional. Its Web Origins are `*`, as for an approved
 extension with a Firefox build, so a browser extension can sign in with it. The registry lists it
-`ACTIVE` with every capability, the three bank scopes included, and the default limits.
+`ACTIVE` with every capability, the three bank scopes and the two job-order scopes included, and
+the default limits.
 
 `sandbox-suspended-client` has the same shape, but the registry lists it `SUSPENDED`, with only
 `exchange.connect` and `exchange.blueprints.read`: every call with its token is refused with
@@ -419,6 +422,22 @@ exchange off. The gateway sees a change within about 5 seconds.
   applications as well, so the bank routes answer instead of `503 BANK_EXCHANGE_DISABLED`. To see
   that refusal, sign in as `sandbox-admin` and switch it off under *Kartellbank in the data
   exchange* on the client registry page.
+- **aUEC orders.** Two [aUEC orders](resources/job-orders.md) requested by IRIDIUM, with Sandbox
+  Profit, the Profit area, responsible for both:
+  - `5a4d0000-0000-4000-8000-000000002204`, `IN_PROGRESS`, with a target of 250 000 aUEC, of
+    which 100 000 were handed over to `sandbox-logistician` as the requester, so it reads
+    `netHandedOver` 100000 and `remaining` 150000. `sandbox-member` works on it as an assignee
+    with a note.
+  - `5a4d0000-0000-4000-8000-000000002205`, `CANCELLED` one day before the seed ran, so it stays
+    in the job-order read for six more days; `reset` brings it back.
+
+  The material and item orders for IRIDIUM name IRIDIUM as the responsible unit too, a unit
+  outside Profit, so they read `responsibilityInvalid: true`.
+- **The job-order switches are on.** The seed switches the job-order family and its writes on for
+  connected applications, so the job-order routes answer instead of
+  `503 JOB_ORDER_EXCHANGE_DISABLED` or `503 JOB_ORDER_WRITES_DISABLED`. To see those refusals,
+  switch them off as `sandbox-admin` under *Job orders in the data exchange* and *Job-order changes
+  in the data exchange* on the client registry page.
 
 ## Test scenarios
 
@@ -584,6 +603,73 @@ A `formatVersion` whose major is not 1, such as `2.0`, is refused `400 SCHEMA_IN
 was added. An older image still answers `200`; if yours does, check its
 [revision](#versions-and-updates), `reset` to pull the current `edge`, or build from your checkout
 (`--build`).
+
+### Job orders
+
+Sign in with `exchange.joborders.read` and `exchange.joborders.write` among your scopes, and as
+`sandbox-logistician` unless a step says otherwise. Unlike the scenarios above, these have not
+been run against a running sandbox yet: each answer follows from the seed and the
+[job orders](resources/job-orders.md) page. Sandbox Profit is
+`5a4d0000-0000-4000-8000-000000000102`, IRIDIUM `00000000-0000-0000-0000-000000000001`.
+
+**Snapshot and feed.** On a fresh sandbox, `GET /exchange/v1/job-orders` answers `200` with four
+orders for `sandbox-logistician`: the material and the item order for IRIDIUM and both
+[aUEC orders](#seeded-data). The in-progress aUEC order reads `target` 250000, `netHandedOver`
+100000 and `remaining` 150000, and lists `sandbox-member` in `assignees[]` without a `note`.
+`sandbox-member` reads the Sandbox Squadron order as well, and on the aUEC order `relations`
+`["requesting", "assignee"]` and its own entry with `own: true` and its note. Page until `hasMore`
+is `false`, keep `nextCursor` and read again with `?cursor=<it>`: without changes in between, the
+feed is empty; after a write it brings the order a few seconds later.
+
+**Create options.** `GET /exchange/v1/job-orders/create-options`:
+
+| Account | `requestingUnits` | `responsibleUnits` | `suggestedResponsible` |
+| --- | --- | --- | --- |
+| `sandbox-logistician` | IRIDIUM | Sandbox Profit, Sandbox Squadron | Sandbox Profit |
+| `sandbox-member`, `sandbox-member-2` | empty | empty | `null` |
+
+`writesEnabled` is `true`, and on a fresh sandbox `limits` is
+`{"openOrderCap": 20, "openOrders": 0, "dailyCreateCap": 20, "createdToday": 0}`.
+
+**Create.** `POST /exchange/v1/job-orders` with a fresh `Idempotency-Key` and
+`{"requestingUnitId": "<IRIDIUM>", "responsibleUnitId": "<Sandbox Profit>", "contact":
+"Sandbox_Logistician", "target": 250000}` answers `201` with the new `id`, `status` `OPEN`,
+`versions` `{"lifecycle": 0, "target": 0, "comment": 0}` and `target` 250000. The same request
+under the same key answers the same order again; another body under that key answers
+`422 IDEMPOTENCY_KEY_REUSED`.
+
+**Cancel.** `POST /exchange/v1/job-orders/<the new id>/cancel` with `{"lifecycleVersion": 0}`
+answers `200` with `status` `CANCELLED` and `versions.lifecycle` 1. The seeded in-progress aUEC
+order answers `409 JOB_ORDER_MONEY_STARTED`, since money was handed over; the seeded cancelled one
+`409 JOB_ORDER_CLOSED`.
+
+**Target.** On the seeded in-progress aUEC order, `POST …/target` with
+`{"target": 300000, "targetVersion": 0}` answers `200` with `target` 300000 and with 1 as
+`versions.target`. With the current `targetVersion`, a target of 100000 or less answers
+`409 JOB_ORDER_TARGET_TOO_LOW`; the cancelled order answers `409 JOB_ORDER_CLOSED`.
+
+**Comment.** On the seeded in-progress aUEC order, `POST …/comment` with
+`{"comment": "Deliver to Sandbox Station", "commentVersion": 0}` answers `200` with
+`versions.comment` 1, and `null` clears it. On the cancelled order it answers
+`409 JOB_ORDER_CLOSED`.
+
+**Refusals.**
+
+| Do | Expect |
+| --- | --- |
+| Create with Sandbox Squadron (`5a4d0000-0000-4000-8000-000000000101`) as `requestingUnitId`, or IRIDIUM as `responsibleUnitId` | `400 JOB_ORDER_UNITS_NOT_OFFERED` |
+| Create as `sandbox-member`, whose create options are empty | `400 JOB_ORDER_UNITS_NOT_OFFERED` |
+| A write on the material order for IRIDIUM, or as `sandbox-member` on the in-progress aUEC order | `403 NOT_PERMITTED` |
+| A write on the Sandbox Squadron order, which `sandbox-logistician` does not read | `404 NOT_FOUND` |
+| A write that echoes a version older than the last answer's | `409 VERSION_CONFLICT` |
+| On a fresh sandbox, create 20 orders, each under a new key, then a 21st | `409 JOB_ORDER_OPEN_ORDER_CAP` |
+| Then cancel one of them and create again | `409 JOB_ORDER_DAILY_CREATE_CAP` with `Retry-After` until the next UTC midnight; the cancelled order still counts for the day |
+| As `sandbox-admin`, switch off *Job-order changes in the data exchange* | every create and write `503 JOB_ORDER_WRITES_DISABLED` with `Retry-After: 300`; the snapshot, the feed and the create options answer, with `writesEnabled` `false` |
+| As `sandbox-admin`, switch off *Job orders in the data exchange* | every path at or below `/exchange/v1/job-orders` `503 JOB_ORDER_EXCHANGE_DISABLED` with `Retry-After: 300`; every other area keeps working |
+
+The orders of the caps scenario hold the open-order cap until you cancel them or
+[`reset`](#start-reset-stop); the daily cap opens again at the next UTC midnight. Switch both
+job-order switches on again afterwards, or run `up`, whose seed turns them back on.
 
 ### The member's proof cap
 
