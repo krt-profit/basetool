@@ -104,5 +104,19 @@ only for the exchange and the bank.
   names today.
 - **D, separate services** — twelve of sixteen cross-domain write families and every audit write
   need the caller's transaction; one host and one maintainer.
-- **JPMS (`module-info.java`)** — no Spring, Boot, Modulith or Hibernate jar ships a module
-  descriptor, and the AOT cache forbids the `--add-opens` a module-path deployment would need.
+- **JPMS (`module-info.java`)** (corrected 2026-11-23: the AOT cache was the stated reason, but a
+  module-path deployment needs `--add-opens` only in the case of the last point) — the dependency
+  set would allow it (no split package, no package that clashes with the JDK), but it buys nothing
+  here:
+  - JPMS encapsulates between modules, and one jar is one module. The backend would be a single
+    module, so `exports` separates no two domains; a module per domain is shape B. ADR-0233 holds
+    the boundaries at package level.
+  - Spring's CGLIB proxies, Hibernate and Jackson reflect into the application's packages, which
+    leaves an `open module` and no reflection barrier.
+  - Spring, Boot, Modulith and Hibernate ship no module descriptor and run as automatic modules;
+    Boot documents no module-path operation.
+  - Tests without their own `module-info` run on the class path, so a missing `opens` surfaces only
+    at runtime.
+  - The application opens its own packages in `module-info`, without a flag. Only a dependency that
+    ships its own descriptor and is reached by reflection needs `--add-opens`, which JEP 483 forbids
+    beside the AOT cache (ADR-0209).
