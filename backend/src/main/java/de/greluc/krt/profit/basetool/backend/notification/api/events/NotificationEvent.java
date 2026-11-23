@@ -289,4 +289,20 @@ public interface NotificationEvent {
   default Set<UUID> supersedeRecipients() {
     return Set.of();
   }
+
+  /**
+   * Notification types whose new notice replaces its recipient's earlier unread notice of the same
+   * type about this event's entity (REQ-NOTIF-017).
+   *
+   * <p>Each member who receives a notice of one of these types loses their unread notices of that
+   * type for the entity before the new one is stored. Read notices, other types and other members'
+   * notices stay. Default: none.
+   *
+   * @return the types that coalesce per recipient; never {@code null}, possibly empty
+   */
+  @NotNull
+  @Unmodifiable
+  default Set<NotificationType> replacesUnreadNotificationTypes() {
+    return Set.of();
+  }
 }

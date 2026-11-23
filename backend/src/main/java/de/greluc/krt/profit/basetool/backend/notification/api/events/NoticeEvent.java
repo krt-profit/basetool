@@ -60,6 +60,8 @@ import org.jetbrains.annotations.Unmodifiable;
  *     supersedeRecipients}
  * @param supersedeRecipients the members whose notices are superseded
  * @param reconcileRecipients the members whose notice is reconciled
+ * @param replacesUnreadNotificationTypes the types whose new notice replaces the recipient's unread
+ *     one
  */
 @Builder(toBuilder = true)
 public record NoticeEvent(
@@ -82,7 +84,8 @@ public record NoticeEvent(
     Set<NotificationType> resolvesNotificationTypes,
     Set<NotificationType> resolvesNotificationTypesForRecipients,
     Set<UUID> supersedeRecipients,
-    Set<UUID> reconcileRecipients)
+    Set<UUID> reconcileRecipients,
+    Set<NotificationType> replacesUnreadNotificationTypes)
     implements NotificationEvent {
 
   /**
@@ -108,6 +111,8 @@ public record NoticeEvent(
    * @param resolvesNotificationTypesForRecipients the types superseded for named members
    * @param supersedeRecipients the members whose notices are superseded
    * @param reconcileRecipients the members whose notice is reconciled
+   * @param replacesUnreadNotificationTypes the types whose new notice replaces the recipient's
+   *     unread one
    */
   public NoticeEvent {
     contextOrgUnits = contextOrgUnits == null ? Map.of() : Map.copyOf(contextOrgUnits);
@@ -122,6 +127,10 @@ public record NoticeEvent(
             : Set.copyOf(resolvesNotificationTypesForRecipients);
     supersedeRecipients = supersedeRecipients == null ? Set.of() : Set.copyOf(supersedeRecipients);
     reconcileRecipients = reconcileRecipients == null ? Set.of() : Set.copyOf(reconcileRecipients);
+    replacesUnreadNotificationTypes =
+        replacesUnreadNotificationTypes == null
+            ? Set.of()
+            : Set.copyOf(replacesUnreadNotificationTypes);
   }
 
   @Override
@@ -173,6 +182,11 @@ public record NoticeEvent(
   @Override
   public @NotNull @Unmodifiable Set<UUID> reconcileRecipients() {
     return reconcileRecipients;
+  }
+
+  @Override
+  public @NotNull @Unmodifiable Set<NotificationType> replacesUnreadNotificationTypes() {
+    return replacesUnreadNotificationTypes;
   }
 
   private static Map<String, String> withoutNulls(Map<String, String> params) {

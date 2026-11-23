@@ -318,6 +318,29 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
       @Param("recipientUserIds") Set<UUID> recipientUserIds);
 
   /**
+   * Deletes the given recipients' unread notifications of one type tagged with the loose entity
+   * reference, so a new notice of that type replaces them (REQ-NOTIF-017). Read notifications stay.
+   *
+   * @param type the notification type to delete
+   * @param entityType the loose entity-type tag
+   * @param entityId the loose entity id
+   * @param recipientUserIds the recipients whose unread notifications are deleted
+   * @return the number of rows deleted
+   */
+  @Modifying
+  @Query(
+      """
+      delete from Notification n
+      where n.type = :type and n.entityType = :entityType and n.entityId = :entityId
+        and n.recipientUserId in :recipientUserIds and n.read = false
+      """)
+  int deleteUnreadOfTypeAndEntityForRecipients(
+      @Param("type") NotificationType type,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId,
+      @Param("recipientUserIds") Set<UUID> recipientUserIds);
+
+  /**
    * Tries to take the transaction-scoped advisory lock that lets one backend instance at a time
    * raise the time-based notices (REQ-NOTIF-026); released at commit or rollback.
    *
