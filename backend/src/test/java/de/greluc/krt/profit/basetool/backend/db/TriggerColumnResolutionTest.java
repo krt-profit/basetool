@@ -51,8 +51,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class TriggerColumnResolutionTest {
 
   /**
-   * The change-feed triggers of V252, V293, V296, V297 and V359, which must stay among the checked
-   * triggers.
+   * The change-feed triggers of V252, V293, V296, V297, V359 and V447, which must stay among the
+   * checked triggers.
    */
   static final Set<String> CHANGE_FEED_TRIGGERS =
       Set.of(
@@ -70,7 +70,9 @@ class TriggerColumnResolutionTest {
           "trg_location_exchange_change",
           "trg_city_exchange_change",
           "trg_space_station_exchange_change",
-          "trg_starmap_object_exchange_change");
+          "trg_starmap_object_exchange_change",
+          "trg_exchange_job_order_fingerprint_exchange_change",
+          "trg_job_order_assignees_exchange_change");
 
   /** Today's user-defined trigger count; the sweep must see at least this many. */
   private static final int TRIGGER_FLOOR = 23;

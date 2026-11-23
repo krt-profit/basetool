@@ -189,21 +189,41 @@ class TableOwnershipTest {
           Map.entry(
               "trg_org_unit_membership_exchange_change",
               new Crossing(
-                  Set.of("exchange_change", "inventory_item"),
+                  Set.of(
+                      "exchange_change",
+                      "inventory_item",
+                      "app_user",
+                      "job_order",
+                      "job_order_participation",
+                      "exchange_job_order_fingerprint"),
                   "V296 org-stock feed: a member joining a unit receives its pool, read from"
-                      + " inventory_item (REQ-XCH-042).")),
+                      + " inventory_item (REQ-XCH-042); V447 job-order log: a membership that"
+                      + " starts, ends or moves announces to the member the unit's job orders, read"
+                      + " from job_order, job_order_participation and the fingerprints'"
+                      + " announced units (REQ-OXCH-003).")),
           Map.entry(
               "trg_app_user_exchange_change",
               new Crossing(
-                  Set.of("exchange_change", "inventory_item", "org_unit"),
+                  Set.of(
+                      "exchange_change",
+                      "inventory_item",
+                      "org_unit",
+                      "job_order",
+                      "job_order_assignees",
+                      "exchange_job_order_fingerprint"),
                   "V297 org-stock feed: a renamed holder re-announces the lots they hold a shared"
-                      + " row in, read from inventory_item (REQ-XCH-043).")),
+                      + " row in, read from inventory_item (REQ-XCH-043); V447 job-order log: a"
+                      + " renamed assignee announces the job orders of the client set they are on,"
+                      + " read from job_order_assignees and job_order (REQ-OXCH-003).")),
           Map.entry(
               "trg_exchange_name_withholding_exchange_change",
               new Crossing(
-                  Set.of("inventory_item", "org_unit"),
+                  Set.of(
+                      "inventory_item", "org_unit", "app_user", "job_order", "job_order_assignees"),
                   "V297 org-stock feed: switching the name withholding re-announces the holder's"
-                      + " lots, read from inventory_item (REQ-XCH-044).")),
+                      + " lots, read from inventory_item (REQ-XCH-044); V447 job-order log: it"
+                      + " announces the job orders of the client set the member is an assignee"
+                      + " of, read from job_order_assignees and job_order (REQ-OXCH-003).")),
           Map.entry(
               "trg_mission_exchange_change",
               new Crossing(
@@ -239,10 +259,16 @@ class TableOwnershipTest {
                       "ship",
                       "inventory_item",
                       "bank_account",
-                      "bank_booking_request"),
-                  "V293/V296/V365 change feed: a renamed unit re-announces its ships, the lots of"
-                      + " its pool and the booking requests on its bank accounts, read from ship,"
-                      + " inventory_item and bank_booking_request, so a client never keeps a stale"
+                      "bank_booking_request",
+                      "job_order",
+                      "job_order_participation",
+                      "exchange_job_order_fingerprint"),
+                  "V293/V296/V365/V447 change feed: a renamed unit re-announces its ships, the"
+                      + " lots of its pool, the booking requests on its bank accounts and its job"
+                      + " orders of the client set, read from ship, inventory_item,"
+                      + " bank_booking_request, job_order and job_order_participation, and its"
+                      + " activation announces those job orders to its members (REQ-OXCH-003)."
+                      + " A client never keeps a stale"
                       + " unit (REQ-XCH-017, REQ-XCH-042, REQ-BXCH-003).")),
           Map.entry(
               "trg_bank_booking_request_exchange_change",
@@ -280,7 +306,29 @@ class TableOwnershipTest {
           Map.entry("trg_inventory_item_exchange_dirty", earmarkMark("earmarked stock row")),
           Map.entry("trg_org_unit_exchange_dirty", hierarchyMark("unit's place in the hierarchy")),
           Map.entry("trg_org_unit_insert_exchange_dirty", hierarchyMark("new active Profit area")),
-          Map.entry("trg_org_unit_delete_exchange_dirty", hierarchyMark("deleted Profit area")));
+          Map.entry("trg_org_unit_delete_exchange_dirty", hierarchyMark("deleted Profit area")),
+          Map.entry(
+              "trg_exchange_job_order_fingerprint_audience",
+              new Crossing(
+                  Set.of("job_order", "job_order_participation", "job_order_assignees"),
+                  "V447 job-order log: a fingerprint stores the units and assignees it is"
+                      + " announced to, read from the order, its active support and its assignees"
+                      + " in the worker's snapshot (REQ-OXCH-003, ADR-0406).")),
+          Map.entry(
+              "trg_exchange_job_order_fingerprint_exchange_change",
+              new Crossing(
+                  Set.of("job_order", "org_unit", "app_user"),
+                  "V447 job-order log: a changed fingerprint announces its order in the logs of"
+                      + " its units and assignees, an existing unit or account only, and a first"
+                      + " one only for an order of the client set, read from job_order"
+                      + " (REQ-OXCH-003, ADR-0406).")),
+          Map.entry(
+              "trg_job_order_assignees_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "exchange_job_order_fingerprint", "app_user"),
+                  "V447 job-order log: an assignee's own note announces the order to that member"
+                      + " alone, while the order is in the client set by its stored settlementOpen"
+                      + " (REQ-OXCH-003).")));
 
   /**
    * The crossing of a V445 trigger on a job-order table that marks its order for the exchange

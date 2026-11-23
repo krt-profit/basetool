@@ -89,8 +89,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * The job-order fingerprint worker against real PostgreSQL (REQ-OXCH-003, ADR-0406): triggers mark
  * an order on every source write, the worker writes a fingerprint and its instant only when the
- * carried read changed, clears exactly the marks it read, and loses no write that commits while it
- * runs.
+ * carried read changed, which alone announces the order in the change log, clears exactly the marks
+ * it read, and loses no write that commits while it runs.
  */
 @SpringBootTest
 class JobOrderFingerprintWorkerIntegrationTest {
@@ -223,7 +223,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
             + " WHERE job_order_id = ?",
         order);
     jdbc.update("UPDATE job_order SET comment = 'second' WHERE id = ?", order);
-    keepOnlyMarksOf(Set.of(order));
+    JobOrderFingerprintRuns.keepOnlyMarksOf(jdbc, Set.of(order));
     SimpleMeterRegistry registry = new SimpleMeterRegistry();
     ExchangeJobOrderBusinessGauges gauges = new ExchangeJobOrderBusinessGauges(marks);
     gauges.register(registry);
@@ -259,6 +259,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
       drain(order);
       Stored beforeCommit = Objects.requireNonNull(stored(order));
       assertThat(beforeCommit.fingerprint()).isEqualTo(JobOrderFingerprints.of(readOf(order)));
+      long logged = logPosition();
 
       racing.commit();
       assertThat(markCount(order)).isPositive();
@@ -268,6 +269,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
       assertThat(afterCommit.fingerprint())
           .isNotEqualTo(beforeCommit.fingerprint())
           .isEqualTo(JobOrderFingerprints.of(readOf(order)));
+      assertThat(unitsAnnounced(order, logged)).containsExactlyInAnyOrder(responsible, requester);
     }
   }
 
@@ -313,6 +315,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
       drain(order);
       Stored inProgress = Objects.requireNonNull(stored(order));
       double unchangedBefore = fingerprints("unchanged");
+      long quiet = logPosition();
 
       provide(order, writerCall(), "6000000");
       move(
@@ -355,6 +358,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
 
       assertThat(stored(order)).isEqualTo(inProgress);
       assertThat(fingerprints("unchanged") - unchangedBefore).isEqualTo(1.0d);
+      assertThat(unitsAnnounced(order, quiet)).isEmpty();
 
       String recipient = recipient(order);
       move(
@@ -369,6 +373,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
 
       assertThat(Objects.requireNonNull(stored(order)).fingerprint())
           .isNotEqualTo(inProgress.fingerprint());
+      assertThat(unitsAnnounced(order, quiet)).containsExactlyInAnyOrder(responsible, requester);
     } finally {
       restoreFeeRate();
     }
@@ -454,16 +459,22 @@ class JobOrderFingerprintWorkerIntegrationTest {
   }
 
   private void drain(UUID... fixtureOrders) {
-    keepOnlyMarksOf(Set.of(fixtureOrders));
-    for (int run = 0; run < 10 && recomputation.recomputeMarked() > 0; run++) {
-      keepOnlyMarksOf(Set.of(fixtureOrders));
-    }
+    JobOrderFingerprintRuns.drain(jdbc, recomputation, fixtureOrders);
   }
 
-  private void keepOnlyMarksOf(Set<UUID> fixtureOrders) {
-    jdbc.update(
-        "DELETE FROM exchange_job_order_dirty WHERE NOT (job_order_id = ANY (?))",
-        (Object) fixtureOrders.toArray(UUID[]::new));
+  private long logPosition() {
+    return Objects.requireNonNull(
+        jdbc.queryForObject("SELECT COALESCE(max(seq), 0) FROM exchange_change", Long.class));
+  }
+
+  private Set<UUID> unitsAnnounced(UUID order, long after) {
+    return Set.copyOf(
+        jdbc.queryForList(
+            "SELECT DISTINCT org_unit_id FROM exchange_change WHERE seq > ?"
+                + " AND resource = 'JOB_ORDER' AND entity_key = ? AND org_unit_id IS NOT NULL",
+            UUID.class,
+            after,
+            order.toString()));
   }
 
   private int markCount(UUID order) {
