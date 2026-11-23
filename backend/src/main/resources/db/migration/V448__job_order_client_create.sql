@@ -48,13 +48,6 @@ ALTER TABLE exchange_client_capability ADD CONSTRAINT ck_exchange_client_capabil
     'exchange.joborders.read',
     'exchange.joborders.write'));
 
-ALTER TABLE exchange_change DROP CONSTRAINT ck_exchange_change_resource;
-
-ALTER TABLE exchange_change
-    ADD CONSTRAINT ck_exchange_change_resource
-        CHECK (resource IN ('BLUEPRINT', 'STOCK', 'SHIP', 'ORG_STOCK', 'BANK_REQUEST', 'REFINERY_ORDER',
-                            'JOB_ORDER'));
-
 -- VARCHAR(63) matches exchange_client.client_id, the longest id the registry admits.
 ALTER TABLE audit_event
     ALTER COLUMN client_id TYPE VARCHAR(63);
