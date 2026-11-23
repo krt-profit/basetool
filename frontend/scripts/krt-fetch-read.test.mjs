@@ -91,6 +91,7 @@ function harness(script = [], page = {}) {
             }
         },
         CustomEvent: class {},
+        addEventListener() {},
         document: {
             querySelector: () => null,
             querySelectorAll: () => [],
