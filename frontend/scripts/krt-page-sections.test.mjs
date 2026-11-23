@@ -135,6 +135,7 @@ function harness(writes = [], serverKeys = {}) {
         Array,
         Object,
         CustomEvent: class {},
+        addEventListener() {},
         __ui: ui,
         __live: live,
         document: {

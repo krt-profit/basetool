@@ -58,7 +58,7 @@ UserSyncService : No users fetched from Keycloak.
 
 The last successful sync ran on 2026-11-05 04:00. `UserSyncStale` covers it. Disconnecting a
 connected app reaches the same Admin API. Step 1 of the role switch
-([`deployment.md` → Roles in the Basetool](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback))
+([`deployment.md` → Roles in the Basetool](https://github.com/krt-profit/basetool/blob/v1.26.7/docs/deployment.md#roles-in-the-basetool-the-switch-and-its-rollback))
 needs a working sync, and the provisioner that assigns the scope also deletes the realm roles, so it
 must not run before the promotion. Assign the one scope by hand instead — exactly what the
 provisioner does later, so its run reports nothing for it:
@@ -122,7 +122,7 @@ python3 provision-keycloak-realm.py --realm basetool --public-origin https://pro
 ```
 
 The dry run exits `2` and lists, besides what
-[`deployment.md` step 6](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback) names
+[`deployment.md` step 6](https://github.com/krt-profit/basetool/blob/v1.26.7/docs/deployment.md#roles-in-the-basetool-the-switch-and-its-rollback) names
 (the three realm roles deleted, `roles` withheld from `basetool-frontend`, Grafana's `client roles`
 mapper added and `realm roles` mapper removed, `view-realm` withdrawn from `backend-service` — under
 `[manual]` when the withdrawal is refused): the three `exchange.refinery.*` and the three
@@ -180,7 +180,7 @@ Prefer a fix forward: there is no rollback that keeps the data written after the
 2. Restore the §1.3 snapshot of the Basetool database ([`backup.md` → Restoring](../backup.md#restoring-disaster-recovery));
    v1.22.3 does not start on the 1.23.0 schema.
 3. Run v1.22.3's provisioner, then `scripts/restore-keycloak-realm-roles.py` with `roles.tsv`, as in
-   [`deployment.md` → Rollback](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback).
+   [`deployment.md` → Rollback](https://github.com/krt-profit/basetool/blob/v1.26.7/docs/deployment.md#roles-in-the-basetool-the-switch-and-its-rollback).
    v1.22.3's provisioner does not know `kc-admin-api`; keep the §1.2 assignment.
 4. Start the deploy timer.
 

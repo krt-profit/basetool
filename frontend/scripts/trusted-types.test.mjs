@@ -105,6 +105,7 @@ function loadKrtFetch(trustedTypes) {
         Map,
         Error,
         CustomEvent: class {},
+        addEventListener() {},
         DOMParser: class {
             parseFromString(markup, type) {
                 parsed.push({ markup, type });

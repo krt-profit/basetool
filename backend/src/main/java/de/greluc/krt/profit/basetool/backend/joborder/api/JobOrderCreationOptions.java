@@ -23,7 +23,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Projects the current creation choices without enumerating pairs, for the writer rule the caller
- * passes (REQ-ORDERS-053, ADR-0405).
+ * passes (REQ-ORDERS-053, ADR-0408).
  */
 public interface JobOrderCreationOptions {
 

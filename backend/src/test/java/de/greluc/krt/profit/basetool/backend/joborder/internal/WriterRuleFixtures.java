@@ -58,7 +58,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Seeds the units, members and memberships the job-order writer-rule tests decide over, and signs a
- * member in the way the web and the exchange present one (ADR-0405).
+ * member in the way the web and the exchange present one (ADR-0408).
  */
 @RequiredArgsConstructor
 final class WriterRuleFixtures {

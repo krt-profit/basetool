@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 /**
  * Names the read check a job-order command applies to the loaded order beside the writer rule; the
- * commands take it as a parameter and decide it under their order locks on every call (ADR-0405).
+ * commands take it as a parameter and decide it under their order locks on every call (ADR-0408).
  */
 public enum JobOrderReadCheck {
 

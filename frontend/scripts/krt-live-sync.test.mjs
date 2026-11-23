@@ -85,6 +85,7 @@ function harness(randomValue = 0.5, page = {}) {
         document: Object.assign({ querySelectorAll: () => [], addEventListener() {} }, page),
         console,
         getComputedStyle: () => ({ display: 'flex' }),
+        addEventListener() {},
     };
     context.window = context;
     context.location = { protocol: 'https:', host: 'example.test' };

@@ -25,7 +25,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * The web's job-order status command for a caller that passes its own writer rule, read check and
  * actor; the order locks, the lifecycle version, the responsibility gate, the audit, the notices
- * and the live update are the web's (ADR-0405).
+ * and the live update are the web's (ADR-0408).
  */
 public interface JobOrderStatusCommand {
 

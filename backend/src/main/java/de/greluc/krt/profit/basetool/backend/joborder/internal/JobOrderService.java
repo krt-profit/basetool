@@ -338,7 +338,7 @@ public class JobOrderService {
         changeStatus(id, dto.status(), dto.version(), JobOrderCaller.web(currentMember())));
   }
 
-  /** Changes the status under the caller's writer rule, read check and actor (ADR-0405). */
+  /** Changes the status under the caller's writer rule, read check and actor (ADR-0408). */
   @Transactional(propagation = Propagation.MANDATORY)
   JobOrder changeStatus(
       @NotNull UUID id,

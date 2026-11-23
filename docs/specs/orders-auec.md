@@ -462,7 +462,7 @@ MATERIAL and ITEM edits (`PUT /api/v1/orders/{id}`, `…/requested`, `…/items`
 carry `commentVersion` beside `version` the same way, and their edit forms echo both.
 
 The target and information commands take the writer rule, the read check and the actor as
-parameters (ADR-0405). Under the order and account locks they keep the web's order of checks: the
+parameters (ADR-0408). Under the order and account locks they keep the web's order of checks: the
 read check, an aUEC order, a valid responsibility, an active member, a writer of either side the
 rule covers and an order that is not cancelled, then the version of the part they write. The web
 passes its contextual authorities with the honoured pin, its complete-order read and the requesting

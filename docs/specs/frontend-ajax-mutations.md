@@ -1240,6 +1240,38 @@ any future stack) with no call-site change.
 **Enforced by:** code review + e2e (a peer edit landing during a slow local refresh does not regress
 the board) · **Code:** `krt-fetch.js` (`swap` sequence guard + `AbortController`) · **Issue:** #1151
 
+### REQ-FE-038 — A fragment swap never removes a control under a press
+
+A browser dispatches `click` only when the pointer is pressed and released on the same element, so a
+swap that replaces the markup between `pointerdown` and `pointerup` makes the press do nothing.
+Swaps land without the user's involvement — the page's own refresh after a write, a peer's change
+(REQ-FE-010, REQ-FE-015), the reconnect resync, and the writer's own echo, which the backend's
+`publishAfterCommit` sends to every socket of the room. `krtFetch.swap` therefore **holds its DOM
+write while a press of the primary pointer's main button that began inside the container is in
+progress**, and writes once the press has ended:
+
+- the press starts on `pointerdown` and ends on `pointerup`, `pointercancel` or `blur` of the
+  window;
+- an ended press settles in the macrotask after its `click`, so the pressed control's click
+  handlers run against the markup the user pressed; a press without a `click` settles a short
+  grace period after its `pointerup`;
+- after the hold the REQ-FE-013 sequence guard is checked again — a newer swap still wins and the
+  held one is dropped whole; otherwise the write, the `krt:swapped` dispatch, the `history` update
+  and the scroll restore happen as for any swap, and the returned promise resolves `true`;
+- a press outside the container holds nothing.
+
+**Acceptance**
+
+- [ ] A press on a control inside a container, held while a swap of that container receives its
+  fragment, still fires its `click` on release (an order's money dialog opens), and the container is
+  re-rendered right after.
+- [ ] A press outside the container does not hold its swap.
+- [ ] A swap superseded during the hold performs no write and no `krt:swapped` dispatch.
+
+**Enforced by:** `:frontend:testKrtFetchSwapPressJs` (`scripts/krt-fetch-swap-press.test.mjs`) ·
+`FragmentSwapPressE2eTest` · **Code:** `krt-fetch.js` (`swap`), `krt-press.js` (`pressSettled`) ·
+**ADR:** ADR-0405
+
 ### REQ-FE-014 — The mission edit modal saves only the sections the user changed
 
 The mission edit form fans out to up to three section PATCHes (`schedule` → `core` → `flags`), each

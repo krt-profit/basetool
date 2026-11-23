@@ -67,7 +67,7 @@ import org.springframework.transaction.annotation.Transactional;
  * direct Logistician of the requesting unit cancels, changes the target and changes the comment
  * alone; a writer of the responsible side, a reach without direct membership and an administrator
  * write nothing through it, and every write it permits is one the web permits for the same member
- * (REQ-XCH-009, ADR-0405).
+ * (REQ-XCH-009, ADR-0408).
  */
 @SpringBootTest
 @Transactional

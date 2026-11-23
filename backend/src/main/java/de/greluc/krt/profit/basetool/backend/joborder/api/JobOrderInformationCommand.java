@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The web's aUEC information command for a caller that passes its own writer rule, read check and
  * actor, writing the comment alone; the order and account locks, the comment version, the
- * responsibility gate, the audit, the notices and the live update are the web's (ADR-0405).
+ * responsibility gate, the audit, the notices and the live update are the web's (ADR-0408).
  */
 public interface JobOrderInformationCommand {
 

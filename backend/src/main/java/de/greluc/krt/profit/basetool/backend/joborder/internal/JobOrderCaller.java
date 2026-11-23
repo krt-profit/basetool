@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * The authority one call of a job-order status, target or information command runs under, as its
- * caller passed it (ADR-0405).
+ * caller passed it (ADR-0408).
  *
  * @param rule the writer rule that decides which side's writer the actor is
  * @param read the read check the loaded order must pass

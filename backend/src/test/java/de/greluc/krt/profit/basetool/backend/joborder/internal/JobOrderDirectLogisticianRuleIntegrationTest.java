@@ -65,7 +65,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The exchange's writer rule at the create seam, against Postgres: a direct member who is a
  * Logistician of a unit by the org-stock rule writes for it as the requesting side, decided from
- * the database (REQ-XCH-009, ADR-0405).
+ * the database (REQ-XCH-009, ADR-0408).
  */
 @SpringBootTest
 @Transactional

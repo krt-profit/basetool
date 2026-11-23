@@ -30,7 +30,7 @@ Job orders take the authority as a parameter instead of a policy object: the cre
 the create-options projection take a `JobOrderWriterRule` and a `JobOrderActor`, resolved on every
 call under the command's locks. The web passes its contextual authorities with the pin, the
 exchange the member's direct Logistician units from the database for the requesting side only, so
-both share one code path and the exchange never permits a pair the web would refuse (ADR-0405).
+both share one code path and the exchange never permits a pair the web would refuse (ADR-0408).
 The status, target and information commands take the same rule and actor beside a
 `JobOrderReadCheck`, decided on the loaded order under the order locks next to each command's own
 section version and the responsibility gate; the exchange reaches them through the ports
@@ -296,7 +296,9 @@ Two binding rules shape every UI change:
   system applies"; it is unreviewed.
 - **Live update is binding** — every create/update/delete/toggle/reorder/filter/paginate updates
   the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
-  peer's change propagates without a manual reload.
+  peer's change propagates without a manual reload. A fragment swap waits for a press inside its
+  container to end, so a re-render never removes the control under a press (REQ-FE-038,
+  ADR-0405).
 - **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): any
   `fetch` or `XMLHttpRequest` outside the transport fails `:frontend:lintJs` — writes go through
   `krtFetch.write` / `submitForm` (REQ-FE-002), reads through `krtFetch.get` / `getJson`, which
@@ -642,7 +644,7 @@ Three rules hold for every exchange route, and each new resource or capability i
 - **A client creates job orders through the web's create.** The exchange calls the one create
   command (`JobOrderCreateCommand`) and the one create-options projection with the writer rule
   `DIRECT_LOGISTICIAN` — a unit the member directly belongs to and is a Logistician of, requesting
-  side only — and an actor carrying the member and the client (ADR-0405), so the locks, checks,
+  side only — and an actor carrying the member and the client (ADR-0408), so the locks, checks,
   notices, queue frame and audit cannot drift between the channels. Unlike the bank raise, whose
   key lives on the bank's request, the create's `Idempotency-Key` lives on the order with the
   creating client and member, unique per member, client and key, and the lookup runs under a

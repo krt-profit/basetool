@@ -106,7 +106,7 @@ public class JobOrderAccessPolicy
 
   /**
    * Decides the read check a command's caller passed on the loaded order, for the request's caller
-   * (ADR-0405); a request that names no member passes no exchange read check.
+   * (ADR-0408); a request that names no member passes no exchange read check.
    *
    * @param read the read check
    * @param order the loaded order

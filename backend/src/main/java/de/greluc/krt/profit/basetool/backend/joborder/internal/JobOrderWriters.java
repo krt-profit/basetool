@@ -37,7 +37,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Resolves a {@link JobOrderWriterRule} for one actor into the units that actor writes job orders
- * for; every command resolves it anew on each call (ADR-0405).
+ * for; every command resolves it anew on each call (ADR-0408).
  */
 @Component
 @RequiredArgsConstructor
