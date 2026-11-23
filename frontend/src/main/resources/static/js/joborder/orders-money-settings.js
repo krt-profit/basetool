@@ -207,7 +207,7 @@ function bindOrderEditor(url) {
             const data = orderMoneyProjection()?.dataset;
             return {
                 value: { target: data?.target || '' },
-                version: Number(data?.targetVersion || 0),
+                versions: { version: Number(data?.targetVersion || 0) },
                 allowed: data?.canEditTarget === 'true',
             };
         },
@@ -222,7 +222,10 @@ function bindOrderEditor(url) {
             const data = orderMoneyProjection()?.dataset;
             return {
                 value: { handle: data?.handle || '', comment: data?.comment || '' },
-                version: Number(data?.informationVersion || 0),
+                versions: {
+                    version: Number(data?.informationVersion || 0),
+                    commentVersion: Number(data?.commentVersion || 0),
+                },
                 allowed: data?.canEditInformation === 'true',
             };
         },
@@ -243,7 +246,9 @@ function bindOrderEditor(url) {
 }
 
 /**
- * Keeps one edit's revision independent and preserves its dirty fields.
+ * Keeps one edit's revisions independent of the other edits and preserves its dirty fields.
+ *
+ * The form echoes every revision of its basis under the request field that carries it.
  *
  * @template {object} Value
  * @param {HTMLFormElement} form the contextual form
@@ -251,7 +256,7 @@ function bindOrderEditor(url) {
  * @param {{
  *   read: () => Value,
  *   write: (value: Value) => void,
- *   current: () => {value: Value, version: number, allowed: boolean}
+ *   current: () => {value: Value, versions: Record<string, number>, allowed: boolean}
  * }} scope the form's fields and live basis
  */
 function bindEditScope(form, url, scope) {
@@ -268,7 +273,9 @@ function bindEditScope(form, url, scope) {
         const latest = scope.current();
         form.hidden = !latest.allowed;
         if (JSON.stringify(scope.read()) === JSON.stringify(basis.value)) reset();
-        else if (latest.version !== basis.version) notice.hidden = false;
+        else if (JSON.stringify(latest.versions) !== JSON.stringify(basis.versions)) {
+            notice.hidden = false;
+        }
     };
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -277,7 +284,7 @@ function bindEditScope(form, url, scope) {
         const result = await krtFetch.write({
             method: 'PATCH',
             url,
-            payload: { ...submitted, version: basis.version },
+            payload: { ...submitted, ...basis.versions },
             submitter: event.submitter,
             onError: (status) => status === 409,
         });

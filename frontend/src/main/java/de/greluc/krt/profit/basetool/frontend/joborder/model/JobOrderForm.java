@@ -48,6 +48,10 @@ public class JobOrderForm {
   private String comment;
 
   private Long version;
+
+  /** The comment version the edit form observed, echoed beside {@link #version}. */
+  private Long commentVersion;
+
   private String source;
   private List<JobOrderMaterialForm> materials = new ArrayList<>();
 
@@ -57,8 +61,8 @@ public class JobOrderForm {
   }
 
   /**
-   * Prefills an edit form with the order's comment, version and material lines with their requested
-   * and handed-over amounts, keeping one empty line when the order has none.
+   * Prefills an edit form with the order's comment, both versions and material lines with their
+   * requested and handed-over amounts, keeping one empty line when the order has none.
    *
    * @param order the order being edited
    * @return the prefilled form
@@ -68,6 +72,7 @@ public class JobOrderForm {
     JobOrderForm form = new JobOrderForm();
     form.setComment(order.comment());
     form.setVersion(order.version());
+    form.setCommentVersion(order.commentVersion());
     if (order.materials() != null && !order.materials().isEmpty()) {
       form.getMaterials().clear();
       for (JobOrderMaterialDto mat : order.materials()) {

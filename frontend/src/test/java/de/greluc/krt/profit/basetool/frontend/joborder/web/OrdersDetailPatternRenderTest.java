@@ -233,31 +233,104 @@ class OrdersDetailPatternRenderTest {
   @Test
   void requesterCanCancelWithTheLifecycleVersion() throws Exception {
     UUID orderId = UUID.randomUUID();
-    JobOrderDto order =
+    stubOrder(
+        orderJson(
+            """
+            {
+              "id": "%s",
+              "displayId": 7,
+              "type": "MATERIAL",
+              "status": "OPEN",
+              "version": 17,
+              "lifecycleVersion": 8,
+              "canCancel": true,
+              "canEditAsRequester": true
+            }
+            """
+                .formatted(orderId)));
+
+    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
+        .containsPattern("data-testid=\"order-cancel\"[^>]*data-version=\"8\"")
+        .doesNotContain("id=\"status-select\"")
+        .doesNotContain("data-testid=\"order-reopen\"");
+  }
+
+  /** The material edit form echoes the order version and the comment version beside it. */
+  @Test
+  void materialEditFormEchoesTheOrderAndTheCommentVersion() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    stubOrder(
+        orderJson(
+            """
+            {
+              "id": "%s",
+              "displayId": 7,
+              "type": "MATERIAL",
+              "status": "OPEN",
+              "version": 17,
+              "commentVersion": 4,
+              "canEditAsRequester": true
+            }
+            """
+                .formatted(orderId)));
+
+    assertThat(editForm(render(orderId, "ROLE_KRT_MEMBER")))
+        .containsPattern("name=\"version\"[^>]*value=\"17\"")
+        .containsPattern("name=\"commentVersion\"[^>]*value=\"4\"");
+  }
+
+  /** The refreshed money section carries the contact version and the comment version. */
+  @Test
+  void moneyFragmentEchoesTheContactAndTheCommentVersion() throws Exception {
+    UUID order = UUID.randomUUID();
+    stubOrder(
+        orderJson(
+            """
+            {
+              "id": "%s",
+              "displayId": 7,
+              "type": "AUEC",
+              "status": "IN_PROGRESS",
+              "handle": "Contact",
+              "comment": "Note",
+              "commentVersion": 5
+            }
+            """
+                .formatted(order)));
+    JobOrderMoneyView money =
         JsonMapper.builder()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .build()
             .readValue(
                 """
                 {
-                  "id": "%s",
-                  "displayId": 7,
-                  "type": "MATERIAL",
-                  "status": "OPEN",
-                  "version": 17,
-                  "lifecycleVersion": 8,
-                  "canCancel": true,
-                  "canEditAsRequester": true
+                  "target":"500000","targetVersion":2,"provided":"0","holdings":"0",
+                  "netHandedOver":"0","remaining":"500000","fees":"0","overpaid":"0",
+                  "responsibilityValid":true,"canEditInformation":true,"informationVersion":3,
+                  "history":[],"targetChanges":[],"recipients":[],"holderIdentityHistory":[],
+                  "returnableRecipientIds":[],"holders":[],"linkedAttempts":[]
                 }
-                """
-                    .formatted(orderId),
-                JobOrderDto.class);
-    stubOrder(order);
+                """,
+                JobOrderMoneyView.class);
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/money"), eq(JobOrderMoneyView.class), eq(order)))
+        .thenReturn(money);
 
-    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
-        .containsPattern("data-testid=\"order-cancel\"[^>]*data-version=\"8\"")
-        .doesNotContain("id=\"status-select\"")
-        .doesNotContain("data-testid=\"order-reopen\"");
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/{id}", order)
+                    .param("fragment", "money")
+                    .header("Accept-Language", "de")
+                    .with(authentication(token("ROLE_KRT_MEMBER"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-information-version=\"3\"", "data-comment-version=\"5\"")
+        .contains("data-handle=\"Contact\"", "data-comment=\"Note\"");
   }
 
   @Test
@@ -502,6 +575,19 @@ class OrdersDetailPatternRenderTest {
   }
 
   /**
+   * Reads an order DTO from the fields a test sets, leaving every other field at its default.
+   *
+   * @param json the order's JSON
+   * @return the order DTO
+   */
+  private static @NotNull JobOrderDto orderJson(@NotNull String json) {
+    return JsonMapper.builder()
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .build()
+        .readValue(json, JobOrderDto.class);
+  }
+
+  /**
    * Renders the order detail page in German for a principal with one role.
    *
    * @param orderId the order to open
@@ -585,6 +671,7 @@ class OrdersDetailPatternRenderTest {
         false,
         false,
         false,
+        0L,
         0L,
         0L);
   }

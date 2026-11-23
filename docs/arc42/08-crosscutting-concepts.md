@@ -208,6 +208,8 @@ Transaction-bound live-sync flushes and read memos follow suspension and resumpt
 ([REQ-DATA-040](../specs/data-persistence.md#req-data-040--transaction-resources-follow-suspension-and-resumption)).
 Role permissions and descriptions use independent row-locked section counters
 ([REQ-SEC-088](../specs/security-and-access.md#req-sec-088--the-four-application-roles-are-assigned-in-the-basetool)).
+A job order's comment carries its own row-locked revision beside the one that guards its contact
+([REQ-ORDERS-066](../specs/orders-auec.md#req-orders-066--narrow-edit-scopes-protect-shared-financial-invariants)).
 
 Account consolidation and Discord registration linking share a reservation for both account IDs
 through the Keycloak calls, separate database commit and any compensation

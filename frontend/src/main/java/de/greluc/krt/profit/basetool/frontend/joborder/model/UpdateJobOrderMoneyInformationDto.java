@@ -30,10 +30,12 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param handle the contact handle
  * @param comment the optional order comment
- * @param version the observed information revision
+ * @param version the observed contact revision
+ * @param commentVersion the observed comment revision
  */
 @DtoMirror
 public record UpdateJobOrderMoneyInformationDto(
     @NotBlank @Size(max = 200) String handle,
     @Nullable @Size(max = 1000) String comment,
-    @NotNull Long version) {}
+    @NotNull Long version,
+    @NotNull Long commentVersion) {}

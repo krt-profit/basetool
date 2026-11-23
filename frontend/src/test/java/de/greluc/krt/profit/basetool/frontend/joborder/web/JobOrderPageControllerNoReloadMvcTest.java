@@ -144,6 +144,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
         false,
         false,
         0L,
+        0L,
         0L);
   }
 
@@ -352,7 +353,8 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   private static String editBody(UUID materialId) {
     return "{\"requestingOrgUnitId\":\""
         + UUID.randomUUID()
-        + "\",\"handle\":\"h\",\"comment\":\"c\",\"version\":1,\"materials\":[{\"materialId\":\""
+        + "\",\"handle\":\"h\",\"comment\":\"c\",\"version\":1,\"commentVersion\":2,"
+        + "\"materials\":[{\"materialId\":\""
         + materialId
         + "\",\"minQuality\":650,\"amount\":5.0}]}";
   }
@@ -372,6 +374,12 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
                 .content(editBody(UUID.randomUUID())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.version").value(4));
+
+    ArgumentCaptor<CreateJobOrderDto> captor = ArgumentCaptor.captor();
+    verify(backendApiClient)
+        .put(eq("/api/v1/orders/{id}"), captor.capture(), eq(JobOrderDto.class), eq(orderId));
+    assertThat(captor.getValue().version()).isEqualTo(1L);
+    assertThat(captor.getValue().commentVersion()).isEqualTo(2L);
   }
 
   @Test
@@ -706,6 +714,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
     assertThat(sent.requestingOrgUnitId()).as("requesting org unit is stripped").isNull();
     assertThat(sent.handle()).as("handle is stripped").isNull();
     assertThat(sent.comment()).isEqualTo("c");
+    assertThat(sent.commentVersion()).as("the comment version is relayed").isEqualTo(2L);
   }
 
   @Test

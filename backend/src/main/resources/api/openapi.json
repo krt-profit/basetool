@@ -92665,6 +92665,10 @@
             "maxLength" : 1000,
             "minLength" : 0
           },
+          "commentVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "handle" : {
             "type" : "string",
             "maxLength" : 200,
@@ -92754,6 +92758,10 @@
             "type" : "string",
             "maxLength" : 1000,
             "minLength" : 0
+          },
+          "commentVersion" : {
+            "type" : "integer",
+            "format" : "int64"
           },
           "handle" : {
             "type" : "string",
@@ -95889,6 +95897,10 @@
           },
           "comment" : {
             "type" : "string"
+          },
+          "commentVersion" : {
+            "type" : "integer",
+            "format" : "int64"
           },
           "countBlueprintsWithVariants" : {
             "type" : "boolean"
@@ -109018,6 +109030,10 @@
             "type" : "string",
             "maxLength" : 1000,
             "minLength" : 0
+          },
+          "commentVersion" : {
+            "type" : "integer",
+            "format" : "int64"
           },
           "handle" : {
             "type" : "string",

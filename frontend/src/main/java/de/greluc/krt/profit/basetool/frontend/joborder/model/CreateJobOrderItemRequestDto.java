@@ -34,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * @param comment optional free-text note
  * @param items the ordered finished-item lines
  * @param version optimistic-lock version (unused on create)
+ * @param commentVersion the observed comment version (unused on create)
  */
 @DtoMirror
 public record CreateJobOrderItemRequestDto(
@@ -42,4 +43,5 @@ public record CreateJobOrderItemRequestDto(
     String handle,
     String comment,
     List<CreateJobOrderItemLineDto> items,
-    Long version) {}
+    Long version,
+    @Nullable Long commentVersion) {}

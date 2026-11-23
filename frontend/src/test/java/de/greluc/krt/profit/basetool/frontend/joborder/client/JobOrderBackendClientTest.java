@@ -317,6 +317,7 @@ class JobOrderBackendClientTest {
                     List.of(new CreateJobOrderItemMaterialDto(MATERIAL, "B")),
                     0,
                     null)),
+            null,
             null);
     CreateJobOrderDto materialOrder =
         new CreateJobOrderDto(
@@ -325,7 +326,8 @@ class JobOrderBackendClientTest {
             "Pilot",
             "Eilig",
             List.of(new CreateJobOrderMaterialDto(MATERIAL, 500, 12.5)),
-            3L);
+            3L,
+            2L);
 
     client.createItemOrder(itemOrder);
     client.updateItemOrder(ORDER, itemOrder);
@@ -351,13 +353,13 @@ class JobOrderBackendClientTest {
             + "\",\"amount\":2,\"materials\":[{\"materialId\":\""
             + MATERIAL
             + "\",\"quality\":\"B\"}],\"clientLineId\":0,\"parentClientLineId\":null}],"
-            + "\"version\":null}";
+            + "\"version\":null,\"commentVersion\":null}";
     String materialBody =
         "{\"responsibleOrgUnitId\":null,\"requestingOrgUnitId\":\""
             + OTHER
             + "\",\"handle\":\"Pilot\",\"comment\":\"Eilig\",\"materials\":[{\"materialId\":\""
             + MATERIAL
-            + "\",\"minQuality\":500,\"amount\":12.5}],\"version\":3}";
+            + "\",\"minQuality\":500,\"amount\":12.5}],\"version\":3,\"commentVersion\":2}";
     backend.expect("POST", "/api/v1/orders/items", itemBody);
     backend.expect("PUT", "/api/v1/orders/" + ORDER + "/items", itemBody);
     backend.expect("PUT", "/api/v1/orders/" + ORDER + "/items/requested", itemBody);

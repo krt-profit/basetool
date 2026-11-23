@@ -1562,13 +1562,7 @@ class JobOrderMoneyIntegrationTest {
         .andExpect(jsonPath("$.remaining").value("1000000"))
         .andExpect(jsonPath("$.informationVersion").value(0));
     assertMoney(order, "12000000", "1000000", "11000000", "1000000", "IN_PROGRESS");
-    mvc.perform(
-            patch("/api/v1/orders/{id}/money/information", order)
-                .with(writer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    json.writeValueAsString(
-                        Map.of("handle", "New contact", "comment", "Terms", "version", 0))))
+    mvc.perform(informationRequest(order, "New contact", "Terms", 0, 0L))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.targetVersion").value(1))
         .andExpect(jsonPath("$.informationVersion").value(1));
@@ -1588,6 +1582,73 @@ class JobOrderMoneyIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"OPEN\",\"version\":4}"))
         .andExpect(status().isBadRequest());
+  }
+
+  /** A contact edit keeps the comment version and a comment edit keeps the contact version. */
+  @Test
+  void informationEditRaisesOnlyTheVersionOfThePartItChanges() throws Exception {
+    UUID order = createOrder();
+
+    mvc.perform(informationRequest(order, "New contact", null, 0, 0L))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.informationVersion").value(1));
+    mvc.perform(get("/api/v1/orders/{id}", order).with(reader()))
+        .andExpect(jsonPath("$.commentVersion").value(0));
+
+    mvc.perform(informationRequest(order, "New contact", "Deliver to Area18", 1, 0L))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.informationVersion").value(1));
+    mvc.perform(get("/api/v1/orders/{id}", order).with(reader()))
+        .andExpect(jsonPath("$.handle").value("New contact"))
+        .andExpect(jsonPath("$.comment").value("Deliver to Area18"))
+        .andExpect(jsonPath("$.commentVersion").value(1));
+  }
+
+  /** A stale or missing comment version refuses the whole edit, the contact included. */
+  @Test
+  void staleCommentVersionRefusesTheInformationEditWithoutWriting() throws Exception {
+    UUID order = createOrder();
+    mvc.perform(informationRequest(order, "Money contact", "First note", 0, 0L))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.informationVersion").value(0));
+
+    mvc.perform(informationRequest(order, "Other contact", "Second note", 0, 0L))
+        .andExpect(status().isConflict());
+    mvc.perform(informationRequest(order, "Other contact", "Second note", 0, null))
+        .andExpect(status().isConflict());
+
+    mvc.perform(get("/api/v1/orders/{id}", order).with(reader()))
+        .andExpect(jsonPath("$.handle").value("Money contact"))
+        .andExpect(jsonPath("$.comment").value("First note"))
+        .andExpect(jsonPath("$.commentVersion").value(1));
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+        .andExpect(jsonPath("$.informationVersion").value(0));
+  }
+
+  /**
+   * A contact write and a comment write from the same observed versions serialize on the order: the
+   * waiting write is refused instead of losing the first, and the contact write leaves the comment
+   * version, so the comment is written with the refreshed contact version and its unchanged own.
+   */
+  @Test
+  @Timeout(60)
+  void concurrentContactAndCommentWritesNeverLoseAnUpdate() throws Exception {
+    UUID order = createOrder();
+
+    RaceResults race =
+        serializeBehind(
+            informationRequest(order, "New contact", null, 0, 0L),
+            200,
+            informationRequest(order, "Money contact", "Late note", 0, 0L));
+
+    assertThat(race.waiter().getResponse().getStatus()).isEqualTo(409);
+    mvc.perform(informationRequest(order, "New contact", "Late note", 1, 0L))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.informationVersion").value(1));
+    mvc.perform(get("/api/v1/orders/{id}", order).with(reader()))
+        .andExpect(jsonPath("$.handle").value("New contact"))
+        .andExpect(jsonPath("$.comment").value("Late note"))
+        .andExpect(jsonPath("$.commentVersion").value(1));
   }
 
   @Test
@@ -1933,19 +1994,7 @@ class JobOrderMoneyIntegrationTest {
                   "10000000",
                   "0",
                   Map.of("recipientId", recipient, "targetVersion", 0));
-          var information =
-              patch("/api/v1/orders/{id}/money/information", order)
-                  .with(writer())
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(
-                      json.writeValueAsString(
-                          Map.of(
-                              "handle",
-                              "Updated contact",
-                              "comment",
-                              "Independent",
-                              "version",
-                              0)));
+          var information = informationRequest(order, "Updated contact", "Independent", 0, 0L);
           RaceResults race =
               serializeBehind(information, 200, movementRequest(order, reader(), payment, false));
           assertThat(race.waiter().getResponse().getStatus()).isEqualTo(200);
@@ -2044,6 +2093,25 @@ class JobOrderMoneyIntegrationTest {
         .with(caller)
         .contentType(MediaType.APPLICATION_JSON)
         .content(json.writeValueAsString(terms));
+  }
+
+  private MockHttpServletRequestBuilder informationRequest(
+      UUID order,
+      String handle,
+      @Nullable String comment,
+      long version,
+      @Nullable Long commentVersion) {
+    Map<String, Object> body = new HashMap<>();
+    body.put("handle", handle);
+    body.put("comment", comment);
+    body.put("version", version);
+    if (commentVersion != null) {
+      body.put("commentVersion", commentVersion);
+    }
+    return patch("/api/v1/orders/{id}/money/information", order)
+        .with(writer())
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(json.writeValueAsString(body));
   }
 
   private MockHttpServletRequestBuilder targetRequest(UUID order, String amount, long version) {

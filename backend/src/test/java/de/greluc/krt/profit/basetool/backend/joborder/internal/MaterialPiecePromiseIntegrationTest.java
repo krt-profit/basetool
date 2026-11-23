@@ -90,7 +90,8 @@ class MaterialPiecePromiseIntegrationTest extends MaterialContributionTestSuppor
                 order.handle(),
                 null,
                 java.util.List.of(new CreateJobOrderMaterialDto(fixture.materialId(), 650, 6.0)),
-                order.version()));
+                order.version(),
+                order.commentVersion()));
     var afterA = contributionHistory(fixture.orderId(), a.id());
     var afterB = contributionHistory(fixture.orderId(), b.id());
     assertThat(afterA.openAmount()).isEqualTo(2.0);
@@ -107,7 +108,8 @@ class MaterialPiecePromiseIntegrationTest extends MaterialContributionTestSuppor
             reduced.handle(),
             null,
             java.util.List.of(new CreateJobOrderMaterialDto(fixture.materialId(), 650, 10.0)),
-            reduced.version()));
+            reduced.version(),
+            reduced.commentVersion()));
     assertThat(contributionHistory(fixture.orderId(), a.id())).isEqualTo(afterA);
     assertThat(contributionHistory(fixture.orderId(), b.id())).isEqualTo(afterB);
   }
