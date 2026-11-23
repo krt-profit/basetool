@@ -178,10 +178,7 @@ group, and a group at most one Kommandoleiter and one stellv. (ADR-0322).
 
 A Bereich may have at most one `BEREICHSLEITER`. The appointment service refuses an occupied
 Leiter seat with HTTP 400. A partial unique index rejects a concurrent second appointment
-with HTTP 409. Before deployment, the
-[read-only preflight](../../scripts/bereich-leader-singleton-preflight.sql) verifies that existing
-areas have at most one Leiter. Resolve duplicates through the role-management workflow before applying the
-migration.
+with HTTP 409.
 
 ### REQ-ROLE-004 — Delegated appointment ladder, no self-promotion
 
