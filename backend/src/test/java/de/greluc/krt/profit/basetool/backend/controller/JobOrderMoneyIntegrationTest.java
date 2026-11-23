@@ -297,6 +297,8 @@ class JobOrderMoneyIntegrationTest {
                         Map.of(
                             "version",
                             0,
+                            "commentVersion",
+                            0,
                             "handle",
                             "Money contact",
                             "materials",
