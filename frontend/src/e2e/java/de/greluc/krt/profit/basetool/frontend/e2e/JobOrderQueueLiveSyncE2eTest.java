@@ -21,11 +21,16 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -33,9 +38,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * E2E live-sync coverage for the job-order queue (REQ-FE-015, ADR-0094): a passive {@code /orders}
- * viewer gains a newly created order in place, via the server-side {@code orders/[queue]} publish
- * of a frontend form create.
+ * E2E live-sync coverage for the job-order queue (REQ-ORDERS-056, REQ-FE-015): a form create
+ * reaches a peer's open {@code /orders} overview in place through the backend's after-commit {@code
+ * orders} frame, and the creator's own open overview receives that frame exactly once.
  */
 @Tag("e2e")
 class JobOrderQueueLiveSyncE2eTest {
@@ -51,6 +56,18 @@ class JobOrderQueueLiveSyncE2eTest {
    * a valid requester and a valid responsible for the create, and the queue viewer sees it).
    */
   private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
+
+  /** The overview rows of the queue fragment. */
+  private static final String QUEUE_ROWS = "#orders-results tr[data-id]";
+
+  /** How long the peer's and the creator's overviews may take to show the created order. */
+  private static final double ARRIVAL_TIMEOUT_MS = 30_000;
+
+  /**
+   * How long the creator's overview keeps listening after the first frame: two announcing paths
+   * would both fire for the one create request, well inside this window.
+   */
+  private static final double SECOND_FRAME_WINDOW_MS = 5_000;
 
   private static Playwright playwright;
   private static Browser browser;
@@ -84,63 +101,106 @@ class JobOrderQueueLiveSyncE2eTest {
   }
 
   /**
-   * Creates an order from one browser context on {@code /orders/create} and asserts that a second
-   * context viewing {@code /orders} gains the row without reloading.
+   * Creates an order from the creator's {@code /orders/create} tab while a peer context and the
+   * creator's second tab both view {@code /orders}: both overviews gain the row without reloading,
+   * and the creator's overview counts exactly one {@code orders} frame on its socket.
    */
   @Test
-  void orderCreatePropagatesToTheQueueViewerLive() {
+  void orderCreateReachesEveryOpenOverviewLiveWithOneFrame() {
     String baseUrl = STACK.baseUrl();
-    try (BrowserContext viewer =
-            browser.newContext(
-                new Browser.NewContextOptions()
-                    .setIgnoreHTTPSErrors(true)
-                    .setStorageStatePath(
-                        E2eSupport.authenticatedStorageState(
-                            browser, baseUrl, USERNAME, PASSWORD)));
-        BrowserContext creator =
-            browser.newContext(
-                new Browser.NewContextOptions()
-                    .setIgnoreHTTPSErrors(true)
-                    .setStorageStatePath(
-                        E2eSupport.authenticatedStorageState(
-                            browser, baseUrl, USERNAME, PASSWORD)))) {
-      Page pageB = viewer.newPage();
-      Page pageA = creator.newPage();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext peer = newContext(storageState);
+        BrowserContext creator = newContext(storageState)) {
+      Page peerOverview = peer.newPage();
+      Page creatorOverview = creator.newPage();
+      Page creatorForm = creator.newPage();
+      AtomicInteger creatorFrames = new AtomicInteger();
+      creatorOverview.onWebSocket(socket ->
+          socket.onFrameReceived(frame -> {
+            if (isOrdersChange(frame.text())) {
+              creatorFrames.incrementAndGet();
+            }
+          }));
       try {
-        E2eSupport.navigate(pageB, baseUrl + "/orders");
-        pageB.waitForLoadState();
+        openSubscribedOverview(peerOverview, baseUrl);
+        openSubscribedOverview(creatorOverview, baseUrl);
+        int before = peerOverview.locator(QUEUE_ROWS).count();
+        int creatorBefore = creatorOverview.locator(QUEUE_ROWS).count();
 
-        int before = pageB.locator("#orders-results tr[data-id]").count();
+        E2eSupport.navigate(creatorForm, baseUrl + "/orders/create");
+        creatorForm.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
+        creatorForm.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
+        creatorForm.locator("#handle").fill("E2E live " + UUID.randomUUID());
+        E2eSupport.selectComboboxFirstOption(creatorForm.getByTestId("order-material-select"));
+        creatorForm.getByTestId("order-material-amount").fill("5");
+        creatorFrames.set(0);
+        E2eSupport.clickSubmitClearingFooter(creatorForm.getByTestId("order-submit"));
+        creatorForm.waitForLoadState();
 
-        pageB.evaluate("window.__krtNoReload = true;");
+        awaitRowCount(peerOverview, before + 1);
+        awaitRowCount(creatorOverview, creatorBefore + 1);
+        creatorOverview.waitForTimeout(SECOND_FRAME_WINDOW_MS);
 
-        pageB.waitForCondition(() ->
-            Boolean.TRUE.equals(
-                pageB.evaluate(
-                    "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
-                        + " && window.krtLiveSync.subscribedTopics().length > 0)")));
-
-        E2eSupport.navigate(pageA, baseUrl + "/orders/create");
-        pageA.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
-        pageA.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
-        pageA.locator("#handle").fill("E2E live " + UUID.randomUUID());
-        E2eSupport.selectComboboxFirstOption(pageA.getByTestId("order-material-select"));
-        pageA.getByTestId("order-material-amount").fill("5");
-        E2eSupport.clickSubmitClearingFooter(pageA.getByTestId("order-submit"));
-        pageA.waitForLoadState();
-
-        pageB.waitForCondition(
-            () -> pageB.locator("#orders-results tr[data-id]").count() == before + 1,
-            new Page.WaitForConditionOptions().setTimeout(30_000));
         assertEquals(
-            Boolean.TRUE,
-            pageB.evaluate("window.__krtNoReload === true"),
-            "the live update on the viewer must be an in-place swap — no full-page reload");
+            1, creatorFrames.get(), "the creator's overview must receive the create's frame once");
+        assertNoReload(peerOverview, "the peer's overview");
+        assertNoReload(creatorOverview, "the creator's overview");
       } catch (RuntimeException | AssertionError failure) {
-        E2eSupport.dump(pageB, "orders-queue-livesync-b");
-        E2eSupport.dump(pageA, "orders-queue-livesync-a");
+        E2eSupport.dump(peerOverview, "orders-queue-livesync-peer");
+        E2eSupport.dump(creatorOverview, "orders-queue-livesync-creator-overview");
+        E2eSupport.dump(creatorForm, "orders-queue-livesync-creator-form");
         throw failure;
       }
     }
+  }
+
+  private static BrowserContext newContext(Path storageState) {
+    return browser.newContext(
+        new Browser.NewContextOptions()
+            .setIgnoreHTTPSErrors(true)
+            .setStorageStatePath(storageState));
+  }
+
+  private static void openSubscribedOverview(Page page, String baseUrl) {
+    E2eSupport.navigate(page, baseUrl + "/orders");
+    page.waitForLoadState();
+    page.evaluate("window.__krtNoReload = true;");
+    page.waitForCondition(() ->
+        Boolean.TRUE.equals(
+            page.evaluate(
+                "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                    + " && window.krtLiveSync.subscribedTopics().includes('orders'))")));
+  }
+
+  private static void awaitRowCount(Page page, int expected) {
+    page.waitForCondition(
+        () -> page.locator(QUEUE_ROWS).count() == expected,
+        new Page.WaitForConditionOptions().setTimeout(ARRIVAL_TIMEOUT_MS));
+  }
+
+  private static void assertNoReload(Page page, String overview) {
+    assertEquals(
+        Boolean.TRUE,
+        page.evaluate("window.__krtNoReload === true"),
+        "the live update on " + overview + " must be an in-place swap, not a full-page reload");
+  }
+
+  /**
+   * Tells whether a relay frame is a {@code changed} signal of the {@code orders} room; the relay
+   * sends every frame as one JSON object with a {@code type} and a {@code topic}.
+   *
+   * @param text the frame's text payload, {@code null} for a binary frame
+   * @return {@code true} for a {@code changed} frame whose topic is {@code orders}
+   */
+  private static boolean isOrdersChange(@Nullable String text) {
+    if (text == null) {
+      return false;
+    }
+    JsonObject frame = JsonParser.parseString(text).getAsJsonObject();
+    return "changed".equals(textField(frame, "type")) && "orders".equals(textField(frame, "topic"));
+  }
+
+  private static @Nullable String textField(JsonObject frame, String name) {
+    return frame.has(name) ? frame.get(name).getAsString() : null;
   }
 }

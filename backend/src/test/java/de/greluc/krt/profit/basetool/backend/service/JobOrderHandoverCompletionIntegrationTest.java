@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -68,7 +70,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Integration test: a Logistiker handing over the remaining amounts of two materials in one request
- * completes the job order without an {@code ObjectOptimisticLockingFailureException}.
+ * completes the job order and records its closing instant (REQ-ORDERS-054) without an {@code
+ * ObjectOptimisticLockingFailureException}.
  */
 @SpringBootTest
 class JobOrderHandoverCompletionIntegrationTest {
@@ -187,27 +190,10 @@ class JobOrderHandoverCompletionIntegrationTest {
   @Test
   void handover_exactlyCoversAllRemainingMaterials_completesOrderWithoutOptimisticLockConflict() {
     Fixture f = prepareFixture();
-    SecurityContextHolder.getContext()
-        .setAuthentication(
-            new JwtAuthenticationToken(
-                Jwt.withTokenValue("handover-test")
-                    .header("alg", "none")
-                    .subject(f.actorId().toString())
-                    .build(),
-                List.of(
-                    new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
-                    new OrgUnitContextualAuthority(Roles.LOGISTICIAN, f.responsibleUnitId()))));
+    signInAsLogistician(f);
 
-    JobOrderHandoverCreateDto dto =
-        new JobOrderHandoverCreateDto(
-            Instant.now(),
-            "swing-by",
-            "KARTELL",
-            List.of(
-                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8, null, null),
-                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 5.7, null, null)));
-
-    jobOrderHandoverService.createHandover(f.jobOrderId(), dto);
+    Instant beforeHandover = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    jobOrderHandoverService.createHandover(f.jobOrderId(), fullHandover(f));
 
     transactionTemplate.executeWithoutResult(status -> {
       JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
@@ -215,6 +201,7 @@ class JobOrderHandoverCompletionIntegrationTest {
           JobOrderStatus.COMPLETED,
           reloaded.getStatus(),
           "JobOrder must be COMPLETED after final handover");
+      assertThat(reloaded.getClosedAt()).isBetween(beforeHandover, Instant.now());
       for (JobOrderMaterial m : reloaded.getMaterials()) {
         assertTrue(
             m.remainingAmount() <= 0.0001,
@@ -228,5 +215,52 @@ class JobOrderHandoverCompletionIntegrationTest {
       assertEquals(0.035, inv1.getAmount(), 0.0001);
       assertEquals(0.030999999999999, inv2.getAmount(), 0.0001);
     });
+  }
+
+  /**
+   * A final handover on an order that is already terminal completes it without moving the closing
+   * instant, since the order closed when it was rejected (REQ-ORDERS-054).
+   */
+  @Test
+  void handover_completingARejectedOrder_keepsItsClosingInstant() {
+    Fixture f = prepareFixture();
+    Instant rejectedAt =
+        transactionTemplate.execute(status -> {
+          JobOrder order = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
+          order.setStatus(JobOrderStatus.REJECTED);
+          return jobOrderRepository.saveAndFlush(order).getClosedAt();
+        });
+    signInAsLogistician(f);
+
+    jobOrderHandoverService.createHandover(f.jobOrderId(), fullHandover(f));
+
+    transactionTemplate.executeWithoutResult(status -> {
+      JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();
+      assertEquals(JobOrderStatus.COMPLETED, reloaded.getStatus());
+      assertThat(reloaded.getClosedAt()).isNotNull().isEqualTo(rejectedAt);
+    });
+  }
+
+  private static void signInAsLogistician(Fixture f) {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new JwtAuthenticationToken(
+                Jwt.withTokenValue("handover-test")
+                    .header("alg", "none")
+                    .subject(f.actorId().toString())
+                    .build(),
+                List.of(
+                    new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                    new OrgUnitContextualAuthority(Roles.LOGISTICIAN, f.responsibleUnitId()))));
+  }
+
+  private static JobOrderHandoverCreateDto fullHandover(Fixture f) {
+    return new JobOrderHandoverCreateDto(
+        Instant.now(),
+        "swing-by",
+        "KARTELL",
+        List.of(
+            new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8, null, null),
+            new JobOrderHandoverItemCreateDto(f.invItem2Id(), 5.7, null, null)));
   }
 }

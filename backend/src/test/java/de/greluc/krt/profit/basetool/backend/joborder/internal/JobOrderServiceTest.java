@@ -66,7 +66,10 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncFanout;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
@@ -76,12 +79,14 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -89,6 +94,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 @ExtendWith({
   MockitoExtension.class,
@@ -98,7 +106,7 @@ class JobOrderServiceTest {
 
   @Mock private ProfitHierarchyService profitHierarchy;
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
-  @Mock private LiveSyncPublisher liveSyncPublisher;
+  @Mock private LiveSyncFanout liveSyncFanout;
 
   private final Bereich profitArea = profitArea();
 
@@ -229,7 +237,7 @@ class JobOrderServiceTest {
                 org.mockito.Mockito.mock(
                     de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
                         .class)),
-            liveSyncPublisher,
+            new LiveSyncPublisher(liveSyncFanout, new SimpleMeterRegistry()),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
@@ -398,6 +406,18 @@ class JobOrderServiceTest {
         .applyItemLines(any(), any());
   }
 
+  @AfterEach
+  void releaseFixtureTransaction() {
+    TransactionSynchronizationUtils.invokeAfterCompletion(
+        TransactionSynchronizationManager.getSynchronizations(),
+        TransactionSynchronization.STATUS_ROLLED_BACK);
+  }
+
+  private static void commitFixtureTransaction() {
+    TransactionSynchronizationUtils.invokeAfterCommit(
+        TransactionSynchronizationManager.getSynchronizations());
+  }
+
   private JobOrderItemPlan preparedItemLines(List<CreateJobOrderItemLineDto> lines) {
     var quality =
         new QualityTierSelection(
@@ -446,11 +466,10 @@ class JobOrderServiceTest {
                     orderId, UUID.randomUUID(), materialId, quality, amount)));
   }
 
-  private JobOrder createAndCaptureSaved(List<CreateJobOrderMaterialDto> lines) {
+  private void stubCreate() {
     when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(jobOrderRepository.save(any(JobOrder.class)))
         .thenAnswer(i -> {
           JobOrder saved = i.getArgument(0);
@@ -458,6 +477,11 @@ class JobOrderServiceTest {
           return saved;
         });
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
+  }
+
+  private JobOrder createAndCaptureSaved(List<CreateJobOrderMaterialDto> lines) {
+    stubCreate();
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     stubTierResolution();
 
     jobOrderService.createJobOrder(
@@ -467,6 +491,58 @@ class JobOrderServiceTest {
     ArgumentCaptor<JobOrder> saved = ArgumentCaptor.forClass(JobOrder.class);
     verify(jobOrderRepository).save(saved.capture());
     return saved.getValue();
+  }
+
+  @Test
+  void createJobOrder_announcesTheNewOrderToTheQueueAndTheDemandOnceAfterTheCommit() {
+    createAndCaptureSaved(List.of(new CreateJobOrderMaterialDto(materialId, 650, 10.0)));
+    verifyNoInteractions(liveSyncFanout);
+
+    commitFixtureTransaction();
+
+    verify(liveSyncFanout)
+        .publish(LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue", "demand"));
+    verify(liveSyncFanout, times(1)).publish(any(), anyList());
+  }
+
+  @Test
+  void createAuecJobOrder_announcesTheNewOrderToTheQueueOnlyOnceAfterTheCommit() {
+    stubCreate();
+
+    jobOrderService.createAuecJobOrder(
+        new CreateAuecJobOrderDto(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, "250000"));
+    verifyNoInteractions(liveSyncFanout);
+
+    commitFixtureTransaction();
+
+    verify(liveSyncFanout)
+        .publish(LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));
+    verify(liveSyncFanout, times(1)).publish(any(), anyList());
+  }
+
+  @Test
+  void createItemJobOrder_announcesTheNewOrderToTheQueueAndTheDemandOnceAfterTheCommit() {
+    stubCreate();
+
+    jobOrderService.createItemJobOrder(
+        new CreateJobOrderItemRequestDto(
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(
+                new CreateJobOrderItemLineDto(
+                    null, UUID.randomUUID(), UUID.randomUUID(), 2, List.of(), null, null)),
+            null,
+            null));
+    verifyNoInteractions(liveSyncFanout);
+
+    commitFixtureTransaction();
+
+    verify(liveSyncFanout)
+        .publish(LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue", "demand"));
+    verify(liveSyncFanout, times(1)).publish(any(), anyList());
   }
 
   @Test

@@ -1505,9 +1505,10 @@ re-subscribed.
 class's section whitelist and the per-session token bucket — **no subscription**: a requester
 creating an order must be able to signal the staff queue it may not read, and an org-unit owner
 approval must reach the bank-staff rooms. Mutations that can happen with no authenticated socket at
-all publish **server-side** through the same local bus the relay uses — the job-order create was the
-example, and since ADR-0149 it needs a login; the server-side publish stays because a socket is not
-implied by a session (a form submit from a page whose socket dropped is the ordinary case). The worst a malicious authenticated client can achieve is bounded re-fetch
+all publish **server-side** through the same local bus the relay uses, because a socket is not
+implied by a session (a form submit from a page whose socket dropped is the ordinary case). The
+job-order create publishes from the backend after its commit instead, because the web and an
+exchange client create through the same command (REQ-ORDERS-056). The worst a malicious authenticated client can achieve is bounded re-fetch
 amplification: whitelisted keys only, bucket-capped frames, and every receiver clamps via its
 coalesce window regardless of publish rate. The `K sockets × rate × viewers` amplification lever is
 bounded on all three multipliers (F2 / #1243): a **per-user socket cap** (20 concurrent `/ws/sync`

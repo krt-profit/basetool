@@ -35,9 +35,12 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -47,6 +50,7 @@ import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.OptimisticLock;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /** Job Order JPA entity. */
@@ -131,6 +135,17 @@ public class JobOrder extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private JobOrderStatus status = JobOrderStatus.OPEN;
 
+  /**
+   * When the order entered a terminal status, or {@code null} while it is active (REQ-ORDERS-054);
+   * kept in step by {@link #setStatus(JobOrderStatus)} and present exactly while the status is
+   * terminal, which the database enforces.
+   */
+  @Column(name = "closed_at")
+  @Nullable
+  @Setter(AccessLevel.NONE)
+  @OptimisticLock(excluded = true)
+  private Instant closedAt;
+
   /** The independently observed revision of the order's lifecycle. */
   @Column(name = "lifecycle_version", nullable = false)
   @OptimisticLock(excluded = true)
@@ -209,6 +224,22 @@ public class JobOrder extends AbstractEntity<UUID> {
       fetch = FetchType.LAZY)
   @Builder.Default
   private Set<JobOrderItemHandover> itemHandovers = new HashSet<>();
+
+  /**
+   * Sets the status and keeps {@link #closedAt} in step: a terminal status records the current
+   * instant unless the order is already closed, so a change between terminal statuses keeps the
+   * first closing instant, and an active status clears it.
+   *
+   * @param status the new status
+   */
+  public void setStatus(@NotNull JobOrderStatus status) {
+    if (status.isActive()) {
+      closedAt = null;
+    } else if (closedAt == null) {
+      closedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    }
+    this.status = status;
+  }
 
   /**
    * Adds a material and keeps the bidirectional back-reference in sync.

@@ -110,7 +110,8 @@ public class JobOrderService {
 
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
-   * minimum quality verbatim from the DTO (650 or {@code null} for none).
+   * minimum quality verbatim from the DTO (650 or {@code null} for none). After the commit the
+   * order overview and the material demand overview are refreshed (REQ-ORDERS-056).
    *
    * @param createDto create payload
    * @return the persisted order
@@ -129,7 +130,8 @@ public class JobOrderService {
   }
 
   /**
-   * Persists an aUEC order's shared information and queue entry.
+   * Persists an aUEC order's shared information and queue entry, and refreshes the order overview
+   * after the commit (REQ-ORDERS-056).
    *
    * @param dto the creation input for the current unit writer
    * @return the common order projection
@@ -183,6 +185,7 @@ public class JobOrderService {
     unitHistory.retainObservedParties(jobOrder, Set.of());
     jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
+    publishQueueSections(jobOrder);
     auditRecorder.record(
         AuditEventType.JOB_ORDER_CREATED,
         jobOrder.getId(),
@@ -195,7 +198,8 @@ public class JobOrderService {
   /**
    * Persists a new {@code ITEM} job order; org-unit stamping and priority match {@link
    * #createJobOrder(CreateJobOrderDto)}, and each line's materials are derived from its blueprint
-   * by {@link JobOrderItemService}.
+   * by {@link JobOrderItemService}. After the commit the order overview and the material demand
+   * overview are refreshed (REQ-ORDERS-056).
    *
    * @param createDto item-order create payload
    * @return the persisted order with derived materials and aggregation
@@ -238,6 +242,7 @@ public class JobOrderService {
     unitHistory.retainObservedParties(jobOrder, Set.of());
     jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
+    publishQueueSections(jobOrder);
     auditRecorder.record(
         AuditEventType.JOB_ORDER_ITEM_CREATED,
         jobOrder.getId(),
@@ -421,28 +426,33 @@ public class JobOrderService {
   }
 
   private void publishLifecycleSections(JobOrder order) {
-    LiveSyncTopic topic = LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId());
-    LiveSyncTopic queue = LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE);
-    if (order.getType() == JobOrderType.AUEC) {
-      liveSyncPublisher.publishAfterCommit(topic, JobOrderMoneyEffects.LIFECYCLE_SECTIONS);
-      liveSyncPublisher.publishAfterCommit(queue, List.of("queue"));
-      return;
-    }
     liveSyncPublisher.publishAfterCommit(
-        topic,
-        List.of(
-            "header",
-            "actions",
-            "dialogs",
-            "kpi",
-            "participations",
-            "materials",
-            "aggregated",
-            "items",
-            "handovers",
-            "item-handovers",
-            "item-handover-lines"));
-    liveSyncPublisher.publishAfterCommit(queue, List.of("queue", "demand"));
+        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId()),
+        order.getType() == JobOrderType.AUEC
+            ? JobOrderMoneyEffects.LIFECYCLE_SECTIONS
+            : List.of(
+                "header",
+                "actions",
+                "dialogs",
+                "kpi",
+                "participations",
+                "materials",
+                "aggregated",
+                "items",
+                "handovers",
+                "item-handovers",
+                "item-handover-lines"));
+    publishQueueSections(order);
+  }
+
+  /**
+   * Refreshes the order overview after the commit, and the material demand overview for the stock
+   * kinds; an aUEC order adds no material demand.
+   */
+  private void publishQueueSections(JobOrder order) {
+    liveSyncPublisher.publishAfterCommit(
+        LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE),
+        order.getType() == JobOrderType.AUEC ? List.of("queue") : List.of("queue", "demand"));
   }
 
   /**

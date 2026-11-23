@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderCreation.ORDERS_QUEUE_SECTION;
 import static de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderCreation.postCreateTarget;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
@@ -106,6 +105,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class JobOrderWriteController {
 
+  private static final List<String> ORDERS_QUEUE_SECTION = List.of("queue");
+
   /** Sends every job-order mutation and its follow-up reads to the backend. */
   private final JobOrderBackendClient jobOrderClient;
 
@@ -116,8 +117,8 @@ public class JobOrderWriteController {
   private final MutationResponseHelper mutationResponseHelper;
 
   /**
-   * Server-side live-sync publisher that announces a new order to the {@code orders} queue room,
-   * whose viewers may not include the creator (REQ-FE-015).
+   * Server-side live-sync publisher that announces an item-order update and a Bearbeiter change to
+   * the {@code orders} queue room and the order's room (REQ-FE-015).
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
@@ -156,7 +157,6 @@ public class JobOrderWriteController {
               form.getVersion(),
               form.getCommentVersion());
       JobOrderDto created = jobOrderClient.createItemOrder(dto);
-      liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
       return "redirect:" + postCreateTarget(created);
@@ -230,7 +230,6 @@ public class JobOrderWriteController {
                   form.getVersion(),
                   form.getCommentVersion());
           JobOrderDto created = jobOrderClient.createItemOrder(dto);
-          liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
   }
@@ -362,7 +361,6 @@ public class JobOrderWriteController {
               form.getVersion(),
               form.getCommentVersion());
       JobOrderDto created = jobOrderClient.createOrder(dto);
-      liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
       return "redirect:" + postCreateTarget(created);
@@ -420,7 +418,6 @@ public class JobOrderWriteController {
                   form.getVersion(),
                   form.getCommentVersion());
           JobOrderDto created = jobOrderClient.createOrder(dto);
-          liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
   }
