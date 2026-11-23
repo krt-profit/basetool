@@ -108,6 +108,12 @@ public enum ScheduledJob {
   NAME_RETENTION("name_retention"),
 
   /**
+   * The recomputation of marked job orders' exchange fingerprints every few seconds ({@code
+   * JobOrderFingerprintTask}, REQ-OXCH-003); its items are the orders recomputed.
+   */
+  JOB_ORDER_EXCHANGE_FINGERPRINT("job_order_exchange_fingerprint"),
+
+  /**
    * An admin's bulk undo of one exchange client ({@code ExchangeBulkUndoRunner}, REQ-XCH-034); run
    * on demand, never scheduled, so it publishes no enabled gauge.
    */

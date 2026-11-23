@@ -28,13 +28,36 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * The job-order family's counters on the exchange (REQ-OXCH-009, REQ-OBS-025): every refusal reason
- * exists at zero before the first refusal, and reads are counted by registry client and route.
+ * The job-order family's counters on the exchange (REQ-OXCH-003, REQ-OXCH-009, REQ-OBS-025): every
+ * refusal reason and fingerprint outcome exists at zero before its first count, and reads are
+ * counted by registry client and route.
  */
 class ExchangeJobOrderMetricsTest {
 
   private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final ExchangeJobOrderMetrics metrics = new ExchangeJobOrderMetrics(registry);
+
+  @Test
+  void bothFingerprintOutcomesAreRegisteredAtZero() {
+    metrics.registerCounters();
+
+    assertThat(registry.find("basetool.exchange.job.order.fingerprints").counters())
+        .allSatisfy(counter -> assertThat(counter.count()).isZero())
+        .extracting(counter -> counter.getId().getTag("outcome"))
+        .containsExactlyInAnyOrder("changed", "unchanged");
+    assertThat(registry.find("basetool.exchange.job.order.refused").counters()).hasSize(12);
+  }
+
+  @Test
+  void aRecomputationCountsItsChangedAndUnchangedOrders() {
+    metrics.registerCounters();
+
+    metrics.countFingerprints(3, 2);
+    metrics.countFingerprints(0, 4);
+
+    assertThat(fingerprints("changed")).isEqualTo(3.0d);
+    assertThat(fingerprints("unchanged")).isEqualTo(6.0d);
+  }
 
   @Test
   void everyRefusalReasonOfTheFamilyIsRegisteredAtZero() {
@@ -89,6 +112,20 @@ class ExchangeJobOrderMetricsTest {
                 .count())
         .isEqualTo(2.0d);
     assertThat(JobOrderExchangeReadRoute.FEED.getTag()).isEqualTo("feed");
+  }
+
+  /**
+   * Reads one fingerprint counter.
+   *
+   * @param outcome the outcome
+   * @return the count
+   */
+  private double fingerprints(String outcome) {
+    return registry
+        .get("basetool.exchange.job.order.fingerprints")
+        .tag("outcome", outcome)
+        .counter()
+        .count();
   }
 
   /**

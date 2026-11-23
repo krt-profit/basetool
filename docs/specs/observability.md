@@ -1324,7 +1324,7 @@ tag values several modules share or the platform owns; every other name sits in 
 `<Module>MetricNames` in its `api` package (`BankMetricNames`, `ExchangeMetricNames`, …). A module
 with no published API keeps its holder in `internal` (`NavigationMetricNames`). The frontend (package `metrics`) and the ingest
 (`observability`) each have their own `MetricNames`. Scheduled-job health flows through the
-shared `platform.api.TaskMetrics` wrapper; queue depth is sampled by the `app.internal.BusinessMetricsCollector`, which runs the `platform.api.BusinessGaugeSource` each owning module publishes (`IdentityBusinessGauges`, `DeletionRequestBusinessGauges`, `BankBusinessGauges`, `JobOrderBusinessGauges`, `OperationBusinessGauges`, `RefineryBusinessGauges`, `P4kImportBusinessGauges`, `MaterialExchangeBusinessGauges`, `SupplyBusinessGauges`),
+shared `platform.api.TaskMetrics` wrapper; queue depth is sampled by the `app.internal.BusinessMetricsCollector`, which runs the `platform.api.BusinessGaugeSource` each owning module publishes (`IdentityBusinessGauges`, `DeletionRequestBusinessGauges`, `BankBusinessGauges`, `JobOrderBusinessGauges`, `OperationBusinessGauges`, `RefineryBusinessGauges`, `P4kImportBusinessGauges`, `MaterialExchangeBusinessGauges`, `SupplyBusinessGauges`, `ExchangeJobOrderBusinessGauges`),
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.
 
@@ -1489,11 +1489,12 @@ nothing, so the alert stays silent on a host without one.
   `basetool_scheduled_job_duration_seconds{task}` timer,
   `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge,
   `basetool_scheduled_job_enabled{task}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the fifteen
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the sixteen
   wrapped jobs (`user_sync`, `notification_retention`, `notification_timed`, `default_blueprint_provisioning`,
   `rejected_registration_retention`, `audit_retention`,
   `bank_ledger_integrity`, `job_order_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`,
-  `exchange_registry_reconcile`, `exchange_change_retention`, `exchange_connection_retention`, `name_retention`) via `TaskMetrics` (`record`
+  `exchange_registry_reconcile`, `exchange_change_retention`, `exchange_connection_retention`, `name_retention`,
+  `job_order_exchange_fingerprint`) via `TaskMetrics` (`record`
   / `recordCounting`). The on-demand `exchange_bulk_undo` job — an admin's undo of one client for
   every member (REQ-XCH-034) — records the same executions, duration and items (members processed)
   but publishes no enabled or last-success staleness signal, since it only runs when an admin starts
@@ -1515,7 +1516,8 @@ nothing, so the alert stays silent on a host without one.
   `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
   violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
   `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for
-  `JobOrderItemBlueprintDrift`) and `BusinessMetricsStale`
+  `JobOrderItemBlueprintDrift`), `JobOrderFingerprintWorkerStale`
+  (`job_order_exchange_fingerprint`, > 10 min, REQ-OBS-025) and `BusinessMetricsStale`
   (`business_metrics`, > 10 min); it is registered on a job's first success, so a job that has not
   yet succeeded in this process publishes nothing at all rather than a falsely-stale `0` (see the
   never-succeeded-sentinel bullet below). The items counter is present only for jobs that report a
@@ -2252,7 +2254,9 @@ nothing, so the alert stays silent on a host without one.
   `_oldest_age_seconds`, `basetool_bank_booking_request_pending_count` + `_oldest_age_seconds`,
   and `{status}`-labelled `basetool_job_order_open_count` / `basetool_operation_open_count` /
   `basetool_refinery_order_open_count` / `basetool_p4k_import_job_pending_count` each with an
-  `_oldest_age_seconds` companion. Every oldest-age gauge now drives a stuck-queue alert: the
+  `_oldest_age_seconds` companion; `basetool_exchange_job_order_dirty_count` +
+  `basetool_exchange_job_order_dirty_oldest_age_seconds` (the job-order fingerprint backlog,
+  `JobOrderExchangeFeedLagging`, REQ-OBS-025). Every oldest-age gauge now drives a stuck-queue alert: the
   registration + bank pairs the "oldest pending > 48 h" `*ApprovalOverdue` alerts, and (since #1041
   item 15) the four work queues `P4kImportStuck` (> 6 h — imports finish in minutes), `JobOrderStale`
   (> 180 d) / `RefineryOrderStale` / `OperationStale` (> 90 d since 2026-08-29, raised from 30 d the
@@ -4502,9 +4506,9 @@ reader/unit/order identities and retained relationship timestamps remain outside
 
 ### REQ-OBS-025 — Job orders on the exchange are measured and alerted
 
-> [!note] Implemented for the two switches (#3642; decided in #3618). The route slices wire the
-> read counter and their refusal reasons, the fingerprint slice adds its worker and window metrics,
-> and each slice adds its alerts and its panels to this entry.
+> [!note] Implemented for the two switches (#3642) and the fingerprint worker (#3643); decided in
+> #3618. The route slices wire the read counter and their refusal reasons, the window slice adds its
+> window metrics, and each slice adds its alerts and its panels to this entry.
 
 The job-order route family of the exchange ([`orders-exchange.md`](orders-exchange.md),
 REQ-OXCH-009) carries its own meters. Every label is a registry `client_id` or a fixed enumeration,
@@ -4525,16 +4529,37 @@ never an id, a path or an amount (REQ-OBS-011).
 - **Switch changes.** `basetool_exchange_registry_changes_total{action}` counts
   `job_order_switch_on`, `job_order_switch_off`, `job_order_writes_switch_on` and
   `job_order_writes_switch_off` once per committed change.
+- **Fingerprint worker** (REQ-OXCH-003). The worker is the `TaskMetrics` job
+  `task="job_order_exchange_fingerprint"`: executions, duration, last success, the enabled gauge,
+  and items counting the orders it recomputed. `basetool_exchange_job_order_fingerprints_total{outcome}`
+  counts each committed recomputation as `changed` or `unchanged`, both registered at zero
+  (`JobOrderFingerprintOutcome`).
+- **Fingerprint backlog.** `basetool_exchange_job_order_dirty_count` (the marked orders) and
+  `basetool_exchange_job_order_dirty_oldest_age_seconds` (the age of the oldest mark, `0` when none
+  is set) are sampled by the 60-second business-metrics collector through
+  `ExchangeJobOrderBusinessGauges`, not published by the worker, so a wedged worker cannot freeze
+  its own signal and `BusinessMetricsStale` covers a frozen sampler. A mark keeps the instant it
+  was first set, so marking an order again never resets its age.
 
 Alerts, each with a promtool rule test that fires and stays silent:
 
 - **`JobOrderExchangeSwitchChanged`**: any change of either job-order switch in ten minutes,
   informational like `ExchangeRegistryChanged`, which stays silent on the job-order actions. It
   points to the operator section „Faulty release on job orders" (arc42 §6.8).
+- **`JobOrderExchangeFeedLagging`** (warning): the oldest dirty mark older than 5 minutes, held for
+  5 minutes.
+- **`JobOrderFingerprintWorkerStale`** (warning): the worker's last success more than 10 minutes
+  ago, or none since the backend started while the worker is enabled; it catches a wedged worker
+  even when nothing is marked.
+- **`JobOrderFingerprintChurn`** (warning): more than 1000 changed fingerprints in an hour, held
+  for 2 hours; a hierarchy change is a single burst, a sustained rate looks like a trigger loop.
+
+The three fingerprint alerts point to the same operator section in `monitoring/README.md`.
 
 The „Job orders" row of the exchange dashboard (`15-exchange.json`) shows the gateway's switch
 refusals by client and reason, the switch changes by action and the backend's job-order refusals by
-reason.
+reason, the fingerprint backlog with the age of its oldest mark, the recomputations changed against
+unchanged, and the worker's runs by outcome with the orders it recomputed.
 
 **Acceptance**
 
@@ -4545,11 +4570,20 @@ reason.
   `ExchangeRegistryChanged` stays silent on the job-order actions.
 - [ ] The read counter and the other refusal reasons are incremented by the job-order routes
   (REQ-OXCH-002…008).
+- [x] Both fingerprint outcomes exist at zero and a committed recomputation counts its changed and
+  unchanged orders (`ExchangeJobOrderMetricsTest`, `JobOrderFingerprintWorkerIntegrationTest`).
+- [x] The backlog gauges report the marked orders and the age of the oldest mark, and a second mark
+  never resets that age (`ExchangeJobOrderBusinessGaugesTest`,
+  `JobOrderFingerprintWorkerIntegrationTest`).
+- [x] `JobOrderExchangeFeedLagging`, `JobOrderFingerprintWorkerStale` and `JobOrderFingerprintChurn`
+  each have a promtool rule test that fires and one that stays silent.
 
 **Enforced by:** `ExchangeJobOrderMetrics`, `JobOrderExchangeRefusal`, `JobOrderExchangeReadRoute`,
+`JobOrderFingerprintOutcome`, `ExchangeJobOrderBusinessGauges`, `JobOrderFingerprintTask`,
 `ExchangeMetricNames`, `ExchangeRegistryAction` (backend) · `ExchangeRefusals` (gateway) ·
 `monitoring/prometheus/alerts/business.yml`,
 `monitoring/prometheus/tests/job_order_exchange_switch_alerts_test.yml`,
 `monitoring/prometheus/tests/exchange_registry_alerts_test.yml`,
+`monitoring/prometheus/tests/job_order_fingerprint_alerts_test.yml`,
 `monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
-REQ-OBS-024, REQ-OXCH-009 · **Issues:** #3618, #3642
+REQ-OBS-024, REQ-OXCH-003, REQ-OXCH-009 · **Issues:** #3618, #3642, #3643

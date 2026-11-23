@@ -259,8 +259,76 @@ class TableOwnershipTest {
           Map.entry("trg_location_exchange_change", locationReannouncement("place")),
           Map.entry("trg_city_exchange_change", locationReannouncement("city")),
           Map.entry("trg_space_station_exchange_change", locationReannouncement("space station")),
+          Map.entry("trg_starmap_object_exchange_change", locationReannouncement("starmap object")),
+          Map.entry("trg_job_order_insert_exchange_dirty", orderMark("job order")),
+          Map.entry("trg_job_order_update_exchange_dirty", orderMark("job order")),
+          Map.entry("trg_job_order_material_exchange_dirty", orderMark("material line")),
+          Map.entry("trg_job_order_item_exchange_dirty", orderMark("item line")),
+          Map.entry("trg_job_order_assignees_exchange_dirty", orderMark("assignee entry")),
+          Map.entry("trg_job_order_participation_exchange_dirty", orderMark("support row")),
+          Map.entry("trg_material_claim_exchange_dirty", orderMark("claim")),
+          Map.entry("trg_job_order_money_target_exchange_dirty", orderMark("target")),
+          Map.entry("trg_job_order_money_operation_exchange_dirty", orderMark("money operation")),
           Map.entry(
-              "trg_starmap_object_exchange_change", locationReannouncement("starmap object")));
+              "trg_job_order_money_correction_entry_exchange_dirty", orderMark("money correction")),
+          Map.entry("trg_job_order_money_holder_exchange_dirty", orderMark("money holder")),
+          Map.entry(
+              "trg_job_order_money_account_holding_exchange_dirty",
+              orderMark("Bank account position")),
+          Map.entry(
+              "trg_inventory_item_job_order_allocation_exchange_dirty", earmarkMark("earmark")),
+          Map.entry("trg_inventory_item_exchange_dirty", earmarkMark("earmarked stock row")),
+          Map.entry("trg_org_unit_exchange_dirty", hierarchyMark("unit's place in the hierarchy")),
+          Map.entry("trg_org_unit_insert_exchange_dirty", hierarchyMark("new active Profit area")),
+          Map.entry("trg_org_unit_delete_exchange_dirty", hierarchyMark("deleted Profit area")));
+
+  /**
+   * The crossing of a V445 trigger on a job-order table that marks its order for the exchange
+   * fingerprint worker.
+   *
+   * @param row what was written, as the reason names it
+   * @return the crossing into the exchange's dirty marks
+   */
+  private static @NotNull Crossing orderMark(@NotNull String row) {
+    return new Crossing(
+        Set.of("exchange_job_order_dirty"),
+        "V445 dirty mark: a written "
+            + row
+            + " marks its order for the exchange fingerprint worker (REQ-OXCH-003, ADR-0406).");
+  }
+
+  /**
+   * The crossing of a V445 trigger on a Lager table that marks the job orders stock is earmarked
+   * for.
+   *
+   * @param row what was written, as the reason names it
+   * @return the crossing into the exchange's dirty marks and the job orders they reference
+   */
+  private static @NotNull Crossing earmarkMark(@NotNull String row) {
+    return new Crossing(
+        Set.of("exchange_job_order_dirty", "job_order"),
+        "V445 dirty mark: a written "
+            + row
+            + " changes the open amount of the job order it is earmarked for, which the mark"
+            + " names after reading it from job_order (REQ-OXCH-003, ADR-0406).");
+  }
+
+  /**
+   * The crossing of a V445 trigger on {@code org_unit} that marks the job orders of the client set
+   * when the Profit hierarchy changes.
+   *
+   * @param change what changed, as the reason names it
+   * @return the crossing into the exchange's dirty marks, read from job orders and fingerprints
+   */
+  private static @NotNull Crossing hierarchyMark(@NotNull String change) {
+    return new Crossing(
+        Set.of("exchange_job_order_dirty", "exchange_job_order_fingerprint", "job_order"),
+        "V445 dirty mark: a "
+            + change
+            + " can flip responsibilityInvalid, so every job order of the client set is marked,"
+            + " selected from job_order and the stored settlementOpen of"
+            + " exchange_job_order_fingerprint (REQ-OXCH-003, REQ-ORDERS-055, ADR-0406).");
+  }
 
   /**
    * The crossing of a V359 trigger that re-announces the entries at the places a catalogue row
