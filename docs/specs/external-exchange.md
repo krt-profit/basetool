@@ -1685,6 +1685,8 @@ the same undo for every member of one client at once (REQ-XCH-034). Refinery-ord
 journaled and undone section by section (REQ-XCH-056). Bank requests (ADR-0354) and job-order
 writes (REQ-OXCH-005, ADR-0407) are the two exceptions: they are neither journaled nor undone, and a
 wrong job-order write is repaired in the web, found through the audit viewer's client filter.
+Both undo pages say so: the member's names bank requests and job orders as not undone, and the
+admin's bulk undo names both with the audit viewer's client filter (REQ-OXCH-005).
 
 A stock journal without recoverable physical quantity identity still supports the same ordinary
 quantity undo. Its restored unknown portion contributes to current stock coverage, but cannot
@@ -3103,6 +3105,10 @@ like the other connected-apps controls), saved in place from the profile and aud
   *`ExchangeOrgStockDetailsControllerTest`.*
 - [x] With the setting on, no bank booking carries the member's handle as counterparty, and the
   booking is still listed. *`ExchangeBankReadsTest`.*
+- [x] With the setting on, no job-order read lists the member among the assignees, and the order
+  is still listed; the profile setting and the privacy notice say the name is then missing from the
+  assignees of job orders. *`ExchangeJobOrderSnapshotTest`, `JobOrderConnectedAppsTextsTest`,
+  `PrivacyControllerTest`.*
 - [x] The privacy notice section „Verbundene Anwendungen" states the named data and the setting.
 
 **Status:** the setting, its export, audit and privacy text built; the org stock's entries honour

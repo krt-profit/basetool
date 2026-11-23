@@ -224,7 +224,9 @@ requires it and duplicating it into further files spreads personal data for no g
 
 - **Purpose:** let an approved client on the member's own device read and write the member's own
   blueprints, warehouse stock (personal and shared) and ships and read the anonymised open demand of the
-  member's units and the units the member directly belongs to, at the member's request; let the member see, disconnect and undo every
+  member's units and the units the member directly belongs to, at the member's request; let the
+  member follow the job orders of their direct units and their own assignee entries and, as a
+  Logistician of the requesting unit, raise and change aUEC orders; let the member see, disconnect and undo every
   connection; detect and reverse a faulty or malicious client (REQ-XCH-*,
   [`external-exchange.md`](../specs/external-exchange.md)).
 - **Data held by the tool:** per installation the client, the DPoP key thumbprint, the
@@ -240,7 +242,15 @@ requires it and duplicating it into further files spreads personal data for no g
   Keycloak the member's consent per client and the client's offline session. The account check
   compares a sent RSI handle with the stored one and keeps neither (REQ-XCH-031). The member's
   choice to withhold their name from connected applications (off by default, set on the profile,
-  audited as `EXCHANGE_NAME_WITHHOLDING_CHANGED`; REQ-XCH-044).
+  audited as `EXCHANGE_NAME_WITHHOLDING_CHANGED`; REQ-XCH-044). For job orders (REQ-OXCH-004,
+  REQ-OXCH-010, REQ-ORDERS-078): per order a client created, the creating client, the creating
+  member and the create's `Idempotency-Key`; the client of a comment's last write while that write
+  came through a client; the client on each target-history entry; the application's display name
+  captured in the create, need-change and finished notices (A5); the feed's unit and member log
+  entries, with the units and assignees each order was last announced to; and the four audit rows
+  `JOB_ORDER_CREATED_VIA_CLIENT`, `JOB_ORDER_CANCELLED_VIA_CLIENT`,
+  `JOB_ORDER_TARGET_CHANGED_VIA_CLIENT` and `JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT`, naming the
+  member and the client (A4). No exchange journal row holds a job-order write.
 - **Disclosed to the client:** only the member's own data within the capabilities the member
   consented to, the anonymised org demand — for a Logistician or leader of a unit under
   `exchange.demand.details` also the open orders of that unit with number, units, the Auftraggeber
@@ -288,15 +298,36 @@ requires it and duplicating it into further files spreads personal data for no g
   unit name; with `exchange.patch.write` (REQ-PATCH-052, built) it makes the member's own choice,
   which the Basetool records as the client's (`CLIENT`) and audits with the client's id. Nothing
   of another member leaves the Basetool this way.
+  The third exception is job orders (ADR-0407, REQ-OXCH-001…010): a client approved for
+  `exchange.joborders.read` (REQ-OXCH-002, -003, built) receives the job orders of the units the
+  member directly belongs to and those the member works on as an assignee — active ones, closed
+  ones for up to 7 days after closing and aUEC orders while their settlement is open — with the
+  units, comment and progress per kind, the assignees' display names with a per-client pseudonym,
+  the member's own assignee note (never another's) and, on material and item orders, the contact
+  handle as its author typed it; never a money holder, an amount per person, the money history or
+  Bank data. A member who withholds their name is left out of the assignees; the order stays. A
+  client approved for `exchange.joborders.write` (REQ-OXCH-004…008, built) receives the member's
+  own create options — the units they may create for and their own figures against the open-order
+  and daily create caps — and lets a Logistician of the requesting unit create aUEC orders, cancel
+  them before any money moved and change their target and comment; money moves only in the
+  Basetool. The client keeps job-order data of every kind at most 7 days, outside cloud-synced
+  folders, never in a backup or diagnostics and never forwarded, as its approval requires
+  (REQ-OXCH-010).
 - **Legal basis:** Art. 6(1)(b) for the transfer the member asked for and the connection records;
   Art. 6(1)(f) for the journal and the audit attribution (detecting misuse, undoing it), and for
   other people's bank data on a client (coordinating the bank's work; the name withholding is
-  the objection), while the member's own requests and own data stay under Art. 6(1)(b). The
+  the objection), while the member's own requests and own data stay under Art. 6(1)(b). For job
+  orders the member's own creates and writes and their own assignee note rest on Art. 6(1)(b), and
+  other members' and other units' order data on a client on Art. 6(1)(f), coordinating the order
+  work, with the name withholding as the objection. The
   Keycloak consent is an OAuth authorisation of the client, not a consent under Art. 6(1)(a) (owner
   decision 2026-09-28).
 - **Where:** `exchange_installation`, `exchange_client_revocation`, `exchange_change`,
   `exchange_journal`, `exchange_ship_link`, `exchange_refinery_order_link`,
-  `exchange_bulk_undo_run` / `exchange_bulk_undo_skip`, `exchange_name_withholding`;
+  `exchange_bulk_undo_run` / `exchange_bulk_undo_skip`, `exchange_name_withholding`,
+  `exchange_job_order_fingerprint`; for job orders `job_order.created_by_client_id`,
+  `created_by_member_id`, `create_idempotency_key` and `comment_client_id` and
+  `job_order_money_target_change.client_id`;
   `redis-shared`'s `exchange:*` and `ingest:xch:*`; the Keycloak realm.
 - **Retention:** a connected installation for as long as it stays connected; a **disconnected
   installation with its label 90 days after the disconnection**, and a **client revocation 90 days
@@ -308,7 +339,12 @@ requires it and duplicating it into further files spreads personal data for no g
   decision 2026-11-09, the nightly `exchange_change_retention` run, REQ-XCH-056). Every member row
   goes with the account (`ON DELETE CASCADE`, REQ-DATA-008); a bulk-undo run keeps its counts with
   `requested_by` nulled. The name withholding is kept for as long as the account exists. All eight
-  are in the Art. 15 export (REQ-SEC-058).
+  are in the Art. 15 export (REQ-SEC-058). The creating member and the create's key of a job order
+  are cleared when the nightly window run finds the order outside the client set — 7 days after
+  closing, at most one run later, and for an aUEC order not before its settlement closed — and the
+  member at the latest with the account (`ON DELETE SET NULL`, REQ-OXCH-010); while the reference
+  exists, the creator's Art. 15 export lists the order. The client markers on an order, its comment
+  and its target history are application ids, not people, and stay as long as their entry.
 - **After the transfer:** the client runs on the member's device and is not operated by the
   controller; what it does with the data is governed by its provider's privacy statement, which the
   approval requires (REQ-XCH-002). See [Recipients](#recipients).
@@ -362,6 +398,7 @@ The single table every other statement about retention must agree with.
 | Exchange: connected installation, ship links | While connected; a ship link until its ship is deleted, at the latest with the account | Disconnection, then the sweep above; `ON DELETE CASCADE` (REQ-DATA-008) | — |
 | Exchange change sequence, write journal, bulk-undo runs | **90 days** | `ExchangeChangeRetentionTask` (REQ-XCH-013/-022/-034) | `app.exchange.change-retention.max-age` |
 | Exchange refinery-order keys | While the order exists, then until no journal or change-sequence entry refers to it | `ExchangeChangeRetentionTask` (REQ-XCH-056); `ON DELETE CASCADE` with the account (REQ-DATA-008) | `app.exchange.change-retention.max-age` |
+| Exchange: creating member and key of a client-created job order | Until the order leaves the client set: **7 days** after closing, at most one nightly run later; an aUEC order not before its settlement closed; at the latest with the account | `JobOrderWindowTask` (REQ-OXCH-010); `ON DELETE SET NULL` | `app.exchange.job-order-window.cron` |
 | Exchange revocation and deny-list mirror (Redis) | **90 days** after the revocation | Redis key expiry (REQ-XCH-008) | `ExchangeRevocationMirror.RETENTION` |
 | Exchange idempotency results (Redis) | **1 hour** | Redis key expiry (REQ-XCH-020) | `app.exchange.store.idempotency-ttl` (ingest) |
 | Exchange staged mass change | **30 minutes** | Expiry of the staged change (REQ-XCH-021) | `ExchangeMassChangeService.STAGING_REACH` |
