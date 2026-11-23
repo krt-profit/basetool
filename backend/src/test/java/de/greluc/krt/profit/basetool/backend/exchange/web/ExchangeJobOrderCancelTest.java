@@ -65,6 +65,12 @@ class ExchangeJobOrderCancelTest {
 
   private static final String WRITTEN_SCHEMA = "job-order-write.schema.json#/$defs/written";
 
+  /** The amount of the money operation {@link #submitMoney} records. */
+  private static final long MONEY = 9_876_543L;
+
+  /** The accountless holder name the money operation records. */
+  private static final String HOLDER_NAME = "Cancel holder";
+
   @Autowired private WebApplicationContext context;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper objectMapper;
@@ -206,8 +212,10 @@ class ExchangeJobOrderCancelTest {
 
     MockHttpServletResponse response = cancel(logistician, order, 0L);
 
-    assertRefused(response, 409, "JOB_ORDER_MONEY_STARTED");
-    assertThat(response.getContentAsString()).doesNotContain("17").doesNotContain("holder");
+    JsonNode problem = assertRefused(response, 409, "JOB_ORDER_MONEY_STARTED");
+    assertThat(response.getContentAsString()).doesNotContain(HOLDER_NAME);
+    assertThat(problem.get("title").asString() + problem.get("detail").asString())
+        .doesNotContain(String.valueOf(MONEY));
     assertThat(status(order)).isEqualTo("OPEN");
   }
 
@@ -439,13 +447,15 @@ class ExchangeJobOrderCancelTest {
         INSERT INTO job_order_money_operation
             (id, order_id, operation_id, holder_id, actor_id, selection_kind,
              selected_accountless_name, bank_handling, amount, recorded_at)
-        VALUES (?, ?, ?, ?, ?, 'ACCOUNTLESS', 'Cancel holder', false, 17, now())
+        VALUES (?, ?, ?, ?, ?, 'ACCOUNTLESS', ?, false, ?, now())
         """,
         UUID.randomUUID(),
         order,
         UUID.randomUUID(),
         holder,
-        logistician);
+        logistician,
+        HOLDER_NAME,
+        MONEY);
   }
 
   private static void awaitQuietly(@NotNull CountDownLatch latch) {
