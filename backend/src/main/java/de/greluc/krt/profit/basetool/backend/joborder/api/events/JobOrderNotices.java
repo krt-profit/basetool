@@ -150,7 +150,8 @@ public final class JobOrderNotices {
   }
 
   /**
-   * Tells affected unit writers about a meaningful edit by the responsible side.
+   * Tells affected unit writers about a meaningful edit by the responsible side; the notice
+   * replaces the recipient's unread one of the same type about the order (REQ-NOTIF-017).
    *
    * @param orderId the affected order
    * @param displayId its display number
@@ -175,6 +176,7 @@ public final class JobOrderNotices {
         .contextOrgUnits(units)
         .observedRevision(revision)
         .renderParams(params(displayId, handle))
+        .replacesUnreadNotificationTypes(Set.of(NotificationType.JOB_ORDER_UPDATED_BY_RESPONSIBLE))
         .build();
   }
 

@@ -172,6 +172,29 @@ public class NotificationEventPreparation {
     return result;
   }
 
+  void replaceUnread(@NotNull Prepared prepared, @NotNull List<Notification> notices) {
+    NotificationEvent event = prepared.event();
+    Set<NotificationType> types = event.replacesUnreadNotificationTypes();
+    String entityType = event.entityType();
+    UUID entityId = event.entityId();
+    if (types.isEmpty() || entityType == null || entityId == null) {
+      return;
+    }
+    Map<NotificationType, Set<UUID>> recipients = new EnumMap<>(NotificationType.class);
+    for (Notification notice : notices) {
+      if (types.contains(notice.getType())
+          && entityType.equals(notice.getEntityType())
+          && entityId.equals(notice.getEntityId())) {
+        recipients
+            .computeIfAbsent(notice.getType(), _ -> new HashSet<>())
+            .add(notice.getRecipientUserId());
+      }
+    }
+    recipients.forEach((type, ids) ->
+        notificationRepository.deleteUnreadOfTypeAndEntityForRecipients(
+            type, entityType, entityId, ids));
+  }
+
   private @NotNull Set<UUID> removeStaleReconciliation(@NotNull Prepared prepared) {
     NotificationEvent event = prepared.event();
     Set<UUID> existing = holders(event);
