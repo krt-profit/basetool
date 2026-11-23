@@ -129,6 +129,15 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Builder.Default
   private long commentVersion = 0L;
 
+  /**
+   * The registry client the {@link #comment} was last written through, or {@code null} while its
+   * last write came from the Basetool; it moves with {@link #commentVersion} (REQ-ORDERS-078).
+   */
+  @Column(name = "comment_client_id", length = 63)
+  @Nullable
+  @OptimisticLock(excluded = true)
+  private String commentClientId;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   @Builder.Default
@@ -273,7 +282,8 @@ public class JobOrder extends AbstractEntity<UUID> {
 
   /**
    * Records that a client created the new order for a member under the client's key; a retry under
-   * the same client, member and key finds the order instead of creating another.
+   * the same client, member and key finds the order instead of creating another. A comment the
+   * create carries is the client's first write of it.
    *
    * @param actor the creating member and the client they acted through
    * @param idempotencyKey the client's {@code Idempotency-Key} of the create
@@ -283,6 +293,9 @@ public class JobOrder extends AbstractEntity<UUID> {
     createdByClientId = actor.clientId();
     createdByMemberId = actor.member();
     createIdempotencyKey = idempotencyKey;
+    if (comment != null) {
+      commentClientId = actor.clientId();
+    }
   }
 
   /**

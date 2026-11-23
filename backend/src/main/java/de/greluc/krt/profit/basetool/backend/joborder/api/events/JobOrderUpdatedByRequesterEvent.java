@@ -49,6 +49,8 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param requestingOrgUnitShorthand the requesting org unit's shorthand, for rendering
  * @param actorSub the editing user's sub, or {@code null} when not resolvable
  * @param observedRevision the order revisions observed when the requester edited it
+ * @param app the display name of the connected application the requester edited through, or {@code
+ *     null} for an edit in the web (REQ-ORDERS-078)
  */
 public record JobOrderUpdatedByRequesterEvent(
     UUID jobOrderId,
@@ -59,7 +61,8 @@ public record JobOrderUpdatedByRequesterEvent(
     @Nullable OrgUnitRef requestingOrgUnit,
     @Nullable String requestingOrgUnitShorthand,
     @Nullable UUID actorSub,
-    @NotNull NotificationRevision observedRevision)
+    @NotNull NotificationRevision observedRevision,
+    @Nullable String app)
     implements NotificationEvent {
 
   /** Loose entity-type tag stored on the produced notifications (shared with the create event). */
@@ -125,6 +128,7 @@ public record JobOrderUpdatedByRequesterEvent(
     if (requestingOrgUnitShorthand != null && !requestingOrgUnitShorthand.isBlank()) {
       params.put("requester", requestingOrgUnitShorthand);
     }
+    JobOrderNotices.addApplication(params, app);
     return params;
   }
 }

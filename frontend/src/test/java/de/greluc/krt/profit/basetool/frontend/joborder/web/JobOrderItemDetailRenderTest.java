@@ -240,7 +240,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
 
     stubDetail(orderId, userId, order);
 
@@ -366,7 +368,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -460,7 +464,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -553,7 +559,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -662,7 +670,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
 
     stubDetail(orderId, userId, order);
 
@@ -762,7 +772,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -829,7 +841,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -907,7 +921,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -995,7 +1011,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         false,
         0L,
         0L,
-        0L);
+        0L,
+        null,
+        null);
   }
 
   @Test
@@ -1556,7 +1574,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -1636,7 +1656,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     when(reader.readOrderDetail(eq(orderId), any(), any()))
         .thenReturn(
             logisticianDetail(order, userId)
@@ -1727,7 +1749,9 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     stubDetail(orderId, userId, order);
 
     String html =

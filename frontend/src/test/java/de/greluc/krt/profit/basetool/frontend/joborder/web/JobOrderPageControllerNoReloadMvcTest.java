@@ -145,7 +145,9 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
         false,
         0L,
         0L,
-        0L);
+        0L,
+        null,
+        null);
   }
 
   @Test

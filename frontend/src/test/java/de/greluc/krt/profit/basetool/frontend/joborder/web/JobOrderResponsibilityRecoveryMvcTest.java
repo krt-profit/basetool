@@ -114,7 +114,9 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             0L,
             6L,
-            0L);
+            0L,
+            null,
+            null);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
     List<OrgUnitMembershipOptionDto> options =
@@ -209,7 +211,9 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
 
@@ -265,7 +269,9 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     when(backendApiClient.patch(
             eq("/api/v1/orders/{id}/responsible-org-unit"),
             eq(new ReassignResponsibleOrgUnitRequest(target, 6L)),
@@ -323,7 +329,9 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
     when(backendApiClient.getCached(

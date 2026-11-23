@@ -62,7 +62,33 @@ public final class JobOrderNotices {
     INELIGIBLE_UNIT
   }
 
+  /**
+   * The coded parameter of a write through a connected application; its code picks the template
+   * variant that names the application (REQ-NOTIF-028, REQ-ORDERS-078).
+   */
+  static final String VIA_CODE = "viaCode";
+
+  /** The code of {@link #VIA_CODE} for a write through a connected application. */
+  static final String VIA_CLIENT = "CLIENT";
+
+  /** The parameter that carries the application's display name, captured at publish. */
+  static final String APP = "app";
+
   private JobOrderNotices() {}
+
+  /**
+   * Adds the coded application parameter of a client's write; a web write adds nothing, so its
+   * notice keeps the type's own wording.
+   *
+   * @param params the notice's render parameters, extended in place
+   * @param app the application's display name, or {@code null} for a write in the web
+   */
+  static void addApplication(@NotNull Map<String, String> params, @Nullable String app) {
+    if (app != null) {
+      params.put(VIA_CODE, VIA_CLIENT);
+      params.put(APP, app);
+    }
+  }
 
   private static String text(@Nullable String value) {
     return value == null || value.isBlank() ? UNKNOWN : value.trim();
@@ -123,6 +149,7 @@ public final class JobOrderNotices {
    * @param statusCode the coded terminal outcome
    * @param assignees active accounts assigned to the order
    * @param actor the actor who ended the order, if known
+   * @param app the connected application the actor ended it through, or {@code null} for the web
    * @return the terminal outcome notice
    */
   public static @NotNull NoticeEvent finished(
@@ -133,10 +160,12 @@ public final class JobOrderNotices {
       @Nullable String unitShorthand,
       @NotNull String statusCode,
       @NotNull Set<UUID> assignees,
-      @Nullable UUID actor) {
+      @Nullable UUID actor,
+      @Nullable String app) {
     Map<String, String> params = params(displayId, handle);
     params.put("unit", text(unitShorthand));
     params.put("statusCode", statusCode);
+    addApplication(params, app);
     return NoticeEvent.builder()
         .eventType(NotificationEventType.JOB_ORDER_FINISHED)
         .actorSub(actor)
@@ -159,6 +188,7 @@ public final class JobOrderNotices {
    * @param units its responsible and requesting unit contexts
    * @param revision the order revisions observed by the editor
    * @param actor the actor editing the order, if known
+   * @param app the connected application the actor edited through, or {@code null} for the web
    * @return the responsible-side update notice
    */
   public static @NotNull NoticeEvent needChanged(
@@ -167,7 +197,10 @@ public final class JobOrderNotices {
       @Nullable String handle,
       @NotNull Map<NotificationContextRole, OrgUnitRef> units,
       @NotNull NotificationRevision revision,
-      @Nullable UUID actor) {
+      @Nullable UUID actor,
+      @Nullable String app) {
+    Map<String, String> params = params(displayId, handle);
+    addApplication(params, app);
     return NoticeEvent.builder()
         .eventType(NotificationEventType.JOB_ORDER_UPDATED_BY_RESPONSIBLE)
         .actorSub(actor)
@@ -175,7 +208,7 @@ public final class JobOrderNotices {
         .entityId(orderId)
         .contextOrgUnits(units)
         .observedRevision(revision)
-        .renderParams(params(displayId, handle))
+        .renderParams(params)
         .replacesUnreadNotificationTypes(Set.of(NotificationType.JOB_ORDER_UPDATED_BY_RESPONSIBLE))
         .build();
   }

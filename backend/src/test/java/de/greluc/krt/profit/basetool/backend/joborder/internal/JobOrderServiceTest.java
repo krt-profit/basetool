@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.profitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -52,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockRe
 import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
@@ -61,6 +63,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
@@ -74,6 +77,8 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncFanout;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
@@ -153,6 +158,8 @@ class JobOrderServiceTest {
       jobOrderItemHandoverMapper;
 
   @Mock private JobOrderChangeEffects effects;
+
+  @Mock private JobOrderClientNames clientNames;
 
   @Mock private AuditService auditService;
 
@@ -248,7 +255,8 @@ class JobOrderServiceTest {
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
-            org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class));
+            org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class),
+            clientNames);
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     lenient().when(jobOrderAccessPolicy.canRead(any(), any())).thenReturn(true);
     lenient()
@@ -380,7 +388,9 @@ class JobOrderServiceTest {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     lenient()
         .when(jobOrderItemService.prepareItemLines(any(), any()))
         .thenAnswer(inv -> preparedItemLines(inv.getArgument(0)));
@@ -567,6 +577,27 @@ class JobOrderServiceTest {
     verify(effects).publish(created.capture());
     assertEquals(member, created.getValue().actorSub());
     verifyNoInteractions(authHelperService);
+  }
+
+  @Test
+  void createAuecJobOrder_namesTheClientsApplicationInTheCreatedNotice() {
+    stubPersistence();
+    JobOrderActor actor = new JobOrderActor.Client(UUID.randomUUID(), "versekit");
+    when(clientNames.appOf(actor)).thenReturn("VerseKit");
+
+    jobOrderService.createAuecJobOrder(
+        new JobOrderCreateCommand.AuecOrder(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
+        JobOrderWriterRule.DIRECT_LOGISTICIAN,
+        actor,
+        _ -> {});
+
+    ArgumentCaptor<JobOrderCreatedEvent> created =
+        ArgumentCaptor.forClass(JobOrderCreatedEvent.class);
+    verify(effects).publish(created.capture());
+    assertThat(created.getValue().renderParams())
+        .containsEntry("viaCode", "CLIENT")
+        .containsEntry("app", "VerseKit");
   }
 
   @Test
@@ -935,6 +966,38 @@ class JobOrderServiceTest {
     assertEquals(JobOrderStatus.COMPLETED, jobOrder.getStatus());
     assertNotNull(result);
     verify(jobOrderRepository, times(2)).lockAllJobOrders();
+  }
+
+  @Test
+  void changeStatus_aClientsCancelNamesTheApplicationInTheFinishedNotice() {
+    jobOrder.setPriority(3);
+    jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
+    jobOrder.setVersion(1L);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
+    JobOrderActor actor = new JobOrderActor.Client(UUID.randomUUID(), "versekit");
+    when(clientNames.appOf(actor)).thenReturn("VerseKit");
+
+    jobOrderService.changeStatus(
+        orderId,
+        JobOrderStatus.CANCELLED,
+        jobOrder.getLifecycleVersion(),
+        new JobOrderCaller(
+            JobOrderWriterRule.DIRECT_LOGISTICIAN, JobOrderReadCheck.CONTEXTUAL, actor));
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(effects, org.mockito.Mockito.atLeastOnce()).publish(published.capture());
+    assertThat(published.getAllValues())
+        .filteredOn(NoticeEvent.class::isInstance)
+        .map(NoticeEvent.class::cast)
+        .filteredOn(notice -> notice.eventType() == NotificationEventType.JOB_ORDER_FINISHED)
+        .singleElement()
+        .satisfies(notice ->
+            assertThat(notice.renderParams())
+                .containsEntry("statusCode", "CANCELLED")
+                .containsEntry("viaCode", "CLIENT")
+                .containsEntry("app", "VerseKit"));
   }
 
   @Test
@@ -2202,7 +2265,9 @@ class JobOrderServiceTest {
               false,
               0L,
               0L,
-              0L);
+              0L,
+              null,
+              null);
       when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(itemBase);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any()))
@@ -2285,7 +2350,9 @@ class JobOrderServiceTest {
                 false,
                 0L,
                 0L,
-                0L);
+                0L,
+                null,
+                null);
           });
     }
 

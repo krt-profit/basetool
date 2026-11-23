@@ -1,6 +1,9 @@
 @layer base, components, page, utilities;
 
 @layer page {
+    .annotation > .chip {
+        flex: none;
+    }
     .od-remove-btn {
         padding: 0.5rem;
     }

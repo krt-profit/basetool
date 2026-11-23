@@ -131,12 +131,13 @@ class JobOrderNoticeIntegrationTest {
         "Ada",
         Map.of(NotificationContextRole.RESPONSIBLE, IRIDIUM),
         new NotificationRevision(0, 1),
-        ACTOR);
+        ACTOR,
+        null);
   }
 
   private static JobOrderUpdatedByRequesterEvent requesterChanged(UUID order) {
     return new JobOrderUpdatedByRequesterEvent(
-        order, 12, "Ada", IRIDIUM, "IRI", null, null, ACTOR, new NotificationRevision(0, 1));
+        order, 12, "Ada", IRIDIUM, "IRI", null, null, ACTOR, new NotificationRevision(0, 1), null);
   }
 
   @Test
@@ -150,7 +151,8 @@ class JobOrderNoticeIntegrationTest {
             "IRI",
             "COMPLETED",
             Set.of(),
-            ACTOR));
+            ACTOR,
+            null));
 
     assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_FINISHED);
     assertThat(inbox(ACTOR)).isEmpty();
@@ -167,7 +169,8 @@ class JobOrderNoticeIntegrationTest {
             "IRI",
             "COMPLETED",
             Set.of(),
-            ACTOR));
+            ACTOR,
+            null));
 
     assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_FINISHED);
     assertThat(inbox(FORMER_LOGISTICIAN)).isEmpty();
@@ -184,7 +187,8 @@ class JobOrderNoticeIntegrationTest {
             "IRI",
             "DELETED",
             Set.of(),
-            ACTOR));
+            ACTOR,
+            null));
 
     assertThat(
             notificationRepository
@@ -197,7 +201,8 @@ class JobOrderNoticeIntegrationTest {
   @Test
   void anOrderWithoutAnyUnitOrAssigneeTellsNobodyAboutItsEnd() {
     creationService.createFromEvent(
-        JobOrderNotices.finished(orderId, 12, "Ada", Map.of(), null, "REJECTED", Set.of(), ACTOR));
+        JobOrderNotices.finished(
+            orderId, 12, "Ada", Map.of(), null, "REJECTED", Set.of(), ACTOR, null));
 
     assertThat(inbox(LOGISTICIAN)).isEmpty();
   }

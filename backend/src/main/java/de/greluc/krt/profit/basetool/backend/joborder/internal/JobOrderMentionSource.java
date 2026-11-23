@@ -104,6 +104,10 @@ public class JobOrderMentionSource implements PersonMentionSource {
         // Written by the server: a registry client id and the client's random idempotency key.
         "job_order.created_by_client_id",
         "job_order.create_idempotency_key",
+        // Written by the server: the registry clients of the comment's last write and of a
+        // target change.
+        "job_order.comment_client_id",
+        "job_order_money_target_change.client_id",
         "job_order_handover_item.location_name",
         "job_order_money_holder_change.kind",
         "job_order_money_operation.selection_kind",

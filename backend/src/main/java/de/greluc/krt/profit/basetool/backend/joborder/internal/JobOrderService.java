@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemPlan;
@@ -39,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
-import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -48,7 +48,6 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
-import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
@@ -110,6 +109,7 @@ public class JobOrderService {
   private final JobOrderUnitHistory unitHistory;
   private final JobOrderParticipationCommands participationCommands;
   private final JobOrderMoneyLifecycle moneyLifecycle;
+  private final JobOrderClientNames clientNames;
 
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
@@ -135,7 +135,7 @@ public class JobOrderService {
             jobOrder ->
                 materialLines.build(createDto.materials(), Set.of()).forEach(jobOrder::addMaterial),
             JobOrderWriterRule.CONTEXTUAL,
-            new JobOrderActor.Web(currentMember()));
+            webActor());
     return jobOrderStockProjectionService.mapToDtoWithStock(order);
   }
 
@@ -196,7 +196,7 @@ public class JobOrderService {
                 itemReconciliation.apply(
                     jobOrder, jobOrderItemService.prepareItemLines(createDto.items(), List.of())),
             JobOrderWriterRule.CONTEXTUAL,
-            new JobOrderActor.Web(currentMember()));
+            webActor());
     return jobOrderStockProjectionService.mapToDtoWithStock(order);
   }
 
@@ -237,7 +237,7 @@ public class JobOrderService {
     jobOrderRepository.flush();
     unitHistory.retainObservedParties(jobOrder, Set.of());
     jobOrderPriorityService.normalizePriorities();
-    publishJobOrderCreated(jobOrder, actor);
+    effects.publish(JobOrderLifecycleNotices.created(jobOrder, actor, clientNames.appOf(actor)));
     publishQueueSections(jobOrder);
     auditRecorder.record(
         JobOrderResponsibilityAudit.createdType(draft.type(), actor),
@@ -250,6 +250,10 @@ public class JobOrderService {
 
   private @Nullable UUID currentMember() {
     return authHelperService.currentUserId().orElse(null);
+  }
+
+  private @NotNull JobOrderActor webActor() {
+    return new JobOrderActor.Web(currentMember());
   }
 
   /**
@@ -271,37 +275,13 @@ public class JobOrderService {
       @Nullable BigDecimal target) {}
 
   /**
-   * Publishes a {@link JobOrderCreatedEvent} for after-commit notification, reading only scalars
-   * and never re-saving the order. The notice excludes the actor's member, none for a web request
-   * without one.
-   *
-   * @param jobOrder the persisted, flushed job order
-   * @param actor who created the order
-   */
-  private void publishJobOrderCreated(@NotNull JobOrder jobOrder, @NotNull JobOrderActor actor) {
-    OrgUnit responsible = jobOrder.getResponsibleOrgUnit();
-    OrgUnit requesting = jobOrder.getRequestingOrgUnit();
-    effects.publish(
-        new JobOrderCreatedEvent(
-            jobOrder.getId(),
-            jobOrder.getDisplayId(),
-            jobOrder.getHandle(),
-            new OrgUnitRef(responsible.getId(), responsible.getKind()),
-            responsible.getShorthand(),
-            requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
-            jobOrder.getType() == null ? null : jobOrder.getType().name(),
-            actor.member(),
-            JobOrderLifecycleNotices.revision(jobOrder)));
-  }
-
-  /**
    * Reports a terminal outcome after commit.
    *
    * @param jobOrder the completed, rejected or deleted order
    * @param statusCode the order's final status code
    */
   private void publishJobOrderFinished(@NotNull JobOrder jobOrder, @NotNull String statusCode) {
-    effects.publish(JobOrderLifecycleNotices.finished(jobOrder, statusCode, currentMember()));
+    effects.publish(JobOrderLifecycleNotices.finished(jobOrder, statusCode, currentMember(), null));
   }
 
   private void publishJobOrderClosed(@NotNull JobOrder order) {
@@ -417,7 +397,9 @@ public class JobOrderService {
       moneyLifecycle.close(jobOrder);
       stockCommands.releaseJobOrderEarmarks(jobOrder.getId());
       notices.add(closedEvent(jobOrder, actor.member()));
-      notices.add(JobOrderLifecycleNotices.finished(jobOrder, status.name(), actor.member()));
+      notices.add(
+          JobOrderLifecycleNotices.finished(
+              jobOrder, status.name(), actor.member(), clientNames.appOf(actor)));
     } else if (previousStatus == JobOrderStatus.CANCELLED
         || (previousStatus == JobOrderStatus.COMPLETED
             && jobOrder.getType() == JobOrderType.AUEC)) {
@@ -440,8 +422,7 @@ public class JobOrderService {
 
   @Transactional(propagation = Propagation.MANDATORY)
   void reopenUnderfulfilledMoneyOrder(JobOrder order) {
-    JobOrderEdit edit =
-        applyStatus(order, JobOrderStatus.IN_PROGRESS, new JobOrderActor.Web(currentMember()));
+    JobOrderEdit edit = applyStatus(order, JobOrderStatus.IN_PROGRESS, webActor());
     auditRecorder.record(
         AuditEventType.JOB_ORDER_STATUS_CHANGED,
         order.getId(),
@@ -563,7 +544,7 @@ public class JobOrderService {
                             updateDto.requestingOrgUnitId()));
                   }
                   jobOrder.setHandle(updateDto.handle());
-                  JobOrderComment.replace(jobOrder, updateDto.comment());
+                  JobOrderComment.replace(jobOrder, updateDto.comment(), webActor());
                   MaterialReplaceOutcome outcome =
                       replaceMaterialsWithinTransaction(id, jobOrder, materials);
                   return notifyChangedNeed(
@@ -719,7 +700,7 @@ public class JobOrderService {
           jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
     }
     jobOrder.setHandle(updateDto.handle());
-    JobOrderComment.replace(jobOrder, updateDto.comment());
+    JobOrderComment.replace(jobOrder, updateDto.comment(), webActor());
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
@@ -741,9 +722,7 @@ public class JobOrderService {
       return edit;
     }
     return edit.notifying(
-        List.of(
-            JobOrderLifecycleNotices.needChanged(
-                order, authHelperService.currentUserId().orElse(null))));
+        List.of(JobOrderLifecycleNotices.needChanged(order, currentMember(), null)));
   }
 
   /**
@@ -775,7 +754,7 @@ public class JobOrderService {
                 plannedOrder,
                 materials,
                 jobOrder -> {
-                  JobOrderComment.replace(jobOrder, updateDto.comment());
+                  JobOrderComment.replace(jobOrder, updateDto.comment(), webActor());
                   MaterialReplaceOutcome outcome =
                       replaceMaterialsWithinTransaction(id, jobOrder, materials);
                   return JobOrderEdit.audited(
@@ -788,8 +767,7 @@ public class JobOrderService {
                       .notifying(
                           List.of(
                               JobOrderLifecycleNotices.requesterChanged(
-                                  outcome.order(),
-                                  authHelperService.currentUserId().orElse(null))));
+                                  outcome.order(), currentMember(), null)));
                 }));
   }
 
@@ -833,7 +811,7 @@ public class JobOrderService {
         new LinkedHashSet<>(jobOrderItemService.requiredGameItemIds(jobOrder));
 
     itemReconciliation.apply(jobOrder, prepared);
-    JobOrderComment.replace(jobOrder, updateDto.comment());
+    JobOrderComment.replace(jobOrder, updateDto.comment(), webActor());
 
     jobOrderRepository.saveAndFlush(jobOrder);
 
@@ -859,9 +837,7 @@ public class JobOrderService {
                 .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn)
                 .with("byRequester", true))
         .notifying(
-            List.of(
-                JobOrderLifecycleNotices.requesterChanged(
-                    refreshed, authHelperService.currentUserId().orElse(null))));
+            List.of(JobOrderLifecycleNotices.requesterChanged(refreshed, currentMember(), null)));
   }
 
   private static void assertItemOrderEditable(@NotNull JobOrder order, boolean requester) {
@@ -905,7 +881,7 @@ public class JobOrderService {
     final Integer priority = order.getPriority();
     final UUID deletedId = order.getId();
     final NoticeEvent deletedNotice =
-        JobOrderLifecycleNotices.finished(order, "DELETED", currentMember());
+        JobOrderLifecycleNotices.finished(order, "DELETED", currentMember(), null);
     final JobOrderClosedEvent closed = closedEvent(order, currentMember());
     stockCommands.releaseJobOrderEarmarks(deletedId);
     materialClaimService.deleteForOrderWithinTransaction(order);

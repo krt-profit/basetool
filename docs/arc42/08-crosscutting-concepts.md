@@ -650,6 +650,12 @@ Three rules hold for every exchange route, and each new resource or capability i
   creating client and member, unique per member, client and key, and the lookup runs under a
   per-member advisory lock that the caps share; a client's create records its own audit type
   (REQ-OXCH-004, REQ-OXCH-005, ADR-0407).
+- **A client's job-order writes stay visible in the web.** The shared commands record the client
+  from the actor they are given — the creator on the order, the client of the comment's last write
+  and of each target change — and the read DTOs name each client by its registry display name,
+  read once per transaction; the created, need-change and cancel notices name the application
+  through a template variant a coded parameter picks, captured when the notice is published
+  ([REQ-ORDERS-078](../specs/orders-core.md), REQ-NOTIF-028).
 
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
 ADR-0221, ADR-0224 … ADR-0228, ADR-0344, and for job orders

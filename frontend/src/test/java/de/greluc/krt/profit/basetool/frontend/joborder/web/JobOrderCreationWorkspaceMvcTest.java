@@ -262,6 +262,8 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
         false,
         0L,
         0L,
-        0L);
+        0L,
+        null,
+        null);
   }
 }

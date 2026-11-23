@@ -214,7 +214,9 @@ class JobOrderServicePriorityAndStatusTest {
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
-            org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class));
+            org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     lenient().when(jobOrderAccessPolicy.canRead(any(), any())).thenReturn(true);
     lenient()
@@ -255,7 +257,9 @@ class JobOrderServicePriorityAndStatusTest {
               false,
               0L,
               0L,
-              0L);
+              0L,
+              null,
+              null);
         });
   }
 

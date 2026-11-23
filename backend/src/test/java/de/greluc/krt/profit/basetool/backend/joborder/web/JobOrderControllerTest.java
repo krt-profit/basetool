@@ -97,7 +97,9 @@ class JobOrderControllerTest {
         false,
         0L,
         0L,
-        0L);
+        0L,
+        null,
+        null);
   }
 
   @Test

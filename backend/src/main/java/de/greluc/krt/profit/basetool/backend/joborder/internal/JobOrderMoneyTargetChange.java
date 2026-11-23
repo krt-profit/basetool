@@ -57,13 +57,26 @@ class JobOrderMoneyTargetChange {
 
   @Nullable private UUID actorId;
 
+  /**
+   * The registry client the change was made through, or {@code null} for a change in the Basetool
+   * (REQ-ORDERS-078).
+   */
+  @Column(updatable = false, length = 63)
+  @Nullable
+  private String clientId;
+
   @Column(nullable = false, updatable = false)
   private Instant recordedAt;
 
   JobOrderMoneyTargetChange(
-      UUID orderId, UUID actorId, BigDecimal previousTarget, BigDecimal target) {
+      UUID orderId,
+      UUID actorId,
+      @Nullable String clientId,
+      BigDecimal previousTarget,
+      BigDecimal target) {
     this.orderId = orderId;
     this.actorId = actorId;
+    this.clientId = clientId;
     this.previousTarget = previousTarget;
     this.target = target;
     this.recordedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
