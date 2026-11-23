@@ -476,9 +476,10 @@ are assigned manually (Track 1) — no automated mapping.
   cannot be used until an admin approves the account, and sets the expectation that approval is
   manual and may take 1–2 days (`pendingApproval.message` / `pendingApproval.patience` in the
   default/de/en bundles).
-- [x] The waiting page also tells the member that it need not stay open, that closing it means no
-  message about the approval arrives, and that a member registered through Discord signs in again
-  with "Mit Discord anmelden", never with a username and password (`pendingApproval.returnLater`).
+- [x] The waiting page also tells the member that it need not stay open, that the decision arrives
+  by e-mail at the address on the account (REQ-NOTIF-014), and that a member registered through
+  Discord signs in again with "Mit Discord anmelden", never with a username and password
+  (`pendingApproval.returnLater`).
 - [x] **`PENDING` and `REJECTED` share the route but never the copy.** `BackendRoleSyncFilter`
   sends both to `/pending-approval` because both are equally access-less — that equivalence is
   access control, and it must not reach the text. `PendingApprovalPageController` therefore re-reads
@@ -500,9 +501,9 @@ are assigned manually (Track 1) — no automated mapping.
   error. Rejection is terminal (`UserRegistrationService` answers a decision on anything but a
   still-`PENDING` row with a `409`), so the waiting copy shown to a rejected user promised an
   approval that could no longer arrive — a rejection from 2026-06-29 was still being reported as a
-  stuck approval weeks later. With `app.mail.enabled=false` in production the REQ-NOTIF-014
-  rejection mail that would otherwise close the loop never goes out either, which leaves this page
-  as the rejected user's only channel. The admin's free-text reason is deliberately **not** shown
+  stuck approval weeks later. The REQ-NOTIF-014 rejection mail closes the loop only for a member with
+  an e-mail address on file and only best-effort, so this page stays the one channel a rejected
+  member is sure to see. The admin's free-text reason is deliberately **not** shown
   (owner decision, 2026-08-19): it stays an audit/e-mail payload, so no read path exposes it here.
 - [x] **An approval reaches the waiting member without any re-login.** The waiting page polls
   `GET /pending-approval/status` (exempt from the waiting-page redirect) every 20 s and forwards to

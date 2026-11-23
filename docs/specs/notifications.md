@@ -750,8 +750,9 @@ logged** (REQ-OBS).
 - [x] Mail composition/sending runs off-thread after commit on a dedicated `MAIL_EXECUTOR`, distinct
   from the notification executor, so a stalled relay cannot starve in-app notification creation.
 - [x] Only the static localized subject is ever logged — never the address, name or reason.
-- [ ] Operator: the channel ships enabled; prod sets `SPRING_MAIL_HOST` (+ port/credentials) to start
-  sending. With no host it stays a no-op; `APP_MAIL_ENABLED=false` hard-disables it.
+- [x] Operator: the channel ships enabled; prod sets `SPRING_MAIL_HOST` (+ port/credentials) and
+  `APP_MAIL_ENABLED=true` and sends through the Lettermint relay. With no host it stays a no-op;
+  `APP_MAIL_ENABLED=false` hard-disables it.
 
 **Enforced by:** `SmtpMailServiceTest` · **Code:** `notification/api/MailService`, `notification/api/MailMessage`,
 `notification/internal/SmtpMailService`, `notification/api/MailProperties`, `platform/api/AsyncConfig#MAIL_EXECUTOR`,
