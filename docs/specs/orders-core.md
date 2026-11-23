@@ -231,12 +231,24 @@ show unmet quantities; the UI must not imply full physical delivery.
 Lifecycle changes refresh a peer's support actions on the order page, including when the order has
 no open promises.
 
+Every order records its closing instant (`job_order.closed_at`). The transition from OPEN or
+IN_PROGRESS into COMPLETED, CANCELLED or REJECTED sets it, whatever causes it: a status write, the
+final MATERIAL or ITEM handover, or an aUEC handover, target change or correction. A change between
+terminal statuses keeps the first closing instant: a MATERIAL or ITEM status write between
+COMPLETED and REJECTED, and a final handover that completes an order already REJECTED. Every
+reopen clears it, including an aUEC return, target raise or correction that reopens a completed
+order. A database `CHECK` holds it present exactly while the status is terminal, so a write path
+that misses it fails. Orders already terminal when the column was added carry their last change.
+The web does not show it.
+
 **Acceptance**
 
 - [ ] Manual early MATERIAL/ITEM completion remains; aUEC cannot complete below its threshold.
 - [ ] Cancellation releases MATERIAL/ITEM earmarks and open promises without deleting history.
 - [ ] Need edits do not silently reopen manual completion or cancellation.
 - [ ] A peer sees the material handover action return in place after explicit reopening.
+- [ ] Every transition into a terminal status records the closing instant for all three kinds, a
+      change between terminal statuses keeps it, and every reopen clears it.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest` covers MATERIAL and ITEM lifecycle
 rights, cancellation and the preservation of historical promises and booked work. The ITEM
@@ -246,7 +258,12 @@ writer closes the order. `JobOrderStatusE2eTest` covers early MATERIAL completio
 `JobOrderStatusQueueRaceIntegrationTest` covers terminal queue changes. The Bank-free completion,
 return and settlement cases are part of the
 [money lifecycle contract](orders-auec.md#req-orders-063--auec-lifecycle-follows-effective-net-handover).
-**Issues:** #3195, #3200, #3201
+The closing instant is covered by `JobOrderClosingInstantTest` (the entity rule),
+`V443JobOrderClosedAtMigrationTest` (backfill and `CHECK`), the MATERIAL and ITEM status writes in
+`JobOrderHierarchyAuthorityIntegrationTest`, the final handovers in
+`JobOrderHandoverCompletionIntegrationTest` and `JobOrderItemHandoverPlanningIntegrationTest`, and
+the aUEC handover, target changes and status writes in `JobOrderMoneyIntegrationTest`.
+**Issues:** #3195, #3200, #3201, #3637
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
 
@@ -334,16 +351,28 @@ reload-safe identity and outcome lookup. There is no durable manager of unsubmit
 Notification preferences, recipient deduplication and privacy gates remain; see
 [notifications](orders-notifications.md) and the [money journey](orders-auec.md).
 
+A new order reaches every open overview without a reload, whichever channel created it. The shared
+create command of every kind publishes the `orders` room from the backend after the commit: the
+`queue` section, and for MATERIAL and ITEM also `demand`, since the new order adds to the material
+demand. A refused or rolled-back create publishes nothing. The frontend publishes no frame of its
+own for a create, so each create is announced exactly once.
+
 **Acceptance**
 
 - [ ] Scopes/type filters work across all kinds and preserve the permitted order set.
 - [ ] Creation opens the detail; peer updates preserve an open edit.
+- [ ] A create of every kind publishes one `orders` frame after its commit, `queue` plus `demand`
+  for MATERIAL and ITEM and `queue` for aUEC; a peer's open overview gains the order without a
+  reload, and the creator's open overview receives no second frame.
 - [ ] Retry after an unknown submitted money outcome cannot duplicate its effects.
 
 **Enforced by:** `JobOrderSupportReadIntegrationTest`, `JobOrderHierarchyAuthorityIntegrationTest`,
 `OrdersListPatternRenderTest`, `JobOrderCreationWorkspaceMvcTest`, `JobOrderCreateE2eTest` and
 `JobOrderSharedWorkspaceE2eTest` cover the MATERIAL/ITEM workspace. The initial aUEC create and
-recovery journey is covered by `JobOrderMoneyE2eTest`. **Issues:** #3201, #3202
+recovery journey is covered by `JobOrderMoneyE2eTest`. `JobOrderServiceTest` covers the create's
+frame per kind, `JobOrderCreationWorkspaceMvcTest` that a web create publishes no frame of its own
+and `JobOrderQueueLiveSyncE2eTest` the peer's overview and the single frame. **Issues:** #3201,
+#3202, #3639
 
 ## Out of scope
 

@@ -21,14 +21,17 @@ package de.greluc.krt.profit.basetool.backend.joborder.api.events;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Domain event published when a requesting owner (Auftraggeber) edits one of their own job orders
@@ -62,6 +65,9 @@ public record JobOrderUpdatedByRequesterEvent(
   /** Loose entity-type tag stored on the produced notifications (shared with the create event). */
   public static final String ENTITY_TYPE = "JOB_ORDER";
 
+  private static final Set<NotificationType> COALESCED =
+      Set.of(NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER);
+
   @NotNull
   @Override
   public NotificationEventType eventType() {
@@ -83,6 +89,19 @@ public record JobOrderUpdatedByRequesterEvent(
   @Override
   public String entityType() {
     return ENTITY_TYPE;
+  }
+
+  /**
+   * The new notice replaces its recipient's unread requester-edit notice of the order
+   * (REQ-NOTIF-017).
+   *
+   * @return {@link NotificationType#JOB_ORDER_UPDATED_BY_REQUESTER}
+   */
+  @NotNull
+  @Unmodifiable
+  @Override
+  public Set<NotificationType> replacesUnreadNotificationTypes() {
+    return COALESCED;
   }
 
   @Override

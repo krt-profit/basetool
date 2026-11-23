@@ -4,7 +4,7 @@
 - **Date:** 2026-10-10
 - **Deciders:** @greluc
 - **Related:** spec [`notifications.md`](../specs/notifications.md) (`REQ-NOTIF-007`,
-  `REQ-NOTIF-018`, `REQ-NOTIF-024`…`REQ-NOTIF-027`) ·
+  `REQ-NOTIF-017`, `REQ-NOTIF-018`, `REQ-NOTIF-024`…`REQ-NOTIF-027`) ·
   [ADR-0096](0096-notification-supersede-on-lifecycle-close.md) (supersede on lifecycle close) ·
   [ADR-0244](0244-a-notification-event-can-reconcile-a-notice-for-named-members.md) (reconcile) ·
   issue #2414
@@ -79,6 +79,14 @@ an OS notification for each one.
    its shared hierarchy and scoped order locks. The remaining original events in a cause retain
    their own delivery policies. When the relevant lifecycle or responsibility revision advances,
    the superseded event neither recreates its prompt nor removes the current transition's prompt.
+
+9. **A new notice can replace its recipient's unread one.** `NotificationEvent` gains
+   `replacesUnreadNotificationTypes()`: for each member a delivery is about to give a notice of one
+   of those types, it deletes that member's unread notices of the same type about the same entity
+   just before it stores the new row, for a single event and a grouped cause alike (REQ-NOTIF-017,
+   issue #3617). Read notices, other types and every member who receives nothing new keep theirs.
+   A type superseding itself (ADR-0096) would delete read notices and clear every holder, the
+   editor and members who muted the type included, so it cannot bound a loop of edits.
 
 ## Consequences
 

@@ -113,7 +113,7 @@ that published the event (REQ-AUDIT-007). Fifteen modules publish today:
 | `admin.api.events` | `HangarNotices`, the factory of the hangar and blueprint notices: a deleted ship dropping out of a mission, fitted marks reset, hangar or blueprints changed by an admin (REQ-HANGAR-006…008) |
 | `refinery.api.events` | `RefineryNotices`, the factory of the order-ready, order-ready-cleared and changed-by-somebody-else notices (REQ-REFINERY-023, -024) |
 
-An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244). The publishing services and the listeners sit in their modules' `internal` packages. `OrgUnitRef` stays with the
+An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244); a new notice may replace its recipient's unread one of the same type and entity (REQ-NOTIF-017, ADR-0245). The publishing services and the listeners sit in their modules' `internal` packages. `OrgUnitRef` stays with the
 notification contract rather than the kernel, because it carries the org-unit module's
 `OrgUnitKind`.
 

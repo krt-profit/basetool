@@ -72,10 +72,13 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -651,13 +654,13 @@ class JobOrderHierarchyAuthorityIntegrationTest {
   void invalidResponsibilityInEveryStatusAllowsConcreteReadingAndImmediateValidTransferOnly(
       JobOrderStatus state) throws Exception {
     JobOrder order =
-        orders.saveAndFlush(
-            JobOrder.builder()
-                .responsibleOrgUnit(responsible)
-                .requestingOrgUnit(requester)
-                .status(state)
-                .handle("Recoverable")
-                .build());
+        JobOrder.builder()
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(requester)
+            .handle("Recoverable")
+            .build();
+    order.setStatus(state);
+    orders.saveAndFlush(order);
     hierarchy.setParent(responsible.getId(), null, responsible.getVersion());
     String path = "/api/v1/orders/" + order.getId();
 
@@ -928,6 +931,48 @@ class JobOrderHierarchyAuthorityIntegrationTest {
         .andExpect(jsonPath("$[0].supporting").value(true));
   }
 
+  @ParameterizedTest
+  @EnumSource(
+      value = JobOrderType.class,
+      names = {"MATERIAL", "ITEM"})
+  void statusWritesRecordTheClosingInstantAndEveryReopenClearsIt(JobOrderType kind)
+      throws Exception {
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .type(kind)
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .handle("Closing instant")
+                .build());
+    Instant beforeCompletion = Instant.now().truncatedTo(ChronoUnit.MICROS);
+
+    Instant completed = writeStatus(order, "COMPLETED", 0);
+    assertThat(completed).isBetween(beforeCompletion, Instant.now());
+    assertThat(writeStatus(order, "REJECTED", 1)).isEqualTo(completed);
+    assertThat(writeStatus(order, "IN_PROGRESS", 2)).isNull();
+    assertThat(writeStatus(order, "REJECTED", 3)).isAfter(completed);
+    assertThat(writeStatus(order, "OPEN", 4)).isNull();
+    Instant beforeCancellation = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    assertThat(writeStatus(order, "CANCELLED", 5)).isBetween(beforeCancellation, Instant.now());
+    assertThat(writeStatus(order, "OPEN", 6)).isNull();
+  }
+
+  private @Nullable Instant writeStatus(JobOrder order, String status, long version)
+      throws Exception {
+    mvc.perform(
+            put("/api/v1/orders/" + order.getId() + "/status")
+                .with(contextualWriter(responsible.getId()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"" + status + "\",\"version\":" + version + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(status));
+    Timestamp closedAt =
+        jdbc.queryForObject(
+            "SELECT closed_at FROM job_order WHERE id = ?", Timestamp.class, order.getId());
+    return closedAt == null ? null : closedAt.toInstant();
+  }
+
   @Test
   void currentResponsibleContextCanEditOrderAndPriorityWithoutAFlatRole() throws Exception {
     JobOrder order =
@@ -1050,9 +1095,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             .responsibleOrgUnit(responsible)
             .requestingOrgUnit(requester)
             .type(JobOrderType.ITEM)
-            .status(status)
             .handle("Partial item order")
             .build();
+    order.setStatus(status);
     JobOrderItem line =
         JobOrderItem.builder()
             .gameItem(gameItems.getReferenceById(gameItemId))
@@ -1286,14 +1331,14 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     processing.setParent(profit);
     processing = units.saveAndFlush(processing);
     JobOrder order =
-        orders.saveAndFlush(
-            JobOrder.builder()
-                .type(kind)
-                .responsibleOrgUnit(processing)
-                .requestingOrgUnit(requester)
-                .status(JobOrderStatus.COMPLETED)
-                .handle("Delete fixture")
-                .build());
+        JobOrder.builder()
+            .type(kind)
+            .responsibleOrgUnit(processing)
+            .requestingOrgUnit(requester)
+            .handle("Delete fixture")
+            .build();
+    order.setStatus(JobOrderStatus.COMPLETED);
+    orders.saveAndFlush(order);
     MaterialClaim archived =
         claims.saveAndFlush(
             MaterialClaim.builder()
