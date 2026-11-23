@@ -57,9 +57,9 @@ public final class ActingMemberHeader {
   public static final String EXCHANGE_CONNECTED_AT_HEADER = "X-Exchange-Connected-At";
 
   /**
-   * Carries the client's {@code Idempotency-Key} of a bank raise, which the gateway checked
-   * (REQ-XCH-020), so a retry after a lost answer finds the request it raised (REQ-BXCH-004); read
-   * only by the exchange's raise route.
+   * Carries the client's {@code Idempotency-Key} of a bank raise or a job-order create, which the
+   * gateway checked (REQ-XCH-020), so a retry after a lost answer finds what it created first
+   * (REQ-BXCH-004, REQ-OXCH-004); read only by the exchange's raise and create routes.
    */
   public static final String EXCHANGE_IDEMPOTENCY_KEY_HEADER = "X-Exchange-Idempotency-Key";
 

@@ -30,9 +30,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Counts the job orders' traffic on the exchange (REQ-OXCH-009, REQ-OBS-025): reads by registered
- * client and route, refusals by reason, and the fingerprint recomputations by outcome
- * (REQ-OXCH-003). Every label is a registry client id or a fixed enumeration, never an id, a path
- * or an amount (REQ-OBS-011).
+ * client and route, writes by client and outcome, refusals by reason, and the fingerprint
+ * recomputations by outcome (REQ-OXCH-003). Every label is a registry client id or a fixed
+ * enumeration, never an id, a path or an amount (REQ-OBS-011).
  */
 @Component
 @RequiredArgsConstructor
@@ -83,6 +83,16 @@ public class ExchangeJobOrderMetrics {
    */
   public void countRefused(@NotNull JobOrderExchangeRefusal reason) {
     refusalCounter(reason).increment();
+  }
+
+  /**
+   * Counts one job-order write on {@code basetool_exchange_writes_total{resource="job_order"}}.
+   *
+   * @param clientId the registry client id the relay bounded
+   * @param outcome {@link ExchangeOps#APPLIED} or {@link ExchangeOps#REJECTED}
+   */
+  public void countWrite(@NotNull String clientId, @NotNull String outcome) {
+    ExchangeWrites.count(meterRegistry, clientId, ExchangeFeedResource.JOB_ORDER, outcome);
   }
 
   /**

@@ -175,6 +175,13 @@ web, naming its client (REQ-AUDIT-005):
   `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the assignee reads the order anyway as a member
   of the Profit hierarchy; the assignee is the
   target user, and the details carry only `assignee=<id>` — no handle, unit name or free text.
+  A member's create of an aUEC order through a connected application records
+  `JOB_ORDER_CREATED_VIA_CLIENT` instead of `JOB_ORDER_CREATED`, one row per create, with
+  `requestingOrgUnit`, `responsibleOrgUnit` (each `id(KIND)`) and `target`, and the client in
+  `client_id` as on every row (REQ-AUDIT-005); the contact and the comment are never recorded, and
+  an idempotent replay and a refused create record nothing
+  ([REQ-OXCH-004](orders-exchange.md#req-oxch-004--create-options-and-the-create-of-an-auec-order),
+  ADR-0407).
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX sync (one summary event per run and catalogue — `REFINERY_METHODS_SYNCED` /
   `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion

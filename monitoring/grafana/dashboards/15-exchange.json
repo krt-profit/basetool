@@ -1822,7 +1822,7 @@
       },
       "type": "timeseries",
       "title": "Job-order reads/hour",
-      "description": "Job-order reads served per hour by client and route: the snapshot and the change feed of the member's job-order set; a syncing client reads one feed page per pass (REQ-OXCH-003, REQ-OBS-025).",
+      "description": "Job-order reads served per hour by client and route: the snapshot and the change feed of the member's job-order set, where a syncing client reads one feed page per pass (REQ-OXCH-003), and the create options under the write scope (REQ-OXCH-004, REQ-OBS-025).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1856,6 +1856,57 @@
           "expr": "sum by (client_id, route) (increase(basetool_exchange_job_order_reads_total{client_id=~\"$client_id\"}[1h]))",
           "refId": "A",
           "legendFormat": "{{client_id}} {{route}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 157
+      },
+      "type": "timeseries",
+      "title": "Job-order writes/day",
+      "description": "Job-order writes through clients per day by client and outcome: applied creates, including a retry answered from the stored key, and rejected ones; a pair that is not offered also counts as units_not_offered in the backend refusals panel (REQ-OXCH-004, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id, outcome) (increase(basetool_exchange_writes_total{resource=\"job_order\", client_id=~\"$client_id\"}[1d]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}} {{outcome}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

@@ -342,7 +342,8 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
             null,
             new BigDecimal("250000")),
         JobOrderWriterRule.DIRECT_LOGISTICIAN,
-        new JobOrderActor.Client(member.getId(), "rule-test-client"));
+        new JobOrderActor.Client(member.getId(), "rule-test-client"),
+        "rule-key-" + UUID.randomUUID());
   }
 
   private Set<UUID> requestingUnits(User member) {

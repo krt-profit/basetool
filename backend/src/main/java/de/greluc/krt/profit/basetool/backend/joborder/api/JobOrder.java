@@ -159,6 +159,36 @@ public class JobOrder extends AbstractEntity<UUID> {
   private long moneyInformationVersion = 0L;
 
   /**
+   * The registry client the order was created through, or {@code null} for an order created in the
+   * Basetool; set by {@link #recordClientCreate} and never changed (REQ-OXCH-004).
+   */
+  @Column(name = "created_by_client_id", length = 63)
+  @Nullable
+  @Setter(AccessLevel.NONE)
+  @OptimisticLock(excluded = true)
+  private String createdByClientId;
+
+  /**
+   * The member who created the order through a client, or {@code null} for a web create and once
+   * the account is gone (REQ-OXCH-004).
+   */
+  @Column(name = "created_by_member_id")
+  @Nullable
+  @Setter(AccessLevel.NONE)
+  @OptimisticLock(excluded = true)
+  private UUID createdByMemberId;
+
+  /**
+   * The client's {@code Idempotency-Key} of the create, unique per client and member, or {@code
+   * null} for a web create (REQ-OXCH-004).
+   */
+  @Column(name = "create_idempotency_key", length = 128)
+  @Nullable
+  @Setter(AccessLevel.NONE)
+  @OptimisticLock(excluded = true)
+  private String createIdempotencyKey;
+
+  /**
    * Exclusive order kind: raw materials, finished items, or an independently tracked net aUEC
    * amount.
    */
@@ -239,6 +269,20 @@ public class JobOrder extends AbstractEntity<UUID> {
       closedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
     this.status = status;
+  }
+
+  /**
+   * Records that a client created the new order for a member under the client's key; a retry under
+   * the same client, member and key finds the order instead of creating another.
+   *
+   * @param actor the creating member and the client they acted through
+   * @param idempotencyKey the client's {@code Idempotency-Key} of the create
+   */
+  public void recordClientCreate(
+      @NotNull JobOrderActor.Client actor, @NotNull String idempotencyKey) {
+    createdByClientId = actor.clientId();
+    createdByMemberId = actor.member();
+    createIdempotencyKey = idempotencyKey;
   }
 
   /**

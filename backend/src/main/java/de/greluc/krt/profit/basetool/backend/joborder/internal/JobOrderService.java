@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -73,10 +74,8 @@ import org.springframework.transaction.annotation.Transactional;
  * → IN_PROGRESS → COMPLETED / REJECTED), priority reorder, assignees and material/inventory
  * unlinking.
  *
- * <p>{@link
- * #completeJobOrderWithinTransaction(de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder)}
- * works on an already-managed entity inside the caller's transaction, so completion never causes a
- * second {@code @Version} bump.
+ * <p>{@link #completeJobOrderWithinTransaction(JobOrder)} works on an already-managed entity inside
+ * the caller's transaction, so completion never causes a second {@code @Version} bump.
  */
 @Service
 @RequiredArgsConstructor
@@ -131,7 +130,8 @@ public class JobOrderService {
                 createDto.requestingOrgUnitId(),
                 createDto.handle(),
                 createDto.comment(),
-                JobOrderType.MATERIAL),
+                JobOrderType.MATERIAL,
+                null),
             jobOrder ->
                 materialLines.build(createDto.materials(), Set.of()).forEach(jobOrder::addMaterial),
             JobOrderWriterRule.CONTEXTUAL,
@@ -146,21 +146,24 @@ public class JobOrderService {
    * @param order the pair, contact and comment; the caller stores the target
    * @param rule the authority that decides whether the actor writes the pair
    * @param actor who creates
+   * @param origin records on the new, unsaved order where the create came from
    * @return the persisted order
    */
   @Transactional(propagation = Propagation.MANDATORY)
   JobOrder createAuecJobOrder(
       @NotNull JobOrderCreateCommand.AuecOrder order,
       @NotNull JobOrderWriterRule rule,
-      @NotNull JobOrderActor actor) {
+      @NotNull JobOrderActor actor,
+      @NotNull Consumer<JobOrder> origin) {
     return createOrder(
         new NewOrder(
             order.responsibleOrgUnitId(),
             order.requestingOrgUnitId(),
             order.handle(),
             order.comment(),
-            JobOrderType.AUEC),
-        _ -> {},
+            JobOrderType.AUEC,
+            order.target()),
+        origin,
         rule,
         actor);
   }
@@ -187,7 +190,8 @@ public class JobOrderService {
                 createDto.requestingOrgUnitId(),
                 createDto.handle(),
                 createDto.comment(),
-                JobOrderType.ITEM),
+                JobOrderType.ITEM,
+                null),
             jobOrder ->
                 itemReconciliation.apply(
                     jobOrder, jobOrderItemService.prepareItemLines(createDto.items(), List.of())),
@@ -236,19 +240,12 @@ public class JobOrderService {
     publishJobOrderCreated(jobOrder, actor);
     publishQueueSections(jobOrder);
     auditRecorder.record(
-        createdEvent(draft.type()),
+        JobOrderResponsibilityAudit.createdType(draft.type(), actor),
         jobOrder.getId(),
         JobOrderAuditLabel.of(jobOrder),
         null,
-        JobOrderResponsibilityAudit.created(jobOrder));
+        JobOrderResponsibilityAudit.created(jobOrder, actor, draft.target()));
     return jobOrder;
-  }
-
-  private static AuditEventType createdEvent(@NotNull JobOrderType type) {
-    return switch (type) {
-      case MATERIAL, AUEC -> AuditEventType.JOB_ORDER_CREATED;
-      case ITEM -> AuditEventType.JOB_ORDER_ITEM_CREATED;
-    };
   }
 
   private @Nullable UUID currentMember() {
@@ -263,13 +260,15 @@ public class JobOrderService {
    * @param handle the contact
    * @param comment the optional comment
    * @param type the order kind
+   * @param target an aUEC order's target, {@code null} for the other kinds
    */
   private record NewOrder(
       @Nullable UUID responsibleOrgUnitId,
       @Nullable UUID requestingOrgUnitId,
       String handle,
       @Nullable String comment,
-      @NotNull JobOrderType type) {}
+      @NotNull JobOrderType type,
+      @Nullable BigDecimal target) {}
 
   /**
    * Publishes a {@link JobOrderCreatedEvent} for after-commit notification, reading only scalars

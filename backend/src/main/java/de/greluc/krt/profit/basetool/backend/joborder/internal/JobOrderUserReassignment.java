@@ -70,6 +70,7 @@ public class JobOrderUserReassignment implements PreparedUserReassignmentPartici
   @Override
   public @NotNull List<String> staysWithTheAct() {
     return List.of(
+        "job_order.created_by_member_id",
         "job_order_handover.executing_user_id",
         "job_order_item_handover.executing_user_id",
         "material_claim.claimed_by_user_id",

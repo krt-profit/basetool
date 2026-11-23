@@ -636,6 +636,15 @@ Three rules hold for every exchange route, and each new resource or capability i
   `JobOrderExchangeReadSet` and the writes' read check `JobOrderReadCheck.OWN_RELATION`; the read
   serves the fingerprint's projection unchanged plus the member's own part (REQ-OXCH-001,
   REQ-OXCH-002, ADR-0407).
+- **A client creates job orders through the web's create.** The exchange calls the one create
+  command (`JobOrderCreateCommand`) and the one create-options projection with the writer rule
+  `DIRECT_LOGISTICIAN` — a unit the member directly belongs to and is a Logistician of, requesting
+  side only — and an actor carrying the member and the client (ADR-0405), so the locks, checks,
+  notices, queue frame and audit cannot drift between the channels. Unlike the bank raise, whose
+  key lives on the bank's request, the create's `Idempotency-Key` lives on the order with the
+  creating client and member, unique per member, client and key, and the lookup runs under a
+  per-member advisory lock that the caps share; a client's create records its own audit type
+  (REQ-OXCH-004, REQ-OXCH-005, ADR-0407).
 
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
 ADR-0221, ADR-0224 … ADR-0228, ADR-0344, and for job orders

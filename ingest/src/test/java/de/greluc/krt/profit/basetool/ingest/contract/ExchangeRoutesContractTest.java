@@ -80,7 +80,7 @@ class ExchangeRoutesContractTest {
   }
 
   @Test
-  void theChangeDraftBankRequestAndHomeLocationRoutesAreTheWrites() {
+  void theChangeDraftBankRequestHomeLocationAndJobOrderRoutesAreTheWrites() {
     Set<String> writes = new TreeSet<>();
     for (ExchangeRoutes.Route route : ExchangeRoutes.ROUTES) {
       if (route.write()) {
@@ -92,6 +92,7 @@ class ExchangeRoutesContractTest {
             "/exchange/v1/bank/requests",
             "/exchange/v1/bank/requests/{id}/cancel",
             "/exchange/v1/bank/requests/{id}/correction",
+            "/exchange/v1/job-orders",
             "/exchange/v1/me/blueprints/changes",
             "/exchange/v1/me/drafts/blueprints",
             "/exchange/v1/me/drafts/refinery-orders",

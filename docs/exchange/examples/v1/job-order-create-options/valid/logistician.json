@@ -1,0 +1,26 @@
+{
+  "requestingUnits": [
+    {
+      "id": "2d8b4f30-6e3c-4a0a-9c73-5b2e7f9c1d32",
+      "name": "Staffel Alpha",
+      "shorthand": "ALP",
+      "kind": "SQUADRON"
+    }
+  ],
+  "responsibleUnits": [
+    {
+      "id": "5a4d0000-0000-4000-8000-000000000102",
+      "name": "Bereich Profit",
+      "shorthand": "PRF",
+      "kind": "BEREICH"
+    },
+    {
+      "id": "5a4d0000-0000-4000-8000-000000000101",
+      "name": "Staffel Profit",
+      "shorthand": "SPF",
+      "kind": "SQUADRON"
+    }
+  ],
+  "suggestedResponsible": "5a4d0000-0000-4000-8000-000000000102",
+  "writesEnabled": true
+}

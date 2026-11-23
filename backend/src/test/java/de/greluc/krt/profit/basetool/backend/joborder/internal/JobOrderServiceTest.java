@@ -537,7 +537,8 @@ class JobOrderServiceTest {
         new JobOrderCreateCommand.AuecOrder(
             responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
         JobOrderWriterRule.CONTEXTUAL,
-        new JobOrderActor.Web(null));
+        new JobOrderActor.Web(null),
+        _ -> {});
     verifyNoInteractions(liveSyncFanout);
 
     commitFixtureTransaction();
@@ -557,7 +558,8 @@ class JobOrderServiceTest {
         new JobOrderCreateCommand.AuecOrder(
             responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
         JobOrderWriterRule.DIRECT_LOGISTICIAN,
-        actor);
+        actor,
+        _ -> {});
 
     verify(writers).resolve(JobOrderWriterRule.DIRECT_LOGISTICIAN, actor);
     ArgumentCaptor<JobOrderCreatedEvent> created =
@@ -588,7 +590,8 @@ class JobOrderServiceTest {
                     null,
                     new BigDecimal("250000")),
                 JobOrderWriterRule.DIRECT_LOGISTICIAN,
-                new JobOrderActor.Client(UUID.randomUUID(), "client")));
+                new JobOrderActor.Client(UUID.randomUUID(), "client"),
+                _ -> {}));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 

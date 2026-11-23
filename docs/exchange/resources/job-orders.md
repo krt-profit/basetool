@@ -2,7 +2,9 @@
 
 The job orders of all three kinds that the member relates to, under scope
 `exchange.joborders.read`: material orders, item orders and aUEC orders, which ask for a provision
-of credits. Every route lies below `/exchange/v1/job-orders`.
+of credits. Under scope `exchange.joborders.write` a Logistician creates aUEC orders on behalf of
+their own units ([creating an aUEC order](#creating-an-auec-order)). Every route lies below
+`/exchange/v1/job-orders`.
 
 **The job-order family is not switched on yet.** Until an administrator turns it on, every path at
 or below `/exchange/v1/job-orders` answers `503 JOB_ORDER_EXCHANGE_DISABLED` with
@@ -19,6 +21,8 @@ assignees or support; each order carries a [`link`](#the-link) to its page for a
 | Route | Retention class | What a client may do with it |
 | --- | --- | --- |
 | `GET /exchange/v1/job-orders` | job-order data | keep it in memory only, for at most 7 days |
+| `GET /exchange/v1/job-orders/create-options` | job-order data | read it when the create form opens; keep it no longer than the form |
+| `POST /exchange/v1/job-orders` | job-order data | keep the answer in memory only, for at most 7 days |
 
 Job-order data of every kind, the member's own orders included, is kept for at most 7 days,
 outside cloud-synced folders, never in a backup or diagnostics, and never forwarded. Keep it out of
@@ -165,17 +169,90 @@ Every action that stays in the Basetool goes through it. Open it only after chec
 `https` on the Basetool's host, as for the login page; never open a URL taken from `comment` or
 `contact`, which are plain text and render as text.
 
+## Creating an aUEC order
+
+A member who is a **Logistician** of a unit they **directly** belong to — by the Logistician flag, a
+leadership rank, or the reach of a Bereich or Organisationsleitung seat over it — creates aUEC
+orders on behalf of that unit, under scope `exchange.joborders.write`. The member's unit is always
+the **requesting** unit; the responsible unit is one of the Profit units. Creating an order on behalf
+of another unit, as a Logistician of the responsible Profit unit, stays in the Basetool. An
+administrator creates like every other member. Money moves only in the Basetool, and nothing is
+undone through the exchange: cancel a wrong order instead.
+
+Create only on an explicit action of the member, never automatically or by a rule, and let the
+member choose both units from the create options (you may preselect).
+
+### Create options
+
+`GET /exchange/v1/job-orders/create-options` — where the member may create an aUEC order, a
+[`job-order-create-options`](../schemas/):
+
+| Field | Meaning |
+| --- | --- |
+| `requestingUnits[]` | the member's units to create on behalf of, as [`org-unit`](../schemas/)s; empty when the member may create no order |
+| `responsibleUnits[]` | the Profit units that process aUEC orders, as `org-unit`s; empty as well when the member may create no order |
+| `suggestedResponsible` | the id of the Profit area to preselect, or `null` |
+| `writesEnabled` | whether job-order writes are switched on now; while `false` a create answers `503 JOB_ORDER_WRITES_DISABLED` |
+
+Empty lists mean: offer no create. The read names no member and is a read, so it answers while
+only the writes are off.
+
+### The create
+
+`POST /exchange/v1/job-orders` with an `Idempotency-Key` — the body is
+[`job-order-write`](../schemas/) `#/$defs/create`:
+
+| Field | Meaning |
+| --- | --- |
+| `requestingUnitId` | one of `requestingUnits` |
+| `responsibleUnitId` | one of `responsibleUnits` |
+| `contact` | whom to contact about the order, plain text, 1 to 200 characters; required |
+| `comment` | optional plain text, at most 1000 characters |
+| `target` | the requested amount in whole aUEC, 1 to 1 000 000 000 000 |
+
+```json
+{
+  "requestingUnitId": "2d8b4f30-6e3c-4a0a-9c73-5b2e7f9c1d32",
+  "responsibleUnitId": "5a4d0000-0000-4000-8000-000000000102",
+  "contact": "Kestrel",
+  "comment": "Fuel for the convoy on Saturday",
+  "target": 250000
+}
+```
+
+The answer is `201` with `#/$defs/created` — only the order's `id`, its `status`, its `versions`
+and its stored `target`; read the order itself from the feed, which brings it a few seconds
+later:
+
+```json
+{
+  "id": "7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "status": "OPEN",
+  "versions": { "lifecycle": 0, "target": 0, "comment": 0 },
+  "target": 250000
+}
+```
+
+The order is created as in the Basetool: the writers of both units are notified, and open
+overviews show it at once. Each create counts one unit of the daily write quota.
+
+**The key is kept with the order.** A create under a key your client already created an order of
+this member with answers that order with `201` and its current state — also after the gateway's
+one-hour cache and after a `5xx` that came after the order was stored. Changed terms are never
+applied: the answer carries the stored `target`, so compare it with what you sent.
+
 ## Client guidance
 
 - **An isolated area.** Make job orders their own area, so a job-order refusal — the switches
   included — never stops the other areas of a sync pass.
 - **Memory only.** Keep every job-order item in memory, own orders included, with a snapshot at
   each start and the feed on every pass after it.
-- **The create**, once published, follows the bank raise: a fresh `Idempotency-Key` per create, held
-  in memory with its body until a clear answer; an unclear outcome (no answer, `5xx`,
-  `IDEMPOTENCY_IN_PROGRESS`, `RATE_LIMITED`) goes again under the same key and body. After a restart
-  nothing is resent; the snapshot shows whether the order exists.
-- **`create-options`**, once published, is read when the create form opens, not on every pass.
+- **The create** follows the bank raise: a fresh `Idempotency-Key` per create, held in memory with
+  its body until a clear answer; an unclear outcome (no answer, `5xx`, `IDEMPOTENCY_IN_PROGRESS`,
+  `RATE_LIMITED`) goes again under the same key and body. After a restart nothing is resent; the
+  snapshot shows whether the order exists, and within a run the feed brings it.
+- **`create-options`** is read when the create form opens, not on every pass. Empty lists hide the
+  create; `JOB_ORDER_UNITS_NOT_OFFERED` means the options went stale: read them again.
 - **The switch codes.** Treat `JOB_ORDER_EXCHANGE_DISABLED` as "pause the job-order area" and
   `JOB_ORDER_WRITES_DISABLED` as "pause the job-order writes", each after `Retry-After`.
 
@@ -183,10 +260,13 @@ Every action that stays in the Basetool goes through it. Open it only after chec
 
 | Status | Code | When | Client action |
 | --- | --- | --- | --- |
-| 400 | `SCHEMA_INVALID` | `limit` outside 1 to 1000 | fix the request |
-| 403 | `SCOPE_MISSING` | the token or the registry lacks `exchange.joborders.read` | ask the member to grant it |
+| 400 | `SCHEMA_INVALID` | `limit` outside 1 to 1000, or a create body outside its schema | fix the request |
+| 400 | `IDEMPOTENCY_KEY_MISSING` | a create without a valid `Idempotency-Key` | send one |
+| 400 | `JOB_ORDER_UNITS_NOT_OFFERED` | a create names a pair the create options do not offer: an unknown unit, a unit the member does not write for, or a responsible unit outside the Profit units; one code for every side | read the create options again and let the member choose |
+| 403 | `SCOPE_MISSING` | the token or the registry lacks `exchange.joborders.read` for the read, or `exchange.joborders.write` for the create options and the create | ask the member to grant it |
 | 410 | `CURSOR_EXPIRED` | the cursor is older than the retained changes or not one the server issued | take a new snapshot and reconcile it against the last baseline |
 | 503 | `JOB_ORDER_EXCHANGE_DISABLED` | the job-order family is switched off; `Retry-After: 300` | pause the job-order area only |
+| 503 | `JOB_ORDER_WRITES_DISABLED` | the job-order writes are switched off; `Retry-After: 300` | pause the job-order writes only; retry the create under the same key |
 | 503 | `EXCHANGE_DISABLED` | the whole exchange is switched off; `Retry-After: 30` | pause every area |
 
 The gateway's other codes apply as everywhere ([errors](../errors.md)).

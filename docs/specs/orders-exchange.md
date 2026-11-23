@@ -19,8 +19,10 @@ This spec is the single home of job orders on the exchange. The orders themselve
 lifecycle, money and notices, stay in [`orders-core.md`](orders-core.md) and
 [`orders-auec.md`](orders-auec.md); the exchange's gateway, registry, limits and error contract stay
 in [`external-exchange.md`](external-exchange.md) and [`docs/exchange/errors.md`](../exchange/errors.md).
-The read serves its snapshot and its change feed (`GET /exchange/v1/job-orders`); the writes and
-the caps follow with their own slices. Both switches are off until an admin turns them on.
+The read serves its snapshot and its change feed (`GET /exchange/v1/job-orders`), and a Logistician
+of the requesting unit creates aUEC orders through `GET /exchange/v1/job-orders/create-options` and
+`POST /exchange/v1/job-orders`; the writes on an existing order and the caps follow with their own
+slices. Both switches are off until an admin turns them on.
 
 The guiding rules:
 
@@ -35,8 +37,9 @@ The guiding rules:
 ### REQ-OXCH-001 — Scopes and the one decision point
 
 > [!note] Implemented for the read: the scope `exchange.joborders.read` and the read set (#3644;
-> decided in #3608, #3610, #3619, ADR-0407). The scope `exchange.joborders.write` and the writer
-> rule of the create come with the create slice.
+> decided in #3608, #3610, #3619, ADR-0407); and for the write: the scope
+> `exchange.joborders.write` and the writer rule of the create (#3646; decided in #3611, #3619,
+> ADR-0405).
 
 **Scopes.** A client reads job orders under `exchange.joborders.read` and writes them under
 `exchange.joborders.write`, each a capability of the registry (REQ-XCH-005) with its own consent
@@ -45,6 +48,11 @@ line:
 | Scope | Consent (EN) | Consent (DE) | Chip label (DE / EN) |
 |---|---|---|---|
 | `exchange.joborders.read` | Read the job orders of the org units you directly belong to and the ones you work on, with progress, contact, comment and the names of those working on them | Die Aufträge der Einheiten lesen, denen du direkt angehörst, und die Aufträge, die du bearbeitest, samt Fortschritt, Kontakt, Kommentar und den Namen der Bearbeiter | „Aufträge der eigenen Einheiten und eigene Bearbeitungen lesen" / "Read the job orders of your units and those you work on" |
+| `exchange.joborders.write` | As a logistician of an org unit, create aUEC orders on its behalf, cancel its aUEC orders before any money has moved and change their target and comment; money moves only in the Basetool | Als Logistiker einer Einheit aUEC-Aufträge in ihrem Namen anlegen, ihre aUEC-Aufträge vor der ersten Geldbewegung stornieren und Zielbetrag und Kommentar ändern; Geld bewegt sich nur im Basetool | „Als Logistiker aUEC-Aufträge anlegen, stornieren und ändern" / "As a logistician, create, cancel and change aUEC orders" |
+
+The write line promises no undo: job-order writes are not undone under „Verbundene Anwendungen"
+(REQ-OXCH-005). `create-options` sits under the write scope, so only a client the member consented
+to create with learns whether the member is a Logistician.
 
 **The read set — the fifth exception of REQ-XCH-009.** The acting member carries no contextual
 authority and is never an administrator, so the read is decided from the database on every request:
@@ -74,6 +82,24 @@ follows that unit's orders. An administrator reads like a plain member.
   never touches assignees or support; everything else stays in the web, reached through the order's
   `link`.
 
+**The writer rule — the Logistician of the requesting unit.** Through a client a member writes for a
+unit only when they are a **direct member** of it and a **Logistician** of it by the org-stock rule
+(REQ-XCH-045): the Logistician flag, a leadership rank, or the reach of a Bereich or OL seat over
+it; they hold `KRT Member`, and the unit is active
+(`OrgUnitMembershipQueryService.findDirectLogisticianOrgUnitIds`). It is the writer rule
+`JobOrderWriterRule.DIRECT_LOGISTICIAN` of ADR-0405, decided from the database on every request.
+
+- Mere membership makes no writer, and reach over a unit the member does not belong to counts not.
+- **Requester direction only:** a client creates an order only with one of the member's writer units
+  as the requesting unit; the responsible unit may be any eligible Profit unit. A writer of the
+  responsible unit creates nothing on behalf of another unit through a client; that stays in the
+  web (REQ-ORDERS-053).
+- The requesting unit is a unit the member directly belongs to, so an order a member creates
+  through a client is always in their read set.
+- An administrator is a plain member: no admin pass, no all-scope, no pin.
+- For the same member without a pin, every pair the rule permits is one the web's contextual rule
+  permits, so a client never creates what the web would refuse (ADR-0405 point 5).
+
 **Acceptance**
 
 - [x] Each of the four relations puts an order into the set, and one order carries every relation
@@ -88,14 +114,22 @@ follows that unit's orders. An administrator reads like a plain member.
   sandbox and E2E realms, the registry's capability check and the shared seam
   (`provision-keycloak-realm.test.sh`, `build-sandbox-realm.py --check`, `SandboxSeedCapabilitiesTest`,
   both `ExchangeRelaySeamParityTest`s).
-- [ ] The scope `exchange.joborders.write` and the writer rule of the create come with the create
-  slice (REQ-OXCH-004).
+- [x] The scope `exchange.joborders.write` is provisioned the same way, and the registry's capability
+  check holds both job-order scopes (`provision-keycloak-realm.test.sh`,
+  `build-sandbox-realm.py --check`, `SandboxSeedCapabilitiesTest`, both
+  `ExchangeRelaySeamParityTest`s, V448).
+- [x] The writer rule counts the flag, a leadership rank and Bereich or OL reach with direct
+  membership only, an active unit and `KRT Member`, and treats an administrator as a plain member;
+  every pair it permits is one the web permits (`JobOrderDirectLogisticianRuleIntegrationTest`).
+- [x] Through a client, a plain member, a writer of the responsible side, leadership reach without
+  membership and an administrator create nothing (`ExchangeJobOrderCreateTest`).
 
 **Enforced by:** `JobOrderExchangeReadSet`, `JobOrderScope`, `JobOrderReadCheck.OWN_RELATION`,
-`JobOrderAccessPolicy#canRead` (job orders) · `ExchangeCapability`,
-`ExchangeJobOrderReadService` (exchange) · V446 · **Related:** REQ-XCH-005, REQ-XCH-009,
-REQ-ORDERS-052, REQ-ORG-032, REQ-SEC-015 · ADR-0405, ADR-0407 · **Issues:** #3608, #3610, #3619,
-#3644
+`JobOrderAccessPolicy#canRead`, `JobOrderWriterRule.DIRECT_LOGISTICIAN`, `JobOrderWriters` (job
+orders) · `ExchangeCapability`, `ExchangeJobOrderReadService`, `ExchangeJobOrderCreateService`
+(exchange) · V446, V448 · **Related:** REQ-XCH-005, REQ-XCH-009, REQ-XCH-045, REQ-ORDERS-052,
+REQ-ORDERS-053, REQ-ORG-032, REQ-SEC-015 · ADR-0405, ADR-0407 · **Issues:** #3608, #3610, #3611,
+#3619, #3644, #3646
 
 ### REQ-OXCH-002 — The client read of a job order
 
@@ -322,11 +356,153 @@ alerts are REQ-OBS-025.
 **Related:** REQ-XCH-013, REQ-ORDERS-054, REQ-ORDERS-055, REQ-OXCH-001, REQ-OXCH-002, REQ-OXCH-009,
 REQ-OBS-025 · ADR-0224, ADR-0406, ADR-0407 · **Issues:** #3615, #3618, #3643, #3644, #3645
 
+### REQ-OXCH-004 — Create options and the create of an aUEC order
+
+> [!note] Implemented (#3646; decided in #3611, #3614, #3617, #3619, ADR-0405, ADR-0407). The
+> open-order and daily create caps and `limits` in the create options follow with their slice
+> (REQ-OXCH-009).
+
+**Create options.** `GET /exchange/v1/job-orders/create-options` (`exchange.joborders.write`),
+relayed to `GET /api/v1/exchange/job-orders/create-options`, answers
+`job-order-create-options.schema.json` from the web's create-options projection under the writer
+rule of REQ-OXCH-001 (`JobOrderCreationOptions.current(DIRECT_LOGISTICIAN, actor)`, ADR-0405):
+
+- `requestingUnits`: the member's writer units, as `{id, name, shorthand, kind}`;
+- `responsibleUnits`: the eligible Profit units, in the same shape;
+- `suggestedResponsible`: the canonical Profit area, the projection's aUEC suggestion;
+- `writesEnabled`: whether the job-order writes switch is on (REQ-OXCH-009).
+
+Without a writer unit both lists are empty and `suggestedResponsible` is `null`: the client offers
+no create. The list itself is the writer flag; no other per-unit flag exists, the read names no
+member, and `/me/org-units` (REQ-XCH-048) stays unchanged. The read is a `GET`, so the writes
+switch never closes it; each read counts one `create_options` read (REQ-OBS-025).
+
+**The create.** `POST /exchange/v1/job-orders` (`exchange.joborders.write`) with a mandatory
+`Idempotency-Key`, relayed with the key as `X-Exchange-Idempotency-Key` to
+`POST /api/v1/exchange/job-orders`:
+
+- body `job-order-write.schema.json#/$defs/create`: `requestingUnitId`, `responsibleUnitId`,
+  `contact` (required plain text, at most 200 characters), `comment` (optional plain text, at most
+  1000) and `target` (an integer in whole aUEC, 1 to 10¹²);
+- answer `201` `job-order-write.schema.json#/$defs/created`: `{ id, status, versions, target }`,
+  read from the stored order.
+
+The create runs the web's aUEC create command (`JobOrderCreateCommand.createAuec`, ADR-0405) with
+the writer rule `DIRECT_LOGISTICIAN` and an actor carrying the member and the client: the same order
+locks, unit resolution, eligible-Profit check, priority, created notice, `orders/queue` frame after
+the commit (REQ-XCH-030) and audit event as a web create. Nothing is filled in.
+
+**Order of checks.** Schema (the gateway's schema, then the backend's bean rules) → the idempotency
+lookup → the pair → the insert. A pair that is not permitted — an unknown unit, a requesting unit
+the member does not write for, a responsible unit that is not an eligible Profit unit — answers one
+`400 JOB_ORDER_UNITS_NOT_OFFERED` with a fixed detail that names no side; the client reads the
+create options again and lets the member choose. The command's own refusals (`400` for an unknown
+or ineligible unit, `403` for a pair the rule refuses) map to this one code.
+
+**The stored key.** A client's create stores the creating client (`job_order.created_by_client_id`),
+the creating member (`created_by_member_id`, `ON DELETE SET NULL`) and the create's key
+(`create_idempotency_key`), unique per member, client and key (V448).
+
+- A create under a key the client already created an order of this member with answers that order
+  with `201` and its current state, also after the gateway's one-hour cache (REQ-XCH-020) and after
+  a `5xx` past the commit. Changed terms are never applied; the answer carries the stored `target`.
+- The lookup and the insert run under the member's client-create lock, a transaction-scoped
+  advisory lock in its own space (`OXCR`) keyed by the member, so two retries never both insert; the
+  caps of REQ-OXCH-009 count under the same lock.
+- The Art. 15 export lists the orders a member created through a client while the order keeps its
+  creator (REQ-SEC-058); the person search exempts the server-written client id and key, and an
+  account merge leaves the creator with the act.
+
+**Audit.** A client's create writes `JOB_ORDER_CREATED_VIA_CLIENT` with
+`{requestingOrgUnit, responsibleOrgUnit, target}` instead of `JOB_ORDER_CREATED`, and the client in
+`client_id` as on every row (REQ-AUDIT-001, REQ-AUDIT-005); a replay and a refusal record nothing.
+
+**Notices.** The create raises the web's `JOB_ORDER_CREATED` for the current writers of both units,
+without the creating member (REQ-NOTIF-008).
+
+**Monitoring** (REQ-OBS-025). Every create counts on
+`basetool_exchange_writes_total{resource="job_order", outcome}` — `applied` for a create and for a
+retry answered from the stored key, `rejected` for a refusal — and a refused pair also on
+`basetool_exchange_job_order_refused_total{reason="units_not_offered"}`.
+
+**Acceptance**
+
+- [x] A Logistician of the requesting unit creates an aUEC order for an eligible Profit unit; the
+  answer carries the order's id, status, versions and target and matches its schema, and the order
+  stores the client and the member (`ExchangeJobOrderCreateTest`).
+- [x] An unknown requesting or responsible unit, a requesting unit the member only belongs to, a
+  responsible unit outside the Profit units, a responsible-side writer, leadership reach without
+  membership and an administrator answer one `400 JOB_ORDER_UNITS_NOT_OFFERED` naming no unit and
+  create nothing (`ExchangeJobOrderCreateTest`).
+- [x] A retry under the same key answers the first order with its stored target and current state,
+  after the cache and after a lost answer; another key creates another order; two creates racing
+  under one key insert one order (`ExchangeJobOrderCreateTest`).
+- [x] A client's create writes `JOB_ORDER_CREATED_VIA_CLIENT` with the client and no free text; a
+  refusal writes nothing; the unit writers get the created notice without the member, the overview
+  is refreshed, and the order lands in the member's snapshot (`ExchangeJobOrderCreateTest`).
+- [x] The create options list the member's Logistician units and the eligible Profit units with the
+  Profit area suggested, are empty for a member without a writer unit, tell the writes switch and
+  count a read (`ExchangeJobOrderCreateTest`).
+- [x] The gateway checks the body before the relay, relays the key on the create only, and needs
+  the write scope for both routes (ingest `ExchangeJobOrderWriteRouteTest`,
+  `ExchangeGoldenAnswerTest`, `ExchangeContractTest`, `ExchangeFieldRatchetTest`).
+- [ ] The open-order and daily create caps, and `limits` in the create options, come with their
+  slice.
+
+**Enforced by:** `JobOrderCreateCommand`, `JobOrderAuecCreation`, `JobOrderClientCreateRepository`,
+`JobOrderCreationOptions`, `JobOrderResponsibilityAudit`, `JobOrderExportSections` (job orders) ·
+`ExchangeJobOrderCreateService`, `ExchangeJobOrderWriteController` (backend exchange) ·
+`ExchangeJobOrderWriteController`, `ExchangeRoutes`, `ExchangeRelay.DETAILS` (gateway) ·
+`job-order-write.schema.json`, `job-order-create-options.schema.json` · V448 · **Related:**
+REQ-XCH-020, REQ-XCH-025, REQ-XCH-030, REQ-XCH-048, REQ-ORDERS-053, REQ-AUDIT-001, REQ-NOTIF-008,
+REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005 · ADR-0405, ADR-0407 · **Issues:** #3611,
+#3614, #3617, #3619, #3646
+
+### REQ-OXCH-005 — Shared rules of the job-order writes
+
+> [!note] Implemented for the create (#3646; decided in #3614, #3616, ADR-0407). Cancel, target and
+> comment follow with their slices under the same rules.
+
+- **Single routes** under `/exchange/v1/job-orders`, one order per call and every path on the
+  acting list (`ActingMemberFilter.ACTING_PATHS`); no change set and no `dryRun`. A client pre-checks
+  from what it reads.
+- **A mandatory `Idempotency-Key`** on every write (REQ-XCH-020): the gateway refuses a write
+  without one with `400 IDEMPOTENCY_KEY_MISSING` and caches the answer for one hour; it relays the
+  key to the backend on the create only, where the order stores it (REQ-OXCH-004). The writes on an
+  existing order need no stored key: a first applied write moves its section version, so a retry
+  after the cache answers `409 VERSION_CONFLICT`.
+- **Named section versions:** a write on an existing order echoes only its own section version,
+  under a named field (`lifecycleVersion`, `targetVersion`, `commentVersion`), and every answer
+  carries the new `versions`.
+- **The order of checks** on an existing order: schema → visibility → writer → version →
+  responsibility → status → the write's own rule.
+- **One quota unit per call** (REQ-XCH-023): each write counts one unit of the daily write quota; a
+  refusal by a job-order switch counts none (REQ-OXCH-009).
+- **No journal, no undo and no mass-change guard** (REQ-XCH-021, REQ-XCH-022, ADR-0407 point 7): a
+  wrong write is repaired in the web, found through the audit viewer's client filter.
+- **Fixed details:** every backend refusal reaches the client with its registry code and the fixed
+  English detail of `ExchangeRelay.DETAILS` (REQ-XCH-025).
+
+**Acceptance**
+
+- [x] The create is a single route on the acting list that needs an `Idempotency-Key`, counts one
+  quota unit and relays the key (`ExchangeRoutes`, ingest `ExchangeJobOrderWriteRouteTest`,
+  `ExchangeGoldenAnswerTest`, `FilterExemptionSetsTest`, both `ExchangeRelaySeamParityTest`s).
+- [x] A refusal by the writes switch comes before the quota and counts no write (ingest
+  `ExchangeGateTest`); the backend gate closes the create while the writes switch is off
+  (`ExchangeJobOrderCreateTest`).
+- [ ] Cancel, target and comment with their named versions come with their slices.
+
+**Enforced by:** `ExchangeRoutes`, `ExchangeIdempotencyFilter`, `ExchangeLimitFilter`,
+`ExchangeRelay` (gateway) · `ActingMemberFilter`, `ExchangeGate` (backend) · **Related:**
+REQ-XCH-020, REQ-XCH-021, REQ-XCH-022, REQ-XCH-023, REQ-XCH-025, REQ-OXCH-004, REQ-OXCH-009 ·
+ADR-0407 · **Issues:** #3614, #3616, #3646
+
 ### REQ-OXCH-009 — The job-order switches
 
-> [!note] Implemented for the two switches and their codes (#3642; decided in #3618, #3621). The
-> open-order cap, the daily create cap and `limits` and `writesEnabled` in `create-options` follow
-> with their slice.
+> [!note] Implemented for the two switches and their codes (#3642; decided in #3618, #3621) and for
+> `writesEnabled` in `create-options` (#3646, REQ-OXCH-004). The open-order cap, the daily create
+> cap and `limits` in `create-options` follow with their slice.
 
 **Two switches.** Beside the global exchange switch (REQ-XCH-003) and the bank switch
 (REQ-BXCH-006), the settings row carries two job-order switches, each with its own version counter
@@ -406,9 +582,10 @@ the backend counts each committed flip on `basetool_exchange_registry_changes_to
 - [x] The family's refusal counter registers every reason at zero, and the backend gate counts its
   switch refusals as `switched_off` and `writes_switched_off` (`ExchangeJobOrderMetricsTest`,
   backend `ExchangeGateTest`).
+- [x] `writesEnabled` in `create-options` tells whether the writes switch is on
+  (`ExchangeJobOrderCreateTest`).
 - [ ] The open-order cap and the daily create cap, with `409 JOB_ORDER_OPEN_ORDER_CAP`,
-  `409 JOB_ORDER_DAILY_CREATE_CAP` and `limits` and `writesEnabled` in `create-options`, come with
-  their slice.
+  `409 JOB_ORDER_DAILY_CREATE_CAP` and `limits` in `create-options`, come with their slice.
 
 **Enforced by:** `ExchangeGate`, `JobOrderExchangeRoutes`, `ExchangeSwitch`,
 `ExchangeRegistryService#updateJobOrdersSwitch`, `#updateJobOrderWritesSwitch`,

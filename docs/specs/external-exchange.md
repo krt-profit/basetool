@@ -77,6 +77,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/org-stock/members?unit=` · `…/targets?unit=&material=` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
 | `GET /exchange/v1/job-orders` | `exchange.joborders.read` | REQ-OXCH-002, REQ-OXCH-003 ([orders-exchange.md](orders-exchange.md)) |
+| `GET /exchange/v1/job-orders/create-options` · `POST /exchange/v1/job-orders` | `exchange.joborders.write` | REQ-OXCH-004, REQ-OXCH-005 ([orders-exchange.md](orders-exchange.md)) |
 
 The three `org-stock` rows are built: the read, as a snapshot and a feed (REQ-XCH-042), with
 `exchange.orgstock.details` (REQ-XCH-043), the writes `book-in`, `book-out`, `sell`,
@@ -88,9 +89,11 @@ The refinery-order rows are built: the read (REQ-XCH-051), the change set with `
 `update`, the goods ops (REQ-XCH-052), `pickup` with and without store lines (REQ-XCH-053),
 `cancel` and `delete` (REQ-XCH-055), and the two store-choice reads (REQ-XCH-054).
 
-The job-order row is built for the snapshot of the member's job-order set (REQ-OXCH-003); its backend
-path `/api/v1/exchange/job-orders` is on the acting list, and the job-order family switch gates it
-(REQ-OXCH-009). The bank's routes are listed in [`bank-exchange.md`](bank-exchange.md).
+The job-order rows are built for the snapshot of the member's job-order set (REQ-OXCH-003) and for
+the create options and the create of an aUEC order (REQ-OXCH-004); their backend paths
+`/api/v1/exchange/job-orders` and `/api/v1/exchange/job-orders/create-options` are on the acting
+list, the job-order family switch gates them and the writes switch the create (REQ-OXCH-009). The
+bank's routes are listed in [`bank-exchange.md`](bank-exchange.md).
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
 else), and no route path collides with a prefix or suffix the bot filter blocks. The backend's
@@ -1559,7 +1562,9 @@ staged and answered with `MASS_CHANGE_CONFIRMATION_REQUIRED` and a confirmation 
 accumulated to ≥ 90 % within the window, and a ship update that changes name and type; a move
 within one batch is not a removal. Only the member's browser session can confirm. The org stock
 counts per client, writer and pool instead, with its own removals (REQ-XCH-046). For refinery
-orders only a `delete` is a removal; `cancel` and `good-remove` never count (REQ-XCH-055).
+orders only a `delete` is a removal; `cancel` and `good-remove` never count (REQ-XCH-055). No
+job-order write counts for the guard: each is a single route on one order and none removes it
+(REQ-OXCH-005).
 
 **Acceptance**
 
@@ -1670,7 +1675,9 @@ in time from „Verbundene Anwendungen" — the org-stock writes they made as a 
 (REQ-XCH-046); undo is version-checked, skips and reports rows the member
 changed afterwards or a merge removed, and does not restore Materialbörse offers. An admin can run
 the same undo for every member of one client at once (REQ-XCH-034). Refinery-order writes are
-journaled and undone section by section (REQ-XCH-056).
+journaled and undone section by section (REQ-XCH-056). Bank requests (ADR-0354) and job-order
+writes (REQ-OXCH-005, ADR-0407) are the two exceptions: they are neither journaled nor undone, and a
+wrong job-order write is repaired in the web, found through the audit viewer's client filter.
 
 A stock journal without recoverable physical quantity identity still supports the same ordinary
 quantity undo. Its restored unknown portion contributes to current stock coverage, but cannot
@@ -1771,8 +1778,8 @@ Responses carry `RateLimit` and `Retry-After` headers. The account check has its
 | live DPoP proofs in total (`dpop-proofs-total`) | 100 000, per path scope | in-process `jti` replay cache (REQ-XCH-006) |
 | change sets of more than 100 ops relayed at once, over all clients and members | 4 | in-process bulkhead `exchangeLargeChangeSets` (`resilience4j.bulkhead.instances.…max-concurrent-calls`) |
 
-The write routes are the seven `…/changes` and `…/drafts/…` routes and the three bank request
-writes of REQ-BXCH-004, one unit each (`ExchangeRoutes`); the org
+The write routes are the seven `…/changes` and `…/drafts/…` routes, the three bank request
+writes of REQ-BXCH-004 and the job-order create of REQ-OXCH-004, one unit each (`ExchangeRoutes`); the org
 stock's change set counts once more for every op after its first (REQ-XCH-045). The refinery-order
 change set (REQ-XCH-052) counts **once per request**, however many
 ops it holds, as the blueprint, stock and ship sets do (ADR-0351). A request over
@@ -1879,6 +1886,16 @@ registry `writesPerDay` override instead — VerseKit 2000, set in the productio
 release under the owner's per-action approval and recorded in
 [`approved-clients.md`](../legal/approved-clients.md).
 
+The job orders (REQ-OXCH-001…005) fit the same sizes too ([How much traffic does a job-order sync
+put on the exchange budgets?](https://github.com/krt-profit/basetool/issues/3634), research
+`research/job-order-sync-traffic.md` on branch `research/job-order-sync-traffic`, commit `bc172e2`).
+A sync pass reads the job-order feed once whatever the member writes, about 10 % more requests per
+pass than VerseKit sends today, and `create-options` is read when the create form opens, not on every
+pass. A typical to heavy member writes 2 to 20 job orders a day, 0.4 % to 4 % of the 500; each write
+is one request and one unit, and a write the job-order switches refuse counts none (REQ-OXCH-009).
+A cached create answer takes about 1 KiB for the hour; the order keeps the create's key in
+PostgreSQL. The buckets, the default quota and the byte budgets therefore stay as they are.
+
 **When a refused write may retry.** The sets are scored by expiry, so the refusal's
 `Retry-After` is read from them: for every scope the write's charge would overflow, the gateway
 reads up to 1000 entries in expiry order, without a transaction since the answer is a hint, until
@@ -1957,6 +1974,12 @@ A client that cannot set its `User-Agent` — a Chromium browser extension — s
 `Exchange-Client-Agent` with ADR-0303
 
 ### REQ-XCH-025 — Errors are problem+json with a stable code
+
+> [!note] Amended 2026-11-23 (REQ-OXCH-004) — `JOB_ORDER_UNITS_NOT_OFFERED` passes through
+> A job-order create whose pair the create options do not offer is refused by the backend with
+> `400 JOB_ORDER_UNITS_NOT_OFFERED`, one code for every side; the relay passes it with its fixed
+> detail (`ExchangeRelay.DETAILS`), and the registry names it
+> ([REQ-OXCH-004](orders-exchange.md#req-oxch-004--create-options-and-the-create-of-an-auec-order)).
 
 > [!note] Amended 2026-11-23 (REQ-OXCH-009) — the job-order switch codes are gate codes
 > `503 JOB_ORDER_EXCHANGE_DISABLED` and `503 JOB_ORDER_WRITES_DISABLED` join the codes the backend's
@@ -2414,6 +2437,15 @@ web's request forms announce, so the staff queue, „Anträge an unsere Konten" 
 - [x] An applied bank write announces both rooms, a refused one neither (`ExchangeLiveSyncTest`,
   `ExchangeBankRequestWriteLiveSyncTest`, `LiveSyncTopicRegistryParityTest`).
 
+The job-order family takes part through the web's own commands (REQ-OXCH-004, ADR-0407): a client's
+create runs the shared create command, which publishes `orders/queue` from the backend after the
+commit for the web and the exchange alike (REQ-ORDERS-056), so an open overview shows the new order
+without a reload; the frontend announces no create of its own. A replay under a known key and a
+refused create announce nothing. The cancel, target and comment writes follow with their slices.
+
+- [x] A client's create refreshes the order overview after the commit (`ExchangeJobOrderCreateTest`,
+  `JobOrderServiceTest`).
+
 **Status:** built for the web pages — `ExchangeLiveSync`, the frames of REQ-XCH-013 — WP 3.3
 (#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086); the refinery-order frames built for the
 writes, cancels, deletes and pickups without store lines (#3168, #3169, #3170) and the pickups with
@@ -2694,10 +2726,11 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 34 relay operations on 32 backend
+byte-identical (D-05 of the domain modularisation plan): the 36 relay operations on 33 backend
 paths (with the refinery-order feed, change set and store choices of REQ-XCH-051…056, the three
 bank reads of REQ-BXCH-002, the own requests of REQ-BXCH-003, their writes of REQ-BXCH-004,
-the staff queue of REQ-BXCH-005 and the job-order snapshot of REQ-OXCH-003), their parameters,
+the staff queue of REQ-BXCH-005, the job-order snapshot of REQ-OXCH-003 and the job-order create
+options and create of REQ-OXCH-004), their parameters,
 request and answer shapes, the relayed codes
 and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
@@ -2718,6 +2751,8 @@ contract allows.
   `ExchangeBankRequestsTest` and `ExchangeBankQueueTest` check their answers against the published
   schemas on one. The job-order read answers only with the job-order switch on;
   `ExchangeJobOrderSnapshotTest` checks its answers against the published schema on a seeded world.
+  The job-order create options and create answer only with both job-order switches on and a member
+  who writes for a unit; `ExchangeJobOrderCreateTest` sends them on a seeded world.
 - **Golden answers.** `ExchangeGoldenAnswerTest` records, for every `/exchange/v1` route and for a
   relayed refusal, a translated code, a relay failure, an answer that breaks its schema, a draft
   its schema refuses before the relay and a staged mass change, the client's request, the backend request the relay sent with every header,
@@ -2755,7 +2790,7 @@ Every guard is proven able to fail by a planted violation in its own test.
   answer validates against its published schema.
   *`ExchangeWireContractTest`.*
 - [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
-  seam's 34 operations. *`ExchangeGoldenAnswerTest`.*
+  seam's 36 operations. *`ExchangeGoldenAnswerTest`.*
 - [x] The gateway's security filter chains hold exactly the pinned filters in order.
   *`SecurityFilterChainOrderTest`, `SecurityFilterChainProductionShapeTest`.*
 - [x] A pull request touching the exchange path without the `e2e` label fails.
@@ -2769,13 +2804,13 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 34 relay operations with their gateway route, backend path, capability, paging and published
-  schemas — against the backend's seventeen exchange controllers and their `@exchangeGate`
-  expressions, `ActingMemberFilter`'s 32 paths (each exact but for a whole `{id}` segment, as in
+- the 36 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's eighteen exchange controllers and their `@exchangeGate`
+  expressions, `ActingMemberFilter`'s 33 paths (each exact but for a whole `{id}` segment, as in
   the bank reads), the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the twenty-four capability scopes (`exchange.orgstock.details` and
+- the five relay headers, the twenty-five capability scopes (`exchange.orgstock.details` and
   `exchange.demand.details` the two that gate no route of their own; `exchange.bank.request` the one no
   route serves yet), the gate codes with their statuses, the
   codes the gateway passes through (the shared `NOT_FOUND` of REQ-BXCH-002 and `NOT_BANK_STAFF` of REQ-BXCH-005 among them) and the
@@ -2828,7 +2863,7 @@ G-18)
 > this requirement, the app leaves the readers of `openapi.json`, and the opening paragraph counts
 > the 31 relay operations `ExchangeFence.RELAY_OPERATIONS` holds, not 20; git keeps the text.
 
-The backend operations the gateway relays to — the 34 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 36 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
 of 2026-10-02). The published `openapi.json`, which the frontend generates its test types from,
@@ -2843,7 +2878,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  34 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
+  36 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
   requirement, and no dangling reference; of `openapi.json` no relay path and no dangling reference
   (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2856,7 +2891,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 34 relay operations and 156 schemas; `openapi.json` holds
+- [x] The relay document holds exactly the 36 relay operations and 159 schemas; `openapi.json` holds
   none of them and the 129 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by

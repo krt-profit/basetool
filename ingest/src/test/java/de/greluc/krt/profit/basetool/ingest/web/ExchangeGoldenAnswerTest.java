@@ -563,6 +563,10 @@ class ExchangeGoldenAnswerTest {
             fixture("bank-request-write--cancel/valid/cancel.json")));
     routes.put("route-get-job-orders", get("/job-orders?limit=2"));
     routes.put("route-get-job-orders-feed", get("/job-orders?cursor=f1.1029384.0&limit=50"));
+    routes.put("route-get-job-order-create-options", get("/job-orders/create-options"));
+    routes.put(
+        "route-post-job-order",
+        post("/job-orders", fixture("job-order-write--create/valid/with-comment.json")));
     routes.put("route-get-openapi", get("/openapi.json"));
     routes.put("route-get-schema", get("/schemas/page.schema.json"));
     return routes;
@@ -634,6 +638,10 @@ class ExchangeGoldenAnswerTest {
                 feed
                     ? "page--jobOrderPage/valid/feed.json"
                     : "page--jobOrderPage/valid/snapshot.json");
+        case "GET /api/v1/exchange/job-orders/create-options" ->
+            fixture("job-order-create-options/valid/logistician.json");
+        case "POST /api/v1/exchange/job-orders" ->
+            fixture("job-order-write--created/valid/open.json");
         case "POST /api/v1/exchange/me/drafts/blueprints" -> PREVIEW;
         case "POST /api/v1/exchange/me/drafts/refinery-orders" -> REFINERY_DRAFT;
         default -> "{\"code\":\"NOT_FOUND\"}";

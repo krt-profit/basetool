@@ -1,7 +1,7 @@
 # ADR-0407 — Job orders on the exchange
 
-- **Status:** Accepted — the read with the snapshot (#3644); the feed, the create, the writes on an
-  existing order and the caps follow with their slices
+- **Status:** Accepted — the read with the snapshot (#3644) and the create (#3646); the feed, the
+  writes on an existing order and the caps follow with their slices
 - **Date:** 2026-11-23
 - **Deciders:** @greluc
 - **Related:** amends [ADR-0216](0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md)
@@ -85,7 +85,9 @@ database, as the org stock (ADR-0257) and the bank (ADR-0354) do.
    `JOB_ORDER_TARGET_CHANGED_VIA_CLIENT` and `JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT`, written instead
    of the web's types.
 9. **The create's `Idempotency-Key` is stored on the order** with the creating client and member, so
-   a retry after the gateway's one-hour cache or after a `5xx` answers the first order.
+   a retry after the gateway's one-hour cache or after a `5xx` answers the first order. The lookup
+   runs under a per-member advisory lock, the one the caps count under, so two retries never both
+   insert.
 10. **The backend publishes the create's `orders/queue` frame** after the commit, for the web and the
     exchange alike. This narrows ADR-0094: the frontend's `LiveSyncLocalBus` no longer serves the
     job-order create.

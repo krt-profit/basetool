@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json",
+  "title": "Job-order writes",
+  "description": "The member's writes on aUEC orders through a client, each on an explicit action of the member. Money moves only in the Basetool; there is no undo: a wrong write is repaired in the Basetool.",
+  "$defs": {
+    "create": {
+      "title": "Create an aUEC order",
+      "description": "Both units come from the create options: one of the member's requesting units and one of the responsible units. A pair that is not among them answers 400 JOB_ORDER_UNITS_NOT_OFFERED. A create under an Idempotency-Key the client already created an order of the member with answers that order; its terms are never changed.",
+      "type": "object",
+      "properties": {
+        "requestingUnitId": {
+          "$ref": "#/$defs/unitId",
+          "description": "The unit that commissions the order: one of the requestingUnits of the create options."
+        },
+        "responsibleUnitId": {
+          "$ref": "#/$defs/unitId",
+          "description": "The Profit unit that processes the order: one of the responsibleUnits of the create options."
+        },
+        "contact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Plain text naming whom to contact about the order; the Basetool shows it as text, links are not clickable."
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000,
+          "description": "Plain text; the Basetool shows it as text, links are not clickable. Absent or null for none."
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        }
+      },
+      "required": [
+        "requestingUnitId",
+        "responsibleUnitId",
+        "contact",
+        "target"
+      ]
+    },
+    "created": {
+      "title": "Created aUEC order",
+      "description": "Only the order's id, status, versions and stored target; read the order itself from the job-order snapshot or feed. A retry under the create's key answers the same order with its current state.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The order's id and the feed key. Clients store and echo it, never parse it."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "CANCELLED",
+            "REJECTED"
+          ]
+        },
+        "versions": {
+          "$ref": "job-order.schema.json#/properties/versions"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "versions",
+        "target"
+      ]
+    },
+    "unitId": {
+      "type": "string",
+      "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+      "description": "An org unit id as the create options answer it."
+    },
+    "target": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000000,
+      "description": "The requested amount in whole aUEC."
+    }
+  }
+}

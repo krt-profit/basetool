@@ -56,7 +56,9 @@ while the commands live in `joborder.internal`.
    the audit event. Nothing is filled in. The web's MATERIAL, ITEM and aUEC creates pass
    `CONTEXTUAL` and the request's member. The port `JobOrderCreateCommand.createAuec` (implemented
    by `JobOrderAuecCreation`, which also stores the target) is what the exchange calls with
-   `DIRECT_LOGISTICIAN` and a `Client` actor.
+   `DIRECT_LOGISTICIAN`, a `Client` actor and the create's `Idempotency-Key`: under the member's
+   client-create lock it answers the order the client created under that key before, and otherwise
+   stores the client, the member and the key on the new order (REQ-OXCH-004).
 4. **One create-options projection.** `JobOrderCreationOptions.current(rule, actor)` projects the
    choices for the rule it is given. A requesting option is writable when the actor writes the unit;
    a responsible option only when the rule also covers the responsible side, so under

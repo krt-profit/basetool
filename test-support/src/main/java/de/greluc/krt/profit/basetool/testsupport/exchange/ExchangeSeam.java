@@ -66,7 +66,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 34 relay operations on 32 backend paths, each with the gateway route that relays it, the
+   * The 36 relay operations on 33 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -343,7 +343,23 @@ public final class ExchangeSeam {
               "exchange.joborders.read",
               true,
               null,
-              "page.schema.json#/$defs/jobOrderPage"));
+              "page.schema.json#/$defs/jobOrderPage"),
+          new RelayOperation(
+              "GET",
+              JOB_ORDERS_PATH + "/create-options",
+              JOB_ORDERS_PATH + "/create-options",
+              "exchange.joborders.write",
+              false,
+              null,
+              "job-order-create-options.schema.json"),
+          new RelayOperation(
+              "POST",
+              JOB_ORDERS_PATH,
+              JOB_ORDERS_PATH,
+              "exchange.joborders.write",
+              false,
+              "job-order-write.schema.json#/$defs/create",
+              "job-order-write.schema.json#/$defs/created"));
 
   /** The query parameters a paged relay operation passes on. */
   public static final @Unmodifiable List<String> PAGE_PARAMETERS = List.of("cursor", "limit");
@@ -363,7 +379,10 @@ public final class ExchangeSeam {
   /** The relay header carrying the connection time in epoch seconds. */
   public static final String CONNECTED_AT_HEADER = "X-Exchange-Connected-At";
 
-  /** The header relaying the client's idempotency key of a bank raise; sent on that route only. */
+  /**
+   * The header relaying the client's idempotency key of a bank raise or a job-order create; sent on
+   * those routes only.
+   */
   public static final String IDEMPOTENCY_KEY_HEADER = "X-Exchange-Idempotency-Key";
 
   /** The five relay headers, in the order above. */
@@ -375,7 +394,7 @@ public final class ExchangeSeam {
           INSTALLATION_HEADER,
           CONNECTED_AT_HEADER);
 
-  /** The twenty-four capability scopes. */
+  /** The twenty-five capability scopes. */
   public static final @Unmodifiable Set<String> CAPABILITY_SCOPES =
       Set.of(
           CONNECT,
@@ -401,7 +420,8 @@ public final class ExchangeSeam {
           "exchange.bank.queue",
           "exchange.patch.read",
           "exchange.patch.write",
-          "exchange.joborders.read");
+          "exchange.joborders.read",
+          "exchange.joborders.write");
 
   /**
    * The capability scopes that gate no route of their own and add to the answer of another route's
@@ -450,7 +470,8 @@ public final class ExchangeSeam {
           "HOME_LOCATION_NOT_ASKED",
           "HOME_LOCATION_ALREADY_CHOSEN",
           "HOME_LOCATION_PHASE_CHANGED",
-          "HOME_LOCATION_NOT_OFFERED");
+          "HOME_LOCATION_NOT_OFFERED",
+          "JOB_ORDER_UNITS_NOT_OFFERED");
 
   /** The backend-wide codes the gateway translates into a code of the exchange registry. */
   public static final @Unmodifiable Map<String, String> TRANSLATED_CODES =
