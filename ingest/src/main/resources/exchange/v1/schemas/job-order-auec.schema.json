@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-auec.schema.json",
+  "title": "aUEC job order",
+  "description": "An AUEC order of the member's set: the fields of every job order and the requester-facing progress in whole aUEC. It carries no contact, no holder and no amount per person; everything about money happens in the Basetool through link.",
+  "allOf": [
+    {
+      "$ref": "job-order.schema.json"
+    }
+  ],
+  "type": "object",
+  "properties": {
+    "kind": {
+      "const": "AUEC"
+    },
+    "target": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The target in whole aUEC."
+    },
+    "netHandedOver": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The net amount handed over to the requester in whole aUEC."
+    },
+    "remaining": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The target less the net handover, never below 0."
+    },
+    "overpaid": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The net handover beyond the target, never below 0."
+    },
+    "settlementOpen": {
+      "type": "boolean",
+      "description": "A closed order still holds purpose-bound funds or an overpayment; it is settled in the Basetool. No amount is carried."
+    }
+  },
+  "required": [
+    "kind",
+    "target",
+    "netHandedOver",
+    "remaining",
+    "overpaid",
+    "settlementOpen"
+  ]
+}

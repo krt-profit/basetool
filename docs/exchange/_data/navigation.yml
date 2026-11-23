@@ -52,6 +52,8 @@
       path: resources/bank.md
     - title: Patch change
       path: resources/patch-change.md
+    - title: Job orders
+      path: resources/job-orders.md
 - section: Reference
   items:
     - title: OpenAPI reference

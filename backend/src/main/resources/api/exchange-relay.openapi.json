@@ -1345,6 +1345,146 @@
         "x-domain" : "exchange"
       }
     },
+    "/api/v1/exchange/job-orders" : {
+      "get" : {
+        "description" : "Gateway-only. The job orders of all three kinds a unit the member directly belongs to requests, is responsible for or actively supports, and those the member works on as an assignee: active, closed within 7 days, and aUEC while its settlement is open. Header, the member's relations, assignee names under per-client refs, the member's own note, the section versions and each kind's progress; no holder, amount per person, provision, Bank state, commitment or claim. A snapshot paged by id that ends with the feed cursor of REQ-XCH-013; a client keeps the data at most 7 days, in memory.",
+        "operationId" : "jobOrders_2",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeJobOrderPageDto"
+                }
+              }
+            },
+            "description" : "The page",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "410" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeJobOrderPageDto"
+                }
+              }
+            },
+            "description" : "The cursor has expired (CURSOR_EXPIRED)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the job orders I relate to",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
     "/api/v1/exchange/me/account-check" : {
       "post" : {
         "description" : "Gateway-only. The handle is compared, never returned, logged or stored.",
@@ -5438,6 +5578,234 @@
           },
           "name" : {
             "type" : "string"
+          }
+        }
+      },
+      "ExchangeJobOrderAssignee" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "own" : {
+            "type" : "boolean"
+          },
+          "ref" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeJobOrderDto" : {
+        "type" : "object",
+        "properties" : {
+          "assignees" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeJobOrderAssignee"
+            }
+          },
+          "comment" : {
+            "type" : "string"
+          },
+          "contact" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeJobOrderItemLine"
+            }
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "MATERIAL", "ITEM", "AUEC" ]
+          },
+          "link" : {
+            "type" : "string"
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeJobOrderMaterialLine"
+            }
+          },
+          "netHandedOver" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "number" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "overpaid" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "priority" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "relations" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "requesting", "responsible", "supporting", "assignee" ]
+            }
+          },
+          "remaining" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "requestingUnit" : {
+            "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+          },
+          "responsibilityInvalid" : {
+            "type" : "boolean"
+          },
+          "responsibleUnit" : {
+            "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+          },
+          "settlementOpen" : {
+            "type" : "boolean"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED", "CANCELLED" ]
+          },
+          "supportingUnits" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+            }
+          },
+          "target" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/ExchangeJobOrderVersions"
+          }
+        }
+      },
+      "ExchangeJobOrderItemLine" : {
+        "type" : "object",
+        "properties" : {
+          "delivered" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "item" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "manufactured" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "open" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ordered" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ExchangeJobOrderMaterialLine" : {
+        "type" : "object",
+        "properties" : {
+          "handedOver" : {
+            "type" : "number"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "minQuality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "open" : {
+            "type" : "number"
+          },
+          "remaining" : {
+            "type" : "number"
+          },
+          "requested" : {
+            "type" : "number"
+          },
+          "unit" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeJobOrderPageDto" : {
+        "type" : "object",
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeJobOrderDto"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "removed" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeJobOrderRemoved"
+            }
+          }
+        }
+      },
+      "ExchangeJobOrderRemoved" : {
+        "type" : "object",
+        "properties" : {
+          "key" : {
+            "type" : "string"
+          },
+          "removedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ExchangeJobOrderVersions" : {
+        "type" : "object",
+        "properties" : {
+          "comment" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lifecycle" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "target" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },

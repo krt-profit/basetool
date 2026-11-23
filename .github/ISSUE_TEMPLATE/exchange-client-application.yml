@@ -105,6 +105,7 @@ body:
         - label: exchange.bank.queue
         - label: exchange.patch.read
         - label: exchange.patch.write
+        - label: exchange.joborders.read
 
   - type: textarea
     id: purpose

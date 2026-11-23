@@ -3,7 +3,8 @@
 > (the bank switch this family follows),
 > [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > [ADR-0406](../adr/0406-the-job-order-feed-moves-on-a-fingerprint-of-the-carried-read.md) (the
-> fingerprint the feed moves on)
+> fingerprint the feed moves on), [ADR-0407](../adr/0407-job-orders-on-the-exchange.md) (job orders
+> on the exchange)
 
 # Job orders on the exchange
 
@@ -18,8 +19,8 @@ This spec is the single home of job orders on the exchange. The orders themselve
 lifecycle, money and notices, stay in [`orders-core.md`](orders-core.md) and
 [`orders-auec.md`](orders-auec.md); the exchange's gateway, registry, limits and error contract stay
 in [`external-exchange.md`](external-exchange.md) and [`docs/exchange/errors.md`](../exchange/errors.md).
-The routes, the read, the feed, the writes and the caps follow with their own slices; until then the
-family serves no route, and both of its switches are off.
+The read serves its snapshot (`GET /exchange/v1/job-orders`); the feed, the writes and the caps
+follow with their own slices. Both switches are off until an admin turns them on.
 
 The guiding rules:
 
@@ -31,11 +32,145 @@ The guiding rules:
 
 ## Requirements
 
+### REQ-OXCH-001 — Scopes and the one decision point
+
+> [!note] Implemented for the read: the scope `exchange.joborders.read` and the read set (#3644;
+> decided in #3608, #3610, #3619, ADR-0407). The scope `exchange.joborders.write` and the writer
+> rule of the create come with the create slice.
+
+**Scopes.** A client reads job orders under `exchange.joborders.read` and writes them under
+`exchange.joborders.write`, each a capability of the registry (REQ-XCH-005) with its own consent
+line:
+
+| Scope | Consent (EN) | Consent (DE) | Chip label (DE / EN) |
+|---|---|---|---|
+| `exchange.joborders.read` | Read the job orders of the org units you directly belong to and the ones you work on, with progress, contact, comment and the names of those working on them | Die Aufträge der Einheiten lesen, denen du direkt angehörst, und die Aufträge, die du bearbeitest, samt Fortschritt, Kontakt, Kommentar und den Namen der Bearbeiter | „Aufträge der eigenen Einheiten und eigene Bearbeitungen lesen" / "Read the job orders of your units and those you work on" |
+
+**The read set — the fifth exception of REQ-XCH-009.** The acting member carries no contextual
+authority and is never an administrator, so the read is decided from the database on every request:
+the web's read set (REQ-ORDERS-052) **and** a current own relation. The member has a current own
+relation to an order when
+
+- a unit the member **directly** belongs to is the order's current requesting unit
+  (`requesting`), its current responsible unit (`responsible`) or an **actively** supporting unit
+  (`supporting`); a unit relation counts only through active units (REQ-ORG-032) and only while the
+  member holds `KRT Member` (REQ-SEC-015); or
+- the member holds an assignee entry on the order (`assignee`).
+
+Not part of the set, although the web lets the member read them: the Profit-wide read of a member
+of an eligible Profit unit, the leadership cascade, contextual grants, the administrator's scope
+and a pin, the aUEC holder and recipient link, retained historical unit reads and ended support. No
+Profit gate stands in front of the read: a member of a requesting unit outside the Profit hierarchy
+follows that unit's orders. An administrator reads like a plain member.
+
+- Every relation implies the web's read, so the set is decided as the relation, through the
+  predicates of `JobOrderScope` that the snapshot and the read check share.
+- `JobOrderExchangeReadSet.reads(member, order)` is the read check the exchange's writes on an
+  existing order pass to the shared commands (ADR-0405); a hidden, an unknown and a deleted order
+  answer alike.
+- **Nothing of the responsible side, no money and no Bank effect through a client** (ADR-0407): a
+  client never accepts, processes, hands over, provides, settles, reassigns or deletes an order and
+  never touches assignees or support; everything else stays in the web, reached through the order's
+  `link`.
+
+**Acceptance**
+
+- [x] Each of the four relations puts an order into the set, and one order carries every relation
+  that applies (`JobOrderExchangeReadSetIntegrationTest`).
+- [x] The Profit-wide read, the leadership cascade, ended support, a retained historical read, the
+  aUEC holder link and a deactivated unit relate nothing; without `KRT Member` only an assignee entry
+  counts; an administrator reads like a plain member; an unknown order answers like a hidden one
+  (`JobOrderExchangeReadSetIntegrationTest`).
+- [x] Every order of the set is one the web lets the same member read
+  (`JobOrderExchangeReadSetIntegrationTest`).
+- [x] The scope is provisioned with its consent lines and chip labels in the realm provisioner, the
+  sandbox and E2E realms, the registry's capability check and the shared seam
+  (`provision-keycloak-realm.test.sh`, `build-sandbox-realm.py --check`, `SandboxSeedCapabilitiesTest`,
+  both `ExchangeRelaySeamParityTest`s).
+- [ ] The scope `exchange.joborders.write` and the writer rule of the create come with the create
+  slice (REQ-OXCH-004).
+
+**Enforced by:** `JobOrderExchangeReadSet`, `JobOrderScope` (job orders) · `ExchangeCapability`,
+`ExchangeJobOrderReadService` (exchange) · V446 · **Related:** REQ-XCH-005, REQ-XCH-009,
+REQ-ORDERS-052, REQ-ORG-032, REQ-SEC-015 · ADR-0405, ADR-0407 · **Issues:** #3608, #3610, #3619,
+#3644
+
+### REQ-OXCH-002 — The client read of a job order
+
+> [!note] Implemented with the snapshot (#3644; decided in #3612, #3621, ADR-0407).
+
+Every order of the member's set reaches a client as the read of its kind: `job-order.schema.json`
+for the fields every kind carries and `job-order-material.schema.json`,
+`job-order-item.schema.json` and `job-order-auec.schema.json` for each kind. The member-independent
+part is the projection the fingerprint hashes (REQ-OXCH-003), served unchanged; the backend adds only
+the member's own part.
+
+- **Every order:** `id` (the feed key), `number` (a display field only; no route accepts it),
+  `kind`, `status`, `priority` (`null` once closed), `requestingUnit`, `responsibleUnit` and
+  `supportingUnits` (each with name, shorthand and kind), `createdAt`, `updatedAt` (the instant of
+  the order's fingerprint, the last change of a carried field), `comment` (the author's plain text),
+  `responsibilityInvalid` (REQ-ORDERS-055) and `versions { lifecycle, target, comment }`, the
+  target version on aUEC orders only and never the information version of the aUEC contact.
+- **The member's own part:** `relations` (REQ-OXCH-001, in the order `requesting`, `responsible`,
+  `supporting`, `assignee`); `assignees[]` with each assignee's display name and per-client `ref`
+  under the org-stock rules (REQ-XCH-043), `own` on the member's own entry, and `note` only there
+  (another member's note is never carried); a member who withholds their name (REQ-XCH-044) is left
+  out, the acting member included; `link`, the server-built
+  `https://profit-base.online/orders/<id>`, validated like the bank queue's.
+- **MATERIAL** and **ITEM** carry `contact`, the author's handle as plain text, left out when the
+  order names none. An **aUEC** order carries no contact, since contact plus remaining amount shows
+  who is about to receive money.
+- **Progress per kind**, as the web shows it: MATERIAL per material and quality floor (`material`
+  with its id as `bt`, `minQuality`, `unit`) `requested`, `handedOver`, `remaining` and `open` in the
+  material's own unit; ITEM per item line (`id`, `item`) `ordered`, `manufactured`, `delivered` and
+  `open`; aUEC `target`, `netHandedOver`, `remaining`, `overpaid` in whole aUEC and
+  `settlementOpen`, a yes/no with no amount.
+- **Never carried:** holders, holder amounts or sums, provision, holdings, fees, movements,
+  recipients, purpose flows, releases, shortages, settlements, the money and target-change history,
+  Bank attempts, account holdings, unit commitments, claims, linked stock, blueprints, other
+  members' notes, the web's `can…` flags and `originalProfitBoundaryUnknown`. The gateway refuses
+  an answer with an undeclared property, so an aUEC order carrying a contact fails closed
+  (REQ-XCH-050).
+- Every DTO field is under the field ratchet (REQ-XCH-050); the answer is in the relay document
+  (REQ-XCH-039).
+
+**Acceptance**
+
+- [x] A MATERIAL order carries exactly the header, the member's part, its contact and its lines; an
+  aUEC order exactly the header, the member's part and its progress, with no contact, holder or
+  amount per person (`ExchangeJobOrderSnapshotTest`).
+- [x] Only the member's own entry carries a note, every entry carries a per-client `ref`, and a
+  member who withholds their name is left out (`ExchangeJobOrderSnapshotTest`).
+- [x] Every answer matches its published schema, and the gateway turns an aUEC order with a contact
+  or a foreign link into `502 BACKEND_RELAY_FAILED` (`ExchangeJobOrderSnapshotTest`, ingest
+  `ExchangeJobOrderRouteTest`, `ExchangeContractTest`, `ExchangeFieldRatchetTest`).
+
+**Enforced by:** `ExchangeJobOrderShaper`, `ExchangeJobOrderDto`, `JobOrderExchangeReads` ·
+`job-order*.schema.json`, `page.schema.json#/$defs/jobOrderPage` · **Related:** REQ-XCH-043,
+REQ-XCH-044, REQ-XCH-050, REQ-ORDERS-055, REQ-OXCH-003 · ADR-0406, ADR-0407 · **Issues:** #3612,
+#3644
+
 ### REQ-OXCH-003 — Snapshot and feed of the job-order set
 
-> [!note] Implemented for the fingerprint, the dirty marks and the worker (#3643; decided in #3615,
-> #3618, ADR-0406). The client set's snapshot, the per-unit and per-member logs, the tombstone and
-> the window run follow with their slices.
+> [!note] Implemented for the fingerprint, the dirty marks and the worker (#3643) and the client
+> set's snapshot (#3644); decided in #3615, #3618, ADR-0406. The per-unit and per-member logs, the
+> feed with its tombstone and the window run follow with their slices.
+
+**The snapshot.** `GET /exchange/v1/job-orders` (`exchange.joborders.read`), relayed to
+`GET /api/v1/exchange/job-orders`, answers `page.schema.json#/$defs/jobOrderPage`: the client set —
+the orders of the member's read set (REQ-OXCH-001) that are active, closed at most 7 days ago by
+`closed_at`, or aUEC while the last fingerprint says `settlementOpen` — read in one
+`REPEATABLE READ` transaction, ascending by `id`, `limit` 1 to 1000 (default 500), each item in the
+read of REQ-OXCH-002.
+
+- An order joins the snapshot with its first fingerprint, so a new order reaches a client a few
+  seconds after it was created; `updatedAt` is never empty.
+- The last page carries the feed cursor at the snapshot's position (REQ-XCH-013); one cursor serves
+  all three kinds. Until the feed is served, a resumed feed cursor answers `410 CURSOR_EXPIRED`, so
+  a client takes a new snapshot.
+- `removed` is always empty on a snapshot page; its entries carry `{ key, removedAt }` without
+  `removedBy`.
+- Each page counts one `snapshot` read for its client (REQ-OBS-025).
 
 **The fingerprint.** Every job order carries the fingerprint of its member-independent exchange
 read in `exchange_job_order_fingerprint`: the SHA-256 of a canonical encoding of the projection
@@ -107,14 +242,22 @@ alerts are REQ-OBS-025.
   runs is recomputed by the next run (`JobOrderFingerprintWorkerIntegrationTest`).
 - [x] A hierarchy change marks the client set only and flips `responsibilityInvalid`; a hard delete
   takes the marks and the fingerprint with the order (`JobOrderFingerprintWorkerIntegrationTest`).
-- [ ] The snapshot, the per-unit and per-member logs, the tombstone `{ key, removedAt }` and the
+- [x] The snapshot holds active orders, orders closed within 7 days and aUEC orders whose last
+  fingerprint says `settlementOpen`, and leaves out an order closed longer ago, a settled aUEC
+  order, an order outside the read set and an order without a fingerprint; it pages by id, ends with
+  the feed cursor and counts a snapshot read (`ExchangeJobOrderSnapshotTest`).
+- [x] The route is on the acting list, behind the family switch and the read scope, on the gateway
+  and in the backend (`ExchangeJobOrderSnapshotTest`, ingest `ExchangeJobOrderRouteTest`,
+  `FilterExemptionSetsTest`).
+- [ ] The per-unit and per-member logs, the feed with its tombstone `{ key, removedAt }` and the
   window run come with their slices.
 
 **Enforced by:** `JobOrderExchangeReads`, `JobOrderExchangeReadProjection` (job orders) ·
 `JobOrderFingerprints`, `JobOrderFingerprintRecomputation`, `JobOrderFingerprintTask`,
-`ExchangeJobOrderMarkRepository`, `ExchangeJobOrderFingerprintRepository` (exchange) · V445 ·
-**Related:** REQ-XCH-013, REQ-ORDERS-054, REQ-ORDERS-055, REQ-OXCH-009, REQ-OBS-025 · ADR-0224,
-ADR-0406 · **Issues:** #3615, #3618, #3643
+`ExchangeJobOrderMarkRepository`, `ExchangeJobOrderFingerprintRepository`, `ExchangeJobOrderReadService`,
+`ExchangeJobOrderController` (exchange) · `ExchangeJobOrderController` (gateway) · V445 ·
+**Related:** REQ-XCH-013, REQ-ORDERS-054, REQ-ORDERS-055, REQ-OXCH-001, REQ-OXCH-002, REQ-OXCH-009,
+REQ-OBS-025 · ADR-0224, ADR-0406, ADR-0407 · **Issues:** #3615, #3618, #3643, #3644
 
 ### REQ-OXCH-009 — The job-order switches
 

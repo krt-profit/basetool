@@ -2186,6 +2186,71 @@
           }
         ]
       }
+    },
+    "/exchange/v1/job-orders": {
+      "get": {
+        "operationId": "job_orders",
+        "summary": "The job orders the member relates to: snapshot of the member's job-order set.",
+        "description": "Orders of all three kinds that a unit the member directly belongs to requests, is responsible for or actively supports, and those the member works on as an assignee: active, closed within 7 days, and aUEC orders while settlementOpen holds. Each order carries the member's relations, the assignees under per-client refs, the member's own note, the section versions and its kind's progress; no holder, amount per person, provision, Bank state, commitment or claim. The snapshot pages by id and its last page hands over the feed cursor. While the job-order switch is off the route answers 503 JOB_ORDER_EXCHANGE_DISABLED with Retry-After: 300. Retention class: job-order data, kept at most 7 days, in memory only.",
+        "tags": [
+          "job-orders"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.joborders.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/jobOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque position from a previous page. Without it the response is a new snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
     }
   },
   "components": {

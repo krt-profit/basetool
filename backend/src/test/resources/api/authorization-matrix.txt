@@ -165,6 +165,7 @@ POST /api/v1/exchange/bank/requests/{id}/cancel | ExchangeBankRequestController#
 POST /api/v1/exchange/bank/requests/{id}/correction | ExchangeBankRequestController#correct | pre=@exchangeGate.allows('exchange.bank.request', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/catalog/locations | ExchangeCatalogController#locations | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/catalog/resolve | ExchangeCatalogController#resolve | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/job-orders | ExchangeJobOrderController#jobOrders | pre=@exchangeGate.allows('exchange.joborders.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/account-check | ExchangeAccountCheckController#check | pre=@exchangeGate.allows('exchange.connect', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/blueprints | ExchangeBlueprintController#blueprints | pre=@exchangeGate.allows('exchange.blueprints.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/blueprints/changes | ExchangeBlueprintController#blueprintChanges | pre=@exchangeGate.allows('exchange.blueprints.write', authentication) | url=anyRequest -> authenticated

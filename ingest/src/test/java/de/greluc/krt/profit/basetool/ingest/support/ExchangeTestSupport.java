@@ -278,6 +278,29 @@ public final class ExchangeTestSupport {
   }
 
   /**
+   * Builds a registry holding the test client, active and switched on, with limit overrides and
+   * every area switched on: the bank, the job orders and their writes.
+   *
+   * @param capabilities the granted capabilities
+   * @param minVersion the minimum client version, or {@code null}
+   * @param requestsPerMinute the per-minute limit override
+   * @return the registry
+   */
+  public static @NotNull ExchangeRegistry registryWithEveryArea(
+      @NotNull Set<String> capabilities, @Nullable String minVersion, int requestsPerMinute) {
+    return new ExchangeRegistry(
+        1L,
+        true,
+        true,
+        true,
+        true,
+        Map.of(
+            CLIENT,
+            new ExchangeRegistry.Client(
+                "VerseKit", true, capabilities, minVersion, requestsPerMinute, null)));
+  }
+
+  /**
    * Sends one DPoP-bound request: a first proof without a nonce fetches the nonce, the second one
    * carries it.
    *
