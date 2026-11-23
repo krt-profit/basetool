@@ -539,6 +539,12 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0408, 
   refusal by a job-order switch counts none (REQ-OXCH-009).
 - **No journal, no undo and no mass-change guard** (REQ-XCH-021, REQ-XCH-022, ADR-0407 point 7): a
   wrong write is repaired in the web, found through the audit viewer's client filter.
+  - The member's undo page under „Verbundene Anwendungen" (`connectedApps.undo.body`) says that job
+    orders are not undone and that a cancel is reopened, and target and comment are set back, in
+    the Basetool.
+  - The admin's bulk-undo page (`admin.exchangeClients.undo.body`) says that bank requests and job
+    orders are not undone and that a client's changes to them are found in the audit viewer with
+    the client filter.
 - **Fixed details:** every backend refusal reaches the client with its registry code and the fixed
   English detail of `ExchangeRelay.DETAILS` (REQ-XCH-025).
 
@@ -566,13 +572,15 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0408, 
 - [x] The comment change runs the same rules with `commentVersion` as its named section version and
   the same route checks (`ExchangeJobOrderCommentTest`, ingest `ExchangeJobOrderWriteRouteTest`,
   `ExchangeGoldenAnswerTest`).
+- [x] The member's undo page and the admin's bulk-undo page say in DE and EN that job orders are
+  not undone and where they are set right (`JobOrderConnectedAppsTextsTest`).
 
 **Enforced by:** `ExchangeRoutes`, `ExchangeIdempotencyFilter`, `ExchangeLimitFilter`,
 `ExchangeRelay`, `ExchangeJobOrderWriteController` (gateway) · `ActingMemberFilter`,
 `ExchangeGate`, `ExchangeJobOrderChangeService` (backend exchange) · `JobOrderClientWriteRules`,
 `JobOrderClientWriteRefusedException`, `JobOrderEditor` (job orders) · **Related:** REQ-XCH-020,
 REQ-XCH-021, REQ-XCH-022, REQ-XCH-023, REQ-XCH-025, REQ-ORDERS-055, REQ-OXCH-001, REQ-OXCH-004,
-REQ-OXCH-009 · ADR-0407, ADR-0408 · **Issues:** #3613, #3614, #3616, #3646, #3650, #3652
+REQ-OXCH-009 · ADR-0407, ADR-0408 · **Issues:** #3613, #3614, #3616, #3646, #3650, #3652, #3654
 
 ### REQ-OXCH-006 — Cancel an aUEC order
 
@@ -927,9 +935,39 @@ REQ-NOTIF-028, REQ-OXCH-004, REQ-OBS-025 · **Issues:** #3618, #3621, #3642, #36
 
 ### REQ-OXCH-010 — Retention of job-order data
 
-> [!note] Implemented for the creating member cleared at age-out (#3649; decided in #3619). The
-> client's 7-day retention, the onboarding criteria and the name withholding follow with their
-> slice.
+> [!note] Implemented for the creating member cleared at age-out (#3649), and for the client's
+> 7-day retention, the onboarding criteria, the name withholding and the privacy records (#3654);
+> decided in #3619 and #3620.
+
+**The client keeps job-order data 7 days at most.** Job-order data of every kind, the member's own
+orders included, is the retention class „job-order data" of `docs/exchange/resources/job-orders.md`,
+whose table has a client keep it in memory. The approval holds a client to the org-demand rule of
+`docs/exchange/client-security.md`, with no exception for own data: it stores job-order data for at
+most 7 days, outside cloud-synced folders, never in a backup or diagnostics, and never forwards it.
+
+**Two approval criteria** in `docs/exchange/onboarding.md`, each named by the approval
+(REQ-XCH-002) and each confirmed in the client application issue template
+(`.github/ISSUE_TEMPLATE/exchange-client-application.yml`, „Job-order requirements"):
+
+- **Both scopes:** the retention above.
+- **`exchange.joborders.write`:** a client creates, cancels or changes an order only on an explicit
+  action of the member, never automatically or by a rule, and the member chooses both units from
+  `create-options`. The client may preselect; an overlay may offer the create on the member's
+  explicit action when it shows both units, each preselected from the current `create-options`.
+
+**Name withholding.** A member who withholds their name from connected applications (REQ-XCH-044)
+is left out of `assignees[]` in every read (REQ-OXCH-002); the order and the member's own relation
+stay. The profile setting and the privacy notice say that the name is then missing from the
+assignees of job orders.
+
+**Privacy records.** Job orders are the third exception for other members' data in A11 of
+`docs/privacy/processing-activities.md`, beside the shared stock (ADR-0257) and the Kartellbank
+(ADR-0354): the member's own creates, writes and assignee note rest on Art. 6(1)(b), other members'
+and other units' order data on a client on Art. 6(1)(f), coordinating the order work, with the name
+withholding as the objection; the Keycloak consent stays an OAuth authorisation, not a consent
+under Art. 6(1)(a). The DPIA threshold assessment carries its re-check, and the privacy notice
+„Verbundene Anwendungen" names the own writes, the other members' names a client receives, the
+window, what the Basetool stores and that job-order changes are not undone there (REQ-OXCH-005).
 
 **The creator leaves with the order.** When an order leaves the client set of REQ-OXCH-003 — 7 days
 after `closed_at`, and an aUEC order not before its settlement is closed — the nightly window run
@@ -954,10 +992,20 @@ application id, not a person.
   keeps both until a run after its settlement closed (`JobOrderWindowRunIntegrationTest`).
 - [x] An order the web reopens after the clearing stays without its creating member and key
   (`JobOrderWindowRunIntegrationTest`).
-- [ ] The client's 7-day retention, the onboarding criteria and the name withholding come with their
-  slice.
+- [x] The creator's Art. 15 export lists a client's create while the order keeps its creating
+  member and no longer once the run cleared it (`JobOrderWindowRunIntegrationTest`).
+- [x] The client's 7-day retention and both approval criteria, the overlay create included, are in
+  `onboarding.md` and the client application template; A11, the DPIA threshold assessment and the
+  privacy notice name the job-order data.
+- [x] The privacy notice renders the job-order read with its window, the stored creator, the
+  missing undo, the withheld name and job orders in the legal basis, in DE and EN
+  (`PrivacyControllerTest`); the profile setting says a withheld name is missing from the
+  assignees (`JobOrderConnectedAppsTextsTest`).
+- [x] A member who withholds their name is left out of the assignees (`ExchangeJobOrderSnapshotTest`).
 
-**Enforced by:** `JobOrderCreatorRetention`, `JobOrderClientCreateRepository#clearCreators` (job
-orders) · `JobOrderWindowRun`, `ExchangeJobOrderFingerprintRepository#findOutsideWithCreator`
-(exchange) · V448, V449 · **Related:** REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-009, REQ-SEC-058,
-REQ-XCH-020 · **Issues:** #3619, #3649
+**Enforced by:** `JobOrderCreatorRetention`, `JobOrderClientCreateRepository#clearCreators`,
+`JobOrderExportSections` (job orders) · `JobOrderWindowRun`,
+`ExchangeJobOrderFingerprintRepository#findOutsideWithCreator`, `ExchangeJobOrderShaper` (exchange)
+· the approval (REQ-XCH-002) · V448, V449 · **Related:** REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-004,
+REQ-OXCH-005, REQ-OXCH-009, REQ-SEC-058, REQ-SEC-060, REQ-XCH-020, REQ-XCH-044 · ADR-0407 ·
+**Issues:** #3619, #3620, #3649, #3654

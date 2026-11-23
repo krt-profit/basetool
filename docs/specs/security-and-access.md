@@ -5056,6 +5056,15 @@ and the refinery-order keys (`exchangeRefineryOrderKeys`: client, the client's k
 when the client created it)
 — REQ-XCH-007, -008, -013, -017, -022, -034.
 
+The job-order module adds `jobOrdersCreatedThroughClients`: the aUEC orders the member created
+through a connected application (order number, client, creation time), selected by the creating
+member reference `job_order.created_by_member_id`. It covers the reference while it exists: the
+nightly window run clears it once the order leaves the client set, and an account deletion sets it
+to null, after which the order is no longer the member's to export (REQ-OXCH-010,
+`DataExportEndStateTest`, `JobOrderWindowRunIntegrationTest`). The client marks on an order's
+comment and target history name an application, not a person, and no exchange journal row holds a
+job-order write, so the exchange's sections gain nothing for job orders.
+
 **Rows that name the member in a role somebody else gave them** have a section each, so every
 column that references a member is either exported or listed with a reason in
 `GdprParticipantCoverageTest` (REQ-DATA-021). All are `ART_15`, being assigned by the organisation,
@@ -5479,7 +5488,13 @@ other name. The exchange's free text is searched under „Verbundene Anwendungen
 labels (`exchange_installation.label`) and the write journal's before and after states
 (`exchange_journal.before_state` / `after_state`, where a note or a ship name can name somebody);
 its other text columns — registry fields, change-sequence keys and channels, journal keys — are
-exempted as holding no name.
+exempted as holding no name. The job-order columns a client's write leaves are covered the same
+way: the server-written client ids (`job_order.created_by_client_id`, `job_order.comment_client_id`,
+`job_order_money_target_change.client_id`) and the create's random key
+(`job_order.create_idempotency_key`) are exempt, and the creating member
+(`job_order.created_by_member_id`) is an account reference rather than text: the export reaches it
+through the account, an account deletion sets it to null (`ON DELETE SET NULL`) and an account
+merge leaves it with the act (`GdprParticipantCoverageTest`, REQ-OXCH-010).
 
 **Bounded by construction**, because a multi-table `ILIKE` sweep with no ceiling is a
 denial-of-service waiting for a one-character term: at least 3 characters, 25 hits per column, 300

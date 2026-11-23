@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -62,9 +63,10 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * The nightly job-order window run against PostgreSQL (REQ-OXCH-003, REQ-OXCH-010): an order whose
  * 7 days after closing ended is announced where it was last announced, so a feed page resolves it
- * to a tombstone, and an order outside the client set loses its creating member and key. Time
- * passing is simulated by moving {@code closed_at} back after the fingerprint was written inside
- * the window, and every statement commits on its own.
+ * to a tombstone, and an order outside the client set loses its creating member and key and so
+ * leaves the creator's Art. 15 export (REQ-SEC-058). Time passing is simulated by moving {@code
+ * closed_at} back after the fingerprint was written inside the window, and every statement commits
+ * on its own.
  */
 @SpringBootTest
 class JobOrderWindowRunIntegrationTest {
@@ -74,6 +76,7 @@ class JobOrderWindowRunIntegrationTest {
   private static final String LEFT_KEY = "00000000-0000-4000-8000-000000003649";
   private static final String INSIDE_KEY = "00000000-0000-4000-8000-000000003650";
   private static final String SETTLING_KEY = "00000000-0000-4000-8000-000000003651";
+  private static final String CLIENT_CREATES_SECTION = "jobOrdersCreatedThroughClients";
 
   @Autowired private WebApplicationContext context;
   @Autowired private JdbcTemplate jdbc;
@@ -84,6 +87,7 @@ class JobOrderWindowRunIntegrationTest {
   @Autowired private JobOrderRepository orders;
   @Autowired private JobOrderFingerprintRecomputation recomputation;
   @Autowired private JobOrderWindowRun window;
+  @Autowired private DataExportService exports;
 
   private final List<UUID> createdOrders = new ArrayList<>();
   private final List<UUID> createdUnits = new ArrayList<>();
@@ -279,6 +283,40 @@ class JobOrderWindowRunIntegrationTest {
             jdbc.queryForObject("SELECT status FROM job_order WHERE id = ?", String.class, order))
         .isEqualTo("OPEN");
     assertThat(creator(order)).isEqualTo(new Creator(CLIENT, null, null));
+  }
+
+  @Test
+  void theCreatorsExportListsAClientCreateOnlyWhileTheOrderKeepsItsCreator() {
+    UUID left = clientCreated(auecOrder(), LEFT_KEY);
+    close(left);
+    UUID inside = clientCreated(auecOrder(), INSIDE_KEY);
+    close(inside);
+
+    assertThat(exportedClientCreates())
+        .containsExactlyInAnyOrder(displayId(left), displayId(inside));
+
+    closedAgo(left, "8 days");
+    window.ageOut();
+
+    assertThat(exportedClientCreates()).containsExactly(displayId(inside));
+  }
+
+  /**
+   * Reads the orders the creating member's Art. 15 export lists as created through a client.
+   *
+   * @return the display numbers of those orders, as text
+   */
+  private List<String> exportedClientCreates() {
+    return exports.export(creatingMember).sections().stream()
+        .filter(section -> CLIENT_CREATES_SECTION.equals(section.key()))
+        .flatMap(section -> section.rows().stream())
+        .map(row -> String.valueOf(row.get("job_order")))
+        .toList();
+  }
+
+  private String displayId(UUID order) {
+    return String.valueOf(
+        jdbc.queryForObject("SELECT display_id FROM job_order WHERE id = ?", Object.class, order));
   }
 
   /**
