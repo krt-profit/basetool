@@ -1,7 +1,9 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-23.
 > **Owner area:** OXCH · **Related ADRs:** [ADR-0354](../adr/0354-bank-resources-on-the-exchange.md)
 > (the bank switch this family follows),
-> [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md)
+> [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
+> [ADR-0406](../adr/0406-the-job-order-feed-moves-on-a-fingerprint-of-the-carried-read.md) (the
+> fingerprint the feed moves on)
 
 # Job orders on the exchange
 
@@ -28,6 +30,91 @@ The guiding rules:
   release is the web (arc42 §6.8, „Faulty release on job orders").
 
 ## Requirements
+
+### REQ-OXCH-003 — Snapshot and feed of the job-order set
+
+> [!note] Implemented for the fingerprint, the dirty marks and the worker (#3643; decided in #3615,
+> #3618, ADR-0406). The client set's snapshot, the per-unit and per-member logs, the tombstone and
+> the window run follow with their slices.
+
+**The fingerprint.** Every job order carries the fingerprint of its member-independent exchange
+read in `exchange_job_order_fingerprint`: the SHA-256 of a canonical encoding of the projection
+`JobOrderExchangeReads` serves alike to the fingerprint and to the client read (ADR-0406). The
+projection holds:
+
+- the header: `id`, `number`, `kind`, `status`, `priority` (empty while terminal), `createdAt`, the
+  requesting and the responsible unit by id, the actively supporting units by id, `comment`, the
+  MATERIAL and ITEM `contact` (never on aUEC) and `responsibilityInvalid` (REQ-ORDERS-055);
+- `versions { lifecycle, target, comment }`, the target version on aUEC only, never the
+  information version of the aUEC contact;
+- the assignees by member id;
+- the progress per kind: MATERIAL per material and quality tier `requested`, `handedOver`,
+  `remaining` and `open`; ITEM per item line `ordered`, `manufactured`, `delivered` and `open`;
+  aUEC `target`, `netHandedOver`, `remaining`, `overpaid` and `settlementOpen`, from the ledger
+  figures the web shows.
+
+Unit names, assignee names and refs, the member's relations and the member's own note are the
+member's part of the read and are not fingerprinted.
+
+**The instant.** The fingerprint's `changed_at` is the read's `updatedAt`: when the worker found a
+carried field changed. It moves with the fingerprint only, so the feed moves on nothing else — not
+on a provision, a holder movement, a fee, a commitment, a claim that leaves `open` unchanged or a
+contact change on an aUEC order. The row also keeps the read's `settlementOpen`, so SQL can select
+the client set.
+
+**Dirty marks.** `AFTER` row triggers on every source table mark the order in
+`exchange_job_order_dirty`: `job_order`, its material and item lines, assignees, support
+(`job_order_participation`), earmarks (`inventory_item_job_order_allocation`, and the material and
+quality of an earmarked stock row), claims, money operations, corrections, holders, Bank account
+positions and the target. Bulk SQL, the patch change, account merges and the name retention reach
+the fingerprint without a service.
+
+- A change of the Profit hierarchy — a unit's activation, kind, department or parent, or an active
+  Profit area added or deleted — marks every order of the client set: active, closed within 7 days
+  by `closed_at`, and aUEC while its last fingerprint says `settlementOpen`.
+- An order gets one mark per marking transaction; a later mark never replaces an earlier one, so
+  the oldest mark keeps its age until the worker clears it.
+- The triggers are named `trg_<table>_exchange_dirty`, never `trg_<table>_exchange_change`, so the
+  change-feed trigger guard keeps one feed trigger per table.
+
+**The worker.** `JobOrderFingerprintTask` runs every `app.exchange.job-order-fingerprint.interval`
+(default 5 s), after the marking transactions committed and whatever the job-order switches say, on
+one backend instance at a time (two-key advisory lock space `OXFP`).
+
+- A run takes the orders marked longest ago, at most
+  `app.exchange.job-order-fingerprint.batch-size` (default 200, 1 to 1000), and reads their marks
+  and their projection in one `REPEATABLE READ` transaction.
+- It writes a fingerprint and its instant only where the fingerprint changed, and deletes exactly
+  the marks it read: a write that commits while the run is under way keeps its own mark for the
+  next run.
+- A failed run rolls back whole; the next run retries it.
+
+**Monitoring:** the worker job, the recomputation counter, the backlog gauges and their three
+alerts are REQ-OBS-025.
+
+**Acceptance**
+
+- [x] Every carried field moves the fingerprint, and one state gives one fingerprint whatever the
+  list order (`JobOrderFingerprintsTest`).
+- [x] The projection carries the header, the versions, active support and assignees by id and each
+  kind's progress as the web shows it, with no contact on aUEC; a claim that leaves `open`
+  unchanged or a contact change on an aUEC order leaves it equal
+  (`JobOrderExchangeReadProjectionIntegrationTest`).
+- [x] A new order gets its first fingerprint; a carried change moves the fingerprint and its
+  instant, any other write moves neither; a provision, a holder movement, a fee, a commitment and an
+  aUEC contact change move nothing, a handover does (`JobOrderFingerprintWorkerIntegrationTest`).
+- [x] A money write, a handover, an earmark or a hierarchy change that commits while the worker
+  runs is recomputed by the next run (`JobOrderFingerprintWorkerIntegrationTest`).
+- [x] A hierarchy change marks the client set only and flips `responsibilityInvalid`; a hard delete
+  takes the marks and the fingerprint with the order (`JobOrderFingerprintWorkerIntegrationTest`).
+- [ ] The snapshot, the per-unit and per-member logs, the tombstone `{ key, removedAt }` and the
+  window run come with their slices.
+
+**Enforced by:** `JobOrderExchangeReads`, `JobOrderExchangeReadProjection` (job orders) ·
+`JobOrderFingerprints`, `JobOrderFingerprintRecomputation`, `JobOrderFingerprintTask`,
+`ExchangeJobOrderMarkRepository`, `ExchangeJobOrderFingerprintRepository` (exchange) · V445 ·
+**Related:** REQ-XCH-013, REQ-ORDERS-054, REQ-ORDERS-055, REQ-OXCH-009, REQ-OBS-025 · ADR-0224,
+ADR-0406 · **Issues:** #3615, #3618, #3643
 
 ### REQ-OXCH-009 — The job-order switches
 

@@ -417,6 +417,32 @@ groups:
           summary: "Job-order exchange switch changed ({{ $labels.action }})"
           description: "An admin switched job orders or their writes on the third-party exchange on or off ({{ $labels.action }}). While the job-order switch is off the gateway refuses every job-order request; while the writes switch is off it refuses every job-order write and the reads go on; the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event JOB_ORDER_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned; switching the writes off is the first step of „Faulty release on job orders“ in arc42 §6 (REQ-OBS-025)."
 
+      - alert: JobOrderExchangeFeedLagging
+        expr: max(basetool_exchange_job_order_dirty_oldest_age_seconds) > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order exchange feed lags behind by over 5 minutes"
+          description: "For 5 minutes the oldest job order marked for a fingerprint recomputation has waited more than 5 minutes, so connected applications see job-order changes late. Either the fingerprint worker stopped (JobOrderFingerprintWorkerStale) or it falls behind the marks (JobOrderFingerprintChurn). Check the backlog and the worker runs in the „Job orders“ row of the Exchange dashboard and the backend log of job_order_exchange_fingerprint; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
+
+      - alert: JobOrderFingerprintWorkerStale
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_exchange_fingerprint"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_exchange_fingerprint"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="job_order_exchange_fingerprint"} == 1))
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order fingerprint worker stale >10m"
+          description: "The job-order fingerprint worker, which runs every few seconds, last succeeded more than 10 minutes ago, or never since the backend started. While it is stale no job-order change reaches the exchange feed, even when nothing is marked. Check the backend log of job_order_exchange_fingerprint for the failing run (ScheduledJobFailureStreak) and the database; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
+
+      - alert: JobOrderFingerprintChurn
+        expr: sum(increase(basetool_exchange_job_order_fingerprints_total{outcome="changed"}[1h])) > 1000
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order fingerprints keep changing"
+          description: "For 2 hours more than 1000 job-order fingerprints an hour changed. A hierarchy change is a single burst, so a sustained rate looks like a trigger loop or a bulk job rewriting carried fields over and over, which floods the exchange feed. Check the changed-against-unchanged recomputations in the „Job orders“ row of the Exchange dashboard and which writes keep marking orders; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
+
       - alert: BusinessMetricsStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="business_metrics"} == 1))
         for: 5m

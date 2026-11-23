@@ -180,6 +180,29 @@ public final class ExchangeMetricNames {
   public static final String EXCHANGE_JOB_ORDER_REFUSED = "basetool.exchange.job.order.refused";
 
   /**
+   * Counter {@code basetool_exchange_job_order_fingerprints_total{outcome}} — job orders the
+   * fingerprint worker recomputed, {@code changed} or {@code unchanged}, both registered at zero
+   * (REQ-OXCH-003, REQ-OBS-025).
+   */
+  public static final String EXCHANGE_JOB_ORDER_FINGERPRINTS =
+      "basetool.exchange.job.order.fingerprints";
+
+  /**
+   * Gauge {@code basetool_exchange_job_order_dirty_count} — job orders marked for a fingerprint
+   * recomputation, sampled by the business-metrics collector (REQ-OXCH-003, REQ-OBS-025).
+   */
+  public static final String EXCHANGE_JOB_ORDER_DIRTY_COUNT =
+      "basetool.exchange.job.order.dirty.count";
+
+  /**
+   * Gauge {@code basetool_exchange_job_order_dirty_oldest_age_seconds} — the age of the oldest
+   * dirty mark, {@code 0} when none is set, sampled by the business-metrics collector
+   * (REQ-OXCH-003, REQ-OBS-025).
+   */
+  public static final String EXCHANGE_JOB_ORDER_DIRTY_OLDEST_AGE =
+      "basetool.exchange.job.order.dirty.oldest.age";
+
+  /**
    * Tag key: the bank route on {@link #EXCHANGE_BANK_READS}, the job-order route on {@link
    * #EXCHANGE_JOB_ORDER_READS}.
    */

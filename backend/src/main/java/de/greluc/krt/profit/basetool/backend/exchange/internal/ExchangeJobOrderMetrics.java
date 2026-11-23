@@ -30,8 +30,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Counts the job orders' traffic on the exchange (REQ-OXCH-009, REQ-OBS-025): reads by registered
- * client and route, refusals by reason. Every label is a registry client id or a fixed enumeration,
- * never an id, a path or an amount (REQ-OBS-011).
+ * client and route, refusals by reason, and the fingerprint recomputations by outcome
+ * (REQ-OXCH-003). Every label is a registry client id or a fixed enumeration, never an id, a path
+ * or an amount (REQ-OBS-011).
  */
 @Component
 @RequiredArgsConstructor
@@ -39,8 +40,19 @@ public class ExchangeJobOrderMetrics {
 
   private final MeterRegistry meterRegistry;
 
-  /** Registers the refusal counter for every reason at zero, so a first refusal is an increase. */
+  /**
+   * Registers every refusal reason and fingerprint outcome at zero, so a first count is an
+   * increase.
+   */
   @PostConstruct
+  void registerCounters() {
+    registerRefusalCounters();
+    for (JobOrderFingerprintOutcome outcome : JobOrderFingerprintOutcome.values()) {
+      fingerprintCounter(outcome);
+    }
+  }
+
+  /** Registers the refusal counter for every reason at zero, so a first refusal is an increase. */
   void registerRefusalCounters() {
     for (JobOrderExchangeRefusal reason : JobOrderExchangeRefusal.values()) {
       refusalCounter(reason);
@@ -71,6 +83,30 @@ public class ExchangeJobOrderMetrics {
    */
   public void countRefused(@NotNull JobOrderExchangeRefusal reason) {
     refusalCounter(reason).increment();
+  }
+
+  /**
+   * Counts the outcomes of one committed recomputation batch of the fingerprint worker.
+   *
+   * @param changed the orders whose fingerprint changed and was written
+   * @param unchanged the orders whose fingerprint equalled the stored one
+   */
+  public void countFingerprints(int changed, int unchanged) {
+    fingerprintCounter(JobOrderFingerprintOutcome.CHANGED).increment(changed);
+    fingerprintCounter(JobOrderFingerprintOutcome.UNCHANGED).increment(unchanged);
+  }
+
+  /**
+   * Returns the fingerprint counter of one outcome.
+   *
+   * @param outcome the outcome
+   * @return the counter, registered on first use
+   */
+  private @NotNull Counter fingerprintCounter(@NotNull JobOrderFingerprintOutcome outcome) {
+    return meterRegistry.counter(
+        ExchangeMetricNames.EXCHANGE_JOB_ORDER_FINGERPRINTS,
+        MetricNames.TAG_OUTCOME,
+        outcome.getTag());
   }
 
   /**

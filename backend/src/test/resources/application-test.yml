@@ -84,6 +84,8 @@ app:
   exchange:
     mirror:
       close-when-off: false
+    job-order-fingerprint:
+      enabled: false
 
 management:
   health:
