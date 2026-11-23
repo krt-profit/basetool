@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.UUID;
@@ -38,15 +39,54 @@ class JobOrderMoneyAccess {
   private final AuthHelperService auth;
 
   UUID actorId() {
-    return auth.currentUserId()
-        .orElseThrow(() -> new AccessDeniedException("An active member account is required."));
+    return auth.currentUserId().orElseThrow(JobOrderMoneyAccess::noActiveMember);
   }
 
   UUID requireActiveActor() {
+    return requireActive(actorId());
+  }
+
+  /**
+   * Names the web's caller of a money command: the contextual authorities, the contextual read and
+   * the request's member.
+   *
+   * @return the web caller
+   */
+  JobOrderCaller webCaller() {
+    return JobOrderCaller.web(auth.currentUserId().orElse(null));
+  }
+
+  /**
+   * Returns the member a caller's actor acts as.
+   *
+   * @param actor the actor
+   * @return the actor's member
+   * @throws AccessDeniedException when the actor resolves to no member
+   */
+  UUID memberOf(JobOrderActor actor) {
+    UUID member = actor.member();
+    if (member == null) {
+      throw noActiveMember();
+    }
+    return member;
+  }
+
+  /**
+   * Requires the member to hold an active account.
+   *
+   * @param member the member
+   * @return the member's id
+   * @throws AccessDeniedException when the account is not active
+   */
+  UUID requireActive(UUID member) {
     return holders
-        .activeUser(actorId())
+        .activeUser(member)
         .map(User::getId)
-        .orElseThrow(() -> new AccessDeniedException("An active member account is required."));
+        .orElseThrow(JobOrderMoneyAccess::noActiveMember);
+  }
+
+  private static AccessDeniedException noActiveMember() {
+    return new AccessDeniedException("An active member account is required.");
   }
 
   boolean responsible(JobOrder order) {
@@ -92,7 +132,22 @@ class JobOrderMoneyAccess {
   }
 
   void requireUnitWriter(JobOrder order) {
-    if (!unitWriter(order)) {
+    requireParty(unitWriter(order));
+  }
+
+  /**
+   * Requires the writer units of a caller's rule to cover either side of the order.
+   *
+   * @param order the loaded order
+   * @param writers the units the caller writes for under its rule
+   * @throws AccessDeniedException when the caller writes neither side
+   */
+  void requireUnitWriter(JobOrder order, JobOrderWriters.Scope writers) {
+    requireParty(writers.writesEitherSide(order));
+  }
+
+  private static void requireParty(boolean party) {
+    if (!party) {
       throw new AccessDeniedException("Caller may not represent either order party.");
     }
   }

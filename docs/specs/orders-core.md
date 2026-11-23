@@ -198,7 +198,9 @@ independent of creation and individual action rights.
 | Personally linked holder/recipient | Their own financial involvement under the money rules. |
 | Any full reader | May provide their own money, creating their own explicitly linked holder. Read alone does not grant assignee enrollment. |
 
-Current authority is rechecked on each action. A genuine own transfer may introduce a new
+Current authority is rechecked on each action. The status, target and information commands take
+the writer rule, the read check and the actor as parameters, like the create command
+(REQ-ORDERS-054, REQ-ORDERS-066, ADR-0405). A genuine own transfer may introduce a new
 counterparty with exactly that transfer's credit, not fabricate provision for another holder.
 Active account search is scoped to the permitted action. Display names alone grant no rights.
 Requesters may safely edit MATERIAL requested amounts and ITEM quantities after partial work,
@@ -217,7 +219,7 @@ recorded facts are not discarded.
 `JobOrderDirectLogisticianRuleIntegrationTest` the database writer rule at the create seam and
 that every pair it permits is one the web permits for the same member.
 `JobOrderHierarchyAuthorityIntegrationTest` covers safe MATERIAL and ITEM requester edits
-after booked work. The money workflow follows its own implementation slice. **Issues:** #3197, #3200, #3640
+after booked work. The money workflow follows its own implementation slice. **Issues:** #3197, #3200, #3640, #3641
 
 ### REQ-ORDERS-054 — Lifecycle distinguishes kind-specific fulfillment
 
@@ -226,7 +228,11 @@ the strict money fulfillment contract. MATERIAL and ITEM retain automatic comple
 complete final handover and permit responsible-unit manual early completion. Their other
 ordinary status changes remain responsible-unit writes. Both requesting and responsible writers
 may cancel an active order and explicitly reopen a cancellation to OPEN. Each status write uses
-the observed lifecycle version. MATERIAL and ITEM need edits preserve the current lifecycle,
+the observed lifecycle version. The status command takes the writer rule, the read check and the
+actor as parameters, and decides them with the responsibility gate under the order locks; the web
+passes its contextual authorities with the honoured pin, its complete-order read and the
+requesting member, and a status change answers an invalid responsibility before the read check,
+the writer and the version (ADR-0405). MATERIAL and ITEM need edits preserve the current lifecycle,
 including manual completion and cancellation. aUEC target-change effects follow its money spec.
 
 Cancelling MATERIAL/ITEM stops ordinary fulfillment and releases order stock earmarks without
@@ -269,7 +275,11 @@ The closing instant is covered by `JobOrderClosingInstantTest` (the entity rule)
 `JobOrderHierarchyAuthorityIntegrationTest`, the final handovers in
 `JobOrderHandoverCompletionIntegrationTest` and `JobOrderItemHandoverPlanningIntegrationTest`, and
 the aUEC handover, target changes and status writes in `JobOrderMoneyIntegrationTest`.
-**Issues:** #3195, #3200, #3201, #3637
+`JobOrderWebWriteCommandsIntegrationTest` pins who changes an aUEC order's status in the web,
+the order of the refusals, the audit event and the notices without the actor, and
+`JobOrderWriteRuleIntegrationTest` the database writer rule at the status command and that every
+status write it permits is one the web permits for the same member.
+**Issues:** #3195, #3200, #3201, #3637, #3641
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
 

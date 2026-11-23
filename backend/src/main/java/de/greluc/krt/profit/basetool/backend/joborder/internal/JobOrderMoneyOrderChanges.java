@@ -22,25 +22,38 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderInformationCommand;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderTargetCommand;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Applies independent target and contextual information changes for aUEC orders. */
+/**
+ * Applies independent target and contextual information changes for aUEC orders, for the web and
+ * for a caller that passes its own writer rule, read check and actor (ADR-0405).
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class JobOrderMoneyOrderChanges {
+public class JobOrderMoneyOrderChanges
+    implements JobOrderTargetCommand, JobOrderInformationCommand {
 
   private final JobOrderEditor editor;
   private final JobOrderMoneyAccess access;
+  private final JobOrderWriters writers;
   private final JobOrderMoneyIdentityLock identityLock;
   private final JobOrderMoneyTargetRepository targets;
   private final JobOrderMoneyTargetChangeRepository history;
@@ -49,38 +62,57 @@ public class JobOrderMoneyOrderChanges {
   private final JobOrderMoneyEffects effects;
 
   /**
-   * Records an agreed new target and reconciles completion in the same transaction.
+   * Records an agreed new target for the web caller and reconciles completion in the same
+   * transaction.
    *
    * @param orderId the aUEC order
    * @param dto the amount and its observed target revision
    */
   public void target(UUID orderId, UpdateJobOrderMoneyTargetDto dto) {
-    BigDecimal requested = WholeAuec.positive(dto.target());
-    UUID actor = access.actorId();
-    identityLock.lockAccounts(actor);
+    writeTarget(orderId, WholeAuec.positive(dto.target()), dto.version(), access.webCaller());
+  }
+
+  @Override
+  public void changeTarget(
+      @NotNull UUID orderId,
+      @NotNull BigDecimal target,
+      long targetVersion,
+      @NotNull JobOrderWriterRule rule,
+      @NotNull JobOrderReadCheck read,
+      @NotNull JobOrderActor actor) {
+    writeTarget(
+        orderId,
+        WholeAuec.positive(target.toPlainString()),
+        targetVersion,
+        new JobOrderCaller(rule, read, actor));
+  }
+
+  /** The one target command, under the account and order locks (ADR-0405). */
+  private void writeTarget(
+      UUID orderId, BigDecimal requested, @Nullable Long version, JobOrderCaller caller) {
+    UUID member = access.memberOf(caller.actor());
+    identityLock.lockAccounts(member);
     editor.editMoney(
         orderId,
+        caller.read(),
         order -> {
-          access.requireActiveActor();
-          access.requireUnitWriter(order);
-          requireOpenForEdits(order);
+          requireWriter(order, member, caller);
           return changesState(order.getStatus(), requested, ledger.delivered(orderId));
         },
-        (order, queueLocked) -> targetLocked(order, dto, actor, requested, queueLocked));
+        (order, queueLocked) ->
+            targetLocked(order, requested, version, member, caller, queueLocked));
   }
 
   private JobOrderEditor.MoneyEdit<JobOrder> targetLocked(
       JobOrder order,
-      UpdateJobOrderMoneyTargetDto dto,
-      UUID actor,
       BigDecimal requested,
+      @Nullable Long version,
+      UUID member,
+      JobOrderCaller caller,
       boolean queueLocked) {
-    access.requireActiveActor();
-    access.requireUnitWriter(order);
-    requireOpenForEdits(order);
+    final JobOrderWriters.Scope scope = requireWriter(order, member, caller);
     JobOrderMoneyTarget target = targets.findById(order.getId()).orElseThrow();
-    OptimisticLock.check(
-        target.getVersion(), dto.version(), JobOrderMoneyTarget.class, order.getId());
+    OptimisticLock.check(target.getVersion(), version, JobOrderMoneyTarget.class, order.getId());
     BigDecimal prior = target.getAmount();
     if (prior.compareTo(requested) == 0) {
       return new JobOrderEditor.MoneyEdit<>(order, JobOrderEdit.unchanged(order));
@@ -91,7 +123,7 @@ public class JobOrderMoneyOrderChanges {
       throw new BusinessConflictException("orders.money.target.basisChanged");
     }
     target.replace(requested);
-    history.save(new JobOrderMoneyTargetChange(order.getId(), actor, prior, requested));
+    history.save(new JobOrderMoneyTargetChange(order.getId(), member, prior, requested));
     if (lifecycleChanged) {
       if (order.getStatus() == JobOrderStatus.COMPLETED) {
         lifecycle.reopenUnderfulfilledMoneyOrder(order);
@@ -106,16 +138,14 @@ public class JobOrderMoneyOrderChanges {
             AuditEventType.JOB_ORDER_MONEY_TARGET_CHANGED,
             AuditDetails.of("previousTarget", prior).with("target", requested));
     if (!lifecycleChanged) {
-      audit =
-          audit.notifying(
-              List.of(
-                  JobOrderLifecycleNotices.needChanged(order, actor, access.responsible(order))));
+      audit = audit.notifying(List.of(needChanged(order, member, scope)));
     }
     return new JobOrderEditor.MoneyEdit<>(order, audit);
   }
 
   /**
-   * Edits the contact and comment without changing the target or another edit scope.
+   * Edits the contact and comment for the web caller without changing the target or another edit
+   * scope.
    *
    * <p>Both observed revisions must be current; each part raises only its own revision, and only
    * when its value changes.
@@ -124,19 +154,50 @@ public class JobOrderMoneyOrderChanges {
    * @param dto the information fields and their observed revisions
    */
   public void information(UUID orderId, UpdateJobOrderMoneyInformationDto dto) {
-    UUID actor = access.actorId();
-    identityLock.lockAccounts(actor);
+    writeInformation(
+        orderId,
+        new Contact(dto.handle(), dto.version()),
+        dto.comment(),
+        dto.commentVersion(),
+        access.webCaller());
+  }
+
+  @Override
+  public void changeComment(
+      @NotNull UUID orderId,
+      @Nullable String comment,
+      long commentVersion,
+      @NotNull JobOrderWriterRule rule,
+      @NotNull JobOrderReadCheck read,
+      @NotNull JobOrderActor actor) {
+    writeInformation(orderId, null, comment, commentVersion, new JobOrderCaller(rule, read, actor));
+  }
+
+  /**
+   * The one information command: the comment under its own revision, and the contact under the
+   * information revision when the write carries it.
+   */
+  private void writeInformation(
+      UUID orderId,
+      @Nullable Contact contact,
+      @Nullable String comment,
+      @Nullable Long commentVersion,
+      JobOrderCaller caller) {
+    UUID member = access.memberOf(caller.actor());
+    identityLock.lockAccounts(member);
     editor.editMoney(
         orderId,
-        order -> {
-          access.requireActiveActor();
-          access.requireUnitWriter(order);
-          requireOpenForEdits(order);
-          OptimisticLock.check(
-              order.getMoneyInformationVersion(), dto.version(), JobOrder.class, orderId);
-          JobOrderComment.check(order, dto.commentVersion());
-          boolean contactChanged = replaceContact(order, dto.handle());
-          boolean commentChanged = JobOrderComment.replace(order, dto.comment());
+        caller.read(),
+        _ -> false,
+        (order, _) -> {
+          final JobOrderWriters.Scope scope = requireWriter(order, member, caller);
+          if (contact != null) {
+            OptimisticLock.check(
+                order.getMoneyInformationVersion(), contact.version(), JobOrder.class, orderId);
+          }
+          JobOrderComment.check(order, commentVersion);
+          boolean contactChanged = contact != null && replaceContact(order, contact.handle());
+          boolean commentChanged = JobOrderComment.replace(order, comment);
           if (!contactChanged && !commentChanged) {
             return new JobOrderEditor.MoneyEdit<>(order, JobOrderEdit.unchanged(order));
           }
@@ -145,11 +206,34 @@ public class JobOrderMoneyOrderChanges {
               order,
               JobOrderEdit.audited(
                       order, AuditEventType.JOB_ORDER_UPDATED, AuditDetails.of("information", true))
-                  .notifying(
-                      List.of(
-                          JobOrderLifecycleNotices.needChanged(
-                              order, actor, access.responsible(order)))));
+                  .notifying(List.of(needChanged(order, member, scope))));
         });
+  }
+
+  /**
+   * The contact an information write replaces.
+   *
+   * @param handle the requested contact
+   * @param version the information revision the caller observed; {@code null} is a conflict
+   */
+  private record Contact(@NotNull String handle, @Nullable Long version) {}
+
+  /**
+   * Requires an active member who writes either side of the order under the caller's rule, and an
+   * order that is not cancelled.
+   */
+  private JobOrderWriters.Scope requireWriter(JobOrder order, UUID member, JobOrderCaller caller) {
+    access.requireActive(member);
+    JobOrderWriters.Scope scope = writers.resolve(caller.rule(), caller.actor());
+    access.requireUnitWriter(order, scope);
+    requireOpenForEdits(order);
+    return scope;
+  }
+
+  /** Announces the change from the responsible side when the actor writes it there. */
+  private static NotificationEvent needChanged(
+      JobOrder order, UUID member, JobOrderWriters.Scope scope) {
+    return JobOrderLifecycleNotices.needChanged(order, member, scope.writesResponsible(order));
   }
 
   private static boolean replaceContact(JobOrder order, String handle) {

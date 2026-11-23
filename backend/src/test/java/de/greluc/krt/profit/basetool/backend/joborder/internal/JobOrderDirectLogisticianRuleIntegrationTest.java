@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -38,44 +37,30 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrganisationsleitungRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.TestingAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * The exchange's writer rule at the create seam, against Postgres: a direct member who is a
@@ -99,6 +84,7 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
   @Autowired private RoleRepository roles;
   @Autowired private OrgUnitMembershipRepository memberships;
 
+  private WriterRuleFixtures fixtures;
   private OrgUnit profit;
   private Squadron profitStaffel;
   private Squadron staffel;
@@ -109,51 +95,38 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @BeforeEach
   void seed() {
-    String tag = UUID.randomUUID().toString().substring(0, 8);
-    profit = ProfitHierarchyFixtures.persistedProfitArea(units);
-    profitStaffel = squadron("Rule profit " + tag, profit, true);
-    staffel = squadron("Rule staffel " + tag, null, true);
-    area = new Bereich();
-    area.setName("Rule area " + tag);
-    area.setShorthand("RA" + tag);
-    area = units.save(area);
-    areaCommand = new SpecialCommand();
-    areaCommand.setName("Rule area command " + tag);
-    areaCommand.setShorthand("RC" + tag);
-    areaCommand.setParent(area);
-    areaCommand = units.save(areaCommand);
-    outside = squadron("Rule outside " + tag, null, true);
-    seeded =
-        Set.of(
-            profit.getId(),
-            profitStaffel.getId(),
-            staffel.getId(),
-            area.getId(),
-            areaCommand.getId(),
-            outside.getId());
+    fixtures = new WriterRuleFixtures(units, leitungen, users, roles, memberships, converter);
+    WriterRuleFixtures.Units seededUnits = fixtures.seedUnits();
+    profit = seededUnits.profit();
+    profitStaffel = seededUnits.profitStaffel();
+    staffel = seededUnits.staffel();
+    area = seededUnits.area();
+    areaCommand = seededUnits.areaCommand();
+    outside = seededUnits.outside();
+    seeded = seededUnits.all().stream().map(OrgUnit::getId).collect(Collectors.toSet());
   }
 
   @Test
   void aLogisticianFlagOnADirectUnitMakesItARequestingUnit() {
-    User member = member(true, false);
-    seat(member, staffel, MembershipRole.MEMBER, true);
-    seat(member, outside, MembershipRole.MEMBER, false);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, staffel, MembershipRole.MEMBER, true);
+    fixtures.seat(member, outside, MembershipRole.MEMBER, false);
 
     assertThat(requestingUnits(member)).containsExactly(staffel.getId());
   }
 
   @Test
   void aLeadershipRankOnADirectUnitMakesItARequestingUnit() {
-    User member = member(true, false);
-    seat(member, staffel, MembershipRole.STAFFELLEITER, false);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, staffel, MembershipRole.STAFFELLEITER, false);
 
     assertThat(requestingUnits(member)).containsExactly(staffel.getId());
   }
 
   @Test
   void plainMembershipMakesNoRequestingUnit() {
-    User member = member(true, false);
-    seat(member, staffel, MembershipRole.MEMBER, false);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, staffel, MembershipRole.MEMBER, false);
 
     assertThat(requestingUnits(member)).isEmpty();
     assertThat(optionsOf(member).canCreate()).isFalse();
@@ -161,11 +134,11 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void bereichReachCountsOnlyOverAUnitTheMemberDirectlyBelongsTo() {
-    User withMembership = member(true, false);
-    seat(withMembership, area, MembershipRole.BEREICHSLEITER, false);
-    seat(withMembership, areaCommand, MembershipRole.MEMBER, false);
-    User reachOnly = member(true, false);
-    seat(reachOnly, area, MembershipRole.BEREICHSKOORDINATOR, false);
+    User withMembership = fixtures.member(true, false);
+    fixtures.seat(withMembership, area, MembershipRole.BEREICHSLEITER, false);
+    fixtures.seat(withMembership, areaCommand, MembershipRole.MEMBER, false);
+    User reachOnly = fixtures.member(true, false);
+    fixtures.seat(reachOnly, area, MembershipRole.BEREICHSKOORDINATOR, false);
 
     assertThat(requestingUnits(withMembership))
         .containsExactlyInAnyOrder(area.getId(), areaCommand.getId());
@@ -174,12 +147,12 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void organisationsleitungReachCountsOnlyOverAUnitTheMemberDirectlyBelongsTo() {
-    Organisationsleitung leitung = leitung();
-    User withMembership = member(true, false);
-    seat(withMembership, leitung, MembershipRole.OL_MEMBER, false);
-    seat(withMembership, areaCommand, MembershipRole.MEMBER, false);
-    User reachOnly = member(true, false);
-    seat(reachOnly, leitung, MembershipRole.OL_MEMBER, false);
+    Organisationsleitung leitung = fixtures.leitung();
+    User withMembership = fixtures.member(true, false);
+    fixtures.seat(withMembership, leitung, MembershipRole.OL_MEMBER, false);
+    fixtures.seat(withMembership, areaCommand, MembershipRole.MEMBER, false);
+    User reachOnly = fixtures.member(true, false);
+    fixtures.seat(reachOnly, leitung, MembershipRole.OL_MEMBER, false);
 
     assertThat(requestingUnits(withMembership)).containsExactly(areaCommand.getId());
     assertThat(requestingUnits(reachOnly)).isEmpty();
@@ -187,12 +160,12 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void aDeactivatedUnitConfersNothing() {
-    User flagged = member(true, false);
-    seat(flagged, staffel, MembershipRole.STAFFELLEITER, true);
-    seat(flagged, outside, MembershipRole.MEMBER, true);
-    User areaLead = member(true, false);
-    seat(areaLead, area, MembershipRole.BEREICHSLEITER, false);
-    seat(areaLead, areaCommand, MembershipRole.MEMBER, false);
+    User flagged = fixtures.member(true, false);
+    fixtures.seat(flagged, staffel, MembershipRole.STAFFELLEITER, true);
+    fixtures.seat(flagged, outside, MembershipRole.MEMBER, true);
+    User areaLead = fixtures.member(true, false);
+    fixtures.seat(areaLead, area, MembershipRole.BEREICHSLEITER, false);
+    fixtures.seat(areaLead, areaCommand, MembershipRole.MEMBER, false);
     staffel.setActive(false);
     units.saveAndFlush(staffel);
     areaCommand.setActive(false);
@@ -204,11 +177,11 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void withoutKrtMemberNoSeatOrFlagConfersAnything() {
-    User flagged = member(false, false);
-    seat(flagged, staffel, MembershipRole.STAFFELLEITER, true);
-    User areaLead = member(false, false);
-    seat(areaLead, area, MembershipRole.BEREICHSLEITER, false);
-    seat(areaLead, areaCommand, MembershipRole.MEMBER, true);
+    User flagged = fixtures.member(false, false);
+    fixtures.seat(flagged, staffel, MembershipRole.STAFFELLEITER, true);
+    User areaLead = fixtures.member(false, false);
+    fixtures.seat(areaLead, area, MembershipRole.BEREICHSLEITER, false);
+    fixtures.seat(areaLead, areaCommand, MembershipRole.MEMBER, true);
 
     assertThat(requestingUnits(flagged)).isEmpty();
     assertThat(requestingUnits(areaLead)).isEmpty();
@@ -217,18 +190,18 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void anAdministratorIsAPlainMember() {
-    User admin = member(true, true);
-    seat(admin, staffel, MembershipRole.MEMBER, false);
-    seat(admin, outside, MembershipRole.MEMBER, true);
-    authenticateAsAdministrator(admin);
+    User admin = fixtures.member(true, true);
+    fixtures.seat(admin, staffel, MembershipRole.MEMBER, false);
+    fixtures.seat(admin, outside, MembershipRole.MEMBER, true);
+    WriterRuleFixtures.signInAsAdministrator(admin);
 
     assertThat(requestingUnits(admin)).containsExactly(outside.getId());
   }
 
   @Test
   void theResponsibleSideNeverWidensTheRequestingUnits() {
-    User member = member(true, false);
-    seat(member, profitStaffel, MembershipRole.MEMBER, true);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, profitStaffel, MembershipRole.MEMBER, true);
 
     JobOrderCreateOptionsDto options = optionsOf(member);
 
@@ -243,8 +216,8 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void aRequestingWriterCreatesAnAuecOrderForTheNamedPair() {
-    User member = member(true, false);
-    seat(member, staffel, MembershipRole.MEMBER, true);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, staffel, MembershipRole.MEMBER, true);
 
     UUID id = createAuec(member, profitStaffel, staffel);
 
@@ -259,9 +232,9 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void aWriterOfTheResponsibleSideAloneCannotCreate() {
-    User member = member(true, false);
-    seat(member, profitStaffel, MembershipRole.MEMBER, true);
-    seat(member, outside, MembershipRole.MEMBER, false);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, profitStaffel, MembershipRole.MEMBER, true);
+    fixtures.seat(member, outside, MembershipRole.MEMBER, false);
 
     assertThatThrownBy(() -> createAuec(member, profitStaffel, outside))
         .isInstanceOf(AccessDeniedException.class);
@@ -269,8 +242,8 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void aRequestingUnitReachedWithoutDirectMembershipCannotBeNamed() {
-    User member = member(true, false);
-    seat(member, area, MembershipRole.BEREICHSLEITER, false);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, area, MembershipRole.BEREICHSLEITER, false);
 
     assertThatThrownBy(() -> createAuec(member, profitStaffel, areaCommand))
         .isInstanceOf(AccessDeniedException.class);
@@ -278,8 +251,8 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void aDeactivatedRequestingUnitCannotBeNamed() {
-    User member = member(true, false);
-    seat(member, staffel, MembershipRole.MEMBER, true);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, staffel, MembershipRole.MEMBER, true);
     staffel.setActive(false);
     units.saveAndFlush(staffel);
 
@@ -289,8 +262,8 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void aResponsibleUnitOutsideTheProfitHierarchyCannotBeNamed() {
-    User member = member(true, false);
-    seat(member, staffel, MembershipRole.MEMBER, true);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, staffel, MembershipRole.MEMBER, true);
 
     assertThatThrownBy(() -> createAuec(member, outside, staffel))
         .isInstanceOf(BadRequestException.class);
@@ -298,9 +271,9 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void anAdministratorWithoutAWriterUnitCannotCreate() {
-    User admin = member(true, true);
-    seat(admin, staffel, MembershipRole.MEMBER, false);
-    authenticateAsAdministrator(admin);
+    User admin = fixtures.member(true, true);
+    fixtures.seat(admin, staffel, MembershipRole.MEMBER, false);
+    WriterRuleFixtures.signInAsAdministrator(admin);
 
     assertThatThrownBy(() -> createAuec(admin, profitStaffel, staffel))
         .isInstanceOf(AccessDeniedException.class);
@@ -308,20 +281,20 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void everyPairTheExchangeRulePermitsIsOneTheWebPermitsForTheSameMemberWithoutAPin() {
-    User flagged = member(true, false);
-    seat(flagged, staffel, MembershipRole.MEMBER, true);
-    seat(flagged, profitStaffel, MembershipRole.MEMBER, true);
-    User squadronLead = member(true, false);
-    seat(squadronLead, outside, MembershipRole.STAFFELLEITER, false);
-    seat(squadronLead, staffel, MembershipRole.MEMBER, false);
-    User areaLead = member(true, false);
-    seat(areaLead, area, MembershipRole.BEREICHSLEITER, false);
-    seat(areaLead, areaCommand, MembershipRole.MEMBER, false);
-    User leitungMember = member(true, false);
-    seat(leitungMember, leitung(), MembershipRole.OL_MEMBER, false);
-    seat(leitungMember, areaCommand, MembershipRole.MEMBER, true);
-    User admin = member(true, true);
-    seat(admin, staffel, MembershipRole.MEMBER, true);
+    User flagged = fixtures.member(true, false);
+    fixtures.seat(flagged, staffel, MembershipRole.MEMBER, true);
+    fixtures.seat(flagged, profitStaffel, MembershipRole.MEMBER, true);
+    User squadronLead = fixtures.member(true, false);
+    fixtures.seat(squadronLead, outside, MembershipRole.STAFFELLEITER, false);
+    fixtures.seat(squadronLead, staffel, MembershipRole.MEMBER, false);
+    User areaLead = fixtures.member(true, false);
+    fixtures.seat(areaLead, area, MembershipRole.BEREICHSLEITER, false);
+    fixtures.seat(areaLead, areaCommand, MembershipRole.MEMBER, false);
+    User leitungMember = fixtures.member(true, false);
+    fixtures.seat(leitungMember, fixtures.leitung(), MembershipRole.OL_MEMBER, false);
+    fixtures.seat(leitungMember, areaCommand, MembershipRole.MEMBER, true);
+    User admin = fixtures.member(true, true);
+    fixtures.seat(admin, staffel, MembershipRole.MEMBER, true);
 
     for (User member : List.of(flagged, squadronLead, areaLead, leitungMember, admin)) {
       Set<List<UUID>> exchange = permittedPairs(JobOrderWriterRule.DIRECT_LOGISTICIAN, member);
@@ -334,8 +307,7 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @AfterEach
   void clearAuthentication() {
-    SecurityContextHolder.clearContext();
-    RequestContextHolder.resetRequestAttributes();
+    WriterRuleFixtures.signOut();
   }
 
   /**
@@ -343,16 +315,7 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
    * minted for the member by the real converter and no pin.
    */
   private Set<List<UUID>> permittedPairs(JobOrderWriterRule rule, User member) {
-    SecurityContextHolder.getContext()
-        .setAuthentication(
-            new JwtAuthenticationToken(
-                Jwt.withTokenValue("pair-subset")
-                    .header("alg", "none")
-                    .subject(member.getId().toString())
-                    .build(),
-                converter.assembleFor(users.findById(member.getId()).orElseThrow())));
-    RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(new MockHttpServletRequest()));
+    fixtures.signInAsWebMember(member);
     JobOrderWriters.Scope scope =
         writers.resolve(
             rule,
@@ -382,17 +345,6 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
         new JobOrderActor.Client(member.getId(), "rule-test-client"));
   }
 
-  private static void authenticateAsAdministrator(User admin) {
-    SecurityContextHolder.getContext()
-        .setAuthentication(
-            new TestingAuthenticationToken(
-                admin.getId().toString(),
-                null,
-                List.of(
-                    new SimpleGrantedAuthority(Roles.authority(Roles.ADMIN)),
-                    new SimpleGrantedAuthority(Roles.authority(Roles.KRT_MEMBER)))));
-  }
-
   private Set<UUID> requestingUnits(User member) {
     return seededIds(optionsOf(member).requestingOptions());
   }
@@ -409,53 +361,5 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
         .map(JobOrderCreateUnitOptionDto::orgUnitId)
         .filter(seeded::contains)
         .collect(Collectors.toSet());
-  }
-
-  private Organisationsleitung leitung() {
-    return leitungen.findAll().stream()
-        .findFirst()
-        .orElseGet(() -> {
-          Organisationsleitung created = new Organisationsleitung();
-          created.setName("Rule OL " + area.getShorthand());
-          created.setShorthand("O" + area.getShorthand());
-          return leitungen.save(created);
-        });
-  }
-
-  private Squadron squadron(String name, @Nullable OrgUnit parent, boolean active) {
-    Squadron unit = new Squadron();
-    unit.setName(name);
-    unit.setShorthand(name);
-    unit.setParent(parent);
-    unit.setActive(active);
-    return units.save(unit);
-  }
-
-  private User member(boolean krtMember, boolean admin) {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    user.setUsername("rule-" + user.getId());
-    user.setApprovalStatus(ApprovalStatus.ACTIVE);
-    user.setInKeycloak(true);
-    Set<de.greluc.krt.profit.basetool.backend.identity.api.Role> held = new HashSet<>();
-    if (krtMember) {
-      held.add(roles.findByCode(Roles.KRT_MEMBER).orElseThrow());
-    }
-    if (admin) {
-      held.add(roles.findByCode(Roles.ADMIN).orElseThrow());
-    }
-    user.setRoles(held);
-    return users.saveAndFlush(user);
-  }
-
-  private void seat(User user, OrgUnit unit, MembershipRole rank, boolean logistician) {
-    OrgUnitMembership membership = new OrgUnitMembership();
-    membership.setId(new OrgUnitMembershipId(user.getId(), unit.getId()));
-    membership.setUser(user);
-    membership.setKind(unit.getKind());
-    membership.setRole(rank);
-    membership.setLogistician(logistician);
-    membership.setJoinedAt(Instant.now());
-    memberships.saveAndFlush(membership);
   }
 }
