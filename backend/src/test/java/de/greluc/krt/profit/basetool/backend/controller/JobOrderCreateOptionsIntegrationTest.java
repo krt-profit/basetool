@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -48,8 +50,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -69,6 +74,7 @@ class JobOrderCreateOptionsIntegrationTest {
   private MockMvc mvc;
   private Squadron responsible;
   private Squadron requester;
+  private Squadron unrelated;
   private UUID caller;
   private UUID profitRootId;
 
@@ -85,6 +91,7 @@ class JobOrderCreateOptionsIntegrationTest {
     profitRootId = profit.getId();
     responsible = squadron("0 Creation responsible " + tag, profit);
     requester = squadron("Creation requester " + tag, null);
+    unrelated = squadron("Creation unrelated " + tag, null);
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("creation-" + tag);
@@ -173,6 +180,82 @@ class JobOrderCreateOptionsIntegrationTest {
         .andExpect(jsonPath("$.canCreate").value(false))
         .andExpect(jsonPath("$.responsibleOptions").isEmpty())
         .andExpect(jsonPath("$.requestingOptions").isEmpty());
+  }
+
+  @Test
+  void aRequestingWriterIsOfferedOnlyTheRequestingUnitsItWrites() throws Exception {
+    options(null, writerOf(requester.getId()))
+        .andExpect(jsonPath(requesting(requester) + ".canWrite").value(contains(true)))
+        .andExpect(jsonPath(requesting(unrelated)).value(empty()))
+        .andExpect(jsonPath(responsibleOption(responsible) + ".canWrite").value(contains(false)));
+  }
+
+  @Test
+  void aResponsibleWriterIsOfferedEveryActiveUnitAsRequester() throws Exception {
+    options(null, writerOf(responsible.getId()))
+        .andExpect(jsonPath(requesting(requester) + ".canWrite").value(contains(false)))
+        .andExpect(jsonPath(requesting(unrelated) + ".canWrite").value(contains(false)))
+        .andExpect(jsonPath(responsibleOption(responsible) + ".canWrite").value(contains(true)));
+  }
+
+  @Test
+  void anAdministratorWithoutAPinWritesEveryOfferedUnit() throws Exception {
+    options(null, admin())
+        .andExpect(jsonPath("$.canCreate").value(true))
+        .andExpect(jsonPath(requesting(requester) + ".canWrite").value(contains(true)))
+        .andExpect(jsonPath(requesting(unrelated) + ".canWrite").value(contains(true)))
+        .andExpect(jsonPath(responsibleOption(responsible) + ".canWrite").value(contains(true)))
+        .andExpect(jsonPath("$.suggestedAuecResponsibleOrgUnitId").value(profitRootId.toString()));
+  }
+
+  @Test
+  void anAdministratorPinnedToOneUnitWritesOnlyThatUnit() throws Exception {
+    options(requester.getId(), admin())
+        .andExpect(jsonPath("$.canCreate").value(true))
+        .andExpect(jsonPath(requesting(requester) + ".canWrite").value(contains(true)))
+        .andExpect(jsonPath(requesting(unrelated)).value(empty()))
+        .andExpect(jsonPath(responsibleOption(responsible) + ".canWrite").value(contains(false)))
+        .andExpect(jsonPath("$.suggestedRequestingOrgUnitId").value(requester.getId().toString()));
+  }
+
+  @Test
+  void aDeactivatedUnitIsNeverOffered() throws Exception {
+    unrelated.setActive(false);
+    squadrons.saveAndFlush(unrelated);
+
+    options(null, admin()).andExpect(jsonPath(requesting(unrelated)).value(empty()));
+  }
+
+  private ResultActions options(UUID pin, List<GrantedAuthority> authorities) throws Exception {
+    MockHttpServletRequestBuilder request = get("/api/v1/orders/create-options");
+    if (pin != null) {
+      request.header("X-Active-Org-Unit-Id", pin);
+    }
+    return mvc.perform(
+            request.with(
+                jwt().jwt(token -> token.subject(caller.toString())).authorities(authorities)))
+        .andExpect(status().isOk());
+  }
+
+  private static String requesting(OrgUnit unit) {
+    return "$.requestingOptions[?(@.orgUnitId == '" + unit.getId() + "')]";
+  }
+
+  private static String responsibleOption(OrgUnit unit) {
+    return "$.responsibleOptions[?(@.orgUnitId == '" + unit.getId() + "')]";
+  }
+
+  private static List<GrantedAuthority> writerOf(UUID unit) {
+    return List.of(
+        new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+        new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+        new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unit));
+  }
+
+  private static List<GrantedAuthority> admin() {
+    return List.of(
+        new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+        new SimpleGrantedAuthority(Roles.authority(Roles.ADMIN)));
   }
 
   private Squadron squadron(String name, OrgUnit parent) {
