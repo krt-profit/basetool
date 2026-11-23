@@ -417,6 +417,24 @@ final class ExchangeJobOrderWorld {
   }
 
   /**
+   * Reads the parameters of the need-change notices the requesting side raised about an order for
+   * one recipient.
+   *
+   * @param order the order
+   * @param recipient the notified member
+   * @return each notice's stored parameters
+   */
+  @NotNull
+  List<String> needChangeNotices(@NotNull UUID order, @NotNull UUID recipient) {
+    return jdbc.queryForList(
+        "SELECT params FROM notification WHERE entity_id = ? AND recipient_user_id = ?"
+            + " AND type = 'JOB_ORDER_UPDATED_BY_REQUESTER'",
+        String.class,
+        order,
+        recipient);
+  }
+
+  /**
    * The counter of the world's client's job-order writes under an outcome.
    *
    * @param outcome {@code applied} or {@code rejected}

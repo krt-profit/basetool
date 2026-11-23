@@ -203,6 +203,11 @@ public enum AuditEventType {
   JOB_ORDER_ITEM_CREATED(AuditDomain.JOB_ORDER),
   /** A material job order was edited (materials/handle/requesting unit). */
   JOB_ORDER_UPDATED(AuditDomain.JOB_ORDER),
+  /**
+   * A member changed an aUEC order's comment through an exchange client; the text is never recorded
+   * (REQ-OXCH-008).
+   */
+  JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT(AuditDomain.JOB_ORDER),
   /** An item job order was edited (item lines rebuilt). */
   JOB_ORDER_ITEM_UPDATED(AuditDomain.JOB_ORDER),
   /** A job order's status was changed via the status endpoint. */

@@ -286,10 +286,10 @@ class ExchangeJobOrderTargetTest {
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(() ->
-            assertThat(needChangeNotices(order, profitLogistician))
+            assertThat(world.needChangeNotices(order, profitLogistician))
                 .singleElement()
                 .satisfies(params -> assertThat(params).contains("VerseKit")));
-    assertThat(needChangeNotices(order, logistician)).isEmpty();
+    assertThat(world.needChangeNotices(order, logistician)).isEmpty();
   }
 
   @Test
@@ -405,14 +405,5 @@ class ExchangeJobOrderTargetTest {
   private @NotNull List<Map<String, Object>> targetChanges(@NotNull UUID order) {
     return jdbc.queryForList(
         "SELECT actor_id, client_id FROM job_order_money_target_change WHERE order_id = ?", order);
-  }
-
-  private @NotNull List<String> needChangeNotices(@NotNull UUID order, @NotNull UUID recipient) {
-    return jdbc.queryForList(
-        "SELECT params FROM notification WHERE entity_id = ? AND recipient_user_id = ?"
-            + " AND type = 'JOB_ORDER_UPDATED_BY_REQUESTER'",
-        String.class,
-        order,
-        recipient);
   }
 }

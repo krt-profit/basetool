@@ -91,6 +91,30 @@
         "lifecycleVersion"
       ]
     },
+    "comment": {
+      "title": "Change an aUEC order's comment",
+      "description": "Replaces the comment of an aUEC order of a unit the member writes for, under the comment's own version; the contact is never written. A cancelled order answers 409 JOB_ORDER_CLOSED. A stale commentVersion answers 409 VERSION_CONFLICT, so a retry after the gateway's one-hour cache does too. The comment then shows the application's name until it is changed in the Basetool.",
+      "type": "object",
+      "properties": {
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000,
+          "description": "Plain text; the Basetool shows it as text, links are not clickable. It is trimmed, and null or blank clears it."
+        },
+        "commentVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "versions.comment as last read."
+        }
+      },
+      "required": [
+        "comment",
+        "commentVersion"
+      ]
+    },
     "written": {
       "title": "Written aUEC order",
       "description": "Only the order's id, status and new versions after a write on an existing order; read the order itself from the job-order snapshot or feed.",

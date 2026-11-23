@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientWriteRefusedException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeRead;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReads;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderInformationCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatusCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderTargetCommand;
@@ -39,6 +40,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -61,6 +63,7 @@ public class ExchangeJobOrderChangeService {
 
   private final JobOrderStatusCommand statusCommand;
   private final JobOrderTargetCommand targetCommand;
+  private final JobOrderInformationCommand informationCommand;
   private final JobOrderExchangeReads reads;
   private final ExchangeJobOrderMetrics metrics;
 
@@ -134,6 +137,41 @@ public class ExchangeJobOrderChangeService {
                 read.status(),
                 ExchangeJobOrderDto.Versions.of(read.versions()),
                 ExchangeAmounts.auecTarget(read)));
+  }
+
+  /**
+   * Replaces the comment of an aUEC order of a unit the member writes for, under the comment's own
+   * version, and leaves the contact untouched (REQ-OXCH-008).
+   *
+   * @param caller the acting member and client
+   * @param orderId the order
+   * @param comment the new comment; {@code null} or blank clears it
+   * @param commentVersion the comment version the client last read
+   * @return the order's id, status and new versions
+   * @throws NotFoundException for an unknown, hidden or deleted order, alike
+   * @throws AccessDeniedException for an order the member does not write for, or one of another
+   *     kind than aUEC
+   * @throws ObjectOptimisticLockingFailureException when the comment version is stale
+   * @throws ExchangeProblemException {@code 409 JOB_ORDER_RESPONSIBILITY_INVALID} or {@code 409
+   *     JOB_ORDER_CLOSED}
+   */
+  @NotNull
+  public ExchangeJobOrderWrittenDto comment(
+      @NotNull ExchangeCaller caller,
+      @NotNull UUID orderId,
+      @Nullable String comment,
+      long commentVersion) {
+    return written(
+        caller,
+        orderId,
+        () ->
+            informationCommand.changeComment(
+                orderId,
+                comment,
+                commentVersion,
+                JobOrderWriterRule.DIRECT_LOGISTICIAN,
+                JobOrderReadCheck.OWN_RELATION,
+                actor(caller)));
   }
 
   /**

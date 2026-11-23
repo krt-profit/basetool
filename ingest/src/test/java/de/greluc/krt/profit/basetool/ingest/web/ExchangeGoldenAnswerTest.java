@@ -577,6 +577,11 @@ class ExchangeGoldenAnswerTest {
         post(
             "/job-orders/7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/target",
             fixture("job-order-write--targetChange/valid/raise.json")));
+    routes.put(
+        "route-post-job-order-comment",
+        post(
+            "/job-orders/7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/comment",
+            fixture("job-order-write--comment/valid/comment.json")));
     routes.put("route-get-openapi", get("/openapi.json"));
     routes.put("route-get-schema", get("/schemas/page.schema.json"));
     return routes;
@@ -656,6 +661,8 @@ class ExchangeGoldenAnswerTest {
             fixture("job-order-write--written/valid/cancelled.json");
         case "POST /api/v1/exchange/job-orders/{id}/target" ->
             fixture("job-order-write--targetChanged/valid/raised.json");
+        case "POST /api/v1/exchange/job-orders/{id}/comment" ->
+            fixture("job-order-write--written/valid/commented.json");
         case "POST /api/v1/exchange/me/drafts/blueprints" -> PREVIEW;
         case "POST /api/v1/exchange/me/drafts/refinery-orders" -> REFINERY_DRAFT;
         default -> "{\"code\":\"NOT_FOUND\"}";

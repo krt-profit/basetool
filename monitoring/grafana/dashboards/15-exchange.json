@@ -1873,7 +1873,7 @@
       },
       "type": "timeseries",
       "title": "Job-order writes/day",
-      "description": "Job-order writes through clients per day by client and outcome: applied creates, including a retry answered from the stored key, and rejected ones; a pair that is not offered also counts as units_not_offered, a create at a cap as open_order_cap or daily_create_cap in the backend refusals panel (REQ-OXCH-004, REQ-OXCH-009, REQ-OBS-025). Cancels count the same way, a refused one also under its reason in the backend refusals panel (REQ-OXCH-006). Target changes count the same way (REQ-OXCH-007).",
+      "description": "Job-order writes through clients per day by client and outcome: applied creates, including a retry answered from the stored key, and rejected ones; a pair that is not offered also counts as units_not_offered, a create at a cap as open_order_cap or daily_create_cap in the backend refusals panel (REQ-OXCH-004, REQ-OXCH-009, REQ-OBS-025). Cancels count the same way, a refused one also under its reason in the backend refusals panel (REQ-OXCH-006). Target changes (REQ-OXCH-007) and comment changes (REQ-OXCH-008) count the same way too.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

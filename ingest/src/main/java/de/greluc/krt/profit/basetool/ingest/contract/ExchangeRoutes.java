@@ -136,7 +136,8 @@ public final class ExchangeRoutes {
           route(HttpMethod.GET, JOB_ORDERS_PATH + "/create-options", "exchange.joborders.write"),
           write(HttpMethod.POST, JOB_ORDERS_PATH, "exchange.joborders.write"),
           write(HttpMethod.POST, JOB_ORDERS_PATH + "/{id}/cancel", "exchange.joborders.write"),
-          write(HttpMethod.POST, JOB_ORDERS_PATH + "/{id}/target", "exchange.joborders.write"));
+          write(HttpMethod.POST, JOB_ORDERS_PATH + "/{id}/target", "exchange.joborders.write"),
+          write(HttpMethod.POST, JOB_ORDERS_PATH + "/{id}/comment", "exchange.joborders.write"));
 
   /** The bank route family as a pattern, matched against the decoded path segments. */
   private static final PathPattern BANK_FAMILY =

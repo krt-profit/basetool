@@ -1844,6 +1844,130 @@
         "x-domain" : "exchange"
       }
     },
+    "/api/v1/exchange/job-orders/{id}/comment" : {
+      "post" : {
+        "description" : "Gateway-only. Changes the comment of an aUEC order of one of the member's direct Logistician units through the web's information command, under the comment version alone; the contact is never written. Checked in this order under the order locks: an unknown, hidden or deleted order answers 404 NOT_FOUND; an order the member does not write for and a MATERIAL or ITEM order 403 ACCESS_DENIED; a stale comment version 409 OPTIMISTIC_LOCK; an invalid responsibility 409 JOB_ORDER_RESPONSIBILITY_INVALID; a cancelled order 409 JOB_ORDER_CLOSED.",
+        "operationId" : "comment",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeJobOrderCommentDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeJobOrderWrittenDto"
+                }
+              }
+            },
+            "description" : "The order with its new comment version"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: change an aUEC order's comment",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
     "/api/v1/exchange/job-orders/{id}/target" : {
       "post" : {
         "description" : "Gateway-only. Raises or lowers the target of an open or in-progress aUEC order of one of the member's direct Logistician units through the web's target command. Checked in this order under the order locks: an unknown, hidden or deleted order answers 404 NOT_FOUND; an order the member does not write for and a MATERIAL or ITEM order 403 ACCESS_DENIED; a stale target version 409 OPTIMISTIC_LOCK; an invalid responsibility 409 JOB_ORDER_RESPONSIBILITY_INVALID; an order that is not open or in progress 409 JOB_ORDER_CLOSED; a target at or below the order's net handover 409 JOB_ORDER_TARGET_TOO_LOW. Never completes or reopens the order and moves no money.",
@@ -6091,6 +6215,22 @@
           }
         },
         "required" : [ "lifecycleVersion" ]
+      },
+      "ExchangeJobOrderCommentDto" : {
+        "type" : "object",
+        "properties" : {
+          "comment" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
+          "commentVersion" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "commentVersion" ]
       },
       "ExchangeJobOrderCreateDto" : {
         "type" : "object",

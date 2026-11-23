@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -66,12 +67,12 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The create options, the create, the cancel and the target change of an aUEC order through both
- * gates, with the backend relay mocked (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006, REQ-OXCH-007,
- * REQ-OXCH-009): the gateway checks the order id and the body before the relay, relays the client's
- * key on the create only, answers a created order with {@code 201}, passes the pair refusal, both
- * cap refusals and the refusals of a write on an existing order on, the daily cap with the wait
- * until the next UTC day, checks the create options' limits and the target answer, and needs {@code
+ * The create options, the create, the cancel, the target change and the comment change of an aUEC
+ * order through both gates, with the backend relay mocked (REQ-OXCH-004 to REQ-OXCH-009): the
+ * gateway checks the order id and the body before the relay, relays the client's key on the create
+ * only, answers a created order with {@code 201}, passes the pair refusal, both cap refusals and
+ * the refusals of a write on an existing order on, the daily cap with the wait until the next UTC
+ * day, checks the create options' limits and the target answer, and needs {@code
  * exchange.joborders.write}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -85,6 +86,7 @@ class ExchangeJobOrderWriteRouteTest {
   private static final Set<String> SCOPES = Set.of("exchange.connect", "exchange.joborders.write");
   private static final String ORDER = "7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
   private static final String CANCEL = "job-order-write--cancel/valid/cancel.json";
+  private static final String COMMENT = "job-order-write--comment/valid/comment.json";
   private static final String TARGET = "job-order-write--targetChange/valid/raise.json";
 
   @Autowired private WebApplicationContext context;
@@ -301,6 +303,82 @@ class ExchangeJobOrderWriteRouteTest {
     call(HttpMethod.POST, cancelRoute(ORDER), example(CANCEL))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+  }
+
+  @Test
+  void aCommentIsRelayedToTheOrderWithoutTheKeyAndAnsweredWithTheWrittenOrder() throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.POST), eq(BACKEND + "/" + ORDER + "/comment"), any(), any(), any()))
+        .thenReturn(ok(example("job-order-write--written/valid/commented.json")));
+
+    call(HttpMethod.POST, commentRoute(ORDER.toUpperCase(Locale.ROOT)), example(COMMENT))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("OPEN"))
+        .andExpect(jsonPath("$.versions.comment").value(1));
+    call(HttpMethod.POST, commentRoute(ORDER), example("job-order-write--comment/valid/clear.json"))
+        .andExpect(status().isOk());
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any(), anyString());
+  }
+
+  @Test
+  void aCommentOutsideTheSchemaOrOnAMalformedIdIsRefusedBeforeTheRelay() throws Exception {
+    for (String invalid :
+        List.of("without-comment.json", "lifecycle-version.json", "negative-version.json")) {
+      call(
+              HttpMethod.POST,
+              commentRoute(ORDER),
+              example("job-order-write--comment/invalid/" + invalid))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+    }
+    call(
+            HttpMethod.POST,
+            commentRoute(ORDER),
+            "{\"comment\":\"" + "x".repeat(1001) + "\",\"commentVersion\":0}")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+    call(HttpMethod.POST, commentRoute("not-an-order"), example(COMMENT))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[0].pointer").value("/id"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void theRefusalsOfACommentReachTheClientWithTheirCodes() throws Exception {
+    for (String code : List.of("VERSION_CONFLICT", "JOB_ORDER_CLOSED")) {
+      String detail = "The fixed detail of " + code + ".";
+      when(relay.forward(
+              eq(HttpMethod.POST), eq(BACKEND + "/" + ORDER + "/comment"), any(), any(), any()))
+          .thenReturn(new ExchangeRelay.Result(409, null, code, detail));
+
+      call(HttpMethod.POST, commentRoute(ORDER), example(COMMENT))
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.code").value(code))
+          .andExpect(jsonPath("$.detail").value(detail));
+    }
+  }
+
+  @Test
+  void theReadScopeAloneDoesNotOpenTheComment() throws Exception {
+    Set<String> read = Set.of("exchange.connect", "exchange.joborders.read");
+    when(registryReader.current())
+        .thenReturn(ExchangeTestSupport.registryWithEveryArea(read, "2.0.0", 120));
+
+    call(HttpMethod.POST, commentRoute(ORDER), example(COMMENT))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+  }
+
+  /**
+   * The gateway route of an order's comment change.
+   *
+   * @param id the order id as the path carries it
+   * @return the route
+   */
+  private static @NotNull String commentRoute(@NotNull String id) {
+    return ROUTE + "/" + id + "/comment";
   }
 
   @Test

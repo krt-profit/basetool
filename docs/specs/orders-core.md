@@ -248,8 +248,12 @@ the writer and the version (ADR-0408). Through a client the status write is narr
 of the requesting unit cancels, only an active aUEC order and only before its first accepted money
 operation, and no client reopens a cancellation; the client's command decides the exchange's order
 of refusals (read set, writer, version, responsibility, status, money) under the same locks, while
-the web keeps its own. MATERIAL and ITEM need edits preserve the current lifecycle, including
-manual completion and cancellation. aUEC target-change effects follow its money spec.
+the web keeps its own. A client's information write is narrower as well
+([REQ-OXCH-008](orders-exchange.md#req-oxch-008--change-the-comment-of-an-auec-order)): it changes
+the comment of an aUEC order alone, under the comment's own version, never the contact, and keeps
+the web's status rule that a cancelled order takes no comment. MATERIAL and ITEM need edits
+preserve the current lifecycle, including manual completion and cancellation. aUEC target-change
+effects follow its money spec.
 
 Cancelling MATERIAL/ITEM stops ordinary fulfillment and releases order stock earmarks without
 deleting physical stock, booked
@@ -295,8 +299,9 @@ the aUEC handover, target changes and status writes in `JobOrderMoneyIntegration
 the order of the refusals, the audit event and the notices without the actor, and
 `JobOrderWriteRuleIntegrationTest` the database writer rule at the status command and that every
 status write it permits is one the web permits for the same member. `ExchangeJobOrderCancelTest`
-covers a client's cancel and its order of refusals.
-**Issues:** #3195, #3200, #3201, #3637, #3641, #3650
+covers a client's cancel and its order of refusals, `ExchangeJobOrderCommentTest` a client's
+comment change and its order of refusals.
+**Issues:** #3195, #3200, #3201, #3637, #3641, #3650, #3652
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
 

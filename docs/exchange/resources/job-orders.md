@@ -4,7 +4,7 @@ The job orders of all three kinds that the member relates to, under scope
 `exchange.joborders.read`: material orders, item orders and aUEC orders, which ask for a provision
 of credits. Under scope `exchange.joborders.write` a Logistician creates aUEC orders on behalf of
 their own units ([creating an aUEC order](#creating-an-auec-order)), cancels them before any
-money moved and changes their target above what was handed over
+money moved, and changes their target above what was handed over and their comment
 ([writes on an existing order](#writes-on-an-existing-order)). Every route lies below
 `/exchange/v1/job-orders`.
 
@@ -27,6 +27,7 @@ assignees or support; each order carries a [`link`](#the-link) to its page for a
 | `POST /exchange/v1/job-orders` | job-order data | keep the answer in memory only, for at most 7 days |
 | `POST /exchange/v1/job-orders/{id}/cancel` | job-order data | keep the answer in memory only, for at most 7 days |
 | `POST /exchange/v1/job-orders/{id}/target` | job-order data | keep the answer in memory only, for at most 7 days |
+| `POST /exchange/v1/job-orders/{id}/comment` | job-order data | keep the answer in memory only, for at most 7 days |
 
 Job-order data of every kind, the member's own orders included, is kept for at most 7 days,
 outside cloud-synced folders, never in a backup or diagnostics, and never forwarded. Keep it out of
@@ -365,6 +366,23 @@ The change runs as in the Basetool: the order's target history names the member 
 application, the responsible unit's writers are told of the new need, naming your application, and
 open pages update at once. A completed order's target is changed in the Basetool.
 
+### Comment
+
+`POST /exchange/v1/job-orders/{id}/comment` with an `Idempotency-Key` — the body is
+[`job-order-write`](../schemas/) `#/$defs/comment`:
+
+```json
+{ "comment": "Deliver to Area18, hangar 3", "commentVersion": 0 }
+```
+
+It replaces the order's `comment` with plain text of at most 1000 characters; the text is trimmed,
+and `null` or a blank text clears it. It echoes `versions.comment` alone: the contact is never
+written through a client, so a contact change in the Basetool never conflicts with it. Every
+status but `CANCELLED` admits it (else `409 JOB_ORDER_CLOSED`). The comment then shows your
+application's name on the order until it is changed in the Basetool, the responsible unit is told
+of the change, naming your application, and open pages update at once. Sending the comment the
+order already holds changes nothing and answers the current `versions`.
+
 ## Client guidance
 
 - **An isolated area.** Make job orders their own area, so a job-order refusal — the switches
@@ -400,7 +418,7 @@ open pages update at once. A completed order's target is changed in the Basetool
 | 404 | `NOT_FOUND` | a write on an order that is unknown, deleted or outside the member's set, alike | drop the order locally |
 | 409 | `VERSION_CONFLICT` | the echoed section version is stale, also on a retry after the one-hour cache | read again, merge, retry |
 | 409 | `JOB_ORDER_RESPONSIBILITY_INVALID` | a write on an order whose responsibility is invalid | do not retry; offer the order's `link` |
-| 409 | `JOB_ORDER_CLOSED` | a cancel or a target change of an order that is not `OPEN` or `IN_PROGRESS` | read again; offer the order's `link` |
+| 409 | `JOB_ORDER_CLOSED` | a cancel or a target change of an order that is not `OPEN` or `IN_PROGRESS`, or a comment change on a `CANCELLED` order | read again; offer the order's `link` |
 | 409 | `JOB_ORDER_MONEY_STARTED` | a cancel after the first accepted money operation; one code for every money fact | offer the order's `link`; cancelling happens in the Basetool |
 | 409 | `JOB_ORDER_TARGET_TOO_LOW` | a target change to an amount at or below the order's `netHandedOver` | read `netHandedOver` again; completing the order happens in the Basetool |
 | 409 | `JOB_ORDER_OPEN_ORDER_CAP` | a create while the member holds `openOrderCap` open orders created through clients ([limits](#limits)) | grey out the create until one of them closes; then create under a new key |

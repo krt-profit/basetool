@@ -197,12 +197,31 @@ public class JobOrderMoneyOrderChanges
    * @param dto the information fields and their observed revisions
    */
   public void information(UUID orderId, UpdateJobOrderMoneyInformationDto dto) {
-    writeInformation(
+    JobOrderCaller caller = access.webCaller();
+    UUID member = access.memberOf(caller.actor());
+    identityLock.lockAccounts(member);
+    editor.editMoney(
         orderId,
-        new Contact(dto.handle(), dto.version()),
-        dto.comment(),
-        dto.commentVersion(),
-        access.webCaller());
+        caller.read(),
+        _ -> false,
+        (order, _) -> {
+          final JobOrderWriters.Scope scope = requireWriter(order, member, caller);
+          OptimisticLock.check(
+              order.getMoneyInformationVersion(), dto.version(), JobOrder.class, orderId);
+          JobOrderComment.check(order, dto.commentVersion());
+          boolean contactChanged = replaceContact(order, dto.handle());
+          boolean commentChanged = JobOrderComment.replace(order, dto.comment(), caller.actor());
+          if (!contactChanged && !commentChanged) {
+            return new JobOrderEditor.MoneyEdit<>(order, JobOrderEdit.unchanged(order));
+          }
+          return informationChanged(
+              order,
+              JobOrderEdit.audited(
+                  order, AuditEventType.JOB_ORDER_UPDATED, AuditDetails.of("information", true)),
+              member,
+              scope,
+              caller.actor());
+        });
   }
 
   @Override
@@ -213,53 +232,54 @@ public class JobOrderMoneyOrderChanges
       @NotNull JobOrderWriterRule rule,
       @NotNull JobOrderReadCheck read,
       @NotNull JobOrderActor actor) {
-    writeInformation(orderId, null, comment, commentVersion, new JobOrderCaller(rule, read, actor));
-  }
-
-  /**
-   * The one information command: the comment under its own revision, and the contact under the
-   * information revision when the write carries it.
-   */
-  private void writeInformation(
-      UUID orderId,
-      @Nullable Contact contact,
-      @Nullable String comment,
-      @Nullable Long commentVersion,
-      JobOrderCaller caller) {
-    UUID member = access.memberOf(caller.actor());
+    JobOrderCaller caller = new JobOrderCaller(rule, read, actor);
+    UUID member = access.memberOf(actor);
     identityLock.lockAccounts(member);
     editor.editMoney(
         orderId,
-        caller.read(),
+        clientRules.checks(
+            caller,
+            new JobOrderClientWriteRules.Write(
+                JobOrderWriters.Scope::writesEitherSide,
+                JobOrder::getCommentVersion,
+                commentVersion,
+                JobOrderMoneyOrderChanges::openForEdits)),
         _ -> false,
-        (order, _) -> {
-          final JobOrderWriters.Scope scope = requireWriter(order, member, caller);
-          if (contact != null) {
-            OptimisticLock.check(
-                order.getMoneyInformationVersion(), contact.version(), JobOrder.class, orderId);
-          }
-          JobOrderComment.check(order, commentVersion);
-          boolean contactChanged = contact != null && replaceContact(order, contact.handle());
-          boolean commentChanged = JobOrderComment.replace(order, comment, caller.actor());
-          if (!contactChanged && !commentChanged) {
-            return new JobOrderEditor.MoneyEdit<>(order, JobOrderEdit.unchanged(order));
-          }
-          effects.informationChanged(order);
-          return new JobOrderEditor.MoneyEdit<>(
-              order,
-              JobOrderEdit.audited(
-                      order, AuditEventType.JOB_ORDER_UPDATED, AuditDetails.of("information", true))
-                  .notifying(List.of(needChanged(order, member, scope, caller.actor()))));
-        });
+        (order, _) -> commentLocked(order, comment, member, caller));
   }
 
   /**
-   * The contact an information write replaces.
-   *
-   * @param handle the requested contact
-   * @param version the information revision the caller observed; {@code null} is a conflict
+   * Replaces the comment of the checked, locked order for a client's write and audits it with the
+   * client's own type and no details, since the text is never recorded (REQ-OXCH-008).
    */
-  private record Contact(@NotNull String handle, @Nullable Long version) {}
+  private JobOrderEditor.MoneyEdit<JobOrder> commentLocked(
+      JobOrder order, @Nullable String comment, UUID member, JobOrderCaller caller) {
+    access.requireActive(member);
+    if (!JobOrderComment.replace(order, comment, caller.actor())) {
+      return new JobOrderEditor.MoneyEdit<>(order, JobOrderEdit.unchanged(order));
+    }
+    return informationChanged(
+        order,
+        JobOrderEdit.audited(order, AuditEventType.JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT, null),
+        member,
+        writers.resolve(caller.rule(), caller.actor()),
+        caller.actor());
+  }
+
+  /**
+   * Completes an information write that changed the order: the live update of its section, then the
+   * audit with the need-change notice.
+   */
+  private JobOrderEditor.MoneyEdit<JobOrder> informationChanged(
+      JobOrder order,
+      JobOrderEdit audit,
+      UUID member,
+      JobOrderWriters.Scope scope,
+      JobOrderActor actor) {
+    effects.informationChanged(order);
+    return new JobOrderEditor.MoneyEdit<>(
+        order, audit.notifying(List.of(needChanged(order, member, scope, actor))));
+  }
 
   /**
    * Requires an active member who writes either side of the order under the caller's rule, and an
@@ -294,9 +314,14 @@ public class JobOrderMoneyOrderChanges
   }
 
   private static void requireOpenForEdits(JobOrder order) {
-    if (order.getStatus() == JobOrderStatus.CANCELLED) {
+    if (!openForEdits(order.getStatus())) {
       throw new BusinessConflictException("orders.money.movement.inactive");
     }
+  }
+
+  /** Tells whether an order in the status takes target and information edits: all but cancelled. */
+  private static boolean openForEdits(JobOrderStatus status) {
+    return status != JobOrderStatus.CANCELLED;
   }
 
   private static boolean changesState(

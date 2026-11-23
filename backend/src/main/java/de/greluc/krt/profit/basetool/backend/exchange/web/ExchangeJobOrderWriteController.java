@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCaller;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeJobOrderChangeService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeJobOrderCreateService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCancelDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCommentDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
@@ -53,9 +54,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The job-order writes of an exchange client under {@code exchange.joborders.write}, reachable only
- * from the ingest gateway (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006, REQ-OXCH-007): the create
- * options, the create of an aUEC order, its cancel and its target change. The job-order family
- * switch gates every route here and the writes switch every write (REQ-OXCH-009).
+ * from the ingest gateway (REQ-OXCH-004 to REQ-OXCH-008): the create options, the create of an aUEC
+ * order, its cancel, its target change and its comment change. The job-order family switch gates
+ * every route here and the writes switch every write (REQ-OXCH-009).
  */
 @RestController
 @RequestMapping("/api/v1/exchange/job-orders")
@@ -218,5 +219,45 @@ public class ExchangeJobOrderWriteController {
             id,
             body.target(),
             body.targetVersion()));
+  }
+
+  /**
+   * Changes the comment of an aUEC order of a unit the member writes for, under the comment's own
+   * version.
+   *
+   * @param id the order
+   * @param body the new comment and the comment version the client last read
+   * @param authentication the relayed acting member the gate admitted
+   * @return the order's id, status and new versions
+   */
+  @NotNull
+  @PostMapping("/{id}/comment")
+  @PreAuthorize("@exchangeGate.allows('exchange.joborders.write', authentication)")
+  @Operation(
+      summary = "Exchange: change an aUEC order's comment",
+      description =
+          "Gateway-only. Changes the comment of an aUEC order of one of the member's direct"
+              + " Logistician units through the web's information command, under the comment"
+              + " version alone; the contact is never written. Checked in this order under the"
+              + " order locks: an unknown, hidden or deleted order answers 404 NOT_FOUND; an order"
+              + " the member does not write for and a MATERIAL or ITEM order 403 ACCESS_DENIED; a"
+              + " stale comment version 409 OPTIMISTIC_LOCK; an invalid responsibility 409"
+              + " JOB_ORDER_RESPONSIBILITY_INVALID; a cancelled order 409 JOB_ORDER_CLOSED.")
+  @ApiResponse(responseCode = "200", description = "The order with its new comment version")
+  @ApiResponse(responseCode = "403", description = "The member does not write the order")
+  @ApiResponse(responseCode = "404", description = "No such order the member reads")
+  @ApiResponse(
+      responseCode = "409",
+      description = "A stale version, invalid responsibility or a cancelled order")
+  public ResponseEntity<ExchangeJobOrderWrittenDto> comment(
+      @NotNull @PathVariable UUID id,
+      @NotNull @Valid @RequestBody ExchangeJobOrderCommentDto body,
+      @NotNull Authentication authentication) {
+    return ResponseEntity.ok(
+        changeService.comment(
+            ExchangeCaller.of((SubjectAuthentication) authentication),
+            id,
+            body.comment(),
+            body.commentVersion()));
   }
 }

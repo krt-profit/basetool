@@ -36,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatusCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderTargetCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
-import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgHierarchyService;
@@ -211,8 +210,7 @@ class JobOrderWriteRuleIntegrationTest {
 
     WriterRuleFixtures.signInAsExchangeMember(member);
 
-    assertRefusedEveryWrite(
-        order, member, JobOrderClientWriteRefusedException.class, BadRequestException.class);
+    assertRefusedEveryWrite(order, member, JobOrderClientWriteRefusedException.class);
   }
 
   @Test
@@ -288,27 +286,18 @@ class JobOrderWriteRuleIntegrationTest {
     return key;
   }
 
-  private void assertRefusedEveryWrite(
-      UUID order, User member, Class<? extends RuntimeException> refusal) {
-    assertRefusedEveryWrite(order, member, refusal, refusal);
-  }
-
   /**
-   * Asserts that the cancel and the target and comment writes are refused and change nothing; the
-   * cancel and the target change answer in the order of the client writes' shared rules
-   * (REQ-OXCH-005).
+   * Asserts that the cancel and the target and comment writes are refused and change nothing; all
+   * three answer in the order of the client writes' shared rules (REQ-OXCH-005).
    */
   private void assertRefusedEveryWrite(
-      UUID order,
-      User member,
-      Class<? extends RuntimeException> sharedRulesRefusal,
-      Class<? extends RuntimeException> refusal) {
+      UUID order, User member, Class<? extends RuntimeException> refusal) {
     assertThatThrownBy(() -> statusCommand.cancel(order, 0L, rule(), read(), client(member)))
-        .isInstanceOf(sharedRulesRefusal);
+        .isInstanceOf(refusal);
     assertThatThrownBy(() ->
             targetCommand.changeTarget(
                 order, new BigDecimal("300000"), 0L, rule(), read(), client(member)))
-        .isInstanceOf(sharedRulesRefusal);
+        .isInstanceOf(refusal);
     assertThatThrownBy(() ->
             informationCommand.changeComment(order, "Note", 0L, rule(), read(), client(member)))
         .isInstanceOf(refusal);

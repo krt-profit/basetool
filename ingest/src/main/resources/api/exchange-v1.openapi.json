@@ -2484,6 +2484,73 @@
           }
         }
       }
+    },
+    "/exchange/v1/job-orders/{id}/comment": {
+      "post": {
+        "operationId": "job_order_comment",
+        "summary": "Change the comment of an aUEC order of one of the member's units.",
+        "description": "Replaces the comment of an aUEC order whose requesting unit is one of the member's requestingUnits, through the Basetool's own information change under the comment's own version: the same locks, notice and live update. The contact is never written, so a contact change in the Basetool never conflicts with it. Checked in this order: an unknown, hidden or deleted order answers 404 NOT_FOUND alike; an order the member reads but does not write for, and any MATERIAL or ITEM order, 403 NOT_PERMITTED; a stale commentVersion 409 VERSION_CONFLICT, which a retry after the one-hour cache answers too; an invalid responsibility 409 JOB_ORDER_RESPONSIBILITY_INVALID; a CANCELLED order 409 JOB_ORDER_CLOSED. The comment shows the application's name until it is changed in the Basetool, and the responsible unit is told of the change, naming the application. The answer names only the order's id, status and new versions. Counts one unit of the daily write quota, a refusal included. While the job-order writes switch is off the route answers 503 JOB_ORDER_WRITES_DISABLED with Retry-After: 300. There is no undo through a client.",
+        "tags": [
+          "job-orders"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.joborders.write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The order's id as the job-order read answers it; a malformed id answers 400 SCHEMA_INVALID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/comment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/written"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

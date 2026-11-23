@@ -45,11 +45,11 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The member's job-order writes on the gateway under {@code exchange.joborders.write}
- * (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006, REQ-OXCH-007): the create options, the create of an
- * aUEC order, its cancel and its target change. The order id and the body are checked before the
- * relay and the answer against its schema after it; the job-order switches, the route scope, the
- * idempotency key and the write quota are checked before a handler runs.
+ * The member's job-order writes on the gateway under {@code exchange.joborders.write} (REQ-OXCH-004
+ * to REQ-OXCH-008): the create options, the create of an aUEC order, its cancel, its target change
+ * and its comment change. The order id and the body are checked before the relay and the answer
+ * against its schema after it; the job-order switches, the route scope, the idempotency key and the
+ * write quota are checked before a handler runs.
  */
 @RestController
 @RequestMapping(ExchangeRoutes.JOB_ORDERS_PATH)
@@ -160,6 +160,26 @@ public class ExchangeJobOrderWriteController {
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
     return orderWrite(id, "target", body, "targetChange", "targetChanged", request, acceptLanguage);
+  }
+
+  /**
+   * Changes the comment of an aUEC order of the member's unit under the comment's own version.
+   *
+   * @param id the order's id
+   * @param body the new comment and the comment version
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the order's id, status and versions, or a problem
+   */
+  @PostMapping(value = "/{id}/comment", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("isAuthenticated()")
+  public @NotNull ResponseEntity<?> comment(
+      @NotNull @PathVariable String id,
+      @NotNull @RequestBody JsonNode body,
+      @NotNull HttpServletRequest request,
+      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage) {
+    return orderWrite(id, "comment", body, "comment", "written", request, acceptLanguage);
   }
 
   /**
