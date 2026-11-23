@@ -23,26 +23,24 @@ import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendCli
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
-import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
-/** Persists the aUEC creation form for both web transports. */
+/**
+ * Persists the aUEC creation form for both web transports; the backend's create command announces
+ * the new order to the open overviews (REQ-ORDERS-056).
+ */
 @Component
 @RequiredArgsConstructor
 public class JobOrderCreation {
 
-  static final List<String> ORDERS_QUEUE_SECTION = List.of("queue");
-
   private final JobOrderBackendClient jobOrderClient;
-  private final LiveSyncLocalBus liveSyncLocalBus;
 
   /**
-   * Creates the aUEC order, notifies the queue and resolves the order's detail destination.
+   * Creates the aUEC order and resolves the order's detail destination.
    *
    * @param form the validated order fields and exact net target
    * @return the created order's detail URL
@@ -54,9 +52,7 @@ public class JobOrderCreation {
       throw new BackendServiceException(
           "Backend returned no created aUEC order identity", null, HttpStatus.BAD_GATEWAY.value());
     }
-    String targetUrl = postCreateTarget(created);
-    liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
-    return targetUrl;
+    return postCreateTarget(created);
   }
 
   static @NotNull String postCreateTarget(@NotNull JobOrderDto created) {

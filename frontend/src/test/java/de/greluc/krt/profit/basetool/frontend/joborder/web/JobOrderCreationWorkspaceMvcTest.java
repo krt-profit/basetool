@@ -62,7 +62,10 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/** Verifies creation enters the created order's common workspace through every form transport. */
+/**
+ * Verifies creation enters the created order's common workspace through every form transport and
+ * leaves the {@code orders} frame to the backend's create command (REQ-ORDERS-056).
+ */
 class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
 
   private static final UUID CREATED_ID = UUID.fromString("00000000-0000-0000-0000-000000000053");
@@ -117,6 +120,7 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
           .andExpect(status().is3xxRedirection())
           .andExpect(redirectedUrl("/orders/" + CREATED_ID));
     }
+    verifyNoInteractions(liveSyncLocalBus);
   }
 
   @ParameterizedTest
@@ -138,7 +142,7 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
           .andExpect(redirectedUrl("/orders/" + CREATED_ID))
           .andExpect(flash().attribute("successToast", "success.joborder.create"));
     }
-    verify(liveSyncLocalBus).publish("orders", List.of("queue"));
+    verifyNoInteractions(liveSyncLocalBus);
   }
 
   @ParameterizedTest
