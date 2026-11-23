@@ -41,8 +41,8 @@ is the notification-engine view of it; the linked requirement is canonical.
 | Event (`NotificationEventType`) | Notification type(s) raised | Seed | Recipients (selectors) | Requirement |
 |---|---|---|---|---|
 | `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 + V387 | `ORG_RELATIVE_ROLE` `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-008 |
-| `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 + V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-017 |
-| `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` after a meaningful edit | REQ-NOTIF-017 |
+| `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 + V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING`; replaces the recipient's unread notice of the type and order | REQ-NOTIF-017 |
+| `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` after a meaningful edit; replaces the recipient's unread notice of the type and order | REQ-NOTIF-017 |
 | `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V360 · V360 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; the approval notice outranks the generic one | REQ-NOTIF-011/-033, [REQ-BANK-026](bank.md) |
 | `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
 | `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
@@ -800,17 +800,37 @@ coordination alone receives the eligible requester-edit notice first. For a resp
 revision, the eligible material notice takes precedence. Rule evaluation and muting apply to each
 original type before the cause chooses one notice per recipient.
 
+**One unread need-change notice per order and type.** A new `JOB_ORDER_UPDATED_BY_REQUESTER` or
+`JOB_ORDER_UPDATED_BY_RESPONSIBLE` notice replaces its recipient's earlier unread notice of the
+same type about the same order, whether a member or a connected client made the change, so a loop
+of edits cannot flood the other side's Inbox. Read notices stay, the two types never replace each
+other, and every new notice still pushes the unread signal (REQ-NOTIF-010). The event names the
+coalescing types through `NotificationEvent#replacesUnreadNotificationTypes`; delivery deletes the
+receiving members' unread rows of that type and order just before it stores the new ones, for a
+single event and for a grouped cause alike. A member who receives no new notice — the editor, a
+member who muted the type, one whom the cause gave a higher-priority notice — keeps theirs.
+
 **Acceptance**
 
 - [ ] Requester and meaningful responsible-side need changes reach both affected current unit
   audiences once and exclude the editor.
 - [ ] An identical responsible-side save raises no update notice.
 - [ ] Derived material changes preserve original preferences and receive one grouped delivery.
+- [x] A loop of requester or responsible-side need changes leaves each recipient one unread
+  need-change notice of the order per type.
+- [x] A read need-change notice, another order's notice and the notice of the other type stay.
 
 **Enforced by:** `ProfitHierarchyNoticeIntegrationTest`, `MaterialContributionEffectsIntegrationTest`,
-`MessageBundleConsistencyTest` · **Code:** `joborder/api/events/JobOrderUpdatedByRequesterEvent`,
+`MessageBundleConsistencyTest`, `JobOrderNoticeIntegrationTest` · **Code:**
+`joborder/api/events/JobOrderUpdatedByRequesterEvent`,
 `joborder/internal/JobOrderLifecycleNotices`, `joborder/internal/JobOrderChangeEffects`,
-`V387__seed_shared_order_notification_audiences.sql`
+`joborder/api/events/JobOrderNotices#needChanged`,
+`notification/api/events/NotificationEvent#replacesUnreadNotificationTypes`,
+`notification/internal/NotificationEventPreparation#replaceUnread`,
+`notification/api/NotificationRepository#deleteUnreadOfTypeAndEntityForRecipients`,
+`V387__seed_shared_order_notification_audiences.sql` · **Decision:**
+[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)
+(item 9) · **Issues:** #3617, #3638
 
 ### REQ-NOTIF-018 — Superseding: clear stale "action needed" notifications on lifecycle close
 
