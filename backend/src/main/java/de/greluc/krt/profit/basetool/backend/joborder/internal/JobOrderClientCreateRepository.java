@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
@@ -30,8 +31,8 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 /**
- * Serialises and finds the aUEC orders members create through clients (REQ-OXCH-004), and clears
- * their creators once they left the exchange's client set (REQ-OXCH-010).
+ * Serialises, finds and counts the aUEC orders members create through clients (REQ-OXCH-004,
+ * REQ-OXCH-009), and clears their creators once they left the exchange's client set (REQ-OXCH-010).
  */
 interface JobOrderClientCreateRepository extends Repository<JobOrder, UUID> {
 
@@ -71,6 +72,32 @@ interface JobOrderClientCreateRepository extends Repository<JobOrder, UUID> {
       @Param("member") UUID member,
       @Param("clientId") String clientId,
       @Param("idempotencyKey") String idempotencyKey);
+
+  /**
+   * Counts the orders a member created through any client that are in one of the given statuses.
+   *
+   * @param member the creating member's user id
+   * @param statuses the statuses that count
+   * @return the number of such orders; orders created in the Basetool never count
+   */
+  @Query(
+      "SELECT count(o) FROM JobOrder o WHERE o.createdByMemberId = :member"
+          + " AND o.createdByClientId IS NOT NULL AND o.status IN :statuses")
+  long countCreatedInStatus(
+      @Param("member") UUID member, @Param("statuses") Collection<JobOrderStatus> statuses);
+
+  /**
+   * Counts the orders a member created through any client at or after an instant, whatever their
+   * status since.
+   *
+   * @param member the creating member's user id
+   * @param since the first creation instant that counts
+   * @return the number of such orders; orders created in the Basetool never count
+   */
+  @Query(
+      "SELECT count(o) FROM JobOrder o WHERE o.createdByMemberId = :member"
+          + " AND o.createdByClientId IS NOT NULL AND o.createdAt >= :since")
+  long countCreatedSince(@Param("member") UUID member, @Param("since") Instant since);
 
   /**
    * Sets the creating member and the create's key of the given orders to {@code null} where they

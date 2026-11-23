@@ -235,6 +235,10 @@ leaves them alone; the operator stops the damage and the units repair it (REQ-OX
 4. have the units repair them in the web: reopen a client's cancel, set a target back, rewrite a
    comment, cancel a client's create.
 
+Until the operator acts, the open-order cap and the daily create cap bound a looping create to 20
+orders a member and UTC day, cancelled ones included; `JobOrderExchangeCapHit` fires when the caps
+keep refusing.
+
 **A draft.** `drafts/blueprints` and `drafts/refinery-orders` write nothing: the backend builds the
 same preview the web's own upload builds, the gateway stages it for a one-time browser pickup and
 answers the review URL, and the member saves through the ordinary path — as in §6.5.

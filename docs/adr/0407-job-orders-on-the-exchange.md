@@ -1,7 +1,7 @@
 # ADR-0407 — Job orders on the exchange
 
-- **Status:** Accepted — the read with the snapshot (#3644) and the create (#3646); the feed, the
-  writes on an existing order and the caps follow with their slices
+- **Status:** Accepted — the read with the snapshot (#3644), the feed (#3645), the create (#3646)
+  and its caps (#3647); the writes on an existing order follow with their slices
 - **Date:** 2026-11-23
 - **Deciders:** @greluc
 - **Related:** amends [ADR-0216](0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md)

@@ -260,7 +260,10 @@ member-independent exchange read (`JobOrderExchangeReads`): the exchange's finge
 hashes it and the client read serves it, while the projection stays in `joborder.internal` and the
 fingerprint and its dirty marks are the exchange's tables (ADR-0406). So is the creator retention
 (`JobOrderCreatorRetention`): the exchange's window run hands it the orders outside the client set,
-and the job-order module clears their creating member and key on its own table (REQ-OXCH-010).
+and the job-order module clears their creating member and key on its own table (REQ-OXCH-010). So
+are the caps on client creates (`JobOrderClientCreateCaps`): the exchange reads the member's
+figures for its create options and maps the create command's `JobOrderClientCreateCapException` to
+its own codes, while the counts and their properties stay in `joborder.internal` (REQ-OXCH-009).
 
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay

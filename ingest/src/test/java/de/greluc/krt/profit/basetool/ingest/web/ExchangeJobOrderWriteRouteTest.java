@@ -29,6 +29,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -53,6 +54,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -64,9 +66,10 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The create options and the create of an aUEC order through both gates, with the backend relay
- * mocked (REQ-OXCH-004, REQ-OXCH-005): the gateway checks the body before the relay, relays the
- * client's key on the create only, answers a created order with {@code 201}, passes the one pair
- * refusal on with its fixed detail and needs {@code exchange.joborders.write}.
+ * mocked (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-009): the gateway checks the body before the relay,
+ * relays the client's key on the create only, answers a created order with {@code 201}, passes the
+ * pair refusal and both cap refusals on, the daily cap with the wait until the next UTC day, checks
+ * the create options' limits and needs {@code exchange.joborders.write}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 class ExchangeJobOrderWriteRouteTest {
@@ -162,6 +165,29 @@ class ExchangeJobOrderWriteRouteTest {
   }
 
   @Test
+  void theOpenOrderCapReachesTheClientWithItsCodeAndNoWait() throws Exception {
+    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND), any(), any(), any(), anyString()))
+        .thenReturn(new ExchangeRelay.Result(409, null, "JOB_ORDER_OPEN_ORDER_CAP", "Capped."));
+
+    call(HttpMethod.POST, ROUTE, example("job-order-write--create/valid/with-comment.json"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("JOB_ORDER_OPEN_ORDER_CAP"))
+        .andExpect(header().doesNotExist(HttpHeaders.RETRY_AFTER));
+  }
+
+  @Test
+  void theDailyCreateCapWaitsUntilTheNextUtcDay() throws Exception {
+    when(quotas.secondsUntilTomorrow()).thenReturn(4321L);
+    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND), any(), any(), any(), anyString()))
+        .thenReturn(new ExchangeRelay.Result(409, null, "JOB_ORDER_DAILY_CREATE_CAP", "Capped."));
+
+    call(HttpMethod.POST, ROUTE, example("job-order-write--create/valid/with-comment.json"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("JOB_ORDER_DAILY_CREATE_CAP"))
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "4321"));
+  }
+
+  @Test
   void theCreateOptionsAreRelayedWithoutAKeyAndCheckedAgainstTheirSchema() throws Exception {
     when(relay.forward(eq(HttpMethod.GET), eq(BACKEND + "/create-options"), isNull(), any(), any()))
         .thenReturn(ok(example("job-order-create-options/valid/logistician.json")));
@@ -169,7 +195,19 @@ class ExchangeJobOrderWriteRouteTest {
     call(HttpMethod.GET, ROUTE + "/create-options", null)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.requestingUnits[0].shorthand").value("ALP"))
-        .andExpect(jsonPath("$.writesEnabled").value(true));
+        .andExpect(jsonPath("$.writesEnabled").value(true))
+        .andExpect(jsonPath("$.limits.openOrderCap").value(20))
+        .andExpect(jsonPath("$.limits.createdToday").value(1));
+  }
+
+  @Test
+  void createOptionsWithoutTheirLimitsAreARelayFailure() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any()))
+        .thenReturn(ok(example("job-order-create-options/invalid/without-limits.json")));
+
+    call(HttpMethod.GET, ROUTE + "/create-options", null)
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value(ExchangeRelay.RELAY_FAILED));
   }
 
   @Test

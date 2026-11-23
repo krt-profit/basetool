@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-create-options.schema.json",
   "title": "Job-order create options",
-  "description": "Where the member may create an aUEC order through a client. Read it when the create form opens and let the member choose both units from it; empty lists mean the client offers no create. It names no member.",
+  "description": "Where the member may create an aUEC order through a client and how close they are to the caps on client creates. Read it when the create form opens and let the member choose both units from it; empty lists mean the client offers no create. It names no member.",
   "type": "object",
   "properties": {
     "requestingUnits": {
@@ -32,12 +32,47 @@
     "writesEnabled": {
       "type": "boolean",
       "description": "Whether job-order writes are switched on; while false a create answers 503 JOB_ORDER_WRITES_DISABLED."
+    },
+    "limits": {
+      "type": "object",
+      "description": "The two caps on the orders a member creates through clients, with the member's own figures against them; orders created in the Basetool count for neither. Grey out the create while openOrders has reached openOrderCap or createdToday has reached dailyCreateCap.",
+      "properties": {
+        "openOrderCap": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "The most open or in-progress orders the member may hold that were created through any client; once openOrders reaches it, a create answers 409 JOB_ORDER_OPEN_ORDER_CAP until one of them closes."
+        },
+        "openOrders": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The member's open or in-progress orders created through any client."
+        },
+        "dailyCreateCap": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "The most orders the member may create through clients in one UTC day; once createdToday reaches it, a create answers 409 JOB_ORDER_DAILY_CREATE_CAP until the next UTC midnight."
+        },
+        "createdToday": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The orders the member created through any client since the last UTC midnight, cancelled ones included."
+        }
+      },
+      "required": [
+        "openOrderCap",
+        "openOrders",
+        "dailyCreateCap",
+        "createdToday"
+      ]
     }
   },
   "required": [
     "requestingUnits",
     "responsibleUnits",
     "suggestedResponsible",
-    "writesEnabled"
+    "writesEnabled",
+    "limits"
   ]
 }

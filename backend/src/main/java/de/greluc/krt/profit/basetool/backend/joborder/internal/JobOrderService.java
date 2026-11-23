@@ -146,7 +146,8 @@ public class JobOrderService {
    * @param order the pair, contact and comment; the caller stores the target
    * @param rule the authority that decides whether the actor writes the pair
    * @param actor who creates
-   * @param origin records on the new, unsaved order where the create came from
+   * @param origin runs on the new, unsaved order after the pair checks and before the insert: it
+   *     records where the create came from, and an exception it throws refuses the create
    * @return the persisted order
    */
   @Transactional(propagation = Propagation.MANDATORY)

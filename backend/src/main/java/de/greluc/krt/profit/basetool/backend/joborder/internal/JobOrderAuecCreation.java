@@ -34,8 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Creates an aUEC order and its target in one transaction, for the web and, at most once per key,
- * for a member acting through a client (REQ-ORDERS-053, REQ-OXCH-004, ADR-0408).
+ * Creates an aUEC order and its target in one transaction, for the web and, at most once per key
+ * and within the caps on client creates, for a member acting through a client (REQ-ORDERS-053,
+ * REQ-OXCH-004, REQ-OXCH-009, ADR-0408).
  */
 @Service
 @RequiredArgsConstructor
@@ -49,6 +50,9 @@ public class JobOrderAuecCreation implements JobOrderCreateCommand {
 
   /** Serialises a member's client creates and finds the order created earlier under a key. */
   private final JobOrderClientCreateRepository clientCreates;
+
+  /** Refuses a client create that would pass a cap. */
+  private final JobOrderClientCreateCapService caps;
 
   /**
    * Creates an aUEC order for the web caller under their contextual authorities and the honoured
@@ -87,7 +91,10 @@ public class JobOrderAuecCreation implements JobOrderCreateCommand {
                     order,
                     rule,
                     actor,
-                    created -> created.recordClientCreate(actor, idempotencyKey))
+                    created -> {
+                      caps.requireRoom(actor.member());
+                      created.recordClientCreate(actor, idempotencyKey);
+                    })
                 .getId());
   }
 

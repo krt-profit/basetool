@@ -64,6 +64,18 @@ public final class ExchangeProblemException extends DomainProblem {
    */
   public static final String JOB_ORDER_UNITS_NOT_OFFERED = "JOB_ORDER_UNITS_NOT_OFFERED";
 
+  /**
+   * A job-order create while the member holds the open-order cap of open orders they created
+   * through clients (REQ-OXCH-009).
+   */
+  public static final String JOB_ORDER_OPEN_ORDER_CAP = "JOB_ORDER_OPEN_ORDER_CAP";
+
+  /**
+   * A job-order create once the member created the daily create cap of orders through clients
+   * within the UTC day (REQ-OXCH-009).
+   */
+  public static final String JOB_ORDER_DAILY_CREATE_CAP = "JOB_ORDER_DAILY_CREATE_CAP";
+
   /** The relayed client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
@@ -175,6 +187,34 @@ public final class ExchangeProblemException extends DomainProblem {
         HttpStatus.BAD_REQUEST,
         JOB_ORDER_UNITS_NOT_OFFERED,
         "The job-order pair is not among the create options.",
+        cause);
+  }
+
+  /**
+   * The refusal of a job-order create while the member holds the open-order cap.
+   *
+   * @param cause the create command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_OPEN_ORDER_CAP} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderOpenOrderCap(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_OPEN_ORDER_CAP,
+        "The member holds the open-order cap of client-created job orders.",
+        cause);
+  }
+
+  /**
+   * The refusal of a job-order create once the member reached the daily create cap.
+   *
+   * @param cause the create command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_DAILY_CREATE_CAP} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderDailyCreateCap(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_DAILY_CREATE_CAP,
+        "The member reached the daily create cap of client-created job orders.",
         cause);
   }
 

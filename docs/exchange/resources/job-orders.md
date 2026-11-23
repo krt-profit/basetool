@@ -195,6 +195,7 @@ member choose both units from the create options (you may preselect).
 | `responsibleUnits[]` | the Profit units that process aUEC orders, as `org-unit`s; empty as well when the member may create no order |
 | `suggestedResponsible` | the id of the Profit area to preselect, or `null` |
 | `writesEnabled` | whether job-order writes are switched on now; while `false` a create answers `503 JOB_ORDER_WRITES_DISABLED` |
+| `limits` | the two caps on creates through clients and the member's own figures against them ([limits](#limits)) |
 
 Empty lists mean: offer no create. The read names no member and is a read, so it answers while
 only the writes are off.
@@ -243,6 +244,34 @@ this member with answers that order with `201` and its current state — also af
 one-hour cache and after a `5xx` that came after the order was stored. Changed terms are never
 applied: the answer carries the stored `target`, so compare it with what you sent.
 
+### Limits
+
+Two caps bound the aUEC orders a member creates through clients — through yours and any other
+client together. Orders created in the Basetool count for neither and are never refused.
+
+| Field of `limits` | Meaning |
+| --- | --- |
+| `openOrderCap` | the most open or in-progress orders the member may hold that were created through clients; 20 by default |
+| `openOrders` | the member's open or in-progress orders created through clients |
+| `dailyCreateCap` | the most orders the member may create through clients in one UTC day; 20 by default |
+| `createdToday` | the orders the member created through clients since the last UTC midnight, cancelled ones included |
+
+```json
+{ "openOrderCap": 20, "openOrders": 3, "dailyCreateCap": 20, "createdToday": 1 }
+```
+
+- Once `openOrders` reaches `openOrderCap`, a create answers `409 JOB_ORDER_OPEN_ORDER_CAP` until one
+  of those orders closes — cancelled, completed or rejected, wherever that happens.
+- Once `createdToday` reaches `dailyCreateCap`, a create answers `409 JOB_ORDER_DAILY_CREATE_CAP`
+  with `Retry-After`, the seconds until the next UTC midnight. Cancelling an order does not give
+  its create back.
+- At both caps the open-order cap answers. The figures are the member's own, read when
+  `create-options` is read; grey out the create while either cap is reached, and read the options
+  again when the form opens next.
+- The caps refuse creates only, and a refused create created nothing but still counts its unit of
+  the daily write quota. A create under a key that already created an order answers that order
+  with `201` whatever the caps say.
+
 ## Client guidance
 
 - **An isolated area.** Make job orders their own area, so a job-order refusal — the switches
@@ -255,6 +284,9 @@ applied: the answer carries the stored `target`, so compare it with what you sen
   snapshot shows whether the order exists, and within a run the feed brings it.
 - **`create-options`** is read when the create form opens, not on every pass. Empty lists hide the
   create; `JOB_ORDER_UNITS_NOT_OFFERED` means the options went stale: read them again.
+- **The caps** are clear answers, not outcomes to retry: drop the key, grey out the create, and
+  create again under a new key once an order closes (`JOB_ORDER_OPEN_ORDER_CAP`) or after
+  `Retry-After` (`JOB_ORDER_DAILY_CREATE_CAP`). The same key replays the refusal for an hour.
 - **The switch codes.** Treat `JOB_ORDER_EXCHANGE_DISABLED` as "pause the job-order area" and
   `JOB_ORDER_WRITES_DISABLED` as "pause the job-order writes", each after `Retry-After`.
 
@@ -266,6 +298,8 @@ applied: the answer carries the stored `target`, so compare it with what you sen
 | 400 | `IDEMPOTENCY_KEY_MISSING` | a create without a valid `Idempotency-Key` | send one |
 | 400 | `JOB_ORDER_UNITS_NOT_OFFERED` | a create names a pair the create options do not offer: an unknown unit, a unit the member does not write for, or a responsible unit outside the Profit units; one code for every side | read the create options again and let the member choose |
 | 403 | `SCOPE_MISSING` | the token or the registry lacks `exchange.joborders.read` for the read, or `exchange.joborders.write` for the create options and the create | ask the member to grant it |
+| 409 | `JOB_ORDER_OPEN_ORDER_CAP` | a create while the member holds `openOrderCap` open orders created through clients ([limits](#limits)) | grey out the create until one of them closes; then create under a new key |
+| 409 | `JOB_ORDER_DAILY_CREATE_CAP` | a create once the member created `dailyCreateCap` orders through clients this UTC day; `Retry-After` runs to the next UTC midnight | grey out the create until `Retry-After`; then create under a new key |
 | 410 | `CURSOR_EXPIRED` | the cursor is older than the retained changes or not one the server issued | take a new snapshot and reconcile it against the last baseline |
 | 503 | `JOB_ORDER_EXCHANGE_DISABLED` | the job-order family is switched off; `Retry-After: 300` | pause the job-order area only |
 | 503 | `JOB_ORDER_WRITES_DISABLED` | the job-order writes are switched off; `Retry-After: 300` | pause the job-order writes only; retry the create under the same key |

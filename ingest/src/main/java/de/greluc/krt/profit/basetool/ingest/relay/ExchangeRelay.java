@@ -121,6 +121,12 @@ public class ExchangeRelay {
   static final String BUSY_RETRY_AFTER_SECONDS = "10";
 
   /**
+   * The backend's refusal of a job-order create once the member reached the daily create cap; its
+   * wait runs to the next UTC midnight, when the day's count starts over (REQ-OXCH-009).
+   */
+  static final String JOB_ORDER_DAILY_CREATE_CAP = "JOB_ORDER_DAILY_CREATE_CAP";
+
+  /**
    * The ceiling on a backend answer the relay reads; the relay client's own cap, {@code
    * app.ingest.max-payload-bytes} (2 MiB by default), refuses a larger answer first, so this bound
    * applies only when that cap is configured above it.
@@ -230,6 +236,14 @@ public class ExchangeRelay {
               "JOB_ORDER_UNITS_NOT_OFFERED",
               "The requesting and responsible unit are not a pair the create options offer; read"
                   + " them again and let the member choose; nothing was created."),
+          Map.entry(
+              "JOB_ORDER_OPEN_ORDER_CAP",
+              "The member holds the most open orders created through clients; create again once"
+                  + " one of them closes; nothing was created."),
+          Map.entry(
+              JOB_ORDER_DAILY_CREATE_CAP,
+              "The member created the most orders through clients allowed for this UTC day;"
+                  + " create again after Retry-After; nothing was created."),
           Map.entry(
               ExchangeRefusals.EXCHANGE_DISABLED, ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL),
           Map.entry(
@@ -557,11 +571,12 @@ public class ExchangeRelay {
   }
 
   /**
-   * Returns the {@code Retry-After} a relay result carries: for a relayed refusal the same the
-   * gateway's gate sends with that code, for {@code RELAY_BUSY} {@value #BUSY_RETRY_AFTER_SECONDS}
-   * and for the codes of the area switches ({@code BANK_EXCHANGE_DISABLED}, {@code
-   * JOB_ORDER_EXCHANGE_DISABLED}, {@code JOB_ORDER_WRITES_DISABLED}) {@value
-   * ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS}.
+   * Returns the fixed {@code Retry-After} a relay result carries: for a relayed refusal the same
+   * the gateway's gate sends with that code, for {@code RELAY_BUSY} {@value
+   * #BUSY_RETRY_AFTER_SECONDS} and for the codes of the area switches ({@code
+   * BANK_EXCHANGE_DISABLED}, {@code JOB_ORDER_EXCHANGE_DISABLED}, {@code
+   * JOB_ORDER_WRITES_DISABLED}) {@value ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS}. A code that
+   * {@link #waitsForNextUtcDay(String)} has none here.
    *
    * @param code a problem code, or {@code null}
    * @return the seconds, or {@code null} when the code carries none
@@ -577,6 +592,18 @@ public class ExchangeRelay {
             || ExchangeRefusals.REGISTRY_UNAVAILABLE.equals(code)
         ? ExchangeGateFilter.RETRY_AFTER_SECONDS
         : null;
+  }
+
+  /**
+   * Tells whether a relayed refusal waits for the next UTC day, so its {@code Retry-After} is the
+   * seconds until UTC midnight, the day boundary of the daily write quota; such a code carries no
+   * fixed wait in {@link #retryAfterSeconds(String)}.
+   *
+   * @param code a problem code, or {@code null}
+   * @return {@code true} for {@code JOB_ORDER_DAILY_CREATE_CAP}
+   */
+  public static boolean waitsForNextUtcDay(@Nullable String code) {
+    return JOB_ORDER_DAILY_CREATE_CAP.equals(code);
   }
 
   /**

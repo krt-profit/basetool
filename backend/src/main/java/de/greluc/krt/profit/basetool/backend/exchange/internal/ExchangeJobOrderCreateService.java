@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOr
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientCreateCapException;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientCreateCaps;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateUnitOptionDto;
@@ -50,10 +52,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * JobOrderWriterRule#DIRECT_LOGISTICIAN} (ADR-0408): a member creates only with one of their direct
  * Logistician units as the requesting unit, for any eligible Profit unit.
  *
- * <p>Every create counts on {@code basetool_exchange_writes_total{resource="job_order"}} and a
- * refused pair on {@code basetool_exchange_job_order_refused_total{reason="units_not_offered"}};
- * every create-options read on {@code basetool_exchange_job_order_reads_total} (REQ-OBS-025). The
- * command publishes the queue frame and the notices after the commit, as for a web create.
+ * <p>Every create counts on {@code basetool_exchange_writes_total{resource="job_order"}}, a refused
+ * pair on {@code basetool_exchange_job_order_refused_total{reason="units_not_offered"}} and a cap
+ * refusal under {@code open_order_cap} or {@code daily_create_cap} (REQ-OXCH-009); every
+ * create-options read on {@code basetool_exchange_job_order_reads_total} (REQ-OBS-025). The command
+ * publishes the queue frame and the notices after the commit, as for a web create.
  */
 @Service
 @RequiredArgsConstructor
@@ -61,6 +64,7 @@ public class ExchangeJobOrderCreateService {
 
   private final JobOrderCreationOptions creationOptions;
   private final JobOrderCreateCommand createCommand;
+  private final JobOrderClientCreateCaps caps;
   private final JobOrderExchangeReads reads;
   private final ExchangeSettingsRepository settingsRepository;
   private final ExchangeJobOrderMetrics metrics;
@@ -69,10 +73,12 @@ public class ExchangeJobOrderCreateService {
   private final TransactionTemplate transaction;
 
   /**
-   * Lists the pairs the member may create an aUEC order for and whether the writes switch is on.
+   * Lists the pairs the member may create an aUEC order for, whether the writes switch is on and
+   * the member's own figures against the caps on client creates.
    *
    * @param caller the acting member and client
-   * @return the member's writer units, the eligible Profit units, the suggestion and the switch
+   * @return the member's writer units, the eligible Profit units, the suggestion, the switch and
+   *     the limits
    */
   @NotNull
   public ExchangeJobOrderCreateOptionsDto options(@NotNull ExchangeCaller caller) {
@@ -88,7 +94,8 @@ public class ExchangeJobOrderCreateService {
         units(options.requestingOptions()),
         units(options.responsibleOptions()),
         options.suggestedAuecResponsibleOrgUnitId(),
-        writesEnabled);
+        writesEnabled,
+        ExchangeJobOrderCreateOptionsDto.Limits.of(caps.limits(caller.member())));
   }
 
   /**
@@ -101,7 +108,8 @@ public class ExchangeJobOrderCreateService {
    * @return the order's id, status, versions and target
    * @throws ExchangeProblemException {@code 400 JOB_ORDER_UNITS_NOT_OFFERED} for an unknown unit, a
    *     requesting unit the member does not write for or a responsible unit that is not an eligible
-   *     Profit unit, alike
+   *     Profit unit, alike; {@code 409 JOB_ORDER_OPEN_ORDER_CAP} or {@code 409
+   *     JOB_ORDER_DAILY_CREATE_CAP} when the create would pass a cap on client creates
    */
   @NotNull
   public ExchangeJobOrderCreatedDto create(
@@ -131,10 +139,33 @@ public class ExchangeJobOrderCreateService {
       metrics.countRefused(JobOrderExchangeRefusal.UNITS_NOT_OFFERED);
       metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
       throw ExchangeProblemException.jobOrderUnitsNotOffered(e);
+    } catch (JobOrderClientCreateCapException e) {
+      metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
+      throw capRefusal(e);
     } catch (RuntimeException e) {
       metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
       throw e;
     }
+  }
+
+  /**
+   * Counts a cap refusal under its reason and turns it into the cap's exchange code.
+   *
+   * @param refusal the create command's cap refusal
+   * @return the {@code 409} refusal with the cap's code
+   */
+  private @NotNull ExchangeProblemException capRefusal(
+      @NotNull JobOrderClientCreateCapException refusal) {
+    return switch (refusal.getCap()) {
+      case OPEN_ORDERS -> {
+        metrics.countRefused(JobOrderExchangeRefusal.OPEN_ORDER_CAP);
+        yield ExchangeProblemException.jobOrderOpenOrderCap(refusal);
+      }
+      case DAILY_CREATES -> {
+        metrics.countRefused(JobOrderExchangeRefusal.DAILY_CREATE_CAP);
+        yield ExchangeProblemException.jobOrderDailyCreateCap(refusal);
+      }
+    };
   }
 
   /**

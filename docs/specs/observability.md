@@ -4507,9 +4507,10 @@ reader/unit/order identities and retained relationship timestamps remain outside
 ### REQ-OBS-025 — Job orders on the exchange are measured and alerted
 
 > [!note] Implemented for the two switches (#3642), the fingerprint worker (#3643), the snapshot
-> reads (#3644), the feed reads (#3645), the create with its create options (#3646) and the window
-> run (#3649); decided in #3618. The other route slices wire their read routes and refusal reasons,
-> and each slice adds its alerts and its panels to this entry.
+> reads (#3644), the feed reads (#3645), the create with its create options (#3646), the window
+> run (#3649) and the caps on client creates (#3647); decided in #3618. The other route slices
+> wire their read routes and refusal reasons, and each slice adds its alerts and its panels to this
+> entry.
 
 The job-order route family of the exchange ([`orders-exchange.md`](orders-exchange.md),
 REQ-OXCH-009) carries its own meters. Every label is a registry `client_id` or a fixed enumeration,
@@ -4523,7 +4524,9 @@ never an id, a path or an amount (REQ-OBS-011).
 - **Writes.** `basetool_exchange_writes_total{client_id, resource="job_order", outcome}` counts every
   job-order write through a client (REQ-OXCH-004): `applied` for a create and for a retry answered
   from the stored key, `rejected` for a refusal. A refused pair also counts
-  `basetool_exchange_job_order_refused_total{reason="units_not_offered"}`.
+  `basetool_exchange_job_order_refused_total{reason="units_not_offered"}`, a create refused at a
+  cap on client creates `{reason="open_order_cap"}` or `{reason="daily_create_cap"}`
+  (REQ-OXCH-009).
 - **Refusals.** `basetool_exchange_job_order_refused_total{reason}` counts what the backend refused,
   every reason registered at zero (`JobOrderExchangeRefusal`): `not_found`, `not_permitted`,
   `units_not_offered`, `version_conflict`, `responsibility_invalid`, `closed`, `money_started`,
@@ -4565,8 +4568,12 @@ Alerts, each with a promtool rule test that fires and stays silent:
   even when nothing is marked.
 - **`JobOrderFingerprintChurn`** (warning): more than 1000 changed fingerprints in an hour, held
   for 2 hours; a hierarchy change is a single burst, a sustained rate looks like a trigger loop.
+- **`JobOrderExchangeCapHit`** (warning): more than 10 `open_order_cap` or `daily_create_cap`
+  refusals in an hour, held for 30 minutes; a client that creates without reading its `limits`, or
+  loops on creates and cancels and so notifies both units each time.
 
-The three fingerprint alerts point to the same operator section in `monitoring/README.md`.
+The three fingerprint alerts and `JobOrderExchangeCapHit` point to the same operator section in
+`monitoring/README.md`.
 
 The „Job orders" row of the exchange dashboard (`15-exchange.json`) shows the gateway's switch
 refusals by client and reason, the switch changes by action and the backend's job-order refusals by
@@ -4575,6 +4582,8 @@ unchanged, the worker's runs by outcome with the orders it recomputed, and the j
 hour by client and route.
 It shows the job-order writes per day by client and outcome too.
 It shows the window run's executions per day by outcome with the orders it aged out.
+The refusals panel shows the cap refusals under their own reasons and names `JobOrderExchangeCapHit`
+in its description; the writes panel names them among the rejected writes.
 
 **Acceptance**
 
@@ -4600,6 +4609,9 @@ It shows the window run's executions per day by outcome with the orders it aged 
   and publishes its enabled gauge (`JobOrderWindowTaskTest`); `ScheduledJobStale` fires when it
   never succeeded or stopped succeeding and stays silent while it succeeds or is switched off
   (`scheduled_job_stale_job_order_exchange_window_test.yml`).
+- [x] A create refused at a cap counts `open_order_cap` or `daily_create_cap` and a `rejected`
+  write (`ExchangeJobOrderCreateTest`); `JobOrderExchangeCapHit` has a promtool rule test that
+  fires and one that stays silent.
 
 **Enforced by:** `ExchangeJobOrderMetrics`, `JobOrderExchangeRefusal`, `JobOrderExchangeReadRoute`,
 `JobOrderFingerprintOutcome`, `ExchangeJobOrderBusinessGauges`, `JobOrderFingerprintTask`,
@@ -4609,6 +4621,7 @@ It shows the window run's executions per day by outcome with the orders it aged 
 `monitoring/prometheus/tests/exchange_registry_alerts_test.yml`,
 `monitoring/prometheus/tests/job_order_fingerprint_alerts_test.yml`,
 `monitoring/prometheus/tests/scheduled_job_stale_job_order_exchange_window_test.yml`,
+`monitoring/prometheus/tests/job_order_exchange_cap_alerts_test.yml`,
 `monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
 REQ-OBS-024, REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-009, REQ-OXCH-010 · **Issues:**
-#3618, #3642, #3643, #3644, #3646, #3649
+#3618, #3642, #3643, #3644, #3646, #3647, #3649

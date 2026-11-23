@@ -443,6 +443,15 @@ groups:
           summary: "Job-order fingerprints keep changing"
           description: "For 2 hours more than 1000 job-order fingerprints an hour changed. A hierarchy change is a single burst, so a sustained rate looks like a trigger loop or a bulk job rewriting carried fields over and over, which floods the exchange feed. Check the changed-against-unchanged recomputations in the „Job orders“ row of the Exchange dashboard and which writes keep marking orders; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
 
+      - alert: JobOrderExchangeCapHit
+        expr: sum(increase(basetool_exchange_job_order_refused_total{reason=~"open_order_cap|daily_create_cap"}[1h])) > 10
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order creates keep hitting the caps on client creates"
+          description: "For 30 minutes more than 10 job-order creates an hour were refused with 409 JOB_ORDER_OPEN_ORDER_CAP or 409 JOB_ORDER_DAILY_CREATE_CAP, because members already held 20 open orders created through clients or created 20 through clients today. A client keeps creating without reading its limits, or loops on creates and cancels, which notifies the writers of both units each time. Check the job-order refusals and the job-order writes per client in the „Job orders“ row of the Exchange dashboard and contact the client's author; if one client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-009, REQ-OBS-025)."
+
       - alert: BusinessMetricsStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="business_metrics"} == 1))
         for: 5m
