@@ -4506,8 +4506,8 @@ reader/unit/order identities and retained relationship timestamps remain outside
 
 ### REQ-OBS-025 — Job orders on the exchange are measured and alerted
 
-> [!note] Implemented for the two switches (#3642), the fingerprint worker (#3643) and the snapshot
-> reads (#3644); decided in #3618. The other route slices wire their read routes and refusal reasons, the window slice adds its
+> [!note] Implemented for the two switches (#3642), the fingerprint worker (#3643), the snapshot
+> reads (#3644) and the create with its create options (#3646); decided in #3618. The other route slices wire their read routes and refusal reasons, the window slice adds its
 > window metrics, and each slice adds its alerts and its panels to this entry.
 
 The job-order route family of the exchange ([`orders-exchange.md`](orders-exchange.md),
@@ -4517,6 +4517,11 @@ never an id, a path or an amount (REQ-OBS-011).
 - **Reads.** `basetool_exchange_job_order_reads_total{client_id, route}` counts the job-order reads
   served, with `route` one of `snapshot`, `feed`, `create_options` (`JobOrderExchangeReadRoute`).
   Each snapshot page counts one `snapshot` read; a refused request counts none.
+  Each served create-options read counts one `create_options` read (REQ-OXCH-004).
+- **Writes.** `basetool_exchange_writes_total{client_id, resource="job_order", outcome}` counts every
+  job-order write through a client (REQ-OXCH-004): `applied` for a create and for a retry answered
+  from the stored key, `rejected` for a refusal. A refused pair also counts
+  `basetool_exchange_job_order_refused_total{reason="units_not_offered"}`.
 - **Refusals.** `basetool_exchange_job_order_refused_total{reason}` counts what the backend refused,
   every reason registered at zero (`JobOrderExchangeRefusal`): `not_found`, `not_permitted`,
   `units_not_offered`, `version_conflict`, `responsibility_invalid`, `closed`, `money_started`,
@@ -4562,6 +4567,7 @@ refusals by client and reason, the switch changes by action and the backend's jo
 reason, the fingerprint backlog with the age of its oldest mark, the recomputations changed against
 unchanged, the worker's runs by outcome with the orders it recomputed, and the job-order reads per
 hour by client and route.
+It shows the job-order writes per day by client and outcome too.
 
 **Acceptance**
 
@@ -4571,8 +4577,11 @@ hour by client and route.
 - [x] `JobOrderExchangeSwitchChanged` has a promtool rule test that fires and stays silent, and
   `ExchangeRegistryChanged` stays silent on the job-order actions.
 - [x] A snapshot page counts one `snapshot` read for its client (`ExchangeJobOrderSnapshotTest`).
-- [ ] The `feed` and `create_options` reads and the other refusal reasons are incremented by their
-  routes (REQ-OXCH-003…008).
+- [x] A create-options read counts one `create_options` read, a create one `applied` or `rejected`
+  write under `resource="job_order"`, and a refused pair `units_not_offered`
+  (`ExchangeJobOrderCreateTest`).
+- [ ] The `feed` reads and the other refusal reasons are incremented by their routes
+  (REQ-OXCH-003, REQ-OXCH-006…009).
 - [x] Both fingerprint outcomes exist at zero and a committed recomputation counts its changed and
   unchanged orders (`ExchangeJobOrderMetricsTest`, `JobOrderFingerprintWorkerIntegrationTest`).
 - [x] The backlog gauges report the marked orders and the age of the oldest mark, and a second mark
@@ -4589,4 +4598,5 @@ hour by client and route.
 `monitoring/prometheus/tests/exchange_registry_alerts_test.yml`,
 `monitoring/prometheus/tests/job_order_fingerprint_alerts_test.yml`,
 `monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
-REQ-OBS-024, REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-009 · **Issues:** #3618, #3642, #3643, #3644
+REQ-OBS-024, REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-009 · **Issues:** #3618, #3642,
+#3643, #3644, #3646

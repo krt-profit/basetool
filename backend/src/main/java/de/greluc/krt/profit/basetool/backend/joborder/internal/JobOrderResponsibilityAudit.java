@@ -20,9 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,6 +34,46 @@ import org.jetbrains.annotations.Nullable;
 final class JobOrderResponsibilityAudit {
 
   private JobOrderResponsibilityAudit() {}
+
+  /**
+   * Names the audit event of a create: a client's create records its own type instead of the web's
+   * (REQ-AUDIT-001, ADR-0407).
+   *
+   * @param type the new order's kind
+   * @param actor who created it
+   * @return {@code JOB_ORDER_CREATED_VIA_CLIENT} for a client, else the web's type of the kind
+   */
+  static @NotNull AuditEventType createdType(
+      @NotNull JobOrderType type, @NotNull JobOrderActor actor) {
+    return switch (actor) {
+      case JobOrderActor.Client _ -> AuditEventType.JOB_ORDER_CREATED_VIA_CLIENT;
+      case JobOrderActor.Web _ ->
+          switch (type) {
+            case MATERIAL, AUEC -> AuditEventType.JOB_ORDER_CREATED;
+            case ITEM -> AuditEventType.JOB_ORDER_ITEM_CREATED;
+          };
+    };
+  }
+
+  /**
+   * Captures a new order's creation details: a client's create records its requesting and
+   * responsible unit and its target, a web create the details of {@link #created(JobOrder)}.
+   *
+   * @param order the persisted order
+   * @param actor who created it
+   * @param target an aUEC order's target, {@code null} for the other kinds
+   * @return its creation details
+   */
+  static @NotNull AuditDetails created(
+      @NotNull JobOrder order, @NotNull JobOrderActor actor, @Nullable BigDecimal target) {
+    return switch (actor) {
+      case JobOrderActor.Client _ ->
+          AuditDetails.of("requestingOrgUnit", unitReference(order.getRequestingOrgUnit()))
+              .with("responsibleOrgUnit", unitReference(order.getResponsibleOrgUnit()))
+              .with("target", target);
+      case JobOrderActor.Web _ -> created(order);
+    };
+  }
 
   /**
    * Captures a new order's parties, original Profit boundary and requirement count.

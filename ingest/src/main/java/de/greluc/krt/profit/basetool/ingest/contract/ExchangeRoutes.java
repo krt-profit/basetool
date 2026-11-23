@@ -132,7 +132,9 @@ public final class ExchangeRoutes {
           write(HttpMethod.POST, BANK_PATH + "/requests", "exchange.bank.request"),
           write(HttpMethod.POST, BANK_PATH + "/requests/{id}/correction", "exchange.bank.request"),
           write(HttpMethod.POST, BANK_PATH + "/requests/{id}/cancel", "exchange.bank.request"),
-          route(HttpMethod.GET, JOB_ORDERS_PATH, "exchange.joborders.read"));
+          route(HttpMethod.GET, JOB_ORDERS_PATH, "exchange.joborders.read"),
+          route(HttpMethod.GET, JOB_ORDERS_PATH + "/create-options", "exchange.joborders.write"),
+          write(HttpMethod.POST, JOB_ORDERS_PATH, "exchange.joborders.write"));
 
   /** The bank route family as a pattern, matched against the decoded path segments. */
   private static final PathPattern BANK_FAMILY =

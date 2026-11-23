@@ -291,7 +291,7 @@ FROM (VALUES ('exchange.connect'), ('exchange.blueprints.read'), ('exchange.blue
              ('exchange.refinery.store'), ('exchange.drafts.blueprints'),
              ('exchange.drafts.refinery'), ('exchange.bank.read'), ('exchange.bank.request'),
              ('exchange.bank.queue'), ('exchange.patch.read'), ('exchange.patch.write'),
-             ('exchange.joborders.read')) AS c (capability)
+             ('exchange.joborders.read'), ('exchange.joborders.write')) AS c (capability)
 UNION ALL
 SELECT '5a4d0000-0000-4000-8000-000000002302'::uuid, c.capability
 FROM (VALUES ('exchange.connect'), ('exchange.blueprints.read')) AS c (capability)

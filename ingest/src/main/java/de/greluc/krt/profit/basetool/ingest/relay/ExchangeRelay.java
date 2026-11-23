@@ -102,8 +102,9 @@ public class ExchangeRelay {
   public static final String CONNECTED_AT_HEADER = "X-Exchange-Connected-At";
 
   /**
-   * The header carrying the client's {@code Idempotency-Key} of a bank raise, which the idempotency
-   * filter admitted, so the backend can answer a retry with the request it raised (REQ-BXCH-004).
+   * The header carrying the client's {@code Idempotency-Key} of a bank raise or a job-order create,
+   * which the idempotency filter admitted, so the backend can answer a retry with what it created
+   * first (REQ-BXCH-004, REQ-OXCH-004).
    */
   public static final String IDEMPOTENCY_KEY_HEADER = "X-Exchange-Idempotency-Key";
 
@@ -225,6 +226,10 @@ public class ExchangeRelay {
           Map.entry(
               "BANK_OPEN_REQUEST_CAP",
               "The member holds the most pending booking requests a client may add to."),
+          Map.entry(
+              "JOB_ORDER_UNITS_NOT_OFFERED",
+              "The requesting and responsible unit are not a pair the create options offer; read"
+                  + " them again and let the member choose; nothing was created."),
           Map.entry(
               ExchangeRefusals.EXCHANGE_DISABLED, ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL),
           Map.entry(

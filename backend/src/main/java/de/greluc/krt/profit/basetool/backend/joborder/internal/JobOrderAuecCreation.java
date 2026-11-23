@@ -27,14 +27,15 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.UUID;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Creates an aUEC order and its target in one transaction, for the web and for a caller that passes
- * its own writer rule and actor (REQ-ORDERS-053, ADR-0405).
+ * Creates an aUEC order and its target in one transaction, for the web and, at most once per key,
+ * for a member acting through a client (REQ-ORDERS-053, REQ-OXCH-004, ADR-0405).
  */
 @Service
 @RequiredArgsConstructor
@@ -45,6 +46,9 @@ public class JobOrderAuecCreation implements JobOrderCreateCommand {
   private final JobOrderMoneyTargetRepository targets;
   private final JobOrderStockProjectionService projection;
   private final AuthHelperService authHelper;
+
+  /** Serialises a member's client creates and finds the order created earlier under a key. */
+  private final JobOrderClientCreateRepository clientCreates;
 
   /**
    * Creates an aUEC order for the web caller under their contextual authorities and the honoured
@@ -65,18 +69,34 @@ public class JobOrderAuecCreation implements JobOrderCreateCommand {
         persist(
             order,
             JobOrderWriterRule.CONTEXTUAL,
-            new JobOrderActor.Web(authHelper.currentUserId().orElse(null))));
+            new JobOrderActor.Web(authHelper.currentUserId().orElse(null)),
+            _ -> {}));
   }
 
   @Override
   public @NotNull UUID createAuec(
-      @NotNull AuecOrder order, @NotNull JobOrderWriterRule rule, @NotNull JobOrderActor actor) {
-    return persist(order, rule, actor).getId();
+      @NotNull AuecOrder order,
+      @NotNull JobOrderWriterRule rule,
+      @NotNull JobOrderActor.Client actor,
+      @NotNull String idempotencyKey) {
+    clientCreates.lockMember(actor.member());
+    return clientCreates
+        .findCreated(actor.member(), actor.clientId(), idempotencyKey)
+        .orElseGet(() ->
+            persist(
+                    order,
+                    rule,
+                    actor,
+                    created -> created.recordClientCreate(actor, idempotencyKey))
+                .getId());
   }
 
   private @NotNull JobOrder persist(
-      @NotNull AuecOrder order, @NotNull JobOrderWriterRule rule, @NotNull JobOrderActor actor) {
-    JobOrder created = orders.createAuecJobOrder(order, rule, actor);
+      @NotNull AuecOrder order,
+      @NotNull JobOrderWriterRule rule,
+      @NotNull JobOrderActor actor,
+      @NotNull Consumer<JobOrder> origin) {
+    JobOrder created = orders.createAuecJobOrder(order, rule, actor, origin);
     targets.save(new JobOrderMoneyTarget(created.getId(), order.target()));
     return created;
   }

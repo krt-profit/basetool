@@ -47,6 +47,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBluep
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeHomeLocationChosenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
@@ -163,10 +165,17 @@ class ExchangeWireContractTest {
 
   /**
    * The job-order reads, which answer only with the job-order switch on; {@code
-   * ExchangeJobOrderSnapshotTest} checks their answers against the published schemas on a seeded
-   * world.
+   * ExchangeJobOrderSnapshotTest} and {@code ExchangeJobOrderCreateTest} check their answers
+   * against the published schemas on a seeded world.
    */
-  private static final Set<String> JOB_ORDER_READS = Set.of("/job-orders");
+  private static final Set<String> JOB_ORDER_READS =
+      Set.of("/job-orders", "/job-orders/create-options");
+
+  /**
+   * The job-order writes, which answer only with both job-order switches on and a member who writes
+   * for a unit; {@code ExchangeJobOrderCreateTest} sends them on a seeded world.
+   */
+  private static final Set<String> JOB_ORDER_WRITES = Set.of("/job-orders");
 
   /**
    * The bank request writes, which answer only with the bank switched on and a seeded bank world;
@@ -199,6 +208,8 @@ class ExchangeWireContractTest {
           Map.entry("bank-queue", ExchangeBankQueueDto.class),
           Map.entry("page--bankRequestPage", ExchangeBankRequestPageDto.class),
           Map.entry("page--jobOrderPage", ExchangeJobOrderPageDto.class),
+          Map.entry("job-order-write--created", ExchangeJobOrderCreatedDto.class),
+          Map.entry("job-order-create-options", ExchangeJobOrderCreateOptionsDto.class),
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),
           Map.entry("org-stock-members", ExchangeOrgStockMembersDto.class),
@@ -294,6 +305,7 @@ class ExchangeWireContractTest {
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
       if (operation.requestSchema() == null
           || BANK_WRITES.contains(operation.relayPath())
+          || JOB_ORDER_WRITES.contains(operation.relayPath())
           || HOME_LOCATION_CHOICE.equals(operation.relayPath())) {
         continue;
       }

@@ -106,6 +106,7 @@ body:
         - label: exchange.patch.read
         - label: exchange.patch.write
         - label: exchange.joborders.read
+        - label: exchange.joborders.write
 
   - type: textarea
     id: purpose

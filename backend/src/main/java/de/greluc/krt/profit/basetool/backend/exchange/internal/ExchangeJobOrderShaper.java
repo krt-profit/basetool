@@ -144,11 +144,7 @@ class ExchangeJobOrderShaper {
             .responsibilityInvalid(read.responsibilityInvalid())
             .link(LINK_PREFIX + read.id())
             .assignees(c.assigneesOf(read))
-            .versions(
-                new ExchangeJobOrderDto.Versions(
-                    read.versions().lifecycle(),
-                    read.versions().target(),
-                    read.versions().comment()));
+            .versions(ExchangeJobOrderDto.Versions.of(read.versions()));
     switch (read.progress()) {
       case MaterialProgress material ->
           dto.materials(material.lines().stream().map(c::materialLine).toList());

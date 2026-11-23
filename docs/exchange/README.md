@@ -82,7 +82,7 @@ the registry grants it to the client.
 - [Patch change](resources/patch-change.md) — the latest patch change with its wipe list, and the
   member's home-location choice after it.
 - [Job orders](resources/job-orders.md) — the job orders of the member's units and those the member
-  works on, with their progress; not yet switched on.
+  works on, with their progress, and creating aUEC orders as a Logistician; not yet switched on.
 
 ## Support
 

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeRead;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRelation;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
@@ -117,7 +118,18 @@ public record ExchangeJobOrderDto(
    * @param comment the comment version
    */
   @Schema(name = "ExchangeJobOrderVersions")
-  public record Versions(long lifecycle, @Nullable Long target, long comment) {}
+  public record Versions(long lifecycle, @Nullable Long target, long comment) {
+
+    /**
+     * Carries the section versions of an order's exchange read.
+     *
+     * @param versions the versions the read holds
+     * @return the same versions in the published shape
+     */
+    public static @NotNull Versions of(@NotNull JobOrderExchangeRead.Versions versions) {
+      return new Versions(versions.lifecycle(), versions.target(), versions.comment());
+    }
+  }
 
   /**
    * One material and quality floor of a MATERIAL order, in the material's own unit.

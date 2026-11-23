@@ -188,6 +188,15 @@ page. A reader without a permitted pair gets
 no create action and cannot open the form. Workspace and unit-work view capabilities remain
 independent of creation and individual action rights.
 
+**Through a client** the rule is narrower ([REQ-OXCH-001](orders-exchange.md#req-oxch-001--scopes-and-the-one-decision-point),
+[REQ-OXCH-004](orders-exchange.md#req-oxch-004--create-options-and-the-create-of-an-auec-order)):
+the exchange passes the writer rule `DIRECT_LOGISTICIAN` — a unit the member directly belongs to
+and is a Logistician of, decided from the database, with an administrator as a plain member — and
+only the requesting side counts. A client therefore creates only aUEC orders on behalf of one of
+the member's own writer units, for any eligible Profit unit; a writer of the responsible unit
+creates on behalf of another unit only in the web. The same create path and the same projection
+serve both, so every pair a client may create is one the web permits.
+
 
 | Actor | Order write scope |
 | --- | --- |
@@ -219,7 +228,9 @@ recorded facts are not discarded.
 `JobOrderDirectLogisticianRuleIntegrationTest` the database writer rule at the create seam and
 that every pair it permits is one the web permits for the same member.
 `JobOrderHierarchyAuthorityIntegrationTest` covers safe MATERIAL and ITEM requester edits
-after booked work. The money workflow follows its own implementation slice. **Issues:** #3197, #3200, #3640, #3641
+after booked work. `ExchangeJobOrderCreateTest` pins the requester-only create through a client.
+The money workflow follows its own implementation slice. **Issues:** #3197, #3200, #3640, #3641,
+#3646
 
 ### REQ-ORDERS-054 — Lifecycle distinguishes kind-specific fulfillment
 

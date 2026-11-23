@@ -177,6 +177,8 @@ public enum AuditEventType {
   INVENTORY_AUDIT_PURGED(AuditDomain.INVENTORY),
   /** A material job order was created. */
   JOB_ORDER_CREATED(AuditDomain.JOB_ORDER),
+  /** A member created an aUEC order through an exchange client (REQ-OXCH-004). */
+  JOB_ORDER_CREATED_VIA_CLIENT(AuditDomain.JOB_ORDER),
   /** Actual aUEC reported as purpose-bound to one order. */
   JOB_ORDER_MONEY_PROVIDED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_MOVED(AuditDomain.JOB_ORDER),

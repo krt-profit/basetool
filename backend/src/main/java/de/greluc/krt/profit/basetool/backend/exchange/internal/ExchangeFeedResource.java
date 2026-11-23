@@ -42,5 +42,8 @@ public enum ExchangeFeedResource {
   BANK_REQUEST,
 
   /** The member's own refinery orders, keyed by order id (REQ-XCH-051). */
-  REFINERY_ORDER
+  REFINERY_ORDER,
+
+  /** The member's job-order set, keyed by order id (REQ-OXCH-003). */
+  JOB_ORDER
 }

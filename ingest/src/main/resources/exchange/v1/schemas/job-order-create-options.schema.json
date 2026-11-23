@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-create-options.schema.json",
+  "title": "Job-order create options",
+  "description": "Where the member may create an aUEC order through a client. Read it when the create form opens and let the member choose both units from it; empty lists mean the client offers no create. It names no member.",
+  "type": "object",
+  "properties": {
+    "requestingUnits": {
+      "type": "array",
+      "maxItems": 100,
+      "description": "The units the member may create an order on behalf of: the active units they directly belong to and are a Logistician of.",
+      "items": {
+        "$ref": "org-unit.schema.json"
+      }
+    },
+    "responsibleUnits": {
+      "type": "array",
+      "maxItems": 100,
+      "description": "The Profit units that may process an aUEC order.",
+      "items": {
+        "$ref": "org-unit.schema.json"
+      }
+    },
+    "suggestedResponsible": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "The id of the canonical Profit area among the responsible units, to preselect; null when no create is offered."
+    },
+    "writesEnabled": {
+      "type": "boolean",
+      "description": "Whether job-order writes are switched on; while false a create answers 503 JOB_ORDER_WRITES_DISABLED."
+    }
+  },
+  "required": [
+    "requestingUnits",
+    "responsibleUnits",
+    "suggestedResponsible",
+    "writesEnabled"
+  ]
+}

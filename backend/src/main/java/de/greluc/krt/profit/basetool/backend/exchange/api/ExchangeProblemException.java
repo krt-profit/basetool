@@ -57,6 +57,13 @@ public final class ExchangeProblemException extends DomainProblem {
   /** The job-order writes switch is off while the family switch is on (REQ-OXCH-009). */
   public static final String JOB_ORDER_WRITES_DISABLED = "JOB_ORDER_WRITES_DISABLED";
 
+  /**
+   * A job-order create names a pair the member may not create for: an unknown unit, a requesting
+   * unit the member does not write for, or a responsible unit that is not an eligible Profit unit
+   * (REQ-OXCH-004).
+   */
+  public static final String JOB_ORDER_UNITS_NOT_OFFERED = "JOB_ORDER_UNITS_NOT_OFFERED";
+
   /** The relayed client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
@@ -154,6 +161,21 @@ public final class ExchangeProblemException extends DomainProblem {
         HttpStatus.SERVICE_UNAVAILABLE,
         JOB_ORDER_WRITES_DISABLED,
         "Job-order writes are switched off on the exchange.");
+  }
+
+  /**
+   * The refusal of a job-order create whose pair the member may not create for, naming no side.
+   *
+   * @param cause the create command's refusal, kept for the log only
+   * @return the {@code 400 JOB_ORDER_UNITS_NOT_OFFERED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderUnitsNotOffered(
+      @NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.BAD_REQUEST,
+        JOB_ORDER_UNITS_NOT_OFFERED,
+        "The job-order pair is not among the create options.",
+        cause);
   }
 
   /**

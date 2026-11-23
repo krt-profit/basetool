@@ -614,6 +614,11 @@ class DataExportEndStateTest {
         "INSERT INTO job_order_money_target (order_id, amount, version) VALUES (?, 80, 0)",
         orderId);
     jdbc.update(
+        "UPDATE job_order SET created_by_client_id = 'zzz-export-client', created_by_member_id = ?,"
+            + " create_idempotency_key = 'export-key-1' WHERE id = ?",
+        subject.getId(),
+        orderId);
+    jdbc.update(
         "INSERT INTO job_order_money_holder (id, order_id, user_id, revision) VALUES (?, ?, ?, 4)",
         holderId,
         orderId,

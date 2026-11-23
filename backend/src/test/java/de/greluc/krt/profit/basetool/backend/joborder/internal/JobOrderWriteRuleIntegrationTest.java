@@ -318,7 +318,8 @@ class JobOrderWriteRuleIntegrationTest {
             null,
             new BigDecimal("250000")),
         JobOrderWriterRule.DIRECT_LOGISTICIAN,
-        client(creator));
+        client(creator),
+        "rule-key-" + UUID.randomUUID());
   }
 
   private static JobOrderWriterRule rule() {
@@ -329,7 +330,7 @@ class JobOrderWriteRuleIntegrationTest {
     return JobOrderReadCheck.CONTEXTUAL;
   }
 
-  private static JobOrderActor client(User member) {
+  private static JobOrderActor.Client client(User member) {
     return new JobOrderActor.Client(member.getId(), CLIENT);
   }
 }

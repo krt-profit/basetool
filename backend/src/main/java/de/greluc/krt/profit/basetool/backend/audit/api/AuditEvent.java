@@ -122,6 +122,6 @@ public class AuditEvent {
    * <p>{@code null} only on rows that predate the column; a new row always records a value.
    */
   @Nullable
-  @Column(name = "client_id", length = 60)
+  @Column(name = "client_id", length = 63)
   private String clientId;
 }

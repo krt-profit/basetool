@@ -1348,7 +1348,7 @@
     "/api/v1/exchange/job-orders" : {
       "get" : {
         "description" : "Gateway-only. The job orders of all three kinds a unit the member directly belongs to requests, is responsible for or actively supports, and those the member works on as an assignee: active, closed within 7 days, and aUEC while its settlement is open. Header, the member's relations, assignee names under per-client refs, the member's own note, the section versions and each kind's progress; no holder, amount per person, provision, Bank state, commitment or claim. A snapshot paged by id that ends with the feed cursor of REQ-XCH-013; a client keeps the data at most 7 days, in memory.",
-        "operationId" : "jobOrders_2",
+        "operationId" : "jobOrders",
         "parameters" : [ {
           "in" : "query",
           "name" : "cursor",
@@ -1481,6 +1481,241 @@
           }
         },
         "summary" : "Exchange: the job orders I relate to",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      },
+      "post" : {
+        "description" : "Gateway-only. Creates an aUEC order with one of the member's direct Logistician units as the requesting unit and an eligible Profit unit as the responsible unit, through the web's create. A pair that is not among the create options answers 400 JOB_ORDER_UNITS_NOT_OFFERED, naming no side. A create under an idempotency key the client already created an order of the member with answers that order with its current state; changed terms are never applied. Moves no money.",
+        "operationId" : "create_6",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Exchange-Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "[A-Za-z0-9._~-]{8,128}"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeJobOrderCreateDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeJobOrderCreatedDto"
+                }
+              }
+            },
+            "description" : "The created order"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: create an aUEC order",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/job-orders/create-options" : {
+      "get" : {
+        "description" : "Gateway-only. The requesting units are the active units the member directly belongs to and is a Logistician of; the responsible units are the eligible Profit units, with the canonical Profit area suggested. Both lists are empty when the member may create no order. writesEnabled tells whether a create can be served now. Names no member.",
+        "operationId" : "createOptions",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeJobOrderCreateOptionsDto"
+                }
+              }
+            },
+            "description" : "The create options",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: where I may create an aUEC order",
         "tags" : [ "exchange" ],
         "x-domain" : "exchange"
       }
@@ -3533,7 +3768,7 @@
     "/api/v1/exchange/me/store-choices/job-orders" : {
       "get" : {
         "description" : "Gateway-only. The open and in-progress job orders in the member's read scope that need the material.",
-        "operationId" : "jobOrders_1",
+        "operationId" : "jobOrders_2",
         "parameters" : [ {
           "in" : "query",
           "name" : "material",
@@ -5595,6 +5830,80 @@
           },
           "ref" : {
             "type" : "string"
+          }
+        }
+      },
+      "ExchangeJobOrderCreateDto" : {
+        "type" : "object",
+        "properties" : {
+          "comment" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
+          "contact" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "requestingUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "responsibleUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "target" : {
+            "type" : "integer",
+            "format" : "int64",
+            "maximum" : 1000000000000,
+            "minimum" : 1
+          }
+        },
+        "required" : [ "contact", "requestingUnitId", "responsibleUnitId", "target" ]
+      },
+      "ExchangeJobOrderCreateOptionsDto" : {
+        "type" : "object",
+        "properties" : {
+          "requestingUnits" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+            }
+          },
+          "responsibleUnits" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+            }
+          },
+          "suggestedResponsible" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "writesEnabled" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ExchangeJobOrderCreatedDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED", "CANCELLED" ]
+          },
+          "target" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/ExchangeJobOrderVersions"
           }
         }
       },
