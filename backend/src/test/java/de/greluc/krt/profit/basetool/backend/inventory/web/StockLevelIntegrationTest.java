@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelCreateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
@@ -583,12 +584,13 @@ class StockLevelIntegrationTest {
     UUID order = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO job_order (id, priority, created_at, updated_at, version, status,"
-            + " requesting_org_unit_id, responsible_org_unit_id, type)"
-            + " VALUES (?, 2, now(), now(), 0, ?, ?, ?, 'MATERIAL')",
+            + " requesting_org_unit_id, responsible_org_unit_id, type, closed_at)"
+            + " VALUES (?, 2, now(), now(), 0, ?, ?, ?, 'MATERIAL', CASE WHEN ? THEN now() END)",
         order,
         status,
         requester,
-        requester);
+        requester,
+        !JobOrderStatus.valueOf(status).isActive());
     jdbc.update(
         """
         INSERT INTO job_order_material (id, job_order_id, material_id, amount, created_at,
