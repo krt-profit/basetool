@@ -433,7 +433,7 @@ client id once the registry no longer holds it.
   of its persistence context carry in one registry query (REQ-DATA-003).
 - **Notices.** A client's create, need-change and cancel notices name the application
   (REQ-NOTIF-008, REQ-NOTIF-017, REQ-ORDERS-042, REQ-NOTIF-028).
-- **Storage and privacy.** V449 adds both client columns; they hold registry client ids the server
+- **Storage and privacy.** V450 adds both client columns; they hold registry client ids the server
   writes, so the Personensuche lists them as exempt (REQ-SEC-060).
 
 Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`).
@@ -451,7 +451,7 @@ Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`).
 **Enforced by:** `JobOrderCommentTest`, `JobOrderClientNamesTest`, `JobOrderMapperTest`,
 `JobOrderClientOriginIntegrationTest` (backend) · `OrdersListPatternRenderTest`,
 `OrdersDetailPatternRenderTest`, `JobOrderClientOriginE2eTest` (frontend) ·
-`joborder/fragments/order-origin` · V449 · **Related:** REQ-OXCH-004, REQ-REFINERY-027,
+`joborder/fragments/order-origin` · V450 · **Related:** REQ-OXCH-004, REQ-REFINERY-027,
 REQ-BANK-067, REQ-XCH-030 · **Issues:** #3617, #3648
 
 ## Out of scope
