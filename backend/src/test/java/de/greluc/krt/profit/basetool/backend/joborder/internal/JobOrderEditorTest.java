@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -36,8 +37,10 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
@@ -210,6 +213,65 @@ class JobOrderEditorTest {
 
     assertThat(mutations).hasValue(0);
     verifyNoInteractions(auditRecorder, effects, jobOrderStockProjectionService);
+  }
+
+  @Test
+  void aLifecycleEditTheReadCheckOrTheWriterRefusesIsDeniedBeforeTheVersionIsChecked() {
+    order.setLifecycleVersion(2L);
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderAccessPolicy.canRead(JobOrderReadCheck.CONTEXTUAL, order)).thenReturn(false, true);
+
+    assertThatThrownBy(() -> lifecycleEdit(1L, true)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> lifecycleEdit(1L, false)).isInstanceOf(AccessDeniedException.class);
+
+    assertThat(mutations).hasValue(0);
+    verifyNoInteractions(auditRecorder, effects, jobOrderStockProjectionService);
+  }
+
+  @Test
+  void anInvalidResponsibilityRefusesALifecycleEditBeforeTheReadCheckIsAsked() {
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    doThrow(new BadRequestException("orders.responsibility.invalid"))
+        .when(responsibilityGuard)
+        .assertWritable(order);
+
+    assertThatThrownBy(() -> lifecycleEdit(0L, true)).isInstanceOf(BadRequestException.class);
+
+    assertThat(mutations).hasValue(0);
+    verify(jobOrderAccessPolicy, never()).canRead(any(), any());
+    verifyNoInteractions(auditRecorder, effects);
+  }
+
+  @Test
+  void aLifecycleEditChecksTheLifecycleVersionAndNotTheOrderVersion() {
+    order.setLifecycleVersion(2L);
+    order.setVersion(9L);
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderAccessPolicy.canRead(JobOrderReadCheck.CONTEXTUAL, order)).thenReturn(true);
+
+    assertThatThrownBy(() -> lifecycleEdit(9L, true))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    JobOrder edited = lifecycleEdit(2L, true);
+
+    assertThat(edited).isSameAs(order);
+    assertThat(mutations).hasValue(1);
+    verify(auditRecorder)
+        .record(
+            eq(AuditEventType.JOB_ORDER_STATUS_CHANGED),
+            eq(id),
+            eq("#42"),
+            isNull(),
+            sameDetails(AuditDetails.of("to", "IN_PROGRESS")));
+    verifyNoInteractions(jobOrderStockProjectionService);
+  }
+
+  private JobOrder lifecycleEdit(long lifecycleVersion, boolean writes) {
+    return editor.editLifecycle(
+        id,
+        lifecycleVersion,
+        JobOrderReadCheck.CONTEXTUAL,
+        _ -> writes,
+        _ -> JobOrderEditPlan.of(statusChanged()));
   }
 
   @Test

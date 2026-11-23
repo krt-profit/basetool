@@ -19,8 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -90,6 +93,17 @@ class JobOrderWriters {
     }
 
     /**
+     * Tells whether the actor writes for the order as its requesting side.
+     *
+     * @param order the loaded order
+     * @return {@code true} iff the order has a requesting unit the actor writes for
+     */
+    boolean writesRequesting(@NotNull JobOrder order) {
+      UUID requesting = OrgUnit.idOf(order.getRequestingOrgUnit());
+      return requesting != null && writesRequesting(requesting);
+    }
+
+    /**
      * Tells whether the actor writes for the unit as an order's responsible side.
      *
      * @param orgUnitId the unit
@@ -97,6 +111,20 @@ class JobOrderWriters {
      */
     boolean writesResponsible(@NotNull UUID orgUnitId) {
       return rule.coversResponsibleSide() && units.permits(orgUnitId);
+    }
+
+    /**
+     * Tells whether the actor writes for the order as its responsible side; an order without a
+     * responsible unit counts only when the actor writes for every unit.
+     *
+     * @param order the loaded order
+     * @return {@code true} iff the rule covers the responsible side and the actor writes it
+     */
+    boolean writesResponsible(@NotNull JobOrder order) {
+      UUID responsible = OrgUnit.idOf(order.getResponsibleOrgUnit());
+      return responsible == null
+          ? rule.coversResponsibleSide() && everyUnit()
+          : writesResponsible(responsible);
     }
 
     /**
@@ -109,6 +137,36 @@ class JobOrderWriters {
      */
     boolean permitsPair(@NotNull UUID responsibleOrgUnitId, @NotNull UUID requestingOrgUnitId) {
       return writesRequesting(requestingOrgUnitId) || writesResponsible(responsibleOrgUnitId);
+    }
+
+    /**
+     * Tells whether the actor writes for either side of the order the rule covers, as the target
+     * and information changes require.
+     *
+     * @param order the loaded order
+     * @return {@code true} iff the actor writes the responsible or the requesting side
+     */
+    boolean writesEitherSide(@NotNull JobOrder order) {
+      return writesResponsible(order) || writesRequesting(order);
+    }
+
+    /**
+     * Tells whether the actor may move the order to the status (REQ-ORDERS-054): the responsible
+     * writer sets every status, a requesting writer cancels and reopens a cancellation.
+     *
+     * @param order the loaded order in its current status
+     * @param status the requested status
+     * @return {@code true} iff a side the actor writes may set the status
+     */
+    boolean permitsStatus(@NotNull JobOrder order, @NotNull JobOrderStatus status) {
+      if (writesResponsible(order)) {
+        return true;
+      }
+      return switch (status) {
+        case CANCELLED -> writesRequesting(order);
+        case OPEN -> order.getStatus() == JobOrderStatus.CANCELLED && writesRequesting(order);
+        case IN_PROGRESS, COMPLETED, REJECTED -> false;
+      };
     }
 
     /**

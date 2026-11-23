@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
@@ -63,9 +64,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class JobOrderEditor {
-
-  /** The version check of an edit whose request carries no version. */
-  private static final Consumer<JobOrder> UNVERSIONED = _ -> {};
 
   private final JobOrderRepository jobOrderRepository;
   private final ProfitHierarchyService profitHierarchy;
@@ -109,15 +107,38 @@ public class JobOrderEditor {
       UUID id,
       Predicate<JobOrder> needsQueue,
       BiFunction<JobOrder, Boolean, MoneyEdit<T>> mutation) {
+    return editMoney(id, JobOrderReadCheck.CONTEXTUAL, needsQueue, mutation);
+  }
+
+  /**
+   * Applies one monetary edit under the read check its command's caller passed, while
+   * responsibility, lifecycle and deletion are serialized (ADR-0405).
+   *
+   * <p>Before and after the order row lock the order must pass the read check, be an aUEC order and
+   * have a valid responsibility; the mutation makes its own writer and version checks.
+   *
+   * @param id the order to edit
+   * @param read the read check the loaded order must pass
+   * @param needsQueue whether the edit may change the lifecycle and so needs the queue rows
+   * @param mutation the financial action over the locked order and whether the queue is locked
+   * @param <T> the action result type
+   * @return the action's durable result
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  <T> T editMoney(
+      UUID id,
+      JobOrderReadCheck read,
+      Predicate<JobOrder> needsQueue,
+      BiFunction<JobOrder, Boolean, MoneyEdit<T>> mutation) {
     profitHierarchy.lockForOrderWrite();
-    JobOrder order = requireMoneyOrder(id);
+    JobOrder order = requireMoneyOrder(id, read);
     boolean queueLocked = needsQueue.test(order);
     if (queueLocked) {
       jobOrderRepository.lockPriorityQueueRows();
     }
     Entities.require(jobOrderRepository.lockForScopedEdit(id), () -> "JobOrder not found: " + id);
     entityManager.refresh(order);
-    authorizeMoney(order);
+    authorizeMoney(order, read);
     MoneyEdit<T> result = mutation.apply(order, queueLocked);
     recordOutcome(result.edit());
     return result.result();
@@ -142,8 +163,8 @@ public class JobOrderEditor {
       Predicate<JobOrder> needsQueue,
       Function<MoneyPairBasis, MoneyPairEdit<T>> mutation) {
     profitHierarchy.lockForOrderWrite();
-    JobOrder source = requireMoneyOrder(sourceId);
-    final JobOrder destination = requireMoneyOrder(destinationId);
+    JobOrder source = requireMoneyOrder(sourceId, JobOrderReadCheck.CONTEXTUAL);
+    final JobOrder destination = requireMoneyOrder(destinationId, JobOrderReadCheck.CONTEXTUAL);
     boolean queueLocked = needsQueue.test(source);
     List<UUID> locked =
         queueLocked
@@ -157,8 +178,8 @@ public class JobOrderEditor {
     }
     entityManager.refresh(source);
     entityManager.refresh(destination);
-    authorizeMoney(source);
-    authorizeMoney(destination);
+    authorizeMoney(source, JobOrderReadCheck.CONTEXTUAL);
+    authorizeMoney(destination, JobOrderReadCheck.CONTEXTUAL);
     MoneyPairEdit<T> result = mutation.apply(new MoneyPairBasis(source, destination, queueLocked));
     recordOutcome(result.source());
     recordOutcome(result.destination());
@@ -190,15 +211,15 @@ public class JobOrderEditor {
     return locked;
   }
 
-  private JobOrder requireMoneyOrder(UUID id) {
+  private JobOrder requireMoneyOrder(UUID id, JobOrderReadCheck read) {
     JobOrder order =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
-    authorizeMoney(order);
+    authorizeMoney(order, read);
     return order;
   }
 
-  private void authorizeMoney(JobOrder order) {
-    if (!jobOrderAccessPolicy.canSeeJobOrder(order)) {
+  private void authorizeMoney(JobOrder order, JobOrderReadCheck read) {
+    if (!jobOrderAccessPolicy.canRead(read, order)) {
       throw new AccessDeniedException("Caller may not read this order.");
     }
     JobOrderMoneyQueries.requireMoneyKind(order);
@@ -226,7 +247,7 @@ public class JobOrderEditor {
       @Nullable Long expectedVersion,
       @NotNull Function<JobOrder, JobOrderEdit> mutation) {
     return jobOrderStockProjectionService.mapToDtoWithStock(
-        run(id, gate, versioned(gate, expectedVersion), _ -> JobOrderEditPlan.of(mutation)));
+        run(id, gated(gate, versioned(gate, expectedVersion)), _ -> JobOrderEditPlan.of(mutation)));
   }
 
   /**
@@ -249,7 +270,47 @@ public class JobOrderEditor {
       @Nullable Long expectedVersion,
       @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
     return jobOrderStockProjectionService.mapToDtoWithStock(
-        run(id, gate, versioned(gate, expectedVersion), planner));
+        run(id, gated(gate, versioned(gate, expectedVersion)), planner));
+  }
+
+  /**
+   * Plans a lifecycle edit under the read check and writer decision its command's caller passed
+   * (ADR-0405).
+   *
+   * <p>Before and after the resource locks the order must have a valid responsibility, then pass
+   * the read check and the writer decision, then match the observed lifecycle version.
+   *
+   * @param id the order to edit
+   * @param expectedLifecycleVersion the observed lifecycle version; {@code null} is a conflict
+   * @param read the read check the loaded order must pass
+   * @param writes the writer decision on the loaded order, resolved anew on each check
+   * @param planner immutable resource selection and mutation over the authorized order
+   * @return the edited order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the
+   *     responsibility is invalid
+   * @throws AccessDeniedException when the read check or the writer decision refuses
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the observed
+   *     lifecycle version is absent or stale
+   * @throws BusinessConflictException when the complete resource plan changes while waiting
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public JobOrder editLifecycle(
+      @NotNull UUID id,
+      @Nullable Long expectedLifecycleVersion,
+      @NotNull JobOrderReadCheck read,
+      @NotNull Predicate<JobOrder> writes,
+      @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
+    return run(
+        id,
+        order -> {
+          responsibilityGuard.assertWritable(order);
+          if (!jobOrderAccessPolicy.canRead(read, order) || !writes.test(order)) {
+            throw denied(order);
+          }
+          OptimisticLock.check(
+              order.getLifecycleVersion(), expectedLifecycleVersion, JobOrder.class, order.getId());
+        },
+        planner);
   }
 
   /**
@@ -280,7 +341,8 @@ public class JobOrderEditor {
     Consumer<JobOrder> versions =
         versioned(gate, expectedVersion)
             .andThen(order -> JobOrderComment.check(order, expectedCommentVersion));
-    return jobOrderStockProjectionService.mapToDtoWithStock(run(id, gate, versions, planner));
+    return jobOrderStockProjectionService.mapToDtoWithStock(
+        run(id, gated(gate, versions), planner));
   }
 
   /**
@@ -300,7 +362,7 @@ public class JobOrderEditor {
       @NotNull JobOrderGate gate,
       @NotNull Function<JobOrder, JobOrderEdit> mutation) {
     return jobOrderStockProjectionService.mapToDtoWithStock(
-        run(id, gate, UNVERSIONED, _ -> JobOrderEditPlan.of(mutation)));
+        run(id, gated(gate), _ -> JobOrderEditPlan.of(mutation)));
   }
 
   /**
@@ -318,7 +380,7 @@ public class JobOrderEditor {
       @NotNull UUID id,
       @NotNull JobOrderGate gate,
       @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
-    run(id, gate, UNVERSIONED, planner);
+    run(id, gated(gate), planner);
   }
 
   /**
@@ -336,7 +398,7 @@ public class JobOrderEditor {
   @Transactional(propagation = Propagation.MANDATORY)
   public void deletePlanned(
       @NotNull UUID id, @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
-    PreparedEdit prepared = prepare(id, JobOrderGate.ADMIN_DELETE, UNVERSIONED, planner);
+    PreparedEdit prepared = prepare(id, gated(JobOrderGate.ADMIN_DELETE), planner);
     if (prepared.order().getType() == JobOrderType.AUEC
         && jobOrderRepository.hasDurableMoneySubmission(id)) {
       throw new BusinessConflictException("orders.money.delete.submitted");
@@ -347,10 +409,9 @@ public class JobOrderEditor {
 
   private JobOrder run(
       @NotNull UUID id,
-      @NotNull JobOrderGate gate,
-      @NotNull Consumer<JobOrder> versions,
+      @NotNull Consumer<JobOrder> authorization,
       @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
-    PreparedEdit prepared = prepare(id, gate, versions, planner);
+    PreparedEdit prepared = prepare(id, authorization, planner);
     JobOrder order = prepared.order();
     JobOrderEditPlan planned = prepared.plan();
     Set<UUID> previousParties = JobOrderUnitHistory.partyIds(order);
@@ -364,13 +425,12 @@ public class JobOrderEditor {
 
   private PreparedEdit prepare(
       @NotNull UUID id,
-      @NotNull JobOrderGate gate,
-      @NotNull Consumer<JobOrder> versions,
+      @NotNull Consumer<JobOrder> authorization,
       @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
     profitHierarchy.lockForOrderWrite();
     JobOrder order =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
-    authorize(order, gate, versions);
+    authorization.accept(order);
     JobOrderEditPlan planned = planner.apply(order);
     List<OrderMaterialScope> scopes = scopesOf(id, planned.materialIds());
     if (planned.stockRowIds().isEmpty()) {
@@ -384,7 +444,7 @@ public class JobOrderEditor {
       jobOrderRepository.lockForScopedEdit(id);
     }
     entityManager.refresh(order);
-    authorize(order, gate, versions);
+    authorization.accept(order);
     JobOrderEditPlan current = planner.apply(order);
     if (!planned.sameResources(current)
         || !Set.copyOf(scopes).equals(Set.copyOf(scopesOf(id, current.materialIds())))) {
@@ -427,15 +487,39 @@ public class JobOrderEditor {
     return scopes.stream().distinct().toList();
   }
 
-  private void authorize(
-      @NotNull JobOrder order, @NotNull JobOrderGate gate, @NotNull Consumer<JobOrder> versions) {
-    if (gate != JobOrderGate.TRANSFER) {
-      responsibilityGuard.assertWritable(order);
-    }
-    if (!jobOrderAccessPolicy.canEdit(order, gate)) {
-      throw new AccessDeniedException("Caller may not edit job order " + order.getId());
-    }
-    versions.accept(order);
+  /**
+   * Builds the authorization of a gated edit whose request carries no version: a valid
+   * responsibility unless the gate is the transfer, then the gate on the loaded order.
+   *
+   * @param gate the access the edit demands
+   * @return the check of the loaded order
+   */
+  private Consumer<JobOrder> gated(@NotNull JobOrderGate gate) {
+    return order -> {
+      if (gate != JobOrderGate.TRANSFER) {
+        responsibilityGuard.assertWritable(order);
+      }
+      if (!jobOrderAccessPolicy.canEdit(order, gate)) {
+        throw denied(order);
+      }
+    };
+  }
+
+  /**
+   * Builds the authorization of a gated, versioned edit: {@link #gated(JobOrderGate)}, then the
+   * versions.
+   *
+   * @param gate the access the edit demands
+   * @param versions the version checks of the edited parts
+   * @return the check of the loaded order
+   */
+  private Consumer<JobOrder> gated(
+      @NotNull JobOrderGate gate, @NotNull Consumer<JobOrder> versions) {
+    return gated(gate).andThen(versions);
+  }
+
+  private static AccessDeniedException denied(@NotNull JobOrder order) {
+    return new AccessDeniedException("Caller may not edit job order " + order.getId());
   }
 
   /**
@@ -450,7 +534,6 @@ public class JobOrderEditor {
     return order -> {
       Long currentVersion =
           switch (gate) {
-            case CANCEL, SET_OPEN, STATUS -> order.getLifecycleVersion();
             case TRANSFER -> order.getResponsibilityVersion();
             case EDIT, REQUESTER, SUPPORT, ADMIN_DELETE -> order.getVersion();
           };

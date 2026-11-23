@@ -250,6 +250,12 @@ class JobOrderServiceTest {
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
             org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
+    lenient().when(jobOrderAccessPolicy.canRead(any(), any())).thenReturn(true);
+    lenient()
+        .when(writers.resolve(any(), any()))
+        .thenReturn(
+            new JobOrderWriters.Scope(
+                JobOrderWriterRule.CONTEXTUAL, new ScopePredicate(true, null, Set.of())));
     jobOrderQueryService =
         new JobOrderQueryService(
             jobOrderRepository,

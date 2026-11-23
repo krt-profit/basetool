@@ -25,7 +25,9 @@ Two order edits keep their own gate and lock and stay outside it: the priority r
 lock on the priority sequence) and the assignee edits (the assignee edge's own version).
 The edit module loads the aggregate, then decides the caller's access on the loaded aggregate
 through the module's access policy (`MissionAccessPolicy.canEdit`, `JobOrderAccessPolicy.canEdit`)
-before any version check or mutation. A refused caller gets HTTP 403, a caller without an
+before any version check or mutation. A job-order status change decides it from the writer rule
+and the read check its caller passes instead of a gate (`JobOrderEditor#editLifecycle`,
+ADR-0405). A refused caller gets HTTP 403, a caller without an
 authentication is refused, and an unknown aggregate is HTTP 404 for every caller. The controller
 keeps a coarse role gate of its own (ADR-0236 §6): `isAuthenticated()` for the mission manage
 gate, member-or-above for the read and participant gates, the LOGISTICIAN role (or LOGISTICIAN,
@@ -76,4 +78,4 @@ even where the edit would otherwise be refused with 400 (a material order sent t
 - [ ] A stale `version` answers 409, no audit event is recorded and no notice is published.
 
 **Enforced by:** `JobOrderEditorTest` · **Code:** `JobOrderEditor#edit`,
-`JobOrderEditor#editPlannedWithComment`.
+`JobOrderEditor#editPlannedWithComment`, `JobOrderEditor#editLifecycle`.
