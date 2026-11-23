@@ -21,8 +21,9 @@ lifecycle, money and notices, stay in [`orders-core.md`](orders-core.md) and
 in [`external-exchange.md`](external-exchange.md) and [`docs/exchange/errors.md`](../exchange/errors.md).
 The read serves its snapshot and its change feed (`GET /exchange/v1/job-orders`), and a Logistician
 of the requesting unit creates aUEC orders through `GET /exchange/v1/job-orders/create-options` and
-`POST /exchange/v1/job-orders`, within an open-order cap and a daily create cap; the writes on an
-existing order follow with their own slices. Both switches are off until an admin turns them on.
+`POST /exchange/v1/job-orders`, within an open-order cap and a daily create cap, and cancels them
+before any money moved through `POST /exchange/v1/job-orders/{id}/cancel`; the target and comment
+writes follow with their own slices. Both switches are off until an admin turns them on.
 
 The guiding rules:
 
@@ -498,8 +499,9 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0408, 
 
 ### REQ-OXCH-005 — Shared rules of the job-order writes
 
-> [!note] Implemented for the create (#3646; decided in #3614, #3616, ADR-0407). Cancel, target and
-> comment follow with their slices under the same rules.
+> [!note] Implemented for the create (#3646) and, with the rules for an existing order, for the
+> cancel (#3650; decided in #3613, #3614, #3616, ADR-0407, ADR-0408). Target and comment follow with
+> their slices under the same rules.
 
 - **Single routes** under `/exchange/v1/job-orders`, one order per call and every path on the
   acting list (`ActingMemberFilter.ACTING_PATHS`); no change set and no `dryRun`. A client pre-checks
@@ -513,7 +515,24 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0408, 
   under a named field (`lifecycleVersion`, `targetVersion`, `commentVersion`), and every answer
   carries the new `versions`.
 - **The order of checks** on an existing order: schema → visibility → writer → version →
-  responsibility → status → the write's own rule.
+  responsibility → status → the write's own rule. The first refusal answers:
+  - the gateway checks the order id as a UUID and the body against the write's schema:
+    `400 SCHEMA_INVALID`;
+  - an unknown, hidden or deleted order answers the same `404 NOT_FOUND`; visibility is the read set
+    of REQ-OXCH-001 (`JobOrderReadCheck.OWN_RELATION`, decided for the request's acting member);
+  - an order the member reads but does not write for by the writer rule of REQ-OXCH-001, and any
+    MATERIAL or ITEM order: `403 NOT_PERMITTED`;
+  - a stale section version: `409 VERSION_CONFLICT`;
+  - an invalid responsibility (REQ-ORDERS-055): `409 JOB_ORDER_RESPONSIBILITY_INVALID`, the
+    exchange's code in place of the web's `400`;
+  - a status the write does not admit: `409 JOB_ORDER_CLOSED`;
+  - then the write's own rule.
+- **One decision under the order locks.** The rules run in the web's command (ADR-0408), before
+  and again under the order locks, so a concurrent web write, money submission or hierarchy change
+  yields one coherent outcome. They are one unit, `JobOrderClientWriteRules`, which every client
+  write on an existing order passes with its writer decision, its section version and the statuses
+  it admits; the web's commands keep their own order and codes.
+- **A refusal writes nothing**: no change, no audit event and no notice.
 - **One quota unit per call** (REQ-XCH-023): each write counts one unit of the daily write quota; a
   refusal by a job-order switch counts none (REQ-OXCH-009).
 - **No journal, no undo and no mass-change guard** (REQ-XCH-021, REQ-XCH-022, ADR-0407 point 7): a
@@ -529,12 +548,96 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0408, 
 - [x] A refusal by the writes switch comes before the quota and counts no write (ingest
   `ExchangeGateTest`); the backend gate closes the create while the writes switch is off
   (`ExchangeJobOrderCreateTest`).
-- [ ] Cancel, target and comment with their named versions come with their slices.
+- [x] The cancel is a single route on the acting list that needs an `Idempotency-Key`, relays no
+  key, checks the order id and the body before the relay, and needs the write scope (ingest
+  `ExchangeJobOrderWriteRouteTest`, `ExchangeGoldenAnswerTest`, `ExchangeContractTest`,
+  `FilterExemptionSetsTest`, both `ExchangeRelaySeamParityTest`s).
+- [x] An unknown, a hidden and a deleted order answer alike; a reader who does not write and a
+  responsible-side writer, and every MATERIAL or ITEM order, are not permitted; a stale version, an
+  invalid responsibility and a closed order answer their codes, in the order above, and write
+  nothing (`ExchangeJobOrderCancelTest`).
+- [x] The backend's refusals reach the client with the registry's codes and fixed details (ingest
+  `ExchangeJobOrderWriteRouteTest`).
+- [ ] Target and comment with their named versions come with their slices.
 
 **Enforced by:** `ExchangeRoutes`, `ExchangeIdempotencyFilter`, `ExchangeLimitFilter`,
-`ExchangeRelay` (gateway) · `ActingMemberFilter`, `ExchangeGate` (backend) · **Related:**
-REQ-XCH-020, REQ-XCH-021, REQ-XCH-022, REQ-XCH-023, REQ-XCH-025, REQ-OXCH-004, REQ-OXCH-009 ·
-ADR-0407 · **Issues:** #3614, #3616, #3646
+`ExchangeRelay`, `ExchangeJobOrderWriteController` (gateway) · `ActingMemberFilter`,
+`ExchangeGate`, `ExchangeJobOrderChangeService` (backend exchange) · `JobOrderClientWriteRules`,
+`JobOrderClientWriteRefusedException`, `JobOrderEditor` (job orders) · **Related:** REQ-XCH-020,
+REQ-XCH-021, REQ-XCH-022, REQ-XCH-023, REQ-XCH-025, REQ-ORDERS-055, REQ-OXCH-001, REQ-OXCH-004,
+REQ-OXCH-009 · ADR-0407, ADR-0408 · **Issues:** #3613, #3614, #3616, #3646, #3650
+
+### REQ-OXCH-006 — Cancel an aUEC order
+
+> [!note] Implemented (#3650; decided in #3613, #3614, #3616, #3617, ADR-0407, ADR-0408).
+
+`POST /exchange/v1/job-orders/{id}/cancel` (`exchange.joborders.write`) with a mandatory
+`Idempotency-Key`, relayed without the key to `POST /api/v1/exchange/job-orders/{id}/cancel`:
+
+- body `job-order-write.schema.json#/$defs/cancel`: `{ lifecycleVersion }`, the order's
+  `versions.lifecycle` as last read;
+- answer `200` `job-order-write.schema.json#/$defs/written`: `{ id, status, versions }`, read from
+  the stored order after the cancel.
+
+**The rules.** The shared rules of REQ-OXCH-005 with the lifecycle version as the section version;
+the writer is a direct Logistician of the requesting unit (a writer of the responsible side writes
+nothing through a client), and only an `OPEN` or `IN_PROGRESS` order admits the cancel. Then the
+cancel's own rule: once any monetary operation of the order has reached its accepted, durable
+submission boundary — the hard-delete boundary of REQ-ORDERS-063
+(`JobOrderRepository.hasDurableMoneySubmission`) — the cancel answers
+`409 JOB_ORDER_MONEY_STARTED`, one refusal for every money fact, naming none. The guard is decided
+under the order locks, so a first money submission racing the cancel either lands first and refuses
+the cancel, or meets a cancelled order. Such an order holds no money, no waiting Bank attempt and
+nothing to settle, so a client's cancel has no money or Bank effect.
+
+**Through the web's status command.** The cancel runs `JobOrderStatusCommand.cancel` with the
+writer rule `DIRECT_LOGISTICIAN`, the read check `OWN_RELATION` and the actor
+`JobOrderActor.Client(member, clientId)` (ADR-0408): the same locks, priority release, earmark
+release, end of open unit commitments (REQ-ORDERS-059), closing instant, live update of the order
+page and the overview after the commit (REQ-XCH-030), and the web's finished notice to the current
+writers of both units without the member, which names the application (REQ-ORDERS-042,
+REQ-NOTIF-028), with its prompt cleanup. No client reopens a cancellation: a mistaken cancel is
+reopened in the Basetool, and no undo exists (REQ-OXCH-005).
+
+**Audit.** A client's cancel writes `JOB_ORDER_CANCELLED_VIA_CLIENT` with `{previousStatus}`
+instead of `JOB_ORDER_STATUS_CHANGED`, and the client in `client_id` as on every row
+(REQ-AUDIT-001, REQ-AUDIT-005); a refusal records nothing.
+
+**Retries.** The backend stores no key for the cancel: a retry under the same key within the
+gateway's hour replays the cached answer (REQ-XCH-020), and after it the moved lifecycle version
+answers `409 VERSION_CONFLICT`; the client reads the order again.
+
+**Monitoring** (REQ-OBS-025). Every cancel counts on
+`basetool_exchange_writes_total{resource="job_order", outcome}`, each refusal also on
+`basetool_exchange_job_order_refused_total` under `not_found`, `not_permitted`,
+`version_conflict`, `responsibility_invalid`, `closed` or `money_started`;
+`JobOrderExchangeNotFoundSpike` fires on more than 50 `not_found` refusals in an hour.
+
+**Acceptance**
+
+- [x] A Logistician of the requesting unit cancels an open or an in-progress aUEC order; the answer
+  carries the order's id, status and versions and matches its schema (`ExchangeJobOrderCancelTest`).
+- [x] An order a money operation of which was accepted answers `409 JOB_ORDER_MONEY_STARTED`
+  naming no money fact and stays open, also when the first submission holds the order lock while
+  the cancel arrives; a closed order answers `JOB_ORDER_CLOSED` before its money is asked about
+  (`ExchangeJobOrderCancelTest`).
+- [x] A retry after the cache answers `409 VERSION_CONFLICT` (`ExchangeJobOrderCancelTest`).
+- [x] A client's cancel writes `JOB_ORDER_CANCELLED_VIA_CLIENT` with the client and the previous
+  status, a refusal nothing; the responsible side's writer gets the finished notice naming the
+  application, the member none (`ExchangeJobOrderCancelTest`).
+- [x] Every cancel counts its outcome and every refusal its reason; the writes switch and the read
+  scope close the route (`ExchangeJobOrderCancelTest`, ingest `ExchangeJobOrderWriteRouteTest`).
+- [x] The alert fires on more than 50 `not_found` refusals in an hour and stays silent below
+  (`job_order_exchange_not_found_alerts_test.yml`).
+
+**Enforced by:** `JobOrderStatusCommand`, `JobOrderCancellation`, `JobOrderClientWriteRules`,
+`JobOrderStatusAudit`, `JobOrderService#changeStatus` (job orders) ·
+`ExchangeJobOrderChangeService`, `ExchangeJobOrderWriteController` (backend exchange) ·
+`ExchangeJobOrderWriteController`, `ExchangeRoutes`, `ExchangeRelay.DETAILS` (gateway) ·
+`job-order-write.schema.json` · `JobOrderExchangeNotFoundSpike` · **Related:** REQ-XCH-020,
+REQ-XCH-025, REQ-XCH-030, REQ-ORDERS-042, REQ-ORDERS-054, REQ-ORDERS-059, REQ-ORDERS-063,
+REQ-AUDIT-001, REQ-NOTIF-028, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005 · ADR-0407, ADR-0408 ·
+**Issues:** #3613, #3614, #3616, #3617, #3650
 
 ### REQ-OXCH-009 — The job-order switches and caps
 

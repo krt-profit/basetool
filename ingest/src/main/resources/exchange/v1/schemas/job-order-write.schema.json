@@ -76,6 +76,51 @@
         "target"
       ]
     },
+    "cancel": {
+      "title": "Cancel an aUEC order",
+      "description": "Cancels an open or in-progress aUEC order of a unit the member writes for, only while no money operation of the order has been accepted. A stale lifecycleVersion answers 409 VERSION_CONFLICT, so a retry after the gateway's one-hour cache does too. There is no undo and no reopen through a client: a mistaken cancel is reopened in the Basetool.",
+      "type": "object",
+      "properties": {
+        "lifecycleVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "versions.lifecycle as last read."
+        }
+      },
+      "required": [
+        "lifecycleVersion"
+      ]
+    },
+    "written": {
+      "title": "Written aUEC order",
+      "description": "Only the order's id, status and new versions after a write on an existing order; read the order itself from the job-order snapshot or feed.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The order's id and the feed key. Clients store and echo it, never parse it."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "CANCELLED",
+            "REJECTED"
+          ]
+        },
+        "versions": {
+          "$ref": "job-order.schema.json#/properties/versions"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "versions"
+      ]
+    },
     "unitId": {
       "type": "string",
       "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",

@@ -333,6 +333,16 @@ public class JobOrderService {
         order -> statusPlan(order, status, caller.actor()));
   }
 
+  /** Changes the status under checks its caller decides, before and under the locks (ADR-0408). */
+  @Transactional(propagation = Propagation.MANDATORY)
+  JobOrder changeStatus(
+      @NotNull UUID id,
+      @NotNull JobOrderStatus status,
+      @NotNull JobOrderActor actor,
+      @NotNull Consumer<JobOrder> checks) {
+    return jobOrderEditor.editLifecycle(id, checks, order -> statusPlan(order, status, actor));
+  }
+
   private JobOrderEditPlan statusPlan(
       @NotNull JobOrder order, @NotNull JobOrderStatus status, @NotNull JobOrderActor actor) {
     if (order.getType() == JobOrderType.AUEC && status == JobOrderStatus.COMPLETED) {
@@ -407,18 +417,8 @@ public class JobOrderService {
       notices.add(JobOrderLifecycleNotices.reopened(jobOrder, actor.member()));
     }
 
-    JobOrderEdit edit =
-        status == JobOrderStatus.COMPLETED && previousStatus != JobOrderStatus.COMPLETED
-            ? JobOrderEdit.audited(
-                jobOrder,
-                AuditEventType.JOB_ORDER_COMPLETED,
-                AuditDetails.of("from", previousStatus).with("autoCompleted", "false"))
-            : JobOrderEdit.audited(
-                jobOrder,
-                AuditEventType.JOB_ORDER_STATUS_CHANGED,
-                AuditDetails.of("from", previousStatus).with("to", status));
     publishLifecycleSections(jobOrder);
-    return edit.notifying(notices);
+    return JobOrderStatusAudit.changed(jobOrder, previousStatus, status, actor).notifying(notices);
   }
 
   @Transactional(propagation = Propagation.MANDATORY)

@@ -93,6 +93,7 @@ class ExchangeRoutesContractTest {
             "/exchange/v1/bank/requests/{id}/cancel",
             "/exchange/v1/bank/requests/{id}/correction",
             "/exchange/v1/job-orders",
+            "/exchange/v1/job-orders/{id}/cancel",
             "/exchange/v1/me/blueprints/changes",
             "/exchange/v1/me/drafts/blueprints",
             "/exchange/v1/me/drafts/refinery-orders",

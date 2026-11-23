@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInsta
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockMembersDto;
@@ -174,9 +175,11 @@ class ExchangeWireContractTest {
 
   /**
    * The job-order writes, which answer only with both job-order switches on and a member who writes
-   * for a unit; {@code ExchangeJobOrderCreateTest} sends them on a seeded world.
+   * for a unit; {@code ExchangeJobOrderCreateTest} and {@code ExchangeJobOrderCancelTest} send them
+   * on a seeded world.
    */
-  private static final Set<String> JOB_ORDER_WRITES = Set.of("/job-orders");
+  private static final Set<String> JOB_ORDER_WRITES =
+      Set.of("/job-orders", "/job-orders/{id}/cancel");
 
   /**
    * The bank request writes, which answer only with the bank switched on and a seeded bank world;
@@ -210,6 +213,7 @@ class ExchangeWireContractTest {
           Map.entry("page--bankRequestPage", ExchangeBankRequestPageDto.class),
           Map.entry("page--jobOrderPage", ExchangeJobOrderPageDto.class),
           Map.entry("job-order-write--created", ExchangeJobOrderCreatedDto.class),
+          Map.entry("job-order-write--written", ExchangeJobOrderWrittenDto.class),
           Map.entry("job-order-create-options", ExchangeJobOrderCreateOptionsDto.class),
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),

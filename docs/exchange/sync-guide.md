@@ -159,7 +159,9 @@ Every change set and draft carries an `Idempotency-Key` of 8 to 128 characters o
   one member share them. Random keys never collide.
 - A [bank raise](resources/bank.md) and a [job-order create](resources/job-orders.md#the-create)
   keep their key with what they created, so a retry under the key answers the first request or order
-  even after the hour and after a `5xx`.
+  even after the hour and after a `5xx`. A write on an existing job order keeps none: after the
+  hour its moved version answers `409 VERSION_CONFLICT`
+  ([writes on an existing order](resources/job-orders.md#writes-on-an-existing-order)).
 
 `401`, `403`, `413`, `415`, `429`, `5xx`, `409 MASS_CHANGE_CONFIRMATION_REQUIRED` and the
 `400 SCHEMA_INVALID` for a body that is not a JSON document are never cached, and

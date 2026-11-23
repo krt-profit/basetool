@@ -205,6 +205,8 @@ public enum AuditEventType {
   JOB_ORDER_ITEM_UPDATED(AuditDomain.JOB_ORDER),
   /** A job order's status was changed via the status endpoint. */
   JOB_ORDER_STATUS_CHANGED(AuditDomain.JOB_ORDER),
+  /** A member cancelled an aUEC order through an exchange client (REQ-OXCH-006). */
+  JOB_ORDER_CANCELLED_VIA_CLIENT(AuditDomain.JOB_ORDER),
   /** A job order was moved to a new priority slot. */
   JOB_ORDER_PRIORITY_CHANGED(AuditDomain.JOB_ORDER),
   /**

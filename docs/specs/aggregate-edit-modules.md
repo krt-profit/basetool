@@ -27,9 +27,10 @@ The edit module loads the aggregate, then decides the caller's access on the loa
 through the module's access policy (`MissionAccessPolicy.canEdit`, `JobOrderAccessPolicy.canEdit`)
 before any version check or mutation. A job-order status change decides it from the writer rule
 and the read check its caller passes instead of a gate (`JobOrderEditor#editLifecycle`,
-ADR-0408). A refused caller gets HTTP 403, a caller without an
-authentication is refused, and an unknown aggregate is HTTP 404 for every caller. The controller
-keeps a coarse role gate of its own (ADR-0236 §6): `isAuthenticated()` for the mission manage
+ADR-0408); a client's cancel passes the shared rules of a client write as the checks of that
+edit, in the exchange's order of refusals (REQ-OXCH-005). A refused caller gets HTTP 403, a caller
+without an authentication is refused, and an unknown aggregate is HTTP 404 for every caller.
+The controller keeps a coarse role gate of its own (ADR-0236 §6): `isAuthenticated()` for the mission manage
 gate, member-or-above for the read and participant gates, the LOGISTICIAN role (or LOGISTICIAN,
 OFFICER, ADMIN for the unlinks) for the job-order edit gate, `isAuthenticated()` for the requester
 gate. Audit event types and payloads are unchanged (REQ-AUDIT-001); a mutation that changes

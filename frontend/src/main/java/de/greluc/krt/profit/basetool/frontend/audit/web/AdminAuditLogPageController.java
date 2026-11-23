@@ -197,6 +197,7 @@ public class AdminAuditLogPageController {
                   "JOB_ORDER_UPDATED",
                   "JOB_ORDER_ITEM_UPDATED",
                   "JOB_ORDER_STATUS_CHANGED",
+                  "JOB_ORDER_CANCELLED_VIA_CLIENT",
                   "JOB_ORDER_PRIORITY_CHANGED",
                   "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED",
                   "JOB_ORDER_DELETED",

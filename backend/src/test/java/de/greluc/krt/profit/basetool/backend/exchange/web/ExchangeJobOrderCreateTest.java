@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.awaitility.Awaitility.await;
@@ -29,23 +28,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import de.greluc.krt.profit.basetool.backend.exchange.ExchangePublishedSchemas;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderFingerprintRecomputation;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
-import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.identity.api.Role;
-import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LivesyncMetricNames;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
@@ -58,7 +44,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -70,7 +55,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,10 +64,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -98,12 +79,10 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest
 class ExchangeJobOrderCreateTest {
 
-  private static final String PATH = "/api/v1/exchange/job-orders";
+  private static final String PATH = ExchangeJobOrderWorld.PATH;
   private static final String OPTIONS = PATH + "/create-options";
-  private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";
-  private static final String INSTALLATION = "Kx9_" + "w".repeat(39);
-  private static final String WRITE = "exchange.joborders.write";
-  private static final String READ = "exchange.joborders.read";
+  private static final String WRITE = ExchangeJobOrderWorld.WRITE;
+  private static final String READ = ExchangeJobOrderWorld.READ;
   private static final String CREATED_SCHEMA = "job-order-write.schema.json#/$defs/created";
   private static final String OPTIONS_SCHEMA = "job-order-create-options.schema.json";
 
@@ -114,20 +93,12 @@ class ExchangeJobOrderCreateTest {
   private static final int DAILY_CREATE_CAP = 20;
 
   @Autowired private WebApplicationContext context;
-  @Autowired private UserRepository userRepository;
-  @Autowired private RoleRepository roleRepository;
-  @Autowired private ExchangeClientRepository clientRepository;
-  @Autowired private KnownExchangeClients knownClients;
-  @Autowired private ExchangeSettingsRepository settingsRepository;
-  @Autowired private OrgUnitRepository orgUnitRepository;
   @Autowired private JobOrderFingerprintRecomputation fingerprints;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper objectMapper;
   @Autowired private MeterRegistry meterRegistry;
 
-  private final List<UUID> orgUnits = new ArrayList<>();
-  private final List<UUID> users = new ArrayList<>();
-
+  private ExchangeJobOrderWorld world;
   private MockMvc mockMvc;
   private UUID profit;
   private UUID responsible;
@@ -137,71 +108,20 @@ class ExchangeJobOrderCreateTest {
   /** A registry client id of the longest length the registry admits, 63 characters. */
   private String client;
 
-  private boolean wasEnabled;
-  private boolean wasJobOrdersEnabled;
-  private boolean wasJobOrderWritesEnabled;
-
   @BeforeEach
   void setUp() {
-    mockMvc =
-        MockMvcBuilders.webAppContextSetup(context)
-            .addFilters(context.getBean(FilterChainProxy.class))
-            .build();
-    profit = persistedProfitArea(orgUnitRepository).getId();
-    responsible = squadron("Create responsible", profit);
-    requesting = squadron("Create requesting", null);
-    logistician = user("create-logistician", false);
-    seat(logistician, requesting, "MEMBER", true);
-    client = "jo-" + UUID.randomUUID().toString().substring(0, 8) + "-" + "c".repeat(51);
-    ExchangeClient registered = new ExchangeClient();
-    registered.setClientId(client);
-    registered.setDisplayName("VerseKit");
-    registered.setStatus(ExchangeClientStatus.ACTIVE);
-    registered.setCapabilities(
-        EnumSet.of(
-            ExchangeCapability.CONNECT,
-            ExchangeCapability.JOB_ORDERS_READ,
-            ExchangeCapability.JOB_ORDERS_WRITE));
-    clientRepository.saveAndFlush(registered);
-    knownClients.invalidate();
-    ExchangeSettings settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
-    wasEnabled = settings.isEnabled();
-    wasJobOrdersEnabled = settings.isJobOrdersEnabled();
-    wasJobOrderWritesEnabled = settings.isJobOrderWritesEnabled();
-    settings.setEnabled(true);
-    settings.setJobOrdersEnabled(true);
-    settings.setJobOrderWritesEnabled(true);
-    settingsRepository.saveAndFlush(settings);
+    world = new ExchangeJobOrderWorld(context);
+    mockMvc = world.getMockMvc();
+    profit = world.getProfit();
+    responsible = world.getResponsible();
+    requesting = world.getRequesting();
+    logistician = world.getLogistician();
+    client = world.getClient();
   }
 
   @AfterEach
   void tearDown() {
-    List<UUID> created =
-        jdbc.queryForList(
-            "SELECT id FROM job_order WHERE created_by_client_id = ? OR requesting_org_unit_id = ?",
-            UUID.class,
-            client,
-            requesting);
-    created.forEach(id -> {
-      jdbc.update("DELETE FROM notification WHERE entity_id = ?", id);
-      jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", id);
-      jdbc.update("DELETE FROM job_order WHERE id = ?", id);
-    });
-    jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
-    users.forEach(id -> {
-      jdbc.update("DELETE FROM notification WHERE recipient_user_id = ?", id);
-      jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
-      jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
-      jdbc.update("DELETE FROM app_user WHERE id = ?", id);
-    });
-    orgUnits.reversed().forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
-    ExchangeSettings settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
-    settings.setEnabled(wasEnabled);
-    settings.setJobOrdersEnabled(wasJobOrdersEnabled);
-    settings.setJobOrderWritesEnabled(wasJobOrderWritesEnabled);
-    settingsRepository.saveAndFlush(settings);
+    world.close();
   }
 
   @Test
@@ -248,40 +168,40 @@ class ExchangeJobOrderCreateTest {
 
   @Test
   void aRequestingUnitTheMemberOnlyBelongsToIsNotOffered() throws Exception {
-    UUID plain = user("create-plain-member", false);
-    seat(plain, requesting, "MEMBER", false);
+    UUID plain = world.user("create-plain-member", false);
+    world.seat(plain, requesting, "MEMBER", false);
 
     assertNotOffered(plain, body(requesting, responsible, 1L));
   }
 
   @Test
   void aResponsibleUnitOutsideTheEligibleProfitUnitsIsNotOffered() throws Exception {
-    UUID outside = squadron("Create outside", null);
+    UUID outside = world.squadron("Create outside", null);
 
     assertNotOffered(logistician, body(requesting, outside, 1L));
   }
 
   @Test
   void aWriterOfTheResponsibleSideIsNotOfferedAPairForAnotherRequester() throws Exception {
-    UUID profitLogistician = user("create-profit-logistician", false);
-    seat(profitLogistician, responsible, "MEMBER", true);
+    UUID profitLogistician = world.user("create-profit-logistician", false);
+    world.seat(profitLogistician, responsible, "MEMBER", true);
 
     assertNotOffered(profitLogistician, body(requesting, responsible, 1L));
   }
 
   @Test
   void leadershipReachWithoutMembershipIsNotOffered() throws Exception {
-    UUID area = orgUnit("BEREICH", "Create area", null);
-    UUID below = squadron("Create below area", area);
-    UUID leader = user("create-area-leader", false);
-    seat(leader, area, "BEREICHSLEITER", false);
+    UUID area = world.orgUnit("BEREICH", "Create area", null);
+    UUID below = world.squadron("Create below area", area);
+    UUID leader = world.user("create-area-leader", false);
+    world.seat(leader, area, "BEREICHSLEITER", false);
 
     assertNotOffered(leader, body(below, responsible, 1L));
   }
 
   @Test
   void anAdministratorIsAPlainMemberThroughAClient() throws Exception {
-    UUID admin = user("create-admin", true);
+    UUID admin = world.user("create-admin", true);
 
     assertNotOffered(admin, body(requesting, responsible, 1L));
   }
@@ -367,15 +287,15 @@ class ExchangeJobOrderCreateTest {
 
   @Test
   void aRefusedCreateRecordsNothing() throws Exception {
-    assertNotOffered(logistician, body(requesting, squadron("Create refused", null), 1L));
+    assertNotOffered(logistician, body(requesting, world.squadron("Create refused", null), 1L));
 
     assertThat(clientAudits()).isEmpty();
   }
 
   @Test
   void aClientsCreateNotifiesTheUnitWritersButTheMemberAndRefreshesTheQueue() throws Exception {
-    UUID colleague = user("create-colleague", false);
-    seat(colleague, requesting, "MEMBER", true);
+    UUID colleague = world.user("create-colleague", false);
+    world.seat(colleague, requesting, "MEMBER", true);
     Counter queueFrames =
         meterRegistry.counter(
             LivesyncMetricNames.LIVESYNC_PUBLISH_ACCEPTED,
@@ -400,7 +320,7 @@ class ExchangeJobOrderCreateTest {
     JsonNode page =
         objectMapper.readTree(
             mockMvc
-                .perform(relayed(get(PATH), logistician, READ))
+                .perform(world.relayed(get(PATH), logistician, READ))
                 .andReturn()
                 .getResponse()
                 .getContentAsString());
@@ -440,7 +360,7 @@ class ExchangeJobOrderCreateTest {
   @Test
   void theCreateOptionsOfferTheMembersLogisticianUnitsAndTheEligibleProfitUnits() throws Exception {
     MockHttpServletResponse response =
-        mockMvc.perform(relayed(get(OPTIONS), logistician, WRITE)).andReturn().getResponse();
+        mockMvc.perform(world.relayed(get(OPTIONS), logistician, WRITE)).andReturn().getResponse();
 
     assertThat(response.getStatus()).isEqualTo(200);
     String content = response.getContentAsString();
@@ -459,13 +379,13 @@ class ExchangeJobOrderCreateTest {
 
   @Test
   void aMemberWithoutAWriterUnitIsOfferedNoCreate() throws Exception {
-    UUID plain = user("create-options-plain", false);
-    seat(plain, requesting, "MEMBER", false);
+    UUID plain = world.user("create-options-plain", false);
+    world.seat(plain, requesting, "MEMBER", false);
 
     JsonNode options =
         objectMapper.readTree(
             mockMvc
-                .perform(relayed(get(OPTIONS), plain, WRITE))
+                .perform(world.relayed(get(OPTIONS), plain, WRITE))
                 .andReturn()
                 .getResponse()
                 .getContentAsString());
@@ -477,10 +397,7 @@ class ExchangeJobOrderCreateTest {
 
   @Test
   void theCreateOptionsTellWhenTheWritesSwitchIsOffAndCountOneRead() throws Exception {
-    ExchangeSettings settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
-    settings.setJobOrderWritesEnabled(false);
-    settingsRepository.saveAndFlush(settings);
+    world.switches(true, true, false);
     Counter reads =
         meterRegistry.counter(
             ExchangeMetricNames.EXCHANGE_JOB_ORDER_READS,
@@ -493,7 +410,7 @@ class ExchangeJobOrderCreateTest {
     JsonNode options =
         objectMapper.readTree(
             mockMvc
-                .perform(relayed(get(OPTIONS), logistician, WRITE))
+                .perform(world.relayed(get(OPTIONS), logistician, WRITE))
                 .andReturn()
                 .getResponse()
                 .getContentAsString());
@@ -504,10 +421,7 @@ class ExchangeJobOrderCreateTest {
 
   @Test
   void theWritesSwitchClosesTheCreate() throws Exception {
-    ExchangeSettings settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
-    settings.setJobOrderWritesEnabled(false);
-    settingsRepository.saveAndFlush(settings);
+    world.switches(true, true, false);
 
     MockHttpServletResponse response =
         create(logistician, body(requesting, responsible, 1L), key());
@@ -523,7 +437,8 @@ class ExchangeJobOrderCreateTest {
     MockHttpServletResponse response =
         mockMvc
             .perform(
-                relayed(post(PATH), logistician, READ)
+                world
+                    .relayed(post(PATH), logistician, READ)
                     .header(ActingMemberHeader.EXCHANGE_IDEMPOTENCY_KEY_HEADER, key())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body(requesting, responsible, 1L)))
@@ -653,12 +568,12 @@ class ExchangeJobOrderCreateTest {
     close(orders.subList(0, 1), "CANCELLED");
     createdAt(orders.subList(1, 2), Instant.now().minus(Duration.ofDays(1)));
     webCreate();
-    UUID colleague = user("create-options-colleague", false);
-    seat(colleague, requesting, "MEMBER", true);
+    UUID colleague = world.user("create-options-colleague", false);
+    world.seat(colleague, requesting, "MEMBER", true);
     createdId(create(colleague, body(requesting, responsible, 1L), key()));
 
     MockHttpServletResponse response =
-        mockMvc.perform(relayed(get(OPTIONS), logistician, WRITE)).andReturn().getResponse();
+        mockMvc.perform(world.relayed(get(OPTIONS), logistician, WRITE)).andReturn().getResponse();
 
     ExchangePublishedSchemas.assertMatches(
         OPTIONS_SCHEMA, response.getContentAsString(), "the create options");
@@ -785,7 +700,8 @@ class ExchangeJobOrderCreateTest {
       @NotNull UUID member, @NotNull String body, @NotNull String idempotencyKey) throws Exception {
     return mockMvc
         .perform(
-            relayed(post(PATH), member, WRITE)
+            world
+                .relayed(post(PATH), member, WRITE)
                 .header(ActingMemberHeader.EXCHANGE_IDEMPOTENCY_KEY_HEADER, idempotencyKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -853,63 +769,5 @@ class ExchangeJobOrderCreateTest {
     List<String> ids = new ArrayList<>();
     units.forEach(unit -> ids.add(unit.get("id").asString()));
     return ids;
-  }
-
-  private @NotNull MockHttpServletRequestBuilder relayed(
-      @NotNull MockHttpServletRequestBuilder request,
-      @NotNull UUID member,
-      @NotNull String capabilities) {
-    return request
-        .with(jwt().jwt(t -> t.subject(GATEWAY).claim("azp", "test-ingest-gateway")))
-        .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, member.toString())
-        .header(ActingMemberHeader.EXCHANGE_CLIENT_HEADER, client)
-        .header(ActingMemberHeader.EXCHANGE_CAPABILITIES_HEADER, capabilities)
-        .header(ActingMemberHeader.EXCHANGE_INSTALLATION_HEADER, INSTALLATION);
-  }
-
-  private @NotNull UUID user(@NotNull String username, boolean admin) {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    user.setUsername(username + "-" + UUID.randomUUID());
-    user.setApprovalStatus(ApprovalStatus.ACTIVE);
-    user.setInKeycloak(true);
-    Set<Role> roles = new HashSet<>();
-    roles.add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
-    if (admin) {
-      roles.add(roleRepository.findByCode(Roles.ADMIN).orElseThrow());
-    }
-    user.setRoles(roles);
-    UUID id = userRepository.saveAndFlush(user).getId();
-    users.add(id);
-    return id;
-  }
-
-  private void seat(
-      @NotNull UUID member, @NotNull UUID unit, @NotNull String role, boolean logisticianFlag) {
-    jdbc.update(
-        "INSERT INTO org_unit_membership (user_id, org_unit_id, role, is_logistician)"
-            + " VALUES (?, ?, ?, ?)",
-        member,
-        unit,
-        role,
-        logisticianFlag);
-  }
-
-  private @NotNull UUID squadron(@NotNull String name, @Nullable UUID parent) {
-    return orgUnit("SQUADRON", name, parent);
-  }
-
-  private @NotNull UUID orgUnit(@NotNull String kind, @NotNull String name, @Nullable UUID parent) {
-    UUID id = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, parent_org_unit_id)"
-            + " VALUES (?, ?, ?, ?, TRUE, ?)",
-        id,
-        kind,
-        name + " " + id,
-        "C" + id.toString().substring(0, 7),
-        parent);
-    orgUnits.add(id);
-    return id;
   }
 }

@@ -20,10 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCaller;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeJobOrderChangeService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeJobOrderCreateService;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCancelDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +34,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
@@ -38,6 +42,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -46,9 +51,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The job-order writes of an exchange client under {@code exchange.joborders.write}, reachable only
- * from the ingest gateway (REQ-OXCH-004, REQ-OXCH-005): the create options and the create of an
- * aUEC order. The job-order family switch gates every route here and the writes switch every write
- * (REQ-OXCH-009).
+ * from the ingest gateway (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006): the create options, the
+ * create of an aUEC order and its cancel. The job-order family switch gates every route here and
+ * the writes switch every write (REQ-OXCH-009).
  */
 @RestController
 @RequestMapping("/api/v1/exchange/job-orders")
@@ -61,6 +66,9 @@ public class ExchangeJobOrderWriteController {
 
   /** Serves the create options and creates aUEC orders. */
   private final ExchangeJobOrderCreateService createService;
+
+  /** Writes on existing aUEC orders. */
+  private final ExchangeJobOrderChangeService changeService;
 
   /**
    * Returns the pairs the member may create an aUEC order for.
@@ -126,5 +134,45 @@ public class ExchangeJobOrderWriteController {
         .body(
             createService.create(
                 ExchangeCaller.of((SubjectAuthentication) authentication), body, idempotencyKey));
+  }
+
+  /**
+   * Cancels an active aUEC order of a unit the member writes for, before its first accepted money
+   * operation.
+   *
+   * @param id the order
+   * @param body the lifecycle version the client last read
+   * @param authentication the relayed acting member the gate admitted
+   * @return the order's id, status and new versions
+   */
+  @NotNull
+  @PostMapping("/{id}/cancel")
+  @PreAuthorize("@exchangeGate.allows('exchange.joborders.write', authentication)")
+  @Operation(
+      summary = "Exchange: cancel an aUEC order",
+      description =
+          "Gateway-only. Cancels an open or in-progress aUEC order of one of the member's direct"
+              + " Logistician units through the web's status command. Checked in this order under"
+              + " the order locks: an unknown, hidden or deleted order answers 404 NOT_FOUND; an"
+              + " order the member does not write for and a MATERIAL or ITEM order 403"
+              + " ACCESS_DENIED; a stale lifecycle version 409 OPTIMISTIC_LOCK; an invalid"
+              + " responsibility 409 JOB_ORDER_RESPONSIBILITY_INVALID; an order that is not open or"
+              + " in progress 409 JOB_ORDER_CLOSED; an order a money operation of which was"
+              + " accepted 409 JOB_ORDER_MONEY_STARTED. Moves no money.")
+  @ApiResponse(responseCode = "200", description = "The cancelled order")
+  @ApiResponse(responseCode = "403", description = "The member does not write the order")
+  @ApiResponse(responseCode = "404", description = "No such order the member reads")
+  @ApiResponse(
+      responseCode = "409",
+      description = "A stale version, invalid responsibility, a closed order or money started")
+  public ResponseEntity<ExchangeJobOrderWrittenDto> cancel(
+      @NotNull @PathVariable UUID id,
+      @NotNull @Valid @RequestBody ExchangeJobOrderCancelDto body,
+      @NotNull Authentication authentication) {
+    return ResponseEntity.ok(
+        changeService.cancel(
+            ExchangeCaller.of((SubjectAuthentication) authentication),
+            id,
+            body.lifecycleVersion()));
   }
 }

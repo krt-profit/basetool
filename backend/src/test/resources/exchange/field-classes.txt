@@ -367,6 +367,7 @@ job-order-material.schema.json#/properties/materials/items/properties/open FACT_
 job-order-material.schema.json#/properties/materials/items/properties/remaining FACT_VALUE
 job-order-material.schema.json#/properties/materials/items/properties/requested FACT_VALUE
 job-order-material.schema.json#/properties/materials/items/properties/unit FACT_VALUE
+job-order-write.schema.json#/$defs/cancel/properties/lifecycleVersion IDENTIFIER
 job-order-write.schema.json#/$defs/create/properties/comment MEMBER_FREE_TEXT
 job-order-write.schema.json#/$defs/create/properties/contact IDENTIFIER
 job-order-write.schema.json#/$defs/create/properties/requestingUnitId IDENTIFIER
@@ -375,6 +376,8 @@ job-order-write.schema.json#/$defs/create/properties/target FACT_VALUE
 job-order-write.schema.json#/$defs/created/properties/id IDENTIFIER
 job-order-write.schema.json#/$defs/created/properties/status FACT_VALUE
 job-order-write.schema.json#/$defs/created/properties/target FACT_VALUE
+job-order-write.schema.json#/$defs/written/properties/id IDENTIFIER
+job-order-write.schema.json#/$defs/written/properties/status FACT_VALUE
 job-order.schema.json#/properties/assignees/items/properties/name SHORT_NAME
 job-order.schema.json#/properties/assignees/items/properties/note MEMBER_FREE_TEXT
 job-order.schema.json#/properties/assignees/items/properties/own FACT_VALUE

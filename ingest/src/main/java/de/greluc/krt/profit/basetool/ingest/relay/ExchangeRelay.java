@@ -245,6 +245,18 @@ public class ExchangeRelay {
               "The member created the most orders through clients allowed for this UTC day;"
                   + " create again after Retry-After; nothing was created."),
           Map.entry(
+              "JOB_ORDER_RESPONSIBILITY_INVALID",
+              "The order's responsibility no longer fits the Profit hierarchy; it takes no write"
+                  + " through a client until it is set anew in the Basetool; nothing was written."),
+          Map.entry(
+              "JOB_ORDER_CLOSED",
+              "The order's status does not admit the write; read the order again; nothing was"
+                  + " written."),
+          Map.entry(
+              "JOB_ORDER_MONEY_STARTED",
+              "Money was accepted for the order already, so it is cancelled only in the Basetool;"
+                  + " nothing was written."),
+          Map.entry(
               ExchangeRefusals.EXCHANGE_DISABLED, ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL),
           Map.entry(
               ExchangeRefusals.BANK_EXCHANGE_DISABLED,

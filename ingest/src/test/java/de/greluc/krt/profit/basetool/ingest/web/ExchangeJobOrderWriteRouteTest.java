@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -65,11 +66,12 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The create options and the create of an aUEC order through both gates, with the backend relay
- * mocked (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-009): the gateway checks the body before the relay,
- * relays the client's key on the create only, answers a created order with {@code 201}, passes the
- * pair refusal and both cap refusals on, the daily cap with the wait until the next UTC day, checks
- * the create options' limits and needs {@code exchange.joborders.write}.
+ * The create options, the create and the cancel of an aUEC order through both gates, with the
+ * backend relay mocked (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006, REQ-OXCH-009): the gateway checks
+ * the order id and the body before the relay, relays the client's key on the create only, answers a
+ * created order with {@code 201}, passes the pair refusal, both cap refusals and the refusals of a
+ * write on an existing order on, the daily cap with the wait until the next UTC day, checks the
+ * create options' limits and needs {@code exchange.joborders.write}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 class ExchangeJobOrderWriteRouteTest {
@@ -80,6 +82,8 @@ class ExchangeJobOrderWriteRouteTest {
   private static final String BACKEND = "/api/v1/exchange/job-orders";
   private static final String ROUTE = "/exchange/v1/job-orders";
   private static final Set<String> SCOPES = Set.of("exchange.connect", "exchange.joborders.write");
+  private static final String ORDER = "7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  private static final String CANCEL = "job-order-write--cancel/valid/cancel.json";
 
   @Autowired private WebApplicationContext context;
 
@@ -232,6 +236,99 @@ class ExchangeJobOrderWriteRouteTest {
     call(HttpMethod.GET, ROUTE + "/create-options", null)
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+  }
+
+  @Test
+  void aCancelIsRelayedToTheOrderWithoutTheKeyAndAnsweredWithTheWrittenOrder() throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.POST), eq(BACKEND + "/" + ORDER + "/cancel"), any(), any(), any()))
+        .thenReturn(ok(example("job-order-write--written/valid/cancelled.json")));
+
+    call(HttpMethod.POST, cancelRoute(ORDER.toUpperCase(Locale.ROOT)), example(CANCEL))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CANCELLED"))
+        .andExpect(jsonPath("$.versions.lifecycle").value(1));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any(), anyString());
+  }
+
+  @Test
+  void aCancelOfAMalformedIdIsRefusedBeforeTheRelay() throws Exception {
+    call(HttpMethod.POST, cancelRoute("not-an-order"), example(CANCEL))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"))
+        .andExpect(jsonPath("$.errors[0].pointer").value("/id"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void aCancelBodyOutsideTheSchemaIsRefusedBeforeTheRelay() throws Exception {
+    call(
+            HttpMethod.POST,
+            cancelRoute(ORDER),
+            example("job-order-write--cancel/invalid/negative-version.json"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+    call(
+            HttpMethod.POST,
+            cancelRoute(ORDER),
+            example("job-order-write--cancel/invalid/target-version.json"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void theRefusalsOfAWriteOnAnExistingOrderReachTheClientWithTheirCodes() throws Exception {
+    assertCancelRefused(404, "NOT_FOUND");
+    assertCancelRefused(403, "NOT_PERMITTED");
+    assertCancelRefused(409, "VERSION_CONFLICT");
+    assertCancelRefused(409, "JOB_ORDER_RESPONSIBILITY_INVALID");
+    assertCancelRefused(409, "JOB_ORDER_CLOSED");
+    assertCancelRefused(409, "JOB_ORDER_MONEY_STARTED");
+  }
+
+  @Test
+  void theReadScopeAloneDoesNotOpenTheCancel() throws Exception {
+    Set<String> read = Set.of("exchange.connect", "exchange.joborders.read");
+    when(registryReader.current())
+        .thenReturn(ExchangeTestSupport.registryWithEveryArea(read, "2.0.0", 120));
+
+    call(HttpMethod.POST, cancelRoute(ORDER), example(CANCEL))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+  }
+
+  /**
+   * Answers the relayed cancel with a refusal as the relay passes it on and checks that it reaches
+   * the client with its status, code and fixed detail.
+   *
+   * @param status the refusal's status
+   * @param code the refusal's registry code
+   * @throws Exception if the request fails
+   */
+  private void assertCancelRefused(int status, @NotNull String code) throws Exception {
+    String detail = "The fixed detail of " + code + ".";
+    when(relay.forward(
+            eq(HttpMethod.POST), eq(BACKEND + "/" + ORDER + "/cancel"), any(), any(), any()))
+        .thenReturn(new ExchangeRelay.Result(status, null, code, detail));
+
+    call(HttpMethod.POST, cancelRoute(ORDER), example(CANCEL))
+        .andExpect(status().is(status))
+        .andExpect(jsonPath("$.code").value(code))
+        .andExpect(jsonPath("$.detail").value(detail));
+  }
+
+  /**
+   * The gateway route of an order's cancel.
+   *
+   * @param id the order id as the path carries it
+   * @return the route
+   */
+  private static @NotNull String cancelRoute(@NotNull String id) {
+    return ROUTE + "/" + id + "/cancel";
   }
 
   /**

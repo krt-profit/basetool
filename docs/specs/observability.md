@@ -4508,7 +4508,8 @@ reader/unit/order identities and retained relationship timestamps remain outside
 
 > [!note] Implemented for the two switches (#3642), the fingerprint worker (#3643), the snapshot
 > reads (#3644), the feed reads (#3645), the create with its create options (#3646), the window
-> run (#3649) and the caps on client creates (#3647); decided in #3618. The other route slices
+> run (#3649), the caps on client creates (#3647) and the cancel with the refusals of a write on an
+> existing order (#3650); decided in #3618. The other route slices
 > wire their read routes and refusal reasons, and each slice adds its alerts and its panels to this
 > entry.
 
@@ -4527,6 +4528,9 @@ never an id, a path or an amount (REQ-OBS-011).
   `basetool_exchange_job_order_refused_total{reason="units_not_offered"}`, a create refused at a
   cap on client creates `{reason="open_order_cap"}` or `{reason="daily_create_cap"}`
   (REQ-OXCH-009).
+  A cancel counts the same way (REQ-OXCH-006), and each refusal of a write on an existing order
+  also under its reason: `not_found`, `not_permitted`, `version_conflict`,
+  `responsibility_invalid`, `closed` and, for the cancel, `money_started` (REQ-OXCH-005).
 - **Refusals.** `basetool_exchange_job_order_refused_total{reason}` counts what the backend refused,
   every reason registered at zero (`JobOrderExchangeRefusal`): `not_found`, `not_permitted`,
   `units_not_offered`, `version_conflict`, `responsibility_invalid`, `closed`, `money_started`,
@@ -4571,9 +4575,12 @@ Alerts, each with a promtool rule test that fires and stays silent:
 - **`JobOrderExchangeCapHit`** (warning): more than 10 `open_order_cap` or `daily_create_cap`
   refusals in an hour, held for 30 minutes; a client that creates without reading its `limits`, or
   loops on creates and cancels and so notifies both units each time.
+- **`JobOrderExchangeNotFoundSpike`** (warning): more than 50 `not_found` refusals in an hour,
+  like `BankExchangeNotFoundSpike`; a client that keeps writing on orders it should have dropped,
+  or one probing order ids.
 
-The three fingerprint alerts and `JobOrderExchangeCapHit` point to the same operator section in
-`monitoring/README.md`.
+The three fingerprint alerts, `JobOrderExchangeCapHit` and `JobOrderExchangeNotFoundSpike` point to
+the same operator section in `monitoring/README.md`.
 
 The „Job orders" row of the exchange dashboard (`15-exchange.json`) shows the gateway's switch
 refusals by client and reason, the switch changes by action and the backend's job-order refusals by
@@ -4584,6 +4591,8 @@ It shows the job-order writes per day by client and outcome too.
 It shows the window run's executions per day by outcome with the orders it aged out.
 The refusals panel shows the cap refusals under their own reasons and names `JobOrderExchangeCapHit`
 in its description; the writes panel names them among the rejected writes.
+The refusals panel shows the refusals of a write on an existing order under their reasons and names
+`JobOrderExchangeNotFoundSpike`; the writes panel counts the cancels.
 
 **Acceptance**
 
@@ -4597,7 +4606,12 @@ in its description; the writes panel names them among the rejected writes.
 - [x] A create-options read counts one `create_options` read, a create one `applied` or `rejected`
   write under `resource="job_order"`, and a refused pair `units_not_offered`
   (`ExchangeJobOrderCreateTest`).
-- [ ] The other refusal reasons are incremented by their routes (REQ-OXCH-006…009).
+- [x] A cancel counts one `applied` or `rejected` write, and each refusal of a write on an existing
+  order its reason: `not_found`, `not_permitted`, `version_conflict`, `responsibility_invalid`,
+  `closed` and `money_started` (`ExchangeJobOrderCancelTest`).
+- [ ] The other refusal reasons are incremented by their routes (REQ-OXCH-007, REQ-OXCH-008).
+- [x] `JobOrderExchangeNotFoundSpike` has a promtool rule test that fires and one that stays silent
+  (`job_order_exchange_not_found_alerts_test.yml`).
 - [x] Both fingerprint outcomes exist at zero and a committed recomputation counts its changed and
   unchanged orders (`ExchangeJobOrderMetricsTest`, `JobOrderFingerprintWorkerIntegrationTest`).
 - [x] The backlog gauges report the marked orders and the age of the oldest mark, and a second mark
@@ -4622,6 +4636,7 @@ in its description; the writes panel names them among the rejected writes.
 `monitoring/prometheus/tests/job_order_fingerprint_alerts_test.yml`,
 `monitoring/prometheus/tests/scheduled_job_stale_job_order_exchange_window_test.yml`,
 `monitoring/prometheus/tests/job_order_exchange_cap_alerts_test.yml`,
+`monitoring/prometheus/tests/job_order_exchange_not_found_alerts_test.yml`,
 `monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
-REQ-OBS-024, REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-009, REQ-OXCH-010 · **Issues:**
-#3618, #3642, #3643, #3644, #3646, #3647, #3649
+REQ-OBS-024, REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006, REQ-OXCH-009,
+REQ-OXCH-010 · **Issues:** #3618, #3642, #3643, #3644, #3646, #3647, #3649, #3650
