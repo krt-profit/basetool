@@ -367,8 +367,8 @@ own for a create, so each create is announced exactly once.
 `OrdersListPatternRenderTest`, `JobOrderCreationWorkspaceMvcTest`, `JobOrderCreateE2eTest` and
 `JobOrderSharedWorkspaceE2eTest` cover the MATERIAL/ITEM workspace. The initial aUEC create and
 recovery journey is covered by `JobOrderMoneyE2eTest`. `JobOrderServiceTest` covers the create's
-frame per kind, `JobOrderCreatePublishMvcTest` that a web create publishes no frame of its own and
-`JobOrderQueueLiveSyncE2eTest` the peer's overview and the single frame. **Issues:** #3201,
+frame per kind, `JobOrderCreationWorkspaceMvcTest` that a web create publishes no frame of its own
+and `JobOrderQueueLiveSyncE2eTest` the peer's overview and the single frame. **Issues:** #3201,
 #3202, #3639
 
 ## Out of scope
