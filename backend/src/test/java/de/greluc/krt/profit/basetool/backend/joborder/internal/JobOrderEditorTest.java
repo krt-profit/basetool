@@ -275,6 +275,51 @@ class JobOrderEditorTest {
   }
 
   @Test
+  void aMoneyEditRunsTheCallersChecksBeforeAndAgainUnderTheOrderLock() {
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderRepository.lockForScopedEdit(id)).thenReturn(Optional.of(id));
+    AtomicInteger checks = new AtomicInteger();
+
+    Integer checksBeforeMutation =
+        editor.editMoney(
+            id,
+            _ -> checks.incrementAndGet(),
+            _ -> false,
+            (o, _) -> new JobOrderEditor.MoneyEdit<>(checks.get(), JobOrderEdit.unchanged(o)));
+
+    assertThat(checksBeforeMutation).isEqualTo(2);
+    InOrder sequence = inOrder(jobOrderRepository);
+    sequence.verify(jobOrderRepository).findById(id);
+    sequence.verify(jobOrderRepository).lockForScopedEdit(id);
+    verifyNoInteractions(jobOrderAccessPolicy, responsibilityGuard, auditRecorder, effects);
+  }
+
+  @Test
+  void aMoneyEditTheChecksRefuseUnderTheOrderLockLeavesTheOrderUntouched() {
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderRepository.lockForScopedEdit(id)).thenReturn(Optional.of(id));
+    AtomicInteger checks = new AtomicInteger();
+
+    assertThatThrownBy(() ->
+            editor.editMoney(
+                id,
+                _ -> {
+                  if (checks.incrementAndGet() == 2) {
+                    throw new AccessDeniedException("refused under the lock");
+                  }
+                },
+                _ -> false,
+                (o, _) -> {
+                  mutations.incrementAndGet();
+                  return new JobOrderEditor.MoneyEdit<>(o, JobOrderEdit.unchanged(o));
+                }))
+        .isInstanceOf(AccessDeniedException.class);
+
+    assertThat(mutations).hasValue(0);
+    verifyNoInteractions(auditRecorder, effects);
+  }
+
+  @Test
   void anUnknownOrderIsNotFoundBeforeTheGateIsAsked() {
     when(jobOrderRepository.findById(id)).thenReturn(Optional.empty());
 

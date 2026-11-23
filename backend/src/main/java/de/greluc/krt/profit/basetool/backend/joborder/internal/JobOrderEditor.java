@@ -130,15 +130,41 @@ public class JobOrderEditor {
       JobOrderReadCheck read,
       Predicate<JobOrder> needsQueue,
       BiFunction<JobOrder, Boolean, MoneyEdit<T>> mutation) {
+    return editMoney(id, order -> authorizeMoney(order, read), needsQueue, mutation);
+  }
+
+  /**
+   * Applies one monetary edit under the checks its command's caller decides, in the order and with
+   * the refusals that caller answers (ADR-0408).
+   *
+   * <p>The checks run on the loaded order before the order row lock and again after it, so the
+   * decision under the lock is the one that counts.
+   *
+   * @param id the order to edit
+   * @param checks the checks of the loaded order; each refusal is an exception
+   * @param needsQueue whether the edit may change the lifecycle and so needs the queue rows
+   * @param mutation the financial action over the locked order and whether the queue is locked
+   * @param <T> the action result type
+   * @return the action's durable result
+   * @throws NotFoundException when the order is unknown
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  <T> T editMoney(
+      UUID id,
+      Consumer<JobOrder> checks,
+      Predicate<JobOrder> needsQueue,
+      BiFunction<JobOrder, Boolean, MoneyEdit<T>> mutation) {
     profitHierarchy.lockForOrderWrite();
-    JobOrder order = requireMoneyOrder(id, read);
+    JobOrder order =
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    checks.accept(order);
     boolean queueLocked = needsQueue.test(order);
     if (queueLocked) {
       jobOrderRepository.lockPriorityQueueRows();
     }
     Entities.require(jobOrderRepository.lockForScopedEdit(id), () -> "JobOrder not found: " + id);
     entityManager.refresh(order);
-    authorizeMoney(order, read);
+    checks.accept(order);
     MoneyEdit<T> result = mutation.apply(order, queueLocked);
     recordOutcome(result.edit());
     return result.result();
