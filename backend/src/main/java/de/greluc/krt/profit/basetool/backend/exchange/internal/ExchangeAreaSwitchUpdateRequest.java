@@ -17,15 +17,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.exchange.model;
+package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 
 /**
- * Turns the bank switch of the exchange on or off (REQ-BXCH-006).
+ * Turns one area switch of the exchange on or off: the bank (REQ-BXCH-006), the job-order family or
+ * its writes (REQ-OXCH-009); a stale {@code version} yields 409.
  *
  * @param enabled the new state
- * @param version the bank switch's version the admin last saw
+ * @param version the switch's version the admin last saw
  */
-@DtoMirror
-public record ExchangeBankSwitchUpdateRequest(Boolean enabled, Long version) {}
+public record ExchangeAreaSwitchUpdateRequest(
+    @NotNull Boolean enabled, @NotNull @Min(0) Long version) {}

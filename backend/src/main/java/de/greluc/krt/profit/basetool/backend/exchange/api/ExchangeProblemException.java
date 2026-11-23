@@ -51,6 +51,12 @@ public final class ExchangeProblemException extends DomainProblem {
   /** The bank switch is off while the global switch is on (REQ-BXCH-006). */
   public static final String BANK_EXCHANGE_DISABLED = "BANK_EXCHANGE_DISABLED";
 
+  /** The job-order family switch is off while the global switch is on (REQ-OXCH-009). */
+  public static final String JOB_ORDER_EXCHANGE_DISABLED = "JOB_ORDER_EXCHANGE_DISABLED";
+
+  /** The job-order writes switch is off while the family switch is on (REQ-OXCH-009). */
+  public static final String JOB_ORDER_WRITES_DISABLED = "JOB_ORDER_WRITES_DISABLED";
+
   /** The relayed client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
@@ -124,6 +130,30 @@ public final class ExchangeProblemException extends DomainProblem {
         HttpStatus.SERVICE_UNAVAILABLE,
         BANK_EXCHANGE_DISABLED,
         "The bank is switched off on the exchange.");
+  }
+
+  /**
+   * The refusal of a job-order route while the job-order family switch is off.
+   *
+   * @return the {@code 503 JOB_ORDER_EXCHANGE_DISABLED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderExchangeDisabled() {
+    return new ExchangeProblemException(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        JOB_ORDER_EXCHANGE_DISABLED,
+        "Job orders are switched off on the exchange.");
+  }
+
+  /**
+   * The refusal of a job-order write while the job-order writes switch is off.
+   *
+   * @return the {@code 503 JOB_ORDER_WRITES_DISABLED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderWritesDisabled() {
+    return new ExchangeProblemException(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        JOB_ORDER_WRITES_DISABLED,
+        "Job-order writes are switched off on the exchange.");
   }
 
   /**

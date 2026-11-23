@@ -65,7 +65,7 @@ public class ExchangeRegistryMirrorSync {
    * @param meterRegistry the registry the write counter binds to
    * @param clientGauges the per-status client gauges every read of the registry refreshes
    * @param transactionManager the manager the resync's own transactions run in
-   * @param entityManager reloads the settings row after the bank switch's own write
+   * @param entityManager reloads the settings row after an area switch's own write
    */
   public ExchangeRegistryMirrorSync(
       @NotNull ExchangeRegistryMirror mirror,
@@ -135,29 +135,35 @@ public class ExchangeRegistryMirrorSync {
   }
 
   /**
-   * Saves and flushes the settings row.
+   * Writes one switch onto the locked settings row and returns the saved row. The global switch is
+   * saved with the row, which bumps the row's version and {@code updatedAt}; every other switch is
+   * written alone with its own counter and change time, which leaves the row's version and {@code
+   * updatedAt} and every other switch's alone (REQ-BXCH-006, REQ-OXCH-009), and the row is
+   * reloaded.
    *
-   * @param settings the changed row
-   * @return the saved row
-   */
-  @NotNull
-  public ExchangeSettings saveSettings(@NotNull ExchangeSettings settings) {
-    return settingsRepository.saveAndFlush(settings);
-  }
-
-  /**
-   * Writes the bank switch onto the locked settings row without touching the row's version or
-   * {@code updatedAt}, which belong to the global switch (REQ-BXCH-006), and reloads the row.
-   *
+   * @param target the switch
    * @param settings the locked settings row
-   * @param enabled the bank switch's new state
-   * @param at the change time
-   * @return the reloaded row, with the bank switch's version bumped
+   * @param enabled the switch's new state
+   * @param at the change time of a switch other than the global one
+   * @return the saved row, with the switch's version bumped
    */
   @NotNull
-  public ExchangeSettings saveBankSwitch(
-      @NotNull ExchangeSettings settings, boolean enabled, @NotNull Instant at) {
-    settingsRepository.writeBankSwitch(settings.getId(), enabled, at);
+  ExchangeSettings saveSwitch(
+      @NotNull ExchangeSwitch target,
+      @NotNull ExchangeSettings settings,
+      boolean enabled,
+      @NotNull Instant at) {
+    Short id = settings.getId();
+    switch (target) {
+      case GLOBAL -> {
+        settings.setEnabled(enabled);
+        return settingsRepository.saveAndFlush(settings);
+      }
+      case BANK -> settingsRepository.writeBankSwitch(id, enabled, at);
+      case JOB_ORDERS -> settingsRepository.writeJobOrdersSwitch(id, enabled, at);
+      case JOB_ORDER_WRITES -> settingsRepository.writeJobOrderWritesSwitch(id, enabled, at);
+      case null -> throw new IllegalArgumentException("A switch write names its switch");
+    }
     entityManager.refresh(settings);
     return settings;
   }
@@ -170,11 +176,8 @@ public class ExchangeRegistryMirrorSync {
   @NotNull
   public ExchangeRegistrySnapshot load() {
     clientRepository.flush();
-    Optional<ExchangeSettings> settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID);
     return ExchangeRegistrySnapshot.of(
-        settings.map(ExchangeSettings::isEnabled).orElse(false),
-        settings.map(ExchangeSettings::isBankEnabled).orElse(false),
+        settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElse(null),
         clientRepository.findAllWithCapabilities());
   }
 

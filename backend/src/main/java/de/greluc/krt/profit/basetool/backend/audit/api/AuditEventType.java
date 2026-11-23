@@ -636,6 +636,11 @@ public enum AuditEventType {
   EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
   /** The bank switch of the exchange was turned on or off; the details carry the new state. */
   BANK_EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
+  /**
+   * The job-order family switch or the job-order writes switch of the exchange was turned on or
+   * off; the details carry the switch and its new state (REQ-OXCH-009).
+   */
+  JOB_ORDER_EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
   /** A member disconnected a whole exchange client from their account (REQ-XCH-008). */
   EXCHANGE_CLIENT_DISCONNECTED(AuditDomain.CONNECTED_APPS),
   /** A member disconnected one installation of an exchange client (REQ-XCH-008). */

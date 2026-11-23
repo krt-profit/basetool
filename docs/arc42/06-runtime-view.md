@@ -220,6 +220,17 @@ notification, the page refreshes the run list while it runs, and the run ends `C
 `FAILED` (then `ExchangeBulkUndoFailed` alerts). Re-activating the client is a separate admin
 action (REQ-XCH-034, ADR-0227).
 
+**Faulty release on job orders.** Job-order writes have no journal and no undo, so the bulk undo
+leaves them alone; the operator stops the damage and the units repair it (REQ-OXCH-009):
+
+1. switch the job-order writes off on *Administration → Verbundene Anwendungen* — every job-order
+   write answers `503 JOB_ORDER_WRITES_DISABLED`, the reads go on;
+2. if that is not enough, switch job orders off as a whole (`503 JOB_ORDER_EXCHANGE_DISABLED`) or
+   suspend the client;
+3. list the client's job-order writes in the audit viewer with its client filter;
+4. have the units repair them in the web: reopen a client's cancel, set a target back, rewrite a
+   comment, cancel a client's create.
+
 **A draft.** `drafts/blueprints` and `drafts/refinery-orders` write nothing: the backend builds the
 same preview the web's own upload builds, the gateway stages it for a one-time browser pickup and
 answers the review URL, and the member saves through the ordinary path — as in §6.5.

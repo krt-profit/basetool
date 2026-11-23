@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeBankSwitchDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeBankSwitchUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeAreaSwitchDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeAreaSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientCreateRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientMapper;
@@ -51,8 +51,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The exchange client registry, the global exchange switch and the bank switch, {@code ADMIN} only
- * (REQ-XCH-003, REQ-BXCH-006).
+ * The exchange client registry, the global exchange switch, the bank switch and the two job-order
+ * switches, {@code ADMIN} only (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009).
  */
 @RestController
 @RequestMapping("/api/v1/connected-apps/admin")
@@ -230,7 +230,7 @@ public class AdminExchangeRegistryController {
   @GetMapping("/settings/bank")
   @Operation(summary = "Get the bank switch of the exchange")
   @ApiResponse(responseCode = "200", description = "The bank switch")
-  public ResponseEntity<ExchangeBankSwitchDto> getBankSwitch() {
+  public ResponseEntity<ExchangeAreaSwitchDto> getBankSwitch() {
     return ResponseEntity.ok(mapper.toBankSwitchDto(registryService.getSettings()));
   }
 
@@ -250,10 +250,83 @@ public class AdminExchangeRegistryController {
   @ApiResponse(responseCode = "200", description = "The saved bank switch")
   @ApiResponse(responseCode = "409", description = "Stale version")
   @ApiResponse(responseCode = "502", description = "The registry mirror could not be written")
-  public ResponseEntity<ExchangeBankSwitchDto> updateBankSwitch(
-      @RequestBody @Valid @NotNull ExchangeBankSwitchUpdateRequest request) {
+  public ResponseEntity<ExchangeAreaSwitchDto> updateBankSwitch(
+      @RequestBody @Valid @NotNull ExchangeAreaSwitchUpdateRequest request) {
     return ResponseEntity.ok(
         mapper.toBankSwitchDto(
             registryService.updateBankSwitch(request.enabled(), request.version())));
+  }
+
+  /**
+   * Reads the job-order family switch of the exchange.
+   *
+   * @return the family switch with its own version
+   */
+  @NotNull
+  @GetMapping("/settings/job-orders")
+  @Operation(summary = "Get the job-order switch of the exchange")
+  @ApiResponse(responseCode = "200", description = "The job-order switch")
+  public ResponseEntity<ExchangeAreaSwitchDto> getJobOrdersSwitch() {
+    return ResponseEntity.ok(mapper.toJobOrdersSwitchDto(registryService.getSettings()));
+  }
+
+  /**
+   * Turns the job-order family switch of the exchange on or off.
+   *
+   * @param request the new state and the family switch's version last seen
+   * @return the saved family switch
+   */
+  @NotNull
+  @PutMapping("/settings/job-orders")
+  @Operation(
+      summary = "Set the job-order switch of the exchange",
+      description =
+          "While it is off, every job-order route answers 503 JOB_ORDER_EXCHANGE_DISABLED;"
+              + " switching off reaches the gateway's mirror before the commit or not at all.")
+  @ApiResponse(responseCode = "200", description = "The saved job-order switch")
+  @ApiResponse(responseCode = "409", description = "Stale version")
+  @ApiResponse(responseCode = "502", description = "The registry mirror could not be written")
+  public ResponseEntity<ExchangeAreaSwitchDto> updateJobOrdersSwitch(
+      @RequestBody @Valid @NotNull ExchangeAreaSwitchUpdateRequest request) {
+    return ResponseEntity.ok(
+        mapper.toJobOrdersSwitchDto(
+            registryService.updateJobOrdersSwitch(request.enabled(), request.version())));
+  }
+
+  /**
+   * Reads the job-order writes switch of the exchange.
+   *
+   * @return the writes switch with its own version
+   */
+  @NotNull
+  @GetMapping("/settings/job-order-writes")
+  @Operation(summary = "Get the job-order writes switch of the exchange")
+  @ApiResponse(responseCode = "200", description = "The job-order writes switch")
+  public ResponseEntity<ExchangeAreaSwitchDto> getJobOrderWritesSwitch() {
+    return ResponseEntity.ok(mapper.toJobOrderWritesSwitchDto(registryService.getSettings()));
+  }
+
+  /**
+   * Turns the job-order writes switch of the exchange on or off.
+   *
+   * @param request the new state and the writes switch's version last seen
+   * @return the saved writes switch
+   */
+  @NotNull
+  @PutMapping("/settings/job-order-writes")
+  @Operation(
+      summary = "Set the job-order writes switch of the exchange",
+      description =
+          "While it is off, every job-order write answers 503 JOB_ORDER_WRITES_DISABLED and the"
+              + " reads go on; switching off reaches the gateway's mirror before the commit or"
+              + " not at all.")
+  @ApiResponse(responseCode = "200", description = "The saved job-order writes switch")
+  @ApiResponse(responseCode = "409", description = "Stale version")
+  @ApiResponse(responseCode = "502", description = "The registry mirror could not be written")
+  public ResponseEntity<ExchangeAreaSwitchDto> updateJobOrderWritesSwitch(
+      @RequestBody @Valid @NotNull ExchangeAreaSwitchUpdateRequest request) {
+    return ResponseEntity.ok(
+        mapper.toJobOrderWritesSwitchDto(
+            registryService.updateJobOrderWritesSwitch(request.enabled(), request.version())));
   }
 }

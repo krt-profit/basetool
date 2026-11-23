@@ -17,17 +17,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exchange.internal;
+package de.greluc.krt.profit.basetool.frontend.exchange.model;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.time.Instant;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Turns the bank switch of the exchange on or off (REQ-BXCH-006); a stale {@code version} yields
- * 409.
+ * Mirror of one area switch of the exchange beside the global switch: the bank (REQ-BXCH-006), the
+ * job-order family or its writes (REQ-OXCH-009).
  *
- * @param enabled the new state
- * @param version the bank switch's version the admin last saw
+ * @param enabled whether the area serves requests while the exchange is on
+ * @param updatedAt when the switch last changed, or {@code null} before its first change
+ * @param version the switch's own optimistic-lock version
  */
-public record ExchangeBankSwitchUpdateRequest(
-    @NotNull Boolean enabled, @NotNull @Min(0) Long version) {}
+@DtoMirror
+public record ExchangeAreaSwitchDto(boolean enabled, @Nullable Instant updatedAt, long version) {}

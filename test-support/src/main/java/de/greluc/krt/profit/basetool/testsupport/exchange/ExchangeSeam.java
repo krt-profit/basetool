@@ -46,8 +46,18 @@ public final class ExchangeSeam {
   /** The root of the bank route family below either prefix, which the bank switch gates. */
   public static final String BANK_PATH = "/bank";
 
-  /** The seconds a client waits after {@code 503 BANK_EXCHANGE_DISABLED}. */
-  public static final int BANK_RETRY_AFTER_SECONDS = 300;
+  /**
+   * The root of the job-order route family below either prefix, which the job-order family switch
+   * gates and, for its {@code POST}s, the job-order writes switch.
+   */
+  public static final String JOB_ORDERS_PATH = "/job-orders";
+
+  /**
+   * The seconds a client waits after the {@code 503} of an area switch: {@code
+   * BANK_EXCHANGE_DISABLED}, {@code JOB_ORDER_EXCHANGE_DISABLED} or {@code
+   * JOB_ORDER_WRITES_DISABLED}.
+   */
+  public static final int AREA_SWITCH_RETRY_AFTER_SECONDS = 300;
 
   /** Stands for a route any granted exchange capability admits. */
   public static final String ANY_CAPABILITY = "*";
@@ -395,15 +405,17 @@ public final class ExchangeSeam {
    * The registry gate's codes, each with the only status either side answers it with (REQ-XCH-025).
    */
   public static final @Unmodifiable Map<String, Integer> GATE_STATUSES =
-      Map.of(
-          "EXCHANGE_DISABLED", 503,
-          "BANK_EXCHANGE_DISABLED", 503,
-          "REGISTRY_UNAVAILABLE", 503,
-          "CLIENT_NOT_ALLOWED", 403,
-          "CLIENT_SUSPENDED", 403,
-          "INSTALLATION_REVOKED", 401,
-          "CLIENT_REVOKED", 401,
-          "SCOPE_MISSING", 403);
+      Map.ofEntries(
+          Map.entry("EXCHANGE_DISABLED", 503),
+          Map.entry("BANK_EXCHANGE_DISABLED", 503),
+          Map.entry("JOB_ORDER_EXCHANGE_DISABLED", 503),
+          Map.entry("JOB_ORDER_WRITES_DISABLED", 503),
+          Map.entry("REGISTRY_UNAVAILABLE", 503),
+          Map.entry("CLIENT_NOT_ALLOWED", 403),
+          Map.entry("CLIENT_SUSPENDED", 403),
+          Map.entry("INSTALLATION_REVOKED", 401),
+          Map.entry("CLIENT_REVOKED", 401),
+          Map.entry("SCOPE_MISSING", 403));
 
   /** The codes outside the gate a backend refusal reaches a client with, as they are. */
   public static final @Unmodifiable Set<String> PASSED_THROUGH_CODES =
@@ -451,7 +463,15 @@ public final class ExchangeSeam {
 
   /** The registry mirror document's top-level members. */
   public static final @Unmodifiable List<String> REGISTRY_DOCUMENT_FIELDS =
-      List.of("schemaVersion", "revision", "writtenAt", "enabled", "bankEnabled", "clients");
+      List.of(
+          "schemaVersion",
+          "revision",
+          "writtenAt",
+          "enabled",
+          "bankEnabled",
+          "jobOrdersEnabled",
+          "jobOrderWritesEnabled",
+          "clients");
 
   /** The members of one client in the registry mirror document. */
   public static final @Unmodifiable List<String> REGISTRY_CLIENT_FIELDS =
@@ -465,13 +485,13 @@ public final class ExchangeSeam {
 
   /**
    * The registry mirror document the backend writes for {@link #REGISTRY_SAMPLE_REVISION}, {@link
-   * #REGISTRY_SAMPLE_WRITTEN_AT}, both switches on and the two clients it lists, and the gateway
+   * #REGISTRY_SAMPLE_WRITTEN_AT}, every switch on and the two clients it lists, and the gateway
    * reads in full.
    */
   public static final String REGISTRY_SAMPLE =
       """
       {"schemaVersion":1,"revision":42,"writtenAt":"2026-10-01T12:00:00Z","enabled":true,\
-      "bankEnabled":true,\
+      "bankEnabled":true,"jobOrdersEnabled":true,"jobOrderWritesEnabled":true,\
       "clients":{\
       "sx-tool":{"displayName":"SC Extractor","status":"SUSPENDED",\
       "capabilities":["exchange.connect"],"minClientVersion":null,\

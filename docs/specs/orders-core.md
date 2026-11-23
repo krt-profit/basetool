@@ -16,6 +16,9 @@ Kind-specific homes remain [production](orders-item-production.md),
 [material promises](orders-material-claims.md), [money](orders-auec.md) and
 [optional Bank integration](orders-auec-bank.md).
 
+Job orders on the connected-applications exchange, with their switches, live in
+[`orders-exchange.md`](orders-exchange.md) (`REQ-OXCH-*`).
+
 ## Requirements
 
 ### REQ-ORDERS-049 — Every order has exactly one kind

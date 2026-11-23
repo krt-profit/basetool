@@ -12,6 +12,8 @@ without Kartellbank. [Shared order rules](orders-core.md) own organisation, part
 common read access and eligibility. [Optional Bank integration](orders-auec-bank.md) alone owns
 the additional Bank effect timing and mappings. This document owns the order's monetary meaning,
 operation identity and user workflow, irrespective of operating mode.
+[Job orders on the exchange](orders-exchange.md) own what a connected application may do with an
+order (`REQ-OXCH-*`).
 
 The approved planning decisions are historical rationale in the
 [Wayfinder map](https://github.com/krt-profit/basetool/issues/3192). This document, the linked

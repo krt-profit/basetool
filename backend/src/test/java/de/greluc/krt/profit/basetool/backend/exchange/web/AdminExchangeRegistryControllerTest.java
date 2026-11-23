@@ -48,6 +48,9 @@ class AdminExchangeRegistryControllerTest {
 
   private static final String CLIENTS = "/api/v1/connected-apps/admin/clients";
   private static final String BANK_SWITCH = "/api/v1/connected-apps/admin/settings/bank";
+  private static final String JOB_ORDER_SWITCH = "/api/v1/connected-apps/admin/settings/job-orders";
+  private static final String JOB_ORDER_WRITES_SWITCH =
+      "/api/v1/connected-apps/admin/settings/job-order-writes";
 
   private static final String VALID =
       """
@@ -358,6 +361,61 @@ class AdminExchangeRegistryControllerTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{\"enabled\":true,\"version\":0}"))
           .andExpect(status().isForbidden());
+    }
+  }
+
+  @Test
+  void bothJobOrderSwitchesStartOffAndAreSetWithTheirOwnVersions() throws Exception {
+    for (String path : new String[] {JOB_ORDER_SWITCH, JOB_ORDER_WRITES_SWITCH}) {
+      String state =
+          mockMvc
+              .perform(get(path).with(admin()))
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.enabled").value(false))
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      Number version = JsonPath.read(state, "$.version");
+
+      mockMvc
+          .perform(
+              put(path)
+                  .with(admin())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"enabled\":true,\"version\":" + version + "}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.enabled").value(true))
+          .andExpect(jsonPath("$.version").value(version.longValue() + 1))
+          .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+      mockMvc
+          .perform(
+              put(path)
+                  .with(admin())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"enabled\":false,\"version\":" + version + "}"))
+          .andExpect(status().isConflict());
+    }
+    mockMvc
+        .perform(get(BANK_SWITCH).with(admin()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enabled").value(false));
+  }
+
+  @Test
+  void onlyAnAdminReadsOrSetsTheJobOrderSwitches() throws Exception {
+    for (String path : new String[] {JOB_ORDER_SWITCH, JOB_ORDER_WRITES_SWITCH}) {
+      for (String role : new String[] {"ROLE_OFFICER", "ROLE_LOGISTICIAN"}) {
+        mockMvc
+            .perform(get(path).with(jwt().authorities(new SimpleGrantedAuthority(role))))
+            .andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                put(path)
+                    .with(jwt().authorities(new SimpleGrantedAuthority(role)))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"enabled\":true,\"version\":0}"))
+            .andExpect(status().isForbidden());
+      }
     }
   }
 

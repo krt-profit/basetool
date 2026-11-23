@@ -47,6 +47,8 @@ class ExchangeRefusalsTest {
                 1L,
                 true,
                 false,
+                false,
+                false,
                 Map.of(
                     "versekit",
                     new ExchangeRegistry.Client(
