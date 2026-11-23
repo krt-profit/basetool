@@ -250,7 +250,10 @@ Every `<module>.web` and `<module>.internal` package is internal to its module.
 
 The application reads order workspace capabilities through `joborder.api.JobOrderWorkspaceAccess`;
 its repository-backed implementation stays in `joborder.internal`, keeping the API independent
-of internal persistence and the module's layers acyclic.
+of internal persistence and the module's layers acyclic. The order creation choices
+(`JobOrderCreationOptions`) and the aUEC create command (`JobOrderCreateCommand`) are ports of
+the same kind: a caller passes a `JobOrderWriterRule` and a `JobOrderActor`, and the
+implementations stay in `joborder.internal` (ADR-0405).
 
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay

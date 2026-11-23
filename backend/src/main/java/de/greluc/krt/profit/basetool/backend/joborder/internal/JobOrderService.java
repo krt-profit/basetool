@@ -26,7 +26,9 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemPlan;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
@@ -35,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -55,6 +58,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -84,7 +88,7 @@ public class JobOrderService {
   private final JobOrderItemFulfillmentGuard itemFulfillment;
   private final ProfitHierarchyService profitHierarchy;
   private final JobOrderResponsibilityGuard responsibilityGuard;
-  private final JobOrderAccessPolicy jobOrderAccessPolicy;
+  private final JobOrderWriters writers;
   private final JobOrderMaterialLines materialLines;
   private final StockReads stockReads;
   private final StockCommands stockCommands;
@@ -120,79 +124,45 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto createJobOrder(CreateJobOrderDto createDto) {
-    return createOrder(
-        createDto.responsibleOrgUnitId(),
-        createDto.requestingOrgUnitId(),
-        createDto.handle(),
-        createDto.comment(),
-        JobOrderType.MATERIAL,
-        createDto.materials());
+    JobOrder order =
+        createOrder(
+            new NewOrder(
+                createDto.responsibleOrgUnitId(),
+                createDto.requestingOrgUnitId(),
+                createDto.handle(),
+                createDto.comment(),
+                JobOrderType.MATERIAL),
+            jobOrder ->
+                materialLines.build(createDto.materials(), Set.of()).forEach(jobOrder::addMaterial),
+            JobOrderWriterRule.CONTEXTUAL,
+            webActor());
+    return jobOrderStockProjectionService.mapToDtoWithStock(order);
   }
 
   /**
    * Persists an aUEC order's shared information and queue entry, and refreshes the order overview
    * after the commit (REQ-ORDERS-056).
    *
-   * @param dto the creation input for the current unit writer
-   * @return the common order projection
+   * @param order the pair, contact and comment; the caller stores the target
+   * @param rule the authority that decides whether the actor writes the pair
+   * @param actor who creates
+   * @return the persisted order
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  JobOrderDto createAuecJobOrder(CreateAuecJobOrderDto dto) {
+  JobOrder createAuecJobOrder(
+      @NotNull JobOrderCreateCommand.AuecOrder order,
+      @NotNull JobOrderWriterRule rule,
+      @NotNull JobOrderActor actor) {
     return createOrder(
-        dto.responsibleOrgUnitId(),
-        dto.requestingOrgUnitId(),
-        dto.handle(),
-        dto.comment(),
-        JobOrderType.AUEC,
-        List.of());
-  }
-
-  private JobOrderDto createOrder(
-      @Nullable UUID responsibleOrgUnitId,
-      @Nullable UUID requestingOrgUnitId,
-      String handle,
-      @Nullable String comment,
-      JobOrderType type,
-      List<CreateJobOrderMaterialDto> materialRequests) {
-    profitHierarchy.lockForOrderWrite();
-    jobOrderRepository.lockAllJobOrders();
-    Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
-
-    OrgUnit responsible = jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(responsibleOrgUnitId);
-    OrgUnit requesting = jobOrderOrgUnitResolver.resolveRequestingOrgUnit(requestingOrgUnitId);
-
-    if (!jobOrderAccessPolicy.canCreate(responsible, requesting)) {
-      throw new AccessDeniedException(
-          "A current writer of the requesting or responsible unit is required.");
-    }
-    JobOrder jobOrder =
-        JobOrder.builder()
-            .handle(handle)
-            .comment(StringNormalization.trimToNull(comment))
-            .priority(newPriority)
-            .type(type)
-            .originalProfitOrgUnitId(profitHierarchy.requireEligible(responsible.getId()))
-            .responsibleOrgUnit(responsible)
-            .requestingOrgUnit(requesting)
-            .build();
-
-    for (JobOrderMaterial line : materialLines.build(materialRequests, Set.of())) {
-      jobOrder.addMaterial(line);
-    }
-
-    jobOrder = jobOrderRepository.save(jobOrder);
-    jobOrderRepository.flush();
-    unitHistory.retainObservedParties(jobOrder, Set.of());
-    jobOrderPriorityService.normalizePriorities();
-    publishJobOrderCreated(jobOrder);
-    publishQueueSections(jobOrder);
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_CREATED,
-        jobOrder.getId(),
-        JobOrderAuditLabel.of(jobOrder),
-        null,
-        JobOrderResponsibilityAudit.created(jobOrder));
-    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
+        new NewOrder(
+            order.responsibleOrgUnitId(),
+            order.requestingOrgUnitId(),
+            order.handle(),
+            order.comment(),
+            JobOrderType.AUEC),
+        _ -> {},
+        rule,
+        actor);
   }
 
   /**
@@ -210,55 +180,106 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto createItemJobOrder(CreateJobOrderItemRequestDto createDto) {
+    JobOrder order =
+        createOrder(
+            new NewOrder(
+                createDto.responsibleOrgUnitId(),
+                createDto.requestingOrgUnitId(),
+                createDto.handle(),
+                createDto.comment(),
+                JobOrderType.ITEM),
+            jobOrder ->
+                itemReconciliation.apply(
+                    jobOrder, jobOrderItemService.prepareItemLines(createDto.items(), List.of())),
+            JobOrderWriterRule.CONTEXTUAL,
+            webActor());
+    return jobOrderStockProjectionService.mapToDtoWithStock(order);
+  }
+
+  /**
+   * The one create path of every kind: under the order locks it resolves both units, rechecks the
+   * pair with the given rule, adds the kind's lines, and records the audit event, the created
+   * notice and the queue frame.
+   */
+  private JobOrder createOrder(
+      @NotNull NewOrder draft,
+      @NotNull Consumer<JobOrder> lines,
+      @NotNull JobOrderWriterRule rule,
+      @NotNull JobOrderActor actor) {
     profitHierarchy.lockForOrderWrite();
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
     OrgUnit responsible =
-        jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
+        jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(draft.responsibleOrgUnitId());
     OrgUnit requesting =
-        jobOrderOrgUnitResolver.resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
-
-    if (!jobOrderAccessPolicy.canCreate(responsible, requesting)) {
-      throw new AccessDeniedException(
-          "A current writer of the requesting or responsible unit is required.");
+        jobOrderOrgUnitResolver.resolveRequestingOrgUnit(draft.requestingOrgUnitId());
+    if (!writers.resolve(rule, actor).permitsPair(responsible.getId(), requesting.getId())) {
+      throw new AccessDeniedException("The writer rule does not let the actor write this pair.");
     }
     JobOrder jobOrder =
         JobOrder.builder()
-            .handle(createDto.handle())
-            .comment(StringNormalization.trimToNull(createDto.comment()))
+            .handle(draft.handle())
+            .comment(StringNormalization.trimToNull(draft.comment()))
             .priority(newPriority)
-            .type(JobOrderType.ITEM)
+            .type(draft.type())
             .originalProfitOrgUnitId(profitHierarchy.requireEligible(responsible.getId()))
             .responsibleOrgUnit(responsible)
             .requestingOrgUnit(requesting)
             .build();
-
-    itemReconciliation.apply(
-        jobOrder, jobOrderItemService.prepareItemLines(createDto.items(), List.of()));
+    lines.accept(jobOrder);
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
     unitHistory.retainObservedParties(jobOrder, Set.of());
     jobOrderPriorityService.normalizePriorities();
-    publishJobOrderCreated(jobOrder);
+    publishJobOrderCreated(jobOrder, actor);
     publishQueueSections(jobOrder);
     auditRecorder.record(
-        AuditEventType.JOB_ORDER_ITEM_CREATED,
+        createdEvent(draft.type()),
         jobOrder.getId(),
         JobOrderAuditLabel.of(jobOrder),
         null,
         JobOrderResponsibilityAudit.created(jobOrder));
-    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
+    return jobOrder;
+  }
+
+  private static AuditEventType createdEvent(@NotNull JobOrderType type) {
+    return switch (type) {
+      case MATERIAL, AUEC -> AuditEventType.JOB_ORDER_CREATED;
+      case ITEM -> AuditEventType.JOB_ORDER_ITEM_CREATED;
+    };
+  }
+
+  private JobOrderActor webActor() {
+    return new JobOrderActor.Web(authHelperService.currentUserId().orElse(null));
   }
 
   /**
+   * The shared terms of a new order of any kind, as submitted.
+   *
+   * @param responsibleOrgUnitId the proposed responsible unit, required by the resolver
+   * @param requestingOrgUnitId the proposed requesting unit, required by the resolver
+   * @param handle the contact
+   * @param comment the optional comment
+   * @param type the order kind
+   */
+  private record NewOrder(
+      @Nullable UUID responsibleOrgUnitId,
+      @Nullable UUID requestingOrgUnitId,
+      String handle,
+      @Nullable String comment,
+      @NotNull JobOrderType type) {}
+
+  /**
    * Publishes a {@link JobOrderCreatedEvent} for after-commit notification, reading only scalars
-   * and never re-saving the order. The actor is the current user, empty for anonymous creates.
+   * and never re-saving the order. The notice excludes the actor's member, none for a web request
+   * without one.
    *
    * @param jobOrder the persisted, flushed job order
+   * @param actor who created the order
    */
-  private void publishJobOrderCreated(@NotNull JobOrder jobOrder) {
+  private void publishJobOrderCreated(@NotNull JobOrder jobOrder, @NotNull JobOrderActor actor) {
     OrgUnit responsible = jobOrder.getResponsibleOrgUnit();
     OrgUnit requesting = jobOrder.getRequestingOrgUnit();
     effects.publish(
@@ -270,7 +291,7 @@ public class JobOrderService {
             responsible.getShorthand(),
             requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
             jobOrder.getType() == null ? null : jobOrder.getType().name(),
-            authHelperService.currentUserId().orElse(null),
+            actor.member(),
             JobOrderLifecycleNotices.revision(jobOrder)));
   }
 
