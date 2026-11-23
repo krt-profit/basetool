@@ -173,6 +173,15 @@ body:
         - label: A release that changes host permissions, optional host permissions, content-script matches or permissions in manifest.json is linked here and reviewed again before it ships to members.
 
   - type: checkboxes
+    id: job-orders
+    attributes:
+      label: Job-order requirements
+      description: Clients requesting exchange.joborders.read or exchange.joborders.write only; each job-order criterion of docs/exchange/onboarding.md.
+      options:
+        - label: Job-order data of every kind, the member's own orders included, stored at most 7 days, outside cloud-synced folders, never in backups or diagnostics, never forwarded.
+        - label: "exchange.joborders.write only: an order is created, cancelled or changed only on an explicit action of the member, never automatically or by a rule; the member chooses both units from create-options, and an overlay create shows both units, each preselected from the current create-options."
+
+  - type: checkboxes
     id: sync
     attributes:
       label: Sync behaviour
