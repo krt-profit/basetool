@@ -20,13 +20,19 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/** Serialises and finds the aUEC orders members create through clients (REQ-OXCH-004). */
+/**
+ * Serialises and finds the aUEC orders members create through clients (REQ-OXCH-004), and clears
+ * their creators once they left the exchange's client set (REQ-OXCH-010).
+ */
 interface JobOrderClientCreateRepository extends Repository<JobOrder, UUID> {
 
   /** The first key of the client-create advisory locks: {@code 'OXCR'} as a 32-bit integer. */
@@ -65,4 +71,20 @@ interface JobOrderClientCreateRepository extends Repository<JobOrder, UUID> {
       @Param("member") UUID member,
       @Param("clientId") String clientId,
       @Param("idempotencyKey") String idempotencyKey);
+
+  /**
+   * Sets the creating member and the create's key of the given orders to {@code null} where they
+   * closed before an instant and still carry either; a bulk update moves no version.
+   *
+   * @param orderIds the orders found outside the exchange's client set
+   * @param closedBefore the instant an order must have closed before
+   * @return the number of orders cleared
+   */
+  @Modifying
+  @Query(
+      "UPDATE JobOrder o SET o.createdByMemberId = NULL, o.createIdempotencyKey = NULL"
+          + " WHERE o.id IN :orderIds AND o.closedAt < :closedBefore"
+          + " AND (o.createdByMemberId IS NOT NULL OR o.createIdempotencyKey IS NOT NULL)")
+  int clearCreators(
+      @Param("orderIds") Collection<UUID> orderIds, @Param("closedBefore") Instant closedBefore);
 }

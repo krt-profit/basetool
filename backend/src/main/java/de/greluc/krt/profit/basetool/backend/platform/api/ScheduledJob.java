@@ -114,6 +114,13 @@ public enum ScheduledJob {
   JOB_ORDER_EXCHANGE_FINGERPRINT("job_order_exchange_fingerprint"),
 
   /**
+   * The nightly run that ages closed job orders out of the exchange's client set and clears their
+   * creators ({@code JobOrderWindowTask}, REQ-OXCH-003, REQ-OXCH-010); its items are the orders
+   * aged out.
+   */
+  JOB_ORDER_EXCHANGE_WINDOW("job_order_exchange_window"),
+
+  /**
    * An admin's bulk undo of one exchange client ({@code ExchangeBulkUndoRunner}, REQ-XCH-034); run
    * on demand, never scheduled, so it publishes no enabled gauge.
    */

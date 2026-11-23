@@ -198,7 +198,10 @@ fingerprint row writes the key log per unit and per member — the order's units
 and new — and memberships, a unit's activation, renames and name withholding announce the orders
 they touch per member or per order; a feed page reads the member's current direct units and own
 entries and resolves each key against the member's current set into an item or a tombstone
-`{ key, removedAt }` that names no writer.
+`{ key, removedAt }` that names no writer. Time alone ends a closed order's 7 days, so a nightly
+window run records on the fingerprint row that the order left the set, the row's trigger announces
+it where it was last announced, and the same run clears the creating member and key of every order
+outside the set (`REQ-OXCH-003`, `REQ-OXCH-010`).
 
 Every table has exactly one owning module of the target cut, recorded in a table-ownership map that
 a test holds against the migrated schema; a trigger or native statement reaches another module's

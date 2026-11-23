@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderFingerprintRecomputation;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderFingerprintRuns;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderWindowRun;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -82,9 +83,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * The change feed of the member's job-order set under {@code exchange.joborders.read}, with the
- * fingerprint worker run as the scheduled task would (REQ-OXCH-003, REQ-XCH-013): a key of the set
- * is an item, any other key a tombstone {@code { key, removedAt }}, whether the relation was lost,
- * the membership ended or the order was deleted.
+ * fingerprint worker and the window run run as the scheduled tasks would (REQ-OXCH-003,
+ * REQ-XCH-013): a key of the set is an item, any other key a tombstone {@code { key, removedAt }},
+ * whether the relation was lost, the membership ended, the order's 7 days ended or it was deleted.
  */
 @SpringBootTest
 class ExchangeJobOrderFeedTest {
@@ -105,6 +106,7 @@ class ExchangeJobOrderFeedTest {
   @Autowired private MaterialRepository materialRepository;
   @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private JobOrderFingerprintRecomputation recomputation;
+  @Autowired private JobOrderWindowRun window;
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private DataSource dataSource;
@@ -294,6 +296,27 @@ class ExchangeJobOrderFeedTest {
 
     assertThat(ids(page.get("items"))).containsExactly(order.toString());
     assertThat(page.get("items").get(0).get("status").asString()).isEqualTo("OPEN");
+  }
+
+  @Test
+  void anOrderWhoseSevenDaysEndedIsGoneAfterTheWindowRun() throws Exception {
+    UUID order = order(other, own);
+    jdbc.update(
+        "UPDATE job_order SET status = 'COMPLETED', priority = NULL,"
+            + " closed_at = now() - INTERVAL '1 day' WHERE id = ?",
+        order);
+    drain(order);
+    String cursor = snapshotCursor();
+    jdbc.update(
+        "UPDATE job_order SET closed_at = now() - INTERVAL '7 days 1 minute' WHERE id = ?", order);
+
+    assertThat(feed(cursor).get("removed")).isEmpty();
+
+    window.ageOut();
+    JsonNode page = feed(cursor);
+
+    assertThat(page.get("items")).isEmpty();
+    assertThat(keys(page.get("removed"))).containsExactly(order.toString());
   }
 
   @Test

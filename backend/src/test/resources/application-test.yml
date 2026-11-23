@@ -86,6 +86,8 @@ app:
       close-when-off: false
     job-order-fingerprint:
       enabled: false
+    job-order-window:
+      enabled: false
 
 management:
   health:
