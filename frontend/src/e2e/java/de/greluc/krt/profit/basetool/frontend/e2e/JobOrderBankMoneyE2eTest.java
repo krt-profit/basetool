@@ -119,7 +119,7 @@ class JobOrderBankMoneyE2eTest {
         assertEquals(0, balance(seeder, fixture.wrongAccount()));
         assertEquals(10_000_000, balance(seeder, fixture.collectionAccount()));
 
-        order.getByTestId("order-money-provide").click();
+        openProvision(order);
         order.getByTestId("order-money-bank-purpose").selectOption("AUTHORISATION");
         order.getByTestId("order-money-bank-account").selectOption(fixture.collectionAccount());
         order.getByTestId("order-money-amount").fill(ONE_MILLION);
@@ -186,13 +186,13 @@ class JobOrderBankMoneyE2eTest {
     assertEquals(
         201,
         seeder.bankDeposit(STAFF, password(STAFF), fixture.collectionAccount(), payer, 1_000_000));
-    order.getByTestId("order-money-provide").click();
+    openProvision(order);
     order.getByTestId("order-money-bank-free").check();
     order.getByTestId("order-money-amount").fill(ONE_MILLION);
     String holder =
         post(order, money + "/provisions", "order-money-save").get("holderId").getAsString();
 
-    order.getByTestId("order-money-move").click();
+    openMovement(order);
     order.getByTestId("order-money-movement-kind").selectOption("HANDOVER");
     order.getByTestId("order-money-source-holder").selectOption(holder);
     order.getByTestId("order-money-handover-recipient").selectOption(designation);
@@ -215,7 +215,7 @@ class JobOrderBankMoneyE2eTest {
     assertEquals("POSTED", handover.get("state").getAsString());
     figure(staff, "order-money-handed-over", "9.300.000");
 
-    staff.getByTestId("order-money-move").click();
+    openMovement(staff);
     staff.getByTestId("order-money-movement-kind").selectOption("REQUESTER_RETURN");
     staff.locator("#order-money-movement-source-type").selectOption("player");
     staff.getByTestId("order-money-handover-recipient").selectOption(designation);
@@ -283,14 +283,14 @@ class JobOrderBankMoneyE2eTest {
           JobOrderMoneyE2eTest.createOrder(
               order, base, fixture.collectionUnit(), fixture.requesterUnit(), ONE_MILLION);
       String money = orderPath + "/money";
-      order.getByTestId("order-money-provide").click();
+      openProvision(order);
       order.getByTestId("order-money-bank-free").check();
       order.getByTestId("order-money-amount").fill(ONE_MILLION);
       String holder =
           post(order, money + "/provisions", "order-money-save").get("holderId").getAsString();
       figure(order, "order-money-holdings", "1.000.000");
 
-      order.getByTestId("order-money-move").click();
+      openMovement(order);
       assertThat(order.getByTestId("order-money-movement-bank")).isChecked();
       order.getByTestId("order-money-movement-kind").selectOption("SETTLEMENT");
       order.getByTestId("order-money-source-holder").selectOption(holder);
@@ -390,7 +390,7 @@ class JobOrderBankMoneyE2eTest {
   }
 
   private static void prepareDeposit(Page order, Fixture fixture, String account, String amount) {
-    order.getByTestId("order-money-provide").click();
+    openProvision(order);
     assertThat(order.getByTestId("order-money-bank")).isChecked();
     assertThat(order.getByTestId("order-money-bank-purpose")).hasValue("DEPOSIT");
     assertThat(order.getByTestId("order-money-bank-custodian")).isHidden();
@@ -405,7 +405,9 @@ class JobOrderBankMoneyE2eTest {
   }
 
   private static String designate(Page order, String money, String account) {
-    order.getByTestId("order-money-designate-recipient").click();
+    E2eSupport.openDialog(
+        order.getByTestId("order-money-designate-recipient"),
+        order.locator("#order-money-recipient-modal"));
     order.getByTestId("order-money-recipient-mode").selectOption("bank");
     var accounts = order.getByTestId("order-money-recipient-bank-account");
     accounts.selectOption(account);
@@ -446,9 +448,19 @@ class JobOrderBankMoneyE2eTest {
     }
   }
 
+  private static void openProvision(Page page) {
+    E2eSupport.openDialog(
+        page.getByTestId("order-money-provide"), page.locator("#order-money-provision-modal"));
+  }
+
+  private static void openMovement(Page page) {
+    E2eSupport.openDialog(
+        page.getByTestId("order-money-move"), page.locator("#order-money-movement-modal"));
+  }
+
   private static void prepareTransfer(
       Page page, String kind, String position, String designation, String amount) {
-    page.getByTestId("order-money-move").click();
+    openMovement(page);
     assertThat(page.getByTestId("order-money-movement-bank")).isChecked();
     page.getByTestId("order-money-movement-kind").selectOption(kind);
     page.getByTestId("order-money-movement-account").selectOption(position);
@@ -459,7 +471,7 @@ class JobOrderBankMoneyE2eTest {
 
   private static void adjust(
       Page order, String money, String position, String kind, String amount) {
-    order.getByTestId("order-money-move").click();
+    openMovement(order);
     order.getByTestId("order-money-movement-kind").selectOption(kind);
     assertThat(order.getByTestId("order-money-movement-bank")).isHidden();
     order.getByTestId("order-money-movement-account").selectOption(position);
