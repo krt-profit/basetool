@@ -66,7 +66,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 38 relay operations on 35 backend paths, each with the gateway route that relays it, the
+   * The 39 relay operations on 36 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -370,6 +370,14 @@ public final class ExchangeSeam {
               "job-order-write.schema.json#/$defs/written"),
           new RelayOperation(
               "POST",
+              JOB_ORDERS_PATH + "/{id}/target",
+              JOB_ORDERS_PATH + "/{id}/target",
+              "exchange.joborders.write",
+              false,
+              "job-order-write.schema.json#/$defs/targetChange",
+              "job-order-write.schema.json#/$defs/targetChanged"),
+          new RelayOperation(
+              "POST",
               JOB_ORDERS_PATH + "/{id}/comment",
               JOB_ORDERS_PATH + "/{id}/comment",
               "exchange.joborders.write",
@@ -492,7 +500,8 @@ public final class ExchangeSeam {
           "JOB_ORDER_DAILY_CREATE_CAP",
           "JOB_ORDER_RESPONSIBILITY_INVALID",
           "JOB_ORDER_CLOSED",
-          "JOB_ORDER_MONEY_STARTED");
+          "JOB_ORDER_MONEY_STARTED",
+          "JOB_ORDER_TARGET_TOO_LOW");
 
   /** The backend-wide codes the gateway translates into a code of the exchange registry. */
   public static final @Unmodifiable Map<String, String> TRANSLATED_CODES =

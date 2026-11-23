@@ -24,11 +24,8 @@ import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import de.greluc.krt.profit.basetool.backend.exchange.ExchangePublishedSchemas;
-import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,7 +69,6 @@ class ExchangeJobOrderCommentTest {
   @Autowired private WebApplicationContext context;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper objectMapper;
-  @Autowired private MeterRegistry meterRegistry;
   @Autowired private TransactionTemplate transactions;
   @Autowired private JobOrderRepository jobOrders;
 
@@ -129,7 +125,7 @@ class ExchangeJobOrderCommentTest {
   @Test
   void aCompletedOrderStillTakesAComment() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
-    close(order, "COMPLETED");
+    world.closeOrder(order, "COMPLETED");
 
     assertThat(comment(logistician, order, "Paid out", 0L).getStatus()).isEqualTo(200);
     assertThat(stored(order)).containsEntry("comment", "Paid out");
@@ -153,7 +149,7 @@ class ExchangeJobOrderCommentTest {
                         + " WHERE id = ?",
                     order);
                 changed.countDown();
-                awaitQuietly(release);
+                ExchangeJobOrderWorld.awaitQuietly(release);
               }));
       assertThat(changed.await(30, TimeUnit.SECONDS)).isTrue();
       Future<MockHttpServletResponse> commentChange =
@@ -176,18 +172,18 @@ class ExchangeJobOrderCommentTest {
   void aStaleCommentVersionIsAVersionConflictAlsoOnARetryAfterTheCache() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
 
-    assertRefused(comment(logistician, order, "Note", 2L), 409, "OPTIMISTIC_LOCK");
+    world.assertRefused(comment(logistician, order, "Note", 2L), 409, "OPTIMISTIC_LOCK");
     assertThat(comment(logistician, order, "Note", 0L).getStatus()).isEqualTo(200);
-    assertRefused(comment(logistician, order, "Note", 0L), 409, "OPTIMISTIC_LOCK");
+    world.assertRefused(comment(logistician, order, "Note", 0L), 409, "OPTIMISTIC_LOCK");
     assertThat(stored(order)).containsEntry("comment_version", 1L);
   }
 
   @Test
   void aCancelledOrderIsClosedForTheComment() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
-    close(order, "CANCELLED");
+    world.closeOrder(order, "CANCELLED");
 
-    assertRefused(comment(logistician, order, "Note", 0L), 409, "JOB_ORDER_CLOSED");
+    world.assertRefused(comment(logistician, order, "Note", 0L), 409, "JOB_ORDER_CLOSED");
     assertThat(stored(order)).containsEntry("comment", null).containsEntry("comment_version", 0L);
   }
 
@@ -198,8 +194,8 @@ class ExchangeJobOrderCommentTest {
     world.seat(stranger, world.squadron("Comment elsewhere", null), "MEMBER", true);
 
     JsonNode unknown =
-        assertRefused(comment(stranger, UUID.randomUUID(), "Note", 0L), 404, "NOT_FOUND");
-    JsonNode outside = assertRefused(comment(stranger, hidden, "Note", 0L), 404, "NOT_FOUND");
+        world.assertRefused(comment(stranger, UUID.randomUUID(), "Note", 0L), 404, "NOT_FOUND");
+    JsonNode outside = world.assertRefused(comment(stranger, hidden, "Note", 0L), 404, "NOT_FOUND");
 
     assertThat(outside.get("title")).isEqualTo(unknown.get("title"));
     assertThat(stored(hidden)).containsEntry("comment", null);
@@ -215,10 +211,10 @@ class ExchangeJobOrderCommentTest {
     UUID material = world.stockOrder("MATERIAL");
     UUID item = world.stockOrder("ITEM");
 
-    assertRefused(comment(plain, order, "Note", 0L), 403, "ACCESS_DENIED");
-    assertRefused(comment(profitLogistician, order, "Note", 0L), 403, "ACCESS_DENIED");
-    assertRefused(comment(logistician, material, "Note", 0L), 403, "ACCESS_DENIED");
-    assertRefused(comment(logistician, item, "Note", 0L), 403, "ACCESS_DENIED");
+    world.assertRefused(comment(plain, order, "Note", 0L), 403, "ACCESS_DENIED");
+    world.assertRefused(comment(profitLogistician, order, "Note", 0L), 403, "ACCESS_DENIED");
+    world.assertRefused(comment(logistician, material, "Note", 0L), 403, "ACCESS_DENIED");
+    world.assertRefused(comment(logistician, item, "Note", 0L), 403, "ACCESS_DENIED");
     assertThat(stored(order)).containsEntry("comment", null);
   }
 
@@ -229,13 +225,13 @@ class ExchangeJobOrderCommentTest {
     UUID stranger = world.user("comment-order-stranger", false);
     UUID material = world.stockOrder("MATERIAL");
     UUID cancelled = world.createAuec(logistician, 250_000L);
-    close(cancelled, "CANCELLED");
-    leaveTheProfitHierarchy();
+    world.closeOrder(cancelled, "CANCELLED");
+    world.leaveTheProfitHierarchy();
 
-    assertRefused(comment(stranger, material, "Note", 7L), 404, "NOT_FOUND");
-    assertRefused(comment(plain, cancelled, "Note", 7L), 403, "ACCESS_DENIED");
-    assertRefused(comment(logistician, cancelled, "Note", 7L), 409, "OPTIMISTIC_LOCK");
-    assertRefused(
+    world.assertRefused(comment(stranger, material, "Note", 7L), 404, "NOT_FOUND");
+    world.assertRefused(comment(plain, cancelled, "Note", 7L), 403, "ACCESS_DENIED");
+    world.assertRefused(comment(logistician, cancelled, "Note", 7L), 409, "OPTIMISTIC_LOCK");
+    world.assertRefused(
         comment(logistician, cancelled, "Note", 0L), 409, "JOB_ORDER_RESPONSIBILITY_INVALID");
   }
 
@@ -251,7 +247,7 @@ class ExchangeJobOrderCommentTest {
   void aClientsCommentRecordsItsOwnAuditTypeWithoutTheTextAndARefusalNothing() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
     UUID refusedOrder = world.createAuec(logistician, 250_000L);
-    assertRefused(comment(logistician, refusedOrder, "Refused", 5L), 409, "OPTIMISTIC_LOCK");
+    world.assertRefused(comment(logistician, refusedOrder, "Refused", 5L), 409, "OPTIMISTIC_LOCK");
 
     assertThat(comment(logistician, order, "Deliver to Area18", 0L).getStatus()).isEqualTo(200);
 
@@ -276,21 +272,21 @@ class ExchangeJobOrderCommentTest {
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(() ->
-            assertThat(needChangeNotices(order, profitLogistician))
+            assertThat(world.needChangeNotices(order, profitLogistician))
                 .singleElement()
                 .satisfies(params -> assertThat(params).contains("VerseKit")));
-    assertThat(needChangeNotices(order, logistician)).isEmpty();
+    assertThat(world.needChangeNotices(order, logistician)).isEmpty();
   }
 
   @Test
   void eachWriteCountsItsOutcomeAndEachRefusalItsReason() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
     UUID cancelled = world.createAuec(logistician, 250_000L);
-    close(cancelled, "CANCELLED");
+    world.closeOrder(cancelled, "CANCELLED");
     UUID plain = world.user("comment-metric-plain", false);
     world.seat(plain, world.getRequesting(), "MEMBER", false);
-    Counter applied = writes("applied");
-    Counter rejected = writes("rejected");
+    Counter applied = world.writes("applied");
+    Counter rejected = world.writes("rejected");
     double appliedBefore = applied.count();
     double rejectedBefore = rejected.count();
     Map<String, Double> before = refusalCounts();
@@ -312,11 +308,12 @@ class ExchangeJobOrderCommentTest {
   @Test
   void anInvalidResponsibilityAnswersItsOwnConflictAndCountsItsReason() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
-    leaveTheProfitHierarchy();
-    Counter invalid = refusals("responsibility_invalid");
+    world.leaveTheProfitHierarchy();
+    Counter invalid = world.refusals("responsibility_invalid");
     double before = invalid.count();
 
-    assertRefused(comment(logistician, order, "Note", 0L), 409, "JOB_ORDER_RESPONSIBILITY_INVALID");
+    world.assertRefused(
+        comment(logistician, order, "Note", 0L), 409, "JOB_ORDER_RESPONSIBILITY_INVALID");
 
     assertThat(invalid.count()).isEqualTo(before + 1);
     assertThat(stored(order)).containsEntry("comment", null);
@@ -327,7 +324,7 @@ class ExchangeJobOrderCommentTest {
     UUID order = world.createAuec(logistician, 250_000L);
     world.switches(true, true, false);
 
-    assertRefused(comment(logistician, order, "Note", 0L), 503, "JOB_ORDER_WRITES_DISABLED");
+    world.assertRefused(comment(logistician, order, "Note", 0L), 503, "JOB_ORDER_WRITES_DISABLED");
     assertThat(stored(order)).containsEntry("comment", null);
   }
 
@@ -335,7 +332,7 @@ class ExchangeJobOrderCommentTest {
   void theReadCapabilityDoesNotOpenTheComment() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
 
-    assertRefused(
+    world.assertRefused(
         comment(logistician, order, "Note", 0L, ExchangeJobOrderWorld.READ), 403, "SCOPE_MISSING");
     assertThat(stored(order)).containsEntry("comment", null);
   }
@@ -370,15 +367,6 @@ class ExchangeJobOrderCommentTest {
         .getResponse();
   }
 
-  private @NotNull JsonNode assertRefused(
-      @NotNull MockHttpServletResponse response, int status, @NotNull String code)
-      throws Exception {
-    assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(status);
-    JsonNode problem = objectMapper.readTree(response.getContentAsString());
-    assertThat(problem.get("code").asString()).isEqualTo(code);
-    return problem;
-  }
-
   private @NotNull Map<String, Object> stored(@NotNull UUID order) {
     return jdbc.queryForMap(
         "SELECT comment, comment_version, comment_client_id, handle, money_information_version"
@@ -394,59 +382,11 @@ class ExchangeJobOrderCommentTest {
         order);
   }
 
-  private void close(@NotNull UUID order, @NotNull String status) {
-    jdbc.update(
-        "UPDATE job_order SET status = ?, priority = NULL, closed_at = now(),"
-            + " lifecycle_version = lifecycle_version + 1 WHERE id = ?",
-        status,
-        order);
-  }
-
-  /** Moves the responsible unit out of the Profit hierarchy, which invalidates its orders. */
-  private void leaveTheProfitHierarchy() {
-    jdbc.update(
-        "UPDATE org_unit SET parent_org_unit_id = NULL WHERE id = ?", world.getResponsible());
-  }
-
-  private static void awaitQuietly(@NotNull CountDownLatch latch) {
-    try {
-      assertThat(latch.await(30, TimeUnit.SECONDS)).isTrue();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException(e);
-    }
-  }
-
-  private @NotNull List<String> needChangeNotices(@NotNull UUID order, @NotNull UUID recipient) {
-    return jdbc.queryForList(
-        "SELECT params FROM notification WHERE entity_id = ? AND recipient_user_id = ?"
-            + " AND type = 'JOB_ORDER_UPDATED_BY_REQUESTER'",
-        String.class,
-        order,
-        recipient);
-  }
-
-  private @NotNull Counter writes(@NotNull String outcome) {
-    return meterRegistry.counter(
-        ExchangeMetricNames.EXCHANGE_WRITES,
-        MetricNames.TAG_CLIENT_ID,
-        world.getClient(),
-        ExchangeMetricNames.TAG_RESOURCE,
-        "job_order",
-        MetricNames.TAG_OUTCOME,
-        outcome);
-  }
-
-  private @NotNull Counter refusals(@NotNull String reason) {
-    return meterRegistry.counter(
-        ExchangeMetricNames.EXCHANGE_JOB_ORDER_REFUSED, MetricNames.TAG_REASON, reason);
-  }
-
   private @NotNull Map<String, Double> refusalCounts() {
     return Map.of(
-        "not_found", refusals("not_found").count(),
-        "not_permitted", refusals("not_permitted").count(),
-        "version_conflict", refusals("version_conflict").count(),
-        "closed", refusals("closed").count());
+        "not_found", world.refusals("not_found").count(),
+        "not_permitted", world.refusals("not_permitted").count(),
+        "version_conflict", world.refusals("version_conflict").count(),
+        "closed", world.refusals("closed").count());
   }
 }

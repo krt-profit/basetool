@@ -170,6 +170,7 @@ POST /api/v1/exchange/job-orders | ExchangeJobOrderWriteController#create | pre=
 GET /api/v1/exchange/job-orders/create-options | ExchangeJobOrderWriteController#createOptions | pre=@exchangeGate.allows('exchange.joborders.write', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/job-orders/{id}/cancel | ExchangeJobOrderWriteController#cancel | pre=@exchangeGate.allows('exchange.joborders.write', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/job-orders/{id}/comment | ExchangeJobOrderWriteController#comment | pre=@exchangeGate.allows('exchange.joborders.write', authentication) | url=anyRequest -> authenticated
+POST /api/v1/exchange/job-orders/{id}/target | ExchangeJobOrderWriteController#changeTarget | pre=@exchangeGate.allows('exchange.joborders.write', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/account-check | ExchangeAccountCheckController#check | pre=@exchangeGate.allows('exchange.connect', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/blueprints | ExchangeBlueprintController#blueprints | pre=@exchangeGate.allows('exchange.blueprints.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/blueprints/changes | ExchangeBlueprintController#blueprintChanges | pre=@exchangeGate.allows('exchange.blueprints.write', authentication) | url=anyRequest -> authenticated

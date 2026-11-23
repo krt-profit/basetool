@@ -22,9 +22,10 @@ in [`external-exchange.md`](external-exchange.md) and [`docs/exchange/errors.md`
 The read serves its snapshot and its change feed (`GET /exchange/v1/job-orders`), and a Logistician
 of the requesting unit creates aUEC orders through `GET /exchange/v1/job-orders/create-options` and
 `POST /exchange/v1/job-orders`, within an open-order cap and a daily create cap, cancels them
-before any money moved through `POST /exchange/v1/job-orders/{id}/cancel` and changes their comment
-through `POST /exchange/v1/job-orders/{id}/comment`; the target write follows with its own slice.
-Both switches are off until an admin turns them on.
+before any money moved through `POST /exchange/v1/job-orders/{id}/cancel`, changes their target
+above the net handover through `POST /exchange/v1/job-orders/{id}/target` and changes their comment
+through `POST /exchange/v1/job-orders/{id}/comment`. Both switches are off until an admin turns them
+on.
 
 The guiding rules:
 
@@ -501,8 +502,8 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0408, 
 ### REQ-OXCH-005 — Shared rules of the job-order writes
 
 > [!note] Implemented for the create (#3646) and, with the rules for an existing order, for the
-> cancel (#3650; decided in #3613, #3614, #3616, ADR-0407, ADR-0408) and the comment (#3652). The
-> target follows with its slice under the same rules.
+> cancel (#3650), the target change (#3651) and the comment (#3652); decided in #3613, #3614, #3616,
+> ADR-0407, ADR-0408.
 
 - **Single routes** under `/exchange/v1/job-orders`, one order per call and every path on the
   acting list (`ActingMemberFilter.ACTING_PATHS`); no change set and no `dryRun`. A client pre-checks
@@ -559,10 +560,12 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0408, 
   nothing (`ExchangeJobOrderCancelTest`).
 - [x] The backend's refusals reach the client with the registry's codes and fixed details (ingest
   `ExchangeJobOrderWriteRouteTest`).
+- [x] The target change is a single route on the acting list with its named `targetVersion`, and
+  answers its refusals in the order above (`ExchangeJobOrderTargetTest`, ingest
+  `ExchangeJobOrderWriteRouteTest`, `ExchangeGoldenAnswerTest`).
 - [x] The comment change runs the same rules with `commentVersion` as its named section version and
   the same route checks (`ExchangeJobOrderCommentTest`, ingest `ExchangeJobOrderWriteRouteTest`,
   `ExchangeGoldenAnswerTest`).
-- [ ] The target with its named version comes with its slice.
 
 **Enforced by:** `ExchangeRoutes`, `ExchangeIdempotencyFilter`, `ExchangeLimitFilter`,
 `ExchangeRelay`, `ExchangeJobOrderWriteController` (gateway) · `ActingMemberFilter`,
@@ -642,6 +645,75 @@ answers `409 VERSION_CONFLICT`; the client reads the order again.
 REQ-XCH-025, REQ-XCH-030, REQ-ORDERS-042, REQ-ORDERS-054, REQ-ORDERS-059, REQ-ORDERS-063,
 REQ-AUDIT-001, REQ-NOTIF-028, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005 · ADR-0407, ADR-0408 ·
 **Issues:** #3613, #3614, #3616, #3617, #3650
+
+### REQ-OXCH-007 — Change an aUEC order's target
+
+> [!note] Implemented (#3651; decided in #3613, #3614, #3617, ADR-0407, ADR-0408).
+
+`POST /exchange/v1/job-orders/{id}/target` (`exchange.joborders.write`) with a mandatory
+`Idempotency-Key`, relayed without the key to `POST /api/v1/exchange/job-orders/{id}/target`:
+
+- body `job-order-write.schema.json#/$defs/targetChange`: `{ target, targetVersion }`, the new
+  target as an integer in whole aUEC from 1 to 10¹² and the order's `versions.target` as last read;
+- answer `200` `job-order-write.schema.json#/$defs/targetChanged`: `{ id, status, versions, target }`,
+  read from the stored order after the change.
+
+**The rules.** The shared rules of REQ-OXCH-005 with the target version as the section version; the
+writer is a direct Logistician of the requesting unit (a writer of the responsible side writes
+nothing through a client), and only an `OPEN` or `IN_PROGRESS` order admits the change, so a
+completed order's target stays in the Basetool (`409 JOB_ORDER_CLOSED`). Then the target's own rule:
+the new target must lie **above** the order's current net handover (`netHandedOver` of REQ-OXCH-002,
+the effective handover of REQ-ORDERS-064), else `409 JOB_ORDER_TARGET_TOO_LOW`. Raising and lowering
+are both admitted. Decided under the order locks, so a handover racing the change either lands first
+and the change is measured against it, or meets the changed target. The change therefore never
+completes or reopens the order and never touches a Bank attempt; completing an order stays in the
+Basetool. A target equal to the stored one changes nothing and answers the current state.
+
+**Through the web's target command.** The change runs `JobOrderTargetCommand.changeTarget` with the
+writer rule `DIRECT_LOGISTICIAN`, the read check `OWN_RELATION` and the actor
+`JobOrderActor.Client(member, clientId)` (ADR-0408): the same account and order locks, the target
+history entry with its actor and its client, shown as „über <App>" (REQ-ORDERS-063,
+REQ-ORDERS-078), the live update of the order page and the overview after the commit
+(REQ-XCH-030), and the web's need-change notice to the responsible side without the member, which
+names the application (REQ-NOTIF-017, REQ-NOTIF-028).
+
+**Audit.** A client's target change writes `JOB_ORDER_TARGET_CHANGED_VIA_CLIENT` with
+`{previousTarget, target}` instead of `JOB_ORDER_MONEY_TARGET_CHANGED`, and the client in
+`client_id` as on every row (REQ-AUDIT-001, REQ-AUDIT-005); a refusal records nothing.
+
+**Retries.** The backend stores no key for the target change: a retry under the same key within the
+gateway's hour replays the cached answer (REQ-XCH-020), and after it the moved target version
+answers `409 VERSION_CONFLICT`; the client reads the order again.
+
+**Monitoring** (REQ-OBS-025). Every target change counts on
+`basetool_exchange_writes_total{resource="job_order", outcome}`, each refusal also on
+`basetool_exchange_job_order_refused_total` under the shared reasons of REQ-OXCH-005 or
+`target_too_low`.
+
+**Acceptance**
+
+- [x] A Logistician of the requesting unit raises and lowers the target of an active aUEC order
+  above its net handover; the answer carries the order's id, status, versions and target and
+  matches its schema, and the order stays in its status (`ExchangeJobOrderTargetTest`).
+- [x] A target equal to the net handover answers `409 JOB_ORDER_TARGET_TOO_LOW` and changes
+  nothing, also when a handover holding the order lock lands while the change waits
+  (`ExchangeJobOrderTargetTest`).
+- [x] A completed order answers `409 JOB_ORDER_CLOSED`; the refusals come in the shared order, the
+  target's own rule last (`ExchangeJobOrderTargetTest`).
+- [x] A retry after the cache answers `409 VERSION_CONFLICT` (`ExchangeJobOrderTargetTest`).
+- [x] A client's change writes `JOB_ORDER_TARGET_CHANGED_VIA_CLIENT` with the client and both
+  targets, a refusal nothing; the history entry records the client; the responsible side's writer
+  gets the need-change notice naming the application, the member none (`ExchangeJobOrderTargetTest`).
+- [x] Every change counts its outcome and every refusal its reason; the writes switch and the read
+  scope close the route (`ExchangeJobOrderTargetTest`, ingest `ExchangeJobOrderWriteRouteTest`).
+
+**Enforced by:** `JobOrderTargetCommand`, `JobOrderMoneyOrderChanges`, `JobOrderClientWriteRules`,
+`JobOrderEditor#editMoney` (job orders) · `ExchangeJobOrderChangeService`,
+`ExchangeJobOrderWriteController` (backend exchange) · `ExchangeJobOrderWriteController`,
+`ExchangeRoutes`, `ExchangeRelay.DETAILS` (gateway) · `job-order-write.schema.json` · **Related:**
+REQ-XCH-020, REQ-XCH-025, REQ-XCH-030, REQ-ORDERS-063, REQ-ORDERS-064, REQ-ORDERS-078,
+REQ-AUDIT-001, REQ-NOTIF-017, REQ-NOTIF-028, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-002,
+REQ-OXCH-005 · ADR-0407, ADR-0408 · **Issues:** #3613, #3614, #3617, #3651
 
 ### REQ-OXCH-008 — Change the comment of an aUEC order
 

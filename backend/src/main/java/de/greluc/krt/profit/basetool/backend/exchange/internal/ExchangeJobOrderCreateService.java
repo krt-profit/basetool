@@ -177,14 +177,11 @@ public class ExchangeJobOrderCreateService {
   private @NotNull ExchangeJobOrderCreatedDto answer(@NotNull UUID orderId) {
     JobOrderExchangeRead read =
         Objects.requireNonNull(reads.project(List.of(orderId)).get(orderId), "created order");
-    if (!(read.progress() instanceof JobOrderExchangeRead.AuecProgress progress)) {
-      throw new IllegalStateException("A client creates only aUEC orders");
-    }
     return new ExchangeJobOrderCreatedDto(
         read.id(),
         read.status(),
         ExchangeJobOrderDto.Versions.of(read.versions()),
-        ExchangeAmounts.whole(progress.target()));
+        ExchangeAmounts.auecTarget(read));
   }
 
   private static @NotNull JobOrderActor.Client actor(@NotNull ExchangeCaller caller) {

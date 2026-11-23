@@ -257,6 +257,10 @@ public class ExchangeRelay {
               "Money was accepted for the order already, so it is cancelled only in the Basetool;"
                   + " nothing was written."),
           Map.entry(
+              "JOB_ORDER_TARGET_TOO_LOW",
+              "The new target does not lie above the order's net handover; read netHandedOver"
+                  + " again, and complete the order in the Basetool; nothing was written."),
+          Map.entry(
               ExchangeRefusals.EXCHANGE_DISABLED, ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL),
           Map.entry(
               ExchangeRefusals.BANK_EXCHANGE_DISABLED,

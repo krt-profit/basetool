@@ -51,6 +51,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOr
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangeDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
@@ -135,6 +137,12 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeJobOrderCancelDto.class, "job-order-write.schema.json#/$defs/cancel"),
           Map.entry(ExchangeJobOrderCommentDto.class, "job-order-write.schema.json#/$defs/comment"),
           Map.entry(ExchangeJobOrderWrittenDto.class, "job-order-write.schema.json#/$defs/written"),
+          Map.entry(
+              ExchangeJobOrderTargetChangeDto.class,
+              "job-order-write.schema.json#/$defs/targetChange"),
+          Map.entry(
+              ExchangeJobOrderTargetChangedDto.class,
+              "job-order-write.schema.json#/$defs/targetChanged"),
           Map.entry(
               ExchangeBankRequestCreateDto.class, "bank-request-write.schema.json#/$defs/raise"),
           Map.entry(

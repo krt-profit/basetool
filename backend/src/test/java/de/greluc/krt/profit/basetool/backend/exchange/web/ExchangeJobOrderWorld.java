@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -39,6 +40,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -47,6 +51,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -58,14 +64,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * A committed world for the job-order writes on an existing order through the relay: a registered
  * client with both job-order capabilities, both job-order switches on, a Profit unit and a
- * requesting unit with a direct Logistician, and relayed requests through the real filter chain.
- * {@link #close()} removes everything it made, the orders of the requesting unit included, and
- * restores the switches.
+ * requesting unit with a direct Logistician, relayed requests through the real filter chain, and
+ * the probes the route tests share. {@link #close()} removes everything it made, the orders of the
+ * requesting unit included, and restores the switches.
  */
 final class ExchangeJobOrderWorld {
 
@@ -83,6 +90,7 @@ final class ExchangeJobOrderWorld {
 
   private final JdbcTemplate jdbc;
   private final ObjectMapper objectMapper;
+  private final MeterRegistry meterRegistry;
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
   private final ExchangeClientRepository clientRepository;
@@ -122,6 +130,7 @@ final class ExchangeJobOrderWorld {
   ExchangeJobOrderWorld(@NotNull WebApplicationContext context) {
     jdbc = context.getBean(JdbcTemplate.class);
     objectMapper = context.getBean(ObjectMapper.class);
+    meterRegistry = context.getBean(MeterRegistry.class);
     userRepository = context.getBean(UserRepository.class);
     roleRepository = context.getBean(RoleRepository.class);
     clientRepository = context.getBean(ExchangeClientRepository.class);
@@ -355,5 +364,117 @@ final class ExchangeJobOrderWorld {
    */
   static @NotNull String key() {
     return "write-" + UUID.randomUUID();
+  }
+
+  /**
+   * Reads an order's stored lifecycle status.
+   *
+   * @param order the order
+   * @return its status
+   */
+  @NotNull
+  String status(@NotNull UUID order) {
+    return jdbc.queryForObject("SELECT status FROM job_order WHERE id = ?", String.class, order);
+  }
+
+  /**
+   * Moves an order to a terminal status in the database, leaving the queue and moving its lifecycle
+   * version on, as a closing in the Basetool does.
+   *
+   * @param order the order
+   * @param status the terminal status
+   */
+  void closeOrder(@NotNull UUID order, @NotNull String status) {
+    jdbc.update(
+        "UPDATE job_order SET status = ?, priority = NULL, closed_at = now(),"
+            + " lifecycle_version = lifecycle_version + 1 WHERE id = ?",
+        status,
+        order);
+  }
+
+  /** Moves the responsible unit out of the Profit hierarchy, which invalidates its orders. */
+  void leaveTheProfitHierarchy() {
+    jdbc.update("UPDATE org_unit SET parent_org_unit_id = NULL WHERE id = ?", responsible);
+  }
+
+  /**
+   * Asserts that a relayed write was refused with the status and the code.
+   *
+   * @param response the backend's answer
+   * @param status the expected status
+   * @param code the expected problem code
+   * @return the problem
+   * @throws Exception if the answer cannot be read
+   */
+  @NotNull
+  JsonNode assertRefused(
+      @NotNull MockHttpServletResponse response, int status, @NotNull String code)
+      throws Exception {
+    assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(status);
+    JsonNode problem = objectMapper.readTree(response.getContentAsString());
+    assertThat(problem.get("code").asString()).isEqualTo(code);
+    return problem;
+  }
+
+  /**
+   * Reads the parameters of the need-change notices the requesting side raised about an order for
+   * one recipient.
+   *
+   * @param order the order
+   * @param recipient the notified member
+   * @return each notice's stored parameters
+   */
+  @NotNull
+  List<String> needChangeNotices(@NotNull UUID order, @NotNull UUID recipient) {
+    return jdbc.queryForList(
+        "SELECT params FROM notification WHERE entity_id = ? AND recipient_user_id = ?"
+            + " AND type = 'JOB_ORDER_UPDATED_BY_REQUESTER'",
+        String.class,
+        order,
+        recipient);
+  }
+
+  /**
+   * The counter of the world's client's job-order writes under an outcome.
+   *
+   * @param outcome {@code applied} or {@code rejected}
+   * @return the counter
+   */
+  @NotNull
+  Counter writes(@NotNull String outcome) {
+    return meterRegistry.counter(
+        ExchangeMetricNames.EXCHANGE_WRITES,
+        MetricNames.TAG_CLIENT_ID,
+        client,
+        ExchangeMetricNames.TAG_RESOURCE,
+        "job_order",
+        MetricNames.TAG_OUTCOME,
+        outcome);
+  }
+
+  /**
+   * The counter of the backend's job-order refusals under a reason.
+   *
+   * @param reason the refusal's reason label
+   * @return the counter
+   */
+  @NotNull
+  Counter refusals(@NotNull String reason) {
+    return meterRegistry.counter(
+        ExchangeMetricNames.EXCHANGE_JOB_ORDER_REFUSED, MetricNames.TAG_REASON, reason);
+  }
+
+  /**
+   * Waits for a latch a racing test thread releases, failing after 30 seconds.
+   *
+   * @param latch the latch
+   */
+  static void awaitQuietly(@NotNull CountDownLatch latch) {
+    try {
+      assertThat(latch.await(30, TimeUnit.SECONDS)).isTrue();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(e);
+    }
   }
 }

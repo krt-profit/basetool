@@ -186,6 +186,11 @@ web, naming its client (REQ-AUDIT-005):
   `JOB_ORDER_CANCELLED_VIA_CLIENT` with `previousStatus` instead of `JOB_ORDER_STATUS_CHANGED`, one
   row per cancel, with the client in `client_id`; a refused cancel records nothing
   ([REQ-OXCH-006](orders-exchange.md#req-oxch-006--cancel-an-auec-order)).
+  A member's target change of an aUEC order through a connected application records
+  `JOB_ORDER_TARGET_CHANGED_VIA_CLIENT` with `previousTarget` and `target` instead of
+  `JOB_ORDER_MONEY_TARGET_CHANGED`, one row per change, with the client in `client_id`; a refused
+  change records nothing
+  ([REQ-OXCH-007](orders-exchange.md#req-oxch-007--change-an-auec-orders-target)).
   A member's comment change of an aUEC order through a connected application records
   `JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT` without details instead of `JOB_ORDER_UPDATED`, one row per
   change, with the client in `client_id`; the text is never recorded, and a refused or unchanged

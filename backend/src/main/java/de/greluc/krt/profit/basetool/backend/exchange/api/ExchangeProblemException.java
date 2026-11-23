@@ -91,6 +91,12 @@ public final class ExchangeProblemException extends DomainProblem {
    */
   public static final String JOB_ORDER_MONEY_STARTED = "JOB_ORDER_MONEY_STARTED";
 
+  /**
+   * A client's target change of a job order to an amount at or below its net handover
+   * (REQ-OXCH-007).
+   */
+  public static final String JOB_ORDER_TARGET_TOO_LOW = "JOB_ORDER_TARGET_TOO_LOW";
+
   /** The relayed client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
@@ -273,6 +279,20 @@ public final class ExchangeProblemException extends DomainProblem {
         HttpStatus.CONFLICT,
         JOB_ORDER_MONEY_STARTED,
         "A money operation of the job order was accepted already.",
+        cause);
+  }
+
+  /**
+   * The refusal of a client's target change to an amount at or below the order's net handover.
+   *
+   * @param cause the command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_TARGET_TOO_LOW} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderTargetTooLow(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_TARGET_TOO_LOW,
+        "The new target does not lie above the job order's net handover.",
         cause);
   }
 

@@ -30,4 +30,14 @@ interface JobOrderMoneyTargetRepository extends JpaRepository<JobOrderMoneyTarge
 
   @Query("SELECT t.amount FROM JobOrderMoneyTarget t WHERE t.orderId = :orderId")
   Optional<BigDecimal> amountFor(UUID orderId);
+
+  /**
+   * Reads the committed target version from the database, past any target the persistence context
+   * holds.
+   *
+   * @param orderId the aUEC order
+   * @return its target version, or empty when the order has no target
+   */
+  @Query("SELECT t.version FROM JobOrderMoneyTarget t WHERE t.orderId = :orderId")
+  Optional<Long> versionFor(UUID orderId);
 }

@@ -67,12 +67,12 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The create options, the create, the cancel and the comment change of an aUEC order through both
- * gates, with the backend relay mocked (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006, REQ-OXCH-008,
- * REQ-OXCH-009): the gateway checks the order id and the body before the relay, relays the client's
- * key on the create only, answers a created order with {@code 201}, passes the pair refusal, both
- * cap refusals and the refusals of a write on an existing order on, the daily cap with the wait
- * until the next UTC day, checks the create options' limits and needs {@code
+ * The create options, the create, the cancel, the target change and the comment change of an aUEC
+ * order through both gates, with the backend relay mocked (REQ-OXCH-004 to REQ-OXCH-009): the
+ * gateway checks the order id and the body before the relay, relays the client's key on the create
+ * only, answers a created order with {@code 201}, passes the pair refusal, both cap refusals and
+ * the refusals of a write on an existing order on, the daily cap with the wait until the next UTC
+ * day, checks the create options' limits and the target answer, and needs {@code
  * exchange.joborders.write}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -87,6 +87,7 @@ class ExchangeJobOrderWriteRouteTest {
   private static final String ORDER = "7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
   private static final String CANCEL = "job-order-write--cancel/valid/cancel.json";
   private static final String COMMENT = "job-order-write--comment/valid/comment.json";
+  private static final String TARGET = "job-order-write--targetChange/valid/raise.json";
 
   @Autowired private WebApplicationContext context;
 
@@ -378,6 +379,87 @@ class ExchangeJobOrderWriteRouteTest {
    */
   private static @NotNull String commentRoute(@NotNull String id) {
     return ROUTE + "/" + id + "/comment";
+  }
+
+  @Test
+  void aTargetChangeIsRelayedToTheOrderWithoutTheKeyAndAnsweredWithItsTarget() throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.POST), eq(BACKEND + "/" + ORDER + "/target"), any(), any(), any()))
+        .thenReturn(ok(example("job-order-write--targetChanged/valid/raised.json")));
+
+    call(HttpMethod.POST, targetRoute(ORDER.toUpperCase(Locale.ROOT)), example(TARGET))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("OPEN"))
+        .andExpect(jsonPath("$.target").value(400000))
+        .andExpect(jsonPath("$.versions.target").value(1));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any(), anyString());
+  }
+
+  @Test
+  void aTargetChangeOutsideTheSchemaIsRefusedBeforeTheRelay() throws Exception {
+    call(HttpMethod.POST, targetRoute("not-an-order"), example(TARGET))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"))
+        .andExpect(jsonPath("$.errors[0].pointer").value("/id"));
+    call(
+            HttpMethod.POST,
+            targetRoute(ORDER),
+            example("job-order-write--targetChange/invalid/zero-target.json"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+    call(
+            HttpMethod.POST,
+            targetRoute(ORDER),
+            example("job-order-write--targetChange/invalid/lifecycle-version.json"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void aTargetTooLowReachesTheClientWithItsCodeAndDetail() throws Exception {
+    String detail = "The fixed detail of JOB_ORDER_TARGET_TOO_LOW.";
+    when(relay.forward(
+            eq(HttpMethod.POST), eq(BACKEND + "/" + ORDER + "/target"), any(), any(), any()))
+        .thenReturn(new ExchangeRelay.Result(409, null, "JOB_ORDER_TARGET_TOO_LOW", detail));
+
+    call(HttpMethod.POST, targetRoute(ORDER), example(TARGET))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("JOB_ORDER_TARGET_TOO_LOW"))
+        .andExpect(jsonPath("$.detail").value(detail));
+  }
+
+  @Test
+  void aTargetAnswerWithoutItsTargetIsARelayFailure() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any()))
+        .thenReturn(ok(example("job-order-write--targetChanged/invalid/without-target.json")));
+
+    call(HttpMethod.POST, targetRoute(ORDER), example(TARGET))
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value(ExchangeRelay.RELAY_FAILED));
+  }
+
+  @Test
+  void theReadScopeAloneDoesNotOpenTheTargetChange() throws Exception {
+    Set<String> read = Set.of("exchange.connect", "exchange.joborders.read");
+    when(registryReader.current())
+        .thenReturn(ExchangeTestSupport.registryWithEveryArea(read, "2.0.0", 120));
+
+    call(HttpMethod.POST, targetRoute(ORDER), example(TARGET))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+  }
+
+  /**
+   * The gateway route of an order's target change.
+   *
+   * @param id the order id as the path carries it
+   * @return the route
+   */
+  private static @NotNull String targetRoute(@NotNull String id) {
+    return ROUTE + "/" + id + "/target";
   }
 
   /**

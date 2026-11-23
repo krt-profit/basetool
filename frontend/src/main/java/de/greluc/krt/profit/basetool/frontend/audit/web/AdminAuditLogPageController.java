@@ -192,6 +192,7 @@ public class AdminAuditLogPageController {
                   "JOB_ORDER_MONEY_HOLDER_IDENTITY_CHANGED",
                   "JOB_ORDER_MONEY_RECIPIENT_CHANGED",
                   "JOB_ORDER_MONEY_TARGET_CHANGED",
+                  "JOB_ORDER_TARGET_CHANGED_VIA_CLIENT",
                   "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED",
                   "JOB_ORDER_ITEM_CREATED",
                   "JOB_ORDER_UPDATED",

@@ -145,6 +145,59 @@
         "versions"
       ]
     },
+    "targetChange": {
+      "title": "Change an aUEC order's target",
+      "description": "Raises or lowers the target of an open or in-progress aUEC order of a unit the member writes for, only to an amount above the order's netHandedOver, so the change never completes or reopens the order. A target at or below it answers 409 JOB_ORDER_TARGET_TOO_LOW; completing an order happens in the Basetool. A stale targetVersion answers 409 VERSION_CONFLICT, so a retry after the gateway's one-hour cache does too.",
+      "type": "object",
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "targetVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "versions.target as last read."
+        }
+      },
+      "required": [
+        "target",
+        "targetVersion"
+      ]
+    },
+    "targetChanged": {
+      "title": "aUEC order with its changed target",
+      "description": "Only the order's id, status, new versions and stored target after a target change; read the order itself from the job-order snapshot or feed.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The order's id and the feed key. Clients store and echo it, never parse it."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "CANCELLED",
+            "REJECTED"
+          ]
+        },
+        "versions": {
+          "$ref": "job-order.schema.json#/properties/versions"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "versions",
+        "target"
+      ]
+    },
     "unitId": {
       "type": "string",
       "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
