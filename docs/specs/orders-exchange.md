@@ -189,8 +189,8 @@ REQ-XCH-044, REQ-XCH-050, REQ-ORDERS-055, REQ-OXCH-003 · ADR-0406, ADR-0407 · 
 ### REQ-OXCH-003 — Snapshot and feed of the job-order set
 
 > [!note] Implemented for the fingerprint, the dirty marks and the worker (#3643), the client set's
-> snapshot (#3644) and the per-unit and per-member logs with the feed and its tombstone (#3645);
-> decided in #3615, #3618, ADR-0406. The window run follows with its slice.
+> snapshot (#3644), the per-unit and per-member logs with the feed and its tombstone (#3645) and
+> the nightly window run (#3649); decided in #3615, #3618, ADR-0406.
 
 **The snapshot.** `GET /exchange/v1/job-orders` (`exchange.joborders.read`), relayed to
 `GET /api/v1/exchange/job-orders`, answers `page.schema.json#/$defs/jobOrderPage`: the client set —
@@ -297,14 +297,31 @@ only.
 - No `removed` entry names a writer, so a lost relation, the end of the window and a deletion look
   alike; a client drops the order and ignores a key it never held. A client cancel is a status
   change, so the order stays an item.
-- A reopened order and a client's own write return as items. Orders leaving at the end of the window
-  come with the nightly window run.
+- A reopened order and a client's own write return as items. An order whose 7 days ended arrives
+  as a `removed` entry after the nightly window run.
 - The log keeps 90 days; an older cursor answers `410 CURSOR_EXPIRED` and the client takes a new
   snapshot (`docs/exchange/sync-guide.md`).
 - Each page counts one `feed` read for its client (REQ-OBS-025).
 
+**The window run.** `JobOrderWindowTask` runs nightly (`app.exchange.job-order-window.cron`,
+default 04:00 UTC), whatever the job-order switches say, on one backend instance at a time
+(two-key advisory lock space `OXWN`). A failed run rolls back whole; the next night retries it.
+
+- It records every fingerprinted order whose 7 days after `closed_at` ended, and that is no aUEC
+  order whose last fingerprint says `settlementOpen`, as having left the set
+  (`exchange_job_order_fingerprint.left_set_at`, V451). The fingerprint row's trigger announces
+  each such order to the units and members it was last announced to, so a feed page resolves it to
+  a `removed` entry: a closed order stays in the feed for at most 7 days plus one run.
+- A fingerprint written while the order lies outside the set records that itself: the write
+  announced the order already or, as a first fingerprint, reached no client. An aUEC order whose
+  settlement closes after its 7 days therefore leaves at once through its fingerprint, not through
+  the run, and a rerun announces nothing.
+- A fingerprint written inside the set clears `left_set_at`, so a reopened order that closes again
+  leaves again after its new 7 days.
+- The same run clears the creator of every order outside the set (REQ-OXCH-010).
+
 **Monitoring:** the worker job, the recomputation counter, the backlog gauges and their three
-alerts are REQ-OBS-025.
+alerts, and the window run's job are REQ-OBS-025.
 
 **Acceptance**
 
@@ -346,15 +363,23 @@ alerts are REQ-OBS-025.
 - [x] The gateway relays the feed and turns a removed entry that names a writer into
   `502 BACKEND_RELAY_FAILED` (ingest `ExchangeJobOrderRouteTest`, `ExchangeGoldenAnswerTest`,
   `ExchangeContractTest`).
-- [ ] The window run comes with its slice.
+- [x] The window run announces an order whose 7 days ended where it was last announced, leaves one
+  closed just under 7 days ago in the set, announces nothing on a rerun and announces a reopened
+  order again once its new 7 days ended (`JobOrderWindowRunIntegrationTest`).
+- [x] An aUEC order with an open settlement stays past its 7 days and leaves through its fingerprint
+  once the settlement closes, not through the run; an order first fingerprinted after its 7 days is
+  never announced (`JobOrderWindowRunIntegrationTest`).
+- [x] After the window run the feed answers an order whose 7 days ended as `{ key, removedAt }`
+  (`ExchangeJobOrderFeedTest`).
 
 **Enforced by:** `JobOrderExchangeReads`, `JobOrderExchangeReadProjection` (job orders) ·
 `JobOrderFingerprints`, `JobOrderFingerprintRecomputation`, `JobOrderFingerprintTask`,
 `ExchangeJobOrderMarkRepository`, `ExchangeJobOrderFingerprintRepository`, `ExchangeJobOrderReadService`,
 `ExchangeFeedReader#jobOrderChanges`, `ExchangeChangeRepository#findAnnouncedJobOrders`,
-`ExchangeJobOrderController` (exchange) · `ExchangeJobOrderController` (gateway) · V445, V447 ·
-**Related:** REQ-XCH-013, REQ-ORDERS-054, REQ-ORDERS-055, REQ-OXCH-001, REQ-OXCH-002, REQ-OXCH-009,
-REQ-OBS-025 · ADR-0224, ADR-0406, ADR-0407 · **Issues:** #3615, #3618, #3643, #3644, #3645
+`ExchangeJobOrderController`, `JobOrderWindowRun`, `JobOrderWindowTask` (exchange) ·
+`ExchangeJobOrderController` (gateway) · V445, V447, V451 · **Related:** REQ-XCH-013,
+REQ-ORDERS-054, REQ-ORDERS-055, REQ-OXCH-001, REQ-OXCH-002, REQ-OXCH-009, REQ-OXCH-010,
+REQ-OBS-025 · ADR-0224, ADR-0406, ADR-0407 · **Issues:** #3615, #3618, #3643, #3644, #3645, #3649
 
 ### REQ-OXCH-004 — Create options and the create of an aUEC order
 
@@ -401,7 +426,8 @@ or ineligible unit, `403` for a pair the rule refuses) map to this one code.
 
 **The stored key.** A client's create stores the creating client (`job_order.created_by_client_id`),
 the creating member (`created_by_member_id`, `ON DELETE SET NULL`) and the create's key
-(`create_idempotency_key`), unique per member, client and key (V448).
+(`create_idempotency_key`), unique per member, client and key (V448). The window run clears the
+member and the key once the order leaves the client set (REQ-OXCH-010).
 
 - A create under a key the client already created an order of this member with answers that order
   with `201` and its current state, also after the gateway's one-hour cache (REQ-XCH-020) and after
@@ -594,3 +620,40 @@ the backend counts each committed flip on `basetool_exchange_registry_changes_to
 `ExchangeSeam.GATE_STATUSES`, `ExchangeSeam.REGISTRY_DOCUMENT_FIELDS` (shared seam) · V444 ·
 **Related:** REQ-XCH-003, REQ-XCH-023, REQ-XCH-025, REQ-BXCH-006, REQ-AUDIT-001, REQ-NOTIF-028,
 REQ-OBS-025 · **Issues:** #3618, #3621, #3642
+
+### REQ-OXCH-010 — Retention of job-order data
+
+> [!note] Implemented for the creating member cleared at age-out (#3649; decided in #3619). The
+> client's 7-day retention, the onboarding criteria and the name withholding follow with their
+> slice.
+
+**The creator leaves with the order.** When an order leaves the client set of REQ-OXCH-003 — 7 days
+after `closed_at`, and an aUEC order not before its settlement is closed — the nightly window run
+sets its creating member (`job_order.created_by_member_id`) and the create's key
+(`create_idempotency_key`) to `null`. The creating client (`created_by_client_id`) stays: it is an
+application id, not a person.
+
+- An order inside the set keeps both, and so does one reopened between the run's selection and its
+  write, since the clearing re-checks the closing instant.
+- The clearing moves neither the order's `version` nor a section version, so it never collides with
+  a web edit, and it moves no fingerprint.
+- An order the web reopens after the clearing no longer counts against its creator's open-order cap
+  (REQ-OXCH-009). A retry of the create under the cleared key creates a new order; within the hour
+  the gateway's idempotency cache still answers it (REQ-XCH-020).
+- An account deletion sets the creating member to `null` at any time (`ON DELETE SET NULL`), and
+  the three-year name retention (`JobOrderNameRetention`) does not need to cover it.
+
+**Acceptance**
+
+- [x] The run clears the creating member and the key of an order outside the set and keeps the
+  creating client; an order inside its 7 days keeps both, and an aUEC order with an open settlement
+  keeps both until a run after its settlement closed (`JobOrderWindowRunIntegrationTest`).
+- [x] An order the web reopens after the clearing stays without its creating member and key
+  (`JobOrderWindowRunIntegrationTest`).
+- [ ] The client's 7-day retention, the onboarding criteria and the name withholding come with their
+  slice.
+
+**Enforced by:** `JobOrderCreatorRetention`, `JobOrderClientCreateRepository#clearCreators` (job
+orders) · `JobOrderWindowRun`, `ExchangeJobOrderFingerprintRepository#findOutsideWithCreator`
+(exchange) · V448, V451 · **Related:** REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-009, REQ-SEC-058,
+REQ-XCH-020 · **Issues:** #3619, #3649

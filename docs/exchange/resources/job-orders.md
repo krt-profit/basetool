@@ -140,7 +140,9 @@ same `jobOrderPage`, and each order appears at most once per page.
   and a lost relation (a unit stopped relating, the member left the unit, the assignee entry ended),
   the end of the order's 7 days and a deletion look alike. Ignore a key you never held.
 - A cancelled order stays an item with its new `status` until its 7 days end. A closed order
-  leaves the set at the latest one day after its 7 days.
+  leaves the set when its 7 days end: the snapshot leaves it out at once, and the feed answers it
+  in `removed` at the latest one day later, after the nightly run. An aUEC order whose settlement
+  closes only after its 7 days arrives in `removed` a few seconds after the settlement closed.
 - An order changes in the feed only when a field the read carries changes, never on a provision, a
   holder movement, a fee, a commitment or a contact change of an aUEC order in the Basetool. A
   change arrives a few seconds after it was made.

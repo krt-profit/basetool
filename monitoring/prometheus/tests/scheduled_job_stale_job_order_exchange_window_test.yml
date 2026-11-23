@@ -1,0 +1,65 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - the job-order window run that has never succeeded
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x1900"
+      - series: 'basetool_scheduled_job_enabled{task="job_order_exchange_window"}'
+        values: "1x1900"
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: ScheduledJobStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              task: "job_order_exchange_window"
+            exp_annotations:
+              summary: "Scheduled job stale >26h (job_order_exchange_window)"
+              description: "The job_order_exchange_window job last succeeded more than 26 hours ago — it may have stopped being scheduled."
+
+  - name: fires - the job-order window run stopped succeeding
+    interval: 1m
+    input_series:
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_exchange_window"}'
+        values: "60x1900"
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: ScheduledJobStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              task: "job_order_exchange_window"
+            exp_annotations:
+              summary: "Scheduled job stale >26h (job_order_exchange_window)"
+              description: "The job_order_exchange_window job last succeeded more than 26 hours ago — it may have stopped being scheduled."
+
+  - name: silent - the job-order window run succeeds every night
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x1900"
+      - series: 'basetool_scheduled_job_enabled{task="job_order_exchange_window"}'
+        values: "1x1900"
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_exchange_window"}'
+        values: "0x1439 86400x461"
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: ScheduledJobStale
+        exp_alerts: []
+
+  - name: silent - a switched-off window run is not a stale one
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x1900"
+      - series: 'basetool_scheduled_job_enabled{task="job_order_exchange_window"}'
+        values: "0x1900"
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: ScheduledJobStale
+        exp_alerts: []
