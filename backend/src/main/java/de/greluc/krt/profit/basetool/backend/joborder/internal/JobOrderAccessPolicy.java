@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthorityFlags;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReadSet;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
@@ -38,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -66,6 +68,7 @@ public class JobOrderAccessPolicy
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderUnitReadHistoryRepository unitReadHistory;
   private final JobOrderParticipationRepository participations;
+  private final JobOrderExchangeReadSet exchangeReadSet;
 
   /**
    * Checks complete current order reading, including personal and observed unit relationships
@@ -102,7 +105,8 @@ public class JobOrderAccessPolicy
   }
 
   /**
-   * Decides the read check a command's caller passed on the loaded order (ADR-0405).
+   * Decides the read check a command's caller passed on the loaded order, for the request's caller
+   * (ADR-0405); a request that names no member passes no exchange read check.
    *
    * @param read the read check
    * @param order the loaded order
@@ -111,7 +115,22 @@ public class JobOrderAccessPolicy
   public boolean canRead(@NotNull JobOrderReadCheck read, @NotNull JobOrder order) {
     return switch (read) {
       case CONTEXTUAL -> canSeeJobOrder(order);
+      case OWN_RELATION ->
+          authHelper.currentUserId().map(member -> relatesTo(member, order)).orElse(false);
     };
+  }
+
+  /**
+   * Decides the exchange read set of one member for one order (REQ-OXCH-001).
+   *
+   * @param member the member
+   * @param order the order
+   * @return {@code true} iff the member has a current own relation to the order
+   */
+  private boolean relatesTo(UUID member, JobOrder order) {
+    return exchangeReadSet
+        .relations(exchangeReadSet.relatingMember(member), List.of(order.getId()))
+        .containsKey(order.getId());
   }
 
   /**

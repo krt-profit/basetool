@@ -200,8 +200,7 @@ class ExchangeJobOrderSnapshotTest {
   }
 
   @Test
-  void aMaterialOrderOfTheMembersUnitCarriesTheHeaderTheMembersPartAndItsLines()
-      throws Exception {
+  void aMaterialOrderOfTheMembersUnitCarriesTheHeaderTheMembersPartAndItsLines() throws Exception {
     UUID material = material("Agricium");
     UUID order = materialOrder(other, own, material, 12.5, "Bring it to Lorville");
     fingerprint(order, false);
@@ -436,9 +435,7 @@ class ExchangeJobOrderSnapshotTest {
 
   @Test
   void anotherCapabilityDoesNotOpenTheRoute() throws Exception {
-    mockMvc
-        .perform(relayed(get(PATH), "exchange.demand.read"))
-        .andExpect(status().isForbidden());
+    mockMvc.perform(relayed(get(PATH), "exchange.demand.read")).andExpect(status().isForbidden());
   }
 
   private List<String> snapshotIds() throws Exception {

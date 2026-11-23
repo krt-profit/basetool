@@ -65,9 +65,10 @@ follows that unit's orders. An administrator reads like a plain member.
 
 - Every relation implies the web's read, so the set is decided as the relation, through the
   predicates of `JobOrderScope` that the snapshot and the read check share.
-- `JobOrderExchangeReadSet.reads(member, order)` is the read check the exchange's writes on an
-  existing order pass to the shared commands (ADR-0405); a hidden, an unknown and a deleted order
-  answer alike.
+- The read check `JobOrderReadCheck.OWN_RELATION`, decided by the access policy for the request's
+  acting member, carries the same rule to the shared status, target and information commands
+  (ADR-0405); the exchange's writes on an existing order pass it. A hidden, an unknown and a deleted
+  order answer alike.
 - **Nothing of the responsible side, no money and no Bank effect through a client** (ADR-0407): a
   client never accepts, processes, hands over, provides, settles, reassigns or deletes an order and
   never touches assignees or support; everything else stays in the web, reached through the order's
@@ -81,8 +82,8 @@ follows that unit's orders. An administrator reads like a plain member.
   aUEC holder link and a deactivated unit relate nothing; without `KRT Member` only an assignee entry
   counts; an administrator reads like a plain member; an unknown order answers like a hidden one
   (`JobOrderExchangeReadSetIntegrationTest`).
-- [x] Every order of the set is one the web lets the same member read
-  (`JobOrderExchangeReadSetIntegrationTest`).
+- [x] Every order of the set is one the web lets the same member read, and the read check
+  `OWN_RELATION` decides the same set for the request's member (`JobOrderExchangeReadSetIntegrationTest`).
 - [x] The scope is provisioned with its consent lines and chip labels in the realm provisioner, the
   sandbox and E2E realms, the registry's capability check and the shared seam
   (`provision-keycloak-realm.test.sh`, `build-sandbox-realm.py --check`, `SandboxSeedCapabilitiesTest`,
@@ -90,7 +91,8 @@ follows that unit's orders. An administrator reads like a plain member.
 - [ ] The scope `exchange.joborders.write` and the writer rule of the create come with the create
   slice (REQ-OXCH-004).
 
-**Enforced by:** `JobOrderExchangeReadSet`, `JobOrderScope` (job orders) · `ExchangeCapability`,
+**Enforced by:** `JobOrderExchangeReadSet`, `JobOrderScope`, `JobOrderReadCheck.OWN_RELATION`,
+`JobOrderAccessPolicy#canRead` (job orders) · `ExchangeCapability`,
 `ExchangeJobOrderReadService` (exchange) · V446 · **Related:** REQ-XCH-005, REQ-XCH-009,
 REQ-ORDERS-052, REQ-ORG-032, REQ-SEC-015 · ADR-0405, ADR-0407 · **Issues:** #3608, #3610, #3619,
 #3644

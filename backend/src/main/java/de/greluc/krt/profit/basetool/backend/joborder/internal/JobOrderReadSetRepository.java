@@ -35,8 +35,8 @@ public interface JobOrderReadSetRepository extends Repository<JobOrder, UUID> {
   /**
    * Decides each relation of a member to the given orders, one row per order of the read set.
    *
-   * @param relatingUnitIds the active units the member directly belongs to while holding {@code
-   *     KRT Member}
+   * @param relatingUnitIds the active units the member directly belongs to while holding {@code KRT
+   *     Member}
    * @param memberId the member
    * @param orderIds the orders
    * @return a row per order with at least one relation

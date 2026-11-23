@@ -30,8 +30,8 @@ import org.jetbrains.annotations.Unmodifiable;
  * feed.
  *
  * @param items the orders of the page, ascending by id
- * @param removed the orders that left the set, each without the reason; always empty on a
- *     snapshot page
+ * @param removed the orders that left the set, each without the reason; always empty on a snapshot
+ *     page
  * @param nextCursor the cursor of the next page, a feed cursor on the snapshot's last page
  * @param hasMore whether the snapshot continues
  */

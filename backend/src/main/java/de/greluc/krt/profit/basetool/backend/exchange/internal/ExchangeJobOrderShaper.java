@@ -210,9 +210,7 @@ class ExchangeJobOrderShaper {
   private Map<UUID, QualityTier> qualityTiersOf(Collection<JobOrderExchangeRead> projected) {
     return byId(
         qualityTiers.findAllById(
-            materialLines(projected)
-                .map(MaterialLine::qualityTierId)
-                .collect(Collectors.toSet())));
+            materialLines(projected).map(MaterialLine::qualityTierId).collect(Collectors.toSet())));
   }
 
   private Map<UUID, GameItem> gameItemsOf(Collection<JobOrderExchangeRead> projected) {
@@ -286,7 +284,8 @@ class ExchangeJobOrderShaper {
               ? QuantityType.PIECE.name()
               : QuantityType.SCU.name();
       return new ExchangeJobOrderDto.MaterialLine(
-          new ExchangeItemRefDto(material.getId().toString(), ExchangeNames.cut(material.getName())),
+          new ExchangeItemRefDto(
+              material.getId().toString(), ExchangeNames.cut(material.getName())),
           Objects.requireNonNull(qualityTiers.get(line.qualityTierId())).getMinQuality(),
           unit,
           ExchangeStockFeedService.amount(line.requested(), unit),

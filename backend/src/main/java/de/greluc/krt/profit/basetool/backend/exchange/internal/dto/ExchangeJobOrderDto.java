@@ -62,8 +62,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param target an aUEC order's target in whole aUEC; left out otherwise
  * @param netHandedOver an aUEC order's net handover to the requester in whole aUEC; left out
  *     otherwise
- * @param remaining an aUEC order's target less the net handover, never negative; left out
- *     otherwise
+ * @param remaining an aUEC order's target less the net handover, never negative; left out otherwise
  * @param overpaid an aUEC order's net handover beyond the target, never negative; left out
  *     otherwise
  * @param settlementOpen whether a terminal aUEC order still holds purpose-bound funds or an
@@ -88,8 +87,7 @@ public record ExchangeJobOrderDto(
     @NotNull String link,
     @NotNull @Unmodifiable List<Assignee> assignees,
     @NotNull Versions versions,
-    @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable @Unmodifiable
-        List<MaterialLine> materials,
+    @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable @Unmodifiable List<MaterialLine> materials,
     @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable @Unmodifiable List<ItemLine> items,
     @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Long target,
     @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Long netHandedOver,

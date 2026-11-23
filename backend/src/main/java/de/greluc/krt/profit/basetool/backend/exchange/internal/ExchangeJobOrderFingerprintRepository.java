@@ -42,8 +42,8 @@ public interface ExchangeJobOrderFingerprintRepository
 
   /**
    * The window of the client set for the order alias {@code o} and its fingerprint {@code f}:
-   * active, closed at or after {@code :closedSince}, or aUEC while the fingerprint says
-   * {@code settlementOpen}.
+   * active, closed at or after {@code :closedSince}, or aUEC while the fingerprint says {@code
+   * settlementOpen}.
    */
   String CLIENT_WINDOW =
       "(o.status IN ('OPEN', 'IN_PROGRESS') OR o.closedAt >= :closedSince"
@@ -53,8 +53,8 @@ public interface ExchangeJobOrderFingerprintRepository
    * Reads one page of the member's client set: the orders of the read set inside the window that
    * carry a fingerprint, ascending by id after a given one.
    *
-   * @param relatingUnitIds the active units the member directly belongs to while holding {@code
-   *     KRT Member}
+   * @param relatingUnitIds the active units the member directly belongs to while holding {@code KRT
+   *     Member}
    * @param memberId the member
    * @param afterId the last order delivered, the zero id for the first page
    * @param closedSince the earliest closing instant a terminal order is kept for

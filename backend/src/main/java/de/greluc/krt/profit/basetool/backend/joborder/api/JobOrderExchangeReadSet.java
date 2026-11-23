@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -31,12 +30,12 @@ import org.jetbrains.annotations.Unmodifiable;
  * The member's job-order read set on the exchange (REQ-OXCH-001), decided from the database on
  * every call: the orders to which the member has a current own relation. A unit relation counts
  * through the active units the member directly belongs to while holding {@code KRT Member}; an
- * assignee entry counts by itself. The Profit-wide read, the leadership cascade, contextual
- * grants, the administrator's scope, a pin, the aUEC holder and recipient link, retained historical
- * reads and ended support never count, so the set never exceeds the web's read (REQ-ORDERS-052).
+ * assignee entry counts by itself. The Profit-wide read, the leadership cascade, contextual grants,
+ * the administrator's scope, a pin, the aUEC holder and recipient link, retained historical reads
+ * and ended support never count, so the set never exceeds the web's read (REQ-ORDERS-052).
  *
- * <p>{@link #reads(UUID, UUID)} is the read check the exchange's writes on an existing order pass
- * to the shared commands (ADR-0405, ADR-0407).
+ * <p>The exchange's writes on an existing order pass the same rule to the shared commands as {@link
+ * JobOrderReadCheck#OWN_RELATION} (ADR-0405, ADR-0407).
  */
 public interface JobOrderExchangeReadSet {
 
@@ -64,8 +63,7 @@ public interface JobOrderExchangeReadSet {
       @NotNull RelatingMember member, @NotNull Collection<UUID> orderIds);
 
   /**
-   * Reads the member's own assignee notes on the given orders; another member's note is never
-   * read.
+   * Reads the member's own assignee notes on the given orders; another member's note is never read.
    *
    * @param memberId the acting member
    * @param orderIds the orders
@@ -74,18 +72,6 @@ public interface JobOrderExchangeReadSet {
   @NotNull
   @Unmodifiable
   Map<UUID, String> ownNotes(@NotNull UUID memberId, @NotNull Collection<UUID> orderIds);
-
-  /**
-   * Decides whether one order is in the member's read set; a hidden, an unknown and a deleted order
-   * answer alike.
-   *
-   * @param memberId the acting member
-   * @param orderId the order
-   * @return {@code true} iff the member has a current own relation to the order
-   */
-  default boolean reads(@NotNull UUID memberId, @NotNull UUID orderId) {
-    return relations(relatingMember(memberId), List.of(orderId)).containsKey(orderId);
-  }
 
   /**
    * A member with the units through which their unit relations count.

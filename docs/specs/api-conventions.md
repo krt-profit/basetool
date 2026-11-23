@@ -431,7 +431,7 @@ that silently stops being scanned fails the build instead of quietly shrinking t
 the `bearer-jwt` scheme and the document-wide requirement on it, exactly one anonymous operation
 (`GET /api/v1/terms/document`), one domain tag on every operation, a per-domain operation-count
 floor, no exchange relay path, no dangling `$ref`, and unique schema names (REQ-API-018;
-`OpenApiDocumentAssertions`, `ExposedTypes`); of the relay document exactly the 33 relay
+`OpenApiDocumentAssertions`, `ExposedTypes`); of the relay document exactly the 34 relay
 operations, all `exchange` and none anonymous (REQ-XCH-039).
 
 > [!note] Corrected 2026-10-03
@@ -516,7 +516,7 @@ own.
   an entry no controller needs fails. One published document stays — the frontend generates its
   test types from it; per-domain views are filtered from it. The exchange
   relay surface alone is fenced into its own internal document (REQ-XCH-039), so the `exchange`
-  domain's 33 relay operations are counted there and its member and admin operations here.
+  domain's 34 relay operations are counted there and its member and admin operations here.
 - **Unique schema names.** Every name under `components.schemas` belongs to exactly one exposed Java
   type or an explicit `@Schema(name = …)`. `ExposedTypes` walks every main-source controller's
   handlers — return types, `@RequestBody` / `@RequestPart` parameters, generic arguments, record

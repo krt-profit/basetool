@@ -40,8 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The member's job orders for an exchange client, reachable only from the ingest gateway
- * (REQ-OXCH-002, REQ-OXCH-003). The job-order family switch gates every route here
- * (REQ-OXCH-009).
+ * (REQ-OXCH-002, REQ-OXCH-003). The job-order family switch gates every route here (REQ-OXCH-009).
  */
 @RestController
 @RequestMapping("/api/v1/exchange/job-orders")
@@ -81,7 +80,6 @@ public class ExchangeJobOrderController {
       @RequestParam(defaultValue = "" + ExchangeFeedReader.DEFAULT_LIMIT) int limit,
       @NotNull Authentication authentication) {
     return ResponseEntity.ok(
-        readService.page(
-            ExchangeCaller.of((SubjectAuthentication) authentication), cursor, limit));
+        readService.page(ExchangeCaller.of((SubjectAuthentication) authentication), cursor, limit));
   }
 }

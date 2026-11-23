@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReadSet;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRelation;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
@@ -176,7 +177,7 @@ class JobOrderExchangeReadSetIntegrationTest {
     seat(member, dormant, MembershipRole.MEMBER);
     JobOrder order = order(other, dormant, JobOrderType.MATERIAL);
 
-    assertThat(readSet.reads(member.getId(), order.getId())).isFalse();
+    assertThat(relationsOf(member, order)).isEmpty();
   }
 
   @Test
@@ -207,8 +208,25 @@ class JobOrderExchangeReadSetIntegrationTest {
     seat(member, own, MembershipRole.MEMBER);
     JobOrder hidden = order(other, third, JobOrderType.MATERIAL);
 
-    assertThat(readSet.reads(member.getId(), UUID.randomUUID())).isFalse();
-    assertThat(readSet.reads(member.getId(), hidden.getId())).isFalse();
+    assertThat(
+            readSet.relations(
+                readSet.relatingMember(member.getId()), List.of(UUID.randomUUID(), hidden.getId())))
+        .isEmpty();
+  }
+
+  @Test
+  void theOwnRelationReadCheckDecidesTheReadSetOfTheRequestsMember() {
+    User member = member(true, false);
+    seat(member, own, MembershipRole.MEMBER);
+    JobOrder requested = order(other, own, JobOrderType.AUEC);
+    JobOrder foreign = order(other, third, JobOrderType.AUEC);
+
+    assertThat(accessPolicy.canRead(JobOrderReadCheck.OWN_RELATION, requested))
+        .as("a request without a member")
+        .isFalse();
+    authenticateForTheWeb(member);
+    assertThat(accessPolicy.canRead(JobOrderReadCheck.OWN_RELATION, requested)).isTrue();
+    assertThat(accessPolicy.canRead(JobOrderReadCheck.OWN_RELATION, foreign)).isFalse();
   }
 
   @Test

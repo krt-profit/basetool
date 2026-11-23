@@ -624,8 +624,7 @@ class ExchangeGoldenAnswerTest {
             fixture("bank-request-write--written/valid/pending.json");
         case "POST /api/v1/exchange/bank/requests/{id}/cancel" ->
             fixture("bank-request-write--cancelled/valid/cancelled.json");
-        case "GET /api/v1/exchange/job-orders" ->
-            fixture("page--jobOrderPage/valid/snapshot.json");
+        case "GET /api/v1/exchange/job-orders" -> fixture("page--jobOrderPage/valid/snapshot.json");
         case "POST /api/v1/exchange/me/drafts/blueprints" -> PREVIEW;
         case "POST /api/v1/exchange/me/drafts/refinery-orders" -> REFINERY_DRAFT;
         default -> "{\"code\":\"NOT_FOUND\"}";

@@ -36,9 +36,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Decides the member's exchange read set from the database: the units come from the member's
- * direct memberships on active units while they hold {@code KRT Member} (REQ-SEC-015,
- * REQ-ORG-032), the relations from the shared predicates of {@code JobOrderScope}.
+ * Decides the member's exchange read set from the database: the units come from the member's direct
+ * memberships on active units while they hold {@code KRT Member} (REQ-SEC-015, REQ-ORG-032), the
+ * relations from the shared predicates of {@code JobOrderScope}. The access policy decides the read
+ * check {@code JobOrderReadCheck.OWN_RELATION} through it.
  */
 @Service
 @RequiredArgsConstructor

@@ -59,9 +59,11 @@ database, as the org stock (ADR-0257) and the bank (ADR-0354) do.
      relation implies the web's read, so the set is decided as the relation; a test pins that it
      never exceeds the web's read for the same member.
    - The relation predicates live once in `JobOrderScope` and are served by the port
-     `JobOrderExchangeReadSet` (`joborder.api`): the snapshot pages through them, and its
-     `reads(member, order)` is the read check the exchange's writes on an existing order pass to
-     the shared commands of ADR-0405. A hidden, an unknown and a deleted order answer alike.
+     `JobOrderExchangeReadSet` (`joborder.api`), through which the snapshot pages. The same rule is
+     the read-check value `JobOrderReadCheck.OWN_RELATION` of ADR-0405, decided by the access
+     policy for the request's acting member; the exchange's writes on an existing order pass it to
+     the shared status, target and information commands. A hidden, an unknown and a deleted order
+     answer alike.
    - **Writing** follows the Logistician of the requesting unit (`DIRECT_LOGISTICIAN`, ADR-0405).
 4. **Nothing of the responsible side, no money and no Bank effect through a client.** A client never
    accepts, processes, hands over, provides, settles, reassigns or deletes an order, never touches
@@ -102,7 +104,7 @@ database, as the org stock (ADR-0257) and the bank (ADR-0354) do.
   change to the gate.
 - The snapshot holds only orders with a fingerprint (ADR-0406), so a new order reaches a client
   through the feed a few seconds after it was created.
-- The write slices pass `JobOrderExchangeReadSet.reads` as the read check; no second copy of the
+- The write slices pass `JobOrderReadCheck.OWN_RELATION` as the read check; no second copy of the
   read rule exists for the writes.
 
 ## Alternatives considered

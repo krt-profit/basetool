@@ -262,7 +262,10 @@ class JobOrderAccessPolicyDifferentialTest {
                       .JobOrderUnitReadHistoryRepository.class),
               org.mockito.Mockito.mock(
                   de.greluc.krt.profit.basetool.backend.joborder.internal
-                      .JobOrderParticipationRepository.class));
+                      .JobOrderParticipationRepository.class),
+              org.mockito.Mockito.mock(
+                  de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReadSet
+                      .class));
     }
 
     private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(String label) {

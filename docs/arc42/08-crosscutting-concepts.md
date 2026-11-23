@@ -624,10 +624,18 @@ Three rules hold for every exchange route, and each new resource or capability i
   backend answer with an undeclared property `502` and counts it `answer_contract_broken`
   (REQ-XCH-050, REQ-P4K-033, ADR-0344). A new outbound integration joins the first two.
 
+- **Job orders read through their own read set.** The acting member reads the job orders of the
+  active units they directly belong to and their own assignee entries, decided from the database on
+  every request — never the web's Profit-wide read, the cascade, a grant or the administrator's
+  scope. One set of JPQL predicates (`JobOrderScope`) serves the snapshot through
+  `JobOrderExchangeReadSet` and the writes' read check `JobOrderReadCheck.OWN_RELATION`; the read
+  serves the fingerprint's projection unchanged plus the member's own part (REQ-OXCH-001,
+  REQ-OXCH-002, ADR-0407).
+
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
 ADR-0221, ADR-0224 … ADR-0228, ADR-0344, and for job orders
-[`orders-exchange.md`](../specs/orders-exchange.md) (`REQ-OXCH-*`) and ADR-0406; the third-party
-view is published from `docs/exchange/`.
+[`orders-exchange.md`](../specs/orders-exchange.md) (`REQ-OXCH-*`), ADR-0406 and ADR-0407; the
+third-party view is published from `docs/exchange/`.
 
 ## 8.14 Domain modules
 

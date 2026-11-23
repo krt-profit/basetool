@@ -240,7 +240,9 @@ class ScopeKernelTest {
                     .JobOrderUnitReadHistoryRepository.class),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal
-                    .JobOrderParticipationRepository.class));
+                    .JobOrderParticipationRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReadSet.class));
   }
 
   /** Makes the given non-admin user the caller, so their own memberships decide their pin. */
