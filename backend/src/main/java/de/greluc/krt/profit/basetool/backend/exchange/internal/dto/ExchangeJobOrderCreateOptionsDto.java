@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientCreateCaps;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -35,9 +37,43 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param suggestedResponsible the canonical Profit area when it is among the responsible units,
  *     else {@code null}
  * @param writesEnabled whether the job-order writes switch is on, so a create can be served
+ * @param limits both caps on client creates and the member's own figures against them
+ *     (REQ-OXCH-009)
  */
 public record ExchangeJobOrderCreateOptionsDto(
     @NotNull @Unmodifiable List<ExchangeOrgUnitDto> requestingUnits,
     @NotNull @Unmodifiable List<ExchangeOrgUnitDto> responsibleUnits,
     @Nullable UUID suggestedResponsible,
-    boolean writesEnabled) {}
+    boolean writesEnabled,
+    @NotNull Limits limits) {
+
+  /**
+   * Both caps on the aUEC orders a member creates through clients and the member's own figures
+   * against them; orders created in the Basetool count for neither.
+   *
+   * @param openOrderCap the open or in-progress client-created orders at which a create answers
+   *     {@code 409 JOB_ORDER_OPEN_ORDER_CAP}
+   * @param openOrders the member's open or in-progress orders created through any client
+   * @param dailyCreateCap the client creates within a UTC day at which a create answers {@code 409
+   *     JOB_ORDER_DAILY_CREATE_CAP}
+   * @param createdToday the orders the member created through clients since the start of the UTC
+   *     day, cancelled ones included
+   */
+  @Schema(name = "ExchangeJobOrderCreateLimits")
+  public record Limits(int openOrderCap, long openOrders, int dailyCreateCap, long createdToday) {
+
+    /**
+     * Copies the job orders' caps and figures into the exchange answer.
+     *
+     * @param limits the caps and the member's figures
+     * @return the same figures in the answer's shape
+     */
+    public static @NotNull Limits of(@NotNull JobOrderClientCreateCaps.Limits limits) {
+      return new Limits(
+          limits.openOrderCap(),
+          limits.openOrders(),
+          limits.dailyCreateCap(),
+          limits.createdToday());
+    }
+  }
+}

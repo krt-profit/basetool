@@ -66,8 +66,8 @@ public class ExchangeJobOrderWriteController {
    * Returns the pairs the member may create an aUEC order for.
    *
    * @param authentication the relayed acting member the gate admitted
-   * @return the member's writer units, the eligible Profit units, the suggestion and the writes
-   *     switch
+   * @return the member's writer units, the eligible Profit units, the suggestion, the writes switch
+   *     and the member's figures against the caps on client creates
    */
   @NotNull
   @GetMapping("/create-options")
@@ -78,8 +78,9 @@ public class ExchangeJobOrderWriteController {
           "Gateway-only. The requesting units are the active units the member directly belongs to"
               + " and is a Logistician of; the responsible units are the eligible Profit units,"
               + " with the canonical Profit area suggested. Both lists are empty when the member"
-              + " may create no order. writesEnabled tells whether a create can be served now."
-              + " Names no member.")
+              + " may create no order. writesEnabled tells whether a create can be served now;"
+              + " limits carries the open-order and daily create caps with the member's own"
+              + " client-created open orders and creates of the UTC day. Names no member.")
   @ApiResponse(responseCode = "200", description = "The create options")
   public ResponseEntity<ExchangeJobOrderCreateOptionsDto> createOptions(
       @NotNull Authentication authentication) {
@@ -104,11 +105,16 @@ public class ExchangeJobOrderWriteController {
           "Gateway-only. Creates an aUEC order with one of the member's direct Logistician units"
               + " as the requesting unit and an eligible Profit unit as the responsible unit,"
               + " through the web's create. A pair that is not among the create options answers"
-              + " 400 JOB_ORDER_UNITS_NOT_OFFERED, naming no side. A create under an idempotency"
-              + " key the client already created an order of the member with answers that order"
-              + " with its current state; changed terms are never applied. Moves no money.")
+              + " 400 JOB_ORDER_UNITS_NOT_OFFERED, naming no side. A member who holds the"
+              + " open-order cap of open orders created through clients is refused with 409"
+              + " JOB_ORDER_OPEN_ORDER_CAP, one who created the daily create cap of orders through"
+              + " clients within the UTC day with 409 JOB_ORDER_DAILY_CREATE_CAP. A create under an"
+              + " idempotency key the client already created an order of the member with answers"
+              + " that order with its current state, whatever the caps; changed terms are never"
+              + " applied. Moves no money.")
   @ApiResponse(responseCode = "201", description = "The created order")
   @ApiResponse(responseCode = "400", description = "The pair is not offered")
+  @ApiResponse(responseCode = "409", description = "The open-order or the daily create cap")
   public ResponseEntity<ExchangeJobOrderCreatedDto> create(
       @NotNull @Valid @RequestBody ExchangeJobOrderCreateDto body,
       @NotNull

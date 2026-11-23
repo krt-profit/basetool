@@ -1485,7 +1485,7 @@
         "x-domain" : "exchange"
       },
       "post" : {
-        "description" : "Gateway-only. Creates an aUEC order with one of the member's direct Logistician units as the requesting unit and an eligible Profit unit as the responsible unit, through the web's create. A pair that is not among the create options answers 400 JOB_ORDER_UNITS_NOT_OFFERED, naming no side. A create under an idempotency key the client already created an order of the member with answers that order with its current state; changed terms are never applied. Moves no money.",
+        "description" : "Gateway-only. Creates an aUEC order with one of the member's direct Logistician units as the requesting unit and an eligible Profit unit as the responsible unit, through the web's create. A pair that is not among the create options answers 400 JOB_ORDER_UNITS_NOT_OFFERED, naming no side. A member who holds the open-order cap of open orders created through clients is refused with 409 JOB_ORDER_OPEN_ORDER_CAP, one who created the daily create cap of orders through clients within the UTC day with 409 JOB_ORDER_DAILY_CREATE_CAP. A create under an idempotency key the client already created an order of the member with answers that order with its current state, whatever the caps; changed terms are never applied. Moves no money.",
         "operationId" : "create_6",
         "parameters" : [ {
           "in" : "header",
@@ -1609,7 +1609,7 @@
     },
     "/api/v1/exchange/job-orders/create-options" : {
       "get" : {
-        "description" : "Gateway-only. The requesting units are the active units the member directly belongs to and is a Logistician of; the responsible units are the eligible Profit units, with the canonical Profit area suggested. Both lists are empty when the member may create no order. writesEnabled tells whether a create can be served now. Names no member.",
+        "description" : "Gateway-only. The requesting units are the active units the member directly belongs to and is a Logistician of; the responsible units are the eligible Profit units, with the canonical Profit area suggested. Both lists are empty when the member may create no order. writesEnabled tells whether a create can be served now; limits carries the open-order and daily create caps with the member's own client-created open orders and creates of the UTC day. Names no member.",
         "operationId" : "createOptions",
         "responses" : {
           "200" : {
@@ -5863,9 +5863,33 @@
         },
         "required" : [ "contact", "requestingUnitId", "responsibleUnitId", "target" ]
       },
+      "ExchangeJobOrderCreateLimits" : {
+        "type" : "object",
+        "properties" : {
+          "createdToday" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "dailyCreateCap" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "openOrderCap" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "openOrders" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "ExchangeJobOrderCreateOptionsDto" : {
         "type" : "object",
         "properties" : {
+          "limits" : {
+            "$ref" : "#/components/schemas/ExchangeJobOrderCreateLimits"
+          },
           "requestingUnits" : {
             "type" : "array",
             "items" : {

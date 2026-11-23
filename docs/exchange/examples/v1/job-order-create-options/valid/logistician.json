@@ -22,5 +22,11 @@
     }
   ],
   "suggestedResponsible": "5a4d0000-0000-4000-8000-000000000102",
-  "writesEnabled": true
+  "writesEnabled": true,
+  "limits": {
+    "openOrderCap": 20,
+    "openOrders": 3,
+    "dailyCreateCap": 20,
+    "createdToday": 1
+  }
 }

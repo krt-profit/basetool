@@ -21,8 +21,8 @@ lifecycle, money and notices, stay in [`orders-core.md`](orders-core.md) and
 in [`external-exchange.md`](external-exchange.md) and [`docs/exchange/errors.md`](../exchange/errors.md).
 The read serves its snapshot and its change feed (`GET /exchange/v1/job-orders`), and a Logistician
 of the requesting unit creates aUEC orders through `GET /exchange/v1/job-orders/create-options` and
-`POST /exchange/v1/job-orders`; the writes on an existing order and the caps follow with their own
-slices. Both switches are off until an admin turns them on.
+`POST /exchange/v1/job-orders`, within an open-order cap and a daily create cap; the writes on an
+existing order follow with their own slices. Both switches are off until an admin turns them on.
 
 The guiding rules:
 
@@ -358,9 +358,8 @@ REQ-OBS-025 · ADR-0224, ADR-0406, ADR-0407 · **Issues:** #3615, #3618, #3643, 
 
 ### REQ-OXCH-004 — Create options and the create of an aUEC order
 
-> [!note] Implemented (#3646; decided in #3611, #3614, #3617, #3619, ADR-0405, ADR-0407). The
-> open-order and daily create caps and `limits` in the create options follow with their slice
-> (REQ-OXCH-009).
+> [!note] Implemented (#3646, the caps and `limits` with #3647; decided in #3611, #3614, #3617,
+> #3618, #3619, ADR-0405, ADR-0407).
 
 **Create options.** `GET /exchange/v1/job-orders/create-options` (`exchange.joborders.write`),
 relayed to `GET /api/v1/exchange/job-orders/create-options`, answers
@@ -370,7 +369,10 @@ rule of REQ-OXCH-001 (`JobOrderCreationOptions.current(DIRECT_LOGISTICIAN, actor
 - `requestingUnits`: the member's writer units, as `{id, name, shorthand, kind}`;
 - `responsibleUnits`: the eligible Profit units, in the same shape;
 - `suggestedResponsible`: the canonical Profit area, the projection's aUEC suggestion;
-- `writesEnabled`: whether the job-order writes switch is on (REQ-OXCH-009).
+- `writesEnabled`: whether the job-order writes switch is on (REQ-OXCH-009);
+- `limits`: `{ openOrderCap, openOrders, dailyCreateCap, createdToday }`, both caps of REQ-OXCH-009
+  with the member's own client-created open orders and creates of the current UTC day, so a client
+  greys out the create before the member fills in the form.
 
 Without a writer unit both lists are empty and `suggestedResponsible` is `null`: the client offers
 no create. The list itself is the writer flag; no other per-unit flag exists, the read names no
@@ -393,7 +395,11 @@ locks, unit resolution, eligible-Profit check, priority, created notice, `orders
 the commit (REQ-XCH-030) and audit event as a web create. Nothing is filled in.
 
 **Order of checks.** Schema (the gateway's schema, then the backend's bean rules) → the idempotency
-lookup → the pair → the insert. A pair that is not permitted — an unknown unit, a requesting unit
+lookup → the pair → the open-order cap → the daily create cap → the insert. A known key answers
+`201` with its order whatever the caps say; a cap refusal (`409 JOB_ORDER_OPEN_ORDER_CAP`,
+`409 JOB_ORDER_DAILY_CREATE_CAP`, REQ-OXCH-009) creates nothing. The lookup and both counts run under
+the member's client-create lock, so two racing creates never both pass a cap. A pair that is not
+permitted — an unknown unit, a requesting unit
 the member does not write for, a responsible unit that is not an eligible Profit unit — answers one
 `400 JOB_ORDER_UNITS_NOT_OFFERED` with a fixed detail that names no side; the client reads the
 create options again and lets the member choose. The command's own refusals (`400` for an unknown
@@ -423,7 +429,8 @@ without the creating member (REQ-NOTIF-008).
 **Monitoring** (REQ-OBS-025). Every create counts on
 `basetool_exchange_writes_total{resource="job_order", outcome}` — `applied` for a create and for a
 retry answered from the stored key, `rejected` for a refusal — and a refused pair also on
-`basetool_exchange_job_order_refused_total{reason="units_not_offered"}`.
+`basetool_exchange_job_order_refused_total{reason="units_not_offered"}`, a cap refusal under
+`open_order_cap` or `daily_create_cap`.
 
 **Acceptance**
 
@@ -446,17 +453,22 @@ retry answered from the stored key, `rejected` for a refusal — and a refused p
 - [x] The gateway checks the body before the relay, relays the key on the create only, and needs
   the write scope for both routes (ingest `ExchangeJobOrderWriteRouteTest`,
   `ExchangeGoldenAnswerTest`, `ExchangeContractTest`, `ExchangeFieldRatchetTest`).
-- [ ] The open-order and daily create caps, and `limits` in the create options, come with their
-  slice.
+- [x] The pair is checked before the caps, the open-order cap before the daily create cap, and a
+  known key answers its order with `201` at either cap; two creates racing for a cap's last slot
+  insert one order (`ExchangeJobOrderCreateTest`).
+- [x] The create options carry `limits` with both caps and the member's own client-created open
+  orders and creates of the UTC day; web creates and another member's creates count for neither
+  (`ExchangeJobOrderCreateTest`, ingest `ExchangeJobOrderWriteRouteTest`, `ExchangeContractTest`).
 
 **Enforced by:** `JobOrderCreateCommand`, `JobOrderAuecCreation`, `JobOrderClientCreateRepository`,
-`JobOrderCreationOptions`, `JobOrderResponsibilityAudit`, `JobOrderExportSections` (job orders) ·
+`JobOrderClientCreateCaps`, `JobOrderCreationOptions`, `JobOrderResponsibilityAudit`,
+`JobOrderExportSections` (job orders) ·
 `ExchangeJobOrderCreateService`, `ExchangeJobOrderWriteController` (backend exchange) ·
 `ExchangeJobOrderWriteController`, `ExchangeRoutes`, `ExchangeRelay.DETAILS` (gateway) ·
 `job-order-write.schema.json`, `job-order-create-options.schema.json` · V448 · **Related:**
 REQ-XCH-020, REQ-XCH-025, REQ-XCH-030, REQ-XCH-048, REQ-ORDERS-053, REQ-AUDIT-001, REQ-NOTIF-008,
-REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005 · ADR-0405, ADR-0407 · **Issues:** #3611,
-#3614, #3617, #3619, #3646
+REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0405, ADR-0407 ·
+**Issues:** #3611, #3614, #3617, #3618, #3619, #3646, #3647
 
 ### REQ-OXCH-005 — Shared rules of the job-order writes
 
@@ -498,11 +510,11 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005 · ADR-0405, ADR-0407 · **
 REQ-XCH-020, REQ-XCH-021, REQ-XCH-022, REQ-XCH-023, REQ-XCH-025, REQ-OXCH-004, REQ-OXCH-009 ·
 ADR-0407 · **Issues:** #3614, #3616, #3646
 
-### REQ-OXCH-009 — The job-order switches
+### REQ-OXCH-009 — The job-order switches and caps
 
-> [!note] Implemented for the two switches and their codes (#3642; decided in #3618, #3621) and for
-> `writesEnabled` in `create-options` (#3646, REQ-OXCH-004). The open-order cap, the daily create
-> cap and `limits` in `create-options` follow with their slice.
+> [!note] Implemented for the two switches and their codes (#3642; decided in #3618, #3621), for
+> `writesEnabled` in `create-options` (#3646, REQ-OXCH-004) and for the open-order cap, the daily
+> create cap and `limits` in `create-options` (#3647).
 
 **Two switches.** Beside the global exchange switch (REQ-XCH-003) and the bank switch
 (REQ-BXCH-006), the settings row carries two job-order switches, each with its own version counter
@@ -547,6 +559,33 @@ global switch keeps the row's version and `updated_at`.
 - A client treats both answers as "wait, then retry", for the job-order area or for its writes only,
   and keeps syncing its other areas.
 
+**The caps on client creates.** Two caps bound the aUEC orders a member creates through clients,
+each counted per member from the orders themselves (`created_by_member_id` and
+`created_by_client_id`, V448), so orders created in the Basetool never count and are never refused:
+
+- **Open-order cap** `app.joborder.exchange.open-order-cap` (default 20, 1 to 1000): the member's
+  orders in `OPEN` or `IN_PROGRESS` created through any client. At the cap the next client create
+  answers `409 JOB_ORDER_OPEN_ORDER_CAP`. Any closing frees the slot, a client cancel as well as a
+  completion or rejection in the web.
+- **Daily create cap** `app.joborder.exchange.daily-create-cap` (default 20, 1 to 1000): the
+  orders the member created through clients since the last UTC midnight, by their creation
+  instant and whatever their status since; a cancelled order still counts. At the cap the next
+  client create answers `409 JOB_ORDER_DAILY_CREATE_CAP`; the gateway adds `Retry-After` with the
+  seconds until the next UTC midnight, from the same day boundary as its daily write quota
+  (`ExchangeRelay.waitsForNextUtcDay`, `ExchangeQuotas#secondsUntilTomorrow`).
+- Both are checked after the pair and before the insert, the open-order cap first, under the
+  member's client-create lock (REQ-OXCH-004); a create under a known key answers `201` whatever the
+  caps say.
+- The caps refuse creates only. Every other job-order write stays possible at either cap, and a
+  cap refusal counts its unit of the daily write quota like every write attempt (REQ-XCH-023).
+- `409`, not `429`: `RATE_LIMITED` and `QUOTA_EXCEEDED` tell a client that the member's whole write
+  budget at that client is spent, while these caps refuse creates only.
+- The bound this gives: a looping client raises at most 20 created and 20 finished notices a day per
+  member for each writer of both units (REQ-NOTIF-008).
+- Both codes pass the relay with their fixed detail (`ExchangeRelay.DETAILS`, REQ-XCH-025).
+- **Visible in advance:** `create-options` carries `limits` (REQ-OXCH-004), the member's own
+  figures only.
+
 **Audit and notice.** Every change of either switch writes `JOB_ORDER_EXCHANGE_SWITCH_CHANGED` with
 `{switch: family|writes, enabled}` in the „Verbundene Anwendungen" audit area (`CONNECTED_APPS`,
 REQ-AUDIT-001), and publishes `JOB_ORDER_EXCHANGE_SWITCHED_ON` or `JOB_ORDER_EXCHANGE_SWITCHED_OFF`
@@ -558,7 +597,9 @@ earlier notice about the same switch, so each switch shows its latest state only
 `basetool_ingest_exchange_refused_total{reason=job_order_exchange_disabled|job_order_writes_disabled}`,
 the backend counts each committed flip on `basetool_exchange_registry_changes_total{action}`
 (`job_order_switch_on` / `_off`, `job_order_writes_switch_on` / `_off`), which
-`JobOrderExchangeSwitchChanged` watches.
+`JobOrderExchangeSwitchChanged` watches. A cap refusal counts on
+`basetool_exchange_job_order_refused_total{reason=open_order_cap|daily_create_cap}`, which
+`JobOrderExchangeCapHit` watches.
 
 **Acceptance**
 
@@ -584,13 +625,21 @@ the backend counts each committed flip on `basetool_exchange_registry_changes_to
   backend `ExchangeGateTest`).
 - [x] `writesEnabled` in `create-options` tells whether the writes switch is on
   (`ExchangeJobOrderCreateTest`).
-- [ ] The open-order cap and the daily create cap, with `409 JOB_ORDER_OPEN_ORDER_CAP`,
-  `409 JOB_ORDER_DAILY_CREATE_CAP` and `limits` in `create-options`, come with their slice.
+- [x] At the open-order cap a client create answers `409 JOB_ORDER_OPEN_ORDER_CAP`, an in-progress
+  order holds its slot and any closing frees it; at the daily create cap it answers
+  `409 JOB_ORDER_DAILY_CREATE_CAP`, cancelled orders included, counted from UTC midnight; both
+  count their refusal reason and a rejected write, and orders created in the web neither count nor
+  are refused (`ExchangeJobOrderCreateTest`).
+- [x] Both codes pass the relay with their fixed detail, and the daily cap's answer carries
+  `Retry-After` until the next UTC midnight (ingest `ExchangeRelayTest`,
+  `ExchangeJobOrderWriteRouteTest`, both `ExchangeRelaySeamParityTest`s, `ExchangeContractTest`).
 
 **Enforced by:** `ExchangeGate`, `JobOrderExchangeRoutes`, `ExchangeSwitch`,
 `ExchangeRegistryService#updateJobOrdersSwitch`, `#updateJobOrderWritesSwitch`,
-`ExchangeRegistrySnapshot`, `ExchangeJobOrderMetrics` (backend) · `ExchangeGateFilter`,
-`ExchangeRoutes#isJobOrder`, `ExchangeRegistryReader`, `ExchangeRelay` (gateway) ·
-`ExchangeSeam.GATE_STATUSES`, `ExchangeSeam.REGISTRY_DOCUMENT_FIELDS` (shared seam) · V444 ·
-**Related:** REQ-XCH-003, REQ-XCH-023, REQ-XCH-025, REQ-BXCH-006, REQ-AUDIT-001, REQ-NOTIF-028,
-REQ-OBS-025 · **Issues:** #3618, #3621, #3642
+`ExchangeRegistrySnapshot`, `ExchangeJobOrderMetrics`, `ExchangeJobOrderCreateService` (backend) ·
+`JobOrderClientCreateCapService`, `JobOrderExchangeProperties`, `JobOrderClientCreateRepository`
+(job orders) · `ExchangeGateFilter`, `ExchangeRoutes#isJobOrder`, `ExchangeRegistryReader`,
+`ExchangeRelay`, `ExchangeRelayResponses` (gateway) · `ExchangeSeam.GATE_STATUSES`,
+`ExchangeSeam.PASSED_THROUGH_CODES`, `ExchangeSeam.REGISTRY_DOCUMENT_FIELDS` (shared seam) · V444 ·
+**Related:** REQ-XCH-003, REQ-XCH-023, REQ-XCH-025, REQ-BXCH-006, REQ-AUDIT-001, REQ-NOTIF-008,
+REQ-NOTIF-028, REQ-OXCH-004, REQ-OBS-025 · **Issues:** #3618, #3621, #3642, #3647

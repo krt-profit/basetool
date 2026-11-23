@@ -1895,6 +1895,11 @@ pass. A typical to heavy member writes 2 to 20 job orders a day, 0.4 % to 4 % of
 is one request and one unit, and a write the job-order switches refuse counts none (REQ-OXCH-009).
 A cached create answer takes about 1 KiB for the hour; the order keeps the create's key in
 PostgreSQL. The buckets, the default quota and the byte budgets therefore stay as they are.
+Two caps of their own bound a member's client creates below the quota (REQ-OXCH-009): at most
+20 open orders created through clients (`409 JOB_ORDER_OPEN_ORDER_CAP`) and at most 20 client
+creates a UTC day, cancelled ones included (`409 JOB_ORDER_DAILY_CREATE_CAP` with `Retry-After`
+until the next UTC midnight). A cap refusal counts its unit like every write attempt; the caps
+refuse creates only, so they answer `409` and not the quota's `429`.
 
 **When a refused write may retry.** The sets are scored by expiry, so the refusal's
 `Retry-After` is read from them: for every scope the write's charge would overflow, the gateway
@@ -1975,6 +1980,14 @@ A client that cannot set its `User-Agent` — a Chromium browser extension — s
 
 ### REQ-XCH-025 — Errors are problem+json with a stable code
 
+> [!note] Amended 2026-11-23 (REQ-OXCH-009) — the job-order caps pass through
+> A job-order create at a cap on client creates is refused by the backend with
+> `409 JOB_ORDER_OPEN_ORDER_CAP` or `409 JOB_ORDER_DAILY_CREATE_CAP`; the relay passes both with
+> their fixed detail (`ExchangeRelay.DETAILS`), and the gateway adds `Retry-After` with the seconds
+> until the next UTC midnight to the daily cap's answer (`ExchangeRelay.waitsForNextUtcDay`), since
+> the relay carries no backend header
+> ([REQ-OXCH-009](orders-exchange.md#req-oxch-009--the-job-order-switches-and-caps)).
+
 > [!note] Amended 2026-11-23 (REQ-OXCH-004) — `JOB_ORDER_UNITS_NOT_OFFERED` passes through
 > A job-order create whose pair the create options do not offer is refused by the backend with
 > `400 JOB_ORDER_UNITS_NOT_OFFERED`, one code for every side; the relay passes it with its fixed
@@ -1985,7 +1998,7 @@ A client that cannot set its `User-Agent` — a Chromium browser extension — s
 > `503 JOB_ORDER_EXCHANGE_DISABLED` and `503 JOB_ORDER_WRITES_DISABLED` join the codes the backend's
 > `@exchangeGate` re-checks with the gateway's own code and status; the relay passes each only with
 > `503` (`ExchangeRelay.GATE_STATUSES`), with the gateway gate's detail and `Retry-After: 300`, as
-> it does `BANK_EXCHANGE_DISABLED` ([REQ-OXCH-009](orders-exchange.md#req-oxch-009--the-job-order-switches)).
+> it does `BANK_EXCHANGE_DISABLED` ([REQ-OXCH-009](orders-exchange.md#req-oxch-009--the-job-order-switches-and-caps)).
 
 > [!note] Amended 2026-11-14 (REQ-PATCH-023) — `RELOCATION_PENDING` passes through
 > A change set that writes a stock lot or ship a pending relocation locks is refused by the backend

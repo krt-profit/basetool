@@ -258,7 +258,10 @@ implementations stay in `joborder.internal` (ADR-0405). So are the cancel
 change (`JobOrderInformationCommand`), which also take a `JobOrderReadCheck`. So is the
 member-independent exchange read (`JobOrderExchangeReads`): the exchange's fingerprint worker
 hashes it and the client read serves it, while the projection stays in `joborder.internal` and the
-fingerprint and its dirty marks are the exchange's tables (ADR-0406).
+fingerprint and its dirty marks are the exchange's tables (ADR-0406). So are the caps on client
+creates (`JobOrderClientCreateCaps`): the exchange reads the member's figures for its create
+options and maps the create command's `JobOrderClientCreateCapException` to its own codes, while
+the counts and their properties stay in `joborder.internal` (REQ-OXCH-009).
 
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay

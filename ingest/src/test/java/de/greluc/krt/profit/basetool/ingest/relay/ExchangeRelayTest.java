@@ -46,6 +46,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -226,6 +227,22 @@ class ExchangeRelayTest {
         .isEqualTo("BACKEND_RELAY_FAILED");
     assertThat(interpret(502, "{\"code\":\"EXTERNAL_SERVICE_ERROR\"}").status()).isEqualTo(502);
     assertThat(count("failed")).isEqualTo(5.0d);
+  }
+
+  @Test
+  void theJobOrderCapsPassWithTheirFixedDetailAndOnlyTheDailyCapWaitsForTheNextUtcDay() {
+    for (String cap : List.of("JOB_ORDER_OPEN_ORDER_CAP", "JOB_ORDER_DAILY_CREATE_CAP")) {
+      ExchangeRelay.Result result =
+          interpret(409, "{\"code\":\"" + cap + "\",\"detail\":\"Backend words.\"}");
+
+      assertThat(result.status()).isEqualTo(409);
+      assertThat(result.code()).isEqualTo(cap);
+      assertThat(result.detail()).isNotBlank().doesNotContain("Backend words.");
+      assertThat(ExchangeRelay.retryAfterSeconds(cap)).isNull();
+    }
+    assertThat(ExchangeRelay.waitsForNextUtcDay("JOB_ORDER_DAILY_CREATE_CAP")).isTrue();
+    assertThat(ExchangeRelay.waitsForNextUtcDay("JOB_ORDER_OPEN_ORDER_CAP")).isFalse();
+    assertThat(ExchangeRelay.waitsForNextUtcDay(null)).isFalse();
   }
 
   @Test

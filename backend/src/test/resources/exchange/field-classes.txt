@@ -346,6 +346,10 @@ job-order-auec.schema.json#/properties/overpaid FACT_VALUE
 job-order-auec.schema.json#/properties/remaining FACT_VALUE
 job-order-auec.schema.json#/properties/settlementOpen FACT_VALUE
 job-order-auec.schema.json#/properties/target FACT_VALUE
+job-order-create-options.schema.json#/properties/limits/properties/createdToday FACT_VALUE
+job-order-create-options.schema.json#/properties/limits/properties/dailyCreateCap FACT_VALUE
+job-order-create-options.schema.json#/properties/limits/properties/openOrderCap FACT_VALUE
+job-order-create-options.schema.json#/properties/limits/properties/openOrders FACT_VALUE
 job-order-create-options.schema.json#/properties/suggestedResponsible IDENTIFIER
 job-order-create-options.schema.json#/properties/writesEnabled FACT_VALUE
 job-order-item.schema.json#/properties/contact IDENTIFIER

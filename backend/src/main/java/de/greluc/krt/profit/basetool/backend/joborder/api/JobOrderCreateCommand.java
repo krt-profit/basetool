@@ -35,9 +35,11 @@ public interface JobOrderCreateCommand {
    * Creates an aUEC order and its target at most once per client, member and key, in one
    * transaction joining the caller's (REQ-OXCH-004). Under the member's client-create lock it first
    * looks for the order the client created for the member under the key and answers that one,
-   * applying none of the given terms. Otherwise, under the order locks, it resolves both units,
-   * requires the responsible one to be an eligible Profit unit, rechecks the pair with the given
-   * rule and stores the client, the member and the key on the new order; nothing is filled in.
+   * applying none of the given terms and passing no cap. Otherwise, under the order locks, it
+   * resolves both units, requires the responsible one to be an eligible Profit unit, rechecks the
+   * pair with the given rule, counts the member's client-created orders against the open-order cap
+   * and then the daily create cap (REQ-OXCH-009) and stores the client, the member and the key on
+   * the new order; nothing is filled in.
    *
    * @param order the pair, contact, comment and target
    * @param rule the authority that decides whether the actor writes the pair
@@ -48,6 +50,8 @@ public interface JobOrderCreateCommand {
    *     or the responsible unit is not an eligible Profit unit
    * @throws org.springframework.security.access.AccessDeniedException when the rule does not let
    *     the actor write the pair
+   * @throws JobOrderClientCreateCapException when the member holds the open-order cap or reached
+   *     the daily create cap
    */
   @NotNull
   UUID createAuec(

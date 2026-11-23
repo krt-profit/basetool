@@ -471,7 +471,9 @@ public final class ExchangeSeam {
           "HOME_LOCATION_ALREADY_CHOSEN",
           "HOME_LOCATION_PHASE_CHANGED",
           "HOME_LOCATION_NOT_OFFERED",
-          "JOB_ORDER_UNITS_NOT_OFFERED");
+          "JOB_ORDER_UNITS_NOT_OFFERED",
+          "JOB_ORDER_OPEN_ORDER_CAP",
+          "JOB_ORDER_DAILY_CREATE_CAP");
 
   /** The backend-wide codes the gateway translates into a code of the exchange registry. */
   public static final @Unmodifiable Map<String, String> TRANSLATED_CODES =

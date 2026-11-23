@@ -348,7 +348,9 @@ class ExchangeRelaySeamParityTest {
             (String) staticField(PendingApprovalAccessFilter.class, "CODE_NO_ROLE"),
             (String) staticField(ActingMemberFilter.class, "CODE_ACTING_MEMBER_REFUSED"),
             ExchangeProblemException.cursorExpired().code(),
-            ExchangeProblemException.massChangeConfirmationRequired().code());
+            ExchangeProblemException.massChangeConfirmationRequired().code(),
+            ExchangeProblemException.jobOrderOpenOrderCap(new IllegalStateException("x")).code(),
+            ExchangeProblemException.jobOrderDailyCreateCap(new IllegalStateException("x")).code());
     assertThat(passedThrough).containsAll(passed);
     assertThat(
             Set.of(

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.web;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -47,9 +48,15 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LivesyncMetricNames;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -72,6 +79,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -83,8 +91,9 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * The create options and the create of aUEC orders under {@code exchange.joborders.write}: the pair
  * a member may create for, the one refusal of any other pair, the stored idempotency key, the audit
- * type of a client's create, its notice and queue frame, and the order landing in the member's read
- * set (REQ-OXCH-001, REQ-OXCH-004, REQ-OXCH-005).
+ * type of a client's create, its notice and queue frame, the order landing in the member's read
+ * set, and the open-order and daily create caps with the limits in the create options
+ * (REQ-OXCH-001, REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-009).
  */
 @SpringBootTest
 class ExchangeJobOrderCreateTest {
@@ -97,6 +106,12 @@ class ExchangeJobOrderCreateTest {
   private static final String READ = "exchange.joborders.read";
   private static final String CREATED_SCHEMA = "job-order-write.schema.json#/$defs/created";
   private static final String OPTIONS_SCHEMA = "job-order-create-options.schema.json";
+
+  /** The default open-order cap of REQ-OXCH-009. */
+  private static final int OPEN_ORDER_CAP = 20;
+
+  /** The default daily create cap of REQ-OXCH-009. */
+  private static final int DAILY_CREATE_CAP = 20;
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
@@ -164,7 +179,10 @@ class ExchangeJobOrderCreateTest {
   void tearDown() {
     List<UUID> created =
         jdbc.queryForList(
-            "SELECT id FROM job_order WHERE created_by_client_id = ?", UUID.class, client);
+            "SELECT id FROM job_order WHERE created_by_client_id = ? OR requesting_org_unit_id = ?",
+            UUID.class,
+            client,
+            requesting);
     created.forEach(id -> {
       jdbc.update("DELETE FROM notification WHERE entity_id = ?", id);
       jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", id);
@@ -288,10 +306,7 @@ class ExchangeJobOrderCreateTest {
   void aRetryAfterALostAnswerCarriesTheOrdersCurrentState() throws Exception {
     String key = key();
     UUID first = createdId(create(logistician, body(requesting, responsible, 250_000L), key));
-    jdbc.update(
-        "UPDATE job_order SET status = 'CANCELLED', priority = NULL, closed_at = now(),"
-            + " lifecycle_version = lifecycle_version + 1 WHERE id = ?",
-        first);
+    close(List.of(first), "CANCELLED");
 
     MockHttpServletResponse retry =
         create(logistician, body(requesting, responsible, 250_000L), key);
@@ -316,26 +331,13 @@ class ExchangeJobOrderCreateTest {
   @Test
   void twoRacingCreatesUnderOneKeyInsertOneOrder() throws Exception {
     String key = key();
-    String body = body(requesting, responsible, 250_000L);
-    CountDownLatch start = new CountDownLatch(1);
-    List<Future<MockHttpServletResponse>> calls = new ArrayList<>();
-    try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
-      for (int i = 0; i < 2; i++) {
-        calls.add(
-            pool.submit(() -> {
-              start.await();
-              return create(logistician, body, key);
-            }));
-      }
-      start.countDown();
-      Set<String> ids = new HashSet<>();
-      for (Future<MockHttpServletResponse> call : calls) {
-        MockHttpServletResponse response = call.get();
-        assertThat(response.getStatus()).isEqualTo(201);
-        ids.add(objectMapper.readTree(response.getContentAsString()).get("id").asString());
-      }
-      assertThat(ids).hasSize(1);
+
+    Set<UUID> ids = new HashSet<>();
+    for (MockHttpServletResponse response : racing(List.of(key, key))) {
+      ids.add(createdId(response));
     }
+
+    assertThat(ids).hasSize(1);
     assertThat(createdOrders()).hasSize(1);
     assertThat(clientAudits()).hasSize(1);
   }
@@ -530,6 +532,241 @@ class ExchangeJobOrderCreateTest {
 
     assertThat(response.getStatus()).isEqualTo(403);
     assertThat(createdOrders()).isEmpty();
+  }
+
+  @Test
+  void aCreateAtTheOpenOrderCapIsRefusedAndCountedAndCreatesNothing() throws Exception {
+    createdAt(createOrders(OPEN_ORDER_CAP), Instant.now().minus(Duration.ofDays(1)));
+    Counter capRefusals = refusals("open_order_cap");
+    Counter rejected = writes(client, "rejected");
+    double capRefusalsBefore = capRefusals.count();
+    double rejectedBefore = rejected.count();
+
+    MockHttpServletResponse response =
+        create(logistician, body(requesting, responsible, 1L), key());
+
+    assertCapRefusal(response, "JOB_ORDER_OPEN_ORDER_CAP");
+    assertThat(createdOrders()).hasSize(OPEN_ORDER_CAP);
+    assertThat(clientAudits()).hasSize(OPEN_ORDER_CAP);
+    assertThat(capRefusals.count()).isEqualTo(capRefusalsBefore + 1);
+    assertThat(rejected.count()).isEqualTo(rejectedBefore + 1);
+  }
+
+  @Test
+  void cancelledOrdersStillCountForTheDailyCreateCap() throws Exception {
+    close(createOrders(DAILY_CREATE_CAP), "CANCELLED");
+    Counter capRefusals = refusals("daily_create_cap");
+    double capRefusalsBefore = capRefusals.count();
+
+    MockHttpServletResponse response =
+        create(logistician, body(requesting, responsible, 1L), key());
+
+    assertCapRefusal(response, "JOB_ORDER_DAILY_CREATE_CAP");
+    assertThat(createdOrders()).hasSize(DAILY_CREATE_CAP);
+    assertThat(capRefusals.count()).isEqualTo(capRefusalsBefore + 1);
+  }
+
+  @Test
+  void atBothCapsTheOpenOrderCapAnswers() throws Exception {
+    createOrders(OPEN_ORDER_CAP);
+
+    assertCapRefusal(
+        create(logistician, body(requesting, responsible, 1L), key()), "JOB_ORDER_OPEN_ORDER_CAP");
+  }
+
+  @Test
+  void anInProgressOrderHoldsAnOpenSlotAndAnyClosingFreesIt() throws Exception {
+    List<UUID> orders = createOrders(OPEN_ORDER_CAP);
+    createdAt(orders, Instant.now().minus(Duration.ofDays(1)));
+    jdbc.update("UPDATE job_order SET status = 'IN_PROGRESS' WHERE id = ?", orders.getFirst());
+    assertCapRefusal(
+        create(logistician, body(requesting, responsible, 1L), key()), "JOB_ORDER_OPEN_ORDER_CAP");
+
+    close(List.of(orders.getFirst()), "COMPLETED");
+
+    createdId(create(logistician, body(requesting, responsible, 1L), key()));
+    assertThat(createdOrders()).hasSize(OPEN_ORDER_CAP + 1);
+  }
+
+  @Test
+  void aKnownKeyAnswersItsOrderWhateverTheCaps() throws Exception {
+    String key = key();
+    UUID first = createdId(create(logistician, body(requesting, responsible, 250_000L), key));
+    createOrders(OPEN_ORDER_CAP - 1);
+
+    MockHttpServletResponse retry = create(logistician, body(requesting, responsible, 1L), key);
+
+    assertThat(createdId(retry)).isEqualTo(first);
+    assertThat(objectMapper.readTree(retry.getContentAsString()).get("target").asLong())
+        .isEqualTo(250_000L);
+    assertThat(createdOrders()).hasSize(OPEN_ORDER_CAP);
+  }
+
+  @Test
+  void twoCreatesRacingForTheLastOpenSlotInsertOneOrder() throws Exception {
+    createdAt(createOrders(OPEN_ORDER_CAP - 1), Instant.now().minus(Duration.ofDays(1)));
+
+    assertOneWinsTheRace(racing(List.of(key(), key())), "JOB_ORDER_OPEN_ORDER_CAP");
+    assertThat(createdOrders()).hasSize(OPEN_ORDER_CAP);
+  }
+
+  @Test
+  void twoCreatesRacingForTheLastDailySlotInsertOneOrder() throws Exception {
+    close(createOrders(DAILY_CREATE_CAP - 1), "CANCELLED");
+
+    assertOneWinsTheRace(racing(List.of(key(), key())), "JOB_ORDER_DAILY_CREATE_CAP");
+    assertThat(createdOrders()).hasSize(DAILY_CREATE_CAP);
+  }
+
+  @Test
+  void ordersCreatedInTheWebNeitherCountNorAreRefused() throws Exception {
+    createOrders(OPEN_ORDER_CAP - 1);
+    webCreate();
+    webCreate();
+
+    createdId(create(logistician, body(requesting, responsible, 1L), key()));
+
+    webCreate();
+    assertThat(createdOrders()).hasSize(OPEN_ORDER_CAP);
+  }
+
+  @Test
+  void theDailyCreateCapCountsFromUtcMidnight() throws Exception {
+    LocalDate today = LocalDate.now(ZoneOffset.UTC);
+    Instant midnight = today.atStartOfDay(ZoneOffset.UTC).toInstant();
+    List<UUID> orders = createOrders(DAILY_CREATE_CAP);
+    close(orders, "CANCELLED");
+    createdAt(orders, midnight.minus(1, ChronoUnit.MICROS));
+
+    createdId(create(logistician, body(requesting, responsible, 1L), key()));
+    createdAt(orders.subList(0, DAILY_CREATE_CAP - 1), midnight);
+    MockHttpServletResponse response =
+        create(logistician, body(requesting, responsible, 1L), key());
+
+    assumeThat(LocalDate.now(ZoneOffset.UTC)).as("the UTC day did not change").isEqualTo(today);
+    assertCapRefusal(response, "JOB_ORDER_DAILY_CREATE_CAP");
+  }
+
+  @Test
+  void theCreateOptionsCarryTheMembersOwnFiguresAgainstBothCaps() throws Exception {
+    List<UUID> orders = createOrders(3);
+    close(orders.subList(0, 1), "CANCELLED");
+    createdAt(orders.subList(1, 2), Instant.now().minus(Duration.ofDays(1)));
+    webCreate();
+    UUID colleague = user("create-options-colleague", false);
+    seat(colleague, requesting, "MEMBER", true);
+    createdId(create(colleague, body(requesting, responsible, 1L), key()));
+
+    MockHttpServletResponse response =
+        mockMvc.perform(relayed(get(OPTIONS), logistician, WRITE)).andReturn().getResponse();
+
+    ExchangePublishedSchemas.assertMatches(
+        OPTIONS_SCHEMA, response.getContentAsString(), "the create options");
+    JsonNode limits = objectMapper.readTree(response.getContentAsString()).get("limits");
+    assertThat(limits.propertyNames())
+        .containsExactlyInAnyOrder("openOrderCap", "openOrders", "dailyCreateCap", "createdToday");
+    assertThat(limits.get("openOrderCap").asInt()).isEqualTo(OPEN_ORDER_CAP);
+    assertThat(limits.get("openOrders").asInt()).isEqualTo(2);
+    assertThat(limits.get("dailyCreateCap").asInt()).isEqualTo(DAILY_CREATE_CAP);
+    assertThat(limits.get("createdToday").asInt()).isEqualTo(2);
+  }
+
+  private void assertOneWinsTheRace(
+      @NotNull List<MockHttpServletResponse> answers, @NotNull String code) throws Exception {
+    assertThat(answers)
+        .extracting(MockHttpServletResponse::getStatus)
+        .containsExactlyInAnyOrder(201, 409);
+    for (MockHttpServletResponse answer : answers) {
+      if (answer.getStatus() == 409) {
+        assertCapRefusal(answer, code);
+      }
+    }
+  }
+
+  private @NotNull List<MockHttpServletResponse> racing(@NotNull List<String> keys)
+      throws Exception {
+    String body = body(requesting, responsible, 250_000L);
+    CountDownLatch start = new CountDownLatch(1);
+    List<Future<MockHttpServletResponse>> calls = new ArrayList<>();
+    List<MockHttpServletResponse> answers = new ArrayList<>();
+    try (ExecutorService pool = Executors.newFixedThreadPool(keys.size())) {
+      for (String key : keys) {
+        calls.add(
+            pool.submit(() -> {
+              start.await();
+              return create(logistician, body, key);
+            }));
+      }
+      start.countDown();
+      for (Future<MockHttpServletResponse> call : calls) {
+        answers.add(call.get());
+      }
+    }
+    return answers;
+  }
+
+  private void webCreate() throws Exception {
+    MockHttpServletResponse response =
+        mockMvc
+            .perform(
+                post("/api/v1/orders/auec")
+                    .with(
+                        jwt()
+                            .jwt(t -> t.subject(logistician.toString()))
+                            .authorities(
+                                new SimpleGrantedAuthority(Roles.authority(Roles.KRT_MEMBER)),
+                                new SimpleGrantedAuthority(Roles.authority(Roles.LOGISTICIAN)),
+                                new OrgUnitContextualAuthority(Roles.LOGISTICIAN, requesting)))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            Map.of(
+                                "responsibleOrgUnitId",
+                                responsible,
+                                "requestingOrgUnitId",
+                                requesting,
+                                "handle",
+                                "Web contact",
+                                "target",
+                                "1"))))
+            .andReturn()
+            .getResponse();
+    assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(201);
+  }
+
+  private void assertCapRefusal(@NotNull MockHttpServletResponse response, @NotNull String code)
+      throws Exception {
+    assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(409);
+    assertThat(objectMapper.readTree(response.getContentAsString()).get("code").asString())
+        .isEqualTo(code);
+  }
+
+  private @NotNull List<UUID> createOrders(int count) throws Exception {
+    List<UUID> ids = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      ids.add(createdId(create(logistician, body(requesting, responsible, 1L), key())));
+    }
+    return ids;
+  }
+
+  private void close(@NotNull List<UUID> orders, @NotNull String status) {
+    orders.forEach(id ->
+        jdbc.update(
+            "UPDATE job_order SET status = ?, priority = NULL, closed_at = now(),"
+                + " lifecycle_version = lifecycle_version + 1 WHERE id = ?",
+            status,
+            id));
+  }
+
+  private void createdAt(@NotNull List<UUID> orders, @NotNull Instant instant) {
+    orders.forEach(id ->
+        jdbc.update(
+            "UPDATE job_order SET created_at = ? WHERE id = ?", Timestamp.from(instant), id));
+  }
+
+  private @NotNull Counter refusals(@NotNull String reason) {
+    return meterRegistry.counter(
+        ExchangeMetricNames.EXCHANGE_JOB_ORDER_REFUSED, MetricNames.TAG_REASON, reason);
   }
 
   private void assertNotOffered(@NotNull UUID member, @NotNull String body) throws Exception {
