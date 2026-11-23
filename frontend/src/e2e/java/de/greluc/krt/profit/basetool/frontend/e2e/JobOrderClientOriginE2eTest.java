@@ -80,7 +80,7 @@ class JobOrderClientOriginE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, USERNAME, PASSWORD);
-        E2eSupport.navigate(page, baseUrl + "/orders?lang=de");
+        E2eSupport.navigate(page, baseUrl + "/orders?lang=de&type=AUEC");
         Locator row = page.locator("[data-testid='order-row'][data-id='" + orderId + "']");
         assertThat(row.getByTestId("order-created-client")).hasText(CHIP);
 
