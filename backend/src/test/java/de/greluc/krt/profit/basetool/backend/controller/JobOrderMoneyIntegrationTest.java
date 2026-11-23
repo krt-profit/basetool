@@ -49,8 +49,10 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -1588,6 +1590,53 @@ class JobOrderMoneyIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"OPEN\",\"version\":4}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void closingInstantFollowsHandoverTargetChangesAndStatusWrites() throws Exception {
+    UUID order = createOrder();
+    String source = providedHolder(order, reader(), "12000000");
+    String recipient = designateRecipient(order, writer(), Map.of("holderId", source));
+    assertThat(closedAt(order)).isNull();
+
+    Instant beforeHandover = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    submitMovement(
+        order,
+        reader(),
+        movementTerms(
+            "PURPOSE_HANDOVER",
+            source,
+            1,
+            "11000000",
+            "0",
+            Map.of("recipientId", recipient, "targetVersion", 0)));
+    assertMoney(order, "12000000", "1000000", "11000000", "0", "COMPLETED");
+    Instant handedOver = closedAt(order);
+    assertThat(handedOver).isBetween(beforeHandover, Instant.now());
+
+    mvc.perform(targetRequest(order, "12000000", 0)).andExpect(status().isOk());
+    assertMoney(order, "12000000", "1000000", "11000000", "1000000", "IN_PROGRESS");
+    assertThat(closedAt(order)).isNull();
+
+    mvc.perform(targetRequest(order, "8000000", 1)).andExpect(status().isOk());
+    assertMoney(order, "12000000", "1000000", "11000000", "0", "COMPLETED");
+    assertThat(closedAt(order)).isAfter(handedOver);
+
+    UUID other = createOrder();
+    Instant beforeCancellation = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    setMoneyStatus(other, "CANCELLED", 0);
+    assertThat(closedAt(other)).isBetween(beforeCancellation, Instant.now());
+    setMoneyStatus(other, "OPEN", 1);
+    assertThat(closedAt(other)).isNull();
+    Instant beforeRejection = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    setMoneyStatus(other, "REJECTED", 2);
+    assertThat(closedAt(other)).isBetween(beforeRejection, Instant.now());
+  }
+
+  private @Nullable Instant closedAt(UUID order) {
+    Timestamp closed =
+        jdbc.queryForObject("SELECT closed_at FROM job_order WHERE id = ?", Timestamp.class, order);
+    return closed == null ? null : closed.toInstant();
   }
 
   @Test

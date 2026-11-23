@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
@@ -644,12 +645,13 @@ class ExchangeRefineryStoreControllerTest {
     UUID id = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO job_order (id, priority, created_at, updated_at, version, status,"
-            + " requesting_org_unit_id, responsible_org_unit_id, type)"
-            + " VALUES (?, 2, now(), now(), 0, ?, ?, ?, 'MATERIAL')",
+            + " requesting_org_unit_id, responsible_org_unit_id, type, closed_at)"
+            + " VALUES (?, 2, now(), now(), 0, ?, ?, ?, 'MATERIAL', CASE WHEN ? THEN now() END)",
         id,
         status,
         responsible,
-        responsible);
+        responsible,
+        !JobOrderStatus.valueOf(status).isActive());
     jdbc.update(
         """
         INSERT INTO job_order_material (id, job_order_id, material_id, amount, created_at,
