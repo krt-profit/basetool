@@ -188,6 +188,13 @@ a relayed exchange client, otherwise `system` — and the exchange change feed's
 a change reaches the feed with its writer whatever path made it, a bulk path included (ADR-0224,
 `REQ-XCH-013`).
 
+Job orders reach the exchange through a fingerprint instead (ADR-0406, `REQ-OXCH-003`): triggers on
+the order's source tables only insert dirty marks, one per order and transaction, and a worker
+recomputes the hash of each marked order's member-independent exchange read every few seconds after
+the commit, in one `REPEATABLE READ` snapshot, writing it only when it changed. A provision or a
+holder movement therefore never moves the job-order feed, while a hierarchy change that flips
+`responsibilityInvalid` does, because it marks every order of the client set.
+
 Every table has exactly one owning module of the target cut, recorded in a table-ownership map that
 a test holds against the migrated schema; a trigger or native statement reaches another module's
 table only through a listed crossing, and every column a trigger function names must resolve,
@@ -618,7 +625,9 @@ Three rules hold for every exchange route, and each new resource or capability i
   (REQ-XCH-050, REQ-P4K-033, ADR-0344). A new outbound integration joins the first two.
 
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
-ADR-0221, ADR-0224 … ADR-0228, ADR-0344; the third-party view is published from `docs/exchange/`.
+ADR-0221, ADR-0224 … ADR-0228, ADR-0344, and for job orders
+[`orders-exchange.md`](../specs/orders-exchange.md) (`REQ-OXCH-*`) and ADR-0406; the third-party
+view is published from `docs/exchange/`.
 
 ## 8.14 Domain modules
 

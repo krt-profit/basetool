@@ -1,0 +1,98 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - the oldest dirty mark stays older than five minutes
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_job_order_dirty_oldest_age_seconds{job="basetool-backend", instance="backend:11261"}'
+        values: "400x20"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: JobOrderExchangeFeedLagging
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Job-order exchange feed lags behind by over 5 minutes"
+              description: "For 5 minutes the oldest job order marked for a fingerprint recomputation has waited more than 5 minutes, so connected applications see job-order changes late. Either the fingerprint worker stopped (JobOrderFingerprintWorkerStale) or it falls behind the marks (JobOrderFingerprintChurn). Check the backlog and the worker runs in the „Job orders“ row of the Exchange dashboard and the backend log of job_order_exchange_fingerprint; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
+
+  - name: silent - a backlog the worker clears within minutes
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_job_order_dirty_oldest_age_seconds{job="basetool-backend", instance="backend:11261"}'
+        values: "400x3 0x17"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: JobOrderExchangeFeedLagging
+        exp_alerts: []
+
+  - name: fires - the fingerprint worker stopped succeeding
+    interval: 1m
+    input_series:
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{job="basetool-backend", instance="backend:11261", task="job_order_exchange_fingerprint"}'
+        values: "60x40"
+      - series: 'basetool_scheduled_job_enabled{job="basetool-backend", instance="backend:11261", task="job_order_exchange_fingerprint"}'
+        values: "1x40"
+      - series: 'process_start_time_seconds{job="basetool-backend", instance="backend:11261"}'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: JobOrderFingerprintWorkerStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: basetool-backend
+              instance: backend:11261
+              task: job_order_exchange_fingerprint
+            exp_annotations:
+              summary: "Job-order fingerprint worker stale >10m"
+              description: "The job-order fingerprint worker, which runs every few seconds, last succeeded more than 10 minutes ago, or never since the backend started. While it is stale no job-order change reaches the exchange feed, even when nothing is marked. Check the backend log of job_order_exchange_fingerprint for the failing run (ScheduledJobFailureStreak) and the database; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
+
+  - name: silent - a fingerprint worker that keeps succeeding
+    interval: 1m
+    input_series:
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{job="basetool-backend", instance="backend:11261", task="job_order_exchange_fingerprint"}'
+        values: "0+60x40"
+      - series: 'basetool_scheduled_job_enabled{job="basetool-backend", instance="backend:11261", task="job_order_exchange_fingerprint"}'
+        values: "1x40"
+      - series: 'process_start_time_seconds{job="basetool-backend", instance="backend:11261"}'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: JobOrderFingerprintWorkerStale
+        exp_alerts: []
+
+  - name: fires - fingerprints keep changing for hours
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_job_order_fingerprints_total{job="basetool-backend", instance="backend:11261", outcome="changed"}'
+        values: "0+20x300"
+      - series: 'basetool_exchange_job_order_fingerprints_total{job="basetool-backend", instance="backend:11261", outcome="unchanged"}'
+        values: "0+50x300"
+    alert_rule_test:
+      - eval_time: 4h
+        alertname: JobOrderFingerprintChurn
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Job-order fingerprints keep changing"
+              description: "For 2 hours more than 1000 job-order fingerprints an hour changed. A hierarchy change is a single burst, so a sustained rate looks like a trigger loop or a bulk job rewriting carried fields over and over, which floods the exchange feed. Check the changed-against-unchanged recomputations in the „Job orders“ row of the Exchange dashboard and which writes keep marking orders; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
+
+  - name: silent - a hierarchy change is a single burst of changed fingerprints
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_job_order_fingerprints_total{job="basetool-backend", instance="backend:11261", outcome="changed"}'
+        values: "0x10 5000x290"
+      - series: 'basetool_exchange_job_order_fingerprints_total{job="basetool-backend", instance="backend:11261", outcome="unchanged"}'
+        values: "0+50x300"
+    alert_rule_test:
+      - eval_time: 1h30m
+        alertname: JobOrderFingerprintChurn
+        exp_alerts: []
+      - eval_time: 4h
+        alertname: JobOrderFingerprintChurn
+        exp_alerts: []

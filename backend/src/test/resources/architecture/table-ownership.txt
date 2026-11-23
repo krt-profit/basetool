@@ -34,6 +34,8 @@ exchange_client_capability exchange
 exchange_client_revocation exchange
 exchange_feed_horizon exchange
 exchange_installation exchange
+exchange_job_order_dirty exchange
+exchange_job_order_fingerprint exchange
 exchange_journal exchange
 exchange_name_withholding exchange
 exchange_settings exchange

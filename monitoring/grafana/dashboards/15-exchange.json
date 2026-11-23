@@ -1623,6 +1623,194 @@
           }
         }
       ]
+    },
+    {
+      "id": 39,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 141
+      },
+      "type": "timeseries",
+      "title": "Job-order fingerprint backlog",
+      "description": "Job orders marked for a fingerprint recomputation and the age of the oldest mark, sampled every 60 s by the business-metrics collector, not by the worker; an oldest mark above 5 minutes for 5 minutes fires JobOrderExchangeFeedLagging (REQ-OXCH-003, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "max(basetool_exchange_job_order_dirty_count)",
+          "refId": "A",
+          "legendFormat": "marked orders",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "max(basetool_exchange_job_order_dirty_oldest_age_seconds)",
+          "refId": "B",
+          "legendFormat": "oldest mark",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 141
+      },
+      "type": "timeseries",
+      "title": "Job-order fingerprint recomputations/hour",
+      "description": "Job orders the fingerprint worker recomputed per hour, changed against unchanged; only a changed fingerprint moves the job-order feed, and more than 1000 changed an hour for 2 hours fires JobOrderFingerprintChurn (REQ-OXCH-003, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (increase(basetool_exchange_job_order_fingerprints_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 149
+      },
+      "type": "timeseries",
+      "title": "Job-order fingerprint worker runs/hour",
+      "description": "Runs of the job-order fingerprint worker per hour by outcome, and the orders it recomputed; a last success older than 10 minutes fires JobOrderFingerprintWorkerStale (REQ-OXCH-003, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (increase(basetool_scheduled_job_executions_total{task=\"job_order_exchange_fingerprint\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "runs {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(increase(basetool_scheduled_job_items_total{task=\"job_order_exchange_fingerprint\"}[1h]))",
+          "refId": "B",
+          "legendFormat": "orders recomputed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }
