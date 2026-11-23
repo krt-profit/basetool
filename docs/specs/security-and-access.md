@@ -6492,7 +6492,7 @@ dry run by default, with a rollback file, never deleting.
   *Amendment 3*). The Basetool authorises from `user_roles` and never reads it; the realm keeps the
   role, the provisioner never deletes it and lists a realm without it as a manual step, and its
   assignments are kept in step with the Basetool's `Admin` by hand
-  ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)).
+  ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-keeping-admin-in-step-with-keycloak)).
   An account holding the Basetool's `Admin` without the realm role is not asked for a second factor.
 - **Forgot password (step 2).** The switch and the realm's own SMTP sender are one decision: a link
   that cannot be answered with a mail is not offered. The reset page (`login-reset-password.ftl`)
@@ -6633,9 +6633,7 @@ same-section save is HTTP 409; a completed edit of the other section does not in
 The permission replacement accepts only exact values declared in `kernel.Permissions`. An unknown
 value yields HTTP 400 with `UNKNOWN_ROLE_PERMISSION` before any write or audit event. JWT authority
 assembly and the web session's `/api/v1/users/me` projection grant only the declared permissions,
-including for roles with unrecognised values in storage. The
-[read-only vocabulary report](../../scripts/role-permission-vocabulary-report.sql) counts existing
-rows outside the vocabulary before deployment.
+including for roles with unrecognised values in storage.
 
 The roles Admin, KRT Member, Bank Employee and Bank Management live in `user_roles` alone and are
 written by the Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)).
@@ -6696,8 +6694,8 @@ The provisioner deletes the realm roles KRT Member, Bank Employee and Bank Manag
 Member's place in `default-roles-<realm>`), keeps `Admin` and withholds the `roles` client scope
 from `basetool-frontend`; the e2e and sandbox realms carry none of the four roles and no `roles`
 scope. The frontend therefore requests only `openid, profile, email`, since Keycloak refuses a
-scope the client is not offered with `invalid_scope`. The runbook ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)) carries the
-final roster sync before the switch and the rollback (`scripts/restore-keycloak-realm-roles.py`).
+scope the client is not offered with `invalid_scope`. The runbook ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-keeping-admin-in-step-with-keycloak))
+says how the realm role `Admin` is kept in step with the Basetool's `Admin`.
 
 **Enforced by:** `FirstLoginAuthoritiesIntegrationTest`, `BootstrapAdminLoginIntegrationTest`,
 `CustomJwtGrantedAuthoritiesConverterTest`,
@@ -6706,7 +6704,7 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 `MemberEditPageRenderTest`, `member-roles.test.mjs` (`testMemberRolesJs`),
 `SecurityConfigTest` (frontend), `FrontendRequestedScopesParityTest`,
 `provision-keycloak-realm.test.sh` (sections 4c and 4d), `UserAccountMergeEndStateTest`,
-`build-sandbox-realm.py --selftest`, `restore-keycloak-realm-roles.py --selftest` ·
+`build-sandbox-realm.py --selftest` ·
 **Code:** `identity/internal/UserRoleAssignmentService`, `RoleAssignmentPolicy`,
 `RoleChangeRecorder`, `BootstrapAdminGrant`, `ApprovalMemberGrant`, `identity/web/UserRoleController`,
 `scope/api/CustomJwtGrantedAuthoritiesConverter`
@@ -6733,9 +6731,6 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 - [x] The provisioner deletes the three retired realm roles and the web login's role claim, and
   keeps the admin-OTP marker `Admin`.
 - [x] The frontend requests no scope its client is not offered in the e2e and sandbox realms.
-- [x] The rollback gives every exported role back, takes the default role and KRT Member from an
-  account that departed in the Basetool, stops on a refused read, and exits `1` on an empty export
-  or a skipped account (`restore-keycloak-realm-roles.py --selftest`).
 
 ### REQ-SEC-089 — The session store is a Redis only the frontend reaches
 
