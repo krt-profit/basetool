@@ -291,18 +291,6 @@ public class JobOrderAccessPolicy
         OrgUnit.idOf(order.getResponsibleOrgUnit()));
   }
 
-  /**
-   * Checks the current writer of either proposed side before creation.
-   *
-   * @param responsible the proposed responsible unit
-   * @param requesting the requesting unit
-   * @return whether the caller currently writes either side
-   */
-  public boolean canCreate(OrgUnit responsible, OrgUnit requesting) {
-    return accessGateService.canActAsLogisticianIn(responsible.getId())
-        || accessGateService.canActAsLogisticianIn(requesting.getId());
-  }
-
   private boolean hasHistoricalUnitRead(@NotNull JobOrder order) {
     ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     Set<UUID> units =

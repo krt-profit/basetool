@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -45,9 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class JobOrderMoneyCommands {
 
-  private final JobOrderService orders;
   private final JobOrderEditor editor;
-  private final JobOrderMoneyTargetRepository targets;
   private final JobOrderMoneyHolderRepository holders;
   private final JobOrderMoneyOperationRepository operations;
   private final JobOrderMoneyLedger ledger;
@@ -61,19 +58,6 @@ public class JobOrderMoneyCommands {
   private final JobOrderLinkedMoneyCommands linked;
   private final JobOrderMoneyAccountCommands accountCommands;
   private final JobOrderMoneyCommitmentCredit commitmentCredit;
-
-  /**
-   * Creates an aUEC order and its requested amount in one transaction.
-   *
-   * @param dto the minimal order request
-   * @return the new order with shared lifecycle and participation fields
-   */
-  public JobOrderDto create(CreateAuecJobOrderDto dto) {
-    BigDecimal target = WholeAuec.positive(dto.target());
-    JobOrderDto order = orders.createAuecJobOrder(dto);
-    targets.save(new JobOrderMoneyTarget(order.id(), target));
-    return order;
-  }
 
   /**
    * Records the caller's reported provision or replays the same accepted attempt.
