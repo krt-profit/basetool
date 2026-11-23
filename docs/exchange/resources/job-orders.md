@@ -3,8 +3,9 @@
 The job orders of all three kinds that the member relates to, under scope
 `exchange.joborders.read`: material orders, item orders and aUEC orders, which ask for a provision
 of credits. Under scope `exchange.joborders.write` a Logistician creates aUEC orders on behalf of
-their own units ([creating an aUEC order](#creating-an-auec-order)) and cancels them before any
-money moved ([writes on an existing order](#writes-on-an-existing-order)). Every route lies below
+their own units ([creating an aUEC order](#creating-an-auec-order)), cancels them before any
+money moved and changes their target above what was handed over
+([writes on an existing order](#writes-on-an-existing-order)). Every route lies below
 `/exchange/v1/job-orders`.
 
 **The job-order family is not switched on yet.** Until an administrator turns it on, every path at
@@ -25,6 +26,7 @@ assignees or support; each order carries a [`link`](#the-link) to its page for a
 | `GET /exchange/v1/job-orders/create-options` | job-order data | read it when the create form opens; keep it no longer than the form |
 | `POST /exchange/v1/job-orders` | job-order data | keep the answer in memory only, for at most 7 days |
 | `POST /exchange/v1/job-orders/{id}/cancel` | job-order data | keep the answer in memory only, for at most 7 days |
+| `POST /exchange/v1/job-orders/{id}/target` | job-order data | keep the answer in memory only, for at most 7 days |
 
 Job-order data of every kind, the member's own orders included, is kept for at most 7 days,
 outside cloud-synced folders, never in a backup or diagnostics, and never forwarded. Keep it out of
@@ -279,7 +281,8 @@ client together. Orders created in the Basetool count for neither and are never 
 A member who is a Logistician of an order's **requesting** unit, by the rule of the create, changes
 an **aUEC** order through a client, under scope `exchange.joborders.write`. Each write is a single
 `POST` below the order, with an `Idempotency-Key`, that echoes the version of the one section it
-edits under a named field, and answers `200` with `job-order-write` `#/$defs/written`:
+edits under a named field, and answers `200` with `job-order-write` `#/$defs/written` — the
+[target change](#target) adds the stored `target`:
 
 ```json
 {
@@ -332,6 +335,36 @@ Basetool. The cancel runs as in the Basetool: the order leaves the queue, the wr
 are told that it ended, naming your application, and open pages update at once. There is no reopen
 through a client: a mistaken cancel is reopened in the Basetool.
 
+### Target
+
+`POST /exchange/v1/job-orders/{id}/target` with an `Idempotency-Key` — the body is
+[`job-order-write`](../schemas/) `#/$defs/targetChange`, the new target in whole aUEC from 1 to
+10¹² and `versions.target` as last read:
+
+```json
+{ "target": 400000, "targetVersion": 0 }
+```
+
+It raises or lowers the target of an `OPEN` or `IN_PROGRESS` order (else `409 JOB_ORDER_CLOSED`),
+only to an amount **above the order's `netHandedOver`**. A target at or below it would complete the
+order and answers `409 JOB_ORDER_TARGET_TOO_LOW`; completing an order happens in the Basetool. So
+the change never completes or reopens an order and moves no money. Pre-check the new target against
+the `netHandedOver` you read; the server decides under the order's locks, so a handover at the same
+moment counts. The answer is `job-order-write` `#/$defs/targetChanged`:
+
+```json
+{
+  "id": "7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "status": "OPEN",
+  "versions": { "lifecycle": 0, "target": 1, "comment": 0 },
+  "target": 400000
+}
+```
+
+The change runs as in the Basetool: the order's target history names the member and your
+application, the responsible unit's writers are told of the new need, naming your application, and
+open pages update at once. A completed order's target is changed in the Basetool.
+
 ## Client guidance
 
 - **An isolated area.** Make job orders their own area, so a job-order refusal — the switches
@@ -350,7 +383,8 @@ through a client: a mistaken cancel is reopened in the Basetool.
 - **Writes on an existing order** take a fresh key per write and echo the version just read. A
   `409 VERSION_CONFLICT` means "read the order again", a `404 NOT_FOUND` "drop it"; the other
   refusals are clear answers that a retry does not change: offer the order's `link`. Since nothing
-  is undone through the exchange, confirm a cancel with the member before sending it.
+  is undone through the exchange, confirm a cancel or a target change with the member before
+  sending it.
 - **The switch codes.** Treat `JOB_ORDER_EXCHANGE_DISABLED` as "pause the job-order area" and
   `JOB_ORDER_WRITES_DISABLED` as "pause the job-order writes", each after `Retry-After`.
 
@@ -366,8 +400,9 @@ through a client: a mistaken cancel is reopened in the Basetool.
 | 404 | `NOT_FOUND` | a write on an order that is unknown, deleted or outside the member's set, alike | drop the order locally |
 | 409 | `VERSION_CONFLICT` | the echoed section version is stale, also on a retry after the one-hour cache | read again, merge, retry |
 | 409 | `JOB_ORDER_RESPONSIBILITY_INVALID` | a write on an order whose responsibility is invalid | do not retry; offer the order's `link` |
-| 409 | `JOB_ORDER_CLOSED` | a cancel of an order that is not `OPEN` or `IN_PROGRESS` | read again; offer the order's `link` |
+| 409 | `JOB_ORDER_CLOSED` | a cancel or a target change of an order that is not `OPEN` or `IN_PROGRESS` | read again; offer the order's `link` |
 | 409 | `JOB_ORDER_MONEY_STARTED` | a cancel after the first accepted money operation; one code for every money fact | offer the order's `link`; cancelling happens in the Basetool |
+| 409 | `JOB_ORDER_TARGET_TOO_LOW` | a target change to an amount at or below the order's `netHandedOver` | read `netHandedOver` again; completing the order happens in the Basetool |
 | 409 | `JOB_ORDER_OPEN_ORDER_CAP` | a create while the member holds `openOrderCap` open orders created through clients ([limits](#limits)) | grey out the create until one of them closes; then create under a new key |
 | 409 | `JOB_ORDER_DAILY_CREATE_CAP` | a create once the member created `dailyCreateCap` orders through clients this UTC day; `Retry-After` runs to the next UTC midnight | grey out the create until `Retry-After`; then create under a new key |
 | 410 | `CURSOR_EXPIRED` | the cursor is older than the retained changes or not one the server issued | take a new snapshot and reconcile it against the last baseline |

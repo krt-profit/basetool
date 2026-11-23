@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInsta
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
@@ -175,11 +176,11 @@ class ExchangeWireContractTest {
 
   /**
    * The job-order writes, which answer only with both job-order switches on and a member who writes
-   * for a unit; {@code ExchangeJobOrderCreateTest} and {@code ExchangeJobOrderCancelTest} send them
-   * on a seeded world.
+   * for a unit; {@code ExchangeJobOrderCreateTest}, {@code ExchangeJobOrderCancelTest} and {@code
+   * ExchangeJobOrderTargetTest} send them on a seeded world.
    */
   private static final Set<String> JOB_ORDER_WRITES =
-      Set.of("/job-orders", "/job-orders/{id}/cancel");
+      Set.of("/job-orders", "/job-orders/{id}/cancel", "/job-orders/{id}/target");
 
   /**
    * The bank request writes, which answer only with the bank switched on and a seeded bank world;
@@ -214,6 +215,7 @@ class ExchangeWireContractTest {
           Map.entry("page--jobOrderPage", ExchangeJobOrderPageDto.class),
           Map.entry("job-order-write--created", ExchangeJobOrderCreatedDto.class),
           Map.entry("job-order-write--written", ExchangeJobOrderWrittenDto.class),
+          Map.entry("job-order-write--targetChanged", ExchangeJobOrderTargetChangedDto.class),
           Map.entry("job-order-create-options", ExchangeJobOrderCreateOptionsDto.class),
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),

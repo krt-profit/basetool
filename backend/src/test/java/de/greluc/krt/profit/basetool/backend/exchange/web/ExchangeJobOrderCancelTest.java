@@ -24,11 +24,8 @@ import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import de.greluc.krt.profit.basetool.backend.exchange.ExchangePublishedSchemas;
-import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +71,6 @@ class ExchangeJobOrderCancelTest {
   @Autowired private WebApplicationContext context;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper objectMapper;
-  @Autowired private MeterRegistry meterRegistry;
   @Autowired private TransactionTemplate transactions;
   @Autowired private JobOrderRepository jobOrders;
 
@@ -106,7 +102,7 @@ class ExchangeJobOrderCancelTest {
     assertThat(written.get("id").asString()).isEqualTo(order.toString());
     assertThat(written.get("status").asString()).isEqualTo("CANCELLED");
     assertThat(written.get("versions").get("lifecycle").asLong()).isEqualTo(1L);
-    assertThat(status(order)).isEqualTo("CANCELLED");
+    assertThat(world.status(order)).isEqualTo("CANCELLED");
   }
 
   @Test
@@ -116,7 +112,7 @@ class ExchangeJobOrderCancelTest {
         "UPDATE job_order SET status = 'IN_PROGRESS', lifecycle_version = 1 WHERE id = ?", order);
 
     assertThat(cancel(logistician, order, 1L).getStatus()).isEqualTo(200);
-    assertThat(status(order)).isEqualTo("CANCELLED");
+    assertThat(world.status(order)).isEqualTo("CANCELLED");
   }
 
   @Test
@@ -128,13 +124,14 @@ class ExchangeJobOrderCancelTest {
     jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", deleted);
     jdbc.update("DELETE FROM job_order WHERE id = ?", deleted);
 
-    JsonNode unknown = assertRefused(cancel(stranger, UUID.randomUUID(), 0L), 404, "NOT_FOUND");
-    JsonNode outside = assertRefused(cancel(stranger, hidden, 0L), 404, "NOT_FOUND");
-    JsonNode gone = assertRefused(cancel(logistician, deleted, 0L), 404, "NOT_FOUND");
+    JsonNode unknown =
+        world.assertRefused(cancel(stranger, UUID.randomUUID(), 0L), 404, "NOT_FOUND");
+    JsonNode outside = world.assertRefused(cancel(stranger, hidden, 0L), 404, "NOT_FOUND");
+    JsonNode gone = world.assertRefused(cancel(logistician, deleted, 0L), 404, "NOT_FOUND");
 
     assertThat(outside.get("title")).isEqualTo(unknown.get("title"));
     assertThat(gone.get("title")).isEqualTo(unknown.get("title"));
-    assertThat(status(hidden)).isEqualTo("OPEN");
+    assertThat(world.status(hidden)).isEqualTo("OPEN");
   }
 
   @Test
@@ -143,8 +140,8 @@ class ExchangeJobOrderCancelTest {
     UUID plain = world.user("cancel-plain", false);
     world.seat(plain, world.getRequesting(), "MEMBER", false);
 
-    assertRefused(cancel(plain, order, 0L), 403, "ACCESS_DENIED");
-    assertThat(status(order)).isEqualTo("OPEN");
+    world.assertRefused(cancel(plain, order, 0L), 403, "ACCESS_DENIED");
+    assertThat(world.status(order)).isEqualTo("OPEN");
   }
 
   @Test
@@ -153,8 +150,8 @@ class ExchangeJobOrderCancelTest {
     UUID profitLogistician = world.user("cancel-profit-logistician", false);
     world.seat(profitLogistician, world.getResponsible(), "MEMBER", true);
 
-    assertRefused(cancel(profitLogistician, order, 0L), 403, "ACCESS_DENIED");
-    assertThat(status(order)).isEqualTo("OPEN");
+    world.assertRefused(cancel(profitLogistician, order, 0L), 403, "ACCESS_DENIED");
+    assertThat(world.status(order)).isEqualTo("OPEN");
   }
 
   @Test
@@ -162,18 +159,18 @@ class ExchangeJobOrderCancelTest {
     UUID material = world.stockOrder("MATERIAL");
     UUID item = world.stockOrder("ITEM");
 
-    assertRefused(cancel(logistician, material, 0L), 403, "ACCESS_DENIED");
-    assertRefused(cancel(logistician, item, 0L), 403, "ACCESS_DENIED");
-    assertThat(status(material)).isEqualTo("OPEN");
-    assertThat(status(item)).isEqualTo("OPEN");
+    world.assertRefused(cancel(logistician, material, 0L), 403, "ACCESS_DENIED");
+    world.assertRefused(cancel(logistician, item, 0L), 403, "ACCESS_DENIED");
+    assertThat(world.status(material)).isEqualTo("OPEN");
+    assertThat(world.status(item)).isEqualTo("OPEN");
   }
 
   @Test
   void aStaleLifecycleVersionIsAVersionConflict() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
 
-    assertRefused(cancel(logistician, order, 3L), 409, "OPTIMISTIC_LOCK");
-    assertThat(status(order)).isEqualTo("OPEN");
+    world.assertRefused(cancel(logistician, order, 3L), 409, "OPTIMISTIC_LOCK");
+    assertThat(world.status(order)).isEqualTo("OPEN");
   }
 
   @Test
@@ -181,28 +178,28 @@ class ExchangeJobOrderCancelTest {
     UUID order = world.createAuec(logistician, 250_000L);
     assertThat(cancel(logistician, order, 0L).getStatus()).isEqualTo(200);
 
-    assertRefused(cancel(logistician, order, 0L), 409, "OPTIMISTIC_LOCK");
+    world.assertRefused(cancel(logistician, order, 0L), 409, "OPTIMISTIC_LOCK");
   }
 
   @Test
   void anInvalidResponsibilityAnswersItsOwnConflict() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
-    leaveTheProfitHierarchy();
+    world.leaveTheProfitHierarchy();
 
-    assertRefused(cancel(logistician, order, 0L), 409, "JOB_ORDER_RESPONSIBILITY_INVALID");
-    assertThat(status(order)).isEqualTo("OPEN");
+    world.assertRefused(cancel(logistician, order, 0L), 409, "JOB_ORDER_RESPONSIBILITY_INVALID");
+    assertThat(world.status(order)).isEqualTo("OPEN");
   }
 
   @Test
   void aCompletedOrRejectedOrderIsClosed() throws Exception {
     UUID completed = world.createAuec(logistician, 250_000L);
     UUID rejected = world.createAuec(logistician, 250_000L);
-    close(completed, "COMPLETED");
-    close(rejected, "REJECTED");
+    world.closeOrder(completed, "COMPLETED");
+    world.closeOrder(rejected, "REJECTED");
 
-    assertRefused(cancel(logistician, completed, 1L), 409, "JOB_ORDER_CLOSED");
-    assertRefused(cancel(logistician, rejected, 1L), 409, "JOB_ORDER_CLOSED");
-    assertThat(status(completed)).isEqualTo("COMPLETED");
+    world.assertRefused(cancel(logistician, completed, 1L), 409, "JOB_ORDER_CLOSED");
+    world.assertRefused(cancel(logistician, rejected, 1L), 409, "JOB_ORDER_CLOSED");
+    assertThat(world.status(completed)).isEqualTo("COMPLETED");
   }
 
   @Test
@@ -212,11 +209,11 @@ class ExchangeJobOrderCancelTest {
 
     MockHttpServletResponse response = cancel(logistician, order, 0L);
 
-    JsonNode problem = assertRefused(response, 409, "JOB_ORDER_MONEY_STARTED");
+    JsonNode problem = world.assertRefused(response, 409, "JOB_ORDER_MONEY_STARTED");
     assertThat(response.getContentAsString()).doesNotContain(HOLDER_NAME);
     assertThat(problem.get("title").asString() + problem.get("detail").asString())
         .doesNotContain(String.valueOf(MONEY));
-    assertThat(status(order)).isEqualTo("OPEN");
+    assertThat(world.status(order)).isEqualTo("OPEN");
   }
 
   @Test
@@ -226,24 +223,24 @@ class ExchangeJobOrderCancelTest {
     UUID stranger = world.user("cancel-order-stranger", false);
     UUID material = world.stockOrder("MATERIAL");
     UUID closedWithMoney = world.createAuec(logistician, 250_000L);
-    close(closedWithMoney, "REJECTED");
+    world.closeOrder(closedWithMoney, "REJECTED");
     submitMoney(closedWithMoney);
-    leaveTheProfitHierarchy();
+    world.leaveTheProfitHierarchy();
 
-    assertRefused(cancel(stranger, material, 7L), 404, "NOT_FOUND");
-    assertRefused(cancel(plain, closedWithMoney, 7L), 403, "ACCESS_DENIED");
-    assertRefused(cancel(logistician, closedWithMoney, 7L), 409, "OPTIMISTIC_LOCK");
-    assertRefused(
+    world.assertRefused(cancel(stranger, material, 7L), 404, "NOT_FOUND");
+    world.assertRefused(cancel(plain, closedWithMoney, 7L), 403, "ACCESS_DENIED");
+    world.assertRefused(cancel(logistician, closedWithMoney, 7L), 409, "OPTIMISTIC_LOCK");
+    world.assertRefused(
         cancel(logistician, closedWithMoney, 1L), 409, "JOB_ORDER_RESPONSIBILITY_INVALID");
   }
 
   @Test
   void aClosedOrderIsRefusedBeforeItsMoneyIsAskedAbout() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
-    close(order, "REJECTED");
+    world.closeOrder(order, "REJECTED");
     submitMoney(order);
 
-    assertRefused(cancel(logistician, order, 1L), 409, "JOB_ORDER_CLOSED");
+    world.assertRefused(cancel(logistician, order, 1L), 409, "JOB_ORDER_CLOSED");
   }
 
   @Test
@@ -260,7 +257,7 @@ class ExchangeJobOrderCancelTest {
                 jobOrders.lockForScopedEdit(order);
                 submitMoney(order);
                 submitted.countDown();
-                awaitQuietly(release);
+                ExchangeJobOrderWorld.awaitQuietly(release);
               }));
       assertThat(submitted.await(30, TimeUnit.SECONDS)).isTrue();
       Future<MockHttpServletResponse> cancel = pool.submit(() -> cancel(logistician, order, 0L));
@@ -270,15 +267,15 @@ class ExchangeJobOrderCancelTest {
       response = cancel.get(30, TimeUnit.SECONDS);
     }
 
-    assertRefused(response, 409, "JOB_ORDER_MONEY_STARTED");
-    assertThat(status(order)).isEqualTo("OPEN");
+    world.assertRefused(response, 409, "JOB_ORDER_MONEY_STARTED");
+    assertThat(world.status(order)).isEqualTo("OPEN");
   }
 
   @Test
   void aClientsCancelRecordsItsOwnAuditTypeWithTheClientAndARefusalNothing() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
     UUID refusedOrder = world.createAuec(logistician, 250_000L);
-    assertRefused(cancel(logistician, refusedOrder, 5L), 409, "OPTIMISTIC_LOCK");
+    world.assertRefused(cancel(logistician, refusedOrder, 5L), 409, "OPTIMISTIC_LOCK");
 
     assertThat(cancel(logistician, order, 0L).getStatus()).isEqualTo(200);
 
@@ -323,13 +320,13 @@ class ExchangeJobOrderCancelTest {
   void eachWriteCountsItsOutcomeAndEachRefusalItsReason() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
     UUID closed = world.createAuec(logistician, 250_000L);
-    close(closed, "REJECTED");
+    world.closeOrder(closed, "REJECTED");
     UUID moneyStarted = world.createAuec(logistician, 250_000L);
     submitMoney(moneyStarted);
     UUID plain = world.user("cancel-metric-plain", false);
     world.seat(plain, world.getRequesting(), "MEMBER", false);
-    Counter applied = writes("applied");
-    Counter rejected = writes("rejected");
+    Counter applied = world.writes("applied");
+    Counter rejected = world.writes("rejected");
     double appliedBefore = applied.count();
     double rejectedBefore = rejected.count();
     Map<String, Double> before = refusalCounts();
@@ -353,8 +350,8 @@ class ExchangeJobOrderCancelTest {
   @Test
   void anInvalidResponsibilityCountsItsReason() throws Exception {
     UUID order = world.createAuec(logistician, 250_000L);
-    leaveTheProfitHierarchy();
-    Counter invalid = refusals("responsibility_invalid");
+    world.leaveTheProfitHierarchy();
+    Counter invalid = world.refusals("responsibility_invalid");
     double before = invalid.count();
 
     cancel(logistician, order, 0L);
@@ -367,8 +364,8 @@ class ExchangeJobOrderCancelTest {
     UUID order = world.createAuec(logistician, 250_000L);
     world.switches(true, true, false);
 
-    assertRefused(cancel(logistician, order, 0L), 503, "JOB_ORDER_WRITES_DISABLED");
-    assertThat(status(order)).isEqualTo("OPEN");
+    world.assertRefused(cancel(logistician, order, 0L), 503, "JOB_ORDER_WRITES_DISABLED");
+    assertThat(world.status(order)).isEqualTo("OPEN");
   }
 
   @Test
@@ -386,8 +383,8 @@ class ExchangeJobOrderCancelTest {
             .andReturn()
             .getResponse();
 
-    assertRefused(response, 403, "SCOPE_MISSING");
-    assertThat(status(order)).isEqualTo("OPEN");
+    world.assertRefused(response, 403, "SCOPE_MISSING");
+    assertThat(world.status(order)).isEqualTo("OPEN");
   }
 
   private @NotNull MockHttpServletResponse cancel(
@@ -405,33 +402,6 @@ class ExchangeJobOrderCancelTest {
 
   private static @NotNull MockHttpServletRequestBuilder cancelRequest(@NotNull UUID order) {
     return post(ExchangeJobOrderWorld.PATH + "/" + order + "/cancel");
-  }
-
-  private @NotNull JsonNode assertRefused(
-      @NotNull MockHttpServletResponse response, int status, @NotNull String code)
-      throws Exception {
-    assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(status);
-    JsonNode problem = objectMapper.readTree(response.getContentAsString());
-    assertThat(problem.get("code").asString()).isEqualTo(code);
-    return problem;
-  }
-
-  private @NotNull String status(@NotNull UUID order) {
-    return jdbc.queryForObject("SELECT status FROM job_order WHERE id = ?", String.class, order);
-  }
-
-  private void close(@NotNull UUID order, @NotNull String status) {
-    jdbc.update(
-        "UPDATE job_order SET status = ?, priority = NULL, closed_at = now(),"
-            + " lifecycle_version = lifecycle_version + 1 WHERE id = ?",
-        status,
-        order);
-  }
-
-  /** Moves the responsible unit out of the Profit hierarchy, which invalidates its orders. */
-  private void leaveTheProfitHierarchy() {
-    jdbc.update(
-        "UPDATE org_unit SET parent_org_unit_id = NULL WHERE id = ?", world.getResponsible());
   }
 
   /** Records an accepted money operation on the order, its first durable money submission. */
@@ -458,15 +428,6 @@ class ExchangeJobOrderCancelTest {
         MONEY);
   }
 
-  private static void awaitQuietly(@NotNull CountDownLatch latch) {
-    try {
-      assertThat(latch.await(30, TimeUnit.SECONDS)).isTrue();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException(e);
-    }
-  }
-
   private @NotNull List<String> finishedNotices(@NotNull UUID order, @NotNull UUID recipient) {
     return jdbc.queryForList(
         "SELECT params FROM notification WHERE entity_id = ? AND recipient_user_id = ?"
@@ -476,28 +437,12 @@ class ExchangeJobOrderCancelTest {
         recipient);
   }
 
-  private @NotNull Counter writes(@NotNull String outcome) {
-    return meterRegistry.counter(
-        ExchangeMetricNames.EXCHANGE_WRITES,
-        MetricNames.TAG_CLIENT_ID,
-        world.getClient(),
-        ExchangeMetricNames.TAG_RESOURCE,
-        "job_order",
-        MetricNames.TAG_OUTCOME,
-        outcome);
-  }
-
-  private @NotNull Counter refusals(@NotNull String reason) {
-    return meterRegistry.counter(
-        ExchangeMetricNames.EXCHANGE_JOB_ORDER_REFUSED, MetricNames.TAG_REASON, reason);
-  }
-
   private @NotNull Map<String, Double> refusalCounts() {
     return Map.of(
-        "not_found", refusals("not_found").count(),
-        "not_permitted", refusals("not_permitted").count(),
-        "version_conflict", refusals("version_conflict").count(),
-        "closed", refusals("closed").count(),
-        "money_started", refusals("money_started").count());
+        "not_found", world.refusals("not_found").count(),
+        "not_permitted", world.refusals("not_permitted").count(),
+        "version_conflict", world.refusals("version_conflict").count(),
+        "closed", world.refusals("closed").count(),
+        "money_started", world.refusals("money_started").count());
   }
 }

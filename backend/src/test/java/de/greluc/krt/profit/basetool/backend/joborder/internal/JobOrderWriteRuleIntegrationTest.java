@@ -295,19 +295,20 @@ class JobOrderWriteRuleIntegrationTest {
 
   /**
    * Asserts that the cancel and the target and comment writes are refused and change nothing; the
-   * cancel answers in the order of the client writes' shared rules (REQ-OXCH-005).
+   * cancel and the target change answer in the order of the client writes' shared rules
+   * (REQ-OXCH-005).
    */
   private void assertRefusedEveryWrite(
       UUID order,
       User member,
-      Class<? extends RuntimeException> cancelRefusal,
+      Class<? extends RuntimeException> sharedRulesRefusal,
       Class<? extends RuntimeException> refusal) {
     assertThatThrownBy(() -> statusCommand.cancel(order, 0L, rule(), read(), client(member)))
-        .isInstanceOf(cancelRefusal);
+        .isInstanceOf(sharedRulesRefusal);
     assertThatThrownBy(() ->
             targetCommand.changeTarget(
                 order, new BigDecimal("300000"), 0L, rule(), read(), client(member)))
-        .isInstanceOf(refusal);
+        .isInstanceOf(sharedRulesRefusal);
     assertThatThrownBy(() ->
             informationCommand.changeComment(order, "Note", 0L, rule(), read(), client(member)))
         .isInstanceOf(refusal);

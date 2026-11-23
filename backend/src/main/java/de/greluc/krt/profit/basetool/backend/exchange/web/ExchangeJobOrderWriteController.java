@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOr
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangeDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
@@ -51,9 +53,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The job-order writes of an exchange client under {@code exchange.joborders.write}, reachable only
- * from the ingest gateway (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006): the create options, the
- * create of an aUEC order and its cancel. The job-order family switch gates every route here and
- * the writes switch every write (REQ-OXCH-009).
+ * from the ingest gateway (REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006, REQ-OXCH-007): the create
+ * options, the create of an aUEC order, its cancel and its target change. The job-order family
+ * switch gates every route here and the writes switch every write (REQ-OXCH-009).
  */
 @RestController
 @RequestMapping("/api/v1/exchange/job-orders")
@@ -174,5 +176,47 @@ public class ExchangeJobOrderWriteController {
             ExchangeCaller.of((SubjectAuthentication) authentication),
             id,
             body.lifecycleVersion()));
+  }
+
+  /**
+   * Changes the target of an active aUEC order of a unit the member writes for, to an amount above
+   * the order's net handover.
+   *
+   * @param id the order
+   * @param body the new target and the target version the client last read
+   * @param authentication the relayed acting member the gate admitted
+   * @return the order's id, status, new versions and stored target
+   */
+  @NotNull
+  @PostMapping("/{id}/target")
+  @PreAuthorize("@exchangeGate.allows('exchange.joborders.write', authentication)")
+  @Operation(
+      summary = "Exchange: change an aUEC order's target",
+      description =
+          "Gateway-only. Raises or lowers the target of an open or in-progress aUEC order of one of"
+              + " the member's direct Logistician units through the web's target command. Checked"
+              + " in this order under the order locks: an unknown, hidden or deleted order answers"
+              + " 404 NOT_FOUND; an order the member does not write for and a MATERIAL or ITEM"
+              + " order 403 ACCESS_DENIED; a stale target version 409 OPTIMISTIC_LOCK; an invalid"
+              + " responsibility 409 JOB_ORDER_RESPONSIBILITY_INVALID; an order that is not open or"
+              + " in progress 409 JOB_ORDER_CLOSED; a target at or below the order's net handover"
+              + " 409 JOB_ORDER_TARGET_TOO_LOW. Never completes or reopens the order and moves no"
+              + " money.")
+  @ApiResponse(responseCode = "200", description = "The order with its new target")
+  @ApiResponse(responseCode = "403", description = "The member does not write the order")
+  @ApiResponse(responseCode = "404", description = "No such order the member reads")
+  @ApiResponse(
+      responseCode = "409",
+      description = "A stale version, invalid responsibility, a closed order or a target too low")
+  public ResponseEntity<ExchangeJobOrderTargetChangedDto> changeTarget(
+      @NotNull @PathVariable UUID id,
+      @NotNull @Valid @RequestBody ExchangeJobOrderTargetChangeDto body,
+      @NotNull Authentication authentication) {
+    return ResponseEntity.ok(
+        changeService.changeTarget(
+            ExchangeCaller.of((SubjectAuthentication) authentication),
+            id,
+            body.target(),
+            body.targetVersion()));
   }
 }

@@ -189,6 +189,8 @@ public enum AuditEventType {
   JOB_ORDER_MONEY_HOLDER_IDENTITY_CHANGED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_RECIPIENT_CHANGED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_TARGET_CHANGED(AuditDomain.JOB_ORDER),
+  /** A member changed an aUEC order's target through an exchange client (REQ-OXCH-007). */
+  JOB_ORDER_TARGET_CHANGED_VIA_CLIENT(AuditDomain.JOB_ORDER),
   /** A unit's outstanding aUEC commitment changed. */
   JOB_ORDER_MONEY_COMMITMENT_CHANGED(AuditDomain.JOB_ORDER),
   /**

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeRead;
 import java.math.BigDecimal;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -51,5 +52,20 @@ final class ExchangeAmounts {
   @Contract("null -> null; !null -> !null")
   static @Nullable Long wholeOrNull(@Nullable BigDecimal amount) {
     return amount == null ? null : whole(amount);
+  }
+
+  /**
+   * The target of an aUEC order's exchange read as a JSON integer of whole aUEC, as a client's
+   * create and target change answer it.
+   *
+   * @param read the read of an aUEC order
+   * @return its stored target
+   * @throws IllegalStateException when the read is of another kind than aUEC
+   */
+  static long auecTarget(@NotNull JobOrderExchangeRead read) {
+    if (!(read.progress() instanceof JobOrderExchangeRead.AuecProgress progress)) {
+      throw new IllegalStateException("A client writes the target of aUEC orders only");
+    }
+    return whole(progress.target());
   }
 }

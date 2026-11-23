@@ -24,36 +24,37 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The web's aUEC target command for a caller that passes its own writer rule, read check and actor;
- * the order and account locks, the target version, the responsibility gate, the target history, the
- * audit, the notices and the live update are the web's (ADR-0408).
+ * The web's aUEC target command for a client's write, with the caller's own writer rule, read check
+ * and actor; the order and account locks, the target version, the target history, the audit, the
+ * notices and the live update are the web's, the order of the refusals is the exchange's
+ * (REQ-OXCH-005, REQ-OXCH-007, ADR-0408).
  */
 public interface JobOrderTargetCommand {
 
   /**
-   * Replaces an aUEC order's target in one transaction, joining the caller's. Under the order locks
-   * it requires the read check, a valid responsibility, an active member, a writer of either side
-   * the rule covers and an order that is not cancelled, then the observed target version; a target
-   * at or below the net handover completes the order and a raised one reopens a completed order, as
-   * in the web.
+   * Replaces an active aUEC order's target in either direction in one transaction, joining the
+   * caller's. Under the order locks it requires, in this order, the read check, an aUEC order and a
+   * writer of a side the rule covers, the observed target version, a valid responsibility, an
+   * active order and a new target above the order's net handover, so the change never completes or
+   * reopens the order.
    *
    * @param orderId the aUEC order
    * @param target the new positive whole aUEC amount
    * @param targetVersion the target version the caller last read
    * @param rule the authority that decides whether the actor writes the order
    * @param read the read check the order must pass
-   * @param actor who changes the target; the history entry names its member, and the notice
-   *     excludes it
+   * @param actor who changes the target; the history entry names its member and client, and the
+   *     notice excludes the member
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order is
-   *     unknown or not an aUEC order
+   *     unknown or fails the read check, alike
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the target is not
-   *     a positive whole amount or the order's responsibility is invalid
-   * @throws org.springframework.security.access.AccessDeniedException when the read check or the
-   *     rule refuses the actor, or the actor's member is no active account
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException when the order
-   *     is cancelled or its completion basis changed while waiting
+   *     a positive whole amount
+   * @throws org.springframework.security.access.AccessDeniedException when the order is no aUEC
+   *     order, the rule refuses the actor, or the actor's member is no active account
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the target version
    *     is stale
+   * @throws JobOrderClientWriteRefusedException when the responsibility is invalid, the order is
+   *     not active or the target does not lie above the net handover
    */
   void changeTarget(
       @NotNull UUID orderId,

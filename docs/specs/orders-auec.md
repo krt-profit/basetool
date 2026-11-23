@@ -301,7 +301,11 @@ actor and history, without a second approval workflow. Increasing a completed ta
 handover returns it to IN_PROGRESS; reducing it to/below net handover completes it and shows any
 overpayment. Returns/corrections that make a completed order underfulfilled also recompute that
 state. A CANCELLED order stays cancelled until deliberate reopening. Ordinary target and contact
-edits resume after reopening.
+edits resume after reopening. Through a client the target change is narrower
+([REQ-OXCH-007](orders-exchange.md#req-oxch-007--change-an-auec-orders-target)): only a direct
+Logistician of the requesting unit changes it, only on an active order, in both directions and only
+to an amount above the current net handover, decided under the order locks, so a client never
+completes or reopens an order through its target; the history entry records the client.
 
 Both unit sides may cancel and deliberately reopen, as defined in the core. Through a client a
 direct Logistician of the requesting unit may only cancel an active order, and only before the
@@ -340,6 +344,8 @@ leaves that path open. Target changes retain the prior amount, new amount, actor
 order history. The money section indicates settlement open when a terminal order has residual
 holdings or the requester has received more than the target. `ExchangeJobOrderCancelTest` covers a
 client's cancel refused at the same boundary, against a concurrent first submission too.
+`ExchangeJobOrderTargetTest` covers a client's target change refused at or below the net handover,
+against a concurrent handover too.
 
 ### REQ-ORDERS-064 — Effective operation history is the monetary authority
 

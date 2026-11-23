@@ -56,6 +56,12 @@ public final class JobOrderClientWriteRefusedException extends RuntimeException 
      * A money operation of the order reached its accepted, durable submission boundary, the
      * hard-delete boundary of REQ-ORDERS-063, so a client cannot cancel it (REQ-OXCH-006).
      */
-    MONEY_STARTED
+    MONEY_STARTED,
+
+    /**
+     * The new target lies at or below the order's current net handover, so it would complete the
+     * order (REQ-OXCH-007).
+     */
+    TARGET_TOO_LOW
   }
 }

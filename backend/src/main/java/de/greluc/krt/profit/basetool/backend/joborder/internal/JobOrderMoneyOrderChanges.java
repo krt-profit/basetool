@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientWriteRefusedException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderInformationCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
@@ -62,6 +63,7 @@ public class JobOrderMoneyOrderChanges
   private final JobOrderService lifecycle;
   private final JobOrderMoneyEffects effects;
   private final JobOrderClientNames clientNames;
+  private final JobOrderClientWriteRules clientRules;
 
   /**
    * Records an agreed new target for the web caller and reconciles completion in the same
@@ -82,14 +84,40 @@ public class JobOrderMoneyOrderChanges
       @NotNull JobOrderWriterRule rule,
       @NotNull JobOrderReadCheck read,
       @NotNull JobOrderActor actor) {
-    writeTarget(
+    BigDecimal requested = WholeAuec.positive(target.toPlainString());
+    JobOrderCaller caller = new JobOrderCaller(rule, read, actor);
+    UUID member = access.memberOf(actor);
+    identityLock.lockAccounts(member);
+    JobOrderClientWriteRules.Write change =
+        new JobOrderClientWriteRules.Write(
+            JobOrderWriters.Scope::writesEitherSide,
+            order -> targets.versionFor(order.getId()).orElse(null),
+            targetVersion,
+            JobOrderStatus::isActive);
+    editor.editMoney(
         orderId,
-        WholeAuec.positive(target.toPlainString()),
-        targetVersion,
-        new JobOrderCaller(rule, read, actor));
+        clientRules.checks(caller, change).andThen(order -> requireAboveHandover(order, requested)),
+        _ -> false,
+        (order, queueLocked) ->
+            targetLocked(order, requested, targetVersion, member, caller, queueLocked));
   }
 
-  /** The one target command, under the account and order locks (ADR-0408). */
+  /**
+   * Refuses a client's target at or below the order's current net handover, which would complete
+   * the order (REQ-OXCH-007).
+   *
+   * @param order the loaded order
+   * @param requested the new target
+   * @throws JobOrderClientWriteRefusedException with {@code TARGET_TOO_LOW} for such a target
+   */
+  private void requireAboveHandover(JobOrder order, BigDecimal requested) {
+    if (requested.compareTo(ledger.delivered(order.getId())) <= 0) {
+      throw new JobOrderClientWriteRefusedException(
+          JobOrderClientWriteRefusedException.Refusal.TARGET_TOO_LOW);
+    }
+  }
+
+  /** The web's target command, under the account and order locks, in the web's refusal order. */
   private void writeTarget(
       UUID orderId, BigDecimal requested, @Nullable Long version, JobOrderCaller caller) {
     UUID member = access.memberOf(caller.actor());
@@ -139,12 +167,23 @@ public class JobOrderMoneyOrderChanges
     JobOrderEdit audit =
         JobOrderEdit.audited(
             order,
-            AuditEventType.JOB_ORDER_MONEY_TARGET_CHANGED,
+            targetChanged(caller.actor()),
             AuditDetails.of("previousTarget", prior).with("target", requested));
     if (!lifecycleChanged) {
       audit = audit.notifying(List.of(needChanged(order, member, scope, caller.actor())));
     }
     return new JobOrderEditor.MoneyEdit<>(order, audit);
+  }
+
+  /**
+   * Names the audit event of a target change: a client's records its own type instead of the web's
+   * (REQ-AUDIT-001, ADR-0407).
+   */
+  private static AuditEventType targetChanged(JobOrderActor actor) {
+    return switch (actor) {
+      case JobOrderActor.Client _ -> AuditEventType.JOB_ORDER_TARGET_CHANGED_VIA_CLIENT;
+      case JobOrderActor.Web _ -> AuditEventType.JOB_ORDER_MONEY_TARGET_CHANGED;
+    };
   }
 
   /**
