@@ -28,9 +28,11 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param handle the current requester contact
  * @param comment the optional order note
- * @param version the observed information revision
+ * @param version the observed contact revision
+ * @param commentVersion the observed comment revision
  */
 public record UpdateJobOrderMoneyInformationDto(
     @NotBlank @Size(max = 200) String handle,
     @Nullable @Size(max = 1000) String comment,
-    @Nullable Long version) {}
+    @Nullable Long version,
+    @Nullable Long commentVersion) {}

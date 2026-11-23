@@ -111,7 +111,8 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
         false,
         false,
         0L,
-        0L);
+        0L,
+        3L);
   }
 
   /** A requesting writer edits item need after delivery through the restricted update. */
@@ -140,6 +141,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             .getContentAsString();
     assertThat(html)
         .containsPattern("name=\"version\"[^>]*value=\"1\"")
+        .containsPattern("name=\"commentVersion\"[^>]*value=\"3\"")
         .containsPattern("name=\"requesterEdit\"[^>]*value=\"true\"")
         .doesNotContain("id=\"item-handle\"", "id=\"item-requestingOrgUnitId\"");
 
@@ -152,7 +154,8 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             List.of(
                 new CreateJobOrderItemLineDto(
                     itemId, gameItemId, blueprintId, 4, List.of(), null, null)),
-            1L);
+            1L,
+            3L);
     when(backendApiClient.put(
             eq("/api/v1/orders/{id}/items/requested"), eq(expected), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
@@ -166,6 +169,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
                 .param("handle", "ignored")
                 .param("comment", "Updated need")
                 .param("version", "1")
+                .param("commentVersion", "3")
                 .param("items[0].id", itemId.toString())
                 .param("items[0].gameItemId", gameItemId.toString())
                 .param("items[0].blueprintId", blueprintId.toString())
@@ -229,6 +233,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             false,
             false,
             false,
+            0L,
             0L,
             0L);
     when(reader.readItemEdit(id))
@@ -405,6 +410,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             false,
             false,
             false,
+            0L,
             0L,
             0L);
     when(reader.readItemEdit(id))

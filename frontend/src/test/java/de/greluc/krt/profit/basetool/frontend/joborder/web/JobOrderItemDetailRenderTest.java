@@ -239,6 +239,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             0L,
+            0L,
             0L);
 
     stubDetail(orderId, userId, order);
@@ -364,6 +365,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             0L,
+            0L,
             0L);
     stubDetail(orderId, userId, order);
 
@@ -457,6 +459,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             0L,
+            0L,
             0L);
     stubDetail(orderId, userId, order);
 
@@ -548,6 +551,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             false,
+            0L,
             0L,
             0L);
     stubDetail(orderId, userId, order);
@@ -657,6 +661,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             0L,
+            0L,
             0L);
 
     stubDetail(orderId, userId, order);
@@ -756,6 +761,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             0L,
+            0L,
             0L);
     stubDetail(orderId, userId, order);
 
@@ -821,6 +827,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             false,
+            0L,
             0L,
             0L);
     stubDetail(orderId, userId, order);
@@ -898,6 +905,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             false,
+            0L,
             0L,
             0L);
     stubDetail(orderId, userId, order);
@@ -985,6 +993,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         false,
         false,
         false,
+        0L,
         0L,
         0L);
   }
@@ -1546,6 +1555,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             0L,
+            0L,
             0L);
     stubDetail(orderId, userId, order);
 
@@ -1624,6 +1634,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             false,
+            0L,
             0L,
             0L);
     when(reader.readOrderDetail(eq(orderId), any(), any()))
@@ -1714,6 +1725,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             false,
+            0L,
             0L,
             0L);
     stubDetail(orderId, userId, order);

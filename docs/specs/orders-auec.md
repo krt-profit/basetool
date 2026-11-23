@@ -450,8 +450,22 @@ spec. An outcome command does not grant Bank staff general order-edit authority.
 versions and genuine conflicts use the existing RFC 7807 contract. Access is checked before
 exposing version information. Exact schema, SQL and classes follow these contracts.
 
+The comment of every order kind carries its own comment revision (`commentVersion` in
+`JobOrderDto`) beside the revision that guards the contact: the information revision on an aUEC
+order, the order version on a MATERIAL or ITEM order. The comment is not part of the order
+version. A write that changes the comment checks the observed comment revision under the order's
+row lock and raises it only when the stored comment changes; a write that leaves the comment as it
+is leaves its revision, and a contact change never raises it. The web's aUEC information form and
+its refreshed money section echo both revisions, and `PATCH /api/v1/orders/{id}/money/information`
+refuses with 409 when either is stale or missing; each part raises only its own revision. The
+MATERIAL and ITEM edits (`PUT /api/v1/orders/{id}`, `…/requested`, `…/items`, `…/items/requested`)
+carry `commentVersion` beside `version` the same way, and their edit forms echo both.
+
 **Acceptance**
 
+- [ ] A concurrent contact write and comment write never lose an update, a stale or missing
+  comment revision refuses the whole write, and a part the write leaves unchanged keeps its
+  revision.
 - [ ] Independent holder provisions and unrelated notes do not stale each other's forms.
 - [ ] Competing use of the same captured funds cannot overdraw or spend a pending bound amount twice.
 - [ ] Concurrent target change, handover, cancellation and hierarchy change produce a coherent permitted result.
@@ -459,13 +473,17 @@ exposing version information. Exact schema, SQL and classes follow these contrac
 - [ ] PostgreSQL races cover first creation, replacement/confirm/cancel and inverse-direction transfers without deadlock-prone lock inversion.
 
 **Enforced by:** `JobOrderMoneyIntegrationTest` exercises concurrent provision, same-source debits,
-target change, cancellation, responsibility transfer, deletion, paired reassignment and audit
-rollback with real PostgreSQL. The Bank increment owns joint Bank effects.
+target change, cancellation, responsibility transfer, deletion, paired reassignment, the contact
+and comment revisions and audit rollback with real PostgreSQL. `JobOrderCommentVersionIntegrationTest`
+covers the comment revision of the MATERIAL and ITEM edits, `JobOrderEditorTest` its check, and
+`OrdersDetailPatternRenderTest` and `JobOrderPageControllerItemEditMvcTest` the echoing forms. The
+Bank increment owns joint Bank effects.
 
 Personal and Bank collection position revisions start at zero before first insertion. A new Bank
 collection provision checks the echoed position revision before entering the Bank queue. A matching
-replay can recover the recorded result even after the revision advances. Contact and comment use an
-information revision separate from target, lifecycle and responsibility. The shared order row stabilizes
+replay can recover the recorded result even after the revision advances. The contact uses an
+information revision and the comment its own comment revision, both separate from target, lifecycle
+and responsibility. The shared order row stabilizes
 money effects and the current write grants. Handover checks its holder and target observations.
 A possible terminal transition takes the existing priority queue guard before scoped order rows.
 Paired writes acquire the required account identity guards, the shared hierarchy guard, then both

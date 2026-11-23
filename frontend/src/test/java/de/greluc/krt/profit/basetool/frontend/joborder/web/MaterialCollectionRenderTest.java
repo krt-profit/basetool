@@ -105,6 +105,7 @@ class MaterialCollectionRenderTest {
                 false,
                 false,
                 0L,
+                0L,
                 0L));
     when(backendApiClient.get(contains("/material-collection"), anyTypeRef(), any(Object[].class)))
         .thenReturn(entries);

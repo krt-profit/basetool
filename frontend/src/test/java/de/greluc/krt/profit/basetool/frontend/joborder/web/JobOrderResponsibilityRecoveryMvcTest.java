@@ -113,7 +113,8 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             false,
             0L,
-            6L);
+            6L,
+            0L);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
     List<OrgUnitMembershipOptionDto> options =
@@ -207,6 +208,7 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             false,
             0L,
+            0L,
             0L);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
@@ -261,6 +263,7 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             false,
             false,
+            0L,
             0L,
             0L);
     when(backendApiClient.patch(
@@ -318,6 +321,7 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             false,
             false,
+            0L,
             0L,
             0L);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))

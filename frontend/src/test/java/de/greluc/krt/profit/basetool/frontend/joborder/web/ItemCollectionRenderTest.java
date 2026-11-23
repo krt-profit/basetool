@@ -135,6 +135,7 @@ class ItemCollectionRenderTest {
                 false,
                 false,
                 0L,
+                0L,
                 0L));
     when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
         .thenReturn(

@@ -511,19 +511,20 @@ public class JobOrderService {
    * deleted, kept lines retain their handed-over credit and inventory links.
    *
    * @param id job order primary key
-   * @param updateDto update payload with the expected version
+   * @param updateDto update payload with the expected order and comment versions
    * @return the persisted order
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
-   *     stale
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the order or
+   *     comment version is missing or stale
    */
   @Transactional
   public JobOrderDto updateJobOrder(UUID id, CreateJobOrderDto updateDto) {
     List<CreateJobOrderMaterialDto> materials = List.copyOf(updateDto.materials());
-    return jobOrderEditor.editPlanned(
+    return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.EDIT,
         updateDto.version(),
+        updateDto.commentVersion(),
         plannedOrder ->
             materialReplacementPlan(
                 plannedOrder,
@@ -536,7 +537,7 @@ public class JobOrderService {
                             updateDto.requestingOrgUnitId()));
                   }
                   jobOrder.setHandle(updateDto.handle());
-                  jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
+                  JobOrderComment.replace(jobOrder, updateDto.comment());
                   MaterialReplaceOutcome outcome =
                       replaceMaterialsWithinTransaction(id, jobOrder, materials);
                   return notifyChangedNeed(
@@ -636,20 +637,21 @@ public class JobOrderService {
    * the order's version. The responsible org unit is not changed here.
    *
    * @param id the order id
-   * @param updateDto the new item lines and metadata with the expected version
+   * @param updateDto the new item lines and metadata with the expected order and comment versions
    * @return the persisted order DTO with re-derived materials and aggregation
    * @throws NotFoundException when the order, a game item or a blueprint id is unknown
    * @throws BadRequestException when the order is not an item order, has item handovers, or a
    *     blueprint does not produce its line's item
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
-   *     stale
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the order or
+   *     comment version is missing or stale
    */
   @Transactional
   public JobOrderDto updateItemJobOrder(UUID id, CreateJobOrderItemRequestDto updateDto) {
-    return jobOrderEditor.editPlanned(
+    return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.EDIT,
         updateDto.version(),
+        updateDto.commentVersion(),
         jobOrder -> itemReplacementPlan(jobOrder, updateDto, false));
   }
 
@@ -691,7 +693,7 @@ public class JobOrderService {
           jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
     }
     jobOrder.setHandle(updateDto.handle());
-    jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
+    JobOrderComment.replace(jobOrder, updateDto.comment());
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
@@ -726,26 +728,28 @@ public class JobOrderService {
    * atomically.
    *
    * @param id the order id
-   * @param updateDto the new material lines and comment with the expected version
+   * @param updateDto the new material lines and comment with the expected order and comment
+   *     versions
    * @return the persisted order DTO
    * @throws NotFoundException when the order or a material id is unknown
    * @throws BadRequestException when the order is not a material order
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
-   *     stale
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the order or
+   *     comment version is missing or stale
    */
   @Transactional
   public JobOrderDto updateJobOrderAsRequester(UUID id, CreateJobOrderDto updateDto) {
     List<CreateJobOrderMaterialDto> materials = List.copyOf(updateDto.materials());
-    return jobOrderEditor.editPlanned(
+    return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.REQUESTER,
         updateDto.version(),
+        updateDto.commentVersion(),
         plannedOrder ->
             materialReplacementPlan(
                 plannedOrder,
                 materials,
                 jobOrder -> {
-                  jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
+                  JobOrderComment.replace(jobOrder, updateDto.comment());
                   MaterialReplaceOutcome outcome =
                       replaceMaterialsWithinTransaction(id, jobOrder, materials);
                   return JobOrderEdit.audited(
@@ -771,21 +775,22 @@ public class JobOrderService {
    * org unit on commit; audited as {@code JOB_ORDER_ITEM_UPDATED} with {@code byRequester=true}.
    *
    * @param id the order id
-   * @param updateDto the new item lines and comment with the expected version
+   * @param updateDto the new item lines and comment with the expected order and comment versions
    * @return the persisted order DTO with re-derived materials
    * @throws NotFoundException when the order, a game item or a blueprint id is unknown
    * @throws BadRequestException when the order is not an item order or the edit discards booked
    *     work
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
-   *     stale
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the order or
+   *     comment version is missing or stale
    */
   @Transactional
   public JobOrderDto updateItemJobOrderAsRequester(
       UUID id, CreateJobOrderItemRequestDto updateDto) {
-    return jobOrderEditor.editPlanned(
+    return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.REQUESTER,
         updateDto.version(),
+        updateDto.commentVersion(),
         jobOrder -> itemReplacementPlan(jobOrder, updateDto, true));
   }
 
@@ -802,7 +807,7 @@ public class JobOrderService {
         new LinkedHashSet<>(jobOrderItemService.requiredGameItemIds(jobOrder));
 
     itemReconciliation.apply(jobOrder, prepared);
-    jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
+    JobOrderComment.replace(jobOrder, updateDto.comment());
 
     jobOrderRepository.saveAndFlush(jobOrder);
 

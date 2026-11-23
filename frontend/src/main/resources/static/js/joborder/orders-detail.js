@@ -174,13 +174,14 @@ export function _odControlById(id) {
 }
 
 /**
- * Finds the version input of the order edit modal.
+ * Finds a version input of the order edit modal.
  *
+ * @param {'version' | 'commentVersion'} [name] the version field; the order version when absent
  * @returns {HTMLInputElement | null} the input, or null when the page has none
  */
-export function _odEditVersionInput() {
+export function _odEditVersionInput(name = 'version') {
     return /** @type {HTMLInputElement | null} */ (
-        document.querySelector('#edit-modal input[name="version"]')
+        document.querySelector(`#edit-modal input[name="${name}"]`)
     );
 }
 

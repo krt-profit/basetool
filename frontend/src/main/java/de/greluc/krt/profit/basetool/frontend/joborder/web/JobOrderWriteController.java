@@ -154,7 +154,8 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               lines,
-              form.getVersion());
+              form.getVersion(),
+              form.getCommentVersion());
       JobOrderDto created = jobOrderClient.createItemOrder(dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -226,7 +227,8 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   lines,
-                  form.getVersion());
+                  form.getVersion(),
+                  form.getCommentVersion());
           JobOrderDto created = jobOrderClient.createItemOrder(dto);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
@@ -302,7 +304,8 @@ public class JobOrderWriteController {
             requester ? null : form.getHandle(),
             form.getComment(),
             lines,
-            form.getVersion());
+            form.getVersion(),
+            form.getCommentVersion());
     if (requester) {
       jobOrderClient.updateItemOrderAsRequester(id, dto);
     } else {
@@ -355,7 +358,8 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               materials,
-              form.getVersion());
+              form.getVersion(),
+              form.getCommentVersion());
       JobOrderDto created = jobOrderClient.createOrder(dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -411,7 +415,8 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   materials,
-                  form.getVersion());
+                  form.getVersion(),
+                  form.getCommentVersion());
           JobOrderDto created = jobOrderClient.createOrder(dto);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
@@ -629,7 +634,8 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               materials,
-              form.getVersion());
+              form.getVersion(),
+              form.getCommentVersion());
       jobOrderClient.updateOrder(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
@@ -647,7 +653,8 @@ public class JobOrderWriteController {
    * in-place re-render; an empty material list yields 400.
    *
    * @param id the order to update
-   * @param form the edit payload (requestingOrgUnitId, handle, comment, version, materials[])
+   * @param form the edit payload (requestingOrgUnitId, handle, comment, version, commentVersion,
+   *     materials[])
    * @return the updated order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/update", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -674,18 +681,19 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   materials,
-                  form.getVersion());
+                  form.getVersion(),
+                  form.getCommentVersion());
           JobOrderDto updated = jobOrderClient.updateOrder(id, dto);
           return ResponseEntity.ok(updated);
         });
   }
 
   /**
-   * Requester-side MATERIAL edit (REQ-ORDERS-023): relays comment, materials and version to {@code
-   * PUT /api/v1/orders/{id}/requested}, which enforces the requester gate.
+   * Requester-side MATERIAL edit (REQ-ORDERS-023): relays comment, materials and both versions to
+   * {@code PUT /api/v1/orders/{id}/requested}, which enforces the requester gate.
    *
    * @param id the order to update
-   * @param form the edit payload (comment, version, materials[])
+   * @param form the edit payload (comment, version, commentVersion, materials[])
    * @param redirectAttributes flash carrier for the result toast
    * @return redirect back to the order detail
    */
@@ -709,7 +717,14 @@ public class JobOrderWriteController {
         return "redirect:/orders/" + id;
       }
       CreateJobOrderDto dto =
-          new CreateJobOrderDto(null, null, null, form.getComment(), materials, form.getVersion());
+          new CreateJobOrderDto(
+              null,
+              null,
+              null,
+              form.getComment(),
+              materials,
+              form.getVersion(),
+              form.getCommentVersion());
       jobOrderClient.updateOrderAsRequester(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
@@ -727,7 +742,7 @@ public class JobOrderWriteController {
    * in-place re-render; an empty material list yields 400.
    *
    * @param id the order to update
-   * @param form the edit payload (comment, version, materials[])
+   * @param form the edit payload (comment, version, commentVersion, materials[])
    * @return the updated complete order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/requested-update", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -749,7 +764,13 @@ public class JobOrderWriteController {
         () -> {
           CreateJobOrderDto dto =
               new CreateJobOrderDto(
-                  null, null, null, form.getComment(), materials, form.getVersion());
+                  null,
+                  null,
+                  null,
+                  form.getComment(),
+                  materials,
+                  form.getVersion(),
+                  form.getCommentVersion());
           JobOrderDto updated = jobOrderClient.updateOrderAsRequester(id, dto);
           return ResponseEntity.ok(updated);
         });

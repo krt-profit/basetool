@@ -96,12 +96,14 @@ class JobOrderControllerTest {
         false,
         false,
         0L,
+        0L,
         0L);
   }
 
   @Test
   void createJobOrder_passesTheServiceResultThroughUnredacted() {
-    CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", null, List.of(), null);
+    CreateJobOrderDto request =
+        new CreateJobOrderDto(null, null, "alice", null, List.of(), null, null);
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
     when(jobOrderService.createJobOrder(request)).thenReturn(created);
 
@@ -410,7 +412,7 @@ class JobOrderControllerTest {
   @Test
   void updateJobOrder_forwardsBodyToService() {
     UUID id = UUID.randomUUID();
-    CreateJobOrderDto updateDto = new CreateJobOrderDto(null, null, "bob", null, List.of(), 1L);
+    CreateJobOrderDto updateDto = new CreateJobOrderDto(null, null, "bob", null, List.of(), 1L, 0L);
     JobOrderDto persisted = jobOrderDto(id);
     when(jobOrderService.updateJobOrder(id, updateDto)).thenReturn(persisted);
 

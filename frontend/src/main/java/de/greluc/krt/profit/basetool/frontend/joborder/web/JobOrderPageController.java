@@ -480,6 +480,7 @@ public class JobOrderPageController {
       itemForm.setRequestingOrgUnitId(
           order.requestingOrgUnit() != null ? order.requestingOrgUnit().id() : null);
       itemForm.setVersion(order.version());
+      itemForm.setCommentVersion(order.commentVersion());
       model.addAttribute("jobOrderItemForm", itemForm);
     }
     model.addAttribute("editOrderId", id);

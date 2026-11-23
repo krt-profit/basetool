@@ -60,7 +60,8 @@ public record JobOrderDto(
     Boolean canCancel,
     Boolean canReopen,
     Long lifecycleVersion,
-    Long responsibilityVersion) {
+    Long responsibilityVersion,
+    Long commentVersion) {
 
   /**
    * Whether the backend lets the caller edit this order: its {@code canEdit} row flag, which is

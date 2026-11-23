@@ -75,7 +75,8 @@ class ItemOrderResourcePlanningIntegrationTest extends MaterialContributionTestS
                     List.of(),
                     null,
                     null)),
-            order.version());
+            order.version(),
+            order.commentVersion());
     var allocation =
         Map.of(
             "field",

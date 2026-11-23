@@ -368,8 +368,7 @@ class ProfitHierarchyNoticeIntegrationTest {
             fixture.responsible(),
             "OPEN",
             JsonPath.read(completed, "$.lifecycleVersion"));
-    changeNeed(
-        Audience.ACTOR, fixture.claiming(), "/requested", JsonPath.read(opened, "$.version"), 7);
+    changeNeed(Audience.ACTOR, fixture.claiming(), "/requested", opened, 7);
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(() ->
@@ -410,12 +409,12 @@ class ProfitHierarchyNoticeIntegrationTest {
 
   @Test
   void requesterNeedChangesNotifyCurrentWritersOfBothAffectedUnits() throws Exception {
-    Number version = JsonPath.read(createAffectedOrder(), "$.version");
+    String created = createAffectedOrder();
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(() -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED"));
 
-    changeNeed(Audience.ACTOR, fixture.claiming(), "/requested", version, 7);
+    changeNeed(Audience.ACTOR, fixture.claiming(), "/requested", created, 7);
 
     await()
         .atMost(Duration.ofSeconds(10))
@@ -431,16 +430,14 @@ class ProfitHierarchyNoticeIntegrationTest {
 
   @Test
   void aRequesterCommentLoopLeavesEachRecipientOneUnreadNeedChangeNotice() throws Exception {
-    Number version = JsonPath.read(createAffectedOrder(), "$.version");
+    String basis = createAffectedOrder();
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(() -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED"));
 
     Set<Object> delivered = new HashSet<>();
     for (int edit = 1; edit <= 3; edit++) {
-      String changed =
-          editOrder(Audience.ACTOR, fixture.claiming(), "/requested", version, 5, "Loop " + edit);
-      version = JsonPath.read(changed, "$.version");
+      basis = editOrder(Audience.ACTOR, fixture.claiming(), "/requested", basis, 5, "Loop " + edit);
       await()
           .atMost(Duration.ofSeconds(10))
           .untilAsserted(() ->
@@ -457,12 +454,12 @@ class ProfitHierarchyNoticeIntegrationTest {
 
   @Test
   void onlyMeaningfulResponsibleNeedEditsNotifyAffectedWriters() throws Exception {
-    Number version = JsonPath.read(createAffectedOrder(), "$.version");
+    String created = createAffectedOrder();
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(() -> assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_CREATED"));
 
-    String changed = changeNeed(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "", version, 7);
+    String changed = changeNeed(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "", created, 7);
 
     await()
         .atMost(Duration.ofSeconds(10))
@@ -474,8 +471,7 @@ class ProfitHierarchyNoticeIntegrationTest {
     assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED");
     assertNoticeTypes(Audience.ADMIN);
 
-    Number changedVersion = JsonPath.read(changed, "$.version");
-    changeNeed(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "", changedVersion, 7);
+    changeNeed(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "", changed, 7);
 
     await()
         .during(Duration.ofMillis(250))
@@ -979,28 +975,32 @@ class ProfitHierarchyNoticeIntegrationTest {
         .getContentAsString();
   }
 
-  private String changeNeed(Audience actor, UUID unit, String path, Number version, int amount)
+  private String changeNeed(Audience actor, UUID unit, String path, String basis, int amount)
       throws Exception {
-    return editOrder(actor, unit, path, version, amount, null);
+    return editOrder(actor, unit, path, basis, amount, null);
   }
 
   private String editOrder(
-      Audience actor, UUID unit, String path, Number version, int amount, @Nullable String comment)
+      Audience actor, UUID unit, String path, String basis, int amount, @Nullable String comment)
       throws Exception {
+    Number version = JsonPath.read(basis, "$.version");
+    Number commentVersion = JsonPath.read(basis, "$.commentVersion");
     String request =
         """
         {
           "handle": "New work for the unit",
           "comment": %s,
           "materials": [{"materialId": "%s", "minQuality": 650, "amount": %s}],
-          "version": %s
+          "version": %s,
+          "commentVersion": %s
         }
         """
             .formatted(
                 comment == null ? "null" : "\"" + comment + "\"",
                 fixture.materials().getFirst(),
                 amount,
-                version);
+                version,
+                commentVersion);
     return as(
             actor,
             put("/api/v1/orders/" + createdOrder + path)
