@@ -188,7 +188,9 @@ class ExchangeGoldenAnswerTest {
               RELAYED_OPERATIONS.add(target);
             }
             MockResponse override = OVERRIDES.get(target);
-            return override != null ? override : json(200, defaultAnswer(target));
+            return override != null
+                ? override
+                : json(200, defaultAnswer(target, readsFeed(request)));
           }
         });
     backend.start();
@@ -560,6 +562,7 @@ class ExchangeGoldenAnswerTest {
             "/bank/requests/33333333-4444-4555-8666-777777777777/cancel",
             fixture("bank-request-write--cancel/valid/cancel.json")));
     routes.put("route-get-job-orders", get("/job-orders?limit=2"));
+    routes.put("route-get-job-orders-feed", get("/job-orders?cursor=f1.1029384.0&limit=50"));
     routes.put("route-get-job-order-create-options", get("/job-orders/create-options"));
     routes.put(
         "route-post-job-order",
@@ -573,9 +576,11 @@ class ExchangeGoldenAnswerTest {
    * The backend stub's default answer per relay operation, the published fixture where one exists.
    *
    * @param target {@code METHOD path}
+   * @param feed whether the request carries a feed cursor, for a route whose snapshot and feed
+   *     answer differently
    * @return the answer's body
    */
-  private static @NotNull String defaultAnswer(@NotNull String target) {
+  private static @NotNull String defaultAnswer(@NotNull String target, boolean feed) {
     try {
       return switch (target) {
         case "GET /api/v1/exchange/me/installation", "POST /api/v1/exchange/me/installation" ->
@@ -628,7 +633,11 @@ class ExchangeGoldenAnswerTest {
             fixture("bank-request-write--written/valid/pending.json");
         case "POST /api/v1/exchange/bank/requests/{id}/cancel" ->
             fixture("bank-request-write--cancelled/valid/cancelled.json");
-        case "GET /api/v1/exchange/job-orders" -> fixture("page--jobOrderPage/valid/snapshot.json");
+        case "GET /api/v1/exchange/job-orders" ->
+            fixture(
+                feed
+                    ? "page--jobOrderPage/valid/feed.json"
+                    : "page--jobOrderPage/valid/snapshot.json");
         case "GET /api/v1/exchange/job-orders/create-options" ->
             fixture("job-order-create-options/valid/logistician.json");
         case "POST /api/v1/exchange/job-orders" ->
@@ -808,6 +817,17 @@ class ExchangeGoldenAnswerTest {
     String path = request.getPath() == null ? "" : request.getPath();
     int query = path.indexOf('?');
     return ID_SEGMENT.matcher(query < 0 ? path : path.substring(0, query)).replaceAll("/{id}");
+  }
+
+  /**
+   * Tells whether a recorded request carries a feed cursor.
+   *
+   * @param request the request the stub received
+   * @return {@code true} for a {@code cursor} query parameter that starts with {@code f1.}
+   */
+  private static boolean readsFeed(@NotNull RecordedRequest request) {
+    String path = request.getPath() == null ? "" : request.getPath();
+    return path.contains("?cursor=f1.") || path.contains("&cursor=f1.");
   }
 
   /**

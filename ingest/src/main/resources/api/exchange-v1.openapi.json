@@ -2190,8 +2190,8 @@
     "/exchange/v1/job-orders": {
       "get": {
         "operationId": "job_orders",
-        "summary": "The job orders the member relates to: snapshot of the member's job-order set.",
-        "description": "Orders of all three kinds that a unit the member directly belongs to requests, is responsible for or actively supports, and those the member works on as an assignee: active, closed within 7 days, and aUEC orders while settlementOpen holds. Each order carries the member's relations, the assignees under per-client refs, the member's own note, the section versions and its kind's progress; no holder, amount per person, provision, Bank state, commitment or claim. The snapshot pages by id and its last page hands over the feed cursor. While the job-order switch is off the route answers 503 JOB_ORDER_EXCHANGE_DISABLED with Retry-After: 300. Retention class: job-order data, kept at most 7 days, in memory only.",
+        "summary": "The job orders the member relates to: snapshot and change feed of the member's job-order set.",
+        "description": "Orders of all three kinds that a unit the member directly belongs to requests, is responsible for or actively supports, and those the member works on as an assignee: active, closed within 7 days, and aUEC orders while settlementOpen holds. Each order carries the member's relations, the assignees under per-client refs, the member's own note, the section versions and its kind's progress; no holder, amount per person, provision, Bank state, commitment or claim. The snapshot pages by id and its last page hands over the feed cursor, one cursor for all three kinds. With a feed cursor the page holds the orders announced since: each order still in the member's set as an item, every other key as a removed entry { key, removedAt } that names no writer, so a lost relation, the end of the window and a deletion look alike. While the job-order switch is off the route answers 503 JOB_ORDER_EXCHANGE_DISABLED with Retry-After: 300. Retention class: job-order data, kept at most 7 days, in memory only.",
         "tags": [
           "job-orders"
         ],

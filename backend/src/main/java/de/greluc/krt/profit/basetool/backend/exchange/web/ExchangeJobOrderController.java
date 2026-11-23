@@ -48,13 +48,14 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Exchange — job orders", description = "The job orders the member relates to")
 public class ExchangeJobOrderController {
 
-  /** Serves the snapshot of the member's job-order set. */
+  /** Serves the snapshot and the change feed of the member's job-order set. */
   private final ExchangeJobOrderReadService readService;
 
   /**
-   * Returns a snapshot page of the member's job-order set.
+   * Returns a snapshot or a change-feed page of the member's job-order set.
    *
-   * @param cursor the cursor of the last page, or absent for a new snapshot
+   * @param cursor the cursor of the last page, or absent for a new snapshot; a feed cursor reads
+   *     the changes after it
    * @param limit the page size, at most 1000
    * @param authentication the relayed acting member the gate admitted
    * @return the page
@@ -71,8 +72,11 @@ public class ExchangeJobOrderController {
               + " is open. Header, the member's relations, assignee names under per-client refs,"
               + " the member's own note, the section versions and each kind's progress; no"
               + " holder, amount per person, provision, Bank state, commitment or claim. A"
-              + " snapshot paged by id that ends with the feed cursor of REQ-XCH-013; a client"
-              + " keeps the data at most 7 days, in memory.")
+              + " snapshot paged by id that ends with the feed cursor of REQ-XCH-013; with that"
+              + " cursor, the orders announced since, each an item while it is in the set and"
+              + " otherwise a removed entry { key, removedAt } that names no writer, alike for a"
+              + " lost relation, the end of the window and a deletion. A client keeps the data at"
+              + " most 7 days, in memory.")
   @ApiResponse(responseCode = "200", description = "The page")
   @ApiResponse(responseCode = "410", description = "The cursor has expired (CURSOR_EXPIRED)")
   public ResponseEntity<ExchangeJobOrderPageDto> jobOrders(

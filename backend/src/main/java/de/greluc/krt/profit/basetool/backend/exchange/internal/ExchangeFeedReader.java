@@ -222,19 +222,65 @@ public class ExchangeFeedReader {
       @NotNull List<ExchangeChangeRepository.ChangedKey> changed) {
     boolean more = changed.size() > size;
     List<ExchangeChangeRepository.ChangedKey> delivered = more ? changed.subList(0, size) : changed;
-    ExchangeFeedPosition next;
-    if (more) {
-      ExchangeChangeRepository.ChangedKey last = delivered.getLast();
-      next = new ExchangeFeedPosition(last.getTx(), last.getSeq());
-    } else {
-      ExchangeFeedPosition caughtUp = new ExchangeFeedPosition(watermark, 0);
-      next = after.isBefore(caughtUp) ? caughtUp : after;
-    }
     return new Changes(
         delivered.stream().map(ExchangeChangeRepository.ChangedKey::getEntityKey).toList(),
         removals(member, delivered),
-        next,
+        next(after, watermark, delivered, more),
         more);
+  }
+
+  /**
+   * Returns the job orders announced after a position in the logs of the given units or in the
+   * member's own log, each once in the order of its latest entry, only from finished transactions
+   * (REQ-OXCH-003).
+   *
+   * @param member the member whose own log is read
+   * @param units the units the member reads through now
+   * @param after the position
+   * @param size the page size
+   * @return the keys with the instant of their latest entry, and where the next page starts
+   */
+  public @NotNull DatedChanges jobOrderChanges(
+      @NotNull UUID member,
+      @NotNull Collection<UUID> units,
+      @NotNull ExchangeFeedPosition after,
+      int size) {
+    long watermark = changeRepository.watermark();
+    List<ExchangeChangeRepository.AnnouncedKey> announced =
+        changeRepository.findAnnouncedJobOrders(
+            units, member, after.tx(), after.seq(), watermark, size + 1);
+    boolean more = announced.size() > size;
+    List<ExchangeChangeRepository.AnnouncedKey> delivered =
+        more ? announced.subList(0, size) : announced;
+    return new DatedChanges(
+        delivered.stream()
+            .map(key -> new DatedChange(key.getEntityKey(), key.getChangedAt()))
+            .toList(),
+        next(after, watermark, delivered, more),
+        more);
+  }
+
+  /**
+   * Positions the page after the delivered keys: at the last of them while more follow, else at the
+   * watermark unless the page started beyond it.
+   *
+   * @param after the position the page starts after
+   * @param watermark the oldest transaction id still running when the keys were read
+   * @param delivered the page's keys in feed order
+   * @param more whether more keys follow now
+   * @return the next page's position
+   */
+  private static @NotNull ExchangeFeedPosition next(
+      @NotNull ExchangeFeedPosition after,
+      long watermark,
+      @NotNull List<? extends ExchangeChangeRepository.ChangedKey> delivered,
+      boolean more) {
+    if (more) {
+      ExchangeChangeRepository.ChangedKey last = delivered.getLast();
+      return new ExchangeFeedPosition(last.getTx(), last.getSeq());
+    }
+    ExchangeFeedPosition caughtUp = new ExchangeFeedPosition(watermark, 0);
+    return after.isBefore(caughtUp) ? caughtUp : after;
   }
 
   /**
@@ -343,6 +389,36 @@ public class ExchangeFeedReader {
       return ExchangeFeedCursor.feed(next).format();
     }
   }
+
+  /**
+   * The keys of one feed page whose removal names no writer.
+   *
+   * @param changes the changed keys in feed order
+   * @param next where the next page starts
+   * @param more whether more changes follow now
+   */
+  public record DatedChanges(
+      @NotNull @Unmodifiable List<DatedChange> changes,
+      @NotNull ExchangeFeedPosition next,
+      boolean more) {
+
+    /**
+     * The cursor of the next page.
+     *
+     * @return the cursor
+     */
+    public @NotNull String nextCursor() {
+      return ExchangeFeedCursor.feed(next).format();
+    }
+  }
+
+  /**
+   * A changed key with the instant of its latest entry.
+   *
+   * @param key the key as the feed recorded it
+   * @param at when its latest entry was written
+   */
+  public record DatedChange(@NotNull String key, @NotNull Instant at) {}
 
   /**
    * When and by whom a key was last changed.

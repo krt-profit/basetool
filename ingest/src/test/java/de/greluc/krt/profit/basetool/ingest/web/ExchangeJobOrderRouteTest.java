@@ -60,8 +60,9 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * The route of the member's job-order set through both gates, with the backend relay mocked
- * (REQ-OXCH-002, REQ-OXCH-003): the gateway relays the snapshot, checks the paging before the relay
- * and every answer against the schema of its kind, and the family switch closes the route.
+ * (REQ-OXCH-002, REQ-OXCH-003): the gateway relays the snapshot and the feed, checks the paging
+ * before the relay and every answer against the schema of its kind, refuses a removed entry that
+ * names its writer, and the family switch closes the route.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 class ExchangeJobOrderRouteTest {
@@ -113,6 +114,33 @@ class ExchangeJobOrderRouteTest {
         .andExpect(jsonPath("$.items[2].settlementOpen").value(true))
         .andExpect(jsonPath("$.items[0].relations[1]").value("assignee"))
         .andExpect(jsonPath("$.hasMore").value(false));
+  }
+
+  @Test
+  void aFeedPageIsRelayedWithItsCursorAndItsRemovedEntriesNameNoWriter() throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.GET), eq(BACKEND + "?cursor=f1.1029384.0"), isNull(), any(), any()))
+        .thenReturn(ok(example("page--jobOrderPage/valid/feed.json")));
+
+    call("/exchange/v1/job-orders?cursor=f1.1029384.0")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].materials[0].open").value(0))
+        .andExpect(jsonPath("$.removed[0].key").value("2c3d4e5f-6071-4b82-9ca3-b4c5d6e7f809"))
+        .andExpect(jsonPath("$.removed[0].removedAt").value("2026-11-22T19:41:03Z"))
+        .andExpect(jsonPath("$.removed[0].removedBy").doesNotExist())
+        .andExpect(jsonPath("$.nextCursor").value("f1.1031777.0"));
+  }
+
+  @Test
+  void aRemovedEntryNamingItsWriterIsARelayFailure() throws Exception {
+    JsonNode page = MAPPER.readTree(example("page--jobOrderPage/valid/feed.json"));
+    ((ObjectNode) page.get("removed").get(0)).putObject("removedBy").put("channel", "web");
+    when(relay.forward(any(), anyString(), any(), any(), any()))
+        .thenReturn(new ExchangeRelay.Result(200, page, null, null));
+
+    call("/exchange/v1/job-orders?cursor=f1.1029384.0")
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value(ExchangeRelay.RELAY_FAILED));
   }
 
   @Test

@@ -907,7 +907,9 @@ change of the default blueprint set — appear in it. Removals leave tombstones 
 (`web`, `app`, `client` with client id and installation id, `system`, and `patch` with the patch
 change `{id, label}`, [REQ-PATCH-007](patch-change.md#req-patch-007--the-exchange-feeds-name-the-patch-change-behind-a-change))
 and `removedAt`, kept 90 days and purged nightly. A cursor older than the tombstones answers
-`410 CURSOR_EXPIRED`.
+`410 CURSOR_EXPIRED`. The job-order feed is the one exception: its tombstones are
+`{ key, removedAt }` without `removedBy`, so a lost relation, the end of the window and a deletion
+look alike ([REQ-OXCH-003](orders-exchange.md#req-oxch-003--snapshot-and-feed-of-the-job-order-set)).
 
 The sequence is `exchange_change` (ADR-0224): an `AFTER` row trigger on every synced table records
 `(member, resource, key)` with its writing transaction's id and a sequence number, and the feed reads
@@ -922,10 +924,16 @@ change's trigger, otherwise `system`); a `patch` entry keeps the patch change in
 purged position as the horizon, below which a cursor has expired.
 
 The feeds are `ExchangeFeedResource`, whose constants are the `exchange_change.resource` values
-`ck_exchange_change_resource` allows: `BLUEPRINT`, `STOCK`, `SHIP`, `ORG_STOCK` and the read-only
-`BANK_REQUEST` (REQ-BXCH-003). The resources a client writes are the separate `ExchangeResource`
-(REQ-XCH-022), each of which names its feed, so a switch over either type covers only the values it
-applies to.
+`ck_exchange_change_resource` allows: `BLUEPRINT`, `STOCK`, `SHIP`, `ORG_STOCK`, `REFINERY_ORDER`
+(REQ-XCH-051) and the read-only `BANK_REQUEST` (REQ-BXCH-003) and `JOB_ORDER` (REQ-OXCH-003). The
+resources a client writes are the separate `ExchangeResource` (REQ-XCH-022), each of which names its
+feed, so a switch over either type covers only the values it applies to.
+
+`ORG_STOCK` entries name a unit (`exchange_change.org_unit_id`) instead of a member, and a
+`JOB_ORDER` entry names a unit or a member: a changed job-order fingerprint is logged for the
+order's units and assignees, old and new, memberships and a unit's activation announce its orders
+per member, and a feed page reads the entries of the member's current direct units and the member's
+own entries and resolves every key against the member's current set (ADR-0406, REQ-OXCH-003).
 
 **Acceptance**
 
@@ -937,7 +945,11 @@ applies to.
   name, its withholding and an earmarked mission's name in the details of REQ-XCH-043), `ship` and
   `org_unit` (the ships and lots of a renamed unit), `refinery_order` and `refinery_good`
   (an order and its goods, once per order and transaction, REQ-XCH-051), and `location`, `city`, `space_station` and
-  `starmap_object` (the entries at a place whose reference changed, REQ-XCH-018, refinery orders included) — to their
+  `starmap_object` (the entries at a place whose reference changed, REQ-XCH-018, refinery orders included),
+  and `exchange_job_order_fingerprint` and `job_order_assignees` (a changed job-order fingerprint
+  per unit and member, and an assignee's own note; `org_unit_membership` with `DELETE`, `org_unit`
+  with its activation, `app_user` and `exchange_name_withholding` announce job orders too,
+  REQ-OXCH-003) — to their
   triggers and runs bulk deletes,
   owner reassignment, a move to another place, a rebooking between personal and shared or between
   pools that keeps the lot's key and changes its split (`V304`), and user deletion through them.
