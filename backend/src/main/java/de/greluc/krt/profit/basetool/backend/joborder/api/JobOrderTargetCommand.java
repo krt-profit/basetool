@@ -26,7 +26,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * The web's aUEC target command for a caller that passes its own writer rule, read check and actor;
  * the order and account locks, the target version, the responsibility gate, the target history, the
- * audit, the notices and the live update are the web's (ADR-0405).
+ * audit, the notices and the live update are the web's (ADR-0408).
  */
 public interface JobOrderTargetCommand {
 

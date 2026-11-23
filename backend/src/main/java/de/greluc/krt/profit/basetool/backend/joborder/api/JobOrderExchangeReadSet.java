@@ -35,7 +35,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * and ended support never count, so the set never exceeds the web's read (REQ-ORDERS-052).
  *
  * <p>The exchange's writes on an existing order pass the same rule to the shared commands as {@link
- * JobOrderReadCheck#OWN_RELATION} (ADR-0405, ADR-0407).
+ * JobOrderReadCheck#OWN_RELATION} (ADR-0408, ADR-0407).
  */
 public interface JobOrderExchangeReadSet {
 

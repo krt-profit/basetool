@@ -183,7 +183,7 @@ unavailable in the choices. The frontend consumes the projected suggestions and 
 The backend revalidates the selected pair when creating. The create command and the projection
 take the writer rule and the actor as parameters, and every kind's create runs one create path;
 the web passes its contextual authorities with the honoured pin and the requesting member
-(ADR-0405). All create transports consume the returned order identity and open its central detail
+(ADR-0408). All create transports consume the returned order identity and open its central detail
 page. A reader without a permitted pair gets
 no create action and cannot open the form. Workspace and unit-work view capabilities remain
 independent of creation and individual action rights.
@@ -209,7 +209,7 @@ serve both, so every pair a client may create is one the web permits.
 
 Current authority is rechecked on each action. The status, target and information commands take
 the writer rule, the read check and the actor as parameters, like the create command
-(REQ-ORDERS-054, REQ-ORDERS-066, ADR-0405). A genuine own transfer may introduce a new
+(REQ-ORDERS-054, REQ-ORDERS-066, ADR-0408). A genuine own transfer may introduce a new
 counterparty with exactly that transfer's credit, not fabricate provision for another holder.
 Active account search is scoped to the permitted action. Display names alone grant no rights.
 Requesters may safely edit MATERIAL requested amounts and ITEM quantities after partial work,
@@ -243,7 +243,7 @@ the observed lifecycle version. The status command takes the writer rule, the re
 actor as parameters, and decides them with the responsibility gate under the order locks; the web
 passes its contextual authorities with the honoured pin, its complete-order read and the
 requesting member, and a status change answers an invalid responsibility before the read check,
-the writer and the version (ADR-0405). MATERIAL and ITEM need edits preserve the current lifecycle,
+the writer and the version (ADR-0408). MATERIAL and ITEM need edits preserve the current lifecycle,
 including manual completion and cancellation. aUEC target-change effects follow its money spec.
 
 Cancelling MATERIAL/ITEM stops ordinary fulfillment and releases order stock earmarks without

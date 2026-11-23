@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Creates an aUEC order and its target in one transaction, for the web and, at most once per key,
- * for a member acting through a client (REQ-ORDERS-053, REQ-OXCH-004, ADR-0405).
+ * for a member acting through a client (REQ-ORDERS-053, REQ-OXCH-004, ADR-0408).
  */
 @Service
 @RequiredArgsConstructor

@@ -39,7 +39,7 @@ The guiding rules:
 > [!note] Implemented for the read: the scope `exchange.joborders.read` and the read set (#3644;
 > decided in #3608, #3610, #3619, ADR-0407); and for the write: the scope
 > `exchange.joborders.write` and the writer rule of the create (#3646; decided in #3611, #3619,
-> ADR-0405).
+> ADR-0408).
 
 **Scopes.** A client reads job orders under `exchange.joborders.read` and writes them under
 `exchange.joborders.write`, each a capability of the registry (REQ-XCH-005) with its own consent
@@ -75,7 +75,7 @@ follows that unit's orders. An administrator reads like a plain member.
   predicates of `JobOrderScope` that the snapshot and the read check share.
 - The read check `JobOrderReadCheck.OWN_RELATION`, decided by the access policy for the request's
   acting member, carries the same rule to the shared status, target and information commands
-  (ADR-0405); the exchange's writes on an existing order pass it. A hidden, an unknown and a deleted
+  (ADR-0408); the exchange's writes on an existing order pass it. A hidden, an unknown and a deleted
   order answer alike.
 - **Nothing of the responsible side, no money and no Bank effect through a client** (ADR-0407): a
   client never accepts, processes, hands over, provides, settles, reassigns or deletes an order and
@@ -87,7 +87,7 @@ unit only when they are a **direct member** of it and a **Logistician** of it by
 (REQ-XCH-045): the Logistician flag, a leadership rank, or the reach of a Bereich or OL seat over
 it; they hold `KRT Member`, and the unit is active
 (`OrgUnitMembershipQueryService.findDirectLogisticianOrgUnitIds`). It is the writer rule
-`JobOrderWriterRule.DIRECT_LOGISTICIAN` of ADR-0405, decided from the database on every request.
+`JobOrderWriterRule.DIRECT_LOGISTICIAN` of ADR-0408, decided from the database on every request.
 
 - Mere membership makes no writer, and reach over a unit the member does not belong to counts not.
 - **Requester direction only:** a client creates an order only with one of the member's writer units
@@ -98,7 +98,7 @@ it; they hold `KRT Member`, and the unit is active
   through a client is always in their read set.
 - An administrator is a plain member: no admin pass, no all-scope, no pin.
 - For the same member without a pin, every pair the rule permits is one the web's contextual rule
-  permits, so a client never creates what the web would refuse (ADR-0405 point 5).
+  permits, so a client never creates what the web would refuse (ADR-0408 point 5).
 
 **Acceptance**
 
@@ -128,7 +128,7 @@ it; they hold `KRT Member`, and the unit is active
 `JobOrderAccessPolicy#canRead`, `JobOrderWriterRule.DIRECT_LOGISTICIAN`, `JobOrderWriters` (job
 orders) · `ExchangeCapability`, `ExchangeJobOrderReadService`, `ExchangeJobOrderCreateService`
 (exchange) · V446, V448 · **Related:** REQ-XCH-005, REQ-XCH-009, REQ-XCH-045, REQ-ORDERS-052,
-REQ-ORDERS-053, REQ-ORG-032, REQ-SEC-015 · ADR-0405, ADR-0407 · **Issues:** #3608, #3610, #3611,
+REQ-ORDERS-053, REQ-ORG-032, REQ-SEC-015 · ADR-0408, ADR-0407 · **Issues:** #3608, #3610, #3611,
 #3619, #3644, #3646
 
 ### REQ-OXCH-002 — The client read of a job order
@@ -383,14 +383,14 @@ REQ-OBS-025 · ADR-0224, ADR-0406, ADR-0407 · **Issues:** #3615, #3618, #3643, 
 
 ### REQ-OXCH-004 — Create options and the create of an aUEC order
 
-> [!note] Implemented (#3646; decided in #3611, #3614, #3617, #3619, ADR-0405, ADR-0407). The
+> [!note] Implemented (#3646; decided in #3611, #3614, #3617, #3619, ADR-0408, ADR-0407). The
 > open-order and daily create caps and `limits` in the create options follow with their slice
 > (REQ-OXCH-009).
 
 **Create options.** `GET /exchange/v1/job-orders/create-options` (`exchange.joborders.write`),
 relayed to `GET /api/v1/exchange/job-orders/create-options`, answers
 `job-order-create-options.schema.json` from the web's create-options projection under the writer
-rule of REQ-OXCH-001 (`JobOrderCreationOptions.current(DIRECT_LOGISTICIAN, actor)`, ADR-0405):
+rule of REQ-OXCH-001 (`JobOrderCreationOptions.current(DIRECT_LOGISTICIAN, actor)`, ADR-0408):
 
 - `requestingUnits`: the member's writer units, as `{id, name, shorthand, kind}`;
 - `responsibleUnits`: the eligible Profit units, in the same shape;
@@ -412,7 +412,7 @@ switch never closes it; each read counts one `create_options` read (REQ-OBS-025)
 - answer `201` `job-order-write.schema.json#/$defs/created`: `{ id, status, versions, target }`,
   read from the stored order.
 
-The create runs the web's aUEC create command (`JobOrderCreateCommand.createAuec`, ADR-0405) with
+The create runs the web's aUEC create command (`JobOrderCreateCommand.createAuec`, ADR-0408) with
 the writer rule `DIRECT_LOGISTICIAN` and an actor carrying the member and the client: the same order
 locks, unit resolution, eligible-Profit check, priority, created notice, `orders/queue` frame after
 the commit (REQ-XCH-030) and audit event as a web create. Nothing is filled in.
@@ -481,7 +481,7 @@ retry answered from the stored key, `rejected` for a refusal — and a refused p
 `ExchangeJobOrderWriteController`, `ExchangeRoutes`, `ExchangeRelay.DETAILS` (gateway) ·
 `job-order-write.schema.json`, `job-order-create-options.schema.json` · V448 · **Related:**
 REQ-XCH-020, REQ-XCH-025, REQ-XCH-030, REQ-XCH-048, REQ-ORDERS-053, REQ-AUDIT-001, REQ-NOTIF-008,
-REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005 · ADR-0405, ADR-0407 · **Issues:** #3611,
+REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005 · ADR-0408, ADR-0407 · **Issues:** #3611,
 #3614, #3617, #3619, #3646
 
 ### REQ-OXCH-005 — Shared rules of the job-order writes

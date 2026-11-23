@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 /**
  * Names the authority that decides for which units a caller writes a job order; the commands take
- * it as a parameter and resolve it on every call (ADR-0405).
+ * it as a parameter and resolve it on every call (ADR-0408).
  */
 public enum JobOrderWriterRule {
 

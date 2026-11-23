@@ -112,7 +112,7 @@ public class JobOrderEditor {
 
   /**
    * Applies one monetary edit under the read check its command's caller passed, while
-   * responsibility, lifecycle and deletion are serialized (ADR-0405).
+   * responsibility, lifecycle and deletion are serialized (ADR-0408).
    *
    * <p>Before and after the order row lock the order must pass the read check, be an aUEC order and
    * have a valid responsibility; the mutation makes its own writer and version checks.
@@ -275,7 +275,7 @@ public class JobOrderEditor {
 
   /**
    * Plans a lifecycle edit under the read check and writer decision its command's caller passed
-   * (ADR-0405).
+   * (ADR-0408).
    *
    * <p>Before and after the resource locks the order must have a valid responsibility, then pass
    * the read check and the writer decision, then match the observed lifecycle version.
