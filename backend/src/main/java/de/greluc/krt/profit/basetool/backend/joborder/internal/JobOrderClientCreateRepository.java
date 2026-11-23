@@ -25,13 +25,14 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 /**
  * Serialises, finds and counts the aUEC orders members create through clients (REQ-OXCH-004,
- * REQ-OXCH-009).
+ * REQ-OXCH-009), and clears their creators once they left the exchange's client set (REQ-OXCH-010).
  */
 interface JobOrderClientCreateRepository extends Repository<JobOrder, UUID> {
 
@@ -97,4 +98,20 @@ interface JobOrderClientCreateRepository extends Repository<JobOrder, UUID> {
       "SELECT count(o) FROM JobOrder o WHERE o.createdByMemberId = :member"
           + " AND o.createdByClientId IS NOT NULL AND o.createdAt >= :since")
   long countCreatedSince(@Param("member") UUID member, @Param("since") Instant since);
+
+  /**
+   * Sets the creating member and the create's key of the given orders to {@code null} where they
+   * closed before an instant and still carry either; a bulk update moves no version.
+   *
+   * @param orderIds the orders found outside the exchange's client set
+   * @param closedBefore the instant an order must have closed before
+   * @return the number of orders cleared
+   */
+  @Modifying
+  @Query(
+      "UPDATE JobOrder o SET o.createdByMemberId = NULL, o.createIdempotencyKey = NULL"
+          + " WHERE o.id IN :orderIds AND o.closedAt < :closedBefore"
+          + " AND (o.createdByMemberId IS NOT NULL OR o.createIdempotencyKey IS NOT NULL)")
+  int clearCreators(
+      @Param("orderIds") Collection<UUID> orderIds, @Param("closedBefore") Instant closedBefore);
 }

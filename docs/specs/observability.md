@@ -1489,12 +1489,12 @@ nothing, so the alert stays silent on a host without one.
   `basetool_scheduled_job_duration_seconds{task}` timer,
   `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge,
   `basetool_scheduled_job_enabled{task}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the sixteen
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the seventeen
   wrapped jobs (`user_sync`, `notification_retention`, `notification_timed`, `default_blueprint_provisioning`,
   `rejected_registration_retention`, `audit_retention`,
   `bank_ledger_integrity`, `job_order_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`,
   `exchange_registry_reconcile`, `exchange_change_retention`, `exchange_connection_retention`, `name_retention`,
-  `job_order_exchange_fingerprint`) via `TaskMetrics` (`record`
+  `job_order_exchange_fingerprint`, `job_order_exchange_window`) via `TaskMetrics` (`record`
   / `recordCounting`). The on-demand `exchange_bulk_undo` job — an admin's undo of one client for
   every member (REQ-XCH-034) — records the same executions, duration and items (members processed)
   but publishes no enabled or last-success staleness signal, since it only runs when an admin starts
@@ -1512,7 +1512,7 @@ nothing, so the alert stays silent on a host without one.
   `app.keycloak.sync.cron`), `ExternalSyncStale` (the catalogue syncs, more than 48 h),
   `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning` /
   `rejected_registration_retention` / `audit_retention` / `exchange_change_retention` /
-  `exchange_connection_retention` / `name_retention`, > 26 h),
+  `exchange_connection_retention` / `name_retention` / `job_order_exchange_window`, > 26 h),
   `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
   violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
   `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for
@@ -4507,9 +4507,10 @@ reader/unit/order identities and retained relationship timestamps remain outside
 ### REQ-OBS-025 — Job orders on the exchange are measured and alerted
 
 > [!note] Implemented for the two switches (#3642), the fingerprint worker (#3643), the snapshot
-> reads (#3644), the feed reads (#3645), the create with its create options (#3646) and the caps
-> on client creates (#3647); decided in #3618. The other route slices wire their read routes and refusal reasons, the window slice adds its
-> window metrics, and each slice adds its alerts and its panels to this entry.
+> reads (#3644), the feed reads (#3645), the create with its create options (#3646), the window
+> run (#3649) and the caps on client creates (#3647); decided in #3618. The other route slices
+> wire their read routes and refusal reasons, and each slice adds its alerts and its panels to this
+> entry.
 
 The job-order route family of the exchange ([`orders-exchange.md`](orders-exchange.md),
 REQ-OXCH-009) carries its own meters. Every label is a registry `client_id` or a fixed enumeration,
@@ -4550,6 +4551,10 @@ never an id, a path or an amount (REQ-OBS-011).
   `ExchangeJobOrderBusinessGauges`, not published by the worker, so a wedged worker cannot freeze
   its own signal and `BusinessMetricsStale` covers a frozen sampler. A mark keeps the instant it
   was first set, so marking an order again never resets its age.
+- **Window run** (REQ-OXCH-003, REQ-OXCH-010). The nightly run is the `TaskMetrics` job
+  `task="job_order_exchange_window"`: executions, duration, last success, the enabled gauge, and
+  items counting the orders it aged out of the client set. It joins `ScheduledJobStale` (more than
+  26 h without a success, or none since a start longer ago while it is enabled, REQ-OBS-011).
 
 Alerts, each with a promtool rule test that fires and stays silent:
 
@@ -4576,6 +4581,7 @@ reason, the fingerprint backlog with the age of its oldest mark, the recomputati
 unchanged, the worker's runs by outcome with the orders it recomputed, and the job-order reads per
 hour by client and route.
 It shows the job-order writes per day by client and outcome too.
+It shows the window run's executions per day by outcome with the orders it aged out.
 The refusals panel shows the cap refusals under their own reasons and names `JobOrderExchangeCapHit`
 in its description; the writes panel names them among the rejected writes.
 
@@ -4599,18 +4605,23 @@ in its description; the writes panel names them among the rejected writes.
   `JobOrderFingerprintWorkerIntegrationTest`).
 - [x] `JobOrderExchangeFeedLagging`, `JobOrderFingerprintWorkerStale` and `JobOrderFingerprintChurn`
   each have a promtool rule test that fires and one that stays silent.
+- [x] The window run records as `job_order_exchange_window` with the orders it aged out as items
+  and publishes its enabled gauge (`JobOrderWindowTaskTest`); `ScheduledJobStale` fires when it
+  never succeeded or stopped succeeding and stays silent while it succeeds or is switched off
+  (`scheduled_job_stale_job_order_exchange_window_test.yml`).
 - [x] A create refused at a cap counts `open_order_cap` or `daily_create_cap` and a `rejected`
   write (`ExchangeJobOrderCreateTest`); `JobOrderExchangeCapHit` has a promtool rule test that
   fires and one that stays silent.
 
 **Enforced by:** `ExchangeJobOrderMetrics`, `JobOrderExchangeRefusal`, `JobOrderExchangeReadRoute`,
 `JobOrderFingerprintOutcome`, `ExchangeJobOrderBusinessGauges`, `JobOrderFingerprintTask`,
-`ExchangeMetricNames`, `ExchangeRegistryAction` (backend) · `ExchangeRefusals` (gateway) ·
-`monitoring/prometheus/alerts/business.yml`,
+`JobOrderWindowTask`, `ExchangeMetricNames`, `ExchangeRegistryAction` (backend) ·
+`ExchangeRefusals` (gateway) · `monitoring/prometheus/alerts/business.yml`,
 `monitoring/prometheus/tests/job_order_exchange_switch_alerts_test.yml`,
 `monitoring/prometheus/tests/exchange_registry_alerts_test.yml`,
 `monitoring/prometheus/tests/job_order_fingerprint_alerts_test.yml`,
+`monitoring/prometheus/tests/scheduled_job_stale_job_order_exchange_window_test.yml`,
 `monitoring/prometheus/tests/job_order_exchange_cap_alerts_test.yml`,
 `monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
-REQ-OBS-024, REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-009 · **Issues:** #3618, #3642,
-#3643, #3644, #3646, #3647
+REQ-OBS-024, REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-009, REQ-OXCH-010 · **Issues:**
+#3618, #3642, #3643, #3644, #3646, #3647, #3649
