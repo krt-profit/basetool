@@ -51,6 +51,9 @@ public class JobOrderItemForm {
   /** Optimistic-lock version (unused on create). */
   private Long version;
 
+  /** The comment version the edit page observed, echoed beside {@link #version}. */
+  private Long commentVersion;
+
   /** Selects the restricted requesting-unit update for an existing order. */
   private boolean requesterEdit;
 

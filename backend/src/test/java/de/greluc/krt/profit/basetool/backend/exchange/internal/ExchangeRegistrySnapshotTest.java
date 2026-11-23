@@ -70,8 +70,8 @@ class ExchangeRegistrySnapshotTest {
 
   @Test
   void switchingTheBankOffIsARestrictionAndSwitchingItOnIsNot() {
-    ExchangeRegistrySnapshot bankOn = new ExchangeRegistrySnapshot(true, true, new TreeMap<>());
-    ExchangeRegistrySnapshot bankOff = new ExchangeRegistrySnapshot(true, false, new TreeMap<>());
+    ExchangeRegistrySnapshot bankOn = switches(true, true, true, true);
+    ExchangeRegistrySnapshot bankOff = switches(true, false, true, true);
 
     assertThat(ExchangeRegistrySnapshot.restricts(bankOn, bankOff)).isTrue();
     assertThat(ExchangeRegistrySnapshot.restrictiveMerge(bankOn, bankOff).bankEnabled()).isFalse();
@@ -80,8 +80,32 @@ class ExchangeRegistrySnapshotTest {
   }
 
   @Test
+  void switchingAJobOrderSwitchOffIsARestrictionThatTouchesOnlyThatSwitch() {
+    ExchangeRegistrySnapshot allOn = switches(true, true, true, true);
+    ExchangeRegistrySnapshot familyOff = switches(true, true, false, true);
+    ExchangeRegistrySnapshot writesOff = switches(true, true, true, false);
+
+    assertThat(ExchangeRegistrySnapshot.restricts(allOn, familyOff)).isTrue();
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(allOn, familyOff)).isEqualTo(familyOff);
+    assertThat(ExchangeRegistrySnapshot.restricts(allOn, writesOff)).isTrue();
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(allOn, writesOff)).isEqualTo(writesOff);
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(familyOff, writesOff))
+        .isEqualTo(switches(true, true, false, false));
+    assertThat(ExchangeRegistrySnapshot.restricts(familyOff, allOn)).isFalse();
+    assertThat(ExchangeRegistrySnapshot.restricts(writesOff, allOn)).isFalse();
+  }
+
+  @Test
+  void aMissingSettingsRowAndASwitchedOffSnapshotGrantNoSwitch() {
+    ExchangeRegistrySnapshot none = ExchangeRegistrySnapshot.of(null, List.of());
+
+    assertThat(none).isEqualTo(switches(false, false, false, false));
+    assertThat(ExchangeRegistrySnapshot.switchedOff(new TreeMap<>())).isEqualTo(none);
+  }
+
+  @Test
   void aNewClientStaysOutOfTheMergeAndAMissingOneIsARestriction() {
-    ExchangeRegistrySnapshot empty = new ExchangeRegistrySnapshot(true, true, new TreeMap<>());
+    ExchangeRegistrySnapshot empty = switches(true, true, true, true);
     ExchangeRegistrySnapshot withClient = snapshot(true, client(ExchangeClientStatus.ACTIVE, "a"));
 
     assertThat(ExchangeRegistrySnapshot.restricts(empty, withClient)).isFalse();
@@ -94,6 +118,8 @@ class ExchangeRegistrySnapshotTest {
     ExchangeRegistrySnapshot before = snapshot(true, client(ExchangeClientStatus.ACTIVE, "a"));
     ExchangeRegistrySnapshot after =
         new ExchangeRegistrySnapshot(
+            true,
+            true,
             true,
             true,
             new TreeMap<>(
@@ -121,7 +147,22 @@ class ExchangeRegistrySnapshotTest {
    */
   private static @NotNull ExchangeRegistrySnapshot snapshot(
       boolean enabled, @NotNull ExchangeRegistrySnapshot.Client client) {
-    return new ExchangeRegistrySnapshot(enabled, true, new TreeMap<>(Map.of("app", client)));
+    return new ExchangeRegistrySnapshot(
+        enabled, true, true, true, new TreeMap<>(Map.of("app", client)));
+  }
+
+  /**
+   * Builds a snapshot without clients.
+   *
+   * @param enabled the global switch
+   * @param bank the bank switch
+   * @param jobOrders the job-order family switch
+   * @param jobOrderWrites the job-order writes switch
+   * @return the snapshot
+   */
+  private static @NotNull ExchangeRegistrySnapshot switches(
+      boolean enabled, boolean bank, boolean jobOrders, boolean jobOrderWrites) {
+    return new ExchangeRegistrySnapshot(enabled, bank, jobOrders, jobOrderWrites, new TreeMap<>());
   }
 
   /**

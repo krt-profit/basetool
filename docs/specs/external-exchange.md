@@ -16,6 +16,8 @@
 > [ADR-0386](../adr/0386-the-coarse-ship-origin-is-exchanged.md)
 > **The bank on the exchange:** its route family, switch, limits and refusal codes live in
 > [`bank-exchange.md`](bank-exchange.md) (`REQ-BXCH-*`, [ADR-0354](../adr/0354-bank-resources-on-the-exchange.md)).
+> **Job orders on the exchange:** their route family, the two switches and their codes live in
+> [`orders-exchange.md`](orders-exchange.md) (`REQ-OXCH-*`).
 
 # External client exchange
 
@@ -1928,6 +1930,12 @@ A client that cannot set its `User-Agent` — a Chromium browser extension — s
 `Exchange-Client-Agent` with ADR-0303
 
 ### REQ-XCH-025 — Errors are problem+json with a stable code
+
+> [!note] Amended 2026-11-23 (REQ-OXCH-009) — the job-order switch codes are gate codes
+> `503 JOB_ORDER_EXCHANGE_DISABLED` and `503 JOB_ORDER_WRITES_DISABLED` join the codes the backend's
+> `@exchangeGate` re-checks with the gateway's own code and status; the relay passes each only with
+> `503` (`ExchangeRelay.GATE_STATUSES`), with the gateway gate's detail and `Retry-After: 300`, as
+> it does `BANK_EXCHANGE_DISABLED` ([REQ-OXCH-009](orders-exchange.md#req-oxch-009--the-job-order-switches)).
 
 > [!note] Amended 2026-11-14 (REQ-PATCH-023) — `RELOCATION_PENDING` passes through
 > A change set that writes a stock lot or ship a pending relocation locks is refused by the backend

@@ -132,6 +132,7 @@
             <form class="orders-create__form" th:action="${editOrderId != null} ? @{/orders/{id}/items/update(id=${editOrderId})} : @{/orders/items}" method="post" th:object="${jobOrderItemForm}">
                 <input type="hidden" th:field="*{source}" />
                 <input th:if="${editOrderId != null}" type="hidden" th:field="*{version}" />
+                <input th:if="${editOrderId != null}" type="hidden" th:field="*{commentVersion}" />
                 <input th:if="${requesterItemEdit == true}" type="hidden" name="requesterEdit" value="true" />
 
                 <fieldset class="form-section" th:unless="${requesterItemEdit == true}">

@@ -4499,3 +4499,57 @@ The complete MATERIAL/ITEM workspace, kind narrowing and retained concrete unit 
 existing templated HTTP spans, order audit events, `order_detail` / `orders_queue` live-sync classes
 and authenticated `/orders` probe. No public gateway, scheduled job, status or metric label is added;
 reader/unit/order identities and retained relationship timestamps remain outside metric labels.
+
+### REQ-OBS-025 — Job orders on the exchange are measured and alerted
+
+> [!note] Implemented for the two switches (#3642; decided in #3618). The route slices wire the
+> read counter and their refusal reasons, the fingerprint slice adds its worker and window metrics,
+> and each slice adds its alerts and its panels to this entry.
+
+The job-order route family of the exchange ([`orders-exchange.md`](orders-exchange.md),
+REQ-OXCH-009) carries its own meters. Every label is a registry `client_id` or a fixed enumeration,
+never an id, a path or an amount (REQ-OBS-011).
+
+- **Reads.** `basetool_exchange_job_order_reads_total{client_id, route}` counts the job-order reads
+  served, with `route` one of `snapshot`, `feed`, `create_options` (`JobOrderExchangeReadRoute`).
+- **Refusals.** `basetool_exchange_job_order_refused_total{reason}` counts what the backend refused,
+  every reason registered at zero (`JobOrderExchangeRefusal`): `not_found`, `not_permitted`,
+  `units_not_offered`, `version_conflict`, `responsibility_invalid`, `closed`, `money_started`,
+  `target_too_low`, `open_order_cap`, `daily_create_cap`, `switched_off`, `writes_switched_off`. The
+  backend gate counts `switched_off` and `writes_switched_off`, and the same refusals as
+  `basetool_exchange_gate_refused_total{reason="job_order_switch_off"|"job_order_writes_switch_off"}`;
+  the route slices wire the others.
+- **Gateway switch refusals.** The gateway's own refusals count as
+  `basetool_ingest_exchange_refused_total{reason="job_order_exchange_disabled"}` (the family switch)
+  and `{reason="job_order_writes_disabled"}` (the writes switch), with the registry `client_id`.
+- **Switch changes.** `basetool_exchange_registry_changes_total{action}` counts
+  `job_order_switch_on`, `job_order_switch_off`, `job_order_writes_switch_on` and
+  `job_order_writes_switch_off` once per committed change.
+
+Alerts, each with a promtool rule test that fires and stays silent:
+
+- **`JobOrderExchangeSwitchChanged`**: any change of either job-order switch in ten minutes,
+  informational like `ExchangeRegistryChanged`, which stays silent on the job-order actions. It
+  points to the operator section „Faulty release on job orders" (arc42 §6.8).
+
+The „Job orders" row of the exchange dashboard (`15-exchange.json`) shows the gateway's switch
+refusals by client and reason, the switch changes by action and the backend's job-order refusals by
+reason.
+
+**Acceptance**
+
+- [x] The refusal counter exists for every reason at zero, and the backend gate counts
+  `switched_off` and `writes_switched_off` (`ExchangeJobOrderMetricsTest`, `ExchangeGateTest`).
+- [x] The gateway counts its two switch refusals under their own reasons (ingest `ExchangeGateTest`).
+- [x] `JobOrderExchangeSwitchChanged` has a promtool rule test that fires and stays silent, and
+  `ExchangeRegistryChanged` stays silent on the job-order actions.
+- [ ] The read counter and the other refusal reasons are incremented by the job-order routes
+  (REQ-OXCH-002…008).
+
+**Enforced by:** `ExchangeJobOrderMetrics`, `JobOrderExchangeRefusal`, `JobOrderExchangeReadRoute`,
+`ExchangeMetricNames`, `ExchangeRegistryAction` (backend) · `ExchangeRefusals` (gateway) ·
+`monitoring/prometheus/alerts/business.yml`,
+`monitoring/prometheus/tests/job_order_exchange_switch_alerts_test.yml`,
+`monitoring/prometheus/tests/exchange_registry_alerts_test.yml`,
+`monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
+REQ-OBS-024, REQ-OXCH-009 · **Issues:** #3618, #3642

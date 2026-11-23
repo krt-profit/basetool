@@ -38,6 +38,7 @@ import org.jetbrains.annotations.Nullable;
  * @param comment optional free-text note (≤ 1000 chars), HTML-escaped on display
  * @param items the ordered finished-item lines (1..50)
  * @param version optimistic-lock version (unused on create)
+ * @param commentVersion the observed comment version; required on update, unused on create
  */
 public record CreateJobOrderItemRequestDto(
     @Nullable UUID responsibleOrgUnitId,
@@ -45,4 +46,5 @@ public record CreateJobOrderItemRequestDto(
     @Size(max = 200) String handle,
     @Size(max = 1000) String comment,
     @NotEmpty @Size(max = 50) List<@Valid CreateJobOrderItemLineDto> items,
-    Long version) {}
+    Long version,
+    @Nullable Long commentVersion) {}

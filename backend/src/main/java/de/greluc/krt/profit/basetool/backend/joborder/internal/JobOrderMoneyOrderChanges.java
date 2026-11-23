@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
@@ -118,8 +117,11 @@ public class JobOrderMoneyOrderChanges {
   /**
    * Edits the contact and comment without changing the target or another edit scope.
    *
+   * <p>Both observed revisions must be current; each part raises only its own revision, and only
+   * when its value changes.
+   *
    * @param orderId the aUEC order
-   * @param dto the information fields and their observed revision
+   * @param dto the information fields and their observed revisions
    */
   public void information(UUID orderId, UpdateJobOrderMoneyInformationDto dto) {
     UUID actor = access.actorId();
@@ -132,15 +134,12 @@ public class JobOrderMoneyOrderChanges {
           requireOpenForEdits(order);
           OptimisticLock.check(
               order.getMoneyInformationVersion(), dto.version(), JobOrder.class, orderId);
-          String handle = dto.handle().strip();
-          String comment = StringNormalization.trimToNull(dto.comment());
-          if (Objects.equals(order.getHandle(), handle)
-              && Objects.equals(order.getComment(), comment)) {
+          JobOrderComment.check(order, dto.commentVersion());
+          boolean contactChanged = replaceContact(order, dto.handle());
+          boolean commentChanged = JobOrderComment.replace(order, dto.comment());
+          if (!contactChanged && !commentChanged) {
             return new JobOrderEditor.MoneyEdit<>(order, JobOrderEdit.unchanged(order));
           }
-          order.setHandle(handle);
-          order.setComment(comment);
-          order.setMoneyInformationVersion(Math.incrementExact(order.getMoneyInformationVersion()));
           effects.informationChanged(order);
           return new JobOrderEditor.MoneyEdit<>(
               order,
@@ -151,6 +150,16 @@ public class JobOrderMoneyOrderChanges {
                           JobOrderLifecycleNotices.needChanged(
                               order, actor, access.responsible(order)))));
         });
+  }
+
+  private static boolean replaceContact(JobOrder order, String handle) {
+    String contact = handle.strip();
+    if (Objects.equals(order.getHandle(), contact)) {
+      return false;
+    }
+    order.setHandle(contact);
+    order.setMoneyInformationVersion(Math.incrementExact(order.getMoneyInformationVersion()));
+    return true;
   }
 
   private static void requireOpenForEdits(JobOrder order) {

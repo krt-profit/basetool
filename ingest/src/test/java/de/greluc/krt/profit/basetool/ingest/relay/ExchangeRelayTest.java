@@ -187,16 +187,31 @@ class ExchangeRelayTest {
   void theBackendGatesRefusalsPassThroughWithTheGatewayGatesCodeStatusAndDetail() {
     assertGate(503, "EXCHANGE_DISABLED", ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL);
     assertGate(503, "BANK_EXCHANGE_DISABLED", ExchangeGateFilter.BANK_EXCHANGE_DISABLED_DETAIL);
+    assertGate(
+        503, "JOB_ORDER_EXCHANGE_DISABLED", ExchangeGateFilter.JOB_ORDER_EXCHANGE_DISABLED_DETAIL);
+    assertGate(
+        503, "JOB_ORDER_WRITES_DISABLED", ExchangeGateFilter.JOB_ORDER_WRITES_DISABLED_DETAIL);
     assertGate(503, "REGISTRY_UNAVAILABLE", ExchangeGateFilter.REGISTRY_UNAVAILABLE_DETAIL);
     assertGate(403, "CLIENT_NOT_ALLOWED", ExchangeGateFilter.CLIENT_NOT_ALLOWED_DETAIL);
     assertGate(403, "CLIENT_SUSPENDED", ExchangeGateFilter.CLIENT_SUSPENDED_DETAIL);
     assertGate(401, "INSTALLATION_REVOKED", ExchangeGateFilter.INSTALLATION_REVOKED_DETAIL);
     assertGate(401, "CLIENT_REVOKED", ExchangeGateFilter.CLIENT_REVOKED_DETAIL);
     assertGate(403, "SCOPE_MISSING", ExchangeGateFilter.SCOPE_MISSING_DETAIL);
-    assertThat(ExchangeRelay.GATE_STATUSES).hasSize(8);
-    assertThat(count("refused")).isEqualTo(8.0d);
+    assertThat(ExchangeRelay.GATE_STATUSES).hasSize(10);
+    assertThat(count("refused")).isEqualTo(10.0d);
     assertThat(ExchangeRelay.retryAfterSeconds("BANK_EXCHANGE_DISABLED")).isEqualTo("300");
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_EXCHANGE_DISABLED")).isEqualTo("300");
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_WRITES_DISABLED")).isEqualTo("300");
     assertThat(ExchangeRelay.retryAfterSeconds("EXCHANGE_DISABLED")).isEqualTo("30");
+    assertThat(ExchangeRelay.retryAfterSeconds(null)).isNull();
+  }
+
+  @Test
+  void aJobOrderSwitchCodeArrivingWithAnotherStatusIsARelayFailure() {
+    assertThat(interpret(502, "{\"code\":\"JOB_ORDER_EXCHANGE_DISABLED\"}").code())
+        .isEqualTo("BACKEND_RELAY_FAILED");
+    assertThat(interpret(409, "{\"code\":\"JOB_ORDER_WRITES_DISABLED\"}").code())
+        .isEqualTo("BACKEND_RELAY_FAILED");
   }
 
   @Test

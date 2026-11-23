@@ -165,13 +165,31 @@ public final class ExchangeMetricNames {
    */
   public static final String EXCHANGE_BANK_REFUSED = "basetool.exchange.bank.refused";
 
-  /** Tag key: the bank route on {@link #EXCHANGE_BANK_READS}. */
+  /**
+   * Counter {@code basetool_exchange_job_order_reads_total{client_id,route}} — job-order reads
+   * served through the exchange, by registered client and job-order route (REQ-OXCH-009,
+   * REQ-OBS-025).
+   */
+  public static final String EXCHANGE_JOB_ORDER_READS = "basetool.exchange.job.order.reads";
+
+  /**
+   * Counter {@code basetool_exchange_job_order_refused_total{reason}} — job-order requests the
+   * backend refused, by bounded reason, every reason registered at zero (REQ-OXCH-009,
+   * REQ-OBS-025).
+   */
+  public static final String EXCHANGE_JOB_ORDER_REFUSED = "basetool.exchange.job.order.refused";
+
+  /**
+   * Tag key: the bank route on {@link #EXCHANGE_BANK_READS}, the job-order route on {@link
+   * #EXCHANGE_JOB_ORDER_READS}.
+   */
   public static final String TAG_ROUTE = "route";
 
   /**
    * Counter {@code basetool_exchange_registry_changes_total{action}} — one per committed change of
-   * the exchange client registry, its global switch or its bank switch (REQ-XCH-003, REQ-BXCH-006);
-   * feeds {@code ExchangeRegistryChanged} and {@code BankExchangeSwitchChanged}.
+   * the exchange client registry, its global switch, its bank switch or its job-order switches
+   * (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009); feeds {@code ExchangeRegistryChanged}, {@code
+   * BankExchangeSwitchChanged} and {@code JobOrderExchangeSwitchChanged}.
    */
   public static final String EXCHANGE_REGISTRY_CHANGES = "basetool.exchange.registry.changes";
 

@@ -101,7 +101,17 @@ class ExchangeRelaySeamParityTest {
     assertThat(ExchangeRoutes.BANK_PATH)
         .isEqualTo(ExchangeSeam.GATEWAY_PREFIX + ExchangeSeam.BANK_PATH);
     assertThat(ExchangeRelay.retryAfterSeconds("BANK_EXCHANGE_DISABLED"))
-        .isEqualTo(String.valueOf(ExchangeSeam.BANK_RETRY_AFTER_SECONDS));
+        .isEqualTo(String.valueOf(ExchangeSeam.AREA_SWITCH_RETRY_AFTER_SECONDS));
+  }
+
+  @Test
+  void theJobOrderSwitchesGateTheSeamsJobOrderRouteFamilyWithTheSeamsWait() {
+    assertThat(ExchangeRoutes.JOB_ORDERS_PATH)
+        .isEqualTo(ExchangeSeam.GATEWAY_PREFIX + ExchangeSeam.JOB_ORDERS_PATH);
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_EXCHANGE_DISABLED"))
+        .isEqualTo(String.valueOf(ExchangeSeam.AREA_SWITCH_RETRY_AFTER_SECONDS));
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_WRITES_DISABLED"))
+        .isEqualTo(String.valueOf(ExchangeSeam.AREA_SWITCH_RETRY_AFTER_SECONDS));
   }
 
   @Test
@@ -157,7 +167,7 @@ class ExchangeRelaySeamParityTest {
       assertReadDiffers(renamed, "clients.versekit." + field);
       read.add(field);
     }
-    assertThat(read).hasSize(11);
+    assertThat(read).hasSize(13);
     assertThat(UNREAD_REGISTRY_FIELDS.keySet()).isSubsetOf(ExchangeSeam.REGISTRY_DOCUMENT_FIELDS);
   }
 
@@ -221,12 +231,14 @@ class ExchangeRelaySeamParityTest {
    */
   private static void assertGateStatuses(@NotNull Map<String, Integer> expected) {
     assertThat(new TreeMap<>(ExchangeRelay.GATE_STATUSES))
-        .hasSize(8)
+        .hasSize(10)
         .isEqualTo(new TreeMap<>(expected));
     Set<String> gateConstants =
         Set.of(
             ExchangeRefusals.EXCHANGE_DISABLED,
             ExchangeRefusals.BANK_EXCHANGE_DISABLED,
+            ExchangeRefusals.JOB_ORDER_EXCHANGE_DISABLED,
+            ExchangeRefusals.JOB_ORDER_WRITES_DISABLED,
             ExchangeRefusals.REGISTRY_UNAVAILABLE,
             ExchangeRefusals.CLIENT_NOT_ALLOWED,
             ExchangeRefusals.CLIENT_SUSPENDED,
@@ -294,6 +306,8 @@ class ExchangeRelaySeamParityTest {
   private static @NotNull ExchangeRegistry expectedRegistry() {
     return new ExchangeRegistry(
         ExchangeSeam.REGISTRY_SAMPLE_REVISION,
+        true,
+        true,
         true,
         true,
         Map.of(

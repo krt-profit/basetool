@@ -28,7 +28,10 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Access to the global exchange switch and the registry's revision counter (REQ-XCH-003). */
+/**
+ * Access to the exchange switches and the registry's revision counter (REQ-XCH-003, REQ-BXCH-006,
+ * REQ-OXCH-009).
+ */
 public interface ExchangeSettingsRepository extends JpaRepository<ExchangeSettings, Short> {
 
   /**
@@ -58,6 +61,44 @@ public interface ExchangeSettingsRepository extends JpaRepository<ExchangeSettin
               + " bank_version = bank_version + 1, bank_updated_at = :at WHERE id = :id",
       nativeQuery = true)
   int writeBankSwitch(
+      @Param("id") Short id, @Param("enabled") boolean enabled, @Param("at") Instant at);
+
+  /**
+   * Writes the job-order family switch alone: its state, its own version counter and its change
+   * time, leaving every other switch's version and time alone (REQ-OXCH-009).
+   *
+   * @param id the singleton id
+   * @param enabled the family switch's new state
+   * @param at the change time
+   * @return the number of rows written, one
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          "UPDATE exchange_settings SET job_orders_enabled = :enabled,"
+              + " job_orders_version = job_orders_version + 1, job_orders_updated_at = :at"
+              + " WHERE id = :id",
+      nativeQuery = true)
+  int writeJobOrdersSwitch(
+      @Param("id") Short id, @Param("enabled") boolean enabled, @Param("at") Instant at);
+
+  /**
+   * Writes the job-order writes switch alone: its state, its own version counter and its change
+   * time, leaving every other switch's version and time alone (REQ-OXCH-009).
+   *
+   * @param id the singleton id
+   * @param enabled the writes switch's new state
+   * @param at the change time
+   * @return the number of rows written, one
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          "UPDATE exchange_settings SET job_order_writes_enabled = :enabled,"
+              + " job_order_writes_version = job_order_writes_version + 1,"
+              + " job_order_writes_updated_at = :at WHERE id = :id",
+      nativeQuery = true)
+  int writeJobOrderWritesSwitch(
       @Param("id") Short id, @Param("enabled") boolean enabled, @Param("at") Instant at);
 
   /**

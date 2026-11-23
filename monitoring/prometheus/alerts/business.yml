@@ -210,7 +210,7 @@ groups:
           description: "The hourly job-order integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and JobOrderItemBlueprintDrift cannot fire — a blueprint re-point would go undetected. Restore the sweep before trusting a 'no drift' reading."
 
       - alert: ExchangeRegistryChanged
-        expr: sum by (action) (increase(basetool_exchange_registry_changes_total{action!~"bank_switch_on|bank_switch_off"}[10m])) > 0
+        expr: sum by (action) (increase(basetool_exchange_registry_changes_total{action!~"bank_switch_on|bank_switch_off|job_order_switch_on|job_order_switch_off|job_order_writes_switch_on|job_order_writes_switch_off"}[10m])) > 0
         labels:
           severity: warning
         annotations:
@@ -408,6 +408,14 @@ groups:
         annotations:
           summary: "Bank exchange switch changed ({{ $labels.action }})"
           description: "An admin switched the bank part of the third-party exchange on or off ({{ $labels.action }}). While it is off the gateway refuses every bank exchange request, the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event BANK_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned (REQ-OBS-024)."
+
+      - alert: JobOrderExchangeSwitchChanged
+        expr: sum by (action) (increase(basetool_exchange_registry_changes_total{action=~"job_order_switch_on|job_order_switch_off|job_order_writes_switch_on|job_order_writes_switch_off"}[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order exchange switch changed ({{ $labels.action }})"
+          description: "An admin switched job orders or their writes on the third-party exchange on or off ({{ $labels.action }}). While the job-order switch is off the gateway refuses every job-order request; while the writes switch is off it refuses every job-order write and the reads go on; the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event JOB_ORDER_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned; switching the writes off is the first step of „Faulty release on job orders“ in arc42 §6 (REQ-OBS-025)."
 
       - alert: BusinessMetricsStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="business_metrics"} == 1))

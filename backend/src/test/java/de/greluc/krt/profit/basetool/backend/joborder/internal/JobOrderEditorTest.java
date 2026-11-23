@@ -167,6 +167,40 @@ class JobOrderEditorTest {
   }
 
   @Test
+  void aCommentEditWithAStaleOrMissingCommentVersionIsAConflictWithoutMutation() {
+    order.setCommentVersion(3L);
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderAccessPolicy.canEdit(order, JobOrderGate.EDIT)).thenReturn(true);
+
+    assertThatThrownBy(() ->
+            editor.editPlannedWithComment(
+                id, JobOrderGate.EDIT, 5L, 2L, _ -> JobOrderEditPlan.of(statusChanged())))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    assertThatThrownBy(() ->
+            editor.editPlannedWithComment(
+                id, JobOrderGate.EDIT, 5L, null, _ -> JobOrderEditPlan.of(statusChanged())))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+    assertThat(mutations).hasValue(0);
+    verifyNoInteractions(auditRecorder, effects, jobOrderStockProjectionService);
+  }
+
+  @Test
+  void aCommentEditWithBothVersionsCurrentRunsOnce() {
+    order.setCommentVersion(3L);
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderAccessPolicy.canEdit(order, JobOrderGate.EDIT)).thenReturn(true);
+    when(jobOrderStockProjectionService.mapToDtoWithStock(order)).thenReturn(projected);
+
+    JobOrderDto result =
+        editor.editPlannedWithComment(
+            id, JobOrderGate.EDIT, 5L, 3L, _ -> JobOrderEditPlan.of(statusChanged()));
+
+    assertThat(result).isSameAs(projected);
+    assertThat(mutations).hasValue(1);
+  }
+
+  @Test
   void aDeniedCallerIsRefusedBeforeTheVersionIsChecked() {
     when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
     when(jobOrderAccessPolicy.canEdit(order, JobOrderGate.EDIT)).thenReturn(false);

@@ -532,7 +532,12 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     String payload =
         createBody().replace(requester.getId().toString(), newRequester.getId().toString());
     payload =
-        payload.substring(0, payload.length() - 1) + ",\"version\":" + order.getVersion() + "}";
+        payload.substring(0, payload.length() - 1)
+            + ",\"version\":"
+            + order.getVersion()
+            + ",\"commentVersion\":"
+            + order.getCommentVersion()
+            + "}";
 
     as(
             put("/api/v1/orders/" + order.getId())
@@ -992,8 +997,15 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             .getResponse()
             .getContentAsString();
     long needVersion = json.readTree(reordered).path("version").asLong();
+    long commentVersion = json.readTree(reordered).path("commentVersion").asLong();
     String body = createBody();
-    body = body.substring(0, body.length() - 1) + ",\"version\":" + needVersion + "}";
+    body =
+        body.substring(0, body.length() - 1)
+            + ",\"version\":"
+            + needVersion
+            + ",\"commentVersion\":"
+            + commentVersion
+            + "}";
     mvc.perform(put(endpoint).with(writer).contentType(MediaType.APPLICATION_JSON).content(body))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.handle").value("Hierarchy test"));
@@ -1007,6 +1019,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     String body =
         "{\"version\":"
             + order.getVersion()
+            + ",\"commentVersion\":"
+            + order.getCommentVersion()
             + ",\"comment\":\"Remaining items\",\"items\":[{\"id\":\""
             + line.getId()
             + "\",\"gameItemId\":\""
@@ -1178,6 +1192,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     String updatedNeed =
         "{\"version\":"
             + order.getVersion()
+            + ",\"commentVersion\":"
+            + order.getCommentVersion()
             + ",\"materials\":[{\"materialId\":\""
             + material
             + "\",\"minQuality\":"

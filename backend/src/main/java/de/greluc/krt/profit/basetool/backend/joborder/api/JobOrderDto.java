@@ -59,6 +59,7 @@ import org.jetbrains.annotations.NotNull;
  * @param canReopen whether the caller may reopen this cancellation
  * @param lifecycleVersion the observed lifecycle revision
  * @param responsibilityVersion the observed responsibility revision
+ * @param commentVersion the observed comment revision, independent of the contact's
  */
 public record JobOrderDto(
     UUID id,
@@ -88,7 +89,8 @@ public record JobOrderDto(
     Boolean canCancel,
     Boolean canReopen,
     Long lifecycleVersion,
-    Long responsibilityVersion) {
+    Long responsibilityVersion,
+    Long commentVersion) {
 
   /**
    * Returns a copy of this DTO with the assignee rows replaced.
@@ -126,7 +128,8 @@ public record JobOrderDto(
         canCancel,
         canReopen,
         lifecycleVersion,
-        responsibilityVersion);
+        responsibilityVersion,
+        commentVersion);
   }
 
   /**
@@ -165,6 +168,7 @@ public record JobOrderDto(
         canCancel,
         canReopen,
         lifecycleVersion,
-        responsibilityVersion);
+        responsibilityVersion,
+        commentVersion);
   }
 }

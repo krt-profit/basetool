@@ -148,7 +148,7 @@ class ExchangeMirrorSeamParityTest {
 
     new RedisExchangeRegistryMirror(template, ExchangeSeam.REGISTRY_KEY, clock)
         .write(
-            new ExchangeRegistrySnapshot(true, true, clients),
+            new ExchangeRegistrySnapshot(true, true, true, true, clients),
             ExchangeSeam.REGISTRY_SAMPLE_REVISION);
 
     ArgumentCaptor<String> written = ArgumentCaptor.forClass(String.class);

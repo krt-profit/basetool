@@ -60,7 +60,8 @@ order-edit bypass.
 A job-order edit whose request carries a version requires the version of the part it edits: a
 status change the order's `lifecycleVersion`, the responsible-unit reassignment its
 `responsibilityVersion`, blueprint counting, the full material and item edits and the two
-requester edits the order's `version`. A missing version is HTTP 409 like a stale one
+requester edits the order's `version`, and the last four, which write the comment, also its
+`commentVersion` (REQ-ORDERS-066). A missing version is HTTP 409 like a stale one
 (`OptimisticLock.check`). The decision is made once, in `JobOrderEditor`, not per method. Money
 edits check the holder and target revisions they rely on, and a matching accepted replay returns
 its recorded outcome instead of failing on its old input versions (REQ-SEC-085,
@@ -74,4 +75,5 @@ even where the edit would otherwise be refused with 400 (a material order sent t
 - [ ] An update whose `version` is absent answers 409 and changes nothing.
 - [ ] A stale `version` answers 409, no audit event is recorded and no notice is published.
 
-**Enforced by:** `JobOrderEditorTest` · **Code:** `JobOrderEditor#edit`.
+**Enforced by:** `JobOrderEditorTest` · **Code:** `JobOrderEditor#edit`,
+`JobOrderEditor#editPlannedWithComment`.

@@ -394,7 +394,7 @@ function initOrdersDetailEdit() {
 /**
  * Collects the order edit form into the request body.
  *
- * @returns {{requestingOrgUnitId: string | null, handle: string, comment: string, version: number | null, materials: Array<{materialId: string, minQuality: number | null, amount: number}>}} the body
+ * @returns {{requestingOrgUnitId: string | null, handle: string, comment: string, version: number | null, commentVersion: number | null, materials: Array<{materialId: string, minQuality: number | null, amount: number}>}} the body
  */
 function _serializeEditForm() {
     /** @type {Array<{materialId: string, minQuality: number | null, amount: number}>} */
@@ -419,11 +419,13 @@ function _serializeEditForm() {
         });
     });
     const versionInput = _odEditVersionInput();
+    const commentVersionInput = _odEditVersionInput('commentVersion');
     return {
         requestingOrgUnitId: _odFieldValue('requestingOrgUnitId') || null,
         handle: _odFieldValue('handle'),
         comment: _odFieldValue('edit-comment'),
         version: versionInput ? parseInt(versionInput.value, 10) : null,
+        commentVersion: commentVersionInput ? parseInt(commentVersionInput.value, 10) : null,
         materials,
     };
 }
@@ -456,6 +458,10 @@ function initOrdersDetailEdit2() {
             onSuccess(dto) {
                 const editVer = _odEditVersionInput();
                 if (editVer && dto && dto.version != null) editVer.value = dto.version;
+                const commentVer = _odEditVersionInput('commentVersion');
+                if (commentVer && dto && dto.commentVersion != null) {
+                    commentVer.value = dto.commentVersion;
+                }
                 const modal = document.getElementById('edit-modal');
                 if (modal) krtModal.close(modal);
                 showFrontendSuccessToast(MSG_UPDATE_SUCCESS);

@@ -70,6 +70,8 @@ public class RedisExchangeRegistryMirror implements ExchangeRegistryMirror {
             clock.instant(),
             snapshot.enabled(),
             snapshot.bankEnabled(),
+            snapshot.jobOrdersEnabled(),
+            snapshot.jobOrderWritesEnabled(),
             snapshot.clients());
     redisTemplate.opsForValue().set(key, jsonMapper.writeValueAsString(document));
   }

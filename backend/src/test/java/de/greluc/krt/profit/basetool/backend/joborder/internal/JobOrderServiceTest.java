@@ -373,6 +373,7 @@ class JobOrderServiceTest {
             false,
             false,
             0L,
+            0L,
             0L);
     lenient()
         .when(jobOrderItemService.prepareItemLines(any(), any()))
@@ -503,7 +504,7 @@ class JobOrderServiceTest {
 
     jobOrderService.createJobOrder(
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, lines, null));
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, lines, null, null));
 
     ArgumentCaptor<JobOrder> saved = ArgumentCaptor.forClass(JobOrder.class);
     verify(jobOrderRepository).save(saved.capture());
@@ -598,6 +599,7 @@ class JobOrderServiceTest {
             List.of(
                 new CreateJobOrderItemLineDto(
                     null, UUID.randomUUID(), UUID.randomUUID(), 2, List.of(), null, null)),
+            null,
             null));
     verifyNoInteractions(liveSyncFanout);
 
@@ -693,7 +695,13 @@ class JobOrderServiceTest {
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(createMat),
+            null,
+            null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -734,7 +742,13 @@ class JobOrderServiceTest {
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(createMat),
+            null,
+            null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -767,7 +781,13 @@ class JobOrderServiceTest {
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, null, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(createMat),
+            null,
+            null);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -814,13 +834,20 @@ class JobOrderServiceTest {
             "Tester",
             "  Deliver fast  ",
             List.of(createMat),
+            null,
             null));
 
     verify(jobOrderRepository).save(argThat(jo -> "Deliver fast".equals(jo.getComment())));
 
     jobOrderService.createJobOrder(
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", "   ", List.of(createMat), null));
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            "   ",
+            List.of(createMat),
+            null,
+            null));
 
     verify(jobOrderRepository).save(argThat(jo -> jo.getComment() == null));
   }
@@ -831,7 +858,13 @@ class JobOrderServiceTest {
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(createMat),
+            null,
+            null);
 
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
@@ -844,7 +877,8 @@ class JobOrderServiceTest {
   void createJobOrder_MissingResponsible_Throws() {
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 5.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+        new CreateJobOrderDto(
+            null, requestingOrgUnitId, "Tester", null, List.of(createMat), null, null);
 
     assertThrows(BadRequestException.class, () -> jobOrderService.createJobOrder(createDto));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
@@ -994,7 +1028,7 @@ class JobOrderServiceTest {
     jobOrder.setVersion(2L);
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, null, "Tester", null, List.of(updateMat), 1L);
+        new CreateJobOrderDto(null, null, "Tester", null, List.of(updateMat), 1L, 0L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
@@ -1025,7 +1059,8 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(UUID.randomUUID(), bravoId, "Tester", null, List.of(updateMat), null);
+        new CreateJobOrderDto(
+            UUID.randomUUID(), bravoId, "Tester", null, List.of(updateMat), null, 0L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(bravoId)).thenReturn(Optional.of(bravo));
@@ -1079,7 +1114,7 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, betaId, "NewTester", null, List.of(updateMat), null);
+        new CreateJobOrderDto(null, betaId, "NewTester", null, List.of(updateMat), null, 0L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(betaId)).thenReturn(Optional.of(beta));
@@ -1105,7 +1140,7 @@ class JobOrderServiceTest {
     beta.setShorthand("Beta");
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, betaId, "Tester", null, List.of(updateMat), null);
+        new CreateJobOrderDto(null, betaId, "Tester", null, List.of(updateMat), null, 0L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(betaId)).thenReturn(Optional.of(beta));
@@ -1124,7 +1159,7 @@ class JobOrderServiceTest {
   void updateJobOrderAsRequester_publishesEventAndAudits() {
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, null, null, "requester note", List.of(updateMat), null);
+        new CreateJobOrderDto(null, null, null, "requester note", List.of(updateMat), null, 0L);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
@@ -1200,7 +1235,7 @@ class JobOrderServiceTest {
 
     de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto dto =
         new de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto(
-            null, null, "note", null, List.of(), null);
+            null, null, "note", null, List.of(), null, 0L);
 
     assertThrows(
         BadRequestException.class,
@@ -1247,7 +1282,8 @@ class JobOrderServiceTest {
             List.of(
                 new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                     null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
-            1L);
+            1L,
+            0L);
 
     jobOrderService.updateItemJobOrderAsRequester(orderId, dto);
 
@@ -1308,7 +1344,8 @@ class JobOrderServiceTest {
             List.of(
                 new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                     null, keptGameItem, UUID.randomUUID(), 1, List.of(), 1, null)),
-            1L);
+            1L,
+            0L);
 
     jobOrderService.updateItemJobOrderAsRequester(orderId, dto);
 
@@ -1905,7 +1942,8 @@ class JobOrderServiceTest {
           List.of(
               new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                   null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
-          version);
+          version,
+          0L);
     }
 
     private JobOrder itemOrder() {
@@ -1965,7 +2003,8 @@ class JobOrderServiceTest {
                       null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null),
                   new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                       null, UUID.randomUUID(), UUID.randomUUID(), 2, List.of(), 2, 1)),
-              1L);
+              1L,
+              0L);
 
       jobOrderService.updateItemJobOrder(orderId, dto);
 
@@ -2023,7 +2062,8 @@ class JobOrderServiceTest {
                       List.of(),
                       1,
                       null)),
-              1L);
+              1L,
+              0L);
 
       jobOrderService.updateItemJobOrder(orderId, dto);
 
@@ -2077,7 +2117,8 @@ class JobOrderServiceTest {
                       List.of(),
                       2,
                       null)),
-              1L);
+              1L,
+              0L);
 
       assertThrows(
           de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
@@ -2108,7 +2149,8 @@ class JobOrderServiceTest {
                       List.of(),
                       1,
                       null)),
-              1L);
+              1L,
+              0L);
 
       assertThrows(
           de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
@@ -2149,6 +2191,7 @@ class JobOrderServiceTest {
               false,
               false,
               false,
+              0L,
               0L,
               0L);
       when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(itemBase);
@@ -2231,6 +2274,7 @@ class JobOrderServiceTest {
                 false,
                 false,
                 false,
+                0L,
                 0L,
                 0L);
           });

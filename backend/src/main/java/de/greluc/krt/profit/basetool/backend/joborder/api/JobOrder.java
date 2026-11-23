@@ -116,11 +116,18 @@ public class JobOrder extends AbstractEntity<UUID> {
   /**
    * Optional, untrusted free-text comment from the order creator, at most {@value
    * #COMMENT_MAX_LENGTH} characters. Always rendered HTML-escaped and never logged; {@code null}
-   * when left empty.
+   * when left empty. Guarded by {@link #commentVersion}, not by the order version.
    */
   @Column(name = "comment", length = COMMENT_MAX_LENGTH)
   @Nullable
+  @OptimisticLock(excluded = true)
   private String comment;
+
+  /** The independently observed revision of the {@link #comment}, for every order kind. */
+  @Column(name = "comment_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  @Builder.Default
+  private long commentVersion = 0L;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
@@ -145,7 +152,7 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Builder.Default
   private Long lifecycleVersion = 0L;
 
-  /** The independently observed contact and comment revision of an aUEC order. */
+  /** The independently observed contact revision of an aUEC order. */
   @Column(name = "money_information_version", nullable = false)
   @OptimisticLock(excluded = true)
   @Builder.Default

@@ -141,6 +141,10 @@ class TenancyGuardTest {
   private static final List<Class<?>> UNVERSIONED_EDIT_PARAMETERS =
       List.of(UUID.class, JobOrderGate.class, Function.class);
 
+  /** The exact editor mutation signature of an edit that also writes the comment. */
+  private static final List<Class<?>> COMMENT_EDIT_PARAMETERS =
+      List.of(UUID.class, JobOrderGate.class, Long.class, Long.class, Function.class);
+
   /**
    * Public mutation contracts whose own bounded bodies must independently reach the scope policy.
    */
@@ -148,6 +152,7 @@ class TenancyGuardTest {
       Set.of(
           new ScopeGateway(JobOrderEditor.class, "edit", VERSIONED_EDIT_PARAMETERS),
           new ScopeGateway(JobOrderEditor.class, "editPlanned", VERSIONED_EDIT_PARAMETERS),
+          new ScopeGateway(JobOrderEditor.class, "editPlannedWithComment", COMMENT_EDIT_PARAMETERS),
           new ScopeGateway(JobOrderEditor.class, "editUnversioned", UNVERSIONED_EDIT_PARAMETERS),
           new ScopeGateway(
               JobOrderEditor.class, "editWithoutProjection", UNVERSIONED_EDIT_PARAMETERS),

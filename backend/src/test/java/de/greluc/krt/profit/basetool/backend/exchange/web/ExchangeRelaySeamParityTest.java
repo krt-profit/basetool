@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemExcepti
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.BankExchangeRoutes;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderExchangeRoutes;
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
 import de.greluc.krt.profit.basetool.backend.kernel.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
@@ -148,6 +149,12 @@ class ExchangeRelaySeamParityTest {
   void theBankSwitchGatesTheSeamsBankRouteFamily() {
     assertThat(BankExchangeRoutes.PATH)
         .isEqualTo(ExchangeSeam.RELAY_PREFIX + ExchangeSeam.BANK_PATH);
+  }
+
+  @Test
+  void theJobOrderSwitchesGateTheSeamsJobOrderRouteFamily() {
+    assertThat(JobOrderExchangeRoutes.PATH)
+        .isEqualTo(ExchangeSeam.RELAY_PREFIX + ExchangeSeam.JOB_ORDERS_PATH);
   }
 
   @Test
@@ -308,6 +315,8 @@ class ExchangeRelaySeamParityTest {
         List.of(
             ExchangeProblemException::exchangeDisabled,
             ExchangeProblemException::bankExchangeDisabled,
+            ExchangeProblemException::jobOrderExchangeDisabled,
+            ExchangeProblemException::jobOrderWritesDisabled,
             ExchangeProblemException::clientNotAllowed,
             ExchangeProblemException::clientSuspended,
             ExchangeProblemException::installationRevoked,
@@ -319,7 +328,7 @@ class ExchangeRelaySeamParityTest {
       ExchangeProblemException problem = refusal.get();
       answered.put(problem.code(), problem.status().value());
     }
-    assertThat(answered).hasSize(8).isEqualTo(new TreeMap<>(expected));
+    assertThat(answered).hasSize(10).isEqualTo(new TreeMap<>(expected));
   }
 
   /**

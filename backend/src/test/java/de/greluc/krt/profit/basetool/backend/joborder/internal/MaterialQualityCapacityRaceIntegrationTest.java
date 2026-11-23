@@ -278,7 +278,13 @@ class MaterialQualityCapacityRaceIntegrationTest extends MaterialContributionTes
   private CreateJobOrderDto demand(
       JobOrderDto observed, List<CreateJobOrderMaterialDto> materials) {
     return new CreateJobOrderDto(
-        null, null, observed.handle(), null, materials, observed.version());
+        null,
+        null,
+        observed.handle(),
+        null,
+        materials,
+        observed.version(),
+        observed.commentVersion());
   }
 
   /** Writes one deliberate promise through HTTP and returns its observed contribution version. */

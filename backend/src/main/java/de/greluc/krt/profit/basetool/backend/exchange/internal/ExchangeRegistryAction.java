@@ -49,7 +49,19 @@ public enum ExchangeRegistryAction {
   BANK_SWITCH_ON("bank_switch_on"),
 
   /** The bank switch was turned off. */
-  BANK_SWITCH_OFF("bank_switch_off");
+  BANK_SWITCH_OFF("bank_switch_off"),
+
+  /** The job-order family switch was turned on. */
+  JOB_ORDER_SWITCH_ON("job_order_switch_on"),
+
+  /** The job-order family switch was turned off. */
+  JOB_ORDER_SWITCH_OFF("job_order_switch_off"),
+
+  /** The job-order writes switch was turned on. */
+  JOB_ORDER_WRITES_SWITCH_ON("job_order_writes_switch_on"),
+
+  /** The job-order writes switch was turned off. */
+  JOB_ORDER_WRITES_SWITCH_OFF("job_order_writes_switch_off");
 
   /** The metric label value. */
   @Getter @NotNull private final String tag;

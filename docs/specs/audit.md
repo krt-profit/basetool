@@ -341,7 +341,9 @@ web, naming its client (REQ-AUDIT-005):
   changed fields and the added and removed scopes), suspending and activating it
   (`EXCHANGE_CLIENT_SUSPENDED` / `_ACTIVATED`, only on a change) and the global exchange switch
   (`EXCHANGE_SWITCH_CHANGED`, the new state), the bank switch of the exchange
-  (`BANK_EXCHANGE_SWITCH_CHANGED`, the new state, REQ-BXCH-006), and a member disconnecting a whole client
+  (`BANK_EXCHANGE_SWITCH_CHANGED`, the new state, REQ-BXCH-006),
+  the two job-order switches of the exchange (`JOB_ORDER_EXCHANGE_SWITCH_CHANGED`, the switch
+  `family` or `writes` and the new state, REQ-OXCH-009), and a member disconnecting a whole client
   (`EXCHANGE_CLIENT_DISCONNECTED`) or one installation (`EXCHANGE_INSTALLATION_DISCONNECTED`,
   REQ-XCH-008; the installation's label never enters the row), and the system ending a departed
   member's exchange access (`EXCHANGE_MEMBER_DEPARTED`: the reason, the number of clients, and

@@ -898,6 +898,7 @@
         <form id="edit-order-form" th:data-order-id="${order.id}" th:data-requester-edit="${requesterEditMode}" th:action="${requesterEditMode} ? @{/orders/{id}/requested-update(id=${order.id})} : @{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
         <div class="krt-modal-body">
             <input type="hidden" th:field="*{version}">
+            <input type="hidden" th:field="*{commentVersion}">
 
             <th:block th:unless="${requesterEditMode}">
                 <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.detail.requesting', true)}"></div>

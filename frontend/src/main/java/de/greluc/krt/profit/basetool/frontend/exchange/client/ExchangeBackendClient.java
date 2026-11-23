@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.exchange.client;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeRequestDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeResultDto;
-import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchDto;
-import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoInstallationDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
@@ -53,8 +53,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * Typed backend client of the exchange domain: the admin client registry, the global switch, the
- * bulk undo runs and the member's connected apps (REQ-XCH-003, REQ-XCH-008, REQ-XCH-021,
- * REQ-XCH-034), over {@link BackendApiClient} (plan §5.9, ADR-0032).
+ * area switches, the bulk undo runs and the member's connected apps (REQ-XCH-003, REQ-XCH-008,
+ * REQ-XCH-021, REQ-XCH-034, REQ-BXCH-006, REQ-OXCH-009), over {@link BackendApiClient} (plan §5.9,
+ * ADR-0032).
  */
 @Service
 @RequiredArgsConstructor
@@ -67,6 +68,12 @@ public class ExchangeBackendClient {
   private static final String SETTINGS = "/api/v1/connected-apps/admin/settings";
 
   private static final String BANK_SWITCH = SETTINGS + "/bank";
+
+  /** The backend's job-order family switch endpoint. */
+  private static final String JOB_ORDER_SWITCH = SETTINGS + "/job-orders";
+
+  /** The backend's job-order writes switch endpoint. */
+  private static final String JOB_ORDER_WRITES_SWITCH = SETTINGS + "/job-order-writes";
 
   /** The backend's bulk undo runs. */
   private static final String UNDO_RUNS = "/api/v1/connected-apps/admin/undo-runs";
@@ -234,8 +241,8 @@ public class ExchangeBackendClient {
    * @return the bank switch, or {@code null} when the backend sent no body
    */
   @Nullable
-  public ExchangeBankSwitchDto bankSwitch() {
-    return backendApiClient.get(BANK_SWITCH, ExchangeBankSwitchDto.class);
+  public ExchangeAreaSwitchDto bankSwitch() {
+    return backendApiClient.get(BANK_SWITCH, ExchangeAreaSwitchDto.class);
   }
 
   /**
@@ -245,8 +252,52 @@ public class ExchangeBackendClient {
    * @return the bank switch
    */
   @Nullable
-  public ExchangeBankSwitchDto updateBankSwitch(@NotNull ExchangeBankSwitchUpdateRequest request) {
-    return backendApiClient.put(BANK_SWITCH, request, ExchangeBankSwitchDto.class);
+  public ExchangeAreaSwitchDto updateBankSwitch(@NotNull ExchangeAreaSwitchUpdateRequest request) {
+    return backendApiClient.put(BANK_SWITCH, request, ExchangeAreaSwitchDto.class);
+  }
+
+  /**
+   * Reads the job-order family switch of the exchange (REQ-OXCH-009).
+   *
+   * @return the family switch, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ExchangeAreaSwitchDto jobOrderSwitch() {
+    return backendApiClient.get(JOB_ORDER_SWITCH, ExchangeAreaSwitchDto.class);
+  }
+
+  /**
+   * Turns the job-order family switch of the exchange on or off (REQ-OXCH-009).
+   *
+   * @param request the new state and the family switch's version the admin last saw
+   * @return the family switch
+   */
+  @Nullable
+  public ExchangeAreaSwitchDto updateJobOrderSwitch(
+      @NotNull ExchangeAreaSwitchUpdateRequest request) {
+    return backendApiClient.put(JOB_ORDER_SWITCH, request, ExchangeAreaSwitchDto.class);
+  }
+
+  /**
+   * Reads the job-order writes switch of the exchange (REQ-OXCH-009).
+   *
+   * @return the writes switch, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ExchangeAreaSwitchDto jobOrderWritesSwitch() {
+    return backendApiClient.get(JOB_ORDER_WRITES_SWITCH, ExchangeAreaSwitchDto.class);
+  }
+
+  /**
+   * Turns the job-order writes switch of the exchange on or off (REQ-OXCH-009).
+   *
+   * @param request the new state and the writes switch's version the admin last saw
+   * @return the writes switch
+   */
+  @Nullable
+  public ExchangeAreaSwitchDto updateJobOrderWritesSwitch(
+      @NotNull ExchangeAreaSwitchUpdateRequest request) {
+    return backendApiClient.put(JOB_ORDER_WRITES_SWITCH, request, ExchangeAreaSwitchDto.class);
   }
 
   /**
