@@ -145,23 +145,20 @@ public class ExchangeRelay {
    * backend's exchange gate answers the same situation with the same code and status (REQ-XCH-025).
    */
   static final Map<String, Integer> GATE_STATUSES =
-      Map.of(
-          ExchangeRefusals.EXCHANGE_DISABLED,
-          HttpStatus.SERVICE_UNAVAILABLE.value(),
-          ExchangeRefusals.BANK_EXCHANGE_DISABLED,
-          HttpStatus.SERVICE_UNAVAILABLE.value(),
-          ExchangeRefusals.REGISTRY_UNAVAILABLE,
-          HttpStatus.SERVICE_UNAVAILABLE.value(),
-          ExchangeRefusals.CLIENT_NOT_ALLOWED,
-          HttpStatus.FORBIDDEN.value(),
-          ExchangeRefusals.CLIENT_SUSPENDED,
-          HttpStatus.FORBIDDEN.value(),
-          ExchangeRefusals.INSTALLATION_REVOKED,
-          HttpStatus.UNAUTHORIZED.value(),
-          ExchangeRefusals.CLIENT_REVOKED,
-          HttpStatus.UNAUTHORIZED.value(),
-          ExchangeRefusals.SCOPE_MISSING,
-          HttpStatus.FORBIDDEN.value());
+      Map.ofEntries(
+          Map.entry(ExchangeRefusals.EXCHANGE_DISABLED, HttpStatus.SERVICE_UNAVAILABLE.value()),
+          Map.entry(
+              ExchangeRefusals.BANK_EXCHANGE_DISABLED, HttpStatus.SERVICE_UNAVAILABLE.value()),
+          Map.entry(
+              ExchangeRefusals.JOB_ORDER_EXCHANGE_DISABLED, HttpStatus.SERVICE_UNAVAILABLE.value()),
+          Map.entry(
+              ExchangeRefusals.JOB_ORDER_WRITES_DISABLED, HttpStatus.SERVICE_UNAVAILABLE.value()),
+          Map.entry(ExchangeRefusals.REGISTRY_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE.value()),
+          Map.entry(ExchangeRefusals.CLIENT_NOT_ALLOWED, HttpStatus.FORBIDDEN.value()),
+          Map.entry(ExchangeRefusals.CLIENT_SUSPENDED, HttpStatus.FORBIDDEN.value()),
+          Map.entry(ExchangeRefusals.INSTALLATION_REVOKED, HttpStatus.UNAUTHORIZED.value()),
+          Map.entry(ExchangeRefusals.CLIENT_REVOKED, HttpStatus.UNAUTHORIZED.value()),
+          Map.entry(ExchangeRefusals.SCOPE_MISSING, HttpStatus.FORBIDDEN.value()));
 
   /**
    * The registry codes a backend refusal may reach a client with, each with the fixed detail the
@@ -234,6 +231,12 @@ public class ExchangeRelay {
               ExchangeRefusals.BANK_EXCHANGE_DISABLED,
               ExchangeGateFilter.BANK_EXCHANGE_DISABLED_DETAIL),
           Map.entry(
+              ExchangeRefusals.JOB_ORDER_EXCHANGE_DISABLED,
+              ExchangeGateFilter.JOB_ORDER_EXCHANGE_DISABLED_DETAIL),
+          Map.entry(
+              ExchangeRefusals.JOB_ORDER_WRITES_DISABLED,
+              ExchangeGateFilter.JOB_ORDER_WRITES_DISABLED_DETAIL),
+          Map.entry(
               ExchangeRefusals.REGISTRY_UNAVAILABLE,
               ExchangeGateFilter.REGISTRY_UNAVAILABLE_DETAIL),
           Map.entry(
@@ -247,6 +250,16 @@ public class ExchangeRelay {
 
   /** Backend codes the exchange contract names and a client may see as they are. */
   static final Set<String> PASSED_THROUGH = DETAILS.keySet();
+
+  /**
+   * The gate codes of the area switches, which carry {@value
+   * ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS} seconds of {@code Retry-After}.
+   */
+  private static final Set<String> AREA_SWITCH_CODES =
+      Set.of(
+          ExchangeRefusals.BANK_EXCHANGE_DISABLED,
+          ExchangeRefusals.JOB_ORDER_EXCHANGE_DISABLED,
+          ExchangeRefusals.JOB_ORDER_WRITES_DISABLED);
 
   /** Outcome: the backend answered 2xx and the gateway passed the answer on. */
   static final String OUTCOME_OK = "ok";
@@ -541,7 +554,9 @@ public class ExchangeRelay {
   /**
    * Returns the {@code Retry-After} a relay result carries: for a relayed refusal the same the
    * gateway's gate sends with that code, for {@code RELAY_BUSY} {@value #BUSY_RETRY_AFTER_SECONDS}
-   * and for {@code BANK_EXCHANGE_DISABLED} {@value ExchangeGateFilter#BANK_RETRY_AFTER_SECONDS}.
+   * and for the codes of the area switches ({@code BANK_EXCHANGE_DISABLED}, {@code
+   * JOB_ORDER_EXCHANGE_DISABLED}, {@code JOB_ORDER_WRITES_DISABLED}) {@value
+   * ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS}.
    *
    * @param code a problem code, or {@code null}
    * @return the seconds, or {@code null} when the code carries none
@@ -550,8 +565,8 @@ public class ExchangeRelay {
     if (ExchangeRefusals.RELAY_BUSY.equals(code)) {
       return BUSY_RETRY_AFTER_SECONDS;
     }
-    if (ExchangeRefusals.BANK_EXCHANGE_DISABLED.equals(code)) {
-      return ExchangeGateFilter.BANK_RETRY_AFTER_SECONDS;
+    if (code != null && AREA_SWITCH_CODES.contains(code)) {
+      return ExchangeGateFilter.AREA_RETRY_AFTER_SECONDS;
     }
     return ExchangeRefusals.EXCHANGE_DISABLED.equals(code)
             || ExchangeRefusals.REGISTRY_UNAVAILABLE.equals(code)

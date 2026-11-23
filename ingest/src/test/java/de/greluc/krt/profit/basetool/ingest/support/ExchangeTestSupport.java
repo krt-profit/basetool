@@ -230,6 +230,8 @@ public final class ExchangeTestSupport {
         1L,
         enabled,
         false,
+        false,
+        false,
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client("VerseKit", active, capabilities, minVersion, null, null)));
@@ -267,6 +269,8 @@ public final class ExchangeTestSupport {
         1L,
         true,
         bankEnabled,
+        false,
+        false,
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client(

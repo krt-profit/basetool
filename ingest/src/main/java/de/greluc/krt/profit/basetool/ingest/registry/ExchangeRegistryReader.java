@@ -173,6 +173,8 @@ public class ExchangeRegistryReader {
         revision != null && revision.isNumber() ? revision.longValue() : 0L,
         flag(root, "enabled"),
         flag(root, "bankEnabled"),
+        flag(root, "jobOrdersEnabled"),
+        flag(root, "jobOrderWritesEnabled"),
         clients);
   }
 

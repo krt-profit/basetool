@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.exchange.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
-import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientStatusRequest;
@@ -158,11 +158,41 @@ public class AdminExchangeClientsRelayController {
    */
   @PutMapping(value = "/settings/bank", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> updateBankSwitch(
-      @RequestBody @NotNull ExchangeBankSwitchUpdateRequest request) {
+      @RequestBody @NotNull ExchangeAreaSwitchUpdateRequest request) {
     return relay(
         log,
         "switch the bank on the exchange (ajax)",
         () -> ResponseEntity.ok(exchangeClient.updateBankSwitch(request)));
+  }
+
+  /**
+   * Turns the job-order family switch of the exchange on or off (REQ-OXCH-009).
+   *
+   * @param request the new state and the family switch's version the admin last saw
+   * @return the family switch, or the relayed backend error
+   */
+  @PutMapping(value = "/settings/job-orders", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateJobOrderSwitch(
+      @RequestBody @NotNull ExchangeAreaSwitchUpdateRequest request) {
+    return relay(
+        log,
+        "switch job orders on the exchange (ajax)",
+        () -> ResponseEntity.ok(exchangeClient.updateJobOrderSwitch(request)));
+  }
+
+  /**
+   * Turns the job-order writes switch of the exchange on or off (REQ-OXCH-009).
+   *
+   * @param request the new state and the writes switch's version the admin last saw
+   * @return the writes switch, or the relayed backend error
+   */
+  @PutMapping(value = "/settings/job-order-writes", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateJobOrderWritesSwitch(
+      @RequestBody @NotNull ExchangeAreaSwitchUpdateRequest request) {
+    return relay(
+        log,
+        "switch job-order writes on the exchange (ajax)",
+        () -> ResponseEntity.ok(exchangeClient.updateJobOrderWritesSwitch(request)));
   }
 
   /**

@@ -1457,6 +1457,172 @@
           }
         }
       ]
+    },
+    {
+      "id": 35,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 124
+      },
+      "type": "row",
+      "title": "Job orders",
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 36,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 125
+      },
+      "type": "timeseries",
+      "title": "Gateway refusals/hour while a job-order switch is off",
+      "description": "Job-order exchange requests of the selected clients the ingest gateway refused per hour because a job-order switch is off: job_order_exchange_disabled for any path of the family while the job-order switch is off, job_order_writes_disabled for a write while only the writes switch is off; the rest of the exchange keeps working (REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id, reason) (increase(basetool_ingest_exchange_refused_total{reason=~\"job_order_exchange_disabled|job_order_writes_disabled\", client_id=~\"$client_id\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}} {{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 125
+      },
+      "type": "timeseries",
+      "title": "Job-order switch changes/day",
+      "description": "Committed changes of the job-order switch and of the job-order writes switch per day, by switch and direction; each one fires JobOrderExchangeSwitchChanged and is logged as JOB_ORDER_EXCHANGE_SWITCH_CHANGED in the Verbundene Anwendungen audit log (REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (action) (increase(basetool_exchange_registry_changes_total{action=~\"job_order_.*\"}[1d]))",
+          "refId": "A",
+          "legendFormat": "{{action}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 133
+      },
+      "type": "timeseries",
+      "title": "Backend job-order refusals/hour",
+      "description": "Job-order exchange requests the backend refused per hour, by reason: switched_off and writes_switched_off when the backend's exchange gate rechecks a job-order switch, the other reasons from the job-order routes (REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (increase(basetool_exchange_job_order_refused_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

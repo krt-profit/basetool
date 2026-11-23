@@ -539,6 +539,18 @@ public enum NotificationEventType {
   BANK_EXCHANGE_SWITCHED_OFF,
 
   /**
+   * An admin switched job orders or their writes on for connected applications (REQ-OXCH-009),
+   * named by the coded {@code switch}. The default rule notifies the admins.
+   */
+  JOB_ORDER_EXCHANGE_SWITCHED_ON,
+
+  /**
+   * An admin switched job orders or their writes off for connected applications (REQ-OXCH-009),
+   * named by the coded {@code switch}. The default rule notifies the admins.
+   */
+  JOB_ORDER_EXCHANGE_SWITCHED_OFF,
+
+  /**
    * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
    * Logisticians of the receiving unit.
    */

@@ -109,6 +109,8 @@ class ExchangeRegistryMirrorIntegrationTest {
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(false);
     settings.setBankEnabled(false);
+    settings.setJobOrdersEnabled(false);
+    settings.setJobOrderWritesEnabled(false);
     settingsRepository.saveAndFlush(settings);
     auditEventRepository.deleteAll(
         auditEventRepository.findAll().stream()
@@ -345,6 +347,93 @@ class ExchangeRegistryMirrorIntegrationTest {
         false);
 
     assertThat(mirrored().bankEnabled()).isTrue();
+  }
+
+  @Test
+  void eachJobOrderSwitchKeepsItsOwnVersionAndTimeAndLeavesEveryOtherSwitchsAlone() {
+    ExchangeSettings start = registryService.getSettings();
+    assertThat(start.isJobOrdersEnabled()).as("the family starts off").isFalse();
+    assertThat(start.isJobOrderWritesEnabled()).as("the writes start off").isFalse();
+
+    ExchangeSettings familyOn =
+        registryService.updateJobOrdersSwitch(true, start.getJobOrdersVersion());
+
+    assertThat(familyOn.isJobOrdersEnabled()).isTrue();
+    assertThat(familyOn.getJobOrdersVersion()).isEqualTo(start.getJobOrdersVersion() + 1);
+    assertThat(familyOn.getJobOrdersUpdatedAt())
+        .isNotNull()
+        .isNotEqualTo(start.getJobOrdersUpdatedAt());
+    ExchangeSettings afterFamily = registryService.getSettings();
+    assertThat(afterFamily.getVersion()).isEqualTo(start.getVersion());
+    assertThat(afterFamily.getUpdatedAt()).isEqualTo(start.getUpdatedAt());
+    assertThat(afterFamily.getBankVersion()).isEqualTo(start.getBankVersion());
+    assertThat(afterFamily.getBankUpdatedAt()).isEqualTo(start.getBankUpdatedAt());
+    assertThat(afterFamily.getJobOrderWritesVersion()).isEqualTo(start.getJobOrderWritesVersion());
+    assertThat(afterFamily.getJobOrderWritesUpdatedAt())
+        .isEqualTo(start.getJobOrderWritesUpdatedAt());
+
+    ExchangeSettings writesOn =
+        registryService.updateJobOrderWritesSwitch(true, start.getJobOrderWritesVersion());
+
+    assertThat(writesOn.isJobOrderWritesEnabled()).isTrue();
+    assertThat(writesOn.getJobOrderWritesVersion()).isEqualTo(start.getJobOrderWritesVersion() + 1);
+    ExchangeSettings afterWrites = registryService.getSettings();
+    assertThat(afterWrites.getJobOrdersVersion()).isEqualTo(familyOn.getJobOrdersVersion());
+    assertThat(afterWrites.getJobOrdersUpdatedAt()).isEqualTo(familyOn.getJobOrdersUpdatedAt());
+    assertThat(afterWrites.getVersion()).isEqualTo(start.getVersion());
+    assertThat(afterWrites.getBankVersion()).isEqualTo(start.getBankVersion());
+
+    registryService.updateBankSwitch(true, start.getBankVersion());
+    registryService.updateSettings(true, start.getVersion());
+    ExchangeSettings afterOthers = registryService.getSettings();
+    assertThat(afterOthers.getJobOrdersVersion()).isEqualTo(familyOn.getJobOrdersVersion());
+    assertThat(afterOthers.getJobOrderWritesVersion())
+        .isEqualTo(writesOn.getJobOrderWritesVersion());
+
+    assertThatThrownBy(
+            () -> registryService.updateJobOrdersSwitch(false, start.getJobOrdersVersion()))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    assertThatThrownBy(() ->
+            registryService.updateJobOrderWritesSwitch(false, start.getJobOrderWritesVersion()))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+  }
+
+  @Test
+  void switchingAJobOrderSwitchOffReachesTheMirrorBeforeTheCommitAndOnOnlyAfterIt() {
+    ExchangeSettings familyOn =
+        registryService.updateJobOrdersSwitch(
+            true, registryService.getSettings().getJobOrdersVersion());
+    assertThat(mirrored().jobOrdersEnabled()).isTrue();
+    long writesVersion = registryService.getSettings().getJobOrderWritesVersion();
+
+    inOuterTransaction(
+        () -> {
+          registryService.updateJobOrderWritesSwitch(true, writesVersion);
+          assertThat(mirrored().jobOrderWritesEnabled()).as("not before the commit").isFalse();
+        },
+        false);
+    assertThat(mirrored().jobOrderWritesEnabled()).isTrue();
+
+    inOuterTransaction(
+        () -> {
+          registryService.updateJobOrdersSwitch(false, familyOn.getJobOrdersVersion());
+          registryService.updateJobOrderWritesSwitch(false, writesVersion + 1);
+          ExchangeRegistrySnapshot during = mirrored();
+          assertThat(during.jobOrdersEnabled())
+              .as("written before the outer transaction commits")
+              .isFalse();
+          assertThat(during.jobOrderWritesEnabled()).isFalse();
+        },
+        false);
+
+    assertThat(mirrored().jobOrdersEnabled()).isFalse();
+    assertThat(mirrored().jobOrderWritesEnabled()).isFalse();
+    assertThat(
+            auditEventRepository.findAll().stream()
+                .filter(event ->
+                    event.getEventType() == AuditEventType.JOB_ORDER_EXCHANGE_SWITCH_CHANGED)
+                .count())
+        .isEqualTo(4);
   }
 
   /**

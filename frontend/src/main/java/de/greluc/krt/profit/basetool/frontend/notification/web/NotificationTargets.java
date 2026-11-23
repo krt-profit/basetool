@@ -56,6 +56,7 @@ final class NotificationTargets {
   private static final String OPERATIONS = "/operations/";
   private static final String BANK_REQUEST_QUEUE = "/bank/requests";
   private static final String CONNECTED_APPS = "/connected-apps";
+  private static final String ADMIN_EXCHANGE_CLIENTS = "/admin/exchange-clients";
   private static final String MY_LAGER = "/inventory?storage=my";
   private static final String STOCK_LEVELS = "/inventory/stock-levels";
   private static final String HANGAR = "/hangar";
@@ -158,6 +159,12 @@ final class NotificationTargets {
           Map.entry("EXCHANGE_SWITCHED_OFF", page(CONNECTED_APPS)),
           Map.entry("BANK_EXCHANGE_SWITCHED_ON", page(CONNECTED_APPS)),
           Map.entry("BANK_EXCHANGE_SWITCHED_OFF", page(CONNECTED_APPS)),
+          Map.entry(
+              "JOB_ORDER_EXCHANGE_SWITCHED_ON",
+              forViewer(Viewer::admin, page(ADMIN_EXCHANGE_CLIENTS))),
+          Map.entry(
+              "JOB_ORDER_EXCHANGE_SWITCHED_OFF",
+              forViewer(Viewer::admin, page(ADMIN_EXCHANGE_CLIENTS))),
           Map.entry("INVENTORY_TRANSFERRED_TO_USER", page(MY_LAGER)),
           Map.entry("INVENTORY_TRANSFERRED_FROM_USER", page(MY_LAGER)),
           Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", page(MY_LAGER)),

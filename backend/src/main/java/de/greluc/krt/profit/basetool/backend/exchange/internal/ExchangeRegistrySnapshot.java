@@ -32,17 +32,22 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The registry's content as the gateway sees it: the global switch, the bank switch and every
- * client by client id (REQ-XCH-003, REQ-BXCH-006). Two snapshots are equal exactly when they grant
- * the same access.
+ * The registry's content as the gateway sees it: the global switch, the bank switch, the two
+ * job-order switches and every client by client id (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009). Two
+ * snapshots are equal exactly when they grant the same access.
  *
  * @param enabled whether the exchange serves any request
  * @param bankEnabled whether the bank route family serves requests while the exchange is on
+ * @param jobOrdersEnabled whether the job-order route family serves requests while the exchange is
+ *     on
+ * @param jobOrderWritesEnabled whether the job-order writes are served while the family is on
  * @param clients every registry client by its Keycloak client id, sorted
  */
 public record ExchangeRegistrySnapshot(
     boolean enabled,
     boolean bankEnabled,
+    boolean jobOrdersEnabled,
+    boolean jobOrderWritesEnabled,
     @NotNull @Unmodifiable SortedMap<String, Client> clients) {
 
   /**
@@ -50,10 +55,24 @@ public record ExchangeRegistrySnapshot(
    *
    * @param enabled whether the exchange serves any request
    * @param bankEnabled whether the bank route family serves requests while the exchange is on
+   * @param jobOrdersEnabled whether the job-order route family serves requests while the exchange
+   *     is on
+   * @param jobOrderWritesEnabled whether the job-order writes are served while the family is on
    * @param clients every registry client by its Keycloak client id
    */
   public ExchangeRegistrySnapshot {
     clients = Collections.unmodifiableSortedMap(new TreeMap<>(clients));
+  }
+
+  /**
+   * Builds the snapshot that grants nothing: every switch off, the clients kept.
+   *
+   * @param clients every registry client by its Keycloak client id
+   * @return the switched-off snapshot
+   */
+  @NotNull
+  public static ExchangeRegistrySnapshot switchedOff(@NotNull SortedMap<String, Client> clients) {
+    return new ExchangeRegistrySnapshot(false, false, false, false, clients);
   }
 
   /**
@@ -90,16 +109,16 @@ public record ExchangeRegistrySnapshot(
   }
 
   /**
-   * Builds a snapshot from the registry rows.
+   * Builds a snapshot from the settings row and the registry rows; without a settings row every
+   * switch counts as off.
    *
-   * @param enabled the global switch
-   * @param bankEnabled the bank switch
+   * @param settings the switches, or {@code null} when the row is missing
    * @param rows the registry clients with their capabilities loaded
    * @return the snapshot
    */
   @NotNull
   public static ExchangeRegistrySnapshot of(
-      boolean enabled, boolean bankEnabled, @NotNull Collection<ExchangeClient> rows) {
+      @Nullable ExchangeSettings settings, @NotNull Collection<ExchangeClient> rows) {
     SortedMap<String, Client> clients = new TreeMap<>();
     for (ExchangeClient row : rows) {
       clients.put(
@@ -112,7 +131,15 @@ public record ExchangeRegistrySnapshot(
               row.getRequestsPerMinute(),
               row.getWritesPerDay()));
     }
-    return new ExchangeRegistrySnapshot(enabled, bankEnabled, clients);
+    if (settings == null) {
+      return switchedOff(clients);
+    }
+    return new ExchangeRegistrySnapshot(
+        settings.isEnabled(),
+        settings.isBankEnabled(),
+        settings.isJobOrdersEnabled(),
+        settings.isJobOrderWritesEnabled(),
+        clients);
   }
 
   /**
@@ -154,7 +181,11 @@ public record ExchangeRegistrySnapshot(
               then.writesPerDay()));
     }
     return new ExchangeRegistrySnapshot(
-        before.enabled() && after.enabled(), before.bankEnabled() && after.bankEnabled(), merged);
+        before.enabled() && after.enabled(),
+        before.bankEnabled() && after.bankEnabled(),
+        before.jobOrdersEnabled() && after.jobOrdersEnabled(),
+        before.jobOrderWritesEnabled() && after.jobOrderWritesEnabled(),
+        merged);
   }
 
   /**

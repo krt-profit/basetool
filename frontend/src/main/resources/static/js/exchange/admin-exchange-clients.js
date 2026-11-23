@@ -148,6 +148,16 @@ function initAdminExchangeClients() {
                 confirmBankOffBody: text('confirmBankOffBody'),
                 confirmBankOnTitle: text('confirmBankOnTitle'),
                 confirmBankOnBody: text('confirmBankOnBody'),
+                jobOrderSwitched: text('jobOrderSwitched'),
+                confirmJobOrderOffTitle: text('confirmJobOrderOffTitle'),
+                confirmJobOrderOffBody: text('confirmJobOrderOffBody'),
+                confirmJobOrderOnTitle: text('confirmJobOrderOnTitle'),
+                confirmJobOrderOnBody: text('confirmJobOrderOnBody'),
+                jobOrderWritesSwitched: text('jobOrderWritesSwitched'),
+                confirmJobOrderWritesOffTitle: text('confirmJobOrderWritesOffTitle'),
+                confirmJobOrderWritesOffBody: text('confirmJobOrderWritesOffBody'),
+                confirmJobOrderWritesOnTitle: text('confirmJobOrderWritesOnTitle'),
+                confirmJobOrderWritesOnBody: text('confirmJobOrderWritesOnBody'),
                 formCreate: text('formCreate'),
                 formEdit: text('formEdit'),
             };
@@ -394,13 +404,39 @@ function initAdminExchangeClients() {
             on: { title: i18n.confirmOnTitle, body: i18n.confirmOnBody },
         };
 
-        /** @type {SwitchSpec} */
-        const bankSwitch = {
-            boxId: 'xc-bank-switch',
-            url: `${BASE}/settings/bank`,
-            switched: i18n.bankSwitched,
-            off: { title: i18n.confirmBankOffTitle, body: i18n.confirmBankOffBody },
-            on: { title: i18n.confirmBankOnTitle, body: i18n.confirmBankOnBody },
+        /**
+         * The area switches beside the global one, by the card id their button names in
+         * `data-xc-area-switch`; each echoes its own version.
+         * @type {Record<string, SwitchSpec>}
+         */
+        const areaSwitches = {
+            'xc-bank-switch': {
+                boxId: 'xc-bank-switch',
+                url: `${BASE}/settings/bank`,
+                switched: i18n.bankSwitched,
+                off: { title: i18n.confirmBankOffTitle, body: i18n.confirmBankOffBody },
+                on: { title: i18n.confirmBankOnTitle, body: i18n.confirmBankOnBody },
+            },
+            'xc-job-order-switch': {
+                boxId: 'xc-job-order-switch',
+                url: `${BASE}/settings/job-orders`,
+                switched: i18n.jobOrderSwitched,
+                off: { title: i18n.confirmJobOrderOffTitle, body: i18n.confirmJobOrderOffBody },
+                on: { title: i18n.confirmJobOrderOnTitle, body: i18n.confirmJobOrderOnBody },
+            },
+            'xc-job-order-writes-switch': {
+                boxId: 'xc-job-order-writes-switch',
+                url: `${BASE}/settings/job-order-writes`,
+                switched: i18n.jobOrderWritesSwitched,
+                off: {
+                    title: i18n.confirmJobOrderWritesOffTitle,
+                    body: i18n.confirmJobOrderWritesOffBody,
+                },
+                on: {
+                    title: i18n.confirmJobOrderWritesOnTitle,
+                    body: i18n.confirmJobOrderWritesOnBody,
+                },
+            },
         };
 
         el.form.addEventListener('submit', onSubmit);
@@ -419,9 +455,12 @@ function initAdminExchangeClients() {
                 toggle(globalSwitch, switchBtn);
                 return;
             }
-            const bankSwitchBtn = target.closest('[data-xc-bank-switch]');
-            if (bankSwitchBtn) {
-                toggle(bankSwitch, bankSwitchBtn);
+            const areaSwitchBtn = target.closest('[data-xc-area-switch]');
+            if (areaSwitchBtn) {
+                const spec = areaSwitches[areaSwitchBtn.getAttribute('data-xc-area-switch') || ''];
+                if (spec) {
+                    toggle(spec, areaSwitchBtn);
+                }
                 return;
             }
             if (target.closest('[data-xc-new]')) {

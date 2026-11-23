@@ -23,10 +23,11 @@ import java.time.Instant;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The bank switch of the exchange (REQ-BXCH-006).
+ * One area switch of the exchange beside the global switch: the bank (REQ-BXCH-006), the job-order
+ * family or its writes (REQ-OXCH-009).
  *
- * @param enabled whether the bank route family serves requests while the exchange is on
- * @param updatedAt when the bank switch last changed, or {@code null} before its first change
- * @param version the bank switch's own optimistic-lock version
+ * @param enabled whether the area serves requests while the exchange is on
+ * @param updatedAt when the switch last changed, or {@code null} before its first change
+ * @param version the switch's own optimistic-lock version
  */
-public record ExchangeBankSwitchDto(boolean enabled, @Nullable Instant updatedAt, long version) {}
+public record ExchangeAreaSwitchDto(boolean enabled, @Nullable Instant updatedAt, long version) {}

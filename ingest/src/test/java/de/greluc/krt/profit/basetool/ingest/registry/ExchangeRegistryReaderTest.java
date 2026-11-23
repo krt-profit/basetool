@@ -132,6 +132,37 @@ class ExchangeRegistryReaderTest {
   }
 
   @Test
+  void theJobOrderSwitchesAreReadAndEachCountsAsOffWhenAbsentOrMalformed() {
+    when(values.get(KEY))
+        .thenReturn(
+            DOCUMENT.replace(
+                "\"enabled\":true,",
+                "\"enabled\":true,\"jobOrdersEnabled\":true,\"jobOrderWritesEnabled\":true,"));
+    ExchangeRegistry both = reader.current();
+    assertThat(both.jobOrdersEnabled()).isTrue();
+    assertThat(both.jobOrderWritesEnabled()).isTrue();
+
+    ExchangeRegistry absent =
+        ExchangeRegistryReader.parse(JsonMapper.builder().build().readTree(DOCUMENT));
+    assertThat(absent.jobOrdersEnabled()).isFalse();
+    assertThat(absent.jobOrderWritesEnabled()).isFalse();
+
+    ExchangeRegistry familyOnly =
+        ExchangeRegistryReader.parse(
+            JsonMapper.builder()
+                .build()
+                .readTree(
+                    DOCUMENT.replace(
+                        "\"enabled\":true,",
+                        "\"enabled\":true,\"jobOrdersEnabled\":true,"
+                            + "\"jobOrderWritesEnabled\":\"yes\",")));
+    assertThat(familyOnly.jobOrdersEnabled()).isTrue();
+    assertThat(familyOnly.jobOrderWritesEnabled())
+        .as("a mirror document without a usable writes field reads as off")
+        .isFalse();
+  }
+
+  @Test
   void theRegistryIsCachedForItsLifetimeOnly() {
     when(values.get(KEY)).thenReturn(DOCUMENT);
 

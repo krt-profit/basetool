@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -40,17 +41,20 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * The backend's own check of an exchange request, used as {@code @exchangeGate} in {@code
  * PreAuthorize} on every exchange controller method (REQ-XCH-004): the caller is an acting member
  * relayed for a registry client, the global switch is on, the bank switch is on for a request of
- * the bank route family (REQ-BXCH-006, {@link BankExchangeRoutes}), the client is active, the
- * member has not disconnected the installation or, after the connection was made, the client
- * (REQ-XCH-008), and the needed capability was both relayed and granted in the registry. Every
- * refusal is counted; a relayed request is refused with the code and status the gateway's own gate
- * answers for the same situation (REQ-XCH-025), so a client sees one code whichever side refuses
- * it.
+ * the bank route family (REQ-BXCH-006, {@link BankExchangeRoutes}), the job-order family switch is
+ * on for a request of the job-order route family and the job-order writes switch for its writes
+ * (REQ-OXCH-009, {@link JobOrderExchangeRoutes}), the client is active, the member has not
+ * disconnected the installation or, after the connection was made, the client (REQ-XCH-008), and
+ * the needed capability was both relayed and granted in the registry. Every refusal is counted; a
+ * relayed request is refused with the code and status the gateway's own gate answers for the same
+ * situation (REQ-XCH-025), so a client sees one code whichever side refuses it.
  */
 @Slf4j
 @Component("exchangeGate")
@@ -65,6 +69,15 @@ public class ExchangeGate {
 
   /** Refusal reason: the bank switch is off and the request is for the bank route family. */
   static final String REASON_BANK_SWITCH_OFF = "bank_switch_off";
+
+  /**
+   * Refusal reason: the job-order family switch is off and the request is for the job-order route
+   * family.
+   */
+  static final String REASON_JOB_ORDER_SWITCH_OFF = "job_order_switch_off";
+
+  /** Refusal reason: the job-order writes switch is off and the request is a job-order write. */
+  static final String REASON_JOB_ORDER_WRITES_SWITCH_OFF = "job_order_writes_switch_off";
 
   /** Refusal reason: the relayed client is not in the registry. */
   static final String REASON_CLIENT_UNKNOWN = "client_unknown";
@@ -94,6 +107,9 @@ public class ExchangeGate {
   /** Counts a bank route refused while the bank switch is off. */
   private final ExchangeBankMetrics bankMetrics;
 
+  /** Counts a job-order route refused while a job-order switch is off. */
+  private final ExchangeJobOrderMetrics jobOrderMetrics;
+
   /** Registers the refusal counter for every reason at zero, so a first refusal is an increase. */
   @PostConstruct
   void registerRefusalCounters() {
@@ -102,6 +118,8 @@ public class ExchangeGate {
           REASON_NOT_RELAYED,
           REASON_SWITCH_OFF,
           REASON_BANK_SWITCH_OFF,
+          REASON_JOB_ORDER_SWITCH_OFF,
+          REASON_JOB_ORDER_WRITES_SWITCH_OFF,
           REASON_CLIENT_UNKNOWN,
           REASON_CLIENT_SUSPENDED,
           REASON_SCOPE_MISSING,
@@ -198,16 +216,7 @@ public class ExchangeGate {
       count(REASON_NOT_RELAYED);
       return Optional.empty();
     }
-    Optional<ExchangeSettings> settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID);
-    if (!settings.map(ExchangeSettings::isEnabled).orElse(false)) {
-      throw refuse(REASON_SWITCH_OFF, ExchangeProblemException.exchangeDisabled());
-    }
-    if (BankExchangeRoutes.isCurrentRequestBank()
-        && !settings.map(ExchangeSettings::isBankEnabled).orElse(false)) {
-      bankMetrics.countRefused(BankExchangeRefusal.SWITCHED_OFF);
-      throw refuse(REASON_BANK_SWITCH_OFF, ExchangeProblemException.bankExchangeDisabled());
-    }
+    refuseBySwitch(settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElse(null));
     ExchangeClient client =
         clientRepository
             .findWithCapabilitiesByClientId(subject.externalClient())
@@ -234,6 +243,49 @@ public class ExchangeGate {
             .filter(granted::contains)
             .collect(Collectors.toSet());
     return Optional.of(relayed);
+  }
+
+  /**
+   * Refuses a request one of the switches stops, in the gateway's order (REQ-XCH-025): the global
+   * switch for every route, the bank switch for the bank route family (REQ-BXCH-006), the job-order
+   * family switch for the job-order route family and then the job-order writes switch for its
+   * {@code POST}s (REQ-OXCH-009). A missing settings row counts as every switch off.
+   *
+   * @param settings the settings row, or {@code null} when it is missing
+   * @throws ExchangeProblemException with the gateway's code for the switch that stops the request
+   */
+  private void refuseBySwitch(@Nullable ExchangeSettings settings) {
+    if (settings == null || !settings.isEnabled()) {
+      throw refuse(REASON_SWITCH_OFF, ExchangeProblemException.exchangeDisabled());
+    }
+    HttpServletRequest request = currentRequest();
+    String path = request == null ? null : request.getRequestURI();
+    if (BankExchangeRoutes.isBank(path) && !settings.isBankEnabled()) {
+      bankMetrics.countRefused(BankExchangeRefusal.SWITCHED_OFF);
+      throw refuse(REASON_BANK_SWITCH_OFF, ExchangeProblemException.bankExchangeDisabled());
+    }
+    if (JobOrderExchangeRoutes.isJobOrder(path) && !settings.isJobOrdersEnabled()) {
+      jobOrderMetrics.countRefused(JobOrderExchangeRefusal.SWITCHED_OFF);
+      throw refuse(
+          REASON_JOB_ORDER_SWITCH_OFF, ExchangeProblemException.jobOrderExchangeDisabled());
+    }
+    if (JobOrderExchangeRoutes.isWrite(request == null ? null : request.getMethod(), path)
+        && !settings.isJobOrderWritesEnabled()) {
+      jobOrderMetrics.countRefused(JobOrderExchangeRefusal.WRITES_SWITCHED_OFF);
+      throw refuse(
+          REASON_JOB_ORDER_WRITES_SWITCH_OFF, ExchangeProblemException.jobOrderWritesDisabled());
+    }
+  }
+
+  /**
+   * Returns the servlet request bound to the current thread.
+   *
+   * @return the request, or {@code null} outside a servlet request
+   */
+  private static @Nullable HttpServletRequest currentRequest() {
+    return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes servlet
+        ? servlet.getRequest()
+        : null;
   }
 
   /**

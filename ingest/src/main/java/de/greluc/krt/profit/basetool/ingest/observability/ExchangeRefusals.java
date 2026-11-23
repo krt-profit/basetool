@@ -64,6 +64,12 @@ public class ExchangeRefusals {
   /** The bank switch is off and the request is for the bank route family. */
   public static final String BANK_EXCHANGE_DISABLED = "BANK_EXCHANGE_DISABLED";
 
+  /** The job-order family switch is off and the request is for the job-order route family. */
+  public static final String JOB_ORDER_EXCHANGE_DISABLED = "JOB_ORDER_EXCHANGE_DISABLED";
+
+  /** The job-order writes switch is off and the request is a job-order write. */
+  public static final String JOB_ORDER_WRITES_DISABLED = "JOB_ORDER_WRITES_DISABLED";
+
   /** The token's client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
@@ -120,6 +126,8 @@ public class ExchangeRefusals {
           REGISTRY_UNAVAILABLE,
           EXCHANGE_DISABLED,
           BANK_EXCHANGE_DISABLED,
+          JOB_ORDER_EXCHANGE_DISABLED,
+          JOB_ORDER_WRITES_DISABLED,
           CLIENT_NOT_ALLOWED,
           CLIENT_SUSPENDED,
           ORIGIN_NOT_ALLOWED,

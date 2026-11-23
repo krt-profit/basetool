@@ -47,8 +47,33 @@ public final class ExchangeNotices {
   /** Loose entity-type tag of the notices about the bank switch. */
   public static final String BANK_SWITCH_ENTITY_TYPE = "EXCHANGE_BANK_SWITCH";
 
-  /** The fixed entity id of the global switch and of the bank switch. */
+  /** Loose entity-type tag of the notices about the job-order family switch. */
+  public static final String JOB_ORDER_SWITCH_ENTITY_TYPE = "EXCHANGE_JOB_ORDER_SWITCH";
+
+  /** Loose entity-type tag of the notices about the job-order writes switch. */
+  public static final String JOB_ORDER_WRITES_SWITCH_ENTITY_TYPE =
+      "EXCHANGE_JOB_ORDER_WRITES_SWITCH";
+
+  /** The fixed entity id of every switch; the entity type tells the switches apart. */
   public static final UUID SWITCH_ENTITY_ID = new UUID(0L, 1L);
+
+  /**
+   * The coded render parameter naming the job-order switch a notice is about (REQ-NOTIF-028), with
+   * the value {@value #FAMILY_SWITCH} or {@value #WRITES_SWITCH}.
+   */
+  public static final String SWITCH_CODE = "switchCode";
+
+  /** The {@link #SWITCH_CODE} of the job-order family switch. */
+  public static final String FAMILY_SWITCH = "family";
+
+  /** The {@link #SWITCH_CODE} of the job-order writes switch. */
+  public static final String WRITES_SWITCH = "writes";
+
+  /** The notice types every job-order switch notice supersedes for its own switch. */
+  private static final Set<NotificationType> JOB_ORDER_SWITCH_NOTICES =
+      Set.of(
+          NotificationType.JOB_ORDER_EXCHANGE_SWITCHED_ON,
+          NotificationType.JOB_ORDER_EXCHANGE_SWITCHED_OFF);
 
   private ExchangeNotices() {}
 
@@ -221,6 +246,82 @@ public final class ExchangeNotices {
             Set.of(
                 NotificationType.BANK_EXCHANGE_SWITCHED_ON,
                 NotificationType.BANK_EXCHANGE_SWITCHED_OFF))
+        .build();
+  }
+
+  /**
+   * Job orders were switched on for connected applications (REQ-OXCH-009); the earlier notices
+   * about the family switch go.
+   *
+   * @param actorSub the admin, or {@code null}
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent jobOrdersSwitchedOn(@Nullable UUID actorSub) {
+    return jobOrderSwitch(
+        NotificationEventType.JOB_ORDER_EXCHANGE_SWITCHED_ON,
+        JOB_ORDER_SWITCH_ENTITY_TYPE,
+        FAMILY_SWITCH,
+        actorSub);
+  }
+
+  /**
+   * Job orders were switched off for connected applications (REQ-OXCH-009); the earlier notices
+   * about the family switch go.
+   *
+   * @param actorSub the admin, or {@code null}
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent jobOrdersSwitchedOff(@Nullable UUID actorSub) {
+    return jobOrderSwitch(
+        NotificationEventType.JOB_ORDER_EXCHANGE_SWITCHED_OFF,
+        JOB_ORDER_SWITCH_ENTITY_TYPE,
+        FAMILY_SWITCH,
+        actorSub);
+  }
+
+  /**
+   * Job-order writes were switched on for connected applications (REQ-OXCH-009); the earlier
+   * notices about the writes switch go.
+   *
+   * @param actorSub the admin, or {@code null}
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent jobOrderWritesSwitchedOn(@Nullable UUID actorSub) {
+    return jobOrderSwitch(
+        NotificationEventType.JOB_ORDER_EXCHANGE_SWITCHED_ON,
+        JOB_ORDER_WRITES_SWITCH_ENTITY_TYPE,
+        WRITES_SWITCH,
+        actorSub);
+  }
+
+  /**
+   * Job-order writes were switched off for connected applications (REQ-OXCH-009); the earlier
+   * notices about the writes switch go.
+   *
+   * @param actorSub the admin, or {@code null}
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent jobOrderWritesSwitchedOff(@Nullable UUID actorSub) {
+    return jobOrderSwitch(
+        NotificationEventType.JOB_ORDER_EXCHANGE_SWITCHED_OFF,
+        JOB_ORDER_WRITES_SWITCH_ENTITY_TYPE,
+        WRITES_SWITCH,
+        actorSub);
+  }
+
+  private static NoticeEvent jobOrderSwitch(
+      NotificationEventType type, String entityType, String switchCode, @Nullable UUID actorSub) {
+    return NoticeEvent.builder()
+        .eventType(type)
+        .actorSub(actorSub)
+        .entityType(entityType)
+        .entityId(SWITCH_ENTITY_ID)
+        .renderParams(Map.of(SWITCH_CODE, switchCode))
+        .resolvesNotificationTypes(JOB_ORDER_SWITCH_NOTICES)
         .build();
   }
 }

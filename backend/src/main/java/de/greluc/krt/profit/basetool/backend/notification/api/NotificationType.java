@@ -454,6 +454,20 @@ public enum NotificationType {
   BANK_EXCHANGE_SWITCHED_OFF,
 
   /**
+   * An admin switched job orders or their writes on for connected applications (REQ-OXCH-009),
+   * rendered with the coded {@code switch}; notifies the admins and supersedes the earlier notice
+   * about the same switch.
+   */
+  JOB_ORDER_EXCHANGE_SWITCHED_ON,
+
+  /**
+   * An admin switched job orders or their writes off for connected applications (REQ-OXCH-009),
+   * rendered with the coded {@code switch}; notifies the admins and supersedes the earlier notice
+   * about the same switch.
+   */
+  JOB_ORDER_EXCHANGE_SWITCHED_OFF,
+
+  /**
    * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
    * Logisticians of the receiving unit, excluding the actor; superseded when the pledge is
    * received, declined or withdrawn.
@@ -617,6 +631,8 @@ public enum NotificationType {
           EXCHANGE_SWITCHED_OFF,
           BANK_EXCHANGE_SWITCHED_ON,
           BANK_EXCHANGE_SWITCHED_OFF,
+          JOB_ORDER_EXCHANGE_SWITCHED_ON,
+          JOB_ORDER_EXCHANGE_SWITCHED_OFF,
           SUPPLY_DONATION_PLEDGED,
           SUPPLY_DONATION_RECEIVED,
           SUPPLY_DONATION_DECLINED,

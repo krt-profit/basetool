@@ -51,9 +51,42 @@ public interface ExchangeClientMapper {
    * @param settings the entity
    * @return the bank switch DTO
    */
-  default @NotNull ExchangeBankSwitchDto toBankSwitchDto(@NotNull ExchangeSettings settings) {
-    return new ExchangeBankSwitchDto(
-        settings.isBankEnabled(), settings.getBankUpdatedAt(), settings.getBankVersion());
+  default @NotNull ExchangeAreaSwitchDto toBankSwitchDto(@NotNull ExchangeSettings settings) {
+    return toAreaSwitchDto(ExchangeSwitch.BANK, settings);
+  }
+
+  /**
+   * Maps the job-order family switch of the settings row, with its own version.
+   *
+   * @param settings the entity
+   * @return the family switch DTO
+   */
+  default @NotNull ExchangeAreaSwitchDto toJobOrdersSwitchDto(@NotNull ExchangeSettings settings) {
+    return toAreaSwitchDto(ExchangeSwitch.JOB_ORDERS, settings);
+  }
+
+  /**
+   * Maps the job-order writes switch of the settings row, with its own version.
+   *
+   * @param settings the entity
+   * @return the writes switch DTO
+   */
+  default @NotNull ExchangeAreaSwitchDto toJobOrderWritesSwitchDto(
+      @NotNull ExchangeSettings settings) {
+    return toAreaSwitchDto(ExchangeSwitch.JOB_ORDER_WRITES, settings);
+  }
+
+  /**
+   * Maps one area switch of the settings row: its state, its own change time and version.
+   *
+   * @param area the switch
+   * @param settings the entity
+   * @return the switch DTO
+   */
+  private static @NotNull ExchangeAreaSwitchDto toAreaSwitchDto(
+      @NotNull ExchangeSwitch area, @NotNull ExchangeSettings settings) {
+    return new ExchangeAreaSwitchDto(
+        area.isOn(settings), area.updatedAtOf(settings), area.versionOf(settings));
   }
 
   /**

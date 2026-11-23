@@ -17,18 +17,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.exchange.model;
+package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
-import java.time.Instant;
-import org.jetbrains.annotations.Nullable;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 
-/**
- * Mirror of the bank switch of the exchange (REQ-BXCH-006).
- *
- * @param enabled whether the bank route family serves requests while the exchange is on
- * @param updatedAt when the bank switch last changed, or {@code null} before its first change
- * @param version the bank switch's own optimistic-lock version
- */
-@DtoMirror
-public record ExchangeBankSwitchDto(boolean enabled, @Nullable Instant updatedAt, long version) {}
+/** A read route of the job orders on the exchange; the {@code route} label of its metric. */
+@RequiredArgsConstructor
+public enum JobOrderExchangeReadRoute {
+
+  /** The snapshot of the member's job-order set. */
+  SNAPSHOT("snapshot"),
+
+  /** The change feed of the member's job-order set. */
+  FEED("feed"),
+
+  /** The choices and limits a client offers before a create. */
+  CREATE_OPTIONS("create_options");
+
+  /** The metric label value. */
+  @Getter @NotNull private final String tag;
+}

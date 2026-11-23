@@ -31,6 +31,10 @@ import org.jetbrains.annotations.NotNull;
  * @param writtenAt when the backend wrote the document
  * @param enabled whether the exchange serves any request
  * @param bankEnabled whether the bank route family serves requests while the exchange is on
+ * @param jobOrdersEnabled whether the job-order route family serves requests while the exchange is
+ *     on; a document without it reads as off
+ * @param jobOrderWritesEnabled whether the job-order writes are served while the family is on; a
+ *     document without it reads as off
  * @param clients every registry client by its Keycloak client id
  */
 public record ExchangeRegistryMirrorDocument(
@@ -39,6 +43,8 @@ public record ExchangeRegistryMirrorDocument(
     @NotNull Instant writtenAt,
     boolean enabled,
     boolean bankEnabled,
+    boolean jobOrdersEnabled,
+    boolean jobOrderWritesEnabled,
     @NotNull SortedMap<String, ExchangeRegistrySnapshot.Client> clients) {
 
   /** The current document format. */
@@ -51,6 +57,7 @@ public record ExchangeRegistryMirrorDocument(
    */
   @NotNull
   public ExchangeRegistrySnapshot snapshot() {
-    return new ExchangeRegistrySnapshot(enabled, bankEnabled, clients);
+    return new ExchangeRegistrySnapshot(
+        enabled, bankEnabled, jobOrdersEnabled, jobOrderWritesEnabled, clients);
   }
 }
