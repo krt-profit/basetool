@@ -154,7 +154,7 @@ class JobOrderServiceAssigneeAndListTest {
             itemFulfillment,
             profitHierarchy,
             responsibilityGuard,
-            jobOrderAccessPolicy,
+            org.mockito.Mockito.mock(JobOrderWriters.class),
             new JobOrderMaterialLines(materialRepository, null),
             new InventoryStockReads(
                 inventoryItemRepository,

@@ -177,8 +177,11 @@ currently permitted proposed pair. The projection also carries the canonical act
 as the aUEC responsible suggestion when available among the eligible choices. It uses the
 same writable requester and falls back to the generic responsible suggestion if the root is
 unavailable in the choices. The frontend consumes the projected suggestions and writer flags.
-The backend revalidates the selected pair when creating. All create transports consume the
-returned order identity and open its central detail page. A reader without a permitted pair gets
+The backend revalidates the selected pair when creating. The create command and the projection
+take the writer rule and the actor as parameters, and every kind's create runs one create path;
+the web passes its contextual authorities with the honoured pin and the requesting member
+(ADR-0405). All create transports consume the returned order identity and open its central detail
+page. A reader without a permitted pair gets
 no create action and cannot open the form. Workspace and unit-work view capabilities remain
 independent of creation and individual action rights.
 
@@ -207,8 +210,11 @@ recorded facts are not discarded.
 
 **Enforced by:** `JobOrderCreateOptionsIntegrationTest`, `JobOrderCreationWorkspaceMvcTest` and
 `JobOrderAssigneeGrantIntegrationTest` cover current creation and personal-entry capabilities.
+`JobOrderAuecCreateAuthorityIntegrationTest` pins who may create an aUEC order in the web, and
+`JobOrderDirectLogisticianRuleIntegrationTest` the database writer rule at the create seam and
+that every pair it permits is one the web permits for the same member.
 `JobOrderHierarchyAuthorityIntegrationTest` covers safe MATERIAL and ITEM requester edits
-after booked work. The money workflow follows its own implementation slice. **Issues:** #3197, #3200
+after booked work. The money workflow follows its own implementation slice. **Issues:** #3197, #3200, #3640
 
 ### REQ-ORDERS-054 — Lifecycle distinguishes kind-specific fulfillment
 

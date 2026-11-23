@@ -26,6 +26,11 @@ ADR-0287).
 The bank goes one step further: every bank access rule sits behind `BankAccessPolicy`, which
 decides for an explicit `BankActor` read from the database and never reads the security context;
 the web beans and the exchange only build the actor and ask (ADR-0352).
+Job orders take the authority as a parameter instead of a policy object: the create command and
+the create-options projection take a `JobOrderWriterRule` and a `JobOrderActor`, resolved on every
+call under the command's locks. The web passes its contextual authorities with the pin, the
+exchange the member's direct Logistician units from the database for the requesting side only, so
+both share one code path and the exchange never permits a pair the web would refuse (ADR-0405).
 
 Beyond roles there are three mechanisms that are easy to miss:
 

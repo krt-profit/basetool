@@ -284,6 +284,26 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
+   * Returns the org-unit ids the user directly belongs to and is a Logistician of: the units of
+   * {@link #findLogisticianOrgUnitIds(UUID)} that are also among {@link
+   * #findDirectMembershipOrgUnitIds(UUID)}, so a Bereich or Organisationsleitung reach counts only
+   * over a unit the user is a member of (REQ-XCH-045).
+   *
+   * @param userId the user whose memberships to read; never {@code null}.
+   * @return the org-unit ids; never {@code null}, possibly empty.
+   */
+  @NotNull
+  public Set<UUID> findDirectLogisticianOrgUnitIds(@NotNull UUID userId) {
+    Set<UUID> logistician = findLogisticianOrgUnitIds(userId);
+    if (logistician.isEmpty()) {
+      return Set.of();
+    }
+    Set<UUID> direct = new LinkedHashSet<>(logistician);
+    direct.retainAll(findDirectMembershipOrgUnitIds(userId));
+    return direct;
+  }
+
+  /**
    * Lists the user's direct memberships on active units across all four kinds as named picker
    * options, ordered OL, Bereich, Staffel, SK and then by name, so the first element is the primary
    * unit. Backs the bank counterparty org-unit picker (REQ-BANK-044, REQ-ORG-032).

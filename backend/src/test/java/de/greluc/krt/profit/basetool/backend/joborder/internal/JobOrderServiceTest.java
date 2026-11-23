@@ -51,6 +51,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCo
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
@@ -63,6 +65,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -80,6 +84,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,6 +99,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionSynchronizationUtils;
@@ -124,6 +130,7 @@ class JobOrderServiceTest {
 
   @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
+  @Mock private JobOrderWriters writers;
 
   @Mock private SystemSettings systemSettings;
 
@@ -187,7 +194,7 @@ class JobOrderServiceTest {
             itemFulfillment,
             profitHierarchy,
             responsibilityGuard,
-            jobOrderAccessPolicy,
+            writers,
             new JobOrderMaterialLines(materialRepository, qualityTierService),
             new InventoryStockReads(
                 inventoryItemRepository,
@@ -465,8 +472,20 @@ class JobOrderServiceTest {
                     orderId, UUID.randomUUID(), materialId, quality, amount)));
   }
 
+  private void permitEveryPair() {
+    when(writers.resolve(any(), any()))
+        .thenReturn(
+            new JobOrderWriters.Scope(
+                JobOrderWriterRule.CONTEXTUAL, new ScopePredicate(true, null, Set.of())));
+  }
+
   private void stubCreate() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    stubPersistence();
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
+  }
+
+  private void stubPersistence() {
+    permitEveryPair();
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(jobOrderRepository.save(any(JobOrder.class)))
@@ -475,7 +494,6 @@ class JobOrderServiceTest {
           saved.setId(orderId);
           return saved;
         });
-    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
   }
 
   private JobOrder createAndCaptureSaved(List<CreateJobOrderMaterialDto> lines) {
@@ -506,11 +524,13 @@ class JobOrderServiceTest {
 
   @Test
   void createAuecJobOrder_announcesTheNewOrderToTheQueueOnlyOnceAfterTheCommit() {
-    stubCreate();
+    stubPersistence();
 
     jobOrderService.createAuecJobOrder(
-        new CreateAuecJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, "250000"));
+        new JobOrderCreateCommand.AuecOrder(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
+        JobOrderWriterRule.CONTEXTUAL,
+        new JobOrderActor.Web(null));
     verifyNoInteractions(liveSyncFanout);
 
     commitFixtureTransaction();
@@ -518,6 +538,51 @@ class JobOrderServiceTest {
     verify(liveSyncFanout)
         .publish(LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));
     verify(liveSyncFanout, times(1)).publish(any(), anyList());
+  }
+
+  @Test
+  void createAuecJobOrder_attributesTheCreatedNoticeToTheActorsMemberUnderTheGivenRule() {
+    stubPersistence();
+    UUID member = UUID.randomUUID();
+    JobOrderActor actor = new JobOrderActor.Client(member, "client");
+
+    jobOrderService.createAuecJobOrder(
+        new JobOrderCreateCommand.AuecOrder(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
+        JobOrderWriterRule.DIRECT_LOGISTICIAN,
+        actor);
+
+    verify(writers).resolve(JobOrderWriterRule.DIRECT_LOGISTICIAN, actor);
+    ArgumentCaptor<JobOrderCreatedEvent> created =
+        ArgumentCaptor.forClass(JobOrderCreatedEvent.class);
+    verify(effects).publish(created.capture());
+    assertEquals(member, created.getValue().actorSub());
+    verifyNoInteractions(authHelperService);
+  }
+
+  @Test
+  void createAuecJobOrder_refusesAPairTheGivenRuleDoesNotPermit() {
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+    when(writers.resolve(any(), any()))
+        .thenReturn(
+            new JobOrderWriters.Scope(
+                JobOrderWriterRule.DIRECT_LOGISTICIAN,
+                new ScopePredicate(false, null, Set.of(responsibleOrgUnitId))));
+
+    assertThrows(
+        AccessDeniedException.class,
+        () ->
+            jobOrderService.createAuecJobOrder(
+                new JobOrderCreateCommand.AuecOrder(
+                    responsibleOrgUnitId,
+                    requestingOrgUnitId,
+                    "Tester",
+                    null,
+                    new BigDecimal("250000")),
+                JobOrderWriterRule.DIRECT_LOGISTICIAN,
+                new JobOrderActor.Client(UUID.randomUUID(), "client")));
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
   @Test
@@ -624,7 +689,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_ShouldCalculateStockAndReturnDto() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -665,7 +730,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_ShouldHonorMinQualityFromDto() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -698,7 +763,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_NullMinQuality_PersistsBaseTier() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, null, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -727,7 +792,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_PersistsComment() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 10.0);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
@@ -762,7 +827,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_MaterialNotFound_ShouldThrowException() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
