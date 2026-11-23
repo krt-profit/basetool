@@ -348,16 +348,28 @@ reload-safe identity and outcome lookup. There is no durable manager of unsubmit
 Notification preferences, recipient deduplication and privacy gates remain; see
 [notifications](orders-notifications.md) and the [money journey](orders-auec.md).
 
+A new order reaches every open overview without a reload, whichever channel created it. The shared
+create command of every kind publishes the `orders` room from the backend after the commit: the
+`queue` section, and for MATERIAL and ITEM also `demand`, since the new order adds to the material
+demand. A refused or rolled-back create publishes nothing. The frontend publishes no frame of its
+own for a create, so each create is announced exactly once.
+
 **Acceptance**
 
 - [ ] Scopes/type filters work across all kinds and preserve the permitted order set.
 - [ ] Creation opens the detail; peer updates preserve an open edit.
+- [ ] A create of every kind publishes one `orders` frame after its commit, `queue` plus `demand`
+  for MATERIAL and ITEM and `queue` for aUEC; a peer's open overview gains the order without a
+  reload, and the creator's open overview receives no second frame.
 - [ ] Retry after an unknown submitted money outcome cannot duplicate its effects.
 
 **Enforced by:** `JobOrderSupportReadIntegrationTest`, `JobOrderHierarchyAuthorityIntegrationTest`,
 `OrdersListPatternRenderTest`, `JobOrderCreationWorkspaceMvcTest`, `JobOrderCreateE2eTest` and
 `JobOrderSharedWorkspaceE2eTest` cover the MATERIAL/ITEM workspace. The initial aUEC create and
-recovery journey is covered by `JobOrderMoneyE2eTest`. **Issues:** #3201, #3202
+recovery journey is covered by `JobOrderMoneyE2eTest`. `JobOrderServiceTest` covers the create's
+frame per kind, `JobOrderCreatePublishMvcTest` that a web create publishes no frame of its own and
+`JobOrderQueueLiveSyncE2eTest` the peer's overview and the single frame. **Issues:** #3201,
+#3202, #3639
 
 ## Out of scope
 

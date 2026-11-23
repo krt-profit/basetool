@@ -64,7 +64,11 @@ missing one turns the next edit into a spurious 409.
    **`/ws/sync`** WebSocket, naming the topic room (`mission:{id}`, …). Publishing needs no
    subscription; only *receiving* needs an authorised subscribe, which the relay checks again for as
    long as the socket holds the room (REQ-FE-015). Where no browser is involved, the server
-   publishes the same frame itself.
+   publishes the same frame itself. A command that more than one channel calls announces its write
+   from the backend after the commit, so the web and an exchange client reach the same rooms
+   through one path: the job-order create refreshes the `orders` room this way
+   ([REQ-ORDERS-056](../specs/orders-core.md#req-orders-056--one-shared-overview-leads-to-a-central-detail)),
+   as the exchange writes do (REQ-XCH-030).
 3. The frontend relays the frame to the room's local members and onto **`redis-shared` pub/sub**
    (`basetool:livesync:changed`), so every other frontend replica reaches its own members.
 4. Each receiving client re-reads the named sections and swaps them in place.
