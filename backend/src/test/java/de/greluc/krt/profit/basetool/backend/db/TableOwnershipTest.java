@@ -326,7 +326,7 @@ class TableOwnershipTest {
               "trg_exchange_job_order_fingerprint_window",
               new Crossing(
                   Set.of("job_order"),
-                  "V451 window run: a fingerprint records whether it was written outside the"
+                  "V449 window run: a fingerprint records whether it was written outside the"
                       + " client set, judged from the order's status, closing instant and kind in"
                       + " the worker's snapshot (REQ-OXCH-003, ADR-0406).")),
           Map.entry(

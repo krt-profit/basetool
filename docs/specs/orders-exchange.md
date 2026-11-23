@@ -309,7 +309,7 @@ default 04:00 UTC), whatever the job-order switches say, on one backend instance
 
 - It records every fingerprinted order whose 7 days after `closed_at` ended, and that is no aUEC
   order whose last fingerprint says `settlementOpen`, as having left the set
-  (`exchange_job_order_fingerprint.left_set_at`, V451). The fingerprint row's trigger announces
+  (`exchange_job_order_fingerprint.left_set_at`, V449). The fingerprint row's trigger announces
   each such order to the units and members it was last announced to, so a feed page resolves it to
   a `removed` entry: a closed order stays in the feed for at most 7 days plus one run.
 - A fingerprint written while the order lies outside the set records that itself: the write
@@ -377,7 +377,7 @@ alerts, and the window run's job are REQ-OBS-025.
 `ExchangeJobOrderMarkRepository`, `ExchangeJobOrderFingerprintRepository`, `ExchangeJobOrderReadService`,
 `ExchangeFeedReader#jobOrderChanges`, `ExchangeChangeRepository#findAnnouncedJobOrders`,
 `ExchangeJobOrderController`, `JobOrderWindowRun`, `JobOrderWindowTask` (exchange) ·
-`ExchangeJobOrderController` (gateway) · V445, V447, V451 · **Related:** REQ-XCH-013,
+`ExchangeJobOrderController` (gateway) · V445, V447, V449 · **Related:** REQ-XCH-013,
 REQ-ORDERS-054, REQ-ORDERS-055, REQ-OXCH-001, REQ-OXCH-002, REQ-OXCH-009, REQ-OXCH-010,
 REQ-OBS-025 · ADR-0224, ADR-0406, ADR-0407 · **Issues:** #3615, #3618, #3643, #3644, #3645, #3649
 
@@ -655,5 +655,5 @@ application id, not a person.
 
 **Enforced by:** `JobOrderCreatorRetention`, `JobOrderClientCreateRepository#clearCreators` (job
 orders) · `JobOrderWindowRun`, `ExchangeJobOrderFingerprintRepository#findOutsideWithCreator`
-(exchange) · V448, V451 · **Related:** REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-009, REQ-SEC-058,
+(exchange) · V448, V449 · **Related:** REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-009, REQ-SEC-058,
 REQ-XCH-020 · **Issues:** #3619, #3649
