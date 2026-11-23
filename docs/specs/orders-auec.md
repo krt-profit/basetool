@@ -461,10 +461,22 @@ refuses with 409 when either is stale or missing; each part raises only its own 
 MATERIAL and ITEM edits (`PUT /api/v1/orders/{id}`, `…/requested`, `…/items`, `…/items/requested`)
 carry `commentVersion` beside `version` the same way, and their edit forms echo both.
 
+The target and information commands take the writer rule, the read check and the actor as
+parameters (ADR-0405). Under the order and account locks they keep the web's order of checks: the
+read check, an aUEC order, a valid responsibility, an active member, a writer of either side the
+rule covers and an order that is not cancelled, then the version of the part they write. The web
+passes its contextual authorities with the honoured pin, its complete-order read and the requesting
+member. The information command also writes the comment alone, under the comment revision only,
+and leaves the contact and the information revision untouched; the web always sends both parts.
+The target history entry names the actor's member, and the need-change notice speaks for the
+responsible side only when the rule lets the actor write it there.
+
 **Acceptance**
 
 - [ ] A concurrent contact write and comment write never lose an update, a stale or missing
   comment revision refuses the whole write, and a part the write leaves unchanged keeps its
+  revision.
+- [ ] A comment-only write succeeds whatever the information revision and raises only the comment
   revision.
 - [ ] Independent holder provisions and unrelated notes do not stale each other's forms.
 - [ ] Competing use of the same captured funds cannot overdraw or spend a pending bound amount twice.
@@ -476,7 +488,11 @@ carry `commentVersion` beside `version` the same way, and their edit forms echo 
 target change, cancellation, responsibility transfer, deletion, paired reassignment, the contact
 and comment revisions and audit rollback with real PostgreSQL. `JobOrderCommentVersionIntegrationTest`
 covers the comment revision of the MATERIAL and ITEM edits, `JobOrderEditorTest` its check, and
-`OrdersDetailPatternRenderTest` and `JobOrderPageControllerItemEditMvcTest` the echoing forms. The
+`OrdersDetailPatternRenderTest` and `JobOrderPageControllerItemEditMvcTest` the echoing forms.
+`JobOrderWebWriteCommandsIntegrationTest` pins who changes the target and the information in the
+web, each part's own version, the audit and the notices without the actor, and
+`JobOrderWriteRuleIntegrationTest` the database writer rule at both commands, the comment-only
+write and that every write it permits is one the web permits for the same member. The
 Bank increment owns joint Bank effects.
 
 Personal and Bank collection position revisions start at zero before first insertion. A new Bank

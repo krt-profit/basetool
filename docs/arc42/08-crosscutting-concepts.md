@@ -31,6 +31,10 @@ the create-options projection take a `JobOrderWriterRule` and a `JobOrderActor`,
 call under the command's locks. The web passes its contextual authorities with the pin, the
 exchange the member's direct Logistician units from the database for the requesting side only, so
 both share one code path and the exchange never permits a pair the web would refuse (ADR-0405).
+The status, target and information commands take the same rule and actor beside a
+`JobOrderReadCheck`, decided on the loaded order under the order locks next to each command's own
+section version and the responsibility gate; the exchange reaches them through the ports
+`JobOrderStatusCommand`, `JobOrderTargetCommand` and `JobOrderInformationCommand`.
 
 Beyond roles there are three mechanisms that are easy to miss:
 

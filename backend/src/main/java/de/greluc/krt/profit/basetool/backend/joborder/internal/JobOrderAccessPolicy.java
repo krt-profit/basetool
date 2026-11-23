@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthorityFlags;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
@@ -98,6 +99,19 @@ public class JobOrderAccessPolicy
                 .currentUserId()
                 .map(caller -> jobOrderRepository.hasMoneyPersonalReadGrant(order.getId(), caller))
                 .orElse(false));
+  }
+
+  /**
+   * Decides the read check a command's caller passed on the loaded order (ADR-0405).
+   *
+   * @param read the read check
+   * @param order the loaded order
+   * @return {@code true} iff the order passes the read check
+   */
+  public boolean canRead(@NotNull JobOrderReadCheck read, @NotNull JobOrder order) {
+    return switch (read) {
+      case CONTEXTUAL -> canSeeJobOrder(order);
+    };
   }
 
   /**
@@ -201,14 +215,10 @@ public class JobOrderAccessPolicy
     return switch (gate) {
       case TRANSFER -> canTransferResponsibility(order);
       case ADMIN_DELETE -> authHelper.isAdmin();
-      case EDIT, STATUS -> canEditJobOrderRow(order);
+      case EDIT -> canEditJobOrderRow(order);
       case SUPPORT ->
           canTransferResponsibility(order)
               || accessGateService.canActAsLogisticianInActiveContext();
-      case CANCEL -> canTransferResponsibility(order) || isRequesterWriter(order);
-      case SET_OPEN ->
-          canTransferResponsibility(order)
-              || (order.getStatus() == JobOrderStatus.CANCELLED && isRequesterWriter(order));
       case REQUESTER -> isRequesterWriter(order);
     };
   }

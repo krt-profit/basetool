@@ -135,7 +135,7 @@ public class JobOrderService {
             jobOrder ->
                 materialLines.build(createDto.materials(), Set.of()).forEach(jobOrder::addMaterial),
             JobOrderWriterRule.CONTEXTUAL,
-            webActor());
+            new JobOrderActor.Web(currentMember()));
     return jobOrderStockProjectionService.mapToDtoWithStock(order);
   }
 
@@ -192,7 +192,7 @@ public class JobOrderService {
                 itemReconciliation.apply(
                     jobOrder, jobOrderItemService.prepareItemLines(createDto.items(), List.of())),
             JobOrderWriterRule.CONTEXTUAL,
-            webActor());
+            new JobOrderActor.Web(currentMember()));
     return jobOrderStockProjectionService.mapToDtoWithStock(order);
   }
 
@@ -251,8 +251,8 @@ public class JobOrderService {
     };
   }
 
-  private JobOrderActor webActor() {
-    return new JobOrderActor.Web(authHelperService.currentUserId().orElse(null));
+  private @Nullable UUID currentMember() {
+    return authHelperService.currentUserId().orElse(null);
   }
 
   /**
@@ -302,30 +302,26 @@ public class JobOrderService {
    * @param statusCode the order's final status code
    */
   private void publishJobOrderFinished(@NotNull JobOrder jobOrder, @NotNull String statusCode) {
-    effects.publish(finishedNotice(jobOrder, statusCode));
-  }
-
-  private NoticeEvent finishedNotice(@NotNull JobOrder jobOrder, @NotNull String statusCode) {
-    return JobOrderLifecycleNotices.finished(
-        jobOrder, statusCode, authHelperService.currentUserId().orElse(null));
+    effects.publish(JobOrderLifecycleNotices.finished(jobOrder, statusCode, currentMember()));
   }
 
   private void publishJobOrderClosed(@NotNull JobOrder order) {
-    effects.publish(closedEvent(order));
+    effects.publish(closedEvent(order, currentMember()));
   }
 
-  private JobOrderClosedEvent closedEvent(@NotNull JobOrder order) {
+  private JobOrderClosedEvent closedEvent(@NotNull JobOrder order, @Nullable UUID actor) {
     return new JobOrderClosedEvent(
         order.getId(),
-        authHelperService.currentUserId().orElse(null),
+        actor,
         JobOrderLifecycleNotices.revision(order),
         effects.captureActionPromptIds(order.getId()));
   }
 
   /**
-   * Updates the status of a job order with its own load, save and flush. Must not be called inside
-   * a transaction that already modified the same order, since the double save fails the version
-   * check; use {@link #completeJobOrderWithinTransaction(JobOrder)} there.
+   * Updates the status of a job order for the web caller, under the contextual authorities with the
+   * honoured pin, the contextual read and the request's member, with its own load, save and flush.
+   * Must not be called inside a transaction that already modified the same order, since the double
+   * save fails the version check; use {@link #completeJobOrderWithinTransaction(JobOrder)} there.
    *
    * @param id job order primary key
    * @param dto the new status and expected version
@@ -338,17 +334,27 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateJobOrderStatus(UUID id, UpdateJobOrderStatusDto dto) {
-    JobOrderGate gate =
-        switch (dto.status()) {
-          case CANCELLED -> JobOrderGate.CANCEL;
-          case OPEN -> JobOrderGate.SET_OPEN;
-          case IN_PROGRESS, COMPLETED, REJECTED -> JobOrderGate.STATUS;
-        };
-    return jobOrderEditor.editPlanned(
-        id, gate, dto.version(), jobOrder -> statusPlan(jobOrder, dto.status()));
+    return jobOrderStockProjectionService.mapToDtoWithStock(
+        changeStatus(id, dto.status(), dto.version(), JobOrderCaller.web(currentMember())));
   }
 
-  private JobOrderEditPlan statusPlan(@NotNull JobOrder order, @NotNull JobOrderStatus status) {
+  /** Changes the status under the caller's writer rule, read check and actor (ADR-0405). */
+  @Transactional(propagation = Propagation.MANDATORY)
+  JobOrder changeStatus(
+      @NotNull UUID id,
+      @NotNull JobOrderStatus status,
+      @Nullable Long lifecycleVersion,
+      @NotNull JobOrderCaller caller) {
+    return jobOrderEditor.editLifecycle(
+        id,
+        lifecycleVersion,
+        caller.read(),
+        order -> writers.resolve(caller.rule(), caller.actor()).permitsStatus(order, status),
+        order -> statusPlan(order, status, caller.actor()));
+  }
+
+  private JobOrderEditPlan statusPlan(
+      @NotNull JobOrder order, @NotNull JobOrderStatus status, @NotNull JobOrderActor actor) {
     if (order.getType() == JobOrderType.AUEC && status == JobOrderStatus.COMPLETED) {
       throw new BadRequestException("orders.money.completion.requiresHandover");
     }
@@ -371,7 +377,7 @@ public class JobOrderService {
             ? Set.copyOf(stockReads.earmarkedRowIds(order.getId()))
             : Set.of(),
         wasTerminal != becomesTerminal,
-        current -> applyStatus(current, status));
+        current -> applyStatus(current, status, actor));
   }
 
   private static boolean terminal(JobOrderStatus status) {
@@ -383,7 +389,8 @@ public class JobOrderService {
     order.setLifecycleVersion(Math.incrementExact(order.getLifecycleVersion()));
   }
 
-  private JobOrderEdit applyStatus(@NotNull JobOrder jobOrder, @NotNull JobOrderStatus status) {
+  private JobOrderEdit applyStatus(
+      @NotNull JobOrder jobOrder, @NotNull JobOrderStatus status, @NotNull JobOrderActor actor) {
     final JobOrderStatus previousStatus = jobOrder.getStatus();
     if (previousStatus == status) {
       return JobOrderEdit.unchanged(jobOrder);
@@ -410,14 +417,12 @@ public class JobOrderService {
     if (isTerminal && !wasTerminal) {
       moneyLifecycle.close(jobOrder);
       stockCommands.releaseJobOrderEarmarks(jobOrder.getId());
-      notices.add(closedEvent(jobOrder));
-      notices.add(finishedNotice(jobOrder, status.name()));
+      notices.add(closedEvent(jobOrder, actor.member()));
+      notices.add(JobOrderLifecycleNotices.finished(jobOrder, status.name(), actor.member()));
     } else if (previousStatus == JobOrderStatus.CANCELLED
         || (previousStatus == JobOrderStatus.COMPLETED
             && jobOrder.getType() == JobOrderType.AUEC)) {
-      notices.add(
-          JobOrderLifecycleNotices.reopened(
-              jobOrder, authHelperService.currentUserId().orElse(null)));
+      notices.add(JobOrderLifecycleNotices.reopened(jobOrder, actor.member()));
     }
 
     JobOrderEdit edit =
@@ -436,7 +441,8 @@ public class JobOrderService {
 
   @Transactional(propagation = Propagation.MANDATORY)
   void reopenUnderfulfilledMoneyOrder(JobOrder order) {
-    JobOrderEdit edit = applyStatus(order, JobOrderStatus.IN_PROGRESS);
+    JobOrderEdit edit =
+        applyStatus(order, JobOrderStatus.IN_PROGRESS, new JobOrderActor.Web(currentMember()));
     auditRecorder.record(
         AuditEventType.JOB_ORDER_STATUS_CHANGED,
         order.getId(),
@@ -899,8 +905,9 @@ public class JobOrderService {
   private JobOrderEdit deletePrepared(@NotNull JobOrder order) {
     final Integer priority = order.getPriority();
     final UUID deletedId = order.getId();
-    final NoticeEvent deletedNotice = finishedNotice(order, "DELETED");
-    final JobOrderClosedEvent closed = closedEvent(order);
+    final NoticeEvent deletedNotice =
+        JobOrderLifecycleNotices.finished(order, "DELETED", currentMember());
+    final JobOrderClosedEvent closed = closedEvent(order, currentMember());
     stockCommands.releaseJobOrderEarmarks(deletedId);
     materialClaimService.deleteForOrderWithinTransaction(order);
     jobOrderRepository.delete(order);
