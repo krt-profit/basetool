@@ -241,7 +241,7 @@ class ExchangeGoldenAnswerTest {
                 String.join(" ", new TreeSet<>(SCOPES)),
                 issuedAt));
     when(registryReader.current())
-        .thenReturn(ExchangeTestSupport.registryWithLimits(SCOPES, "2.0.0", 1000, true));
+        .thenReturn(ExchangeTestSupport.registryWithEveryArea(SCOPES, "2.0.0", 1000));
     when(revocationReader.isDenied(anyString())).thenReturn(false);
     when(tokenProvider.currentToken()).thenReturn(GATEWAY_TOKEN);
     when(quotas.countWrite(anyString(), anyString()))
@@ -559,6 +559,7 @@ class ExchangeGoldenAnswerTest {
         post(
             "/bank/requests/33333333-4444-4555-8666-777777777777/cancel",
             fixture("bank-request-write--cancel/valid/cancel.json")));
+    routes.put("route-get-job-orders", get("/job-orders?limit=2"));
     routes.put("route-get-openapi", get("/openapi.json"));
     routes.put("route-get-schema", get("/schemas/page.schema.json"));
     return routes;
@@ -623,6 +624,7 @@ class ExchangeGoldenAnswerTest {
             fixture("bank-request-write--written/valid/pending.json");
         case "POST /api/v1/exchange/bank/requests/{id}/cancel" ->
             fixture("bank-request-write--cancelled/valid/cancelled.json");
+        case "GET /api/v1/exchange/job-orders" -> fixture("page--jobOrderPage/valid/snapshot.json");
         case "POST /api/v1/exchange/me/drafts/blueprints" -> PREVIEW;
         case "POST /api/v1/exchange/me/drafts/refinery-orders" -> REFINERY_DRAFT;
         default -> "{\"code\":\"NOT_FOUND\"}";

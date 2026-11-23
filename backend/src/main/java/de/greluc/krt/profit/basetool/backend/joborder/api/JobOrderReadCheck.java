@@ -29,5 +29,12 @@ public enum JobOrderReadCheck {
    * The web's complete-order read of the signed-in caller, from the request's authorities and the
    * honoured pin (REQ-ORDERS-052).
    */
-  CONTEXTUAL
+  CONTEXTUAL,
+
+  /**
+   * The exchange's read set of the request's acting member: a current own relation through the
+   * active units they directly belong to while holding {@code KRT Member}, or their assignee entry,
+   * decided from the database (REQ-OXCH-001, ADR-0407).
+   */
+  OWN_RELATION
 }

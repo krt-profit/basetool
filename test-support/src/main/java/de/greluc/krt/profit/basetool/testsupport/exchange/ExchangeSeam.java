@@ -66,7 +66,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 33 relay operations on 31 backend paths, each with the gateway route that relays it, the
+   * The 34 relay operations on 32 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -335,7 +335,15 @@ public final class ExchangeSeam {
               "exchange.bank.request",
               false,
               "bank-request-write.schema.json#/$defs/cancel",
-              "bank-request-write.schema.json#/$defs/cancelled"));
+              "bank-request-write.schema.json#/$defs/cancelled"),
+          new RelayOperation(
+              "GET",
+              JOB_ORDERS_PATH,
+              JOB_ORDERS_PATH,
+              "exchange.joborders.read",
+              true,
+              null,
+              "page.schema.json#/$defs/jobOrderPage"));
 
   /** The query parameters a paged relay operation passes on. */
   public static final @Unmodifiable List<String> PAGE_PARAMETERS = List.of("cursor", "limit");
@@ -367,7 +375,7 @@ public final class ExchangeSeam {
           INSTALLATION_HEADER,
           CONNECTED_AT_HEADER);
 
-  /** The twenty-three capability scopes. */
+  /** The twenty-four capability scopes. */
   public static final @Unmodifiable Set<String> CAPABILITY_SCOPES =
       Set.of(
           CONNECT,
@@ -392,7 +400,8 @@ public final class ExchangeSeam {
           "exchange.bank.request",
           "exchange.bank.queue",
           "exchange.patch.read",
-          "exchange.patch.write");
+          "exchange.patch.write",
+          "exchange.joborders.read");
 
   /**
    * The capability scopes that gate no route of their own and add to the answer of another route's

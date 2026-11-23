@@ -1,0 +1,46 @@
+{
+  "items": [
+    {
+      "id": "0a1b2c3d-4e5f-4a60-9b71-c2d3e4f50617",
+      "number": 377,
+      "kind": "AUEC",
+      "status": "OPEN",
+      "priority": 1,
+      "requestingUnit": {
+        "id": "4c5d6e7f-8091-4a2b-8c3d-4e5f60718293",
+        "name": "Iridium",
+        "shorthand": "IRI",
+        "kind": "SQUADRON"
+      },
+      "responsibleUnit": {
+        "id": "5d6e7f80-91a2-4b3c-9d4e-5f6071829304",
+        "name": "Profit",
+        "shorthand": "PRO",
+        "kind": "BEREICH"
+      },
+      "supportingUnits": [],
+      "createdAt": "2026-11-22T07:30:00Z",
+      "updatedAt": "2026-11-22T07:30:05Z",
+      "relations": [
+        "responsible"
+      ],
+      "comment": null,
+      "responsibilityInvalid": true,
+      "link": "https://profit-base.online/orders/0a1b2c3d-4e5f-4a60-9b71-c2d3e4f50617",
+      "assignees": [],
+      "versions": {
+        "lifecycle": 0,
+        "target": 0,
+        "comment": 0
+      },
+      "target": 100000,
+      "netHandedOver": 0,
+      "remaining": 100000,
+      "overpaid": 0,
+      "settlementOpen": false
+    }
+  ],
+  "removed": [],
+  "nextCursor": "s1.1029384.0.0a1b2c3d-4e5f-4a60-9b71-c2d3e4f50617",
+  "hasMore": true
+}

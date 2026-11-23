@@ -19,18 +19,71 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/** The stored exchange fingerprints of job orders (REQ-OXCH-003). */
+/**
+ * The stored exchange fingerprints of job orders and the client set read through them
+ * (REQ-OXCH-003).
+ */
 @Repository
 public interface ExchangeJobOrderFingerprintRepository
     extends JpaRepository<ExchangeJobOrderFingerprint, UUID> {
+
+  /**
+   * The window of the client set for the order alias {@code o} and its fingerprint {@code f}:
+   * active, closed at or after {@code :closedSince}, or aUEC while the fingerprint says {@code
+   * settlementOpen}.
+   */
+  String CLIENT_WINDOW =
+      "(o.status IN ('OPEN', 'IN_PROGRESS') OR o.closedAt >= :closedSince"
+          + " OR (o.type = 'AUEC' AND f.settlementOpen = true))";
+
+  /**
+   * Reads one page of the member's client set: the orders of the read set inside the window that
+   * carry a fingerprint, ascending by id after a given one.
+   *
+   * @param relatingUnitIds the active units the member directly belongs to while holding {@code KRT
+   *     Member}
+   * @param memberId the member
+   * @param afterId the last order delivered, the zero id for the first page
+   * @param closedSince the earliest closing instant a terminal order is kept for
+   * @param limit the most rows to read
+   * @return the orders with the instant of their fingerprint
+   */
+  @Query(
+      "SELECT new de.greluc.krt.profit.basetool.backend.exchange.internal"
+          + ".ExchangeJobOrderFingerprintRepository$ClientSetRow(o.id, f.changedAt)"
+          + " FROM JobOrder o, ExchangeJobOrderFingerprint f"
+          + " WHERE f.jobOrderId = o.id AND o.id > :afterId AND "
+          + JobOrderScope.EXCHANGE_READ_SET
+          + " AND "
+          + CLIENT_WINDOW
+          + " ORDER BY o.id")
+  List<ClientSetRow> findClientSetAfter(
+      @Param("relatingUnitIds") Collection<UUID> relatingUnitIds,
+      @Param("memberId") UUID memberId,
+      @Param("afterId") UUID afterId,
+      @Param("closedSince") Instant closedSince,
+      Limit limit);
+
+  /**
+   * One order of the member's client set.
+   *
+   * @param orderId the order
+   * @param updatedAt the instant of its fingerprint, the read's last change of a carried field
+   */
+  record ClientSetRow(@NotNull UUID orderId, @NotNull Instant updatedAt) {}
 
   /**
    * Stores an order's changed fingerprint with the instant of the change, inserting the order's

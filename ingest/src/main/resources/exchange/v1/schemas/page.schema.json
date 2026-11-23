@@ -164,6 +164,68 @@
           "maximum": 1000
         }
       }
+    },
+    "jobOrderPage": {
+      "type": "object",
+      "description": "A snapshot page or a change-feed page of the member's job-order set, one cursor for all three kinds. Its removed entries carry no removedBy: an order that left the set by a lost relation, the end of its window or a deletion looks alike.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "job-order-material.schema.json"
+              },
+              {
+                "$ref": "job-order-item.schema.json"
+              },
+              {
+                "$ref": "job-order-auec.schema.json"
+              }
+            ]
+          }
+        },
+        "removed": {
+          "type": "array",
+          "maxItems": 1000,
+          "description": "Orders that left the member's set; always empty on a snapshot page. Drop the order; ignore a key never held.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The id of the order that left the set."
+              },
+              "removedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When the order's latest change was recorded."
+              }
+            },
+            "required": [
+              "key",
+              "removedAt"
+            ]
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "removed",
+        "hasMore"
+      ]
     }
   }
 }

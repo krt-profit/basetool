@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-item.schema.json",
+  "title": "Item job order",
+  "description": "An ITEM order of the member's set: the fields of every job order, the contact and the progress per item line, in whole pieces.",
+  "allOf": [
+    {
+      "$ref": "job-order.schema.json"
+    }
+  ],
+  "type": "object",
+  "properties": {
+    "kind": {
+      "const": "ITEM"
+    },
+    "contact": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "The author's contact handle as plain text; absent when the order names none."
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 1000,
+      "description": "The progress per item line.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The item line's id."
+          },
+          "item": {
+            "$ref": "item-ref.schema.json"
+          },
+          "ordered": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "manufactured": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "delivered": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "open": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The ordered pieces not yet delivered, never below 0."
+          }
+        },
+        "required": [
+          "id",
+          "item",
+          "ordered",
+          "manufactured",
+          "delivered",
+          "open"
+        ]
+      }
+    }
+  },
+  "required": [
+    "kind",
+    "items"
+  ]
+}

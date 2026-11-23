@@ -98,6 +98,12 @@ public enum ExchangeCapability {
   /** Reading, as bank staff, the open requests the member may confirm or approve. */
   BANK_QUEUE("exchange.bank.queue"),
 
+  /**
+   * Reading the job orders of the member's direct units and those the member works on
+   * (REQ-OXCH-001).
+   */
+  JOB_ORDERS_READ("exchange.joborders.read"),
+
   /** Reading the latest patch change and the member's home-location prompt (REQ-PATCH-050). */
   PATCH_READ("exchange.patch.read"),
 

@@ -76,6 +76,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `GET /exchange/v1/org-stock/members?unit=` · `…/targets?unit=&material=` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
+| `GET /exchange/v1/job-orders` | `exchange.joborders.read` | REQ-OXCH-002, REQ-OXCH-003 ([orders-exchange.md](orders-exchange.md)) |
 
 The three `org-stock` rows are built: the read, as a snapshot and a feed (REQ-XCH-042), with
 `exchange.orgstock.details` (REQ-XCH-043), the writes `book-in`, `book-out`, `sell`,
@@ -86,6 +87,10 @@ units to the org demand (REQ-XCH-047).
 The refinery-order rows are built: the read (REQ-XCH-051), the change set with `create`,
 `update`, the goods ops (REQ-XCH-052), `pickup` with and without store lines (REQ-XCH-053),
 `cancel` and `delete` (REQ-XCH-055), and the two store-choice reads (REQ-XCH-054).
+
+The job-order row is built for the snapshot of the member's job-order set (REQ-OXCH-003); its backend
+path `/api/v1/exchange/job-orders` is on the acting list, and the job-order family switch gates it
+(REQ-OXCH-009). The bank's routes are listed in [`bank-exchange.md`](bank-exchange.md).
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
 else), and no route path collides with a prefix or suffix the bot filter blocks. The backend's
@@ -368,7 +373,8 @@ Of the first-party clients only `basetool-sc-extractor` is offered `offline_acce
 withholds it from the others and from the realm's default client scopes, so the realm-wide role
 opens offline sessions to the exchange clients alone (owner decision 2026-09-28).
 Consent is shown in German, per capability; the three bank scopes carry the consent lines of
-REQ-BXCH-001. The consent and device
+REQ-BXCH-001 and the job-order scopes those of REQ-OXCH-001, each with a chip label on the admin
+page. The consent and device
 pages use the Basetool theme; the device page warns to enter only codes created on one's own PC.
 A `verification_uri_complete` link skips the device page, so for a device login the consent page
 carries the same warning and shows the user code for the member to compare with the one on their PC,
@@ -713,6 +719,15 @@ view, their bookings with the counterparty names and the requests the member rai
 and raises and corrects the member's own requests. It decides through the bank's access policy from
 the database (ADR-0352), without an active-org-unit pin, since the exchange carries no active
 context (REQ-ORG-032).
+
+The fifth exception are job orders (REQ-OXCH-001, ADR-0407): a client reads the orders of all three
+kinds to which the member has a current own relation — a unit the member directly belongs to
+requests the order, is responsible for it or actively supports it, or the member holds an assignee
+entry — with the assignees' names under per-client refs (REQ-XCH-043) and without the members who
+withhold them (REQ-XCH-044); a Logistician of the requesting unit writes them. Both decide from the
+database on every request, never from a stored role, a contextual grant, the leadership cascade, the
+admin all-scope or a pin, and nothing of the responsible side, no money and no Bank effect goes
+through a client.
 
 **How it is built** (WP 3.1). `ActingMemberFilter` keeps an explicit list of exchange routes
 next to the two ingest routes. On an exchange route the member gets
@@ -2667,10 +2682,11 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 33 relay operations on 31 backend
+byte-identical (D-05 of the domain modularisation plan): the 34 relay operations on 32 backend
 paths (with the refinery-order feed, change set and store choices of REQ-XCH-051…056, the three
-bank reads of REQ-BXCH-002, the own requests of REQ-BXCH-003, their writes of REQ-BXCH-004 and
-the staff queue of REQ-BXCH-005), their parameters, request and answer shapes, the relayed codes
+bank reads of REQ-BXCH-002, the own requests of REQ-BXCH-003, their writes of REQ-BXCH-004,
+the staff queue of REQ-BXCH-005 and the job-order snapshot of REQ-OXCH-003), their parameters,
+request and answer shapes, the relayed codes
 and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
 surfacing in production as a `502 BACKEND_RELAY_FAILED` or a `400 SCHEMA_INVALID` for a body the
@@ -2688,7 +2704,8 @@ contract allows.
   `installationId` into the service document, so only that member is checked. The bank
   reads answer only with the bank switched on and a seeded bank world; `ExchangeBankReadsTest`,
   `ExchangeBankRequestsTest` and `ExchangeBankQueueTest` check their answers against the published
-  schemas on one.
+  schemas on one. The job-order read answers only with the job-order switch on;
+  `ExchangeJobOrderSnapshotTest` checks its answers against the published schema on a seeded world.
 - **Golden answers.** `ExchangeGoldenAnswerTest` records, for every `/exchange/v1` route and for a
   relayed refusal, a translated code, a relay failure, an answer that breaks its schema, a draft
   its schema refuses before the relay and a staged mass change, the client's request, the backend request the relay sent with every header,
@@ -2698,7 +2715,7 @@ contract allows.
   key thumbprint, connection time, correlation id, DPoP nonce, idempotency key, trace context,
   the rate-limit counters). A difference writes the observed answer under
   `ingest/build/exchange-golden/` for review; a deliberate change replaces the golden in the same
-  pull request. The test also asserts that the backend stub received exactly the 33 relay
+  pull request. The test also asserts that the backend stub received exactly the 34 relay
   operations.
 - **Security filter order.** `SecurityFilterChainOrderTest` and
   `SecurityFilterChainProductionShapeTest` pin, through `FilterChainProxy`, the gateway's chains in
@@ -2726,7 +2743,7 @@ Every guard is proven able to fail by a planted violation in its own test.
   answer validates against its published schema.
   *`ExchangeWireContractTest`.*
 - [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
-  seam's 33 operations. *`ExchangeGoldenAnswerTest`.*
+  seam's 34 operations. *`ExchangeGoldenAnswerTest`.*
 - [x] The gateway's security filter chains hold exactly the pinned filters in order.
   *`SecurityFilterChainOrderTest`, `SecurityFilterChainProductionShapeTest`.*
 - [x] A pull request touching the exchange path without the `e2e` label fails.
@@ -2740,13 +2757,13 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 33 relay operations with their gateway route, backend path, capability, paging and published
-  schemas — against the backend's sixteen exchange controllers and their `@exchangeGate`
-  expressions, `ActingMemberFilter`'s 29 paths (each exact but for a whole `{id}` segment, as in
+- the 34 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's seventeen exchange controllers and their `@exchangeGate`
+  expressions, `ActingMemberFilter`'s 32 paths (each exact but for a whole `{id}` segment, as in
   the bank reads), the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the twenty-three capability scopes (`exchange.orgstock.details` and
+- the five relay headers, the twenty-four capability scopes (`exchange.orgstock.details` and
   `exchange.demand.details` the two that gate no route of their own; `exchange.bank.request` the one no
   route serves yet), the gate codes with their statuses, the
   codes the gateway passes through (the shared `NOT_FOUND` of REQ-BXCH-002 and `NOT_BANK_STAFF` of REQ-BXCH-005 among them) and the
@@ -2799,7 +2816,7 @@ G-18)
 > this requirement, the app leaves the readers of `openapi.json`, and the opening paragraph counts
 > the 31 relay operations `ExchangeFence.RELAY_OPERATIONS` holds, not 20; git keeps the text.
 
-The backend operations the gateway relays to — the 33 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 34 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
 of 2026-10-02). The published `openapi.json`, which the frontend generates its test types from,
@@ -2814,7 +2831,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  33 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
+  34 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
   requirement, and no dangling reference; of `openapi.json` no relay path and no dangling reference
   (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2827,7 +2844,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 33 relay operations and 149 schemas; `openapi.json` holds
+- [x] The relay document holds exactly the 34 relay operations and 156 schemas; `openapi.json` holds
   none of them and the 129 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
@@ -2977,7 +2994,9 @@ A profile setting „Meinen Namen nicht an verbundene Anwendungen weitergeben" i
 While it is on, the member's entries in the org stock carry no name, `ref` or note
 (REQ-XCH-043) and the member is left out of the roster (REQ-XCH-045) and cannot be chosen as a
 holder. In the bank's bookings the member's `counterpartyHandle` and in the staff queue their
-`requesterHandle` are `null` (REQ-BXCH-007); the booking and the request themselves stay. Their entries stay in the lots
+`requesterHandle` are `null` (REQ-BXCH-007); the booking and the request themselves stay. In a job order's
+`assignees` the member is left out entirely, in their own client too, while the order itself stays
+(REQ-OXCH-002). Their entries stay in the lots
 and stay writable by id. Switching it takes effect on the next request and announces the affected
 lots in the feed. The setting is part of the member's data export; the privacy notice
 („Verbundene Anwendungen") and the records of processing state which names reach a connected
@@ -3373,6 +3392,10 @@ joins the first two:
    on. The content of a declared free-form map (`extensions`, `additionalProperties` with a schema)
    passes verbatim. This changes the frozen exchange path (REQ-XCH-036): goldens record both cases
    and the pull request carries the `e2e` label.
+
+The job-order read (REQ-OXCH-002) is under all three guards: its schemas per kind list every leaf in
+the ratchet, its materials and items carry their display names only, and an answer that put a field
+of another kind on an order — a contact on an aUEC order, say — fails closed at the gateway.
 
 The Wiki/UEX catalogue evidence follows the same rule: `game_item_redirect.retired_snapshot` and
 `game_item.wiki_metadata` are on no exchange or relay surface, and a material's `miningData` travels

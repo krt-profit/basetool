@@ -108,6 +108,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
           "/api/v1/exchange/bank/requests/{id}/cancel",
           "/api/v1/exchange/catalog/locations",
           "/api/v1/exchange/catalog/resolve",
+          "/api/v1/exchange/job-orders",
           "/api/v1/exchange/me/account-check",
           "/api/v1/exchange/me/blueprints",
           "/api/v1/exchange/me/blueprints/changes",
