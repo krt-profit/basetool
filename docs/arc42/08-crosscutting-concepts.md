@@ -270,7 +270,9 @@ Two binding rules shape every UI change:
   system applies"; it is unreviewed.
 - **Live update is binding** — every create/update/delete/toggle/reorder/filter/paginate updates
   the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
-  peer's change propagates without a manual reload.
+  peer's change propagates without a manual reload. A fragment swap waits for a press inside its
+  container to end, so a re-render never removes the control under a press (REQ-FE-038,
+  ADR-0405).
 - **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): any
   `fetch` or `XMLHttpRequest` outside the transport fails `:frontend:lintJs` — writes go through
   `krtFetch.write` / `submitForm` (REQ-FE-002), reads through `krtFetch.get` / `getJson`, which

@@ -841,6 +841,18 @@ val testKrtFetchReadJs =
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
   }
 
+val testKrtFetchSwapPressJs =
+  registerNodeScriptTest(
+    "testKrtFetchSwapPressJs",
+    "Regression tests for the press guard of krtFetch.swap (REQ-FE-038).",
+    "scripts/krt-fetch-swap-press.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-press.js"))
+  }
+
 val testPageSectionsJs =
   registerNodeScriptTest(
     "testPageSectionsJs",
@@ -1317,6 +1329,7 @@ tasks.named("check").configure {
   dependsOn("checkExchangeDocs")
   dependsOn(
     testKrtFetchReadJs,
+    testKrtFetchSwapPressJs,
     testPageSectionsJs,
     testTrustedTypesJs,
     testClientErrorCspJs,

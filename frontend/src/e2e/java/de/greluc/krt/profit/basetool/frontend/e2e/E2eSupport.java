@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
-import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -27,7 +26,6 @@ import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
-import com.microsoft.playwright.ElementHandle;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
@@ -49,7 +47,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Shared helpers for the E2E suite: launching the configured browser (Chromium / Firefox / WebKit),
@@ -455,29 +452,6 @@ final class E2eSupport {
   static void clearCombobox(Locator comboInput) {
     comboInput.click();
     comboInput.locator("xpath=..").locator("li[role='option'][data-value='']").first().click();
-  }
-
-  /**
-   * Presses a control whose click handler opens a dialog and waits for that dialog.
-   *
-   * <p>A live-update re-render that replaces the control between press and release makes the
-   * browser fire no {@code click}, so the dialog stays closed; that press is repeated once on the
-   * control that replaced it.
-   *
-   * @param trigger the control whose click handler opens the dialog synchronously
-   * @param dialog the dialog the control opens
-   */
-  static void openDialog(@NotNull Locator trigger, @NotNull Locator dialog) {
-    ElementHandle pressed = trigger.elementHandle();
-    trigger.click();
-    boolean swallowed =
-        !dialog.isVisible()
-            && !Boolean.TRUE.equals(pressed.evaluate("control => control.isConnected"));
-    pressed.dispose();
-    if (swallowed) {
-      trigger.click();
-    }
-    assertThat(dialog).isVisible();
   }
 
   /**
