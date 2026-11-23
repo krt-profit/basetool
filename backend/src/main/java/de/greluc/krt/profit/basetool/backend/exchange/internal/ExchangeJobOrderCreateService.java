@@ -47,7 +47,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * The create options and the create of aUEC orders for an exchange client (REQ-OXCH-004), through
  * the web's create command and options projection under {@link
- * JobOrderWriterRule#DIRECT_LOGISTICIAN} (ADR-0405): a member creates only with one of their direct
+ * JobOrderWriterRule#DIRECT_LOGISTICIAN} (ADR-0408): a member creates only with one of their direct
  * Logistician units as the requesting unit, for any eligible Profit unit.
  *
  * <p>Every create counts on {@code basetool_exchange_writes_total{resource="job_order"}} and a

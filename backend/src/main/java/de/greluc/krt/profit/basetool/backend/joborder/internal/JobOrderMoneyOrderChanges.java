@@ -44,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Applies independent target and contextual information changes for aUEC orders, for the web and
- * for a caller that passes its own writer rule, read check and actor (ADR-0405).
+ * for a caller that passes its own writer rule, read check and actor (ADR-0408).
  */
 @Service
 @RequiredArgsConstructor
@@ -89,7 +89,7 @@ public class JobOrderMoneyOrderChanges
         new JobOrderCaller(rule, read, actor));
   }
 
-  /** The one target command, under the account and order locks (ADR-0405). */
+  /** The one target command, under the account and order locks (ADR-0408). */
   private void writeTarget(
       UUID orderId, BigDecimal requested, @Nullable Long version, JobOrderCaller caller) {
     UUID member = access.memberOf(caller.actor());

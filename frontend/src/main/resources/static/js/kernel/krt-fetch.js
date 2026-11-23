@@ -4,6 +4,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { pressSettled } from '/js/kernel/krt-press.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
 const fragmentPolicy =
@@ -1050,8 +1051,9 @@ function withoutFragmentParam(url, paramName) {
  *  - errorMessage    optional localized error toast when the response is redirected or not OK;
  *                    the container is then left untouched
  *
- * Only a non-redirected 2xx body is injected. Afterwards, contained a.page-btn[href] and
- * a[data-swap][href] anchors re-swap in place. Resolves to true when the container was updated.
+ * Only a non-redirected 2xx body is injected, and not before a press that began inside the
+ * container has ended (REQ-FE-038). Afterwards, contained a.page-btn[href] and a[data-swap][href]
+ * anchors re-swap in place. Resolves to true when the container was updated.
  *
  * @param {KrtSwapOpts} opts the swap options
  * @returns {Promise<boolean>} true when the container was updated
@@ -1127,34 +1129,13 @@ function swap(opts) {
                 });
                 return false;
             }
-            const openDetails = Array.from(
-                container.querySelectorAll('details[data-preserve-open][id][open]'),
-                (details) => details.id,
-            );
-            setTrustedHtml(container, html);
-            for (const id of openDetails) {
-                const details = document.getElementById(id);
-                if (
-                    details instanceof HTMLDetailsElement &&
-                    container.contains(details) &&
-                    details.hasAttribute('data-preserve-open')
-                ) {
-                    details.open = true;
+            return pressSettled(container).then(() => {
+                if (!isCurrent()) {
+                    return false;
                 }
-            }
-            bindSwapAnchorInterception(container, opts);
-            document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
-            if (opts.history) {
-                window.history.replaceState(
-                    window.history.state,
-                    '',
-                    withoutFragmentParam(/** @type {string} */ (opts.url), paramName),
-                );
-            }
-            if (opts.preserveScroll !== false) {
-                window.scrollTo(0, scrollY);
-            }
-            return true;
+                writeFragment(container, html, opts, paramName, scrollY);
+                return true;
+            });
         })
         .catch((error) => {
             hideIndicatorIfCurrent();
@@ -1165,6 +1146,47 @@ function swap(opts) {
             }
             return false;
         });
+}
+
+/**
+ * Writes a fetched fragment into its container, then reopens the preserved `<details>`, binds the
+ * anchor interception, dispatches `krt:swapped` and updates the address bar and scroll position as
+ * the options ask.
+ *
+ * @param {SwapContainer} container the swapped container
+ * @param {string} html the fragment markup
+ * @param {KrtSwapOpts} opts the swap options
+ * @param {string} paramName the fragment query parameter's name
+ * @param {number} scrollY the window scroll position when the swap started
+ */
+function writeFragment(container, html, opts, paramName, scrollY) {
+    const openDetails = Array.from(
+        container.querySelectorAll('details[data-preserve-open][id][open]'),
+        (details) => details.id,
+    );
+    setTrustedHtml(container, html);
+    for (const id of openDetails) {
+        const details = document.getElementById(id);
+        if (
+            details instanceof HTMLDetailsElement &&
+            container.contains(details) &&
+            details.hasAttribute('data-preserve-open')
+        ) {
+            details.open = true;
+        }
+    }
+    bindSwapAnchorInterception(container, opts);
+    document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
+    if (opts.history) {
+        window.history.replaceState(
+            window.history.state,
+            '',
+            withoutFragmentParam(/** @type {string} */ (opts.url), paramName),
+        );
+    }
+    if (opts.preserveScroll !== false) {
+        window.scrollTo(0, scrollY);
+    }
 }
 
 /**

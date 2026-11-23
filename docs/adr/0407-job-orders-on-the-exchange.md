@@ -11,7 +11,7 @@
   [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-009`) ·
   [ADR-0257](0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md) and
   [ADR-0354](0354-bank-resources-on-the-exchange.md) (the other exceptions it sits beside) ·
-  [ADR-0405](0405-job-order-commands-take-the-writer-rule-the-read-check-and-the-actor-as-parameters.md)
+  [ADR-0408](0408-job-order-commands-take-the-writer-rule-the-read-check-and-the-actor-as-parameters.md)
   (the command seam) · [ADR-0406](0406-the-job-order-feed-moves-on-a-fingerprint-of-the-carried-read.md)
   (the fingerprint) · decided in [#3608](https://github.com/krt-profit/basetool/issues/3608),
   [#3610](https://github.com/krt-profit/basetool/issues/3610),
@@ -60,11 +60,11 @@ database, as the org stock (ADR-0257) and the bank (ADR-0354) do.
      never exceeds the web's read for the same member.
    - The relation predicates live once in `JobOrderScope` and are served by the port
      `JobOrderExchangeReadSet` (`joborder.api`), through which the snapshot pages. The same rule is
-     the read-check value `JobOrderReadCheck.OWN_RELATION` of ADR-0405, decided by the access
+     the read-check value `JobOrderReadCheck.OWN_RELATION` of ADR-0408, decided by the access
      policy for the request's acting member; the exchange's writes on an existing order pass it to
      the shared status, target and information commands. A hidden, an unknown and a deleted order
      answer alike.
-   - **Writing** follows the Logistician of the requesting unit (`DIRECT_LOGISTICIAN`, ADR-0405).
+   - **Writing** follows the Logistician of the requesting unit (`DIRECT_LOGISTICIAN`, ADR-0408).
 4. **Nothing of the responsible side, no money and no Bank effect through a client.** A client never
    accepts, processes, hands over, provides, settles, reassigns or deletes an order, never touches
    assignees or support, and no client write moves money or reaches the Bank. Every such action

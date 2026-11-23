@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Cancels a job order through the web's status command for a caller that passes its own writer
- * rule, read check and actor (REQ-ORDERS-054, ADR-0405).
+ * rule, read check and actor (REQ-ORDERS-054, ADR-0408).
  */
 @Service
 @RequiredArgsConstructor

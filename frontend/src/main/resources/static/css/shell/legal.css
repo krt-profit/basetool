@@ -11,6 +11,10 @@
         max-width: calc(var(--measure) + 2.5rem);
     }
 
+    .legal-doc a {
+        overflow-wrap: anywhere;
+    }
+
     .legal-doc h2,
     .terms-body h2 {
         margin: var(--space-8) 0 var(--space-3);

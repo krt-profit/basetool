@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Who performs a job-order write and through which channel; the commands attribute the write to it,
- * and {@link JobOrderWriterRule#DIRECT_LOGISTICIAN} reads its member's units (ADR-0405).
+ * and {@link JobOrderWriterRule#DIRECT_LOGISTICIAN} reads its member's units (ADR-0408).
  */
 public sealed interface JobOrderActor {
 
