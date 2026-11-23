@@ -1,7 +1,7 @@
 # ADR-0355 — Roles are held in the Basetool database
 
 - **Status:** Accepted; the cutover (#3151) is *Amendment 1*, its follow-ups *Amendment 2*, the
-  admin-OTP marker *Amendment 3*
+  admin-OTP marker *Amendment 3*, the retired rollback *Amendment 4*
 - **Date:** 2026-11-08
 - **Deciders:** @greluc
 - **Related:** spec [`security-and-access.md`](../specs/security-and-access.md) (REQ-SEC-088) ·
@@ -95,3 +95,16 @@ deleting it would switch the second factor off for every admin.
 3. **Its assignments are kept in step by hand**: whoever gives or withdraws the Basetool's Admin also
    maps or unmaps the realm role, as the runbook's step says. An account with the Basetool's Admin and
    no realm role is not asked for a second factor.
+
+## Amendment 4 — the cutover's rollback is retired
+
+- **Deciders:** @greluc
+
+Production runs several releases past the cutover, and going back to the release before it would
+also need the database backup taken before its promotion (`V344` drops columns that release maps),
+discarding everything written since. The rollback of *Amendment 1*, item 7, is therefore retired:
+`scripts/restore-keycloak-realm-roles.py` and `scripts/role-assignments-export.sql` are deleted,
+and `docs/deployment.md` → *Roles in the Basetool* keeps only the lasting rule of *Amendment 3*,
+item 3. The cutover procedure stays readable in the archived
+[`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md`](../archive/RELEASE_1.23.0_PRODUCTION_RUNBOOK.md) and in
+[`deployment.md` at `v1.26.7`](https://github.com/krt-profit/basetool/blob/v1.26.7/docs/deployment.md#roles-in-the-basetool-the-switch-and-its-rollback).
