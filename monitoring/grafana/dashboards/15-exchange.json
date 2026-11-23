@@ -1913,6 +1913,66 @@
           }
         }
       ]
+    },
+    {
+      "id": 44,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 157
+      },
+      "type": "timeseries",
+      "title": "Job-order window runs/day",
+      "description": "The nightly job-order window run per day by outcome, with the orders it aged out of the client set after their 7 days; it runs whatever the job-order switches say, and ScheduledJobStale fires when it has not succeeded for more than 26 hours (REQ-OXCH-003, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (increase(basetool_scheduled_job_executions_total{task=\"job_order_exchange_window\"}[1d]))",
+          "refId": "A",
+          "legendFormat": "runs {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(increase(basetool_scheduled_job_items_total{task=\"job_order_exchange_window\"}[1d]))",
+          "refId": "B",
+          "legendFormat": "orders aged out",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

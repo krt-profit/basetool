@@ -75,6 +75,14 @@ bulk SQL, the patch change, account merges, the name retention and hierarchy cha
    unit's orders of the client set, the orders last announced to the unit and every order the
    unit's log still names. A client that syncs only after its member left therefore still drops an
    order that left the unit in the meantime, although the member no longer reads the unit's log.
+9. **The end of the window is announced through the fingerprint row too.** Time alone moves an
+   order out of the client set, and no write marks it. The fingerprint row records whether its last
+   write found the order outside the set (`left_set_at`); a nightly run (advisory lock space
+   `OXWN`) sets it on every order whose 7 days ended while the stored flag still says inside, and
+   the row's feed trigger announces those orders where they were last announced. The log stays
+   trigger-written, an order already announced outside the set — a settlement that closed after the
+   7 days, a first fingerprint of an old order — is not announced again, and a rerun announces
+   nothing.
 
 ## Consequences
 
@@ -90,6 +98,8 @@ bulk SQL, the patch change, account merges, the name retention and hierarchy cha
   move for them.
 - A membership end or a unit's deactivation writes one entry per member and order the unit's log
   names, a burst bounded by the log's 90 days; a client ignores the keys it never held.
+- A closed order stays in the feed for up to one nightly run past its 7 days; the snapshot leaves
+  it out at once.
 
 ## Alternatives considered
 
@@ -107,3 +117,6 @@ bulk SQL, the patch change, account merges, the name retention and hierarchy cha
   worker that deletes the mark drop the change of a writer that found it already set.
 - **Hashing a JSON rendering of the read.** Rejected: a serialiser upgrade that renders a number
   differently would change every fingerprint at once.
+- **A window run that writes the log itself, or remembers a cutoff.** Rejected: calling the log
+  functions directly would make the run the one writer of `exchange_change` outside a trigger, and a
+  stored cutoff cannot tell an order a late settlement already announced from one still to announce.

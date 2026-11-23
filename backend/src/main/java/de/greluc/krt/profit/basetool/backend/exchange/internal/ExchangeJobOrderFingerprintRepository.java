@@ -31,6 +31,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The stored exchange fingerprints of job orders and the client set read through them
@@ -39,6 +41,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ExchangeJobOrderFingerprintRepository
     extends JpaRepository<ExchangeJobOrderFingerprint, UUID> {
+
+  /** The first key of the window run's two-key advisory lock, {@code OXWN}; its alone. */
+  int WINDOW_LOCK_SPACE = 0x4F58574E;
 
   /**
    * The window of the client set for the order alias {@code o} and its fingerprint {@code f}:
@@ -137,4 +142,48 @@ public interface ExchangeJobOrderFingerprintRepository
       @Param("fingerprint") byte[] fingerprint,
       @Param("changedAt") Instant changedAt,
       @Param("settlementOpen") boolean settlementOpen);
+
+  /**
+   * Tries to take the window run's lock for the rest of the transaction, so one backend instance at
+   * a time ages orders out.
+   *
+   * @return whether this transaction holds the lock
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @Query(
+      value = "SELECT pg_try_advisory_xact_lock(" + WINDOW_LOCK_SPACE + ", 0)",
+      nativeQuery = true)
+  boolean tryWindowLock();
+
+  /**
+   * Records that every fingerprinted order outside the window whose last fingerprint was written
+   * inside it left the client set; the fingerprint row's trigger announces each such order where it
+   * was last announced (ADR-0406).
+   *
+   * @param closedSince the earliest closing instant a terminal order is kept for
+   * @param now the instant of the run, stored as {@code left_set_at}
+   * @return the number of orders aged out
+   */
+  @Modifying
+  @Query(
+      "UPDATE ExchangeJobOrderFingerprint f SET f.leftSetAt = :now"
+          + " WHERE f.leftSetAt IS NULL AND EXISTS (SELECT o.id FROM JobOrder o"
+          + " WHERE o.id = f.jobOrderId AND NOT "
+          + CLIENT_WINDOW
+          + ")")
+  int markLeftSet(@Param("closedSince") Instant closedSince, @Param("now") Instant now);
+
+  /**
+   * Lists the fingerprinted orders outside the window that still keep their creating member or
+   * their create's key (REQ-OXCH-010).
+   *
+   * @param closedSince the earliest closing instant a terminal order is kept for
+   * @return the orders' ids
+   */
+  @Query(
+      "SELECT o.id FROM JobOrder o, ExchangeJobOrderFingerprint f WHERE f.jobOrderId = o.id"
+          + " AND (o.createdByMemberId IS NOT NULL OR o.createIdempotencyKey IS NOT NULL)"
+          + " AND NOT "
+          + CLIENT_WINDOW)
+  List<UUID> findOutsideWithCreator(@Param("closedSince") Instant closedSince);
 }

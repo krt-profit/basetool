@@ -30,10 +30,12 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The stored exchange fingerprint of one job order (REQ-OXCH-003, ADR-0406); written by the
- * fingerprint worker through {@link ExchangeJobOrderFingerprintRepository#write} only.
+ * fingerprint worker through {@link ExchangeJobOrderFingerprintRepository#write} and by the window
+ * run through {@link ExchangeJobOrderFingerprintRepository#markLeftSet} only.
  */
 @Entity
 @Table(name = "exchange_job_order_fingerprint")
@@ -58,6 +60,15 @@ public class ExchangeJobOrderFingerprint {
   /** The read's {@code settlementOpen} as of the fingerprint. */
   @Column(name = "settlement_open", nullable = false)
   private boolean settlementOpen;
+
+  /**
+   * When the order was announced as outside the client set, by a fingerprint written while it lay
+   * outside or by the window run; {@code null} while its last fingerprint was written inside the
+   * set.
+   */
+  @Column(name = "left_set_at")
+  @Nullable
+  private Instant leftSetAt;
 
   /**
    * Tells whether the stored fingerprint equals a freshly computed one.
