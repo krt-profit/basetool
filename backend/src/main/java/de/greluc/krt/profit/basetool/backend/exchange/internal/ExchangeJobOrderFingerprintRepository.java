@@ -78,6 +78,31 @@ public interface ExchangeJobOrderFingerprintRepository
       Limit limit);
 
   /**
+   * Selects the given orders that lie in the member's client set: in the read set, inside the
+   * window and carrying a fingerprint.
+   *
+   * @param relatingUnitIds the active units the member directly belongs to while holding {@code KRT
+   *     Member}
+   * @param memberId the member
+   * @param orderIds the orders to decide; never empty
+   * @param closedSince the earliest closing instant a terminal order is kept for
+   * @return the orders of the set among them, with the instant of their fingerprint
+   */
+  @Query(
+      "SELECT new de.greluc.krt.profit.basetool.backend.exchange.internal"
+          + ".ExchangeJobOrderFingerprintRepository$ClientSetRow(o.id, f.changedAt)"
+          + " FROM JobOrder o, ExchangeJobOrderFingerprint f"
+          + " WHERE f.jobOrderId = o.id AND o.id IN :orderIds AND "
+          + JobOrderScope.EXCHANGE_READ_SET
+          + " AND "
+          + CLIENT_WINDOW)
+  List<ClientSetRow> findClientSetAmong(
+      @Param("relatingUnitIds") Collection<UUID> relatingUnitIds,
+      @Param("memberId") UUID memberId,
+      @Param("orderIds") Collection<UUID> orderIds,
+      @Param("closedSince") Instant closedSince);
+
+  /**
    * One order of the member's client set.
    *
    * @param orderId the order

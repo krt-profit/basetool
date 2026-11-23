@@ -193,7 +193,12 @@ the order's source tables only insert dirty marks, one per order and transaction
 recomputes the hash of each marked order's member-independent exchange read every few seconds after
 the commit, in one `REPEATABLE READ` snapshot, writing it only when it changed. A provision or a
 holder movement therefore never moves the job-order feed, while a hierarchy change that flips
-`responsibilityInvalid` does, because it marks every order of the client set.
+`responsibilityInvalid` does, because it marks every order of the client set. A trigger on the
+fingerprint row writes the key log per unit and per member — the order's units and assignees, old
+and new — and memberships, a unit's activation, renames and name withholding announce the orders
+they touch per member or per order; a feed page reads the member's current direct units and own
+entries and resolves each key against the member's current set into an item or a tombstone
+`{ key, removedAt }` that names no writer.
 
 Every table has exactly one owning module of the target cut, recorded in a table-ownership map that
 a test holds against the migrated schema; a trigger or native statement reaches another module's

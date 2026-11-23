@@ -400,8 +400,10 @@ class ExchangeJobOrderSnapshotTest {
     assertThat(cursor).startsWith("f1.");
     mockMvc
         .perform(relayed(get(PATH).param("cursor", cursor), READ))
-        .andExpect(status().isGone())
-        .andExpect(jsonPath("$.code").value("CURSOR_EXPIRED"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(0))
+        .andExpect(jsonPath("$.removed.length()").value(0))
+        .andExpect(jsonPath("$.nextCursor").value(startsWith("f1.")));
   }
 
   @Test
