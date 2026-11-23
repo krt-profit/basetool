@@ -1125,6 +1125,12 @@ line to the pins in `docker-compose.yml`, runs
 `generate-quadlet.py` and `check-monitoring-image-pins.sh --fix`, and commits the changed files as
 `basetool-release[bot]`. The required checks then run again on that head and should be green.
 
+Dependabot does not propose `node-exporter`: production runs the host's EPEL package, and its pin
+moves by hand once the host runs a new version (REQ-OPS-032). An `alloy` bump is merged only after
+the host package runs that version, testing host first. Nor does it propose a new `postgres` major:
+that follows [the major-upgrade runbook](postgres-major-upgrade.md) in a release of its own
+(REQ-OPS-063); digest refreshes of the current tag still arrive.
+
 | What you see on the PR | What to do |
 | --- | --- |
 | A `basetool-release[bot]` commit, checks green | Review the diff — the digest may differ from the PR title when the tag was rebuilt — and merge. |

@@ -476,6 +476,10 @@ The old cluster is the way back: it is set aside, never deleted or written, unti
 proven itself. The new cluster is complete before anything connects to it, because the backend's
 Flyway builds a fresh schema on an empty database and Keycloak a fresh realm.
 
+Dependabot does not propose a new major of the `postgres:` image: such a bump passes CI, yet it
+needs this procedure and a release of its own, and `deploy.sh` holds every later promotion back
+until it runs. A digest refresh of the current tag stays proposed.
+
 **Acceptance**
 
 - [ ] The old cluster's data directory is renamed, not deleted, and nothing writes to it until the
@@ -492,8 +496,9 @@ Flyway builds a fresh schema on an empty database and Keycloak a fresh realm.
 - [ ] The release that changes the major changes nothing else.
 
 **Enforced by:** the operator, following the runbook — no script checks the order of its steps;
-`scripts/deploy.sh` holds the release back until `--force` (REQ-OPS-006), and
-`scripts/restore-drill.sh` takes the new major through `BASETOOL_DRILL_IMAGE` · **Runbook:**
+`scripts/deploy.sh` holds the release back until `--force` (REQ-OPS-006),
+`scripts/restore-drill.sh` takes the new major through `BASETOOL_DRILL_IMAGE`, and
+`.github/dependabot.yml` ignores `postgres` majors · **Runbook:**
 `docs/postgres-major-upgrade.md`
 
 ### REQ-OPS-007 — Keycloak provider JAR delivered as a separate promotable artifact
@@ -2491,6 +2496,11 @@ haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only w
   an advisory applied here or a manual `dnf upgrade` — the image pin moves to the running version in
   a reviewed commit, after the configuration passes `scripts/check-monitoring-configs.sh` against the
   new image; the host package is not rolled back to the pin (ADR-0199).
+- **Dependabot does not propose `node-exporter`.** EPEL packages a release only after upstream
+  publishes it, so a Dependabot bump would move the pin ahead of a host that cannot follow; the pin
+  moves by hand once the host runs the new version. `alloy` stays proposed: Grafana's own repository
+  carries the upstream releases, so its bump is the cue for the host's tested maintenance, testing
+  host first, and is merged once the host runs that version.
 
 **Acceptance**
 
@@ -2507,7 +2517,7 @@ haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only w
 **Enforced by:** `ansible/roles/basetool_host/tasks/45-updates.yml` ·
 `scripts/host-updates-metrics.sh` · `scripts/basetool-host-updates-metrics.service` ·
 `monitoring/prometheus/alerts/infrastructure.yml` · `scripts/check-conformance.py` ·
-`scripts/check-monitoring-configs.sh` · **Decision:**
+`scripts/check-monitoring-configs.sh` · `.github/dependabot.yml` · **Decision:**
 [ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
 
 ### REQ-OPS-033 — A realm gets the Basetool's shape from the provisioner, never by hand
