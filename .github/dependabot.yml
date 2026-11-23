@@ -63,6 +63,12 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    ignore:
+      # The pin follows the host's EPEL package (REQ-OPS-032).
+      - dependency-name: "prometheus/node-exporter"
+      # A PostgreSQL major moves by dump and restore (REQ-OPS-063); digest refreshes stay proposed.
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
     labels:
       - dependencies
       - docker
