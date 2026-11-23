@@ -53,7 +53,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Makes exchange writes idempotent (REQ-XCH-020) within the byte budget (REQ-XCH-023). A write
- * needs an {@code Idempotency-Key}; its answer is kept a day per client, member and key and
+ * needs an {@code Idempotency-Key}; its answer is kept for {@link
+ * ExchangeStoreProperties#idempotencyTtl()} (one hour by default) per client, member and key and
  * replayed for the same request, a different request under the same key is refused, and a duplicate
  * while the first is in flight is refused with {@code 409 IDEMPOTENCY_IN_PROGRESS}. Under the claim
  * the cache is read again, so a request that raced the first one's answer replays it instead of
