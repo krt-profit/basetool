@@ -39,7 +39,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 /**
  * A render parameter named {@code <name>Code} gives the placeholder {@code {<name>}} the localized
  * word of its code (REQ-NOTIF-028), so one notification type can say „verschoben" or „abgesagt"
- * without a type per word.
+ * without a type per word; a code the type has a template variant for picks that variant.
  */
 class NotificationRenderCodesTest {
 
@@ -51,6 +51,14 @@ class NotificationRenderCodesTest {
         "notifications.type.SAMPLE", Locale.GERMAN, "{mission}: {change} durch {actor}");
     messages.addMessage(
         "notifications.type.SAMPLE", Locale.ENGLISH, "{mission}: {change} by {actor}");
+    messages.addMessage(
+        "notifications.type.SAMPLE.via.CLIENT",
+        Locale.GERMAN,
+        "{mission}: {change} durch {actor} über {app}");
+    messages.addMessage(
+        "notifications.type.SAMPLE.via.CLIENT",
+        Locale.ENGLISH,
+        "{mission}: {change} by {actor} via {app}");
     messages.addMessage("notifications.value.change.cancelled", Locale.GERMAN, "abgesagt");
     messages.addMessage("notifications.value.change.cancelled", Locale.ENGLISH, "cancelled");
     return new NotificationPageController(
@@ -105,6 +113,29 @@ class NotificationRenderCodesTest {
             new SessionGates(List.of()));
 
     assertEquals("Code X1", controller.render("PLAIN", params, Locale.GERMAN));
+  }
+
+  @Test
+  void aCodeWithAVariantPicksTheVariantTemplate() {
+    Map<String, String> params = params("cancelled");
+    params.put("viaCode", "CLIENT");
+    params.put("app", "VerseKit");
+
+    assertEquals(
+        "Nachtflug: abgesagt durch Ada über VerseKit",
+        controller().render("SAMPLE", params, Locale.GERMAN));
+    assertEquals(
+        "Nachtflug: cancelled by Ada via VerseKit",
+        controller().render("SAMPLE", params, Locale.ENGLISH));
+  }
+
+  @Test
+  void aCodeWithoutAVariantKeepsTheTypesTemplate() {
+    Map<String, String> params = params("cancelled");
+    params.put("viaCode", "WEB");
+
+    assertEquals(
+        "Nachtflug: abgesagt durch Ada", controller().render("SAMPLE", params, Locale.GERMAN));
   }
 
   @Test

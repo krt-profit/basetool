@@ -379,16 +379,24 @@ settings are retained. One creation cause can reach a writer of both sides once.
 The notice leaves the Inbox when the order closes or responsibility moves. The cleanup runs with
 the resulting order cause and preserves business history (REQ-NOTIF-018).
 
+**A create through a connected application** raises the same notice to the same audience, without
+the creating member, and names the application: it carries `viaCode = CLIENT` and `app`, the
+registry display name captured when the notice is published, and renders the variant „Neuer
+Auftrag #… für … über <App>" (REQ-NOTIF-028, REQ-ORDERS-078). A web create carries neither and keeps
+the type's own wording.
+
 **Acceptance**
 
 - [ ] The order creation notice reaches each affected current writer once, including an overlapping
   writer, and excludes the creating actor and unrelated global administrators.
 - [ ] A closure or transfer retires the outstanding creation prompt.
 - [ ] The stock seed uses both unit contexts under `UNIT_WRITER` and retains its actor exclusion.
+- [x] A client's create names the application in DE and EN; a web create does not.
 
 **Enforced by:** `ProfitHierarchyNoticeIntegrationTest`, `NotificationRuleEngineIntegrationTest`,
-`JobOrderNoticeIntegrationTest`, `JobOrderServicePriorityAndStatusTest` · **Code:**
-`joborder/internal/JobOrderService#publishJobOrderCreated`,
+`JobOrderNoticeIntegrationTest`, `JobOrderServicePriorityAndStatusTest`, `JobOrderServiceTest`,
+`JobOrderApplicationNoticeTest`, `JobOrderClientNoticeWordingTest` · **Code:**
+`joborder/internal/JobOrderLifecycleNotices#created`,
 `joborder/api/events/JobOrderCreatedEvent`, `joborder/internal/JobOrderChangeEffects`,
 `notification/internal/RecipientResolutionService`,
 `V387__seed_shared_order_notification_audiences.sql`
@@ -812,6 +820,10 @@ receiving members' unread rows of that type and order just before it stores the 
 single event and for a grouped cause alike. A member who receives no new notice — the editor, a
 member who muted the type, one whom the cause gave a higher-priority notice — keeps theirs.
 
+**A need change through a connected application** — a target or comment change of an aUEC order —
+raises the same notice as the web's and names the application with `viaCode = CLIENT` and `app`,
+the registry display name captured when the notice is published (REQ-NOTIF-028, REQ-ORDERS-078).
+
 **Acceptance**
 
 - [ ] Requester and meaningful responsible-side need changes reach both affected current unit
@@ -821,9 +833,11 @@ member who muted the type, one whom the cause gave a higher-priority notice — 
 - [x] A loop of requester or responsible-side need changes leaves each recipient one unread
   need-change notice of the order per type.
 - [x] A read need-change notice, another order's notice and the notice of the other type stay.
+- [x] A client's need change names the application in DE and EN; a web change does not.
 
 **Enforced by:** `ProfitHierarchyNoticeIntegrationTest`, `MaterialContributionEffectsIntegrationTest`,
-`MessageBundleConsistencyTest`, `JobOrderNoticeIntegrationTest` · **Code:**
+`MessageBundleConsistencyTest`, `JobOrderNoticeIntegrationTest`, `JobOrderApplicationNoticeTest`,
+`JobOrderClientNoticeWordingTest` · **Code:**
 `joborder/api/events/JobOrderUpdatedByRequesterEvent`,
 `joborder/internal/JobOrderLifecycleNotices`, `joborder/internal/JobOrderChangeEffects`,
 `joborder/api/events/JobOrderNotices#needChanged`,
@@ -1257,13 +1271,29 @@ the placeholder (`{mission}: {change} durch {actor}`). A parameter named just `C
 parameter. The web inbox and bell apply the rule when they fill a template
 (`NotificationPageController#render`).
 
+**A code can pick the template.** Where the bundle holds `notifications.type.<TYPE>.<name>.<code>`
+for a `<name>Code` parameter, that variant is the notice's template, the first such parameter in
+order deciding; a notice without the code, every notice stored before the variant existed
+included, keeps the type's own template. An unfilled placeholder stays visible in the text, so a
+wording that only some notices of a type can fill lives in a variant, never in the type's own
+template. The application parameter of the job-order notices is such a code: a client's write
+carries `viaCode = CLIENT` and `app`, the application's registry display name captured when the
+notice is published, and `notifications.type.JOB_ORDER_….via.CLIENT` names it („über {app}",
+"via {app}"); a later rename of the application leaves a stored notice as it was
+(REQ-ORDERS-078).
+
 **Acceptance**
 
 - [x] A `…Code` parameter renders as the word of the member's language and as itself without one.
 - [x] A parameter named `code` is not special.
+- [x] A code the type has a variant for renders the variant; a code without one and a notice without
+  the code render the type's own template.
+- [x] The job-order created, need-change and finished notices of a client's write name the
+  application in DE and EN, and the web's keep their wording without a placeholder.
 
-**Enforced by:** `NotificationRenderCodesTest` · **Code:**
-`NotificationPageController#render` · **Issues:** #2414
+**Enforced by:** `NotificationRenderCodesTest`, `JobOrderClientNoticeWordingTest`,
+`JobOrderApplicationNoticeTest` · **Code:** `NotificationPageController#render`,
+`joborder/api/events/JobOrderNotices#addApplication` · **Issues:** #2414, #3648
 
 ### REQ-NOTIF-029 — No notice is lost to a full executor
 

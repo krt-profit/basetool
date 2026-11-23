@@ -166,7 +166,9 @@ class LogisticianPinAwareSurfacesMvcTest {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 

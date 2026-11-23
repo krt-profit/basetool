@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import java.util.Objects;
@@ -51,19 +52,23 @@ final class JobOrderComment {
   }
 
   /**
-   * Stores the trimmed comment and raises the comment revision when the stored value changes.
+   * Stores the trimmed comment when the stored value changes, raises the comment revision and
+   * records the client the write came through, none for a web write (REQ-ORDERS-078).
    *
    * @param order the locked order whose comment revision the caller has checked
    * @param comment the requested comment; blank clears it
+   * @param actor who writes, and through which channel
    * @return whether the stored comment changed
    */
-  static boolean replace(@NotNull JobOrder order, @Nullable String comment) {
+  static boolean replace(
+      @NotNull JobOrder order, @Nullable String comment, @NotNull JobOrderActor actor) {
     String normalized = StringNormalization.trimToNull(comment);
     if (Objects.equals(order.getComment(), normalized)) {
       return false;
     }
     order.setComment(normalized);
     order.setCommentVersion(Math.incrementExact(order.getCommentVersion()));
+    order.setCommentClientId(actor.clientId());
     return true;
   }
 }

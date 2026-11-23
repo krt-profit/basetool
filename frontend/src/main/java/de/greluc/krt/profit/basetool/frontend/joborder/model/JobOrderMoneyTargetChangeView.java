@@ -32,6 +32,8 @@ import org.jetbrains.annotations.Nullable;
  * @param target the new exact target
  * @param recordedAt the time of the change
  * @param actorName the visible actor label
+ * @param client the connected application the change was made through, or {@code null} for the
+ *     Basetool (REQ-ORDERS-078)
  */
 @DtoMirror
 public record JobOrderMoneyTargetChangeView(
@@ -39,4 +41,5 @@ public record JobOrderMoneyTargetChangeView(
     String previousTarget,
     String target,
     Instant recordedAt,
-    @Nullable String actorName) {}
+    @Nullable String actorName,
+    @Nullable String client) {}

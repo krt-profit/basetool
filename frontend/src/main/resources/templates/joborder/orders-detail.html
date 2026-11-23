@@ -24,6 +24,7 @@
                 <span id="order-status-badge" class="status-badge" th:classappend="${orderStatusClass}" data-testid="order-status-badge"
                       th:data-lifecycle-version="${order.lifecycleVersion}"
                       th:text="#{__${orderStatusKey}__}">In Bearbeitung</span>
+                <th:block th:replace="~{joborder/fragments/order-origin :: clientChip(${order.createdClient}, #{orders.client.hint}, 'order-created-client')}"></th:block>
             </div>
         </div>
         <div id="order-actions-results" class="page-actions"><th:block th:fragment="orderActions" th:with="isItemOrder=${order.type == 'ITEM'}">
@@ -112,6 +113,7 @@
             <div th:if="${order.comment != null and !order.comment.isEmpty()}" class="annotation">
                 <span class="annotation-label" th:text="#{orders.detail.comment}">Kommentar</span>
                 <span class="annotation-text" th:text="${order.comment}">Kommentar</span>
+                <th:block th:replace="~{joborder/fragments/order-origin :: clientChip(${order.commentClient}, #{orders.comment.client.hint}, 'order-comment-client')}"></th:block>
             </div>
 
             <div th:if="${canProcessStatus or order.canCancel == true or order.canReopen == true}" class="od-status-row">

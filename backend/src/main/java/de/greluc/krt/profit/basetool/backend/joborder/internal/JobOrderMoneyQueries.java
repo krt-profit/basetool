@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderPatchLabels;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
@@ -71,6 +72,7 @@ public class JobOrderMoneyQueries {
   private final JobOrderMoneyPairedCorrectionChoices pairedCorrectionChoices;
   private final ObjectProvider<JobOrderBankPort> bankPort;
   private final JobOrderPatchLabels patchChangeLabels;
+  private final JobOrderClientNames clientNames;
 
   /**
    * Reconstructs current reported amounts from effective monetary facts.
@@ -274,6 +276,7 @@ public class JobOrderMoneyQueries {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList());
+    clientNames.prime(changes.stream().map(JobOrderMoneyTargetChange::getClientId).toList());
     return changes.stream()
         .map(change ->
             new JobOrderMoneyTargetChangeView(
@@ -281,7 +284,8 @@ public class JobOrderMoneyQueries {
                 change.getPreviousTarget().toPlainString(),
                 change.getTarget().toPlainString(),
                 change.getRecordedAt(),
-                change.getActorId() == null ? null : names.get(change.getActorId())))
+                change.getActorId() == null ? null : names.get(change.getActorId()),
+                clientNames.nameOf(change.getClientId())))
         .toList();
   }
 

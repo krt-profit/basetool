@@ -79,6 +79,19 @@ public abstract class JobOrderMapper {
     this.assigneeUserMapper = userMapper;
   }
 
+  /** Names the clients of the origin markers, one registry read per transaction. */
+  protected JobOrderClientNames clientNames;
+
+  /**
+   * Receives the client names of the origin markers from the container.
+   *
+   * @param names the order module's client names
+   */
+  @Autowired
+  void setClientNames(JobOrderClientNames names) {
+    this.clientNames = names;
+  }
+
   /**
    * Maps a {@link JobOrder} entity to its outbound DTO, projecting the responsible and requesting
    * org units, including the Profit Bereich, into {@code SquadronReferenceDto} slots.
@@ -112,6 +125,12 @@ public abstract class JobOrderMapper {
       target = "canManageAssignees",
       expression = "java(authority.get(jobOrder.getId()).canEdit())")
   @Mapping(target = "withCanManageAssignees", ignore = true)
+  @Mapping(
+      target = "createdClient",
+      expression = "java(clientNames.nameOf(jobOrder.getCreatedByClientId()))")
+  @Mapping(
+      target = "commentClient",
+      expression = "java(clientNames.nameOf(jobOrder.getCommentClientId()))")
   public abstract JobOrderDto toDtoWithAuthority(
       JobOrder jobOrder, @Context Map<UUID, JobOrderAuthorityFlags> authority);
 

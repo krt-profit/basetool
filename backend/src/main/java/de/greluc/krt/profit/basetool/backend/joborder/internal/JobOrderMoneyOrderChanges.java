@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderInformationCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
@@ -60,6 +61,7 @@ public class JobOrderMoneyOrderChanges
   private final JobOrderMoneyLedger ledger;
   private final JobOrderService lifecycle;
   private final JobOrderMoneyEffects effects;
+  private final JobOrderClientNames clientNames;
 
   /**
    * Records an agreed new target for the web caller and reconciles completion in the same
@@ -123,7 +125,9 @@ public class JobOrderMoneyOrderChanges
       throw new BusinessConflictException("orders.money.target.basisChanged");
     }
     target.replace(requested);
-    history.save(new JobOrderMoneyTargetChange(order.getId(), member, prior, requested));
+    history.save(
+        new JobOrderMoneyTargetChange(
+            order.getId(), member, caller.actor().clientId(), prior, requested));
     if (lifecycleChanged) {
       if (order.getStatus() == JobOrderStatus.COMPLETED) {
         lifecycle.reopenUnderfulfilledMoneyOrder(order);
@@ -138,7 +142,7 @@ public class JobOrderMoneyOrderChanges
             AuditEventType.JOB_ORDER_MONEY_TARGET_CHANGED,
             AuditDetails.of("previousTarget", prior).with("target", requested));
     if (!lifecycleChanged) {
-      audit = audit.notifying(List.of(needChanged(order, member, scope)));
+      audit = audit.notifying(List.of(needChanged(order, member, scope, caller.actor())));
     }
     return new JobOrderEditor.MoneyEdit<>(order, audit);
   }
@@ -197,7 +201,7 @@ public class JobOrderMoneyOrderChanges
           }
           JobOrderComment.check(order, commentVersion);
           boolean contactChanged = contact != null && replaceContact(order, contact.handle());
-          boolean commentChanged = JobOrderComment.replace(order, comment);
+          boolean commentChanged = JobOrderComment.replace(order, comment, caller.actor());
           if (!contactChanged && !commentChanged) {
             return new JobOrderEditor.MoneyEdit<>(order, JobOrderEdit.unchanged(order));
           }
@@ -206,7 +210,7 @@ public class JobOrderMoneyOrderChanges
               order,
               JobOrderEdit.audited(
                       order, AuditEventType.JOB_ORDER_UPDATED, AuditDetails.of("information", true))
-                  .notifying(List.of(needChanged(order, member, scope))));
+                  .notifying(List.of(needChanged(order, member, scope, caller.actor()))));
         });
   }
 
@@ -230,10 +234,14 @@ public class JobOrderMoneyOrderChanges
     return scope;
   }
 
-  /** Announces the change from the responsible side when the actor writes it there. */
-  private static NotificationEvent needChanged(
-      JobOrder order, UUID member, JobOrderWriters.Scope scope) {
-    return JobOrderLifecycleNotices.needChanged(order, member, scope.writesResponsible(order));
+  /**
+   * Announces the change from the responsible side when the actor writes it there, naming the
+   * application a client's write came through (REQ-ORDERS-078).
+   */
+  private NotificationEvent needChanged(
+      JobOrder order, UUID member, JobOrderWriters.Scope scope, JobOrderActor actor) {
+    return JobOrderLifecycleNotices.needChanged(
+        order, member, scope.writesResponsible(order), clientNames.appOf(actor));
   }
 
   private static boolean replaceContact(JobOrder order, String handle) {

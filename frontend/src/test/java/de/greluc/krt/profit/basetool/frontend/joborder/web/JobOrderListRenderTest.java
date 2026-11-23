@@ -147,7 +147,9 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
 
     when(reader.readOrderList(any()))
         .thenReturn(
@@ -310,7 +312,9 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     when(reader.readOrderList(any()))
         .thenReturn(
             JobOrderPageStubs.list(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of())));
@@ -349,7 +353,9 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
 
     when(reader.readOrderList(any()))
         .thenReturn(

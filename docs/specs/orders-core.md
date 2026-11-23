@@ -401,6 +401,59 @@ frame per kind, `JobOrderCreationWorkspaceMvcTest` that a web create publishes n
 and `JobOrderQueueLiveSyncE2eTest` the peer's overview and the single frame. **Issues:** #3201,
 #3202, #3639
 
+### REQ-ORDERS-078 — An order shows the application behind its creation, target and comment
+
+Decided in [#3617](https://github.com/krt-profit/basetool/issues/3617), after the model of
+REQ-REFINERY-027 and REQ-BANK-067. A job-order write through a connected application
+([orders-exchange](orders-exchange.md)) leaves a visible origin on the order. Nothing is specific to
+one application: the name shown is the registry's display name of the client (REQ-XCH-003), or the
+client id once the registry no longer holds it.
+
+- **Creator chip.** An order a client created (`job_order.created_by_client_id`, REQ-OXCH-004)
+  carries an info chip (`.chip--info`) "über <App>" next to its number in the overview row and next
+  to the status badge in the detail head. It never changes; an order created in the web has none.
+- **Target history.** Each target change records the client it came through
+  (`job_order_money_target_change.client_id`); an entry written through a client reads
+  "Erfasst von: <name> über <App>", a web entry "Erfasst von: <name>".
+- **Comment.** The comment records the client of its last write beside its revision
+  (`job_order.comment_client_id`): a client's write sets it, a client's create with a comment
+  included, and a web write of the comment clears it; a write that leaves the text as it is moves
+  neither. While it is set the comment shows "über <App>", so a client's comment on a web order is
+  never shown without its origin.
+- **No marker for a cancel.** A client's cancel shows no marker on the page, as a web cancel names
+  nobody; the audit carries it (REQ-AUDIT-001).
+- **One write path.** The shared status, target and information commands write the markers from the
+  actor they are given (`JobOrderActor#clientId`, ADR-0405), so every client write of these parts
+  records its origin through the same code as the web.
+- **Live.** The overview chip renders in the results the `orders/queue` frame refreshes, the comment
+  marker in the `header` section and the target-history line in the `money` section their frames
+  refresh (REQ-XCH-030); the detail head's chip never changes.
+- **One query.** The read DTOs carry the names (`JobOrderDto.createdClient`, `commentClient`,
+  `JobOrderMoneyTargetChangeView.client`); a transaction reads the names of every client the orders
+  of its persistence context carry in one registry query (REQ-DATA-003).
+- **Notices.** A client's create, need-change and cancel notices name the application
+  (REQ-NOTIF-008, REQ-NOTIF-017, REQ-ORDERS-042, REQ-NOTIF-028).
+- **Storage and privacy.** V449 adds both client columns; they hold registry client ids the server
+  writes, so the Personensuche lists them as exempt (REQ-SEC-060).
+
+Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`).
+
+**Acceptance**
+
+- [x] An order a client created names the client on the chip in the overview row and the detail
+  head; a web order carries no chip.
+- [x] A client's target change records the client and its history entry names it; a web change
+  names the member alone.
+- [x] A client's comment write marks the comment; a web write of the comment clears the marker and
+  keeps the chip.
+- [x] A page of orders names its clients in one registry query.
+
+**Enforced by:** `JobOrderCommentTest`, `JobOrderClientNamesTest`, `JobOrderMapperTest`,
+`JobOrderClientOriginIntegrationTest` (backend) · `OrdersListPatternRenderTest`,
+`OrdersDetailPatternRenderTest`, `JobOrderClientOriginE2eTest` (frontend) ·
+`joborder/fragments/order-origin` · V449 · **Related:** REQ-OXCH-004, REQ-REFINERY-027,
+REQ-BANK-067, REQ-XCH-030 · **Issues:** #3617, #3648
+
 ## Out of scope
 
 Automatic in-game payments, reading/verifying full player wallets, mixed-kind orders, money

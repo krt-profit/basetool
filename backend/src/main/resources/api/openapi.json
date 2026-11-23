@@ -96368,6 +96368,9 @@
           "comment" : {
             "type" : "string"
           },
+          "commentClient" : {
+            "type" : "string"
+          },
           "commentVersion" : {
             "type" : "integer",
             "format" : "int64"
@@ -96378,6 +96381,9 @@
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "createdClient" : {
+            "type" : "string"
           },
           "displayId" : {
             "type" : "integer",
@@ -97707,6 +97713,9 @@
         "type" : "object",
         "properties" : {
           "actorName" : {
+            "type" : "string"
+          },
+          "client" : {
             "type" : "string"
           },
           "id" : {

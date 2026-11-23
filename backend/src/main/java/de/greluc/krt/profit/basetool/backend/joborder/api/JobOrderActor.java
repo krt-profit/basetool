@@ -38,6 +38,17 @@ public sealed interface JobOrderActor {
   UUID member();
 
   /**
+   * Returns the registry client the write comes through, which the origin markers record
+   * (REQ-ORDERS-078).
+   *
+   * @return the client's registry id, or {@code null} for a write in the Basetool web
+   */
+  @Nullable
+  default String clientId() {
+    return null;
+  }
+
+  /**
    * A member acting in the Basetool web.
    *
    * @param member the member's user id, or {@code null} when the request resolves to none

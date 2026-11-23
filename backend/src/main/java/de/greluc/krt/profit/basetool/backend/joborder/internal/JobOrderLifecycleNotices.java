@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderUpdatedByRequesterEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
@@ -48,8 +50,38 @@ final class JobOrderLifecycleNotices {
     return new NotificationRevision(order.getLifecycleVersion(), order.getResponsibilityVersion());
   }
 
+  /**
+   * Builds the created notice; it excludes the actor's member, none for a web request without one,
+   * and names the application of a client's create (REQ-NOTIF-008, REQ-ORDERS-078).
+   *
+   * @param order the persisted, flushed order
+   * @param actor who created the order
+   * @param app the display name of the client the actor created through, or {@code null} for the
+   *     web
+   * @return the created notice
+   */
+  static @NotNull JobOrderCreatedEvent created(
+      @NotNull JobOrder order, @NotNull JobOrderActor actor, @Nullable String app) {
+    OrgUnit responsible = order.getResponsibleOrgUnit();
+    OrgUnit requesting = order.getRequestingOrgUnit();
+    return new JobOrderCreatedEvent(
+        order.getId(),
+        order.getDisplayId(),
+        order.getHandle(),
+        new OrgUnitRef(responsible.getId(), responsible.getKind()),
+        responsible.getShorthand(),
+        requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
+        order.getType() == null ? null : order.getType().name(),
+        actor.member(),
+        revision(order),
+        app);
+  }
+
   static @NotNull NoticeEvent finished(
-      @NotNull JobOrder order, @NotNull String statusCode, @Nullable UUID actor) {
+      @NotNull JobOrder order,
+      @NotNull String statusCode,
+      @Nullable UUID actor,
+      @Nullable String app) {
     OrgUnit namedUnit = order.getRequestingOrgUnit();
     if (namedUnit == null) {
       namedUnit = order.getResponsibleOrgUnit();
@@ -62,7 +94,8 @@ final class JobOrderLifecycleNotices {
         namedUnit == null ? null : namedUnit.getShorthand(),
         statusCode,
         assignees(order),
-        actor);
+        actor,
+        app);
   }
 
   static @NotNull NoticeEvent reassigned(
@@ -80,21 +113,25 @@ final class JobOrderLifecycleNotices {
         actor);
   }
 
-  static @NotNull NoticeEvent needChanged(@NotNull JobOrder order, @Nullable UUID actor) {
+  static @NotNull NoticeEvent needChanged(
+      @NotNull JobOrder order, @Nullable UUID actor, @Nullable String app) {
     return JobOrderNotices.needChanged(
         order.getId(),
         order.getDisplayId(),
         order.getHandle(),
         units(order),
         revision(order),
-        actor);
+        actor,
+        app);
   }
 
-  static NotificationEvent needChanged(JobOrder order, UUID actor, boolean responsible) {
-    return responsible ? needChanged(order, actor) : requesterChanged(order, actor);
+  static NotificationEvent needChanged(
+      JobOrder order, UUID actor, boolean responsible, @Nullable String app) {
+    return responsible ? needChanged(order, actor, app) : requesterChanged(order, actor, app);
   }
 
-  static JobOrderUpdatedByRequesterEvent requesterChanged(JobOrder order, @Nullable UUID actor) {
+  static JobOrderUpdatedByRequesterEvent requesterChanged(
+      JobOrder order, @Nullable UUID actor, @Nullable String app) {
     OrgUnit responsible = order.getResponsibleOrgUnit();
     OrgUnit requesting = order.getRequestingOrgUnit();
     return new JobOrderUpdatedByRequesterEvent(
@@ -106,7 +143,8 @@ final class JobOrderLifecycleNotices {
         requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
         requesting == null ? null : requesting.getShorthand(),
         actor,
-        revision(order));
+        revision(order),
+        app);
   }
 
   static @NotNull NoticeEvent reopened(@NotNull JobOrder order, @Nullable UUID actor) {

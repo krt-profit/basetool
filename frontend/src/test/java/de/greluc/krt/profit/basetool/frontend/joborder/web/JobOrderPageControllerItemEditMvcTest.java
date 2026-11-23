@@ -112,7 +112,9 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
         false,
         0L,
         0L,
-        3L);
+        3L,
+        null,
+        null);
   }
 
   /** A requesting writer edits item need after delivery through the restricted update. */
@@ -235,7 +237,9 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     when(reader.readItemEdit(id))
         .thenReturn(
             new JobOrderPageReader.ItemEditPage(
@@ -412,7 +416,9 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             false,
             0L,
             0L,
-            0L);
+            0L,
+            null,
+            null);
     when(reader.readItemEdit(id))
         .thenReturn(JobOrderPageStubs.editable(order, List.of(), List.of()));
 

@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The connected application an order or its comment came through (REQ-ORDERS-078); nothing for the Basetool. */-->
+<span th:fragment="clientChip(clientName, hint, testId)" th:if="${clientName != null}"
+      class="chip chip--info" th:data-testid="${testId}"
+      th:title="${hint}"
+      th:text="#{orders.client(${clientName})}">&uuml;ber VerseKit</span>
+</body>
+</html>

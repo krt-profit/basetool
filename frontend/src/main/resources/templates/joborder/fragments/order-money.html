@@ -192,8 +192,10 @@
                     <div>
                         <strong th:text="#{orders.money.history.target(
                             ${@moneyFormat.exactWhole(change.previousTarget, #locale)}, ${@moneyFormat.exactWhole(change.target, #locale)})}"></strong>
-                        <div th:text="#{orders.money.history.recordedBy(
-                            ${@handles.display(change.actorName) ?: #messages.msg('orders.money.nameUnavailable')})}"></div>
+                        <div th:with="actor=${@handles.display(change.actorName) ?: #messages.msg('orders.money.nameUnavailable')}"
+                             th:text="${change.client == null} ? #{orders.money.history.recordedBy(${actor})}
+                                 : #{orders.money.history.recordedByClient(${actor}, ${change.client})}"
+                             th:data-testid="${change.client != null ? 'order-money-target-change-client' : null}"></div>
                     </div>
                     <time class="od-money-date" th:datetime="${change.recordedAt}" th:data-utc="${change.recordedAt}"></time>
                 </li>
