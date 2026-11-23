@@ -578,11 +578,6 @@ their expenses (REQ-SEC-042 holds the same for a refinery order's mission link).
 - **Payout basis.** The first current mark retains the transfer-fee rate and the reference time used
   for open attendance. Further marks and reads share that basis until the final reversal. The
   migration records the then-current basis for existing marks. See [ADR-0375](../adr/0375-operation-payout-inputs-freeze-while-paid.md).
-- **Review of stored links.** [`scripts/mission-operation-link-review.sql`](../../scripts/mission-operation-link-review.sql)
-  reports links between different owning units, including cases where only one side has a unit.
-  Its output contains ids, statuses and dates only. The report flags candidates for review, including
-  legitimate joint operations. The owner reviews each link and uses the mission's core edit for any
-  correction.
 - **The picker offers what may be linked.** `GET /api/v1/operations/lookup` lists exactly the
   operations the caller may edit (`OperationAccessPolicy.OPERATION_EDIT_PREDICATE`) without any
   paid-out marks, within the status and recency bound of ADR-0081. The edit mode's operation select adds the mission's current
