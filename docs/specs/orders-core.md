@@ -423,7 +423,7 @@ client id once the registry no longer holds it.
 - **No marker for a cancel.** A client's cancel shows no marker on the page, as a web cancel names
   nobody; the audit carries it (REQ-AUDIT-001).
 - **One write path.** The shared status, target and information commands write the markers from the
-  actor they are given (`JobOrderActor#clientId`, ADR-0405), so every client write of these parts
+  actor they are given (`JobOrderActor#clientId`, ADR-0408), so every client write of these parts
   records its origin through the same code as the web.
 - **Live.** The overview chip renders in the results the `orders/queue` frame refreshes, the comment
   marker in the `header` section and the target-history line in the `money` section their frames
