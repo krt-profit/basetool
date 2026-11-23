@@ -23,17 +23,18 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The web's job-order status command for a caller that passes its own writer rule, read check and
- * actor; the order locks, the lifecycle version, the responsibility gate, the audit, the notices
- * and the live update are the web's (ADR-0408).
+ * The web's job-order status command for a client's write, with the caller's own writer rule, read
+ * check and actor; the order locks, the lifecycle version, the audit, the notices and the live
+ * update are the web's, the order of the refusals is the exchange's (REQ-OXCH-005, ADR-0408).
  */
 public interface JobOrderStatusCommand {
 
   /**
-   * Cancels an active order in one transaction, joining the caller's. Under the order locks it
-   * requires a valid responsibility, then the read check and a writer of either side the rule
-   * covers, then the observed lifecycle version; a cancellation ends the order's open unit
-   * commitments and earmarks as in the web.
+   * Cancels an active aUEC order in one transaction, joining the caller's. Under the order locks it
+   * requires, in this order, the read check, an aUEC order and a writer of a side the rule lets
+   * cancel, the observed lifecycle version, a valid responsibility, an active order and no money
+   * operation that reached its accepted, durable submission boundary (REQ-ORDERS-063); a
+   * cancellation ends the order's open unit commitments and earmarks as in the web.
    *
    * @param orderId the order
    * @param lifecycleVersion the lifecycle version the caller last read
@@ -41,13 +42,13 @@ public interface JobOrderStatusCommand {
    * @param read the read check the order must pass
    * @param actor who cancels; the notices exclude its member
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order is
-   *     unknown
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the order's
-   *     responsibility is invalid or the order is not active
-   * @throws org.springframework.security.access.AccessDeniedException when the read check or the
-   *     rule refuses the actor
+   *     unknown or fails the read check, alike
+   * @throws org.springframework.security.access.AccessDeniedException when the order is no aUEC
+   *     order or the rule refuses the actor
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the lifecycle
    *     version is stale
+   * @throws JobOrderClientWriteRefusedException when the responsibility is invalid, the order is
+   *     not active or its money started
    */
   void cancel(
       @NotNull UUID orderId,

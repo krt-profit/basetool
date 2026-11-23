@@ -1,8 +1,9 @@
 # ADR-0408 — Job-order commands take the writer rule, the read check and the actor as parameters
 
 - **Status:** Accepted — the create seam
-  ([#3640](https://github.com/krt-profit/basetool/issues/3640)) and the status, target and
-  information commands ([#3641](https://github.com/krt-profit/basetool/issues/3641))
+  ([#3640](https://github.com/krt-profit/basetool/issues/3640)), the status, target and
+  information commands ([#3641](https://github.com/krt-profit/basetool/issues/3641)) and the
+  client's order of refusals ([#3650](https://github.com/krt-profit/basetool/issues/3650))
 - **Date:** 2026-11-23
 - **Deciders:** @greluc
 - **Related:** decided in [#3611](https://github.com/krt-profit/basetool/issues/3611),
@@ -105,6 +106,18 @@ while the commands live in `joborder.internal`.
    - For the same member without a pin, every status, target and comment write
      `DIRECT_LOGISTICIAN` permits is one `CONTEXTUAL` permits; a test pins it with the web's
      authorities minted by the real converter, beside point 5's pair test.
+8. **The client ports decide the exchange's order of refusals** (REQ-OXCH-005,
+   [#3650](https://github.com/krt-profit/basetool/issues/3650)). A write on an existing order
+   through a client answers in its own order — visibility, writer, version, responsibility,
+   status, the write's own rule — with the exchange's codes, where the web answers an invalid
+   responsibility first with `400`. The order is one unit, `JobOrderClientWriteRules`, which a port
+   passes to the shared command as the checks of its edit; the edit module runs them on the loaded
+   order before and again under the order locks. The web's entry points pass their own checks and
+   never see the unit, so the web keeps its codes and order. The cancel adds its own rule after the
+   shared ones: no money operation of the order reached its accepted, durable submission boundary
+   (REQ-ORDERS-063). The rules refuse with the web's exceptions for a hidden order (`404`, like an
+   unknown one), a write the actor may not make (`403`) and a stale version (`409`), and with
+   `JobOrderClientWriteRefusedException` for the job-order codes.
 
 ## Consequences
 

@@ -243,8 +243,13 @@ the observed lifecycle version. The status command takes the writer rule, the re
 actor as parameters, and decides them with the responsibility gate under the order locks; the web
 passes its contextual authorities with the honoured pin, its complete-order read and the
 requesting member, and a status change answers an invalid responsibility before the read check,
-the writer and the version (ADR-0408). MATERIAL and ITEM need edits preserve the current lifecycle,
-including manual completion and cancellation. aUEC target-change effects follow its money spec.
+the writer and the version (ADR-0408). Through a client the status write is narrower
+([REQ-OXCH-006](orders-exchange.md#req-oxch-006--cancel-an-auec-order)): only a direct Logistician
+of the requesting unit cancels, only an active aUEC order and only before its first accepted money
+operation, and no client reopens a cancellation; the client's command decides the exchange's order
+of refusals (read set, writer, version, responsibility, status, money) under the same locks, while
+the web keeps its own. MATERIAL and ITEM need edits preserve the current lifecycle, including
+manual completion and cancellation. aUEC target-change effects follow its money spec.
 
 Cancelling MATERIAL/ITEM stops ordinary fulfillment and releases order stock earmarks without
 deleting physical stock, booked
@@ -289,8 +294,9 @@ the aUEC handover, target changes and status writes in `JobOrderMoneyIntegration
 `JobOrderWebWriteCommandsIntegrationTest` pins who changes an aUEC order's status in the web,
 the order of the refusals, the audit event and the notices without the actor, and
 `JobOrderWriteRuleIntegrationTest` the database writer rule at the status command and that every
-status write it permits is one the web permits for the same member.
-**Issues:** #3195, #3200, #3201, #3637, #3641
+status write it permits is one the web permits for the same member. `ExchangeJobOrderCancelTest`
+covers a client's cancel and its order of refusals.
+**Issues:** #3195, #3200, #3201, #3637, #3641, #3650
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
 

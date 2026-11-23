@@ -1583,7 +1583,7 @@
       },
       "type": "timeseries",
       "title": "Backend job-order refusals/hour",
-      "description": "Job-order exchange requests the backend refused per hour, by reason: switched_off and writes_switched_off when the backend's exchange gate rechecks a job-order switch, the other reasons from the job-order routes. open_order_cap and daily_create_cap are creates refused at the caps on client creates; more than 10 of them an hour for 30 minutes fires JobOrderExchangeCapHit (REQ-OXCH-009, REQ-OBS-025).",
+      "description": "Job-order exchange requests the backend refused per hour, by reason: switched_off and writes_switched_off when the backend's exchange gate rechecks a job-order switch, the other reasons from the job-order routes. open_order_cap and daily_create_cap are creates refused at the caps on client creates; more than 10 of them an hour for 30 minutes fires JobOrderExchangeCapHit (REQ-OXCH-009, REQ-OBS-025). not_found, not_permitted, version_conflict, responsibility_invalid and closed refuse a write on an existing order, money_started a cancel after the first accepted money operation; more than 50 not_found an hour fires JobOrderExchangeNotFoundSpike (REQ-OXCH-005, REQ-OXCH-006).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1873,7 +1873,7 @@
       },
       "type": "timeseries",
       "title": "Job-order writes/day",
-      "description": "Job-order writes through clients per day by client and outcome: applied creates, including a retry answered from the stored key, and rejected ones; a pair that is not offered also counts as units_not_offered, a create at a cap as open_order_cap or daily_create_cap in the backend refusals panel (REQ-OXCH-004, REQ-OXCH-009, REQ-OBS-025).",
+      "description": "Job-order writes through clients per day by client and outcome: applied creates, including a retry answered from the stored key, and rejected ones; a pair that is not offered also counts as units_not_offered, a create at a cap as open_order_cap or daily_create_cap in the backend refusals panel (REQ-OXCH-004, REQ-OXCH-009, REQ-OBS-025). Cancels count the same way, a refused one also under its reason in the backend refusals panel (REQ-OXCH-006).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

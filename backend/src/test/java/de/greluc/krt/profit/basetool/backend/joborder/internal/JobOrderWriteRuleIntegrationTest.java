@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientWriteRefusedException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderInformationCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
@@ -210,7 +211,8 @@ class JobOrderWriteRuleIntegrationTest {
 
     WriterRuleFixtures.signInAsExchangeMember(member);
 
-    assertRefusedEveryWrite(order, member, BadRequestException.class);
+    assertRefusedEveryWrite(
+        order, member, JobOrderClientWriteRefusedException.class, BadRequestException.class);
   }
 
   @Test
@@ -288,8 +290,20 @@ class JobOrderWriteRuleIntegrationTest {
 
   private void assertRefusedEveryWrite(
       UUID order, User member, Class<? extends RuntimeException> refusal) {
+    assertRefusedEveryWrite(order, member, refusal, refusal);
+  }
+
+  /**
+   * Asserts that the cancel and the target and comment writes are refused and change nothing; the
+   * cancel answers in the order of the client writes' shared rules (REQ-OXCH-005).
+   */
+  private void assertRefusedEveryWrite(
+      UUID order,
+      User member,
+      Class<? extends RuntimeException> cancelRefusal,
+      Class<? extends RuntimeException> refusal) {
     assertThatThrownBy(() -> statusCommand.cancel(order, 0L, rule(), read(), client(member)))
-        .isInstanceOf(refusal);
+        .isInstanceOf(cancelRefusal);
     assertThatThrownBy(() ->
             targetCommand.changeTarget(
                 order, new BigDecimal("300000"), 0L, rule(), read(), client(member)))

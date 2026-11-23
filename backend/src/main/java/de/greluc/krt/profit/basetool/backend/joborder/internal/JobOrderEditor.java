@@ -300,7 +300,7 @@ public class JobOrderEditor {
       @NotNull JobOrderReadCheck read,
       @NotNull Predicate<JobOrder> writes,
       @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
-    return run(
+    return editLifecycle(
         id,
         order -> {
           responsibilityGuard.assertWritable(order);
@@ -311,6 +311,29 @@ public class JobOrderEditor {
               order.getLifecycleVersion(), expectedLifecycleVersion, JobOrder.class, order.getId());
         },
         planner);
+  }
+
+  /**
+   * Plans a lifecycle edit under the checks its command's caller decides, in the order and with the
+   * refusals that caller answers (ADR-0408).
+   *
+   * <p>The checks run on the loaded order before the resource locks and again after them, so the
+   * decision under the locks is the one that counts.
+   *
+   * @param id the order to edit
+   * @param checks the checks of the loaded order; each refusal is an exception
+   * @param planner immutable resource selection and mutation over the checked order
+   * @return the edited order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order is
+   *     unknown
+   * @throws BusinessConflictException when the complete resource plan changes while waiting
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public JobOrder editLifecycle(
+      @NotNull UUID id,
+      @NotNull Consumer<JobOrder> checks,
+      @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
+    return run(id, checks, planner);
   }
 
   /**

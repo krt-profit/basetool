@@ -3,7 +3,8 @@
 The job orders of all three kinds that the member relates to, under scope
 `exchange.joborders.read`: material orders, item orders and aUEC orders, which ask for a provision
 of credits. Under scope `exchange.joborders.write` a Logistician creates aUEC orders on behalf of
-their own units ([creating an aUEC order](#creating-an-auec-order)). Every route lies below
+their own units ([creating an aUEC order](#creating-an-auec-order)) and cancels them before any
+money moved ([writes on an existing order](#writes-on-an-existing-order)). Every route lies below
 `/exchange/v1/job-orders`.
 
 **The job-order family is not switched on yet.** Until an administrator turns it on, every path at
@@ -23,6 +24,7 @@ assignees or support; each order carries a [`link`](#the-link) to its page for a
 | `GET /exchange/v1/job-orders` | job-order data | keep it in memory only, for at most 7 days |
 | `GET /exchange/v1/job-orders/create-options` | job-order data | read it when the create form opens; keep it no longer than the form |
 | `POST /exchange/v1/job-orders` | job-order data | keep the answer in memory only, for at most 7 days |
+| `POST /exchange/v1/job-orders/{id}/cancel` | job-order data | keep the answer in memory only, for at most 7 days |
 
 Job-order data of every kind, the member's own orders included, is kept for at most 7 days,
 outside cloud-synced folders, never in a backup or diagnostics, and never forwarded. Keep it out of
@@ -272,6 +274,64 @@ client together. Orders created in the Basetool count for neither and are never 
   the daily write quota. A create under a key that already created an order answers that order
   with `201` whatever the caps say.
 
+## Writes on an existing order
+
+A member who is a Logistician of an order's **requesting** unit, by the rule of the create, changes
+an **aUEC** order through a client, under scope `exchange.joborders.write`. Each write is a single
+`POST` below the order, with an `Idempotency-Key`, that echoes the version of the one section it
+edits under a named field, and answers `200` with `job-order-write` `#/$defs/written`:
+
+```json
+{
+  "id": "7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "status": "CANCELLED",
+  "versions": { "lifecycle": 1, "target": 0, "comment": 0 }
+}
+```
+
+Every answer carries the new `versions`, so you can write on without reading the feed first; the
+feed brings the whole order a few seconds later. Write only on an explicit action of the member.
+
+**The order of checks.** The first rule that fails answers, and nothing is written:
+
+1. the order id is a UUID and the body matches its schema, else `400 SCHEMA_INVALID`;
+2. the order is in the member's job-order set, else `404 NOT_FOUND` — an unknown, a deleted and a
+   hidden order answer alike, so drop it from what you show;
+3. the member writes for its requesting unit and it is an aUEC order, else `403 NOT_PERMITTED` —
+   a MATERIAL or ITEM order, or one the member only reads;
+4. the echoed version is current, else `409 VERSION_CONFLICT`;
+5. its responsibility is valid (`responsibilityInvalid` is `false`), else
+   `409 JOB_ORDER_RESPONSIBILITY_INVALID`;
+6. its `status` admits the write, else `409 JOB_ORDER_CLOSED`;
+7. the write's own rule.
+
+The server decides all of them under the order's locks, so a change in the Basetool at the same
+moment yields one clear answer. Pre-check what you can from the read: `kind`, `relations`,
+`status` and `responsibilityInvalid`.
+
+**Retries.** The writes on an existing order keep no key on the server. A retry under the same key
+within the gateway's hour gets the first answer again; after it the moved version answers
+`409 VERSION_CONFLICT`, so read the order again before you decide anything.
+
+There is no undo through the exchange: a wrong write is set right in the Basetool, through the
+order's `link`.
+
+### Cancel
+
+`POST /exchange/v1/job-orders/{id}/cancel` with an `Idempotency-Key` — the body is
+[`job-order-write`](../schemas/) `#/$defs/cancel`:
+
+```json
+{ "lifecycleVersion": 0 }
+```
+
+It cancels an `OPEN` or `IN_PROGRESS` order (else `409 JOB_ORDER_CLOSED`), only while **no money
+operation of the order has been accepted**. Once one has, the cancel answers
+`409 JOB_ORDER_MONEY_STARTED`, one code for every money fact, and cancelling happens in the
+Basetool. The cancel runs as in the Basetool: the order leaves the queue, the writers of both units
+are told that it ended, naming your application, and open pages update at once. There is no reopen
+through a client: a mistaken cancel is reopened in the Basetool.
+
 ## Client guidance
 
 - **An isolated area.** Make job orders their own area, so a job-order refusal — the switches
@@ -287,6 +347,10 @@ client together. Orders created in the Basetool count for neither and are never 
 - **The caps** are clear answers, not outcomes to retry: drop the key, grey out the create, and
   create again under a new key once an order closes (`JOB_ORDER_OPEN_ORDER_CAP`) or after
   `Retry-After` (`JOB_ORDER_DAILY_CREATE_CAP`). The same key replays the refusal for an hour.
+- **Writes on an existing order** take a fresh key per write and echo the version just read. A
+  `409 VERSION_CONFLICT` means "read the order again", a `404 NOT_FOUND` "drop it"; the other
+  refusals are clear answers that a retry does not change: offer the order's `link`. Since nothing
+  is undone through the exchange, confirm a cancel with the member before sending it.
 - **The switch codes.** Treat `JOB_ORDER_EXCHANGE_DISABLED` as "pause the job-order area" and
   `JOB_ORDER_WRITES_DISABLED` as "pause the job-order writes", each after `Retry-After`.
 
@@ -294,10 +358,16 @@ client together. Orders created in the Basetool count for neither and are never 
 
 | Status | Code | When | Client action |
 | --- | --- | --- | --- |
-| 400 | `SCHEMA_INVALID` | `limit` outside 1 to 1000, or a create body outside its schema | fix the request |
-| 400 | `IDEMPOTENCY_KEY_MISSING` | a create without a valid `Idempotency-Key` | send one |
+| 400 | `SCHEMA_INVALID` | `limit` outside 1 to 1000, a write body outside its schema, or an order id that is no UUID | fix the request |
+| 400 | `IDEMPOTENCY_KEY_MISSING` | a write without a valid `Idempotency-Key` | send one |
 | 400 | `JOB_ORDER_UNITS_NOT_OFFERED` | a create names a pair the create options do not offer: an unknown unit, a unit the member does not write for, or a responsible unit outside the Profit units; one code for every side | read the create options again and let the member choose |
-| 403 | `SCOPE_MISSING` | the token or the registry lacks `exchange.joborders.read` for the read, or `exchange.joborders.write` for the create options and the create | ask the member to grant it |
+| 403 | `SCOPE_MISSING` | the token or the registry lacks `exchange.joborders.read` for the read, or `exchange.joborders.write` for the create options and the writes | ask the member to grant it |
+| 403 | `NOT_PERMITTED` | a write on an order the member reads but does not write for, or on a MATERIAL or ITEM order | stop; offer the order's `link` |
+| 404 | `NOT_FOUND` | a write on an order that is unknown, deleted or outside the member's set, alike | drop the order locally |
+| 409 | `VERSION_CONFLICT` | the echoed section version is stale, also on a retry after the one-hour cache | read again, merge, retry |
+| 409 | `JOB_ORDER_RESPONSIBILITY_INVALID` | a write on an order whose responsibility is invalid | do not retry; offer the order's `link` |
+| 409 | `JOB_ORDER_CLOSED` | a cancel of an order that is not `OPEN` or `IN_PROGRESS` | read again; offer the order's `link` |
+| 409 | `JOB_ORDER_MONEY_STARTED` | a cancel after the first accepted money operation; one code for every money fact | offer the order's `link`; cancelling happens in the Basetool |
 | 409 | `JOB_ORDER_OPEN_ORDER_CAP` | a create while the member holds `openOrderCap` open orders created through clients ([limits](#limits)) | grey out the create until one of them closes; then create under a new key |
 | 409 | `JOB_ORDER_DAILY_CREATE_CAP` | a create once the member created `dailyCreateCap` orders through clients this UTC day; `Retry-After` runs to the next UTC midnight | grey out the create until `Retry-After`; then create under a new key |
 | 410 | `CURSOR_EXPIRED` | the cursor is older than the retained changes or not one the server issued | take a new snapshot and reconcile it against the last baseline |

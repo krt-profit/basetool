@@ -303,8 +303,12 @@ overpayment. Returns/corrections that make a completed order underfulfilled also
 state. A CANCELLED order stays cancelled until deliberate reopening. Ordinary target and contact
 edits resume after reopening.
 
-Both unit sides may cancel and deliberately reopen, as defined in the core. Cancellation stops
-normal procurement and retains all money/history. The normal movement/correction actions support
+Both unit sides may cancel and deliberately reopen, as defined in the core. Through a client a
+direct Logistician of the requesting unit may only cancel an active order, and only before the
+hard-delete boundary below: once any monetary operation reached its accepted, durable submission
+boundary the client gets one refusal for every money fact, decided under the order locks, and
+cancelling stays in the Basetool ([REQ-OXCH-006](orders-exchange.md#req-oxch-006--cancel-an-auec-order)).
+Cancellation stops normal procurement and retains all money/history. The normal movement/correction actions support
 settlement, including necessary explicit fee means. “Settlement open” is a concrete indicator of
 remaining money/repayment, not another state machine or work queue. Early rejection remains
 with the responsible side. Terminal conditions end open commitments as in REQ-ORDERS-059.
@@ -334,7 +338,8 @@ completion, cancellation, settlement and deletion races in PostgreSQL. The Bank 
 its delayed outcomes. The first accepted operation closes hard-delete. A pre-submission refusal
 leaves that path open. Target changes retain the prior amount, new amount, actor and time in the
 order history. The money section indicates settlement open when a terminal order has residual
-holdings or the requester has received more than the target.
+holdings or the requester has received more than the target. `ExchangeJobOrderCancelTest` covers a
+client's cancel refused at the same boundary, against a concurrent first submission too.
 
 ### REQ-ORDERS-064 — Effective operation history is the monetary authority
 

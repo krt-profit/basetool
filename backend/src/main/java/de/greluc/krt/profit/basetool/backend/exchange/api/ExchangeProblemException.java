@@ -76,6 +76,21 @@ public final class ExchangeProblemException extends DomainProblem {
    */
   public static final String JOB_ORDER_DAILY_CREATE_CAP = "JOB_ORDER_DAILY_CREATE_CAP";
 
+  /**
+   * A client write on an existing job order whose responsibility no longer fits the Profit
+   * hierarchy (REQ-OXCH-005, REQ-ORDERS-055).
+   */
+  public static final String JOB_ORDER_RESPONSIBILITY_INVALID = "JOB_ORDER_RESPONSIBILITY_INVALID";
+
+  /** A client write on an existing job order whose status does not admit it (REQ-OXCH-005). */
+  public static final String JOB_ORDER_CLOSED = "JOB_ORDER_CLOSED";
+
+  /**
+   * A client's cancel of a job order a money operation of which was accepted already
+   * (REQ-OXCH-006).
+   */
+  public static final String JOB_ORDER_MONEY_STARTED = "JOB_ORDER_MONEY_STARTED";
+
   /** The relayed client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
@@ -215,6 +230,49 @@ public final class ExchangeProblemException extends DomainProblem {
         HttpStatus.CONFLICT,
         JOB_ORDER_DAILY_CREATE_CAP,
         "The member reached the daily create cap of client-created job orders.",
+        cause);
+  }
+
+  /**
+   * The refusal of a client write on a job order whose responsibility is invalid.
+   *
+   * @param cause the command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_RESPONSIBILITY_INVALID} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderResponsibilityInvalid(
+      @NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_RESPONSIBILITY_INVALID,
+        "The job order's responsibility is invalid.",
+        cause);
+  }
+
+  /**
+   * The refusal of a client write on a job order whose status does not admit it.
+   *
+   * @param cause the command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_CLOSED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderClosed(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_CLOSED,
+        "The job order's status does not admit the write.",
+        cause);
+  }
+
+  /**
+   * The refusal of a client's cancel once a money operation of the order was accepted.
+   *
+   * @param cause the command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_MONEY_STARTED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderMoneyStarted(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_MONEY_STARTED,
+        "A money operation of the job order was accepted already.",
         cause);
   }
 

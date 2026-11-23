@@ -863,7 +863,7 @@
     "/api/v1/exchange/bank/requests/{id}/cancel" : {
       "post" : {
         "description" : "Gateway-only. Cancels a pending own request, raised anywhere. Another member's request answers 404 NOT_FOUND.",
-        "operationId" : "cancel_1",
+        "operationId" : "cancel_2",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -1716,6 +1716,130 @@
           }
         },
         "summary" : "Exchange: where I may create an aUEC order",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/job-orders/{id}/cancel" : {
+      "post" : {
+        "description" : "Gateway-only. Cancels an open or in-progress aUEC order of one of the member's direct Logistician units through the web's status command. Checked in this order under the order locks: an unknown, hidden or deleted order answers 404 NOT_FOUND; an order the member does not write for and a MATERIAL or ITEM order 403 ACCESS_DENIED; a stale lifecycle version 409 OPTIMISTIC_LOCK; an invalid responsibility 409 JOB_ORDER_RESPONSIBILITY_INVALID; an order that is not open or in progress 409 JOB_ORDER_CLOSED; an order a money operation of which was accepted 409 JOB_ORDER_MONEY_STARTED. Moves no money.",
+        "operationId" : "cancel_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeJobOrderCancelDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeJobOrderWrittenDto"
+                }
+              }
+            },
+            "description" : "The cancelled order"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: cancel an aUEC order",
         "tags" : [ "exchange" ],
         "x-domain" : "exchange"
       }
@@ -5833,6 +5957,17 @@
           }
         }
       },
+      "ExchangeJobOrderCancelDto" : {
+        "type" : "object",
+        "properties" : {
+          "lifecycleVersion" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "lifecycleVersion" ]
+      },
       "ExchangeJobOrderCreateDto" : {
         "type" : "object",
         "properties" : {
@@ -6139,6 +6274,22 @@
           "target" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "ExchangeJobOrderWrittenDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED", "CANCELLED" ]
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/ExchangeJobOrderVersions"
           }
         }
       },

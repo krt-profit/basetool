@@ -34,7 +34,10 @@ both share one code path and the exchange never permits a pair the web would ref
 The status, target and information commands take the same rule and actor beside a
 `JobOrderReadCheck`, decided on the loaded order under the order locks next to each command's own
 section version and the responsibility gate; the exchange reaches them through the ports
-`JobOrderStatusCommand`, `JobOrderTargetCommand` and `JobOrderInformationCommand`.
+`JobOrderStatusCommand`, `JobOrderTargetCommand` and `JobOrderInformationCommand`. A port's write
+on an existing order answers in the exchange's order of refusals, one unit
+(`JobOrderClientWriteRules`) the port passes to the shared edit as its checks, while the web keeps
+its own (ADR-0408 point 8, REQ-OXCH-005).
 
 Beyond roles there are three mechanisms that are easy to miss:
 
