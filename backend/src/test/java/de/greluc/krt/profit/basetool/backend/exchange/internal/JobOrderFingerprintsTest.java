@@ -122,10 +122,10 @@ class JobOrderFingerprintsTest {
     assertThat(JobOrderFingerprints.of(split)).isNotEqualTo(JobOrderFingerprints.of(joined));
   }
 
-  @ParameterizedTest(name = "{0}")
+  @ParameterizedTest(name = "{argumentSetName}")
   @MethodSource("carriedFieldChanges")
   void everyCarriedFieldMovesTheFingerprint(
-      String field, JobOrderExchangeRead base, UnaryOperator<JobOrderExchangeRead> change) {
+      JobOrderExchangeRead base, UnaryOperator<JobOrderExchangeRead> change) {
     JobOrderExchangeRead changed = change.apply(base);
 
     assertThat(changed).isNotEqualTo(base);
@@ -200,7 +200,7 @@ class JobOrderFingerprintsTest {
 
   private static Arguments change(
       String field, JobOrderExchangeRead base, UnaryOperator<JobOrderExchangeRead> change) {
-    return Arguments.of(field, base, change);
+    return Arguments.argumentSet(field, base, change);
   }
 
   private static JobOrderExchangeRead material() {
