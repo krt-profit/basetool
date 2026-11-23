@@ -952,6 +952,9 @@ design-system walk of every page on all six device classes):
 - [ ] A grid track that must hold free text is `minmax(0, 1fr)` and its content may break
   (`overflow-wrap: anywhere`). Neither half works alone: the first lets the track shrink, the second
   lets the text inside it wrap instead of painting straight out of the narrowed track.
+- [ ] A link in a legal document (`.legal-doc a`) may break anywhere (`overflow-wrap: anywhere`),
+  so a bare URL or e-mail address in the privacy policy or the imprint wraps inside its card
+  instead of widening it.
 - [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
   `fixed` and `main`'s `padding-bottom` covers its measured height.
 - [ ] **The page-pattern rules of REQ-UI-027 hold on every swept page** (2026-10-04): on the phone
