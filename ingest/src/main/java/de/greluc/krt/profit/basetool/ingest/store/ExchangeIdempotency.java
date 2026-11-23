@@ -42,10 +42,11 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * The exchange's idempotency cache in Redis (REQ-XCH-020): per client, member and key, the answer
- * to a write and the fingerprint of the request that produced it, kept for a day; and a claim on
- * the key, a Redis entry and no JVM lock, while the first request with a key is in flight, held
- * with a random token so only its holder releases it. Keys are hashed, so no client-chosen text
- * becomes part of a Redis key.
+ * to a write and the fingerprint of the request that produced it, kept for {@link
+ * ExchangeStoreProperties#idempotencyTtl()} (one hour by default); and a claim on the key, a Redis
+ * entry and no JVM lock, while the first request with a key is in flight, held with a random token
+ * so only its holder releases it. Keys are hashed, so no client-chosen text becomes part of a Redis
+ * key.
  */
 @Slf4j
 @Component
