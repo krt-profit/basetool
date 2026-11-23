@@ -21,9 +21,10 @@ lifecycle, money and notices, stay in [`orders-core.md`](orders-core.md) and
 in [`external-exchange.md`](external-exchange.md) and [`docs/exchange/errors.md`](../exchange/errors.md).
 The read serves its snapshot and its change feed (`GET /exchange/v1/job-orders`), and a Logistician
 of the requesting unit creates aUEC orders through `GET /exchange/v1/job-orders/create-options` and
-`POST /exchange/v1/job-orders`, within an open-order cap and a daily create cap, and cancels them
-before any money moved through `POST /exchange/v1/job-orders/{id}/cancel`; the target and comment
-writes follow with their own slices. Both switches are off until an admin turns them on.
+`POST /exchange/v1/job-orders`, within an open-order cap and a daily create cap, cancels them
+before any money moved through `POST /exchange/v1/job-orders/{id}/cancel` and changes their comment
+through `POST /exchange/v1/job-orders/{id}/comment`; the target write follows with its own slice.
+Both switches are off until an admin turns them on.
 
 The guiding rules:
 
@@ -500,8 +501,8 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0408, 
 ### REQ-OXCH-005 — Shared rules of the job-order writes
 
 > [!note] Implemented for the create (#3646) and, with the rules for an existing order, for the
-> cancel (#3650; decided in #3613, #3614, #3616, ADR-0407, ADR-0408). Target and comment follow with
-> their slices under the same rules.
+> cancel (#3650; decided in #3613, #3614, #3616, ADR-0407, ADR-0408) and the comment (#3652). The
+> target follows with its slice under the same rules.
 
 - **Single routes** under `/exchange/v1/job-orders`, one order per call and every path on the
   acting list (`ActingMemberFilter.ACTING_PATHS`); no change set and no `dryRun`. A client pre-checks
@@ -558,14 +559,17 @@ REQ-SEC-058, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005, REQ-OXCH-009 · ADR-0408, 
   nothing (`ExchangeJobOrderCancelTest`).
 - [x] The backend's refusals reach the client with the registry's codes and fixed details (ingest
   `ExchangeJobOrderWriteRouteTest`).
-- [ ] Target and comment with their named versions come with their slices.
+- [x] The comment change runs the same rules with `commentVersion` as its named section version and
+  the same route checks (`ExchangeJobOrderCommentTest`, ingest `ExchangeJobOrderWriteRouteTest`,
+  `ExchangeGoldenAnswerTest`).
+- [ ] The target with its named version comes with its slice.
 
 **Enforced by:** `ExchangeRoutes`, `ExchangeIdempotencyFilter`, `ExchangeLimitFilter`,
 `ExchangeRelay`, `ExchangeJobOrderWriteController` (gateway) · `ActingMemberFilter`,
 `ExchangeGate`, `ExchangeJobOrderChangeService` (backend exchange) · `JobOrderClientWriteRules`,
 `JobOrderClientWriteRefusedException`, `JobOrderEditor` (job orders) · **Related:** REQ-XCH-020,
 REQ-XCH-021, REQ-XCH-022, REQ-XCH-023, REQ-XCH-025, REQ-ORDERS-055, REQ-OXCH-001, REQ-OXCH-004,
-REQ-OXCH-009 · ADR-0407, ADR-0408 · **Issues:** #3613, #3614, #3616, #3646, #3650
+REQ-OXCH-009 · ADR-0407, ADR-0408 · **Issues:** #3613, #3614, #3616, #3646, #3650, #3652
 
 ### REQ-OXCH-006 — Cancel an aUEC order
 
@@ -638,6 +642,82 @@ answers `409 VERSION_CONFLICT`; the client reads the order again.
 REQ-XCH-025, REQ-XCH-030, REQ-ORDERS-042, REQ-ORDERS-054, REQ-ORDERS-059, REQ-ORDERS-063,
 REQ-AUDIT-001, REQ-NOTIF-028, REQ-OBS-025, REQ-OXCH-001, REQ-OXCH-005 · ADR-0407, ADR-0408 ·
 **Issues:** #3613, #3614, #3616, #3617, #3650
+
+### REQ-OXCH-008 — Change the comment of an aUEC order
+
+> [!note] Implemented (#3652; decided in #3613, #3614, #3617, ADR-0407, ADR-0408).
+
+`POST /exchange/v1/job-orders/{id}/comment` (`exchange.joborders.write`) with a mandatory
+`Idempotency-Key`, relayed without the key to `POST /api/v1/exchange/job-orders/{id}/comment`:
+
+- body `job-order-write.schema.json#/$defs/comment`: `{ comment, commentVersion }`; `comment` is
+  plain text of at most 1000 characters, the web's bean rules (`JobOrder.COMMENT_MAX_LENGTH`),
+  trimmed, and `null` or blank clears it; `commentVersion` is the order's `versions.comment` as last
+  read;
+- answer `200` `job-order-write.schema.json#/$defs/written`: `{ id, status, versions }`, read from
+  the stored order after the write.
+
+**The rules.** The shared rules of REQ-OXCH-005 with the comment version as the section version;
+the writer is a direct Logistician of the requesting unit (a writer of the responsible side writes
+nothing through a client). The comment keeps the web's status rule: a `CANCELLED` order answers
+`409 JOB_ORDER_CLOSED`, every other status admits it. The comment has no further rule of its own.
+
+**A comment-only write.** The write runs `JobOrderInformationCommand.changeComment` with the writer
+rule `DIRECT_LOGISTICIAN`, the read check `OWN_RELATION` and the actor
+`JobOrderActor.Client(member, clientId)` (ADR-0408), through the web's money edit under the order
+and account locks. It checks and raises only the comment version (REQ-ORDERS-066): the contact is
+never written through a client after the create, and the information version is neither checked
+nor moved, so a contact change in the web before or during the write never conflicts with it. A
+write that leaves the stored comment as it is changes nothing and answers the current versions.
+A changed comment records its client (`job_order.comment_client_id`, REQ-ORDERS-078), which shows
+"über <App>" on the order until a web write of the comment clears it, publishes the web's live
+update of the order page and the overview after the commit (REQ-XCH-030), and raises the web's
+need-change notice to the responsible side without the member, which names the application
+(REQ-NOTIF-017, REQ-NOTIF-028).
+
+**Audit.** A changed comment writes `JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT` without details, since
+the text is never recorded, instead of `JOB_ORDER_UPDATED`, with the client in `client_id` as on
+every row (REQ-AUDIT-001, REQ-AUDIT-005); a refusal and an unchanged comment record nothing.
+
+**Retries.** The backend stores no key for the comment: a retry under the same key within the
+gateway's hour replays the cached answer (REQ-XCH-020), and after it the moved comment version
+answers `409 VERSION_CONFLICT`; the client reads the order again.
+
+**Monitoring** (REQ-OBS-025). Every comment change counts on
+`basetool_exchange_writes_total{resource="job_order", outcome}`, each refusal also on
+`basetool_exchange_job_order_refused_total` under `not_found`, `not_permitted`,
+`version_conflict`, `responsibility_invalid` or `closed`; `JobOrderExchangeNotFoundSpike` covers
+the comment's `not_found` refusals too.
+
+**Acceptance**
+
+- [x] A Logistician of the requesting unit changes the comment alone: the answer carries the order's
+  id, status and versions and matches its schema, the comment version moves, the contact and the
+  information version do not, and the comment records the client (`ExchangeJobOrderCommentTest`).
+- [x] A contact change in the web holding the order lock never conflicts with the comment write,
+  nor does one through the web's information form before it, which keeps the client marker
+  (`ExchangeJobOrderCommentTest`, `JobOrderClientOriginIntegrationTest`).
+- [x] A stale comment version, also on a retry after the cache, answers `409 VERSION_CONFLICT`; a
+  cancelled order `409 JOB_ORDER_CLOSED`, a completed one takes the comment; a blank comment clears
+  it and an unchanged one writes nothing; a comment above 1000 characters is refused
+  (`ExchangeJobOrderCommentTest`, ingest `ExchangeJobOrderWriteRouteTest`).
+- [x] The refusals come in the order of REQ-OXCH-005 and write nothing (`ExchangeJobOrderCommentTest`,
+  `JobOrderWriteRuleIntegrationTest`).
+- [x] A client's comment writes `JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT` without details, a refusal
+  nothing; the responsible side's writer gets the need-change notice naming the application, the
+  member none; a later web write of the comment clears the marker (`ExchangeJobOrderCommentTest`,
+  `JobOrderClientOriginIntegrationTest`).
+- [x] Every comment change counts its outcome and every refusal its reason; the writes switch and
+  the read scope close the route (`ExchangeJobOrderCommentTest`, ingest
+  `ExchangeJobOrderWriteRouteTest`).
+
+**Enforced by:** `JobOrderInformationCommand`, `JobOrderMoneyOrderChanges#changeComment`,
+`JobOrderClientWriteRules`, `JobOrderComment`, `JobOrderEditor` (job orders) ·
+`ExchangeJobOrderChangeService`, `ExchangeJobOrderWriteController` (backend exchange) ·
+`ExchangeJobOrderWriteController`, `ExchangeRoutes` (gateway) · `job-order-write.schema.json` ·
+**Related:** REQ-XCH-020, REQ-XCH-025, REQ-XCH-030, REQ-ORDERS-054, REQ-ORDERS-066,
+REQ-ORDERS-078, REQ-AUDIT-001, REQ-NOTIF-017, REQ-NOTIF-028, REQ-OBS-025, REQ-OXCH-001,
+REQ-OXCH-005 · ADR-0407, ADR-0408 · **Issues:** #3613, #3614, #3617, #3652
 
 ### REQ-OXCH-009 — The job-order switches and caps
 

@@ -368,6 +368,8 @@ job-order-material.schema.json#/properties/materials/items/properties/remaining 
 job-order-material.schema.json#/properties/materials/items/properties/requested FACT_VALUE
 job-order-material.schema.json#/properties/materials/items/properties/unit FACT_VALUE
 job-order-write.schema.json#/$defs/cancel/properties/lifecycleVersion IDENTIFIER
+job-order-write.schema.json#/$defs/comment/properties/comment MEMBER_FREE_TEXT
+job-order-write.schema.json#/$defs/comment/properties/commentVersion IDENTIFIER
 job-order-write.schema.json#/$defs/create/properties/comment MEMBER_FREE_TEXT
 job-order-write.schema.json#/$defs/create/properties/contact IDENTIFIER
 job-order-write.schema.json#/$defs/create/properties/requestingUnitId IDENTIFIER

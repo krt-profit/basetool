@@ -195,6 +195,7 @@ public class AdminAuditLogPageController {
                   "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED",
                   "JOB_ORDER_ITEM_CREATED",
                   "JOB_ORDER_UPDATED",
+                  "JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT",
                   "JOB_ORDER_ITEM_UPDATED",
                   "JOB_ORDER_STATUS_CHANGED",
                   "JOB_ORDER_CANCELLED_VIA_CLIENT",

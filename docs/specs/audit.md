@@ -186,6 +186,11 @@ web, naming its client (REQ-AUDIT-005):
   `JOB_ORDER_CANCELLED_VIA_CLIENT` with `previousStatus` instead of `JOB_ORDER_STATUS_CHANGED`, one
   row per cancel, with the client in `client_id`; a refused cancel records nothing
   ([REQ-OXCH-006](orders-exchange.md#req-oxch-006--cancel-an-auec-order)).
+  A member's comment change of an aUEC order through a connected application records
+  `JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT` without details instead of `JOB_ORDER_UPDATED`, one row per
+  change, with the client in `client_id`; the text is never recorded, and a refused or unchanged
+  comment records nothing
+  ([REQ-OXCH-008](orders-exchange.md#req-oxch-008--change-the-comment-of-an-auec-order)).
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX sync (one summary event per run and catalogue — `REFINERY_METHODS_SYNCED` /
   `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion

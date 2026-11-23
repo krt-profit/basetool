@@ -181,6 +181,36 @@ class JobOrderClientOriginIntegrationTest {
     assertThat(written.createdClient()).isEqualTo(APP_NAME);
   }
 
+  @Test
+  void aWebContactChangeNeitherConflictsWithAClientsCommentNorClearsItsMarker() {
+    UUID order = createThroughClient(APP, null);
+    WriterRuleFixtures.signInAsExchangeMember(member);
+    changeCommentThroughClient(order, "Deliver to Area18", 0L);
+
+    fixtures.signInAsWebMember(member);
+    moneyOrderChanges.information(
+        order, new UpdateJobOrderMoneyInformationDto("Web contact", "Deliver to Area18", 0L, 1L));
+    assertThat(readAsAdministrator(order).commentClient()).isEqualTo(APP_NAME);
+
+    WriterRuleFixtures.signInAsExchangeMember(member);
+    changeCommentThroughClient(order, "Deliver to Lorville", 1L);
+
+    JobOrderDto written = readAsAdministrator(order);
+    assertThat(written.comment()).isEqualTo("Deliver to Lorville");
+    assertThat(written.handle()).isEqualTo("Web contact");
+    assertThat(written.commentClient()).isEqualTo(APP_NAME);
+  }
+
+  private void changeCommentThroughClient(UUID order, String comment, long commentVersion) {
+    informationCommand.changeComment(
+        order,
+        comment,
+        commentVersion,
+        JobOrderWriterRule.DIRECT_LOGISTICIAN,
+        JobOrderReadCheck.CONTEXTUAL,
+        client(APP));
+  }
+
   /**
    * The page's creators are set to clients no earlier step of the transaction named, since the
    * created notices already read the names of the clients the orders were created through.
