@@ -66,8 +66,15 @@ bulk SQL, the patch change, account merges, the name retention and hierarchy cha
    writes the `exchange_change` entries of the order, through a trigger on the fingerprint row, so
    the key log of ADR-0224 stays trigger-written: one entry each for the requesting, the
    responsible and every actively supporting unit, old and new, and one for each assignee, old and
-   new. A feed page reads the entries of the member's current direct units and the member's own
-   entries and resolves every key against the member's current set (the feed slice, #3645).
+   new. The fingerprint row keeps the units and assignees it was announced to, read in the worker's
+   snapshot, so a change and a hard delete reach the old ones. A feed page reads the entries of the
+   member's current direct units and the member's own entries and resolves every key against the
+   member's current set.
+8. **A member who stops reading through a unit is told per member.** A membership that ends or
+   moves and a unit that is deactivated announce to each member concerned, in their own log, the
+   unit's orders of the client set, the orders last announced to the unit and every order the
+   unit's log still names. A client that syncs only after its member left therefore still drops an
+   order that left the unit in the meantime, although the member no longer reads the unit's log.
 
 ## Consequences
 
@@ -81,6 +88,8 @@ bulk SQL, the patch change, account merges, the name retention and hierarchy cha
   as `JobOrderFingerprintChurn` (REQ-OBS-025).
 - Writes to orders outside the client set are marked and recomputed too; the hash simply does not
   move for them.
+- A membership end or a unit's deactivation writes one entry per member and order the unit's log
+  names, a burst bounded by the log's 90 days; a client ignores the keys it never held.
 
 ## Alternatives considered
 

@@ -1822,7 +1822,7 @@
       },
       "type": "timeseries",
       "title": "Job-order reads/hour",
-      "description": "Job-order reads served per hour by client and route: the snapshot of the member's job-order set (REQ-OXCH-003, REQ-OBS-025).",
+      "description": "Job-order reads served per hour by client and route: the snapshot and the change feed of the member's job-order set; a syncing client reads one feed page per pass (REQ-OXCH-003, REQ-OBS-025).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

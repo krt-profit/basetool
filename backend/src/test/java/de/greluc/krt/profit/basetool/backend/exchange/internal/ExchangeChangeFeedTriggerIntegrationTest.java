@@ -75,7 +75,9 @@ class ExchangeChangeFeedTriggerIntegrationTest {
           "space_station",
           "starmap_object",
           "bank_booking_request",
-          "bank_account");
+          "bank_account",
+          "exchange_job_order_fingerprint",
+          "job_order_assignees");
 
   @Autowired private JdbcTemplate jdbc;
 

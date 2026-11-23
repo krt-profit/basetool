@@ -49,9 +49,8 @@ Of these orders the read holds:
 
 `GET /exchange/v1/job-orders` — a snapshot of the member's job-order set, ascending by `id`. Page
 with `cursor` and `limit` (1 to 1000, default 500) as in the [sync guide](../sync-guide.md). There
-is one cursor for all three kinds, and the snapshot's last page hands over the feed cursor. The
-change feed that reads it is not published yet: until it is, a feed cursor answers
-`410 CURSOR_EXPIRED`, so take a new snapshot at the start of each pass.
+is one cursor for all three kinds, and the snapshot's last page hands over the cursor of the
+[feed](#the-feed).
 
 A new order joins the snapshot a few seconds after it was created.
 
@@ -123,6 +122,42 @@ members' notes.
 }
 ```
 
+## The feed
+
+`GET /exchange/v1/job-orders?cursor=<cursor>` with the cursor of the snapshot's last page, or of
+the last feed page, answers the changes of the member's job-order set since then. Read it to its
+end, until `hasMore` is `false`, on every pass ([sync guide](../sync-guide.md)). The page is the
+same `jobOrderPage`, and each order appears at most once per page.
+
+- An order that is in the member's set arrives in `items` with its whole current state, as in the
+  snapshot. Your own writes, a reopened order and an order the member starts to relate to arrive
+  this way.
+- Any other order arrives in `removed` as `{ key, removedAt }`: drop it. The entry names no writer,
+  and a lost relation (a unit stopped relating, the member left the unit, the assignee entry ended),
+  the end of the order's 7 days and a deletion look alike. Ignore a key you never held.
+- A cancelled order stays an item with its new `status` until its 7 days end. A closed order
+  leaves the set at the latest one day after its 7 days.
+- An order changes in the feed only when a field the read carries changes, never on a provision, a
+  holder movement, a fee, a commitment or a contact change of an aUEC order in the Basetool. A
+  change arrives a few seconds after it was made.
+- `removedAt` is when the order's latest change was recorded; `updatedAt` of an item is the last
+  change of a field the read carries.
+
+```json
+{
+  "items": [],
+  "removed": [
+    { "key": "2c3d4e5f-6071-4b82-9ca3-b4c5d6e7f809", "removedAt": "2026-11-22T19:41:03Z" }
+  ],
+  "nextCursor": "f1.1031777.0",
+  "hasMore": false
+}
+```
+
+The feed keeps 90 days of changes. An older cursor answers `410 CURSOR_EXPIRED`: take a new
+snapshot and reconcile it against your last baseline
+([full resync](../sync-guide.md#full-resync-after-a-cursor-expired)).
+
 ## The link
 
 `link` is an absolute `https://profit-base.online/…` URL of the order's page, built by the server.
@@ -135,7 +170,7 @@ Every action that stays in the Basetool goes through it. Open it only after chec
 - **An isolated area.** Make job orders their own area, so a job-order refusal — the switches
   included — never stops the other areas of a sync pass.
 - **Memory only.** Keep every job-order item in memory, own orders included, with a snapshot at
-  each start.
+  each start and the feed on every pass after it.
 - **The create**, once published, follows the bank raise: a fresh `Idempotency-Key` per create, held
   in memory with its body until a clear answer; an unclear outcome (no answer, `5xx`,
   `IDEMPOTENCY_IN_PROGRESS`, `RATE_LIMITED`) goes again under the same key and body. After a restart
@@ -150,7 +185,7 @@ Every action that stays in the Basetool goes through it. Open it only after chec
 | --- | --- | --- | --- |
 | 400 | `SCHEMA_INVALID` | `limit` outside 1 to 1000 | fix the request |
 | 403 | `SCOPE_MISSING` | the token or the registry lacks `exchange.joborders.read` | ask the member to grant it |
-| 410 | `CURSOR_EXPIRED` | the cursor is older than the retained changes, not one the server issued, or a feed cursor before the feed is published | take a new snapshot |
+| 410 | `CURSOR_EXPIRED` | the cursor is older than the retained changes or not one the server issued | take a new snapshot and reconcile it against the last baseline |
 | 503 | `JOB_ORDER_EXCHANGE_DISABLED` | the job-order family is switched off; `Retry-After: 300` | pause the job-order area only |
 | 503 | `EXCHANGE_DISABLED` | the whole exchange is switched off; `Retry-After: 30` | pause every area |
 

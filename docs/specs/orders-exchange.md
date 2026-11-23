@@ -19,8 +19,8 @@ This spec is the single home of job orders on the exchange. The orders themselve
 lifecycle, money and notices, stay in [`orders-core.md`](orders-core.md) and
 [`orders-auec.md`](orders-auec.md); the exchange's gateway, registry, limits and error contract stay
 in [`external-exchange.md`](external-exchange.md) and [`docs/exchange/errors.md`](../exchange/errors.md).
-The read serves its snapshot (`GET /exchange/v1/job-orders`); the feed, the writes and the caps
-follow with their own slices. Both switches are off until an admin turns them on.
+The read serves its snapshot and its change feed (`GET /exchange/v1/job-orders`); the writes and
+the caps follow with their own slices. Both switches are off until an admin turns them on.
 
 The guiding rules:
 
@@ -154,9 +154,9 @@ REQ-XCH-044, REQ-XCH-050, REQ-ORDERS-055, REQ-OXCH-003 · ADR-0406, ADR-0407 · 
 
 ### REQ-OXCH-003 — Snapshot and feed of the job-order set
 
-> [!note] Implemented for the fingerprint, the dirty marks and the worker (#3643) and the client
-> set's snapshot (#3644); decided in #3615, #3618, ADR-0406. The per-unit and per-member logs, the
-> feed with its tombstone and the window run follow with their slices.
+> [!note] Implemented for the fingerprint, the dirty marks and the worker (#3643), the client set's
+> snapshot (#3644) and the per-unit and per-member logs with the feed and its tombstone (#3645);
+> decided in #3615, #3618, ADR-0406. The window run follows with its slice.
 
 **The snapshot.** `GET /exchange/v1/job-orders` (`exchange.joborders.read`), relayed to
 `GET /api/v1/exchange/job-orders`, answers `page.schema.json#/$defs/jobOrderPage`: the client set —
@@ -168,8 +168,7 @@ read of REQ-OXCH-002.
 - An order joins the snapshot with its first fingerprint, so a new order reaches a client a few
   seconds after it was created; `updatedAt` is never empty.
 - The last page carries the feed cursor at the snapshot's position (REQ-XCH-013); one cursor serves
-  all three kinds. Until the feed is served, a resumed feed cursor answers `410 CURSOR_EXPIRED`, so
-  a client takes a new snapshot.
+  all three kinds.
 - `removed` is always empty on a snapshot page; its entries carry `{ key, removedAt }` without
   `removedBy`.
 - Each page counts one `snapshot` read for its client (REQ-OBS-025).
@@ -226,6 +225,50 @@ one backend instance at a time (two-key advisory lock space `OXFP`).
   next run.
 - A failed run rolls back whole; the next run retries it.
 
+**The log.** The family's log is `exchange_change` with `resource = 'JOB_ORDER'` and the order's
+`id` as key (REQ-XCH-013, ADR-0406). Each entry names a unit or a member, never both; triggers alone
+write it (V447), at most once per unit or member, key and transaction:
+
+- **Per unit.** A changed fingerprint writes one entry each for the order's requesting unit, its
+  responsible unit and every actively supporting unit. The fingerprint row keeps them as
+  `announced_unit_ids`, read in the worker's snapshot, so a change of these units writes for the old
+  and the new ones alike. A first fingerprint writes only for an order of the client set; a hard
+  delete writes for the units and assignees the order was last announced to.
+- **Per member.** The same change writes one entry for each assignee, old and new
+  (`announced_member_ids`).
+- **Memberships.** A membership that starts, ends (`DELETE` included) or moves, and a unit that is
+  activated or deactivated, write per-member entries. A start writes the unit's orders of the client
+  set; an end writes those, the orders last announced to the unit and every order the unit's log
+  still names, so a client that syncs only after its member left still drops an order that left the
+  unit before.
+- **Announcements from outside the order.** A unit's new name or shorthand announces the orders of
+  the client set it requests, is responsible for or supports; an assignee's new display name or name
+  withholding announces the orders of the client set they are on; each goes to every unit and member
+  the order was last announced to. A change of an assignee's own note writes an entry for that
+  member alone, since no other member's read carries it.
+- Nothing else writes the log: a provision, a holder movement, a fee, a commitment, a claim that
+  leaves `open` unchanged or a contact change of an aUEC order leaves the fingerprint, and so the
+  log, alone.
+
+**The feed.** The snapshot's last cursor and every feed page's `nextCursor` read the feed
+(REQ-XCH-013): one cursor for all three kinds, `limit` 1 to 1000, entries of finished transactions
+only.
+
+- A page reads the entries of the units the member reads through now (REQ-OXCH-001: direct, active,
+  with `KRT Member`) and the member's own entries. Entries a unit received after the member left it
+  are never read.
+- Each key appears once, in the order of its latest entry, resolved against the member's current
+  client set: an order of the set is an item in the read of REQ-OXCH-002, any other key a `removed`
+  entry `{ key, removedAt }`, `removedAt` the instant of the key's latest entry the page read.
+- No `removed` entry names a writer, so a lost relation, the end of the window and a deletion look
+  alike; a client drops the order and ignores a key it never held. A client cancel is a status
+  change, so the order stays an item.
+- A reopened order and a client's own write return as items. Orders leaving at the end of the window
+  come with the nightly window run.
+- The log keeps 90 days; an older cursor answers `410 CURSOR_EXPIRED` and the client takes a new
+  snapshot (`docs/exchange/sync-guide.md`).
+- Each page counts one `feed` read for its client (REQ-OBS-025).
+
 **Monitoring:** the worker job, the recomputation counter, the backlog gauges and their three
 alerts are REQ-OBS-025.
 
@@ -251,15 +294,33 @@ alerts are REQ-OBS-025.
 - [x] The route is on the acting list, behind the family switch and the read scope, on the gateway
   and in the backend (`ExchangeJobOrderSnapshotTest`, ingest `ExchangeJobOrderRouteTest`,
   `FilterExemptionSetsTest`).
-- [ ] The per-unit and per-member logs, the feed with its tombstone `{ key, removedAt }` and the
-  window run come with their slices.
+- [x] A changed fingerprint announces the order to its requesting, responsible and actively
+  supporting units and its assignees, old and new; a first fingerprint outside the client set, an
+  unchanged one and a settlement flag alone announce nothing; a hard delete announces the order
+  where it was last announced (`ExchangeJobOrderFeedTriggerIntegrationTest`).
+- [x] A membership that starts, ends or moves, a unit's deactivation and activation, a unit's
+  rename, an assignee's rename and name withholding and an assignee's own note announce exactly the
+  orders they touch, to exactly the logs they reach (`ExchangeJobOrderFeedTriggerIntegrationTest`).
+- [x] A provision, a holder movement, a fee, a commitment and an aUEC contact change write no log
+  entry; a money write, a handover, an earmark or a hierarchy change that commits while the worker
+  runs reaches the log on the next run (`JobOrderFingerprintWorkerIntegrationTest`).
+- [x] The feed answers a changed order as an item; a lost relation and a hard delete as the same
+  `{ key, removedAt }`; a membership end as gone, an order that left the unit before the member did
+  included, and leaves the unit's later entries unread; a reopened order and a client's own write as
+  items; it never passes an announcement that commits late, counts a feed read and closes with the
+  family switch (`ExchangeJobOrderFeedTest`).
+- [x] The gateway relays the feed and turns a removed entry that names a writer into
+  `502 BACKEND_RELAY_FAILED` (ingest `ExchangeJobOrderRouteTest`, `ExchangeGoldenAnswerTest`,
+  `ExchangeContractTest`).
+- [ ] The window run comes with its slice.
 
 **Enforced by:** `JobOrderExchangeReads`, `JobOrderExchangeReadProjection` (job orders) ·
 `JobOrderFingerprints`, `JobOrderFingerprintRecomputation`, `JobOrderFingerprintTask`,
 `ExchangeJobOrderMarkRepository`, `ExchangeJobOrderFingerprintRepository`, `ExchangeJobOrderReadService`,
-`ExchangeJobOrderController` (exchange) · `ExchangeJobOrderController` (gateway) · V445 ·
+`ExchangeFeedReader#jobOrderChanges`, `ExchangeChangeRepository#findAnnouncedJobOrders`,
+`ExchangeJobOrderController` (exchange) · `ExchangeJobOrderController` (gateway) · V445, V447 ·
 **Related:** REQ-XCH-013, REQ-ORDERS-054, REQ-ORDERS-055, REQ-OXCH-001, REQ-OXCH-002, REQ-OXCH-009,
-REQ-OBS-025 · ADR-0224, ADR-0406, ADR-0407 · **Issues:** #3615, #3618, #3643, #3644
+REQ-OBS-025 · ADR-0224, ADR-0406, ADR-0407 · **Issues:** #3615, #3618, #3643, #3644, #3645
 
 ### REQ-OXCH-009 — The job-order switches
 

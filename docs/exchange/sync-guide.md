@@ -83,6 +83,11 @@ and **do not add it back**. The server refuses such an add per op with `REMOVED_
 tombstone lives (90 days). If you believe the entry should come back, ask the member; only after they
 agree resend the op with `override: true`.
 
+Job orders are the exception: their removed entries carry only `key` and `removedAt`, because an
+order that left the member's set looks the same whether a relation ended, its 7 days ended or it
+was deleted. Drop the order locally; it comes back as an item if it returns to the set
+([job orders](resources/job-orders.md#the-feed)).
+
 ## Patch changes
 
 When a patch change asks the members for a new home location, the Basetool relocates each member's

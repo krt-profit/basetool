@@ -163,8 +163,8 @@ class ExchangeWireContractTest {
 
   /**
    * The job-order reads, which answer only with the job-order switch on; {@code
-   * ExchangeJobOrderSnapshotTest} checks their answers against the published schemas on a seeded
-   * world.
+   * ExchangeJobOrderSnapshotTest} and {@code ExchangeJobOrderFeedTest} check their snapshot and
+   * feed answers against the published schemas on a seeded world.
    */
   private static final Set<String> JOB_ORDER_READS = Set.of("/job-orders");
 

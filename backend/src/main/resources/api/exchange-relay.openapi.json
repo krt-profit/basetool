@@ -1347,7 +1347,7 @@
     },
     "/api/v1/exchange/job-orders" : {
       "get" : {
-        "description" : "Gateway-only. The job orders of all three kinds a unit the member directly belongs to requests, is responsible for or actively supports, and those the member works on as an assignee: active, closed within 7 days, and aUEC while its settlement is open. Header, the member's relations, assignee names under per-client refs, the member's own note, the section versions and each kind's progress; no holder, amount per person, provision, Bank state, commitment or claim. A snapshot paged by id that ends with the feed cursor of REQ-XCH-013; a client keeps the data at most 7 days, in memory.",
+        "description" : "Gateway-only. The job orders of all three kinds a unit the member directly belongs to requests, is responsible for or actively supports, and those the member works on as an assignee: active, closed within 7 days, and aUEC while its settlement is open. Header, the member's relations, assignee names under per-client refs, the member's own note, the section versions and each kind's progress; no holder, amount per person, provision, Bank state, commitment or claim. A snapshot paged by id that ends with the feed cursor of REQ-XCH-013; with that cursor, the orders announced since, each an item while it is in the set and otherwise a removed entry { key, removedAt } that names no writer, alike for a lost relation, the end of the window and a deletion. A client keeps the data at most 7 days, in memory.",
         "operationId" : "jobOrders_2",
         "parameters" : [ {
           "in" : "query",

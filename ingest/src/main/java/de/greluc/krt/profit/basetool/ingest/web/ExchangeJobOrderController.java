@@ -34,9 +34,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The member's job orders on the gateway (REQ-OXCH-002, REQ-OXCH-003): the snapshot of the member's
- * job-order set. The paging is checked before the relay and the answer against its schema after it;
- * the job-order family switch and the route scope are checked before a handler runs.
+ * The member's job orders on the gateway (REQ-OXCH-002, REQ-OXCH-003): the snapshot and the change
+ * feed of the member's job-order set. The paging is checked before the relay and the answer against
+ * its schema after it; the job-order family switch and the route scope are checked before a handler
+ * runs.
  */
 @RestController
 @RequestMapping(ExchangeRoutes.JOB_ORDERS_PATH)
@@ -50,9 +51,10 @@ public class ExchangeJobOrderController {
   private final ExchangeRelayResponses responses;
 
   /**
-   * Returns a snapshot page of the member's job-order set.
+   * Returns a snapshot or a change-feed page of the member's job-order set.
    *
-   * @param cursor the cursor of the last page, or {@code null} for a new snapshot
+   * @param cursor the cursor of the last page, or {@code null} for a new snapshot; a feed cursor
+   *     reads the changes after it
    * @param limit the page size, 1 to 1000, or {@code null} for the default
    * @param request the admitted request
    * @param acceptLanguage the caller's language
