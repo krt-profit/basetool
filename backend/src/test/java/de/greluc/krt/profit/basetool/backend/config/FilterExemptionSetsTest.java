@@ -72,6 +72,7 @@ class FilterExemptionSetsTest {
           "/api/v1/exchange/job-orders",
           "/api/v1/exchange/job-orders/create-options",
           "/api/v1/exchange/job-orders/{id}/cancel",
+          "/api/v1/exchange/job-orders/{id}/comment",
           "/api/v1/exchange/me/account-check",
           "/api/v1/exchange/me/blueprints",
           "/api/v1/exchange/me/blueprints/changes",

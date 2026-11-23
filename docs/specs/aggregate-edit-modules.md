@@ -28,7 +28,8 @@ through the module's access policy (`MissionAccessPolicy.canEdit`, `JobOrderAcce
 before any version check or mutation. A job-order status change decides it from the writer rule
 and the read check its caller passes instead of a gate (`JobOrderEditor#editLifecycle`,
 ADR-0408); a client's cancel passes the shared rules of a client write as the checks of that
-edit, in the exchange's order of refusals (REQ-OXCH-005). A refused caller gets HTTP 403, a caller
+edit, in the exchange's order of refusals (REQ-OXCH-005), and a client's comment change passes them
+to the money edit (`JobOrderEditor#editMoney`, REQ-OXCH-008). A refused caller gets HTTP 403, a caller
 without an authentication is refused, and an unknown aggregate is HTTP 404 for every caller.
 The controller keeps a coarse role gate of its own (ADR-0236 §6): `isAuthenticated()` for the mission manage
 gate, member-or-above for the read and participant gates, the LOGISTICIAN role (or LOGISTICIAN,

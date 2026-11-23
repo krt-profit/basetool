@@ -79,6 +79,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/job-orders` | `exchange.joborders.read` | REQ-OXCH-002, REQ-OXCH-003 ([orders-exchange.md](orders-exchange.md)) |
 | `GET /exchange/v1/job-orders/create-options` · `POST /exchange/v1/job-orders` | `exchange.joborders.write` | REQ-OXCH-004, REQ-OXCH-005 ([orders-exchange.md](orders-exchange.md)) |
 | `POST /exchange/v1/job-orders/{id}/cancel` | `exchange.joborders.write` | REQ-OXCH-005, REQ-OXCH-006 ([orders-exchange.md](orders-exchange.md)) |
+| `POST /exchange/v1/job-orders/{id}/comment` | `exchange.joborders.write` | REQ-OXCH-005, REQ-OXCH-008 ([orders-exchange.md](orders-exchange.md)) |
 
 The three `org-stock` rows are built: the read, as a snapshot and a feed (REQ-XCH-042), with
 `exchange.orgstock.details` (REQ-XCH-043), the writes `book-in`, `book-out`, `sell`,
@@ -91,11 +92,11 @@ The refinery-order rows are built: the read (REQ-XCH-051), the change set with `
 `cancel` and `delete` (REQ-XCH-055), and the two store-choice reads (REQ-XCH-054).
 
 The job-order rows are built for the snapshot of the member's job-order set (REQ-OXCH-003), for
-the create options and the create of an aUEC order (REQ-OXCH-004) and for its cancel
-(REQ-OXCH-006); their backend paths `/api/v1/exchange/job-orders`,
-`/api/v1/exchange/job-orders/create-options` and `/api/v1/exchange/job-orders/{id}/cancel` are on
-the acting list, the job-order family switch gates them and the writes switch the create and the
-cancel (REQ-OXCH-009). The
+the create options and the create of an aUEC order (REQ-OXCH-004), for its cancel (REQ-OXCH-006)
+and for its comment change (REQ-OXCH-008); their backend paths `/api/v1/exchange/job-orders`,
+`/api/v1/exchange/job-orders/create-options`, `/api/v1/exchange/job-orders/{id}/cancel` and
+`/api/v1/exchange/job-orders/{id}/comment` are on the acting list, the job-order family switch
+gates them and the writes switch the create, the cancel and the comment change (REQ-OXCH-009). The
 bank's routes are listed in [`bank-exchange.md`](bank-exchange.md).
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
@@ -2751,11 +2752,12 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 37 relay operations on 34 backend
+byte-identical (D-05 of the domain modularisation plan): the 38 relay operations on 35 backend
 paths (with the refinery-order feed, change set and store choices of REQ-XCH-051…056, the three
 bank reads of REQ-BXCH-002, the own requests of REQ-BXCH-003, their writes of REQ-BXCH-004,
 the staff queue of REQ-BXCH-005, the job-order snapshot of REQ-OXCH-003, the job-order create
-options and create of REQ-OXCH-004 and the job-order cancel of REQ-OXCH-006), their parameters,
+options and create of REQ-OXCH-004, the job-order cancel of REQ-OXCH-006 and the job-order comment
+change of REQ-OXCH-008), their parameters,
 request and answer shapes, the relayed codes
 and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
@@ -2829,9 +2831,9 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 37 relay operations with their gateway route, backend path, capability, paging and published
+- the 38 relay operations with their gateway route, backend path, capability, paging and published
   schemas — against the backend's eighteen exchange controllers and their `@exchangeGate`
-  expressions, `ActingMemberFilter`'s 34 paths (each exact but for a whole `{id}` segment, as in
+  expressions, `ActingMemberFilter`'s 35 paths (each exact but for a whole `{id}` segment, as in
   the bank reads), the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
@@ -2903,7 +2905,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  37 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
+  38 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
   requirement, and no dangling reference; of `openapi.json` no relay path and no dangling reference
   (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2916,7 +2918,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 37 relay operations and 162 schemas; `openapi.json` holds
+- [x] The relay document holds exactly the 38 relay operations and 163 schemas; `openapi.json` holds
   none of them and the 129 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by

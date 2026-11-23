@@ -4508,8 +4508,8 @@ reader/unit/order identities and retained relationship timestamps remain outside
 
 > [!note] Implemented for the two switches (#3642), the fingerprint worker (#3643), the snapshot
 > reads (#3644), the feed reads (#3645), the create with its create options (#3646), the window
-> run (#3649), the caps on client creates (#3647) and the cancel with the refusals of a write on an
-> existing order (#3650); decided in #3618. The other route slices
+> run (#3649), the caps on client creates (#3647), the cancel with the refusals of a write on an
+> existing order (#3650) and the comment change (#3652); decided in #3618. The other route slices
 > wire their read routes and refusal reasons, and each slice adds its alerts and its panels to this
 > entry.
 
@@ -4531,6 +4531,8 @@ never an id, a path or an amount (REQ-OBS-011).
   A cancel counts the same way (REQ-OXCH-006), and each refusal of a write on an existing order
   also under its reason: `not_found`, `not_permitted`, `version_conflict`,
   `responsibility_invalid`, `closed` and, for the cancel, `money_started` (REQ-OXCH-005).
+  A comment change counts the same way, its refusals under the same reasons but `money_started`
+  (REQ-OXCH-008).
 - **Refusals.** `basetool_exchange_job_order_refused_total{reason}` counts what the backend refused,
   every reason registered at zero (`JobOrderExchangeRefusal`): `not_found`, `not_permitted`,
   `units_not_offered`, `version_conflict`, `responsibility_invalid`, `closed`, `money_started`,
@@ -4592,7 +4594,7 @@ It shows the window run's executions per day by outcome with the orders it aged 
 The refusals panel shows the cap refusals under their own reasons and names `JobOrderExchangeCapHit`
 in its description; the writes panel names them among the rejected writes.
 The refusals panel shows the refusals of a write on an existing order under their reasons and names
-`JobOrderExchangeNotFoundSpike`; the writes panel counts the cancels.
+`JobOrderExchangeNotFoundSpike`; the writes panel counts the cancels and the comment changes.
 
 **Acceptance**
 
@@ -4609,7 +4611,10 @@ The refusals panel shows the refusals of a write on an existing order under thei
 - [x] A cancel counts one `applied` or `rejected` write, and each refusal of a write on an existing
   order its reason: `not_found`, `not_permitted`, `version_conflict`, `responsibility_invalid`,
   `closed` and `money_started` (`ExchangeJobOrderCancelTest`).
-- [ ] The other refusal reasons are incremented by their routes (REQ-OXCH-007, REQ-OXCH-008).
+- [x] A comment change counts one `applied` or `rejected` write, and each refusal its reason:
+  `not_found`, `not_permitted`, `version_conflict`, `responsibility_invalid` and `closed`
+  (`ExchangeJobOrderCommentTest`).
+- [ ] The other refusal reasons are incremented by their routes (REQ-OXCH-007).
 - [x] `JobOrderExchangeNotFoundSpike` has a promtool rule test that fires and one that stays silent
   (`job_order_exchange_not_found_alerts_test.yml`).
 - [x] Both fingerprint outcomes exist at zero and a committed recomputation counts its changed and
@@ -4638,5 +4643,6 @@ The refusals panel shows the refusals of a write on an existing order under thei
 `monitoring/prometheus/tests/job_order_exchange_cap_alerts_test.yml`,
 `monitoring/prometheus/tests/job_order_exchange_not_found_alerts_test.yml`,
 `monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
-REQ-OBS-024, REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006, REQ-OXCH-009,
-REQ-OXCH-010 · **Issues:** #3618, #3642, #3643, #3644, #3646, #3647, #3649, #3650
+REQ-OBS-024, REQ-OXCH-002, REQ-OXCH-003, REQ-OXCH-004, REQ-OXCH-005, REQ-OXCH-006, REQ-OXCH-008,
+REQ-OXCH-009, REQ-OXCH-010 · **Issues:** #3618, #3642, #3643, #3644, #3646, #3647, #3649, #3650,
+#3652

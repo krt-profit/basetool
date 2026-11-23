@@ -66,7 +66,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 37 relay operations on 34 backend paths, each with the gateway route that relays it, the
+   * The 38 relay operations on 35 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -367,6 +367,14 @@ public final class ExchangeSeam {
               "exchange.joborders.write",
               false,
               "job-order-write.schema.json#/$defs/cancel",
+              "job-order-write.schema.json#/$defs/written"),
+          new RelayOperation(
+              "POST",
+              JOB_ORDERS_PATH + "/{id}/comment",
+              JOB_ORDERS_PATH + "/{id}/comment",
+              "exchange.joborders.write",
+              false,
+              "job-order-write.schema.json#/$defs/comment",
               "job-order-write.schema.json#/$defs/written"));
 
   /** The query parameters a paged relay operation passes on. */

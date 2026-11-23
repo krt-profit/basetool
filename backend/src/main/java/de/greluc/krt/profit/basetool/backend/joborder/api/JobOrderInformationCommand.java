@@ -24,17 +24,20 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The web's aUEC information command for a caller that passes its own writer rule, read check and
- * actor, writing the comment alone; the order and account locks, the comment version, the
- * responsibility gate, the audit, the notices and the live update are the web's (ADR-0408).
+ * The web's aUEC information command for a client's write, with the caller's own writer rule, read
+ * check and actor, writing the comment alone; the order and account locks, the comment version, the
+ * notices and the live update are the web's, the order of the refusals and the audit type are the
+ * exchange's (REQ-OXCH-005, REQ-OXCH-008, ADR-0408).
  */
 public interface JobOrderInformationCommand {
 
   /**
    * Replaces an aUEC order's comment in one transaction, joining the caller's, and leaves the
-   * contact and its version untouched. Under the order locks it requires the read check, a valid
-   * responsibility, an active member, a writer of either side the rule covers and an order that is
-   * not cancelled, then the observed comment version.
+   * contact and its version untouched. Under the order locks it requires, in this order, the read
+   * check, an aUEC order and a writer of either side the rule covers, the observed comment version,
+   * a valid responsibility and an order that is not cancelled, then an active account of the
+   * actor's member. A change records {@code JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT} without the text
+   * and marks the comment with the actor's client.
    *
    * @param orderId the aUEC order
    * @param comment the new comment, at most 1000 characters; trimmed, and blank clears it
@@ -43,15 +46,13 @@ public interface JobOrderInformationCommand {
    * @param read the read check the order must pass
    * @param actor who changes the comment; the notice excludes its member
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order is
-   *     unknown or not an aUEC order
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the order's
-   *     responsibility is invalid
-   * @throws org.springframework.security.access.AccessDeniedException when the read check or the
-   *     rule refuses the actor, or the actor's member is no active account
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException when the order
-   *     is cancelled
+   *     unknown or fails the read check, alike
+   * @throws org.springframework.security.access.AccessDeniedException when the order is no aUEC
+   *     order, the rule refuses the actor or the actor's member is no active account
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the comment
    *     version is stale
+   * @throws JobOrderClientWriteRefusedException when the responsibility is invalid or the order is
+   *     cancelled
    */
   void changeComment(
       @NotNull UUID orderId,

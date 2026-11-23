@@ -175,11 +175,11 @@ class ExchangeWireContractTest {
 
   /**
    * The job-order writes, which answer only with both job-order switches on and a member who writes
-   * for a unit; {@code ExchangeJobOrderCreateTest} and {@code ExchangeJobOrderCancelTest} send them
-   * on a seeded world.
+   * for a unit; {@code ExchangeJobOrderCreateTest}, {@code ExchangeJobOrderCancelTest} and {@code
+   * ExchangeJobOrderCommentTest} send them on a seeded world.
    */
   private static final Set<String> JOB_ORDER_WRITES =
-      Set.of("/job-orders", "/job-orders/{id}/cancel");
+      Set.of("/job-orders", "/job-orders/{id}/cancel", "/job-orders/{id}/comment");
 
   /**
    * The bank request writes, which answer only with the bank switched on and a seeded bank world;
