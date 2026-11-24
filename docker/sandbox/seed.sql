@@ -293,8 +293,8 @@ FROM org_unit p
 WHERE p.kind = 'BEREICH' AND p.department = 'PROFIT' AND p.active
 ON CONFLICT (id) DO NOTHING;
 
--- Closed a day before the seed runs, so the order lies inside the 7-day window of the job-order
--- read after every fresh seed (REQ-OXCH-003).
+-- Closed a day before the seed runs; every run moves the closing instant of the still-closed order
+-- again, so it lies inside the 7-day window of the job-order read after every seed (REQ-OXCH-003).
 INSERT INTO job_order (id, handle, priority, created_at, updated_at, version, status,
                        requesting_org_unit_id, responsible_org_unit_id,
                        original_profit_org_unit_id, comment, type, lifecycle_version, closed_at)
@@ -304,7 +304,8 @@ SELECT '5a4d0000-0000-4000-8000-000000002205', 'Sandbox_Logistician', NULL,
        now() - INTERVAL '1 day'
 FROM org_unit p
 WHERE p.kind = 'BEREICH' AND p.department = 'PROFIT' AND p.active
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET closed_at = EXCLUDED.closed_at
+WHERE job_order.closed_at IS NOT NULL;
 
 INSERT INTO job_order_money_target (order_id, amount, version)
 VALUES ('5a4d0000-0000-4000-8000-000000002204', 250000, 0),

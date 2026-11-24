@@ -131,7 +131,7 @@ until every service is healthy and applies the seed; with the images already pul
 a minute. `reset` is `down` followed by `up`. `down` removes the containers **and the volumes**, so
 the next start is a clean sandbox. `up` on a running sandbox keeps its data and applies the seed
 again, which adds nothing that is already there but turns the exchange, bank and job-order
-switches back on.
+switches back on and moves the closing day of the seeded cancelled order along.
 
 To build the images from your checkout instead, add `--build` (Linux, macOS) or `-Build`
 (Windows). The first build takes several minutes. Locally built images are tagged `local`. They are
@@ -428,8 +428,8 @@ exchange off. The gateway sees a change within about 5 seconds.
     which 100 000 were handed over to `sandbox-logistician` as the requester, so it reads
     `netHandedOver` 100000 and `remaining` 150000. `sandbox-member` works on it as an assignee
     with a note.
-  - `5a4d0000-0000-4000-8000-000000002205`, `CANCELLED` one day before the seed ran, so it stays
-    in the job-order read for six more days; `reset` brings it back.
+  - `5a4d0000-0000-4000-8000-000000002205`, `CANCELLED` one day before the seed ran. Every `up`
+    runs the seed again and moves the closing day along, so the order stays in the job-order read.
 
   The material and item orders for IRIDIUM name IRIDIUM as the responsible unit too, a unit
   outside Profit, so they read `responsibilityInvalid: true`.
@@ -639,8 +639,9 @@ under the same key answers the same order again; another body under that key ans
 `422 IDEMPOTENCY_KEY_REUSED`.
 
 **Cancel.** `POST /exchange/v1/job-orders/<the new id>/cancel` with `{"lifecycleVersion": 0}`
-answers `200` with `status` `CANCELLED` and `versions.lifecycle` 1. The seeded in-progress aUEC
-order answers `409 JOB_ORDER_MONEY_STARTED`, since money was handed over; the seeded cancelled one
+answers `200` with `status` `CANCELLED` and `versions.lifecycle` 1. Both seeded aUEC orders are at
+`versions.lifecycle` 1: with `{"lifecycleVersion": 1}` the in-progress one answers
+`409 JOB_ORDER_MONEY_STARTED`, since money was handed over, and the cancelled one
 `409 JOB_ORDER_CLOSED`.
 
 **Target.** On the seeded in-progress aUEC order, `POST …/target` with
