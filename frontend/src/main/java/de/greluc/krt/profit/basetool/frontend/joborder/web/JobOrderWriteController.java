@@ -333,13 +333,7 @@ public class JobOrderWriteController {
   public String createOrder(
       @ModelAttribute("jobOrderForm") JobOrderForm form, RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderMaterialDto> materials =
-          form.getMaterials().stream()
-              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m ->
-                  new CreateJobOrderMaterialDto(
-                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .toList();
+      List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -608,13 +602,7 @@ public class JobOrderWriteController {
       @ModelAttribute("jobOrderForm") JobOrderForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderMaterialDto> materials =
-          form.getMaterials().stream()
-              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m ->
-                  new CreateJobOrderMaterialDto(
-                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .toList();
+      List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -655,12 +643,7 @@ public class JobOrderWriteController {
   @ResponseBody
   public ResponseEntity<Object> updateOrderAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
-    List<CreateJobOrderMaterialDto> materials =
-        form.getMaterials().stream()
-            .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-            .map(m ->
-                new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-            .toList();
+    List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
     if (materials.isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
@@ -697,13 +680,7 @@ public class JobOrderWriteController {
       @ModelAttribute("jobOrderForm") JobOrderForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderMaterialDto> materials =
-          form.getMaterials().stream()
-              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m ->
-                  new CreateJobOrderMaterialDto(
-                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .toList();
+      List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
         redirectAttributes.addFlashAttribute("jobOrderForm", form);
@@ -736,12 +713,7 @@ public class JobOrderWriteController {
   @ResponseBody
   public ResponseEntity<Object> updateOrderAsRequesterAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
-    List<CreateJobOrderMaterialDto> materials =
-        form.getMaterials().stream()
-            .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-            .map(m ->
-                new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-            .toList();
+    List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
     if (materials.isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
