@@ -2422,10 +2422,12 @@ admin suspension), `ExchangeSyncE2eTest` (corpus round trip, confirmed mass chan
       a default blueprint, with `--conformance` every change-set fixture of
       `docs/exchange/examples/v1` (valid ones as dry runs accepted, invalid ones refused) and with
       `--proof-limit` a flood until `429 DPOP_PROOF_LIMIT`; then the same without the fixtures and
-      the flood as the second member, whose org demand must be withheld (`--demand withheld`).
-      Because that job runs only after a merge, `repo-lint.yml` loads `sandbox-smoke.py` and
-      `sandbox-load.py` with `--help` on every pull request, so a script that no longer imports
-      fails before the merge. Both take the DPoP reference's keys from `scripts/sandbox_client.py`,
+      the flood as the second member, whose org demand must be withheld (`--demand withheld`);
+      then, as `sandbox-logistician` with `--job-orders`, the job-order snapshot and create options
+      against the seed. Because that job runs only after a merge, `repo-lint.yml` loads
+      `sandbox-smoke.py` and `sandbox-load.py` with `--help` on every pull request, so a script
+      that no longer imports fails before the merge, and runs `sandbox-smoke.py --selftest`, which
+      checks the job-order seed checks on the conformance examples. Both take the DPoP reference's keys from `scripts/sandbox_client.py`,
       the one module that puts the reference on `sys.path`.*
 - [x] The E2E stack with the sandbox Keycloak and the ingest gateway, and the exchange round trip on
       it. *`E2eStackExtension`, `docker-compose.e2e.yml`, `ExchangeRoundTripE2eTest`, the
@@ -3250,6 +3252,10 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
   *`ExchangeOrgStockWriteControllerTest`.*
 - [x] An op on a pool where the writer is not a Logistician, on a personal row or on a row of
   another pool is refused `NOT_PERMITTED` and changes nothing. *`ExchangeOrgStockWriteControllerTest`.*
+- [x] A Logistician of a Bereich or of the Organisationsleitung who is no direct member of a unit
+  below it is refused that unit's ops (`NOT_PERMITTED`), roster and targets (`403`), as one query
+  of the direct Logistician units decides for the reads, the roster, the targets and the ops.
+  *`ExchangeOrgStockWriteControllerTest`.*
 - [x] A `book-in` naming a member who withholds their name, or who is not a member of the unit, is
   refused `HOLDER_UNKNOWN`, and so is a `move-holder` to such a member; a `move-holder` into a unit
   the writer is not a Logistician of is `NOT_PERMITTED`. *`ExchangeOrgStockWriteControllerTest`.*

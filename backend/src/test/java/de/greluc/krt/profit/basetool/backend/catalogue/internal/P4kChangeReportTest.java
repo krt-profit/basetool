@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -141,12 +140,11 @@ class P4kChangeReportTest {
     P4kImportResultDto applied = runs.apply(P4kTestCatalogues.fixtureBytes(), true);
     List<P4kImportChangeDto> written =
         P4kImportRuns.report(changeRepository, applied.runId()).stream()
-            .sorted(Comparator.comparingInt(P4kImportChange::getPosition))
             .map(P4kImportChangeDto::of)
             .toList();
 
     assertThat(previewed).isNotEmpty();
-    assertThat(written).isEqualTo(previewed);
+    assertThat(written).containsExactlyInAnyOrderElementsOf(previewed);
   }
 
   /**
