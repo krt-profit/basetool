@@ -114,8 +114,9 @@ the bytes are UTF-8 without a byte order mark.
 ## Out of scope
 
 - **PDF/UA-2 (ISO 14289-2:2024).** A tagged, accessible PDF needs a structure tree in the PDF 2.0
-  namespace around every paragraph and table cell; OpenPDF 3.0.6 tags nothing on its own and knows
-  no structure namespaces (ADR-0409).
+  namespace around every heading, paragraph, table cell and figure. OpenPDF 3.0.6 tags nothing
+  that `Document.add` lays out, so it takes a tagging layer of our own on OpenPDF's marked-content
+  API; that layer is a separate change (ADR-0409).
 - **Spreadsheet behaviour.** RFC 4180 does not define how a spreadsheet opens a file; REQ-PUR-023
   names the supported import workflow.
 - **Exchange documents** (`/exchange/v1/openapi.json`, `/exchange/v1/schemas/*`) are served inline,

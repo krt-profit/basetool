@@ -69,9 +69,13 @@ found these deviations:
   behind. Rejected as a byte-level workaround.
 - **Re-saving through Apache PDFBox to drop `Info`.** A second PDF library at runtime for one
   dictionary entry. Rejected.
-- **PDF/UA-2 (ISO 14289-2:2024).** It needs a structure tree in the PDF 2.0 namespace around every
-  paragraph, table cell and artifact. OpenPDF 3.0.6 tags no content on its own and has no
-  structure-namespace support, so it would mean replacing the PDF library. Not decided here.
+- **PDF/UA-2 (ISO 14289-2:2024) in this change.** It needs a structure tree in the PDF 2.0
+  namespace around every heading, paragraph, table cell and figure, with decoration marked as
+  artifact. OpenPDF 3.0.6 tags nothing that `Document.add` lays out and has no namespace
+  constants, but a hand-tagged OpenPDF document — content drawn through `ColumnText` inside marked
+  content, `/NS` and `/Namespaces` set as plain dictionary entries — passes veraPDF's PDF/UA-2 and
+  PDF/A-4 profiles in one file. That tagging layer is a change of its own; the owner chose it over
+  iText 9 (AGPL-3.0-or-later), the only Java library with built-in PDF/UA-2.
 - **Keeping the semicolon for German spreadsheets.** RFC 4180 and the `text/csv` registration name
   the comma; REQ-PUR-023 already places double-click opening outside the supported workflow.
   Rejected on the owner's decision.
