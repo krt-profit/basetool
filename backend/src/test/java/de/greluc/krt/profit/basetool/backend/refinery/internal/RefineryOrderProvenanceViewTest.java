@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientNames;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderProvenanceDto;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -48,7 +49,9 @@ class RefineryOrderProvenanceViewTest {
   void setUp() {
     clientDirectory = mock(ClientDirectory.class);
     when(clientDirectory.displayNames(anyCollection())).thenReturn(Map.of("versekit", "VerseKit"));
-    view = new RefineryOrderProvenanceView(clientDirectory, mock(EntityManager.class));
+    view =
+        new RefineryOrderProvenanceView(
+            new ClientNames(clientDirectory), mock(EntityManager.class));
   }
 
   /** A web order names no client and carries its last change. */

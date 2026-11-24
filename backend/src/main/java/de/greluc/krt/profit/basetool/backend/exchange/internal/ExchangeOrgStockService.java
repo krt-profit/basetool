@@ -37,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -101,8 +100,7 @@ public class ExchangeOrgStockService {
     List<ExchangeOrgUnitDto> units = orgUnitService.orgUnits(caller.member()).items();
     Map<UUID, ExchangeOrgUnitDto> byId =
         units.stream().collect(Collectors.toMap(ExchangeOrgUnitDto::id, Function.identity()));
-    Set<UUID> logistician = new HashSet<>(orgUnitService.logisticianUnits(caller.member()));
-    logistician.retainAll(byId.keySet());
+    Set<UUID> logistician = orgUnitService.directLogisticianUnits(caller.member());
     List<ExchangeOrgStockPoolDto> listed =
         units.stream()
             .map(unit -> ExchangeOrgStockPoolDto.of(unit, logistician.contains(unit.id())))
