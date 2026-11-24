@@ -34,6 +34,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderCreation;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
@@ -62,6 +64,7 @@ import org.springframework.data.domain.Pageable;
 class JobOrderControllerTest {
 
   @Mock private JobOrderService jobOrderService;
+  @Mock private JobOrderCreation jobOrderCreation;
   @Mock private JobOrderQueryService jobOrderQueryService;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
@@ -79,9 +82,10 @@ class JobOrderControllerTest {
   @Test
   void createJobOrder_passesTheServiceResultThroughUnredacted() {
     CreateJobOrderDto request =
-        new CreateJobOrderDto(null, null, "alice", null, List.of(), null, null);
+        new CreateJobOrderDto(
+            null, null, "alice", null, List.of(), new JobOrderObservedVersions(null, null));
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
-    when(jobOrderService.createJobOrder(request)).thenReturn(created);
+    when(jobOrderCreation.createMaterialOrder(request)).thenReturn(created);
 
     JobOrderDto result = controller.createJobOrder(request);
 
@@ -388,7 +392,9 @@ class JobOrderControllerTest {
   @Test
   void updateJobOrder_forwardsBodyToService() {
     UUID id = UUID.randomUUID();
-    CreateJobOrderDto updateDto = new CreateJobOrderDto(null, null, "bob", null, List.of(), 1L, 0L);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto(
+            null, null, "bob", null, List.of(), new JobOrderObservedVersions(1L, 0L));
     JobOrderDto persisted = jobOrderDto(id);
     when(jobOrderService.updateJobOrder(id, updateDto)).thenReturn(persisted);
 

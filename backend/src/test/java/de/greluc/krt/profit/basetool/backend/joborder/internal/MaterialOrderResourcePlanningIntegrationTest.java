@@ -72,8 +72,7 @@ class MaterialOrderResourcePlanningIntegrationTest extends MaterialContributionT
             order.handle(),
             null,
             List.of(new CreateJobOrderMaterialDto(replacementId, 650, 10.0)),
-            order.version(),
-            order.commentVersion());
+            new JobOrderObservedVersions(order.version(), order.commentVersion()));
     var allocation =
         Map.of(
             "field",

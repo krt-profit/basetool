@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAssigneeDto
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
@@ -358,8 +359,7 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
     ArgumentCaptor<CreateJobOrderDto> captor = ArgumentCaptor.captor();
     verify(backendApiClient)
         .put(eq("/api/v1/orders/{id}"), captor.capture(), eq(JobOrderDto.class), eq(orderId));
-    assertThat(captor.getValue().version()).isEqualTo(1L);
-    assertThat(captor.getValue().commentVersion()).isEqualTo(2L);
+    assertThat(captor.getValue().observed()).isEqualTo(new JobOrderObservedVersions(1L, 2L));
   }
 
   @Test
@@ -694,7 +694,9 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
     assertThat(sent.requestingOrgUnitId()).as("requesting org unit is stripped").isNull();
     assertThat(sent.handle()).as("handle is stripped").isNull();
     assertThat(sent.comment()).isEqualTo("c");
-    assertThat(sent.commentVersion()).as("the comment version is relayed").isEqualTo(2L);
+    assertThat(sent.observed())
+        .as("both versions are relayed")
+        .isEqualTo(new JobOrderObservedVersions(1L, 2L));
   }
 
   @Test

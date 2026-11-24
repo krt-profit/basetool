@@ -88,8 +88,7 @@ class ItemOrderRecipeFreshnessIntegrationTest extends MaterialContributionTestSu
             before.handle(),
             null,
             List.of(line),
-            before.version(),
-            before.commentVersion());
+            new JobOrderObservedVersions(before.version(), before.commentVersion()));
     var allocation =
         Map.of(
             "field",
@@ -185,8 +184,7 @@ class ItemOrderRecipeFreshnessIntegrationTest extends MaterialContributionTestSu
             refused.handle(),
             null,
             List.of(line),
-            refused.version(),
-            refused.commentVersion());
+            new JobOrderObservedVersions(refused.version(), refused.commentVersion()));
     String body =
         mvc()
             .perform(

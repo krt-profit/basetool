@@ -206,8 +206,7 @@ class JobOrderServiceAssigneeAndListTest {
                     de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
                         .class)),
             liveSyncPublisher,
-            org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
+            new JobOrderQueueFrame(liveSyncPublisher),
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
             org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class),
             org.mockito.Mockito.mock(

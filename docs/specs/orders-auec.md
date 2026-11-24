@@ -470,7 +470,9 @@ is leaves its revision, and a contact change never raises it. The web's aUEC inf
 its refreshed money section echo both revisions, and `PATCH /api/v1/orders/{id}/money/information`
 refuses with 409 when either is stale or missing; each part raises only its own revision. The
 MATERIAL and ITEM edits (`PUT /api/v1/orders/{id}`, `…/requested`, `…/items`, `…/items/requested`)
-carry `commentVersion` beside `version` the same way, and their edit forms echo both.
+carry `commentVersion` beside `version` the same way, and their edit forms echo both. Behind the
+flat `version` and `commentVersion` fields the two travel as one value (`JobOrderObservedVersions`)
+from the edit form through the payload to `JobOrderEditor`, so no step can split or swap them.
 
 The target and information commands take the writer rule, the read check and the actor as
 parameters (ADR-0408). Under the order and account locks they keep the web's order of checks: the
@@ -504,7 +506,9 @@ responsible side only when the rule lets the actor write it there.
 target change, cancellation, responsibility transfer, deletion, paired reassignment, the contact
 and comment revisions and audit rollback with real PostgreSQL. `JobOrderCommentVersionIntegrationTest`
 covers the comment revision of the MATERIAL and ITEM edits, `JobOrderEditorTest` its check, and
-`OrdersDetailPatternRenderTest` and `JobOrderPageControllerItemEditMvcTest` the echoing forms.
+`OrdersDetailPatternRenderTest` and `JobOrderPageControllerItemEditMvcTest` the echoing forms;
+`JobOrderVersionEchoTest`, `JobOrderObservedVersionsWireTest` and `JobOrderBackendClientTest` keep
+the two versions one pair on both sides of the flat wire fields.
 `JobOrderWebWriteCommandsIntegrationTest` pins who changes the target and the information in the
 web, each part's own version, the audit and the notices without the actor, and
 `JobOrderWriteRuleIntegrationTest` the database writer rule at both commands, the comment-only

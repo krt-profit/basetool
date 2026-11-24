@@ -173,8 +173,7 @@ class JobOrderMaterialEditCreditIntegrationTest extends MaterialContributionTest
             current.handle(),
             current.comment(),
             List.of(new CreateJobOrderMaterialDto(fixture.materialId(), GOOD_FLOOR, requested)),
-            current.version(),
-            current.commentVersion());
+            new JobOrderObservedVersions(current.version(), current.commentVersion()));
     return mvc()
         .perform(
             put("/api/v1/orders/{id}", fixture.orderId())

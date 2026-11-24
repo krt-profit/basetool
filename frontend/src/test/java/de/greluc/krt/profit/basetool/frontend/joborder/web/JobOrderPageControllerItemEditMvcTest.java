@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemR
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
@@ -133,8 +134,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             List.of(
                 new CreateJobOrderItemLineDto(
                     itemId, gameItemId, blueprintId, 4, List.of(), null, null)),
-            1L,
-            3L);
+            new JobOrderObservedVersions(1L, 3L));
     when(backendApiClient.put(
             eq("/api/v1/orders/{id}/items/requested"), eq(expected), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);

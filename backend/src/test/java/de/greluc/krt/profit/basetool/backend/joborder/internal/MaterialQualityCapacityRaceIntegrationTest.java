@@ -283,8 +283,7 @@ class MaterialQualityCapacityRaceIntegrationTest extends MaterialContributionTes
         observed.handle(),
         null,
         materials,
-        observed.version(),
-        observed.commentVersion());
+        new JobOrderObservedVersions(observed.version(), observed.commentVersion()));
   }
 
   /** Writes one deliberate promise through HTTP and returns its observed contribution version. */

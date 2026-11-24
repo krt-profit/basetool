@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -33,8 +35,8 @@ import org.jetbrains.annotations.Nullable;
  * @param handle optional contact handle
  * @param comment optional free-text note
  * @param items the ordered finished-item lines
- * @param version optimistic-lock version (unused on create)
- * @param commentVersion the observed comment version (unused on create)
+ * @param observed the order and comment versions an edit observed, sent as the flat {@code version}
+ *     and {@code commentVersion} fields; both empty on a create
  */
 @DtoMirror
 public record CreateJobOrderItemRequestDto(
@@ -43,5 +45,4 @@ public record CreateJobOrderItemRequestDto(
     String handle,
     String comment,
     List<CreateJobOrderItemLineDto> items,
-    Long version,
-    @Nullable Long commentVersion) {}
+    @JsonUnwrapped @NotNull JobOrderObservedVersions observed) {}

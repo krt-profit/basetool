@@ -43,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class JobOrderAuecCreation implements JobOrderCreateCommand {
 
-  private final JobOrderService orders;
+  private final JobOrderCreation orders;
   private final JobOrderMoneyTargetRepository targets;
   private final JobOrderStockProjectionService projection;
   private final AuthHelperService authHelper;
@@ -100,7 +100,7 @@ public class JobOrderAuecCreation implements JobOrderCreateCommand {
       @NotNull JobOrderWriterRule rule,
       @NotNull JobOrderActor actor,
       @NotNull Consumer<JobOrder> origin) {
-    JobOrder created = orders.createAuecJobOrder(order, rule, actor, origin);
+    JobOrder created = orders.createAuecOrder(order, rule, actor, origin);
     targets.save(new JobOrderMoneyTarget(created.getId(), order.target()));
     return created;
   }

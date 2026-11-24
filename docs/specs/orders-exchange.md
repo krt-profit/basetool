@@ -489,8 +489,8 @@ retry answered from the stored key, `rejected` for a refusal — and a refused p
   orders and creates of the UTC day; web creates and another member's creates count for neither
   (`ExchangeJobOrderCreateTest`, ingest `ExchangeJobOrderWriteRouteTest`, `ExchangeContractTest`).
 
-**Enforced by:** `JobOrderCreateCommand`, `JobOrderAuecCreation`, `JobOrderClientCreateRepository`,
-`JobOrderClientCreateCaps`, `JobOrderCreationOptions`, `JobOrderResponsibilityAudit`,
+**Enforced by:** `JobOrderCreateCommand`, `JobOrderAuecCreation`, `JobOrderCreation`,
+`JobOrderClientCreateRepository`, `JobOrderClientCreateCaps`, `JobOrderCreationOptions`, `JobOrderResponsibilityAudit`,
 `JobOrderExportSections` (job orders) ·
 `ExchangeJobOrderCreateService`, `ExchangeJobOrderWriteController` (backend exchange) ·
 `ExchangeJobOrderWriteController`, `ExchangeRoutes`, `ExchangeRelay.DETAILS` (gateway) ·
