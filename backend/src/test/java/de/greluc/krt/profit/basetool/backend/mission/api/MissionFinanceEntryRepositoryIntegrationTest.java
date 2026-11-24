@@ -23,10 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryMissionProfitAggregate;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -139,10 +139,8 @@ class MissionFinanceEntryRepositoryIntegrationTest {
 
   private Mission newMission() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("Fin-Agg-" + tag);
-    squadron.setShorthand("FA" + tag);
-    OrgUnit owner = squadronRepository.save(squadron);
+    OrgUnit owner =
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Fin-Agg-" + tag, "FA" + tag, null);
 
     Mission mission = new Mission();
     mission.setName("Fin-Agg-Mission-" + tag);

@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.List;
@@ -111,12 +110,13 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
   private Fixture prepareFixture() {
     return transactionTemplate.execute(status -> {
-      Squadron processor = new Squadron();
       String unitTag = UUID.randomUUID().toString().substring(0, 8);
-      processor.setName("Handover Processor " + unitTag);
-      processor.setShorthand("H" + unitTag);
-      withinProfit(processor, persistedProfitArea(orgUnitRepository));
-      processor = squadronRepository.save(processor);
+      Squadron processor =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository,
+              orgUnitRepository,
+              "Handover Processor " + unitTag,
+              "H" + unitTag);
 
       User user = new User();
       user.setId(UUID.randomUUID());

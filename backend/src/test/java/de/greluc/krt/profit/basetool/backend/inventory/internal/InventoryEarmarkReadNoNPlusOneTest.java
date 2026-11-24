@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -115,11 +114,9 @@ class InventoryEarmarkReadNoNPlusOneTest {
   @BeforeEach
   void signInAsAdmin() {
     String tag = UUID.randomUUID().toString().substring(0, 6);
-    Squadron squadron = new Squadron();
-    squadron.setName("Earmark Unit " + tag);
-    squadron.setShorthand("E" + tag);
-    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
-    unit = squadronRepository.save(squadron);
+    unit =
+        OrgUnitFixtures.persistedProfitSquadron(
+            squadronRepository, orgUnitRepository, "Earmark Unit " + tag, "E" + tag);
     SecurityContextHolder.getContext()
         .setAuthentication(
             new JwtAuthenticationToken(

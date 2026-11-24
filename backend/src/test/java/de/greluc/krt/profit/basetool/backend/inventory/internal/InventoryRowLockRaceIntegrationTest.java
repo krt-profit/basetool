@@ -32,11 +32,11 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.LockRace;
 import de.greluc.krt.profit.basetool.backend.support.LockRace.Caller;
 import de.greluc.krt.profit.basetool.backend.support.LockRace.Held;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.List;
 import java.util.UUID;
@@ -112,10 +112,10 @@ class InventoryRowLockRaceIntegrationTest {
     user.setId(UUID.randomUUID());
     user.setUsername("row-lock-" + tag);
     owner = userRepository.save(user);
-    Squadron unit = new Squadron();
-    unit.setName("Row lock " + tag);
-    unit.setShorthand("L" + tag.substring(0, 4));
-    unitId = squadronRepository.save(unit).getId();
+    unitId =
+        OrgUnitFixtures.persistedSquadron(
+                squadronRepository, "Row lock " + tag, "L" + tag.substring(0, 4), null)
+            .getId();
     Material material = new Material();
     material.setName("Row lock ore " + tag);
     material.setType(MaterialType.RAW);

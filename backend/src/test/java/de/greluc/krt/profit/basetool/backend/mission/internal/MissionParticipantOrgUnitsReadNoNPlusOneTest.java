@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -122,10 +123,9 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
       membership.setKind(OrgUnitKind.SQUADRON);
       membership.setJoinedAt(Instant.now());
       membershipRepository.save(membership);
-      Squadron squadron = new Squadron();
-      squadron.setName("Roster Staffel " + tag);
-      squadron.setShorthand("R" + tag);
-      staffel = squadronRepository.save(squadron);
+      staffel =
+          OrgUnitFixtures.persistedSquadron(
+              squadronRepository, "Roster Staffel " + tag, "R" + tag, null);
       SpecialCommand specialCommand = new SpecialCommand();
       specialCommand.setName("Roster Kommando " + tag);
       specialCommand.setShorthand("K" + tag);

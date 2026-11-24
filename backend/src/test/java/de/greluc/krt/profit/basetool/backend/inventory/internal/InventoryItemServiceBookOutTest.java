@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -635,8 +636,7 @@ class InventoryItemServiceBookOutTest {
 
       InventoryItem source = newItem(10.0, 1L);
 
-      Squadron orgA = new Squadron();
-      orgA.setId(UUID.randomUUID());
+      Squadron orgA = squadron(UUID.randomUUID());
       InventoryItem foreignOrgTarget = new InventoryItem();
       foreignOrgTarget.setId(UUID.randomUUID());
       foreignOrgTarget.setUser(targetUser);
@@ -647,8 +647,7 @@ class InventoryItemServiceBookOutTest {
       foreignOrgTarget.setAmount(6.0);
       foreignOrgTarget.setOwningOrgUnit(orgA);
 
-      Squadron orgB = new Squadron();
-      orgB.setId(UUID.randomUUID());
+      Squadron orgB = squadron(UUID.randomUUID());
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
       when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
@@ -679,8 +678,7 @@ class InventoryItemServiceBookOutTest {
       UUID pickedOrgUnitId = UUID.randomUUID();
       User targetUser = new User();
       targetUser.setId(targetUserId);
-      Squadron picked = new Squadron();
-      picked.setId(pickedOrgUnitId);
+      Squadron picked = squadron(pickedOrgUnitId);
       InventoryItem item = newItem(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));

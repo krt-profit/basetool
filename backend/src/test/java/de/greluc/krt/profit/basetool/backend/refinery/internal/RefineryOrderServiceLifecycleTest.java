@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -223,8 +224,7 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void onBehalf_stampedUnitWithoutALogisticianGrant_isRefused() {
-      Squadron unitB = new Squadron();
-      unitB.setId(UUID.randomUUID());
+      Squadron unitB = squadron(UUID.randomUUID());
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
       when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, unitB.getId()))
           .thenReturn(unitB);
@@ -256,8 +256,7 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void onBehalf_stampedUnitWithALogisticianGrant_isCreated() {
-      Squadron unitA = new Squadron();
-      unitA.setId(UUID.randomUUID());
+      Squadron unitA = squadron(UUID.randomUUID());
       Location cityLoc = new Location();
       cityLoc.setId(LOCATION_ID);
       City city = new City();
@@ -1135,9 +1134,7 @@ class RefineryOrderServiceLifecycleTest {
       user.setId(userId);
       when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
-          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-      resolved.setId(pickedOrgUnitId);
+      Squadron resolved = squadron(pickedOrgUnitId);
       when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
           .thenReturn(resolved);
 

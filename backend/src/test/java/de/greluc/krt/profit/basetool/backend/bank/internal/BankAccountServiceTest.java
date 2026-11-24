@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -97,8 +98,7 @@ class BankAccountServiceTest {
   @Test
   void createAccount_orgUnit_requiresReferenceAndUniqueness() {
     UUID orgUnitId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(orgUnitId);
+    Squadron squadron = squadron(orgUnitId);
     when(orgUnitRepository.findById(orgUnitId)).thenReturn(Optional.of(squadron));
     when(accountRepository.existsByOrgUnitId(orgUnitId)).thenReturn(false);
     when(accountRepository.nextAccountNoValue()).thenReturn(7L);
@@ -168,8 +168,7 @@ class BankAccountServiceTest {
   @Test
   void createAccount_secondAccountForSameOrgUnitIsRejected() {
     UUID orgUnitId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(orgUnitId);
+    Squadron squadron = squadron(orgUnitId);
     when(orgUnitRepository.findById(orgUnitId)).thenReturn(Optional.of(squadron));
     when(accountRepository.existsByOrgUnitId(orgUnitId)).thenReturn(true);
 
@@ -205,8 +204,7 @@ class BankAccountServiceTest {
                 new CreateBankAccountRequest(
                     "Bereich Profit", BankAccountType.AREA, UUID.randomUUID(), "Profit")));
     UUID staffelId = UUID.randomUUID();
-    Squadron staffel = new Squadron();
-    staffel.setId(staffelId);
+    Squadron staffel = squadron(staffelId);
     when(orgUnitRepository.findById(staffelId)).thenReturn(Optional.of(staffel));
     assertThrows(
         BadRequestException.class,
@@ -265,8 +263,7 @@ class BankAccountServiceTest {
     assertEquals(olId, saved.getValue().getOrgUnit().getId());
 
     UUID staffelId = UUID.randomUUID();
-    Squadron staffel = new Squadron();
-    staffel.setId(staffelId);
+    Squadron staffel = squadron(staffelId);
     when(accountRepository.existsByType(BankAccountType.CARTEL)).thenReturn(false);
     when(orgUnitRepository.findById(staffelId)).thenReturn(Optional.of(staffel));
     assertThrows(

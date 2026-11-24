@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -269,8 +270,7 @@ class RefineryAccessPolicyDifferentialTest {
       user.setId(owner);
       order.setOwner(user);
       if (unit != null) {
-        Squadron squadron = new Squadron();
-        squadron.setId(unit);
+        Squadron squadron = squadron(unit);
         order.setOwningOrgUnit(squadron);
       }
       when(repository.findById(id)).thenReturn(Optional.of(order));

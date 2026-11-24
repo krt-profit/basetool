@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -58,7 +59,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import java.math.BigDecimal;
@@ -329,11 +329,7 @@ class BankBookingRequestServiceTest {
     account.setName("Staffel ALPHA");
     account.setType(BankAccountType.ORG_UNIT);
     account.setStatus(BankAccountStatus.ACTIVE);
-    Squadron squadron = new Squadron();
-    squadron.setId(UUID.randomUUID());
-    squadron.setName("ALPHA");
-    squadron.setShorthand("ALP");
-    account.setOrgUnit(squadron);
+    account.setOrgUnit(squadron(UUID.randomUUID(), "ALPHA", "ALP"));
     return account;
   }
 

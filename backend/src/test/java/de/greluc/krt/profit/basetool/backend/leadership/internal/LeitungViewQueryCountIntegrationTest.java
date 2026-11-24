@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -42,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 class LeitungViewQueryCountIntegrationTest {
   @Autowired private LeitungViewService service;
   @Autowired private OrgUnitRepository repository;
+  @Autowired private SquadronRepository squadronRepository;
   @Autowired private EntityManager entityManager;
 
   @Test
@@ -80,11 +83,9 @@ class LeitungViewQueryCountIntegrationTest {
     parent.setActive(false);
     parent.setDepartment(Department.FORSCHUNG);
     repository.save(parent);
-    Squadron child = new Squadron();
-    child.setName("Active profile squadron " + token);
-    child.setShorthand("C" + token);
-    child.setParent(parent);
-    repository.save(child);
+    Squadron child =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Active profile squadron " + token, "C" + token, parent);
     return new Pair(child.getId(), parent.getName());
   }
 

@@ -61,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Map;
@@ -154,11 +155,9 @@ class UserDeletionForeignKeyIntegrityTest {
     withinProfit(sk, persistedProfitArea(orgUnitRepository));
     sk = specialCommandRepository.save(sk);
 
-    Squadron squadron = new Squadron();
-    squadron.setName("FK-SQ-" + tag);
-    squadron.setShorthand("Q" + tag);
-    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
-    squadron = squadronRepository.save(squadron);
+    Squadron squadron =
+        OrgUnitFixtures.persistedProfitSquadron(
+            squadronRepository, orgUnitRepository, "FK-SQ-" + tag, "Q" + tag);
 
     Material material = new Material();
     material.setName("FK-Mat-" + tag);

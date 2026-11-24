@@ -66,6 +66,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepo
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.backend.repository.*;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -739,11 +740,9 @@ class RefineryOrderTest {
    */
   @Test
   void storeRefusesAJobOrderOutsideTheCallersReadScopeLikeAnUnknownOne() throws Exception {
-    Squadron foreign = new Squadron();
-    foreign.setName("Refinery-Foreign");
-    foreign.setShorthand("RFX");
-    withinProfit(foreign, persistedProfitArea(orgUnitRepository));
-    foreign = squadronRepository.save(foreign);
+    Squadron foreign =
+        OrgUnitFixtures.persistedProfitSquadron(
+            squadronRepository, orgUnitRepository, "Refinery-Foreign", "RFX");
     JobOrder foreignOrder = openJobOrderNeeding(foreign, quantanium);
     RefineryOrder order = storableOrder();
 

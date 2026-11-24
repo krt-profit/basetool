@@ -39,8 +39,8 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.math.BigDecimal;
 import java.util.List;
@@ -282,10 +282,11 @@ class LikeEscapeCatalogRepositoriesDataTest {
   }
 
   private OrgUnit saveSquadron() {
-    Squadron squadron = new Squadron();
-    squadron.setName("LikeSq-" + TAG);
-    squadron.setShorthand("L" + UUID.randomUUID().toString().substring(0, 6));
-    return squadronRepository.save(squadron);
+    return OrgUnitFixtures.persistedSquadron(
+        squadronRepository,
+        "LikeSq-" + TAG,
+        "L" + UUID.randomUUID().toString().substring(0, 6),
+        null);
   }
 
   private void saveMission(OrgUnit owner, String name, String description) {

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -115,8 +116,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
   }
 
   private static JobOrder order(JobOrderItem... items) {
-    Squadron responsible = new Squadron();
-    responsible.setId(ORG_ID);
+    Squadron responsible = squadron(ORG_ID);
     return JobOrder.builder()
         .id(ORDER_ID)
         .responsibleOrgUnit(responsible)
@@ -130,8 +130,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
    * of family key.
    */
   private static JobOrder orderWithoutVariants(JobOrderItem... items) {
-    Squadron responsible = new Squadron();
-    responsible.setId(ORG_ID);
+    Squadron responsible = squadron(ORG_ID);
     return JobOrder.builder()
         .id(ORDER_ID)
         .responsibleOrgUnit(responsible)

@@ -24,8 +24,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -60,10 +60,8 @@ class MissionInternalConstraintDataTest {
     Mission ownerlessPublic = newMission(false);
     Mission ownedInternal = newMission(true);
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("Internal-" + tag);
-    squadron.setShorthand("IN" + tag);
-    ownedInternal.setOwningOrgUnit(squadronRepository.save(squadron));
+    ownedInternal.setOwningOrgUnit(
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Internal-" + tag, "IN" + tag, null));
 
     assertThat(missionRepository.saveAndFlush(ownerlessPublic).getId()).isNotNull();
     assertThat(missionRepository.saveAndFlush(ownedInternal).getId()).isNotNull();

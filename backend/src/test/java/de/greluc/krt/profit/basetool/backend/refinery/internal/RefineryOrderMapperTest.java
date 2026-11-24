@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -193,10 +194,7 @@ class RefineryOrderMapperTest {
 
   @Test
   void toListDto_shouldProjectStaffelOwnerIntoOwningSquadron() {
-    Squadron squadron = new Squadron();
-    squadron.setId(UUID.randomUUID());
-    squadron.setName("ALPHA");
-    squadron.setShorthand("ALP");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
     RefineryOrder order = new RefineryOrder();
     order.setId(UUID.randomUUID());
     order.setOwningOrgUnit(squadron);

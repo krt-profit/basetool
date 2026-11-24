@@ -24,8 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -98,10 +98,11 @@ class MissionSearchOrgUnitFilterDataTest {
   }
 
   private OrgUnit saveSquadron(String suffix) {
-    Squadron squadron = new Squadron();
-    squadron.setName("OuSq" + suffix + "-" + TAG);
-    squadron.setShorthand(suffix + UUID.randomUUID().toString().substring(0, 6));
-    return squadronRepository.save(squadron);
+    return OrgUnitFixtures.persistedSquadron(
+        squadronRepository,
+        "OuSq" + suffix + "-" + TAG,
+        suffix + UUID.randomUUID().toString().substring(0, 6),
+        null);
   }
 
   private void saveMission(OrgUnit owner, String name, boolean internal) {

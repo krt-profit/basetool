@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -330,10 +331,8 @@ class BankLedgerSplitDepositTest {
    */
   private static BankAccount squadronAccount() {
     UUID orgUnitId = UUID.randomUUID();
-    OrgUnit squadron = new Squadron();
-    squadron.setId(orgUnitId);
-    squadron.setName("Staffel " + orgUnitId);
-    squadron.setShorthand("S" + orgUnitId.toString().substring(0, 4));
+    OrgUnit squadron =
+        squadron(orgUnitId, "Staffel " + orgUnitId, "S" + orgUnitId.toString().substring(0, 4));
     BankAccount account = new BankAccount();
     account.setId(UUID.randomUUID());
     account.setAccountNo("KB-" + orgUnitId.toString().substring(0, 4));

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -701,13 +702,9 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldSucceed_whenInventoryItemBelongsToForeignSquadron() {
     de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron squadronA =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    squadronA.setId(UUID.randomUUID());
-    squadronA.setShorthand("ALF");
+        squadron(UUID.randomUUID(), null, "ALF");
     de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron squadronB =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    squadronB.setId(UUID.randomUUID());
-    squadronB.setShorthand("BRV");
+        squadron(UUID.randomUUID(), null, "BRV");
 
     order.setResponsibleOrgUnit(squadronA);
     order.setRequestingOrgUnit(squadronA);

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
@@ -52,8 +53,7 @@ class OwnerScopeServiceTest {
 
   @Test
   void requireLogisticianInOwnerPassesWithReachInTheOwningUnit() {
-    Squadron unit = new Squadron();
-    unit.setId(UNIT);
+    Squadron unit = squadron(UNIT);
     when(accessGateService.canActAsLogisticianInOwner(UNIT)).thenReturn(true);
 
     assertThatCode(() -> service.requireLogisticianInOwner(unit)).doesNotThrowAnyException();
@@ -61,8 +61,7 @@ class OwnerScopeServiceTest {
 
   @Test
   void requireLogisticianInOwnerRefusesWithoutReach() {
-    Squadron unit = new Squadron();
-    unit.setId(UNIT);
+    Squadron unit = squadron(UNIT);
     when(accessGateService.canActAsLogisticianInOwner(UNIT)).thenReturn(false);
 
     assertThatThrownBy(() -> service.requireLogisticianInOwner(unit))

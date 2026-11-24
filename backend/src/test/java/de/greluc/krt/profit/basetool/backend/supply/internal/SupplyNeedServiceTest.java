@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -620,8 +621,7 @@ class SupplyNeedServiceTest {
   }
 
   private JobOrder order(UUID responsibleUnit, JobOrderStatus status) {
-    Squadron unit = new Squadron();
-    unit.setId(responsibleUnit);
+    Squadron unit = squadron(responsibleUnit);
     JobOrder order = new JobOrder();
     order.setId(UUID.randomUUID());
     order.setDisplayId(42);

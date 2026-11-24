@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.*;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -133,10 +134,7 @@ class MissionUnitCrewTest {
     crewJob.setArchetype(JobTypeArchetype.CREW);
     jobTypeRepository.save(crewJob);
 
-    Squadron sq = new Squadron();
-    sq.setName("Test Sq");
-    sq.setShorthand("TSQ");
-    squadronRepository.save(sq);
+    OrgUnitFixtures.persistedSquadron(squadronRepository, "Test Sq", "TSQ", null);
   }
 
   @Test

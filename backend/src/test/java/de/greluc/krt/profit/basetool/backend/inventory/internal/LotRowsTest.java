@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -65,8 +66,7 @@ class LotRowsTest {
     material.setId(UUID.randomUUID());
     Location location = new Location();
     location.setId(UUID.randomUUID());
-    Squadron unit = new Squadron();
-    unit.setId(UUID.randomUUID());
+    Squadron unit = squadron(UUID.randomUUID());
     InventoryItem row = new InventoryItem();
     row.setId(UUID.randomUUID());
     row.setUser(owner);

@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -360,10 +361,8 @@ class RefineryOrderRepositoryListFilterTest {
   @NotNull
   private Squadron createSquadron() {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("ListFilter Refinery " + suffix);
-    squadron.setShorthand("LFR" + suffix);
-    return squadronRepository.saveAndFlush(squadron);
+    return OrgUnitFixtures.persistedSquadron(
+        squadronRepository, "ListFilter Refinery " + suffix, "LFR" + suffix, null);
   }
 
   /**

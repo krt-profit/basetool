@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
@@ -36,9 +34,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -66,8 +63,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @SpringBootTest
 class RetainedSeatWithoutKrtMemberIntegrationTest {
 
-  @Autowired private OrgUnitRepository orgUnitRepository;
-
   @Autowired private CustomJwtGrantedAuthoritiesConverter converter;
   @Autowired private AccessGateService accessGateService;
   @Autowired private RequestScopeResolver requestScopeResolver;
@@ -91,12 +86,9 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
     area.setName("Seat-Bereich-" + tag);
     area.setShorthand("SB" + tag);
     bereich = bereichRepository.save(area);
-    Squadron staffel = new Squadron();
-    staffel.setName("Seat-Staffel-" + tag);
-    staffel.setShorthand("SS" + tag);
-    withinProfit(staffel, persistedProfitArea(orgUnitRepository));
-    staffel.setParent(area);
-    squadron = squadronRepository.save(staffel);
+    squadron =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Seat-Staffel-" + tag, "SS" + tag, area);
   }
 
   @AfterEach

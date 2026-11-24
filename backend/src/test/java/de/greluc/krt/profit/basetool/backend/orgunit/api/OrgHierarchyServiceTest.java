@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -60,8 +61,7 @@ class OrgHierarchyServiceTest {
 
   @Test
   void listAllOrgUnits_delegatesToRepository() {
-    Squadron staffel = new Squadron();
-    staffel.setId(UUID.randomUUID());
+    Squadron staffel = squadron(UUID.randomUUID());
     when(orgUnitRepository.findAllActiveWithParent()).thenReturn(List.of(staffel));
 
     List<OrgUnit> result = service.listAllOrgUnits();
@@ -99,8 +99,7 @@ class OrgHierarchyServiceTest {
   @Test
   void createBereich_parentNotOrganisationsleitung_throwsBadRequest() {
     UUID parentId = UUID.randomUUID();
-    Squadron notAnOl = new Squadron();
-    notAnOl.setId(parentId);
+    Squadron notAnOl = squadron(parentId);
     when(bereichRepository.existsByNameIgnoreCase("Profit")).thenReturn(false);
     when(orgUnitRepository.findById(parentId)).thenReturn(Optional.of(notAnOl));
 
@@ -151,8 +150,7 @@ class OrgHierarchyServiceTest {
   void setParent_squadronToBereich_persists() {
     UUID squadronId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
+    Squadron squadron = squadron(squadronId);
     squadron.setVersion(0L);
     Bereich bereich = new Bereich();
     bereich.setId(bereichId);
@@ -170,8 +168,7 @@ class OrgHierarchyServiceTest {
   void setParent_squadronToOl_throwsBadRequest() {
     UUID squadronId = UUID.randomUUID();
     UUID olId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
+    Squadron squadron = squadron(squadronId);
     squadron.setVersion(0L);
     Organisationsleitung ol = new Organisationsleitung();
     ol.setId(olId);
@@ -186,8 +183,7 @@ class OrgHierarchyServiceTest {
   @Test
   void setParent_staleVersion_throwsOptimisticLock() {
     UUID squadronId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
+    Squadron squadron = squadron(squadronId);
     squadron.setVersion(5L);
     when(orgUnitRepository.findById(squadronId)).thenReturn(Optional.of(squadron));
 
@@ -200,8 +196,7 @@ class OrgHierarchyServiceTest {
   @Test
   void setParent_nullParent_detaches() {
     UUID squadronId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
+    Squadron squadron = squadron(squadronId);
     squadron.setVersion(0L);
     Bereich oldParent = new Bereich();
     squadron.setParent(oldParent);

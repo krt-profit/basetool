@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationDto;
@@ -70,10 +71,7 @@ class OperationMapperTest {
   @Test
   void theEmbeddedOperationOfAMissionIsTheOperationDtoOnTheWire() {
     UUID id = UUID.randomUUID();
-    Squadron owner = new Squadron();
-    owner.setId(UUID.randomUUID());
-    owner.setName("Staffel Nord");
-    owner.setShorthand("SN");
+    Squadron owner = squadron(UUID.randomUUID(), "Staffel Nord", "SN");
     Operation entity = new Operation();
     entity.setId(id);
     entity.setName("Operation Sunfire");

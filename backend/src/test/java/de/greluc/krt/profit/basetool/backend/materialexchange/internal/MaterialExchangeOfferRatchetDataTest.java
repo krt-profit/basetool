@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -83,10 +84,12 @@ class MaterialExchangeOfferRatchetDataTest {
 
   @BeforeEach
   void createFixtureUnit() {
-    fixtureUnit = new Squadron();
-    fixtureUnit.setName("Offer scope " + UUID.randomUUID());
-    fixtureUnit.setShorthand("OF" + UUID.randomUUID().toString().substring(0, 6));
-    fixtureUnit = squadronRepository.save(fixtureUnit);
+    fixtureUnit =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository,
+            "Offer scope " + UUID.randomUUID(),
+            "OF" + UUID.randomUUID().toString().substring(0, 6),
+            null);
   }
 
   @Test

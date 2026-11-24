@@ -27,8 +27,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -69,15 +69,14 @@ class OrgUnitBankVisibleAccountsReadNoNPlusOneTest {
   void orderingByOrgUnitStaysStatementBounded_independentOfAccountCount() throws Exception {
     String tag = UUID.randomUUID().toString().substring(0, 6);
     for (int i = 0; i < ACCOUNTS; i++) {
-      Squadron squadron = new Squadron();
-      squadron.setName("Visible Staffel " + tag + " " + i);
-      squadron.setShorthand("V" + tag + i);
       BankAccount account = new BankAccount();
       account.setAccountNo(String.format("KB-%04d", accountRepository.nextAccountNoValue()));
       account.setName("Visible Konto " + tag + " " + i);
       account.setType(BankAccountType.ORG_UNIT);
       account.setStatus(BankAccountStatus.ACTIVE);
-      account.setOrgUnit(squadronRepository.save(squadron));
+      account.setOrgUnit(
+          OrgUnitFixtures.persistedSquadron(
+              squadronRepository, "Visible Staffel " + tag + " " + i, "V" + tag + i, null));
       accountRepository.save(account);
     }
     User admin = new User();

@@ -34,12 +34,12 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
 import de.greluc.krt.profit.basetool.backend.support.LockRace;
 import de.greluc.krt.profit.basetool.backend.support.LockRace.Caller;
 import de.greluc.krt.profit.basetool.backend.support.LockRace.Held;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.Optional;
 import java.util.UUID;
@@ -97,10 +97,10 @@ class SupplyDonationStockLockRaceIntegrationTest {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     donor = user("donation-lock-donor-" + tag);
     admin = user("donation-lock-admin-" + tag);
-    Squadron unit = new Squadron();
-    unit.setName("Donation lock " + tag);
-    unit.setShorthand("D" + tag.substring(0, 4));
-    unitId = squadronRepository.save(unit).getId();
+    unitId =
+        OrgUnitFixtures.persistedSquadron(
+                squadronRepository, "Donation lock " + tag, "D" + tag.substring(0, 4), null)
+            .getId();
     unitSettingRepository.save(new SupplyUnitSetting(unitId, false, true));
     Material material = new Material();
     material.setName("Donation lock ore " + tag);

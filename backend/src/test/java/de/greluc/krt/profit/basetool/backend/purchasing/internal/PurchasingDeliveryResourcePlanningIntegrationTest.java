@@ -46,8 +46,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.DealStatus;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PartnerChannel;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PartnerContact;
@@ -59,6 +58,7 @@ import de.greluc.krt.profit.basetool.backend.supply.api.PurchaseReason;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyNeeds;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyNeed;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyNeedRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.List;
 import java.util.UUID;
@@ -83,7 +83,7 @@ class PurchasingDeliveryResourcePlanningIntegrationTest {
   @Autowired private TransactionTemplate transactions;
   @Autowired private SystemSettings systemSettings;
   @Autowired private UserRepository users;
-  @Autowired private OrgUnitRepository units;
+  @Autowired private SquadronRepository squadrons;
   @Autowired private MaterialRepository materials;
   @Autowired private LocationRepository locations;
   @Autowired private CityRepository cities;
@@ -297,9 +297,10 @@ class PurchasingDeliveryResourcePlanningIntegrationTest {
 
   /** Persists a pool outside the valid Profit order-processing hierarchy. */
   private OrgUnit unit() {
-    Squadron unit = new Squadron();
-    unit.setName("Purchase pool " + UUID.randomUUID());
-    unit.setShorthand("PP" + UUID.randomUUID().toString().substring(0, 6));
-    return units.saveAndFlush(unit);
+    return OrgUnitFixtures.persistedSquadron(
+        squadrons,
+        "Purchase pool " + UUID.randomUUID(),
+        "PP" + UUID.randomUUID().toString().substring(0, 6),
+        null);
   }
 }

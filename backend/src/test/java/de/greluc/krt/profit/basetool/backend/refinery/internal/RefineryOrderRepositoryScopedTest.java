@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -143,10 +144,8 @@ class RefineryOrderRepositoryScopedTest {
    */
   private Squadron createSecondSquadron() {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("ScopeTest Refinery " + suffix);
-    squadron.setShorthand("STR" + suffix);
-    return squadronRepository.saveAndFlush(squadron);
+    return OrgUnitFixtures.persistedSquadron(
+        squadronRepository, "ScopeTest Refinery " + suffix, "STR" + suffix, null);
   }
 
   /**

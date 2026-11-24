@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
@@ -77,8 +78,7 @@ class OrgUnitStampingStampableUnitsTest {
             new OrgUnitSeatEligibility(orgUnitMembershipRepository, userRepository));
     owner = new User();
     owner.setId(UUID.randomUUID());
-    hel = new Squadron();
-    hel.setId(HEL);
+    hel = squadron(HEL);
     lenient().when(orgUnitRepository.findById(HEL)).thenReturn(Optional.of(hel));
     lenient().when(requestScopeResolver.currentPin()).thenReturn(Optional.empty());
     when(orgUnitMembershipRepository.findActiveOrgUnitIdsByUserId(owner.getId()))
@@ -159,8 +159,7 @@ class OrgUnitStampingStampableUnitsTest {
   @Test
   void aCallerWithEditReachCannotExplicitlyAssignNewRowsToAnInactiveUnit() {
     UUID inactiveUnitId = UUID.randomUUID();
-    Squadron inactiveUnit = new Squadron();
-    inactiveUnit.setId(inactiveUnitId);
+    Squadron inactiveUnit = squadron(inactiveUnitId);
     inactiveUnit.setActive(false);
     when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
     when(accessGateService.canEditSquadron(inactiveUnitId)).thenReturn(true);
@@ -178,8 +177,7 @@ class OrgUnitStampingStampableUnitsTest {
   void aMissionWithoutAPickLandsOnTheHonouredPin() {
     when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
     when(requestScopeResolver.currentPin()).thenReturn(Optional.of(PINNED_STAFFEL));
-    Squadron pinned = new Squadron();
-    pinned.setId(PINNED_STAFFEL);
+    Squadron pinned = squadron(PINNED_STAFFEL);
     when(orgUnitRepository.findById(PINNED_STAFFEL)).thenReturn(Optional.of(pinned));
 
     assertThat(service.resolveOrgUnitForUnitOwnedAggregate(owner, null)).isSameAs(pinned);

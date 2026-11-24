@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -127,8 +128,7 @@ class InventoryItemServicePersonalRebookTest {
     material.setId(UUID.randomUUID());
     material.setName("Quantanium");
 
-    sourceOrgUnit = new Squadron();
-    sourceOrgUnit.setId(UUID.randomUUID());
+    sourceOrgUnit = squadron(UUID.randomUUID());
 
     lenient().when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(SENTINEL);
     lenient()
@@ -236,8 +236,7 @@ class InventoryItemServicePersonalRebookTest {
     void partial_savesSharedRowAndDecrementsSource() {
       InventoryItem item = newItem(10.0, 1L, true);
       item.setOwningOrgUnit(sourceOrgUnit);
-      Squadron picked = new Squadron();
-      picked.setId(UUID.randomUUID());
+      Squadron picked = squadron(UUID.randomUUID());
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       UUID pickedId = UUID.randomUUID();
       when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
@@ -295,8 +294,7 @@ class InventoryItemServicePersonalRebookTest {
     void full_deletesSourceAndSavesSharedRow() {
       InventoryItem item = newItem(5.0, 1L, true);
       item.setOwningOrgUnit(sourceOrgUnit);
-      Squadron picked = new Squadron();
-      picked.setId(UUID.randomUUID());
+      Squadron picked = squadron(UUID.randomUUID());
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       UUID pickedId = UUID.randomUUID();
       when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
