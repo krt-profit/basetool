@@ -908,6 +908,7 @@ public class JobOrderWriteController {
       JobOrderHandoverCreateDto dto =
           new JobOrderHandoverCreateDto(
               parseHandoverTime(form.getHandoverTime()),
+              form.getHandingOverUserId(),
               form.getRecipientHandle(),
               form.getRecipientSquadron(),
               items);
@@ -963,7 +964,10 @@ public class JobOrderWriteController {
 
       JobOrderItemHandoverCreateDto dto =
           new JobOrderItemHandoverCreateDto(
-              parseHandoverTime(form.getHandoverTime()), form.getRecipientHandle(), entries);
+              parseHandoverTime(form.getHandoverTime()),
+              form.getHandingOverUserId(),
+              form.getRecipientHandle(),
+              entries);
       jobOrderClient.createItemHandover(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
     } catch (BackendServiceException bse) {
@@ -1039,6 +1043,7 @@ public class JobOrderWriteController {
       JobOrderHandoverCreateDto dto =
           new JobOrderHandoverCreateDto(
               parseHandoverTime(form.getHandoverTime()),
+              form.getHandingOverUserId(),
               form.getRecipientHandle(),
               form.getRecipientSquadron(),
               items);
@@ -1076,7 +1081,10 @@ public class JobOrderWriteController {
     try {
       JobOrderItemHandoverCreateDto dto =
           new JobOrderItemHandoverCreateDto(
-              parseHandoverTime(form.getHandoverTime()), form.getRecipientHandle(), entries);
+              parseHandoverTime(form.getHandoverTime()),
+              form.getHandingOverUserId(),
+              form.getRecipientHandle(),
+              entries);
       jobOrderClient.createItemHandover(id, dto);
       JobOrderDto order = jobOrderClient.order(id);
       return ResponseEntity.ok(order);

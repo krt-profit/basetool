@@ -28,16 +28,20 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverEntry;
+import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
+import de.greluc.krt.profit.basetool.backend.support.PdfText;
 import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,19 +53,22 @@ import org.springframework.context.MessageSource;
 
 /**
  * Unit tests for {@link JobOrderItemHandoverReportService}: a valid PDF is produced for a persisted
- * item handover (carrying the order number and produced item names), and a handover belonging to a
- * different order is rejected.
+ * item handover (carrying the order number, produced item names and the handing-over member), and a
+ * handover belonging to a different order is rejected.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemHandoverReportServiceTest {
 
+  private static final String HANDING_OVER_LABEL = "ÜBERGEBENDER (HANDLE)";
+
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
 
+  private MessageSource messages;
   private JobOrderItemHandoverReportService service;
 
   @BeforeEach
   void setUp() {
-    MessageSource messages = BackendMessages.bundle();
+    messages = BackendMessages.bundle();
     service =
         new JobOrderItemHandoverReportService(
             jobOrderItemHandoverRepository,
@@ -104,6 +111,7 @@ class JobOrderItemHandoverReportServiceTest {
             "DATUM DER ÜBERGABE",
             "UHRZEIT DER ÜBERGABE",
             "10:00 (Lokalzeit)",
+            HANDING_OVER_LABEL,
             "EMPFÄNGER (HANDLE)",
             "ÜBERGEBENE GÜTER",
             "GUT",
@@ -138,6 +146,47 @@ class JobOrderItemHandoverReportServiceTest {
             () -> service.generateItemHandoverReport(UUID.randomUUID(), handoverId, ZoneOffset.UTC))
         .isInstanceOf(NotFoundException.class)
         .hasMessageContaining("does not belong");
+  }
+
+  /** The delivery note names the handing-over member in its own row (REQ-ORDERS-079). */
+  @Test
+  void showsTheHandingOverMember() throws Exception {
+    assertThat(handingOverRow("Chewie")).isEqualTo("Chewie");
+  }
+
+  /** A handover that names no handing-over member shows a dash in that row. */
+  @Test
+  void showsADashWhenNoHandingOverMemberIsRecorded() throws Exception {
+    assertThat(handingOverRow(null)).isEqualTo("-");
+  }
+
+  /** An erased handing-over handle prints the anonymised label, never the sentinel. */
+  @Test
+  void showsTheAnonymisedLabelForAnErasedHandingOverHandle() throws Exception {
+    assertThat(handingOverRow(HandleAnonymisation.SENTINEL))
+        .isEqualTo(messages.getMessage("general.anonymisedHandle", null, Locale.GERMAN));
+  }
+
+  /**
+   * Renders the delivery note of a handover naming {@code handingOverHandle} and reads its
+   * handing-over row.
+   *
+   * @param handingOverHandle the stored handle snapshot, or {@code null} for none
+   * @return the value printed in the handing-over row
+   * @throws Exception when the PDF cannot be read
+   */
+  private String handingOverRow(@Nullable String handingOverHandle) throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID handoverId = UUID.randomUUID();
+    JobOrderItemHandover handover = handover(orderId, "Ballista", 3);
+    handover.setHandingOverHandle(handingOverHandle);
+    when(jobOrderItemHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    String text =
+        PdfText.of(service.generateItemHandoverReport(orderId, handoverId, ZoneOffset.UTC));
+
+    assertThat(text).doesNotContain(HandleAnonymisation.SENTINEL);
+    return PdfText.rowValue(text, HANDING_OVER_LABEL, "EMPFÄNGER (HANDLE)");
   }
 
   private static JobOrderItemHandover handover(UUID orderId, String itemName, int amount) {

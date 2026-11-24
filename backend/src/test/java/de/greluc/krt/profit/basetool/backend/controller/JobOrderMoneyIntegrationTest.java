@@ -319,6 +319,8 @@ class JobOrderMoneyIntegrationTest {
                         Map.of(
                             "handoverTime",
                             Instant.now().toString(),
+                            "handingOverUserId",
+                            writer,
                             "recipientHandle",
                             "Fixture recipient",
                             "items",

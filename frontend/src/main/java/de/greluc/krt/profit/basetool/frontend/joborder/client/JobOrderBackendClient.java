@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptio
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverGiverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverCreateDto;
@@ -127,6 +128,9 @@ public class JobOrderBackendClient {
 
   private static final ParameterizedTypeReference<List<JobOrderAssigneeCandidateDto>>
       LIST_OF_ASSIGNEE_CANDIDATE = new ParameterizedTypeReference<>() {};
+
+  private static final ParameterizedTypeReference<List<JobOrderHandoverGiverDto>>
+      LIST_OF_HANDOVER_GIVER = new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<List<JobOrderNumberHitDto>> LIST_OF_NUMBER_HIT =
       new ParameterizedTypeReference<>() {};
@@ -478,6 +482,18 @@ public class JobOrderBackendClient {
         LIST_OF_ASSIGNEE_CANDIDATE,
         id,
         query);
+  }
+
+  /**
+   * Lists the members of the order's processing unit who may be named as handing a handover over
+   * (REQ-ORDERS-079).
+   *
+   * @param id the order
+   * @return the members ordered by handle, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<JobOrderHandoverGiverDto> handoverGivers(@NotNull UUID id) {
+    return backendApiClient.get("/api/v1/orders/{id}/handover-givers", LIST_OF_HANDOVER_GIVER, id);
   }
 
   /**

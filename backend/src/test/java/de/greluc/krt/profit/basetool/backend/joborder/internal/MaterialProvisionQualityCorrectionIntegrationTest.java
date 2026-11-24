@@ -50,6 +50,7 @@ class MaterialProvisionQualityCorrectionIntegrationTest extends MaterialContribu
     var handover =
         new JobOrderHandoverCreateDto(
             Instant.now(),
+            handingOverMember(fixture),
             "Handover recipient",
             null,
             List.of(new JobOrderHandoverItemCreateDto(source.rowId(), 3.0, null, null)));

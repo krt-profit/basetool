@@ -27,16 +27,19 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
+import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
+import de.greluc.krt.profit.basetool.backend.support.PdfText;
 import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -46,14 +49,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openpdf.text.pdf.PdfReader;
-import org.openpdf.text.pdf.parser.PdfTextExtractor;
 import org.springframework.context.MessageSource;
 
 @ExtendWith(MockitoExtension.class)
 class JobOrderHandoverReportServiceTest {
 
+  private static final String HANDING_OVER_LABEL = "ÜBERGEBENDER (HANDLE)";
+  private static final String RECIPIENT_LABEL = "EMPFÄNGER (HANDLE)";
+
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
 
+  private MessageSource messages;
   private JobOrderHandoverReportService service;
 
   private UUID jobOrderId;
@@ -63,7 +69,7 @@ class JobOrderHandoverReportServiceTest {
 
   @BeforeEach
   void setUp() {
-    MessageSource messages = BackendMessages.bundle();
+    messages = BackendMessages.bundle();
     service =
         new JobOrderHandoverReportService(
             jobOrderHandoverRepository,
@@ -170,7 +176,7 @@ class JobOrderHandoverReportServiceTest {
     byte[] pdf = service.generateHandoverReport(jobOrderId, handoverId, null);
 
     assertNotNull(pdf);
-    String pdfContent = extractAllText(pdf);
+    String pdfContent = PdfText.of(pdf);
     assertTrue(pdfContent.contains("RecipientOnly"), "Recipient handle must be present in PDF");
     assertFalse(pdfContent.contains("BESITZER"), "Previous owner must NOT appear in PDF");
     assertFalse(pdfContent.contains("OWNER"), "Previous owner must NOT appear in PDF");
@@ -182,6 +188,7 @@ class JobOrderHandoverReportServiceTest {
         new HandoverReportPreviewRequestDto(
             "#42",
             LocalDateTime.parse("2025-06-15T10:30:00"),
+            "Giver",
             "PreviewPilot",
             List.of(
                 new HandoverReportPreviewRequestDto.HandoverReportItemDto(
@@ -211,13 +218,14 @@ class JobOrderHandoverReportServiceTest {
                 "Laranite", "E", 5.0, 90, "SCU"));
 
     HandoverReportPreviewRequestDto dto =
-        new HandoverReportPreviewRequestDto("#7", LocalDateTime.now(), "SortTestPilot", items);
+        new HandoverReportPreviewRequestDto(
+            "#7", LocalDateTime.now(), "Giver", "SortTestPilot", items);
 
     byte[] pdf = service.generateHandoverReportPreview(dto);
 
     assertNotNull(pdf);
     assertTrue(pdf.length > 0);
-    String pdfContent = extractAllText(pdf);
+    String pdfContent = PdfText.of(pdf);
     assertTrue(pdfContent.contains("Agricium"));
     assertTrue(pdfContent.contains("Laranite"));
     assertTrue(pdfContent.contains("Titanium"));
@@ -226,7 +234,8 @@ class JobOrderHandoverReportServiceTest {
   @Test
   void generateHandoverReportPreview_shouldHandleEmptyItemList() {
     HandoverReportPreviewRequestDto dto =
-        new HandoverReportPreviewRequestDto("#0", LocalDateTime.now(), "EmptyPilot", List.of());
+        new HandoverReportPreviewRequestDto(
+            "#0", LocalDateTime.now(), "Giver", "EmptyPilot", List.of());
 
     byte[] pdf = service.generateHandoverReportPreview(dto);
 
@@ -240,6 +249,7 @@ class JobOrderHandoverReportServiceTest {
         new HandoverReportPreviewRequestDto(
             "#5",
             LocalDateTime.now(),
+            "Giver",
             "RecipientHandle",
             List.of(
                 new HandoverReportPreviewRequestDto.HandoverReportItemDto(
@@ -248,7 +258,7 @@ class JobOrderHandoverReportServiceTest {
     byte[] pdf = service.generateHandoverReportPreview(dto);
 
     assertNotNull(pdf);
-    String pdfContent = extractAllText(pdf);
+    String pdfContent = PdfText.of(pdf);
     assertFalse(pdfContent.contains("BESITZER"), "Owner field must NOT appear in preview PDF");
     assertFalse(pdfContent.contains("OWNER"), "Owner field must NOT appear in preview PDF");
   }
@@ -260,7 +270,7 @@ class JobOrderHandoverReportServiceTest {
     handover.setItems(Set.of(item));
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
-    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
 
     assertTrue(text.contains("ÜBERGABEPROTOKOLL"), "Title must appear in PDF");
     assertTrue(text.contains("AUFTRAGSNUMMER"));
@@ -276,7 +286,7 @@ class JobOrderHandoverReportServiceTest {
     handover.setItems(Set.of(item));
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
-    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
 
     assertTrue(text.contains("#42"), "Job order number '#42' must appear");
     assertTrue(text.contains("15.06.2025"), "Handover date must appear in dd.MM.yyyy");
@@ -292,7 +302,7 @@ class JobOrderHandoverReportServiceTest {
     handover.setItems(Set.of(item));
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
-    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
 
     assertTrue(text.contains("ÜBERGEBENE MATERIALIEN"), "Section header must appear");
     assertTrue(text.contains("MATERIAL"));
@@ -308,7 +318,7 @@ class JobOrderHandoverReportServiceTest {
     handover.setItems(Set.of(item));
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
-    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
 
     String expectedAmount = String.format("%.3f SCU", 5.0);
     assertTrue(text.contains("Laranite"));
@@ -326,7 +336,7 @@ class JobOrderHandoverReportServiceTest {
     handover.setItems(Set.of(item));
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
-    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
 
     assertTrue(
         text.matches(
@@ -339,7 +349,7 @@ class JobOrderHandoverReportServiceTest {
     handover.setItems(Set.of());
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
-    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
 
     assertTrue(
         text.contains("Keine Materialien vorhanden."),
@@ -354,7 +364,7 @@ class JobOrderHandoverReportServiceTest {
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
     String text =
-        extractAllText(
+        PdfText.of(
             service.generateHandoverReport(jobOrderId, handoverId, ZoneId.of("Europe/Berlin")));
 
     assertTrue(
@@ -371,7 +381,7 @@ class JobOrderHandoverReportServiceTest {
     handover.setItems(Set.of(item));
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
-    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
 
     assertTrue(text.contains("25"), "PIECE amount must render as integer '25'");
     String scuFormatted = String.format("%.3f SCU", 25.0);
@@ -391,7 +401,7 @@ class JobOrderHandoverReportServiceTest {
     handover.setItems(Set.of(laraniteLowQ, laraniteHighQLowA, laraniteHighQHighA, agriciumItem));
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
-    String text = extractAllText(service.generateHandoverReport(jobOrderId, handoverId, null));
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
 
     int idxAgricium = text.indexOf("LocAgricium");
     int idxHighQHighA = text.indexOf("LocHighQHighA");
@@ -428,12 +438,13 @@ class JobOrderHandoverReportServiceTest {
         new HandoverReportPreviewRequestDto(
             "#777",
             LocalDateTime.parse("2025-12-01T14:45:00"),
+            "Giver",
             "PreviewPilot",
             List.of(
                 new HandoverReportPreviewRequestDto.HandoverReportItemDto(
                     "Laranite", "Port Olisar", 3.5, 90, "SCU")));
 
-    String text = extractAllText(service.generateHandoverReportPreview(dto));
+    String text = PdfText.of(service.generateHandoverReportPreview(dto));
 
     assertTrue(text.contains("ÜBERGABEPROTOKOLL"));
     assertTrue(text.contains("#777"));
@@ -454,17 +465,72 @@ class JobOrderHandoverReportServiceTest {
         new HandoverReportPreviewRequestDto(
             "#1",
             LocalDateTime.parse("2025-06-15T14:45:00"),
+            "Giver",
             "Pilot",
             List.of(
                 new HandoverReportPreviewRequestDto.HandoverReportItemDto(
                     "X", "Y", 1.0, 50, "SCU")));
 
-    String text = extractAllText(service.generateHandoverReportPreview(dto));
+    String text = PdfText.of(service.generateHandoverReportPreview(dto));
 
     assertTrue(
         text.contains("14:45"),
         "Time must render as entered (no zone conversion in preview branch)");
     assertTrue(text.contains("15.06.2025"));
+  }
+
+  /** The protocol names the handing-over member in its own row (REQ-ORDERS-079). */
+  @Test
+  void generateHandoverReport_showsTheHandingOverMember() throws IOException {
+    handover.setHandingOverHandle("Chewie");
+    handover.setItems(Set.of());
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    assertEquals("Chewie", handingOverRow(text));
+  }
+
+  /** A handover that names no handing-over member shows a dash in that row. */
+  @Test
+  void generateHandoverReport_showsADash_whenNoHandingOverMemberIsRecorded() throws IOException {
+    handover.setItems(Set.of());
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    assertEquals("-", handingOverRow(text));
+  }
+
+  /** An erased handing-over handle prints the anonymised label, never the sentinel. */
+  @Test
+  void generateHandoverReport_showsTheAnonymisedLabel_forAnErasedHandingOverHandle()
+      throws IOException {
+    handover.setHandingOverHandle(HandleAnonymisation.SENTINEL);
+    handover.setItems(Set.of());
+    when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
+
+    assertEquals(
+        messages.getMessage("general.anonymisedHandle", null, Locale.GERMAN), handingOverRow(text));
+    assertFalse(text.contains(HandleAnonymisation.SENTINEL), "The sentinel must not be printed");
+  }
+
+  /** The preview names the handing-over member chosen in the form. */
+  @Test
+  void generateHandoverReportPreview_showsTheChosenHandingOverMember() throws IOException {
+    HandoverReportPreviewRequestDto dto =
+        new HandoverReportPreviewRequestDto(
+            "#3", LocalDateTime.parse("2025-06-15T14:45:00"), "Chewie", "Pilot", List.of());
+
+    String text = PdfText.of(service.generateHandoverReportPreview(dto));
+
+    assertEquals("Chewie", handingOverRow(text));
+  }
+
+  private static String handingOverRow(String text) {
+    return PdfText.rowValue(text, HANDING_OVER_LABEL, RECIPIENT_LABEL);
   }
 
   private Material buildMaterial(String name, QuantityType quantityType) {
@@ -484,20 +550,6 @@ class JobOrderHandoverReportServiceTest {
     item.setQuality(quality);
     item.setLocationName(locationName);
     return item;
-  }
-
-  private static String extractAllText(byte[] pdf) throws IOException {
-    PdfReader reader = new PdfReader(pdf);
-    try {
-      PdfTextExtractor extractor = new PdfTextExtractor(reader);
-      StringBuilder sb = new StringBuilder();
-      for (int i = 1; i <= reader.getNumberOfPages(); i++) {
-        sb.append(extractor.getTextFromPage(i)).append('\n');
-      }
-      return sb.toString();
-    } finally {
-      reader.close();
-    }
   }
 
   private static int countPages(byte[] pdf) throws IOException {

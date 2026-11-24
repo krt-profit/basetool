@@ -75,6 +75,7 @@ public class JobOrderHandoverService {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final OrgUnitRepository orgUnitRepository;
   private final AuditRecorder auditRecorder;
+  private final JobOrderHandoverGivers givers;
 
   /**
    * Snapshot of one handed-over inventory row, taken before it is decremented or deleted, for
@@ -101,6 +102,8 @@ public class JobOrderHandoverService {
    * Creates a job-order handover and atomically applies its effects.
    *
    * <ul>
+   *   <li>records the named handing-over member, an active direct member of the processing unit
+   *       (REQ-ORDERS-079), else 400,
    *   <li>reduces inventory amounts, deleting fully consumed rows,
    *   <li>credits each item to the requirement lines it fulfils and records the rest as its
    *       surplus, leaving every line's requested amount unchanged (ADR-0400),
@@ -131,6 +134,7 @@ public class JobOrderHandoverService {
     if (jobOrder.getType() != JobOrderType.MATERIAL) {
       throw new BadRequestException(JobOrderStockErrors.MATERIAL_ORDER_REQUIRED);
     }
+    final JobOrderHandoverGivers.Giver giver = givers.require(jobOrder, dto.handingOverUserId());
     final MaterialHandoverCalculation.Booked booked =
         handoverPlanner.prepare(jobOrder, items, scopes);
     accessPolicy.assertCanFulfill(jobOrder);
@@ -138,6 +142,8 @@ public class JobOrderHandoverService {
     JobOrderHandover handover = new JobOrderHandover();
     handover.setJobOrder(jobOrder);
     handover.setHandoverTime(dto.handoverTime());
+    handover.setHandingOverUser(giver.user());
+    handover.setHandingOverHandle(giver.handle());
     handover.setRecipientHandle(dto.recipientHandle());
     handover.setRecipientSquadron(dto.recipientSquadron());
 
@@ -230,7 +236,7 @@ public class JobOrderHandoverService {
         AuditEventType.JOB_ORDER_HANDOVER_CREATED,
         jobOrderId,
         JobOrderAuditLabel.of(managedJobOrder.getDisplayId()),
-        null,
+        giver.user().getId(),
         AuditDetails.of("handover", savedHandover.getId())
             .with("items", handedItems.size())
             .with("autoCompleted", allFulfilled));

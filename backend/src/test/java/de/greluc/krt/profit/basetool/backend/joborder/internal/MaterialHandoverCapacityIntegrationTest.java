@@ -59,6 +59,7 @@ class MaterialHandoverCapacityIntegrationTest extends MaterialContributionTestSu
     var request =
         new JobOrderHandoverCreateDto(
             Instant.now(),
+            handingOverMember(fixture),
             "Handover recipient",
             null,
             List.of(
@@ -129,6 +130,7 @@ class MaterialHandoverCapacityIntegrationTest extends MaterialContributionTestSu
     var request =
         new JobOrderHandoverCreateDto(
             Instant.now(),
+            handingOverMember(fixture),
             "Handover recipient",
             null,
             List.of(new JobOrderHandoverItemCreateDto(selected.rowId(), 10.0, null, null)));

@@ -257,6 +257,7 @@ class JobOrderHandoverCompletionIntegrationTest {
   private static JobOrderHandoverCreateDto fullHandover(Fixture f) {
     return new JobOrderHandoverCreateDto(
         Instant.now(),
+        f.actorId(),
         "swing-by",
         "KARTELL",
         List.of(

@@ -25,10 +25,21 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
-/** Data transfer record carrying Job Order Handover Create payload. */
+/**
+ * Create payload for a material handover.
+ *
+ * @param handoverTime when the handover occurred (UTC)
+ * @param handingOverUserId the member of the processing unit who handed the materials over
+ *     (REQ-ORDERS-079)
+ * @param recipientHandle the recipient's handle
+ * @param recipientSquadron the recipient's squadron name, or {@code null}
+ * @param items the handed-over stock rows (at least one)
+ */
 public record JobOrderHandoverCreateDto(
     @NotNull Instant handoverTime,
+    @NotNull UUID handingOverUserId,
     @NotBlank String recipientHandle,
     String recipientSquadron,
     @NotEmpty List<@Valid JobOrderHandoverItemCreateDto> items) {}

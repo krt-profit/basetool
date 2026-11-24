@@ -36,6 +36,9 @@ public class JobOrderItemHandoverForm {
   /** Client-produced UTC ISO-Instant string; parsed to {@code Instant} before sending. */
   private String handoverTime;
 
+  /** The member of the processing unit who handed the items over (REQ-ORDERS-079). */
+  private UUID handingOverUserId;
+
   /** The recipient's in-game handle. */
   private String recipientHandle;
 

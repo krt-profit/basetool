@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
@@ -57,7 +59,9 @@ class JobOrderHandleAnonymisationTest {
         .containsExactly(
             "job_order.handle",
             "job_order_handover.recipient_handle",
+            "job_order_handover.handing_over_handle",
             "job_order_item_handover.recipient_handle",
+            "job_order_item_handover.handing_over_handle",
             "job_order_money_holder.accountless_name",
             "job_order_money_holder_change.previous_name",
             "job_order_money_holder_change.name",
@@ -71,8 +75,10 @@ class JobOrderHandleAnonymisationTest {
   void rewritesEachColumnOncePerSpellingAndSumsTheRows() {
     when(jobOrderRepository.anonymiseHandle("Longer", SENTINEL)).thenReturn(1);
     when(jobOrderRepository.anonymiseHandle("Name", SENTINEL)).thenReturn(2);
+    when(jobOrderHandoverRepository.anonymiseHandingOverHandle(userId, SENTINEL)).thenReturn(4);
     when(jobOrderHandoverRepository.anonymiseRecipientHandle("Longer", SENTINEL)).thenReturn(3);
     when(jobOrderHandoverRepository.anonymiseRecipientHandle("Name", SENTINEL)).thenReturn(0);
+    when(jobOrderItemHandoverRepository.anonymiseHandingOverHandle(userId, SENTINEL)).thenReturn(6);
     when(jobOrderItemHandoverRepository.anonymiseRecipientHandle("Longer", SENTINEL)).thenReturn(0);
     when(jobOrderItemHandoverRepository.anonymiseRecipientHandle("Name", SENTINEL)).thenReturn(5);
 
@@ -80,20 +86,26 @@ class JobOrderHandleAnonymisationTest {
         .containsExactlyInAnyOrderEntriesOf(
             Map.of(
                 Rewritten.JOB_ORDERS, 3,
-                Rewritten.MATERIAL_HANDOVERS, 3,
-                Rewritten.ITEM_HANDOVERS, 5));
+                Rewritten.MATERIAL_HANDOVERS, 7,
+                Rewritten.ITEM_HANDOVERS, 11));
   }
 
+  /** Without a known spelling only the handing-over members, matched by id, are rewritten. */
   @Test
   void skipsLegacyTextMatchesWhenNoSpellingIsKnown() {
+    when(jobOrderHandoverRepository.anonymiseHandingOverHandle(userId, SENTINEL)).thenReturn(2);
+    when(jobOrderItemHandoverRepository.anonymiseHandingOverHandle(userId, SENTINEL)).thenReturn(1);
+
     assertThat(participant.anonymise(userId, List.of()))
         .containsExactlyInAnyOrderEntriesOf(
             Map.of(
                 Rewritten.JOB_ORDERS, 0,
-                Rewritten.MATERIAL_HANDOVERS, 0,
-                Rewritten.ITEM_HANDOVERS, 0));
+                Rewritten.MATERIAL_HANDOVERS, 2,
+                Rewritten.ITEM_HANDOVERS, 1));
 
-    verifyNoInteractions(
-        jobOrderRepository, jobOrderHandoverRepository, jobOrderItemHandoverRepository);
+    verifyNoInteractions(jobOrderRepository);
+    verify(jobOrderHandoverRepository).anonymiseHandingOverHandle(userId, SENTINEL);
+    verify(jobOrderItemHandoverRepository).anonymiseHandingOverHandle(userId, SENTINEL);
+    verifyNoMoreInteractions(jobOrderHandoverRepository, jobOrderItemHandoverRepository);
   }
 }

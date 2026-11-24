@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -68,6 +69,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 })
 class JobOrderHandoverQualityTierTest {
 
+  private static final UUID GIVER_ID = UUID.randomUUID();
+
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
 
   @Mock private JobOrderRepository jobOrderRepository;
@@ -80,6 +83,7 @@ class JobOrderHandoverQualityTierTest {
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private AuditService auditService;
+  @Mock private JobOrderHandoverGivers givers;
   private JobOrderHandoverService service;
 
   private UUID orderId;
@@ -123,7 +127,8 @@ class JobOrderHandoverQualityTierTest {
             userService,
             orgUnitMembershipQueryService,
             orgUnitRepository,
-            auditService);
+            auditService,
+            givers);
     orderId = UUID.randomUUID();
     order = new JobOrder();
     order.setId(orderId);
@@ -133,6 +138,12 @@ class JobOrderHandoverQualityTierTest {
     material.setName("Stileron");
     goodLine = line(QualityTierFixtures.good(), 0.1);
     noneLine = line(QualityTierFixtures.none(), 2.64);
+    User giver = new User();
+    giver.setId(GIVER_ID);
+    giver.setUsername("Giver");
+    lenient()
+        .when(givers.require(order, GIVER_ID))
+        .thenReturn(new JobOrderHandoverGivers.Giver(giver, "Giver"));
     lenient().when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     lenient().when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     lenient()
@@ -164,7 +175,8 @@ class JobOrderHandoverQualityTierTest {
 
   private void handOver(JobOrderHandoverItemCreateDto... items) {
     service.createHandover(
-        orderId, new JobOrderHandoverCreateDto(Instant.now(), "Receiver", null, List.of(items)));
+        orderId,
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "Receiver", null, List.of(items)));
   }
 
   @Test

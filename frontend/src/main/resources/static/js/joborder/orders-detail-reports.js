@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_HANDOVER_I18N */
+/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDING_OVER, MSG_HANDOVER_REPORT_VALIDATION_HANDLE,MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_HANDOVER_I18N */
 
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import {
@@ -185,6 +185,13 @@ export async function previewHandoverReport(btn) {
     const timePart = /** @type {HTMLInputElement | null} */ (
         document.querySelector('#handover-modal .time-part')
     )?.value;
+    const giverSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('handingOverUserId')
+    );
+    const handingOverHandle =
+        giverSelect && giverSelect.value
+            ? giverSelect.options[giverSelect.selectedIndex]?.text?.trim()
+            : '';
     const recipientHandle = /** @type {HTMLInputElement | null} */ (
         document.getElementById('recipientHandle')
     )?.value?.trim();
@@ -202,6 +209,10 @@ export async function previewHandoverReport(btn) {
     }
     if (!timePart) {
         showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_TIME);
+        return;
+    }
+    if (!handingOverHandle) {
+        showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_HANDING_OVER);
         return;
     }
     if (!recipientHandle) {
@@ -252,6 +263,7 @@ export async function previewHandoverReport(btn) {
     const payload = {
         jobOrderNumber: orderNumber,
         handoverTime: handoverTimeIso,
+        handingOverHandle,
         recipientHandle,
         items,
     };

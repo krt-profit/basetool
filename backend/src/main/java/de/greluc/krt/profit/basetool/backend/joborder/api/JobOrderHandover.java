@@ -72,6 +72,21 @@ public class JobOrderHandover extends AbstractEntity<UUID> {
   private String recipientSquadron;
 
   /**
+   * The member of the processing unit who handed the materials over (REQ-ORDERS-079); {@code null}
+   * when none was recorded or the account is deleted.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "handing_over_user_id")
+  private User handingOverUser;
+
+  /**
+   * Handle snapshot of {@link #handingOverUser} at recording time; it outlives the account and is
+   * replaced by the erasure sentinel on anonymisation and name retention.
+   */
+  @Column(name = "handing_over_handle")
+  private String handingOverHandle;
+
+  /**
    * Audit field: the user who executed the handover, stamped from the current JWT principal at
    * create time; {@code null} when not recorded. May belong to a different squadron than the order.
    */

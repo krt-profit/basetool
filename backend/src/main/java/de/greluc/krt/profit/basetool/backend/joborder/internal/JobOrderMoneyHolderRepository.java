@@ -176,7 +176,7 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
    * Locks every closed job order whose last change lies before the cutoff and which still carries a
    * name the name retention removes (REQ-DATA-047): a requester handle, an accountless holder,
    * recipient or submitted name, a holder-change name, a linked-attempt name or a handover
-   * recipient.
+   * recipient or handing-over member.
    *
    * @param cutoff the oldest last change whose names are kept
    * @param sentinel {@code HandleAnonymisation#SENTINEL}
@@ -200,9 +200,11 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
               OR EXISTS (SELECT 1 FROM job_order_money_holder_change c WHERE c.order_id = o.id
                          AND (c.previous_name <> :sentinel OR c.name <> :sentinel))
               OR EXISTS (SELECT 1 FROM job_order_handover h WHERE h.job_order_id = o.id
-                         AND h.recipient_handle <> :sentinel)
+                         AND (h.recipient_handle <> :sentinel
+                              OR h.handing_over_handle <> :sentinel))
               OR EXISTS (SELECT 1 FROM job_order_item_handover h WHERE h.job_order_id = o.id
-                         AND h.recipient_handle <> :sentinel))
+                         AND (h.recipient_handle <> :sentinel
+                              OR h.handing_over_handle <> :sentinel)))
           ORDER BY o.id
           FOR NO KEY UPDATE OF o
           """,

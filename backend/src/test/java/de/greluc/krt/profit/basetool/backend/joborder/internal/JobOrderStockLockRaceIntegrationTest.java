@@ -205,6 +205,7 @@ class JobOrderStockLockRaceIntegrationTest {
                 order,
                 new JobOrderHandoverCreateDto(
                     Instant.now(),
+                    logistician.getId(),
                     "race",
                     "KARTELL",
                     List.of(new JobOrderHandoverItemCreateDto(row, REQUIRED, null, null)))));

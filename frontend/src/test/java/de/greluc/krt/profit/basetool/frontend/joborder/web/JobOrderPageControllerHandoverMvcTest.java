@@ -78,6 +78,7 @@ class JobOrderPageControllerHandoverMvcTest {
     CapabilityStubs.logistician(backendApiClient);
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
+    UUID giverId = UUID.randomUUID();
 
     when(backendApiClient.post(
             eq("/api/v1/orders/{id}/handovers"), any(), eq(JobOrderHandoverDto.class), eq(orderId)))
@@ -88,6 +89,7 @@ class JobOrderPageControllerHandoverMvcTest {
             post("/orders/" + orderId + "/handovers")
                 .with(csrf())
                 .param("handoverTime", "2026-04-29T18:00:00.000Z")
+                .param("handingOverUserId", giverId.toString())
                 .param("recipientHandle", "RecipientUser")
                 .param("recipientSquadron", "Alpha")
                 .param("items[0].inventoryItemId", inventoryItemId.toString())
@@ -106,6 +108,7 @@ class JobOrderPageControllerHandoverMvcTest {
             eq(orderId));
 
     JobOrderHandoverCreateDto sent = dtoCaptor.getValue();
+    assertThat(sent.handingOverUserId()).isEqualTo(giverId);
     assertThat(sent.recipientHandle()).isEqualTo("RecipientUser");
     assertThat(sent.recipientSquadron()).isEqualTo("Alpha");
     assertThat(sent.items()).hasSize(1);

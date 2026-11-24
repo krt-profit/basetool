@@ -29,6 +29,7 @@ import java.util.List;
  *
  * @param jobOrderNumber the order number printed on the report
  * @param handoverTime the handover time as the user typed it, rendered unchanged
+ * @param handingOverHandle the handle of the chosen handing-over member
  * @param recipientHandle the recipient's handle
  * @param items the handed-over material lines
  */
@@ -36,5 +37,6 @@ import java.util.List;
 public record HandoverReportPreviewRequestDto(
     String jobOrderNumber,
     LocalDateTime handoverTime,
+    String handingOverHandle,
     String recipientHandle,
     List<HandoverReportItemDto> items) {}

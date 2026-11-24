@@ -23,8 +23,10 @@ import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
@@ -38,6 +40,9 @@ class HandoverReportLabels {
 
   /** The language both handover reports are written in. */
   private static final Locale REPORT_LOCALE = Locale.GERMAN;
+
+  /** Shown for a handover that names no handing-over member. */
+  private static final String NOT_RECORDED = "-";
 
   /** The backend message bundle the texts are resolved from. */
   private final MessageSource messageSource;
@@ -54,20 +59,23 @@ class HandoverReportLabels {
 
   /**
    * Builds the header table both handover reports open with: order number, handover date, handover
-   * time marked as local time, and the recipient handle, shown as the anonymised placeholder once
-   * erased (REQ-SEC-062).
+   * time marked as local time, the handing-over member of the processing unit (REQ-ORDERS-079) and
+   * the recipient handle; an erased handle shows as the anonymised placeholder (REQ-SEC-062).
    *
    * @param jobOrderNumber the order number including its leading {@code #}
    * @param handoverDate the formatted handover date
    * @param handoverTime the formatted handover time in the reader's zone
+   * @param handingOverHandle the stored handing-over handle, possibly the erasure sentinel, or
+   *     {@code null} when the handover names nobody (shown as a dash)
    * @param recipientHandle the stored recipient handle, possibly the erasure sentinel
-   * @return the four labelled values in reading order
+   * @return the five labelled values in reading order
    */
   @NotNull
   List<PdfKeyValue> header(
       @NotNull String jobOrderNumber,
       @NotNull String handoverDate,
       @NotNull String handoverTime,
+      @Nullable String handingOverHandle,
       @NotNull String recipientHandle) {
     return List.of(
         new PdfKeyValue(resolve("pdf.handover.jobOrderNumber"), jobOrderNumber),
@@ -76,6 +84,12 @@ class HandoverReportLabels {
             resolve("pdf.handover.time"),
             messageSource.getMessage(
                 "pdf.handover.localTime", new Object[] {handoverTime}, REPORT_LOCALE)),
+        new PdfKeyValue(
+            resolve("pdf.handover.handingOver"),
+            Objects.requireNonNullElse(
+                HandleAnonymisation.humanise(
+                    handingOverHandle, resolve("general.anonymisedHandle")),
+                NOT_RECORDED)),
         new PdfKeyValue(
             resolve("pdf.handover.recipient"),
             HandleAnonymisation.humaniseRequired(

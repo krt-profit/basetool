@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverGiverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
@@ -54,6 +55,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -166,6 +168,64 @@ class OrdersDetailPatternRenderTest {
           .as("the template carries no migrated krtm class")
           .doesNotContainPattern("class=\"[^\"]*krtm-");
     }
+  }
+
+  /**
+   * A material handover names its handing-over member in the history, and the dialog offers the
+   * processing unit's members as a required choice (REQ-ORDERS-079).
+   */
+  @Test
+  void theMaterialHandoverNamesItsHandingOverMember() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
+    UUID orderId = UUID.randomUUID();
+    MaterialDto titanium = material("Titanium");
+    stubOrder(
+        order(
+            orderId,
+            "MATERIAL",
+            "IN_PROGRESS",
+            List.of(materialLine(titanium, 400.0, 100.0)),
+            List.of(),
+            List.of(handover(orderId, titanium, 100.0)),
+            false));
+    UUID giver = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/handover-givers"),
+            org.mockito.ArgumentMatchers
+                .<ParameterizedTypeReference<List<JobOrderHandoverGiverDto>>>any(),
+            eq(orderId)))
+        .thenReturn(List.of(new JobOrderHandoverGiverDto(giver, "Ada")));
+
+    String html = render(orderId, "ROLE_LOGISTICIAN");
+
+    assertThat(section(html, "id=\"pane-handovers\""))
+        .contains(">Übergebender<")
+        .containsPattern("data-testid=\"handover-giver\"[^>]*>Giver<");
+    assertThat(html)
+        .containsPattern("<select[^>]*id=\"handingOverUserId\"[^>]*required")
+        .containsPattern("<option value=\"" + giver + "\"[^>]*>Ada</option>")
+        .doesNotContain("data-testid=\"handover-giver-none\"");
+  }
+
+  /** Without a member to choose, the dialog says the processing unit has none. */
+  @Test
+  void theHandoverDialogSaysWhenTheProcessingUnitHasNoMember() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
+    UUID orderId = UUID.randomUUID();
+    MaterialDto titanium = material("Titanium");
+    stubOrder(
+        order(
+            orderId,
+            "MATERIAL",
+            "IN_PROGRESS",
+            List.of(materialLine(titanium, 400.0)),
+            List.of(),
+            List.of(),
+            false));
+
+    assertThat(render(orderId, "ROLE_LOGISTICIAN"))
+        .contains("data-testid=\"handover-giver-none\"")
+        .contains("Die bearbeitende Einheit hat keine aktiven Mitglieder");
   }
 
   /** An item order for a member shows its item tabs and hides the empty handover tab. */
@@ -840,6 +900,7 @@ class OrdersDetailPatternRenderTest {
         UUID.randomUUID(),
         orderId,
         Instant.now(),
+        "Giver",
         "Recipient",
         "ALP",
         null,

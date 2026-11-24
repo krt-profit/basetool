@@ -37,6 +37,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -104,19 +105,26 @@ public class JobOrderItemHandoverReportService {
             .toList();
 
     return buildPdf(
-        jobOrderNumber, handoverDate, handoverTime, handover.getRecipientHandle(), rows);
+        jobOrderNumber,
+        handoverDate,
+        handoverTime,
+        handover.getHandingOverHandle(),
+        handover.getRecipientHandle(),
+        rows);
   }
 
   private byte @NotNull [] buildPdf(
       @NotNull String jobOrderNumber,
       @NotNull String handoverDate,
       @NotNull String handoverTime,
+      @Nullable String handingOverHandle,
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
       try (KrtPdfDocument pdf = pdfDocuments.open(baos, labels.title())) {
         pdf.keyValueTable(
-            labels.header(jobOrderNumber, handoverDate, handoverTime, recipientHandle));
+            labels.header(
+                jobOrderNumber, handoverDate, handoverTime, handingOverHandle, recipientHandle));
         pdf.heading(labels.resolve("pdf.handover.items"));
         try (PdfDataTable table =
             pdf.dataTable(

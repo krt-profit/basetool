@@ -5706,6 +5706,7 @@ tables.
 | `job_order.handle`                                                        | **the whole text, case-insensitively** — no id beside it    |
 | `job_order_handover.recipient_handle`                                     | likewise                                                    |
 | `job_order_item_handover.recipient_handle`                                | likewise                                                    |
+| `job_order_handover.handing_over_handle` and `job_order_item_handover.handing_over_handle` (REQ-ORDERS-079) | `handing_over_user_id` |
 | `job_order_money_holder.accountless_name` and `job_order_money_recipient.accountless_name` | attributed account or whole spelling, according to the record |
 | `job_order_money_holder_change.previous_name` and `name` | attributed account or whole spelling, according to the record |
 | `job_order_money_operation.selected_accountless_name` | attributed holder or whole spelling, according to the recorded purpose |

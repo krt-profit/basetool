@@ -531,6 +531,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             handoverId,
             orderId,
             Instant.now(),
+            "Giver",
             "Recipient",
             null,
             null,

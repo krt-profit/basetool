@@ -296,6 +296,29 @@ abstract class MaterialContributionTestSupport {
   }
 
   /**
+   * Commits an active account as a direct member of the order's processing unit, the member a
+   * handover names as handing it over (REQ-ORDERS-079).
+   *
+   * @param fixture the order whose responsible unit the member joins
+   * @return the member's user id
+   */
+  protected UUID handingOverMember(Fixture fixture) {
+    return transactionTemplate.execute(_ -> {
+      var member = new de.greluc.krt.profit.basetool.backend.identity.api.User();
+      member.setId(UUID.randomUUID());
+      member.setUsername("handing-over-" + UUID.randomUUID());
+      member.setDisplayName("Handing-over member");
+      member = users.saveAndFlush(member);
+      var order = jobOrderRepository.findById(fixture.orderId()).orElseThrow();
+      jdbc.update(
+          "INSERT INTO org_unit_membership (user_id, org_unit_id) VALUES (?, ?)",
+          member.getId(),
+          order.getResponsibleOrgUnit().getId());
+      return member.getId();
+    });
+  }
+
+  /**
    * Reads and verifies the order's single canonical material bucket.
    *
    * @param orderId the concrete order

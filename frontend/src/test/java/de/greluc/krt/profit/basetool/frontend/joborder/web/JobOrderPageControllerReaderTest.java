@@ -32,6 +32,9 @@ import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendCli
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateUnitOptionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverForm;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverGiverDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
@@ -167,6 +170,10 @@ class JobOrderPageControllerReaderTest {
   void theDetailModelCarriesTheReadersOptionalParts() {
     JobOrderDto o = order("MATERIAL");
     List<OrgUnitMembershipOptionDto> options = List.of(option(), option());
+    List<JobOrderHandoverGiverDto> givers =
+        List.of(
+            new JobOrderHandoverGiverDto(UUID.randomUUID(), "Other"),
+            new JobOrderHandoverGiverDto(ID, "Me"));
     when(reader.readOrderDetail(any(), any(), any()))
         .thenReturn(
             new JobOrderPageReader.OrderDetailPage(
@@ -185,7 +192,8 @@ class JobOrderPageControllerReaderTest {
                 List.of(options.getFirst()),
                 List.of(),
                 JobOrderPageReader.Part.absent(),
-                JobOrderPageReader.Part.absent()));
+                JobOrderPageReader.Part.absent(),
+                JobOrderPageReader.Part.of(givers)));
     Model model = new ExtendedModelMap();
 
     assertThat(controller.viewOrderDetail(ID, model, null, null))
@@ -200,8 +208,33 @@ class JobOrderPageControllerReaderTest {
         .containsKeys("materials", "squadrons", "jobOrderForm", "kpi")
         .containsEntry("actingUser", null)
         .containsEntry("orphanedInventory", null)
+        .containsEntry("handoverGivers", givers)
         .doesNotContainKeys("itemBlueprintOwners", "itemStockByGameItem");
     assertThat((List<?>) model.asMap().get("responsibleOptions")).hasSize(1);
+    assertThat(((JobOrderHandoverForm) model.asMap().get("handoverForm")).getHandingOverUserId())
+        .isEqualTo(ID);
+    assertThat(
+            ((JobOrderItemHandoverForm) model.asMap().get("itemHandoverForm"))
+                .getHandingOverUserId())
+        .isEqualTo(ID);
+  }
+
+  @Test
+  void aCallerOutsideTheProcessingUnitIsNotPreselectedAsHandingOver() {
+    JobOrderDto o = order("MATERIAL");
+    when(reader.readOrderDetail(any(), any(), any()))
+        .thenReturn(
+            JobOrderPageStubs.detail(o)
+                .assigning(List.of(), List.of(), List.of())
+                .currentUserId(ID)
+                .handoverGivers(List.of(new JobOrderHandoverGiverDto(UUID.randomUUID(), "Other")))
+                .build());
+    Model model = new ExtendedModelMap();
+
+    controller.viewOrderDetail(ID, model, null, null);
+
+    assertThat(((JobOrderHandoverForm) model.asMap().get("handoverForm")).getHandingOverUserId())
+        .isNull();
   }
 
   @Test
@@ -234,6 +267,7 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.absent(),
                 List.of(),
                 List.of(),
+                JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent()));
 

@@ -48,6 +48,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -131,10 +132,16 @@ class HandleAnonymisationEndStateTest {
     UUID orderByAlias = jobOrder(alias.toUpperCase());
     UUID orderStranger = jobOrder("Unrelated-" + tag);
 
-    UUID materialHandover = materialHandover(orderStranger, callsign.toUpperCase());
-    UUID materialHandoverStranger = materialHandover(orderStranger, "Unrelated-" + tag);
-    UUID itemHandover = itemHandover(orderStranger, alias);
-    UUID itemHandoverStranger = itemHandover(orderStranger, "Unrelated-" + tag);
+    UUID materialHandover = materialHandover(orderStranger, callsign.toUpperCase(), null, null);
+    UUID materialHandoverStranger =
+        materialHandover(orderStranger, "Unrelated-" + tag, stayer, "Stayer-" + tag);
+    UUID materialHandoverByLeaver =
+        materialHandover(orderStranger, "Unrelated-" + tag, leaver, "Renamed-" + tag);
+    UUID itemHandover = itemHandover(orderStranger, alias, null, null);
+    UUID itemHandoverStranger =
+        itemHandover(orderStranger, "Unrelated-" + tag, stayer, "Stayer-" + tag);
+    UUID itemHandoverByLeaver =
+        itemHandover(orderStranger, "Unrelated-" + tag, leaver, "Renamed-" + tag);
     entityManager.flush();
 
     HandleAnonymisationService.AnonymisationResult result =
@@ -148,9 +155,9 @@ class HandleAnonymisationEndStateTest {
     assertThat(result.bookingRequests()).isEqualTo(2);
     assertThat(result.bankHolders()).isEqualTo(1);
     assertThat(result.jobOrders()).isEqualTo(2);
-    assertThat(result.materialHandovers()).isEqualTo(1);
-    assertThat(result.itemHandovers()).isEqualTo(1);
-    assertThat(result.total()).isEqualTo(12);
+    assertThat(result.materialHandovers()).isEqualTo(2);
+    assertThat(result.itemHandovers()).isEqualTo(2);
+    assertThat(result.total()).isEqualTo(14);
 
     assertThat(text("audit_event", "subject_label", labelByCallsign)).isEqualTo(SENTINEL);
     assertThat(text("audit_event", "subject_label", labelByAlias)).isEqualTo(SENTINEL);
@@ -200,15 +207,27 @@ class HandleAnonymisationEndStateTest {
         .isEqualTo(SENTINEL);
     assertThat(text("job_order_handover", "recipient_handle", materialHandoverStranger))
         .isEqualTo("Unrelated-" + tag);
+    assertThat(text("job_order_handover", "handing_over_handle", materialHandoverStranger))
+        .isEqualTo("Stayer-" + tag);
+    assertThat(text("job_order_handover", "handing_over_handle", materialHandoverByLeaver))
+        .isEqualTo(SENTINEL);
+    assertThat(text("job_order_handover", "recipient_handle", materialHandoverByLeaver))
+        .isEqualTo("Unrelated-" + tag);
     assertThat(text("job_order_item_handover", "recipient_handle", itemHandover))
         .isEqualTo(SENTINEL);
     assertThat(text("job_order_item_handover", "recipient_handle", itemHandoverStranger))
+        .isEqualTo("Unrelated-" + tag);
+    assertThat(text("job_order_item_handover", "handing_over_handle", itemHandoverStranger))
+        .isEqualTo("Stayer-" + tag);
+    assertThat(text("job_order_item_handover", "handing_over_handle", itemHandoverByLeaver))
+        .isEqualTo(SENTINEL);
+    assertThat(text("job_order_item_handover", "recipient_handle", itemHandoverByLeaver))
         .isEqualTo("Unrelated-" + tag);
 
     assertThat(markers("audit_event"))
         .containsExactly(
             "activityAudit=3 bankAudit=1 bankTransactions=1 bookingRequests=2 bankHolders=1"
-                + " jobOrders=2 materialHandovers=1 itemHandovers=1"
+                + " jobOrders=2 materialHandovers=2 itemHandovers=2"
                 + " orderMoneyHolders=0 orderMoneyOperations=0 orderMoneyRecipients=0"
                 + " orderMoneyHolderChanges=0 orderLinkedMoneyAttempts=0 spellings=2");
     assertThat(markers("bank_audit_event"))
@@ -231,6 +250,8 @@ class HandleAnonymisationEndStateTest {
     UUID byActor = auditEvent(leaver, callsign, null);
     UUID holder = bankHolder(leaver, callsign);
     UUID order = jobOrder(callsign);
+    UUID materialGiven = materialHandover(order, callsign, leaver, callsign);
+    UUID itemGiven = itemHandover(order, callsign, leaver, callsign);
     entityManager.flush();
 
     HandleAnonymisationService.AnonymisationResult result =
@@ -241,14 +262,22 @@ class HandleAnonymisationEndStateTest {
     assertThat(result.activityAudit()).isEqualTo(1);
     assertThat(result.bankHolders()).isEqualTo(1);
     assertThat(result.jobOrders()).isZero();
+    assertThat(result.materialHandovers()).isEqualTo(1);
+    assertThat(result.itemHandovers()).isEqualTo(1);
     assertThat(text("audit_event", "actor_handle", byActor)).isEqualTo(SENTINEL);
     assertThat(text("audit_event", "subject_label", byLabel)).isEqualTo(callsign);
     assertThat(text("bank_holder", "handle", holder)).isEqualTo(SENTINEL);
     assertThat(text("job_order", "handle", order)).isEqualTo(callsign);
+    assertThat(text("job_order_handover", "handing_over_handle", materialGiven))
+        .isEqualTo(SENTINEL);
+    assertThat(text("job_order_handover", "recipient_handle", materialGiven)).isEqualTo(callsign);
+    assertThat(text("job_order_item_handover", "handing_over_handle", itemGiven))
+        .isEqualTo(SENTINEL);
+    assertThat(text("job_order_item_handover", "recipient_handle", itemGiven)).isEqualTo(callsign);
     assertThat(markers("audit_event"))
         .containsExactly(
             "activityAudit=1 bankAudit=0 bankTransactions=0 bookingRequests=0 bankHolders=1"
-                + " jobOrders=0 materialHandovers=0 itemHandovers=0"
+                + " jobOrders=0 materialHandovers=1 itemHandovers=1"
                 + " orderMoneyHolders=0 orderMoneyOperations=0 orderMoneyRecipients=0"
                 + " orderMoneyHolderChanges=0 orderLinkedMoneyAttempts=0 spellings=0");
     assertThat(markers("bank_audit_event"))
@@ -389,25 +418,41 @@ class HandleAnonymisationEndStateTest {
     return jobOrderRepository.saveAndFlush(order).getId();
   }
 
-  private UUID materialHandover(UUID order, String recipient) {
-    UUID id = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO job_order_handover (id, job_order_id, handover_time, recipient_handle,"
-            + " created_at, updated_at, version) VALUES (?, ?, now(), ?, now(), now(), 0)",
-        id,
-        order,
-        recipient);
-    return id;
+  private UUID materialHandover(
+      UUID order,
+      String recipient,
+      @Nullable UUID handingOverUser,
+      @Nullable String handingOverHandle) {
+    return handover("job_order_handover", order, recipient, handingOverUser, handingOverHandle);
   }
 
-  private UUID itemHandover(UUID order, String recipient) {
+  private UUID itemHandover(
+      UUID order,
+      String recipient,
+      @Nullable UUID handingOverUser,
+      @Nullable String handingOverHandle) {
+    return handover(
+        "job_order_item_handover", order, recipient, handingOverUser, handingOverHandle);
+  }
+
+  private UUID handover(
+      String table,
+      UUID order,
+      String recipient,
+      @Nullable UUID handingOverUser,
+      @Nullable String handingOverHandle) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO job_order_item_handover (id, job_order_id, handover_time, recipient_handle,"
-            + " created_at, updated_at, version) VALUES (?, ?, now(), ?, now(), now(), 0)",
+        "INSERT INTO "
+            + table
+            + " (id, job_order_id, handover_time, recipient_handle, handing_over_user_id,"
+            + " handing_over_handle, created_at, updated_at, version)"
+            + " VALUES (?, ?, now(), ?, ?, ?, now(), now(), 0)",
         id,
         order,
-        recipient);
+        recipient,
+        handingOverUser,
+        handingOverHandle);
     return id;
   }
 }
