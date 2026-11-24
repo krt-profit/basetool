@@ -154,8 +154,7 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               lines,
-              form.getVersion(),
-              form.getCommentVersion());
+              form.observedVersions());
       JobOrderDto created = jobOrderClient.createItemOrder(dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -227,8 +226,7 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   lines,
-                  form.getVersion(),
-                  form.getCommentVersion());
+                  form.observedVersions());
           JobOrderDto created = jobOrderClient.createItemOrder(dto);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
@@ -304,8 +302,7 @@ public class JobOrderWriteController {
             requester ? null : form.getHandle(),
             form.getComment(),
             lines,
-            form.getVersion(),
-            form.getCommentVersion());
+            form.observedVersions());
     if (requester) {
       jobOrderClient.updateItemOrderAsRequester(id, dto);
     } else {
@@ -336,13 +333,7 @@ public class JobOrderWriteController {
   public String createOrder(
       @ModelAttribute("jobOrderForm") JobOrderForm form, RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderMaterialDto> materials =
-          form.getMaterials().stream()
-              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m ->
-                  new CreateJobOrderMaterialDto(
-                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .toList();
+      List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -358,8 +349,7 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               materials,
-              form.getVersion(),
-              form.getCommentVersion());
+              form.observedVersions());
       JobOrderDto created = jobOrderClient.createOrder(dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -415,8 +405,7 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   materials,
-                  form.getVersion(),
-                  form.getCommentVersion());
+                  form.observedVersions());
           JobOrderDto created = jobOrderClient.createOrder(dto);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
@@ -613,13 +602,7 @@ public class JobOrderWriteController {
       @ModelAttribute("jobOrderForm") JobOrderForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderMaterialDto> materials =
-          form.getMaterials().stream()
-              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m ->
-                  new CreateJobOrderMaterialDto(
-                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .toList();
+      List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -634,8 +617,7 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               materials,
-              form.getVersion(),
-              form.getCommentVersion());
+              form.observedVersions());
       jobOrderClient.updateOrder(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
@@ -661,12 +643,7 @@ public class JobOrderWriteController {
   @ResponseBody
   public ResponseEntity<Object> updateOrderAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
-    List<CreateJobOrderMaterialDto> materials =
-        form.getMaterials().stream()
-            .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-            .map(m ->
-                new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-            .toList();
+    List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
     if (materials.isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
@@ -681,8 +658,7 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   materials,
-                  form.getVersion(),
-                  form.getCommentVersion());
+                  form.observedVersions());
           JobOrderDto updated = jobOrderClient.updateOrder(id, dto);
           return ResponseEntity.ok(updated);
         });
@@ -704,13 +680,7 @@ public class JobOrderWriteController {
       @ModelAttribute("jobOrderForm") JobOrderForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderMaterialDto> materials =
-          form.getMaterials().stream()
-              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m ->
-                  new CreateJobOrderMaterialDto(
-                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .toList();
+      List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
         redirectAttributes.addFlashAttribute("jobOrderForm", form);
@@ -718,13 +688,7 @@ public class JobOrderWriteController {
       }
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              null,
-              null,
-              null,
-              form.getComment(),
-              materials,
-              form.getVersion(),
-              form.getCommentVersion());
+              null, null, null, form.getComment(), materials, form.observedVersions());
       jobOrderClient.updateOrderAsRequester(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
@@ -749,12 +713,7 @@ public class JobOrderWriteController {
   @ResponseBody
   public ResponseEntity<Object> updateOrderAsRequesterAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
-    List<CreateJobOrderMaterialDto> materials =
-        form.getMaterials().stream()
-            .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-            .map(m ->
-                new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-            .toList();
+    List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
     if (materials.isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
@@ -764,13 +723,7 @@ public class JobOrderWriteController {
         () -> {
           CreateJobOrderDto dto =
               new CreateJobOrderDto(
-                  null,
-                  null,
-                  null,
-                  form.getComment(),
-                  materials,
-                  form.getVersion(),
-                  form.getCommentVersion());
+                  null, null, null, form.getComment(), materials, form.observedVersions());
           JobOrderDto updated = jobOrderClient.updateOrderAsRequester(id, dto);
           return ResponseEntity.ok(updated);
         });

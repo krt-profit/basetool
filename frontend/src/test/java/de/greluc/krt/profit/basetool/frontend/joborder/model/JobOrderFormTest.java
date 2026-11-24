@@ -163,6 +163,14 @@ class JobOrderFormTest {
         .containsExactly(tuple(first, 800, 12.5), tuple(second, 0, 3.0));
   }
 
+  /** The order version and the comment version are echoed as one pair, each in its own slot. */
+  @Test
+  void echoesTheOrderAndCommentVersionAsOnePair() {
+    JobOrderForm form = JobOrderForm.forEdit(order(List.of()));
+
+    assertThat(form.observedVersions()).isEqualTo(new JobOrderObservedVersions(5L, 0L));
+  }
+
   /** An order without material lines keeps the single empty line the form starts with. */
   @Test
   void keepsOneEmptyLineWhenTheOrderHasNone() {

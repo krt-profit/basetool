@@ -152,6 +152,8 @@ class JobOrderServicePriorityAndStatusTest {
             org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
             auditService,
             jobOrderStockProjectionService);
+    LiveSyncPublisher liveSyncPublisher =
+        new LiveSyncPublisher(liveSyncFanout, new SimpleMeterRegistry());
     service =
         new JobOrderService(
             jobOrderRepository,
@@ -208,9 +210,8 @@ class JobOrderServicePriorityAndStatusTest {
                 org.mockito.Mockito.mock(
                     de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
                         .class)),
-            new LiveSyncPublisher(liveSyncFanout, new SimpleMeterRegistry()),
-            org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
+            liveSyncPublisher,
+            new JobOrderQueueFrame(liveSyncPublisher),
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
             org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class),
             org.mockito.Mockito.mock(
@@ -587,8 +588,7 @@ class JobOrderServicePriorityAndStatusTest {
               "OP-1",
               null,
               List.of(new CreateJobOrderMaterialDto(yId, 650, 5.0)),
-              1L,
-              0L);
+              new JobOrderObservedVersions(1L, 0L));
 
       service.updateJobOrder(ORDER_ID, dto);
       assertEquals(
@@ -610,8 +610,7 @@ class JobOrderServicePriorityAndStatusTest {
               "OP-1",
               null,
               List.of(new CreateJobOrderMaterialDto(missingMat, 650, 5.0)),
-              1L,
-              0L);
+              new JobOrderObservedVersions(1L, 0L));
 
       assertThrows(NotFoundException.class, () -> service.updateJobOrder(ORDER_ID, dto));
     }
@@ -798,7 +797,8 @@ class JobOrderServicePriorityAndStatusTest {
   }
 
   private CreateJobOrderDto newUpdateDto(Long version) {
-    return new CreateJobOrderDto(null, null, "OP-X", null, List.of(), version, 0L);
+    return new CreateJobOrderDto(
+        null, null, "OP-X", null, List.of(), new JobOrderObservedVersions(version, 0L));
   }
 
   private static UserService actingUserService() {

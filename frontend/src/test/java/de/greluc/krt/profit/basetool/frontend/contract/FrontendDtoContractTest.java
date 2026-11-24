@@ -84,7 +84,7 @@ class FrontendDtoContractTest {
       }
       contractChecked++;
       JsonNode properties = schema.get("properties");
-      for (RecordComponent component : record.getRecordComponents()) {
+      for (RecordComponent component : WireComponents.of(record)) {
         checkComponent(record, component, properties, problems);
       }
     }

@@ -87,8 +87,7 @@ class ItemOrderDerivationContractIntegrationTest extends MaterialContributionTes
             before.handle(),
             null,
             List.of(line),
-            before.version(),
-            before.commentVersion());
+            new JobOrderObservedVersions(before.version(), before.commentVersion()));
     String body =
         mvc()
             .perform(

@@ -50,7 +50,7 @@ while the commands live in `joborder.internal`.
    `joborder.internal`) resolves a rule for an actor into the writer units of that call: the web's
    `ScopePredicate` for `CONTEXTUAL`, the member's direct Logistician units for
    `DIRECT_LOGISTICIAN`. Nothing is cached across calls.
-3. **One create command.** Every kind's create runs one path in `JobOrderService`: the order locks,
+3. **One create command.** Every kind's create runs one path in `JobOrderCreation`: the order locks,
    both units resolved (an unknown unit and a responsible unit outside the eligible Profit units
    answer `400` first), the pair rechecked with the rule it was given, the lines of the kind, the
    unit history, the priority, the created notice, the `orders/queue` frame after the commit and

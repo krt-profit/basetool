@@ -169,6 +169,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemPlan;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.ItemHandoverRequirement;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderCreation;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderFulfillmentContext;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockGroupDto;
@@ -730,6 +731,7 @@ class ArchitectureTest {
           HangarService.class,
           OperationService.class,
           JobOrderService.class,
+          JobOrderCreation.class,
           JobOrderQueryService.class,
           MaterialClaimService.class,
           PersonalBlueprintOverviewService.class,

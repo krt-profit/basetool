@@ -177,11 +177,17 @@ class JobOrderEditorTest {
 
     assertThatThrownBy(() ->
             editor.editPlannedWithComment(
-                id, JobOrderGate.EDIT, 5L, 2L, _ -> JobOrderEditPlan.of(statusChanged())))
+                id,
+                JobOrderGate.EDIT,
+                new JobOrderObservedVersions(5L, 2L),
+                _ -> JobOrderEditPlan.of(statusChanged())))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
     assertThatThrownBy(() ->
             editor.editPlannedWithComment(
-                id, JobOrderGate.EDIT, 5L, null, _ -> JobOrderEditPlan.of(statusChanged())))
+                id,
+                JobOrderGate.EDIT,
+                new JobOrderObservedVersions(5L, null),
+                _ -> JobOrderEditPlan.of(statusChanged())))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
     assertThat(mutations).hasValue(0);
@@ -197,7 +203,10 @@ class JobOrderEditorTest {
 
     JobOrderDto result =
         editor.editPlannedWithComment(
-            id, JobOrderGate.EDIT, 5L, 3L, _ -> JobOrderEditPlan.of(statusChanged()));
+            id,
+            JobOrderGate.EDIT,
+            new JobOrderObservedVersions(5L, 3L),
+            _ -> JobOrderEditPlan.of(statusChanged()));
 
     assertThat(result).isSameAs(projected);
     assertThat(mutations).hasValue(1);
