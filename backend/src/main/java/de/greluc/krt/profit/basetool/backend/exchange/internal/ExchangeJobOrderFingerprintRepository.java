@@ -46,15 +46,6 @@ public interface ExchangeJobOrderFingerprintRepository
   int WINDOW_LOCK_SPACE = 0x4F58574E;
 
   /**
-   * The window of the client set for the order alias {@code o} and its fingerprint {@code f}:
-   * active, closed at or after {@code :closedSince}, or aUEC while the fingerprint says {@code
-   * settlementOpen}.
-   */
-  String CLIENT_WINDOW =
-      "(o.status IN ('OPEN', 'IN_PROGRESS') OR o.closedAt >= :closedSince"
-          + " OR (o.type = 'AUEC' AND f.settlementOpen = true))";
-
-  /**
    * Reads one page of the member's client set: the orders of the read set inside the window that
    * carry a fingerprint, ascending by id after a given one.
    *
@@ -73,7 +64,7 @@ public interface ExchangeJobOrderFingerprintRepository
           + " WHERE f.jobOrderId = o.id AND o.id > :afterId AND "
           + JobOrderScope.EXCHANGE_READ_SET
           + " AND "
-          + CLIENT_WINDOW
+          + JobOrderClientWindow.PREDICATE
           + " ORDER BY o.id")
   List<ClientSetRow> findClientSetAfter(
       @Param("relatingUnitIds") Collection<UUID> relatingUnitIds,
@@ -100,7 +91,7 @@ public interface ExchangeJobOrderFingerprintRepository
           + " WHERE f.jobOrderId = o.id AND o.id IN :orderIds AND "
           + JobOrderScope.EXCHANGE_READ_SET
           + " AND "
-          + CLIENT_WINDOW)
+          + JobOrderClientWindow.PREDICATE)
   List<ClientSetRow> findClientSetAmong(
       @Param("relatingUnitIds") Collection<UUID> relatingUnitIds,
       @Param("memberId") UUID memberId,
@@ -169,7 +160,7 @@ public interface ExchangeJobOrderFingerprintRepository
       "UPDATE ExchangeJobOrderFingerprint f SET f.leftSetAt = :now"
           + " WHERE f.leftSetAt IS NULL AND EXISTS (SELECT o.id FROM JobOrder o"
           + " WHERE o.id = f.jobOrderId AND NOT "
-          + CLIENT_WINDOW
+          + JobOrderClientWindow.PREDICATE
           + ")")
   int markLeftSet(@Param("closedSince") Instant closedSince, @Param("now") Instant now);
 
@@ -184,6 +175,6 @@ public interface ExchangeJobOrderFingerprintRepository
       "SELECT o.id FROM JobOrder o, ExchangeJobOrderFingerprint f WHERE f.jobOrderId = o.id"
           + " AND (o.createdByMemberId IS NOT NULL OR o.createIdempotencyKey IS NOT NULL)"
           + " AND NOT "
-          + CLIENT_WINDOW)
+          + JobOrderClientWindow.PREDICATE)
   List<UUID> findOutsideWithCreator(@Param("closedSince") Instant closedSince);
 }

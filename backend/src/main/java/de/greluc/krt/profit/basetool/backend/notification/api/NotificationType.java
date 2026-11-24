@@ -455,15 +455,15 @@ public enum NotificationType {
 
   /**
    * An admin switched job orders or their writes on for connected applications (REQ-OXCH-009),
-   * rendered with the coded {@code switch}; notifies the admins and supersedes the earlier notice
-   * about the same switch.
+   * rendered with the coded {@code switchCode}; notifies the admins and supersedes the earlier
+   * notice about the same switch.
    */
   JOB_ORDER_EXCHANGE_SWITCHED_ON,
 
   /**
    * An admin switched job orders or their writes off for connected applications (REQ-OXCH-009),
-   * rendered with the coded {@code switch}; notifies the admins and supersedes the earlier notice
-   * about the same switch.
+   * rendered with the coded {@code switchCode}; notifies the admins and supersedes the earlier
+   * notice about the same switch.
    */
   JOB_ORDER_EXCHANGE_SWITCHED_OFF,
 

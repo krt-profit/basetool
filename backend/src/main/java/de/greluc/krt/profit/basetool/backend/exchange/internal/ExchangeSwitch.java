@@ -42,25 +42,29 @@ enum ExchangeSwitch {
   GLOBAL(
       AuditEventType.EXCHANGE_SWITCH_CHANGED,
       ExchangeRegistryAction.SWITCH_ON,
-      ExchangeRegistryAction.SWITCH_OFF),
+      ExchangeRegistryAction.SWITCH_OFF,
+      null),
 
   /** The bank switch, guarded by its own {@code bankVersion}. */
   BANK(
       AuditEventType.BANK_EXCHANGE_SWITCH_CHANGED,
       ExchangeRegistryAction.BANK_SWITCH_ON,
-      ExchangeRegistryAction.BANK_SWITCH_OFF),
+      ExchangeRegistryAction.BANK_SWITCH_OFF,
+      null),
 
   /** The job-order family switch, guarded by its own {@code jobOrdersVersion}. */
   JOB_ORDERS(
       AuditEventType.JOB_ORDER_EXCHANGE_SWITCH_CHANGED,
       ExchangeRegistryAction.JOB_ORDER_SWITCH_ON,
-      ExchangeRegistryAction.JOB_ORDER_SWITCH_OFF),
+      ExchangeRegistryAction.JOB_ORDER_SWITCH_OFF,
+      ExchangeNotices.FAMILY_SWITCH),
 
   /** The job-order writes switch, guarded by its own {@code jobOrderWritesVersion}. */
   JOB_ORDER_WRITES(
       AuditEventType.JOB_ORDER_EXCHANGE_SWITCH_CHANGED,
       ExchangeRegistryAction.JOB_ORDER_WRITES_SWITCH_ON,
-      ExchangeRegistryAction.JOB_ORDER_WRITES_SWITCH_OFF);
+      ExchangeRegistryAction.JOB_ORDER_WRITES_SWITCH_OFF,
+      ExchangeNotices.WRITES_SWITCH);
 
   /** The audit event every flip writes. */
   @Getter @NotNull private final AuditEventType auditType;
@@ -70,6 +74,12 @@ enum ExchangeSwitch {
 
   /** The metric action of switching off. */
   @NotNull private final ExchangeRegistryAction offAction;
+
+  /**
+   * The {@link ExchangeNotices#SWITCH_CODE} a job-order switch's audit details name it by, {@code
+   * null} for a switch that is no job-order switch.
+   */
+  @Nullable private final String switchCode;
 
   /**
    * Tells whether the switch is on.
@@ -128,13 +138,9 @@ enum ExchangeSwitch {
    */
   @NotNull
   AuditDetails auditDetails(boolean enabled) {
-    return switch (this) {
-      case GLOBAL, BANK -> AuditDetails.of("enabled", enabled);
-      case JOB_ORDERS ->
-          AuditDetails.of("switch", ExchangeNotices.FAMILY_SWITCH).with("enabled", enabled);
-      case JOB_ORDER_WRITES ->
-          AuditDetails.of("switch", ExchangeNotices.WRITES_SWITCH).with("enabled", enabled);
-    };
+    return switchCode == null
+        ? AuditDetails.of("enabled", enabled)
+        : AuditDetails.of("switch", switchCode).with("enabled", enabled);
   }
 
   /**

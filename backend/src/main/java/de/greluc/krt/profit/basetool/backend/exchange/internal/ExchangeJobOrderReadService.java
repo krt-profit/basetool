@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOr
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReadSet;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReadSet.RelatingMember;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,9 +53,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ExchangeJobOrderReadService {
-
-  /** How long a terminal order stays in the client set after closing. */
-  static final Duration CLOSED_WINDOW = Duration.ofDays(7);
 
   private final ExchangeFeedReader feedReader;
   private final ExchangeJobOrderFingerprintRepository fingerprints;
@@ -142,6 +138,6 @@ public class ExchangeJobOrderReadService {
   }
 
   private Instant closedSince() {
-    return clock.instant().minus(CLOSED_WINDOW);
+    return JobOrderClientWindow.closedSince(clock.instant());
   }
 }

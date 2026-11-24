@@ -125,6 +125,18 @@ public class ExchangeLotCatalogue {
   }
 
   /**
+   * Names the unit a material is counted in on the exchange, by its quantity type.
+   *
+   * @param material the material
+   * @return {@code PIECE} for a material counted in pieces, else {@code SCU}
+   */
+  static @NotNull String unitOf(@NotNull Material material) {
+    return material.getQuantityType() == QuantityType.PIECE
+        ? QuantityType.PIECE.name()
+        : QuantityType.SCU.name();
+  }
+
+  /**
    * A resolved material or item, or the result that ends the op.
    *
    * @param material the material, or {@code null}
@@ -147,11 +159,7 @@ public class ExchangeLotCatalogue {
      * @return the entry
      */
     static @NotNull Entry of(@NotNull Material material) {
-      String unit =
-          material.getQuantityType() == QuantityType.PIECE
-              ? QuantityType.PIECE.name()
-              : QuantityType.SCU.name();
-      return new Entry(material, null, unit, null, null);
+      return new Entry(material, null, unitOf(material), null, null);
     }
 
     /**
