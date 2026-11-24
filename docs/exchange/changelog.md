@@ -3,6 +3,37 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-24
+
+- **New: job orders.** The job orders of all three kinds that the member relates to, and writes on
+  aUEC orders, under the new scopes `exchange.joborders.read` and `exchange.joborders.write`
+  ([job orders](resources/job-orders.md)). Every route lies below `/exchange/v1/job-orders`.
+  - **Reads.** `GET /exchange/v1/job-orders` answers a snapshot and a change feed with tombstones:
+    active orders, closed ones for up to 7 days after closing, and aUEC orders while their
+    settlement is open. New schemas `job-order`, `job-order-material`, `job-order-item` and
+    `job-order-auec`, and the page definition `jobOrderPage`. The answers are job-order data: at
+    most 7 days, outside cloud-synced folders, never in backups or diagnostics.
+  - **Create options and create.** `GET …/create-options` lists the units the member may pair, the
+    Profit area to preselect, whether writes are on and the member's own `limits`;
+    `POST /exchange/v1/job-orders` creates an aUEC order on the member's explicit action, a write
+    with a mandatory `Idempotency-Key`, within an open-order cap and a daily create cap. New schemas
+    `job-order-create-options` and `job-order-write`.
+  - **Writes on an existing order.** `POST …/{id}/cancel` before any money moved,
+    `POST …/{id}/target` above what was handed over, and `POST …/{id}/comment` under the comment's
+    own version, each a write with a mandatory `Idempotency-Key`.
+  - **Error codes.** `503 JOB_ORDER_EXCHANGE_DISABLED` and `JOB_ORDER_WRITES_DISABLED` with
+    `Retry-After: 300`, `400 JOB_ORDER_UNITS_NOT_OFFERED`, and `409 JOB_ORDER_OPEN_ORDER_CAP`,
+    `JOB_ORDER_DAILY_CREATE_CAP`, `JOB_ORDER_RESPONSIBILITY_INVALID`, `JOB_ORDER_CLOSED`,
+    `JOB_ORDER_MONEY_STARTED` and `JOB_ORDER_TARGET_TOO_LOW` ([errors](errors.md)).
+  - **Sandbox.** A `sandbox-logistician` account, seeded aUEC orders and both job-order switches
+    on, with scenarios for every route and refusal ([sandbox](sandbox.md)).
+- **Approved: the job-order scopes for VerseKit.** `exchange.joborders.read` and
+  `exchange.joborders.write` join VerseKit's row in the [approved-clients list][approved] from
+  Basetool 1.27.0, under both job-order [criteria](onboarding.md#criteria). VerseKit keeps all
+  job-order data, its own orders included, in memory only. The family stays switched off until an
+  administrator grants the read scope in the registry; the writes switch goes on only after the
+  write grant.
+
 ## 2026-11-22
 
 - **Changed: a ship type the Basetool does not offer creates no ship.** An `upsert` that would
