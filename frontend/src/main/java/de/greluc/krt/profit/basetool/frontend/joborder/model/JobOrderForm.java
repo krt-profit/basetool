@@ -27,7 +27,7 @@ import org.jetbrains.annotations.NotNull;
 
 /** Form-binding object for Job Order input. */
 @Data
-public class JobOrderForm {
+public class JobOrderForm implements JobOrderVersionEcho {
   /**
    * UUID of the profit-eligible org unit that will <em>process</em> the order (the responsible org
    * unit). Bound by the responsible picker on the create form; forwarded as {@code
@@ -47,6 +47,7 @@ public class JobOrderForm {
   /** Optional free-text comment captured from the order creator; HTML-escaped on display. */
   private String comment;
 
+  /** The order version the edit form observed; empty on a create. */
   private Long version;
 
   /** The comment version the edit form observed, echoed beside {@link #version}. */
@@ -71,8 +72,7 @@ public class JobOrderForm {
   public static JobOrderForm forEdit(@NotNull JobOrderDto order) {
     JobOrderForm form = new JobOrderForm();
     form.setComment(order.comment());
-    form.setVersion(order.version());
-    form.setCommentVersion(order.commentVersion());
+    form.observe(JobOrderObservedVersions.of(order));
     if (order.materials() != null && !order.materials().isEmpty()) {
       form.getMaterials().clear();
       for (JobOrderMaterialDto mat : order.materials()) {

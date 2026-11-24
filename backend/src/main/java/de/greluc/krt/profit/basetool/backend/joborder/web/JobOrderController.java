@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderCreation;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
@@ -79,6 +80,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Orders", description = "Operations related to job orders")
 public class JobOrderController {
   private final JobOrderService jobOrderService;
+  private final JobOrderCreation jobOrderCreation;
   private final JobOrderQueryService jobOrderQueryService;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
 
@@ -95,7 +97,7 @@ public class JobOrderController {
       description = "Creates a job order through a current writer of either proposed unit.")
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto createJobOrder(@RequestBody @Valid CreateJobOrderDto dto) {
-    return jobOrderService.createJobOrder(dto);
+    return jobOrderCreation.createMaterialOrder(dto);
   }
 
   /**
@@ -114,7 +116,7 @@ public class JobOrderController {
               + " item's blueprint.")
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto createItemJobOrder(@RequestBody @Valid CreateJobOrderItemRequestDto dto) {
-    return jobOrderService.createItemJobOrder(dto);
+    return jobOrderCreation.createItemOrder(dto);
   }
 
   /**

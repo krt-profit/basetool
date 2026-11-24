@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -37,9 +39,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>{@code requestingOrgUnitId} — the customer org unit; any squadron or Spezialkommando;
  *       mandatory.
  *   <li>{@code comment} — optional free-text note (≤1000 chars), HTML-escaped on display.
- *   <li>{@code version} — the observed order version; required on update, unused on create.
- *   <li>{@code commentVersion} — the observed comment version; required on update, unused on
- *       create.
+ *   <li>{@code observed} — the observed order and comment versions, read from the flat {@code
+ *       version} and {@code commentVersion} fields; both required on update, unused on create.
  * </ul>
  */
 public record CreateJobOrderDto(
@@ -48,5 +49,4 @@ public record CreateJobOrderDto(
     @Size(max = JobOrder.CONTACT_MAX_LENGTH) String handle,
     @Size(max = 1000) String comment,
     @NotEmpty @Size(max = 50) List<@Valid CreateJobOrderMaterialDto> materials,
-    Long version,
-    @Nullable Long commentVersion) {}
+    @JsonUnwrapped @NotNull JobOrderObservedVersions observed) {}

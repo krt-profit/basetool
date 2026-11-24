@@ -181,8 +181,8 @@ source aggregate (no second `@Version` bump).
 **Acceptance**
 
 - [x] Notifications are created only after the producing transaction commits.
-- [x] The producer path (`createJobOrder` / `createItemJobOrder`) gains no second `@Version`
-  write on the order.
+- [x] The producer path (`JobOrderCreation#createMaterialOrder` / `#createItemOrder`) gains no
+  second `@Version` write on the order.
 
 **Enforced by:** `NotificationCreationServiceTest`, `NotificationRuleEngineIntegrationTest`,
 `JobOrderServiceTest` · **Code:** `notification/api/events/NotificationEvent`, `notification/internal/NotificationEventListener`,

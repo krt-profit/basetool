@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemPlan;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
@@ -39,12 +38,10 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
@@ -53,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -70,9 +66,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages the lifecycle of job orders: create, full and per-field update, status transitions (OPEN
- * → IN_PROGRESS → COMPLETED / REJECTED), priority reorder, assignees and material/inventory
- * unlinking.
+ * Manages the lifecycle of existing job orders: full and per-field update, status transitions (OPEN
+ * → IN_PROGRESS → COMPLETED / REJECTED), priority reorder, responsibility transfer, assignees,
+ * material/inventory unlinking and deletion; {@link JobOrderCreation} creates them.
  *
  * <p>{@link #completeJobOrderWithinTransaction(JobOrder)} works on an already-managed entity inside
  * the caller's transaction, so completion never causes a second {@code @Version} bump.
@@ -107,148 +103,10 @@ public class JobOrderService {
   private final JobOrderEditor jobOrderEditor;
 
   private final LiveSyncPublisher liveSyncPublisher;
-  private final JobOrderUnitHistory unitHistory;
+  private final JobOrderQueueFrame queueFrame;
   private final JobOrderParticipationCommands participationCommands;
   private final JobOrderMoneyLifecycle moneyLifecycle;
   private final JobOrderClientNames clientNames;
-
-  /**
-   * Persists a new job order in the next free priority slot (1 is highest), taking each material's
-   * minimum quality verbatim from the DTO (650 or {@code null} for none). After the commit the
-   * order overview and the material demand overview are refreshed (REQ-ORDERS-056).
-   *
-   * @param createDto create payload
-   * @return the persisted order
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when a referenced
-   *     material or user id is unknown
-   */
-  @Transactional
-  public JobOrderDto createJobOrder(CreateJobOrderDto createDto) {
-    JobOrder order =
-        createOrder(
-            new NewOrder(
-                createDto.responsibleOrgUnitId(),
-                createDto.requestingOrgUnitId(),
-                createDto.handle(),
-                createDto.comment(),
-                JobOrderType.MATERIAL,
-                null),
-            jobOrder ->
-                materialLines.build(createDto.materials(), Set.of()).forEach(jobOrder::addMaterial),
-            JobOrderWriterRule.CONTEXTUAL,
-            webActor());
-    return jobOrderStockProjectionService.mapToDtoWithStock(order);
-  }
-
-  /**
-   * Persists an aUEC order's shared information and queue entry, and refreshes the order overview
-   * after the commit (REQ-ORDERS-056).
-   *
-   * @param order the pair, contact and comment; the caller stores the target
-   * @param rule the authority that decides whether the actor writes the pair
-   * @param actor who creates
-   * @param origin runs on the new, unsaved order after the pair checks and before the insert: it
-   *     records where the create came from, and an exception it throws refuses the create
-   * @return the persisted order
-   */
-  @Transactional(propagation = Propagation.MANDATORY)
-  JobOrder createAuecJobOrder(
-      @NotNull JobOrderCreateCommand.AuecOrder order,
-      @NotNull JobOrderWriterRule rule,
-      @NotNull JobOrderActor actor,
-      @NotNull Consumer<JobOrder> origin) {
-    return createOrder(
-        new NewOrder(
-            order.responsibleOrgUnitId(),
-            order.requestingOrgUnitId(),
-            order.handle(),
-            order.comment(),
-            JobOrderType.AUEC,
-            order.target()),
-        origin,
-        rule,
-        actor);
-  }
-
-  /**
-   * Persists a new {@code ITEM} job order; org-unit stamping and priority match {@link
-   * #createJobOrder(CreateJobOrderDto)}, and each line's materials are derived from its blueprint
-   * by {@link JobOrderItemService}. After the commit the order overview and the material demand
-   * overview are refreshed (REQ-ORDERS-056).
-   *
-   * @param createDto item-order create payload
-   * @return the persisted order with derived materials and aggregation
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when a referenced game
-   *     item or blueprint id is unknown
-   * @throws BadRequestException when a blueprint does not produce its line's item, or org-unit
-   *     stamping cannot be resolved
-   */
-  @Transactional
-  public JobOrderDto createItemJobOrder(CreateJobOrderItemRequestDto createDto) {
-    JobOrder order =
-        createOrder(
-            new NewOrder(
-                createDto.responsibleOrgUnitId(),
-                createDto.requestingOrgUnitId(),
-                createDto.handle(),
-                createDto.comment(),
-                JobOrderType.ITEM,
-                null),
-            jobOrder ->
-                itemReconciliation.apply(
-                    jobOrder, jobOrderItemService.prepareItemLines(createDto.items(), List.of())),
-            JobOrderWriterRule.CONTEXTUAL,
-            webActor());
-    return jobOrderStockProjectionService.mapToDtoWithStock(order);
-  }
-
-  /**
-   * The one create path of every kind: under the order locks it resolves both units, rechecks the
-   * pair with the given rule, adds the kind's lines, and records the audit event, the created
-   * notice and the queue frame.
-   */
-  private JobOrder createOrder(
-      @NotNull NewOrder draft,
-      @NotNull Consumer<JobOrder> lines,
-      @NotNull JobOrderWriterRule rule,
-      @NotNull JobOrderActor actor) {
-    profitHierarchy.lockForOrderWrite();
-    jobOrderRepository.lockAllJobOrders();
-    Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
-
-    OrgUnit responsible =
-        jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(draft.responsibleOrgUnitId());
-    OrgUnit requesting =
-        jobOrderOrgUnitResolver.resolveRequestingOrgUnit(draft.requestingOrgUnitId());
-    if (!writers.resolve(rule, actor).permitsPair(responsible.getId(), requesting.getId())) {
-      throw new AccessDeniedException("The writer rule does not let the actor write this pair.");
-    }
-    JobOrder jobOrder =
-        JobOrder.builder()
-            .handle(draft.handle())
-            .comment(StringNormalization.trimToNull(draft.comment()))
-            .priority(newPriority)
-            .type(draft.type())
-            .originalProfitOrgUnitId(profitHierarchy.requireEligible(responsible.getId()))
-            .responsibleOrgUnit(responsible)
-            .requestingOrgUnit(requesting)
-            .build();
-    lines.accept(jobOrder);
-
-    jobOrder = jobOrderRepository.save(jobOrder);
-    jobOrderRepository.flush();
-    unitHistory.retainObservedParties(jobOrder, Set.of());
-    jobOrderPriorityService.normalizePriorities();
-    effects.publish(JobOrderLifecycleNotices.created(jobOrder, actor, clientNames.appOf(actor)));
-    publishQueueSections(jobOrder);
-    auditRecorder.record(
-        JobOrderResponsibilityAudit.createdType(draft.type(), actor),
-        jobOrder.getId(),
-        JobOrderAuditLabel.of(jobOrder),
-        null,
-        JobOrderResponsibilityAudit.created(jobOrder, actor, draft.target()));
-    return jobOrder;
-  }
 
   private @Nullable UUID currentMember() {
     return authHelperService.currentUserId().orElse(null);
@@ -257,24 +115,6 @@ public class JobOrderService {
   private @NotNull JobOrderActor webActor() {
     return JobOrderActor.Web.current(authHelperService);
   }
-
-  /**
-   * The shared terms of a new order of any kind, as submitted.
-   *
-   * @param responsibleOrgUnitId the proposed responsible unit, required by the resolver
-   * @param requestingOrgUnitId the proposed requesting unit, required by the resolver
-   * @param handle the contact
-   * @param comment the optional comment
-   * @param type the order kind
-   * @param target an aUEC order's target, {@code null} for the other kinds
-   */
-  private record NewOrder(
-      @Nullable UUID responsibleOrgUnitId,
-      @Nullable UUID requestingOrgUnitId,
-      String handle,
-      @Nullable String comment,
-      @NotNull JobOrderType type,
-      @Nullable BigDecimal target) {}
 
   /**
    * Reports a terminal outcome after commit.
@@ -451,17 +291,7 @@ public class JobOrderService {
                 "handovers",
                 "item-handovers",
                 "item-handover-lines"));
-    publishQueueSections(order);
-  }
-
-  /**
-   * Refreshes the order overview after the commit, and the material demand overview for the stock
-   * kinds; an aUEC order adds no material demand.
-   */
-  private void publishQueueSections(JobOrder order) {
-    liveSyncPublisher.publishAfterCommit(
-        LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE),
-        order.getType() == JobOrderType.AUEC ? List.of("queue") : List.of("queue", "demand"));
+    queueFrame.publish(order);
   }
 
   /**
@@ -532,8 +362,7 @@ public class JobOrderService {
     return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.EDIT,
-        updateDto.version(),
-        updateDto.commentVersion(),
+        updateDto.observed(),
         plannedOrder ->
             materialReplacementPlan(
                 plannedOrder,
@@ -659,8 +488,7 @@ public class JobOrderService {
     return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.EDIT,
-        updateDto.version(),
-        updateDto.commentVersion(),
+        updateDto.observed(),
         jobOrder -> itemReplacementPlan(jobOrder, updateDto, false));
   }
 
@@ -749,8 +577,7 @@ public class JobOrderService {
     return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.REQUESTER,
-        updateDto.version(),
-        updateDto.commentVersion(),
+        updateDto.observed(),
         plannedOrder ->
             materialReplacementPlan(
                 plannedOrder,
@@ -795,8 +622,7 @@ public class JobOrderService {
     return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.REQUESTER,
-        updateDto.version(),
-        updateDto.commentVersion(),
+        updateDto.observed(),
         jobOrder -> itemReplacementPlan(jobOrder, updateDto, true));
   }
 

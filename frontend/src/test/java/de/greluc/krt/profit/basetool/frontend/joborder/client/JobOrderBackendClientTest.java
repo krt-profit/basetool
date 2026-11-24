@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverIte
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverEntryCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
@@ -317,8 +318,7 @@ class JobOrderBackendClientTest {
                     List.of(new CreateJobOrderItemMaterialDto(MATERIAL, "B")),
                     0,
                     null)),
-            null,
-            null);
+            new JobOrderObservedVersions(null, null));
     CreateJobOrderDto materialOrder =
         new CreateJobOrderDto(
             null,
@@ -326,8 +326,7 @@ class JobOrderBackendClientTest {
             "Pilot",
             "Eilig",
             List.of(new CreateJobOrderMaterialDto(MATERIAL, 500, 12.5)),
-            3L,
-            2L);
+            new JobOrderObservedVersions(3L, 2L));
 
     client.createItemOrder(itemOrder);
     client.updateItemOrder(ORDER, itemOrder);
