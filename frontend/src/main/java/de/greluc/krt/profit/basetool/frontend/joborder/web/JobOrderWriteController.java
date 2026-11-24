@@ -161,31 +161,52 @@ public class JobOrderWriteController {
     } catch (BackendServiceException e) {
       SectionFallback.rethrowHandOff(e);
       log.debug("Failed to create item order (status {})", e.getStatusCode());
-      return createFailed("jobOrderItemForm", form, form.getSource(), redirectAttributes);
+      return createFailed(form, redirectAttributes);
     } catch (Exception e) {
       SectionFallback.rethrowHandOff(e);
       log.error("Failed to create item order", e);
-      return createFailed("jobOrderItemForm", form, form.getSource(), redirectAttributes);
+      return createFailed(form, redirectAttributes);
     }
   }
 
   /**
-   * Sends a failed creation back to the creation form with the submitted form and the create-failed
-   * toast.
+   * Sends a failed item-order creation back to the creation form with the submitted form and the
+   * create-failed toast.
    *
-   * @param formAttribute the flash name the creation page reads the submitted form from
-   * @param form the submitted form
+   * @param form the submitted item-order form, flashed as {@code jobOrderItemForm}
+   * @param redirectAttributes the flash carrier
+   * @return the redirect to the creation form
+   */
+  private static @NotNull String createFailed(
+      @NotNull JobOrderItemForm form, @NotNull RedirectAttributes redirectAttributes) {
+    redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
+    return createFailed(form.getSource(), redirectAttributes);
+  }
+
+  /**
+   * Sends a failed material-order creation back to the creation form with the submitted form and
+   * the create-failed toast.
+   *
+   * @param form the submitted material-order form, flashed as {@code jobOrderForm}
+   * @param redirectAttributes the flash carrier
+   * @return the redirect to the creation form
+   */
+  private static @NotNull String createFailed(
+      @NotNull JobOrderForm form, @NotNull RedirectAttributes redirectAttributes) {
+    redirectAttributes.addFlashAttribute("jobOrderForm", form);
+    return createFailed(form.getSource(), redirectAttributes);
+  }
+
+  /**
+   * Flashes the create-failed toast and returns to the creation form.
+   *
    * @param source the page the creation form was opened from, or {@code null}
    * @param redirectAttributes the flash carrier
    * @return the redirect to the creation form
    */
   private static @NotNull String createFailed(
-      @NotNull String formAttribute,
-      @NotNull Object form,
-      @Nullable String source,
-      @NotNull RedirectAttributes redirectAttributes) {
+      @Nullable String source, @NotNull RedirectAttributes redirectAttributes) {
     redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
-    redirectAttributes.addFlashAttribute(formAttribute, form);
     return createFormRedirect(source);
   }
 
@@ -402,11 +423,11 @@ public class JobOrderWriteController {
     } catch (BackendServiceException e) {
       SectionFallback.rethrowHandOff(e);
       log.debug("Failed to create job order (status {})", e.getStatusCode());
-      return createFailed("jobOrderForm", form, form.getSource(), redirectAttributes);
+      return createFailed(form, redirectAttributes);
     } catch (Exception e) {
       SectionFallback.rethrowHandOff(e);
       log.error("Failed to create job order", e);
-      return createFailed("jobOrderForm", form, form.getSource(), redirectAttributes);
+      return createFailed(form, redirectAttributes);
     }
   }
 
