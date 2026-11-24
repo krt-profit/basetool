@@ -3363,6 +3363,9 @@ the guard (`ExchangeOrgStockWriteService#applyConfirmed`).
   *`ExchangeOrgStockUndoControllerTest`.*
 - [x] The holders of the entries cannot undo the writer's changes, and a writer who is no longer a
   Logistician of the pool cannot undo its entries. *`ExchangeOrgStockUndoControllerTest`.*
+- [x] A writer who left the pool's unit and reaches it only as a Logistician of a Bereich or of the
+  Organisationsleitung above it cannot undo its entries either (`GONE`), as the writer's undo takes
+  the same direct Logistician units as the ops. *`ExchangeOrgStockUndoControllerTest`.*
 
 **Code:** `ExchangeUndoService`, `PoolEntryCommands#restore` / `InventoryPoolRestorer`,
 `ExchangeMassChangeGuard#requiresPoolConfirmation`, `ExchangeOrgStockWriteService#applyConfirmed`,

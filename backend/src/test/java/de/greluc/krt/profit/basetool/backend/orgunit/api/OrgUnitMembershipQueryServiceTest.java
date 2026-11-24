@@ -48,8 +48,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Unit tests for {@link OrgUnitMembershipQueryService}: option lists and their orderings, the
- * descendant-expanding picker, the SK roster, the DTO projections through the real mapper and the
- * name-sorted Staffel accessors (REQ-ORG-017).
+ * descendant-expanding picker, the SK roster, the DTO projections through the real mapper, the
+ * name-sorted Staffel accessors (REQ-ORG-017) and the direct Logistician units (REQ-XCH-045).
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitMembershipQueryServiceTest {
@@ -175,6 +175,29 @@ class OrgUnitMembershipQueryServiceTest {
     when(membershipRepository.findActiveOrgUnitIdsByUserId(userId)).thenReturn(Set.of());
 
     assertTrue(queryService.findDirectMembershipOrgUnitIds(userId).isEmpty());
+  }
+
+  @Test
+  void findDirectLogisticianOrgUnitIds_dropsTheUnitsReachedOnlyFromAbove() {
+    UUID bereichId = UUID.randomUUID();
+    UUID staffelId = UUID.randomUUID();
+    UUID belowId = UUID.randomUUID();
+    when(seatEligibility.holdsKrtMember(userId)).thenReturn(true);
+    when(orgUnitCascadeService.grantedUnits(any(), any()))
+        .thenReturn(Set.of(bereichId, staffelId, belowId));
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(userId))
+        .thenReturn(Set.of(bereichId, staffelId));
+
+    assertEquals(
+        Set.of(bereichId, staffelId), queryService.findDirectLogisticianOrgUnitIds(userId));
+  }
+
+  @Test
+  void findDirectLogisticianOrgUnitIds_withoutKrtMember_returnsEmptyWithoutReadingMemberships() {
+    when(seatEligibility.holdsKrtMember(userId)).thenReturn(false);
+
+    assertTrue(queryService.findDirectLogisticianOrgUnitIds(userId).isEmpty());
+    verify(membershipRepository, never()).findActiveOrgUnitIdsByUserId(any());
   }
 
   @Test

@@ -73,6 +73,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -679,6 +680,27 @@ class ExchangeOrgStockUndoControllerTest {
   }
 
   @Test
+  void aWriterWhoLeftThePoolButIsALogisticianOfTheBereichAboveItCannotUndoItsEntries()
+      throws Exception {
+    UUID bereich = orgUnit("BEREICH", null);
+    UUID pool = orgUnit("SQUADRON", bereich);
+    joins(writer, bereich, true);
+    joins(writer, pool, true);
+    joins(holder, pool, false);
+    UUID entry = stock(holder, material("SCU"), location(), 10, pool);
+    clientWrite(ops(entryOp("book-out", pool, entry, 0, quantity("4"))))
+        .andExpect(jsonPath("$.applied").value(1));
+    jdbc.update(
+        "DELETE FROM org_unit_membership WHERE user_id = ? AND org_unit_id = ?", writer, pool);
+
+    undo(writer)
+        .andExpect(jsonPath("$.restored").value(0))
+        .andExpect(jsonPath("$.skipped[0].reason").value("GONE"));
+
+    assertThat(amountOf(entry)).isEqualTo(6);
+  }
+
+  @Test
   void aBatchThatTakesTooMuchOutOfOnePoolIsHeldAndAppliesOnlyAfterTheWriterConfirms()
       throws Exception {
     UUID pool = orgUnit();
@@ -1136,13 +1158,26 @@ class ExchangeOrgStockUndoControllerTest {
   }
 
   private @NotNull UUID orgUnit() {
+    return orgUnit("SPECIAL_COMMAND", null);
+  }
+
+  /**
+   * Seeds an active org unit of a kind.
+   *
+   * @param kind the kind
+   * @param parent the parent unit, or {@code null} for a top-level unit
+   * @return its id
+   */
+  private @NotNull UUID orgUnit(@NotNull String kind, @Nullable UUID parent) {
     UUID id = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active,"
-            + " is_profit_eligible) VALUES (?, 'SPECIAL_COMMAND', ?, ?, TRUE, FALSE)",
+            + " is_profit_eligible, parent_org_unit_id) VALUES (?, ?, ?, ?, TRUE, FALSE, ?)",
         id,
+        kind,
         "Pool " + id,
-        "U" + id.toString().substring(0, 8));
+        "U" + id.toString().substring(0, 8),
+        parent);
     orgUnits.add(id);
     return id;
   }

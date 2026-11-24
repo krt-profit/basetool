@@ -88,7 +88,8 @@ public class ExchangeOrgUnitService {
 
   /**
    * Returns the units of which the member is a Logistician, by membership or by the cascade of a
-   * Bereich or Organisationsleitung membership (REQ-XCH-043).
+   * Bereich or Organisationsleitung membership: the units in which a refinery pickup may book for
+   * others (REQ-SEC-039, REQ-XCH-054).
    *
    * @param member the member the current request acts for
    * @return the unit ids, possibly empty
