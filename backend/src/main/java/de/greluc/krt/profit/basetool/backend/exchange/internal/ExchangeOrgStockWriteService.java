@@ -184,15 +184,15 @@ public class ExchangeOrgStockWriteService
    */
   private @NotNull ExchangeOrgStockUnitDto logisticianUnit(
       @NotNull ExchangeCaller caller, @NotNull UUID unit) {
-    if (!orgUnitService.logisticianUnits(caller.member()).contains(unit)) {
-      throw new AccessDeniedException("The member is not a Logistician of the unit");
+    if (orgUnitService.directLogisticianUnits(caller.member()).contains(unit)) {
+      for (ExchangeOrgUnitDto named : orgUnitService.orgUnits(caller.member()).items()) {
+        if (named.id().equals(unit)) {
+          return new ExchangeOrgStockUnitDto(named.id(), named.name());
+        }
+      }
     }
-    ExchangeOrgUnitDto named =
-        orgUnitService.orgUnits(caller.member()).items().stream()
-            .filter(candidate -> candidate.id().equals(unit))
-            .findFirst()
-            .orElseThrow(() -> new AccessDeniedException("The member does not belong to the unit"));
-    return new ExchangeOrgStockUnitDto(named.id(), named.name());
+    throw new AccessDeniedException(
+        "The member is not a Logistician and direct member of the unit");
   }
 
   /**
