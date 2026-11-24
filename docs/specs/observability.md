@@ -4567,9 +4567,10 @@ never an id, a path or an amount (REQ-OBS-011).
 
 Alerts, each with a promtool rule test that fires and stays silent:
 
-- **`JobOrderExchangeSwitchChanged`**: any change of either job-order switch in ten minutes,
-  informational like `ExchangeRegistryChanged`, which stays silent on the job-order actions. It
-  points to the operator section „Faulty release on job orders" (arc42 §6.8).
+- **`JobOrderExchangeSwitchChanged`** (warning, like `BankExchangeSwitchChanged`; the rules have no
+  info level): any change of either job-order switch in ten minutes; `ExchangeRegistryChanged`
+  stays silent on the job-order actions. It points to the operator section „Faulty release on job
+  orders" (arc42 §6.8).
 - **`JobOrderExchangeFeedLagging`** (warning): the oldest dirty mark older than 5 minutes, held for
   5 minutes.
 - **`JobOrderFingerprintWorkerStale`** (warning): the worker's last success more than 10 minutes

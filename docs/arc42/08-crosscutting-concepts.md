@@ -26,18 +26,11 @@ ADR-0287).
 The bank goes one step further: every bank access rule sits behind `BankAccessPolicy`, which
 decides for an explicit `BankActor` read from the database and never reads the security context;
 the web beans and the exchange only build the actor and ask (ADR-0352).
-Job orders take the authority as a parameter instead of a policy object: the create command and
-the create-options projection take a `JobOrderWriterRule` and a `JobOrderActor`, resolved on every
-call under the command's locks. The web passes its contextual authorities with the pin, the
-exchange the member's direct Logistician units from the database for the requesting side only, so
-both share one code path and the exchange never permits a pair the web would refuse (ADR-0408).
-The status, target and information commands take the same rule and actor beside a
-`JobOrderReadCheck`, decided on the loaded order under the order locks next to each command's own
-section version and the responsibility gate; the exchange reaches them through the ports
-`JobOrderStatusCommand`, `JobOrderTargetCommand` and `JobOrderInformationCommand`. A port's write
-on an existing order answers in the exchange's order of refusals, one unit
-(`JobOrderClientWriteRules`) the port passes to the shared edit as its checks, while the web keeps
-its own (ADR-0408 point 8, REQ-OXCH-005).
+Job orders take the authority as parameters instead of a policy object: every job-order command
+takes a writer rule, a read check and an actor (`JobOrderCaller`), so the web and the exchange run
+one code path with their own refusal order
+([ADR-0408](../adr/0408-job-order-commands-take-the-writer-rule-the-read-check-and-the-actor-as-parameters.md),
+[REQ-OXCH-005](../specs/orders-exchange.md#req-oxch-005--shared-rules-of-the-job-order-writes)).
 
 Beyond roles there are three mechanisms that are easy to miss:
 
@@ -191,20 +184,10 @@ a relayed exchange client, otherwise `system` — and the exchange change feed's
 a change reaches the feed with its writer whatever path made it, a bulk path included (ADR-0224,
 `REQ-XCH-013`).
 
-Job orders reach the exchange through a fingerprint instead (ADR-0406, `REQ-OXCH-003`): triggers on
-the order's source tables only insert dirty marks, one per order and transaction, and a worker
-recomputes the hash of each marked order's member-independent exchange read every few seconds after
-the commit, in one `REPEATABLE READ` snapshot, writing it only when it changed. A provision or a
-holder movement therefore never moves the job-order feed, while a hierarchy change that flips
-`responsibilityInvalid` does, because it marks every order of the client set. A trigger on the
-fingerprint row writes the key log per unit and per member — the order's units and assignees, old
-and new — and memberships, a unit's activation, renames and name withholding announce the orders
-they touch per member or per order; a feed page reads the member's current direct units and own
-entries and resolves each key against the member's current set into an item or a tombstone
-`{ key, removedAt }` that names no writer. Time alone ends a closed order's 7 days, so a nightly
-window run records on the fingerprint row that the order left the set, the row's trigger announces
-it where it was last announced, and the same run clears the creating member and key of every order
-outside the set (`REQ-OXCH-003`, `REQ-OXCH-010`).
+Job orders reach the exchange feed through a fingerprint of their carried read instead, which a
+worker recomputes from trigger-set dirty marks and a nightly window run ages out
+([ADR-0406](../adr/0406-the-job-order-feed-moves-on-a-fingerprint-of-the-carried-read.md),
+[REQ-OXCH-003](../specs/orders-exchange.md#req-oxch-003--snapshot-and-feed-of-the-job-order-set)).
 
 Every table has exactly one owning module of the target cut, recorded in a table-ownership map that
 a test holds against the migrated schema; a trigger or native statement reaches another module's

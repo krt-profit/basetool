@@ -22,12 +22,12 @@ assignees or support; each order carries a [`link`](#the-link) to its page for a
 
 | Route | Retention class | What a client may do with it |
 | --- | --- | --- |
-| `GET /exchange/v1/job-orders` | job-order data | keep it in memory only, for at most 7 days |
+| `GET /exchange/v1/job-orders` | job-order data | keep it for at most 7 days, outside cloud-synced folders, backups and diagnostics; never forward it |
 | `GET /exchange/v1/job-orders/create-options` | job-order data | read it when the create form opens; keep it no longer than the form |
-| `POST /exchange/v1/job-orders` | job-order data | keep the answer in memory only, for at most 7 days |
-| `POST /exchange/v1/job-orders/{id}/cancel` | job-order data | keep the answer in memory only, for at most 7 days |
-| `POST /exchange/v1/job-orders/{id}/target` | job-order data | keep the answer in memory only, for at most 7 days |
-| `POST /exchange/v1/job-orders/{id}/comment` | job-order data | keep the answer in memory only, for at most 7 days |
+| `POST /exchange/v1/job-orders` | job-order data | keep the answer for at most 7 days, outside cloud-synced folders, backups and diagnostics; never forward it |
+| `POST /exchange/v1/job-orders/{id}/cancel` | job-order data | keep the answer for at most 7 days, outside cloud-synced folders, backups and diagnostics; never forward it |
+| `POST /exchange/v1/job-orders/{id}/target` | job-order data | keep the answer for at most 7 days, outside cloud-synced folders, backups and diagnostics; never forward it |
+| `POST /exchange/v1/job-orders/{id}/comment` | job-order data | keep the answer for at most 7 days, outside cloud-synced folders, backups and diagnostics; never forward it |
 
 Job-order data of every kind, the member's own orders included, is kept for at most 7 days,
 outside cloud-synced folders, never in a backup or diagnostics, and never forwarded. Keep it out of
@@ -387,8 +387,9 @@ order already holds changes nothing and answers the current `versions`.
 
 - **An isolated area.** Make job orders their own area, so a job-order refusal — the switches
   included — never stops the other areas of a sync pass.
-- **Memory only.** Keep every job-order item in memory, own orders included, with a snapshot at
-  each start and the feed on every pass after it.
+- **At most 7 days.** Keep every job-order item, own orders included, for at most 7 days, outside
+  cloud-synced folders and out of backups and diagnostics. A client that keeps nothing across
+  restarts reads a snapshot at each start and the feed on every pass after it.
 - **The create** follows the bank raise: a fresh `Idempotency-Key` per create, held in memory with
   its body until a clear answer; an unclear outcome (no answer, `5xx`, `IDEMPOTENCY_IN_PROGRESS`,
   `RATE_LIMITED`) goes again under the same key and body. After a restart nothing is resent; the

@@ -2008,7 +2008,7 @@ A client that cannot set its `User-Agent` — a Chromium browser extension — s
 > A job-order create at a cap on client creates is refused by the backend with
 > `409 JOB_ORDER_OPEN_ORDER_CAP` or `409 JOB_ORDER_DAILY_CREATE_CAP`; the relay passes both with
 > their fixed detail (`ExchangeRelay.DETAILS`), and the gateway adds `Retry-After` with the seconds
-> until the next UTC midnight to the daily cap's answer (`ExchangeRelay.waitsForNextUtcDay`), since
+> until the next UTC midnight to the daily cap's answer (`ExchangeRelay.retryAfterSeconds`), since
 > the relay carries no backend header
 > ([REQ-OXCH-009](orders-exchange.md#req-oxch-009--the-job-order-switches-and-caps)).
 
@@ -2351,8 +2351,8 @@ responses. It publishes loopback ports only ([`docs/exchange/sandbox.md`](../exc
 
 The seed also carries the job-order family: the account `sandbox-logistician`, a member of IRIDIUM
 with the Logistician flag; an in-progress aUEC order of IRIDIUM with a requester handover and an
-assignee note of `sandbox-member`; an aUEC order closed relative to the seed time, inside the
-7-day window; and both job-order switches on.
+assignee note of `sandbox-member`; an aUEC order closed relative to the seed time, which every seed
+run moves along so it stays inside the 7-day window; and both job-order switches on.
 
 The E2E stack runs the same Keycloak image and the ingest gateway (ADR-0225): the same generator
 writes the E2E realm (`frontend/src/e2e/resources/realm-export.e2e.json`) from the same base with the

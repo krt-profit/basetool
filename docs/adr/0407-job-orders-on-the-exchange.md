@@ -94,7 +94,8 @@ database, as the org stock (ADR-0257) and the bank (ADR-0354) do.
 11. **A11's third exception for other members' data**, beside the shared stock (ADR-0257) and the
     Kartellbank (ADR-0354): other members' and other units' order data on the client rests on
     Art. 6(1)(f), coordinating the order work, with the name withholding as the objection, and a
-    client keeps job-order data at most 7 days, in memory only.
+    client keeps job-order data at most 7 days, outside cloud-synced folders, never in a backup or
+    diagnostics, and never forwards it, as for the org demand (#3619).
 
 ## Consequences
 
