@@ -562,15 +562,19 @@ per controller (S11, #917). Use the shared seams; do not re-derive them inline:
   per-controller `requireSub(JwtAuthenticationToken)` guards, and — since ADR-0142 point 2 (#1640)
   — its String-typed twin `@CurrentUserSub`, which handed the same value out unparsed under the
   identity provider's name for it. A controller must not read `jwt.getSubject()` itself.
-- **`@UserZone ZoneId`** — resolved by `UserZoneArgumentResolver` from the `X-User-Time-Zone`
-  header, tolerating an absent/blank/invalid IANA zone as `null` (the report services fall back to
-  UTC). Each site re-declares the header for the OpenAPI document via a method-level `@Parameter`.
+- **`UserZone`** — a parameter of this record type is resolved by `UserZoneArgumentResolver` from
+  the `X-User-Time-Zone` header; an absent/blank/invalid IANA zone yields a `UserZone` whose
+  `zone()` is `null` (the report services fall back to UTC). It is a type of its own, never an
+  annotated `ZoneId`: Spring MVC's built-in `ServletRequestMethodArgumentResolver` answers every
+  `ZoneId` parameter with the server's zone before a custom resolver is asked.
+  `UserZoneArgumentResolverTest` binds the header through the full MVC resolver chain. Each site
+  re-declares the header for the OpenAPI document via a method-level `@Parameter`.
 - **`AttachmentResponses`** (`pdf`, `json`, `attachment`) — builds every file-download response:
   the file's media type and an RFC 6266 `attachment` disposition (REQ-API-025).
 
-The two resolvers are wired in `WebMvcConfig#addArgumentResolvers`; the JWT-subject annotations are
-hidden from the generated OpenAPI document via `SpringDocUtils.addAnnotationsToIgnore` in
-`OpenApiConfig` (they are as invisible as the `JwtAuthenticationToken` parameters they replaced).
+The two resolvers are wired in `WebMvcConfig#addArgumentResolvers`; `OpenApiConfig` hides the
+JWT-subject annotation (`SpringDocUtils.addAnnotationsToIgnore`) and the `UserZone` type
+(`addRequestWrapperToIgnore`) from the generated OpenAPI document.
 
 ### REQ-API-009 — The external contract set is frozen against in-place change *(superseded)*
 

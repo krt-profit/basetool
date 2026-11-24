@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverS
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderHandoverController;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -69,7 +70,7 @@ class JobOrderHandoverReportControllerTest {
         .thenReturn(fakePdf);
 
     ResponseEntity<byte[]> response =
-        controller.downloadHandoverReport(jobOrderId, handoverId, null);
+        controller.downloadHandoverReport(jobOrderId, handoverId, new UserZone(null));
 
     assertEquals(HttpStatus.OK, response.getStatusCode());
     assertNotNull(response.getBody());
@@ -92,7 +93,7 @@ class JobOrderHandoverReportControllerTest {
 
     assertThrows(
         NotFoundException.class,
-        () -> controller.downloadHandoverReport(jobOrderId, handoverId, null));
+        () -> controller.downloadHandoverReport(jobOrderId, handoverId, new UserZone(null)));
   }
 
   @Test

@@ -27,8 +27,8 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Registers the {@link CurrentUserArgumentResolver} and {@link UserZoneArgumentResolver} behind
- * {@code @CurrentUserId} and {@code @UserZone}.
+ * Registers the {@link CurrentUserArgumentResolver} behind {@code @CurrentUserId} and the {@link
+ * UserZoneArgumentResolver} behind {@code UserZone} parameters.
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {

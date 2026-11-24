@@ -36,7 +36,9 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
   static {
-    SpringDocUtils.getConfig().addAnnotationsToIgnore(CurrentUserId.class, UserZone.class);
+    SpringDocUtils.getConfig()
+        .addAnnotationsToIgnore(CurrentUserId.class)
+        .addRequestWrapperToIgnore(UserZone.class);
   }
 
   /**

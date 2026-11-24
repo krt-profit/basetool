@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.platform.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 import java.lang.reflect.Method;
 import java.time.ZoneId;
@@ -30,56 +32,83 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.MethodParameter;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.NativeWebRequest;
 
 /**
- * Unit tests for {@link UserZoneArgumentResolver}, asserting the header-parse contract the resolver
- * consolidated: valid zones parse (with trimming), and absent/blank/invalid values fall back to
- * {@code null} so the report services render in UTC.
+ * Unit tests for {@link UserZoneArgumentResolver}: the header-parse contract, and that a {@link
+ * UserZone} parameter reaches the controller through Spring MVC's full resolver chain.
  */
 class UserZoneArgumentResolverTest {
 
   private final UserZoneArgumentResolver resolver = new UserZoneArgumentResolver();
 
-  /** Reflection target providing the {@code @UserZone ZoneId} and control parameters. */
+  /** Reflection target providing a {@link UserZone} and a plain {@link ZoneId} parameter. */
   @SuppressWarnings("unused")
-  private void handlers(@UserZone ZoneId zone, @UserZone String zoneOnWrongType, ZoneId plain) {}
+  private void handlers(UserZone zone, ZoneId plain) {}
 
   private static MethodParameter param(int index) throws NoSuchMethodException {
     Method method =
         UserZoneArgumentResolverTest.class.getDeclaredMethod(
-            "handlers", ZoneId.class, String.class, ZoneId.class);
+            "handlers", UserZone.class, ZoneId.class);
     return new MethodParameter(method, index);
   }
 
+  /** Echoes the zone Spring MVC bound to its {@link UserZone} parameter. */
+  @RestController
+  static class ZoneProbeController {
+
+    /**
+     * Answers the bound zone id.
+     *
+     * @param zone the zone the resolver bound
+     * @return the zone id, or {@code none} without a zone
+     */
+    @GetMapping("/probe")
+    String probe(UserZone zone) {
+      return zone.zone() == null ? "none" : zone.zone().getId();
+    }
+  }
+
   @Test
-  void supportsUserZoneOnZoneId() throws Exception {
+  void supportsUserZoneParameter() throws Exception {
     assertThat(resolver.supportsParameter(param(0))).isTrue();
   }
 
   @Test
-  void rejectsUserZoneOnNonZoneIdParameter() throws Exception {
+  void rejectsPlainZoneIdParameter() throws Exception {
     assertThat(resolver.supportsParameter(param(1))).isFalse();
-  }
-
-  @Test
-  void rejectsUnannotatedZoneIdParameter() throws Exception {
-    assertThat(resolver.supportsParameter(param(2))).isFalse();
   }
 
   @Test
   void resolvesValidZoneFromHeader() throws Exception {
     NativeWebRequest request = mock(NativeWebRequest.class);
     when(request.getHeader(UserZoneArgumentResolver.HEADER)).thenReturn("Europe/Berlin");
-    Object resolved = resolver.resolveArgument(param(0), null, request, null);
-    assertThat(resolved).isEqualTo(ZoneId.of("Europe/Berlin"));
+    assertThat(resolver.resolveArgument(param(0), null, request, null))
+        .isEqualTo(new UserZone(ZoneId.of("Europe/Berlin")));
   }
 
   @Test
-  void resolvesToNullWhenHeaderAbsent() throws Exception {
+  void resolvesToEmptyZoneWhenHeaderAbsent() throws Exception {
     NativeWebRequest request = mock(NativeWebRequest.class);
     when(request.getHeader(UserZoneArgumentResolver.HEADER)).thenReturn(null);
-    assertThat(resolver.resolveArgument(param(0), null, request, null)).isNull();
+    assertThat(resolver.resolveArgument(param(0), null, request, null))
+        .isEqualTo(new UserZone(null));
+  }
+
+  @Test
+  void springMvcBindsTheHeaderZoneRatherThanTheServerZone() throws Exception {
+    MockMvc mvc =
+        MockMvcBuilders.standaloneSetup(new ZoneProbeController())
+            .setCustomArgumentResolvers(new UserZoneArgumentResolver())
+            .build();
+
+    mvc.perform(get("/probe").header(UserZoneArgumentResolver.HEADER, "Pacific/Auckland"))
+        .andExpect(content().string("Pacific/Auckland"));
+    mvc.perform(get("/probe")).andExpect(content().string("none"));
   }
 
   @ParameterizedTest

@@ -41,7 +41,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.time.ZoneId;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -169,7 +168,7 @@ public class JobOrderHandoverController {
    *
    * @param jobOrderId job-order id
    * @param handoverId item-handover id
-   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
+   * @param userZone the caller's {@code X-User-Time-Zone} zone; without one the PDF uses UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @GetMapping("/{jobOrderId}/item-handovers/{handoverId}/report")
@@ -188,10 +187,10 @@ public class JobOrderHandoverController {
       required = false,
       schema = @Schema(type = "string"))
   public ResponseEntity<byte[]> downloadItemHandoverReport(
-      @PathVariable UUID jobOrderId, @PathVariable UUID handoverId, @UserZone ZoneId userZone) {
+      @PathVariable UUID jobOrderId, @PathVariable UUID handoverId, UserZone userZone) {
     byte[] pdf =
         jobOrderItemHandoverReportService.generateItemHandoverReport(
-            jobOrderId, handoverId, userZone);
+            jobOrderId, handoverId, userZone.zone());
     String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
     return AttachmentResponses.pdf(pdf, filename);
   }
@@ -203,7 +202,7 @@ public class JobOrderHandoverController {
    *
    * @param jobOrderId job-order id
    * @param handoverId handover id
-   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
+   * @param userZone the caller's {@code X-User-Time-Zone} zone; without one the PDF uses UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @GetMapping("/{jobOrderId}/handovers/{handoverId}/report")
@@ -222,9 +221,10 @@ public class JobOrderHandoverController {
       required = false,
       schema = @Schema(type = "string"))
   public ResponseEntity<byte[]> downloadHandoverReport(
-      @PathVariable UUID jobOrderId, @PathVariable UUID handoverId, @UserZone ZoneId userZone) {
+      @PathVariable UUID jobOrderId, @PathVariable UUID handoverId, UserZone userZone) {
     byte[] pdf =
-        jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, userZone);
+        jobOrderHandoverReportService.generateHandoverReport(
+            jobOrderId, handoverId, userZone.zone());
     String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
     return AttachmentResponses.pdf(pdf, filename);
   }

@@ -859,12 +859,15 @@ handover protocol (`GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/repor
   (`uebergabeprotokoll-<orderId>.pdf`).
 - A handover id that belongs to a different order is a 404, never another order's document.
 - Timestamps render in the caller's zone from the optional `X-User-Time-Zone` header (the page
-  sends the browser's IANA zone); a missing or invalid zone falls back to UTC rather than failing.
+  sends the browser's IANA zone) and are labelled „Lokalzeit"; a missing or invalid zone falls back
+  to UTC rather than failing, and the time is then labelled „UTC".
 - The frontend reaches it through `JobOrderHandoverReportProxyController`, which forwards the zone
   header.
 
-**Enforced by:** `JobOrderItemHandoverReportServiceTest` (order number + item name in the PDF,
-foreign-order handover rejected) · **Code:** `JobOrderController.downloadItemHandoverReport`,
+**Enforced by:** `JobOrderItemHandoverReportServiceTest` (order number + item name in the PDF, the
+time in the caller's zone or labelled UTC, foreign-order handover rejected),
+`UserZoneArgumentResolverTest` (the header reaches the controller through the MVC resolver chain) ·
+**Code:** `JobOrderController.downloadItemHandoverReport`,
 `JobOrderItemHandoverReportService`, `JobOrderHandoverReportProxyController`, `orders-detail.js`
 (item-handover download) · **Issues:** —
 

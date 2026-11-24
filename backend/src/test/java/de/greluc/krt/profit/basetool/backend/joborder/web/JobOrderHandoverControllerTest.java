@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverR
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionService;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -117,7 +118,7 @@ class JobOrderHandoverControllerTest {
 
     ResponseEntity<byte[]> response =
         controller.downloadHandoverReport(
-            jobOrderId, handoverId, java.time.ZoneId.of("Europe/Berlin"));
+            jobOrderId, handoverId, new UserZone(java.time.ZoneId.of("Europe/Berlin")));
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody()).isSameAs(pdf);
@@ -136,7 +137,7 @@ class JobOrderHandoverControllerTest {
         .thenReturn(pdf);
 
     ResponseEntity<byte[]> response =
-        controller.downloadHandoverReport(jobOrderId, handoverId, null);
+        controller.downloadHandoverReport(jobOrderId, handoverId, new UserZone(null));
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     verify(jobOrderHandoverReportService).generateHandoverReport(jobOrderId, handoverId, null);

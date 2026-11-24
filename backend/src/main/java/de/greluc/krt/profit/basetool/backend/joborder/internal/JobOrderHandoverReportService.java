@@ -56,6 +56,8 @@ public class JobOrderHandoverReportService {
 
   private static final DateTimeFormatter DATE_PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy");
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
+  private static final String LOCAL_TIME_SUFFIX = " (Lokalzeit)";
+  private static final String UTC_SUFFIX = " (UTC)";
 
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final MessageSource messageSource;
@@ -66,11 +68,11 @@ public class JobOrderHandoverReportService {
    *
    * @param jobOrderId the job order ID
    * @param handoverId the handover ID
-   * @param userZone the display time zone; {@code null} means UTC
+   * @param userZone the display time zone; {@code null} renders and labels the time as UTC
    * @return PDF as byte array
    */
   public byte @NotNull [] generateHandoverReport(
-      @NotNull UUID jobOrderId, @NotNull UUID handoverId, ZoneId userZone) {
+      @NotNull UUID jobOrderId, @NotNull UUID handoverId, @Nullable ZoneId userZone) {
     log.debug(
         "Generating handover report for jobOrderId={}, handoverId={}, userZone={}",
         jobOrderId,
@@ -91,7 +93,9 @@ public class JobOrderHandoverReportService {
     String jobOrderNumber = "#" + handover.getJobOrder().getDisplayId();
     String recipientHandle = handover.getRecipientHandle();
     String handoverDate = dateFormatter.format(handover.getHandoverTime());
-    String handoverTime = timeFormatter.format(handover.getHandoverTime());
+    String handoverTime =
+        timeFormatter.format(handover.getHandoverTime())
+            + (userZone != null ? LOCAL_TIME_SUFFIX : UTC_SUFFIX);
 
     List<ItemRow> rows =
         handover.getItems().stream()
@@ -121,7 +125,7 @@ public class JobOrderHandoverReportService {
     log.debug("Generating handover report preview for jobOrderNumber={}", dto.jobOrderNumber());
 
     String handoverDate = DATE_PATTERN.format(dto.handoverTime());
-    String handoverTime = TIME_PATTERN.format(dto.handoverTime());
+    String handoverTime = TIME_PATTERN.format(dto.handoverTime()) + LOCAL_TIME_SUFFIX;
 
     List<ItemRow> rows =
         dto.items().stream()
@@ -153,7 +157,7 @@ public class JobOrderHandoverReportService {
       PdfPTable metaTable = KrtPdfSupport.newMetaTable();
       KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
       KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
-      KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
+      KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime);
       KrtPdfSupport.addMetaRow(
           metaTable,
           "EMPFÄNGER (HANDLE)",
