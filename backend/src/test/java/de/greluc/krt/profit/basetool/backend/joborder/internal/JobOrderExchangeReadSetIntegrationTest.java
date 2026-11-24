@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -33,20 +31,16 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRelation;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrganisationsleitungRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
 import jakarta.persistence.EntityManager;
-import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,13 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * The member's job-order read set on the exchange against Postgres: each current own relation
@@ -80,12 +68,14 @@ class JobOrderExchangeReadSetIntegrationTest {
   @Autowired private CustomJwtGrantedAuthoritiesConverter converter;
   @Autowired private JobOrderRepository orders;
   @Autowired private OrgUnitRepository units;
+  @Autowired private OrganisationsleitungRepository leitungen;
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private UserRepository users;
   @Autowired private RoleRepository roles;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private EntityManager entityManager;
 
+  private WriterRuleFixtures fixtures;
   private OrgUnit profit;
   private Squadron own;
   private Squadron other;
@@ -93,22 +83,22 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @BeforeEach
   void seed() {
+    fixtures = new WriterRuleFixtures(units, leitungen, users, roles, memberships, converter);
     profit = ProfitHierarchyFixtures.persistedProfitArea(units);
-    own = squadron("Read own", profit, true);
-    other = squadron("Read other", profit, true);
-    third = squadron("Read third", null, true);
+    own = fixtures.squadron(tagged("Read own"), profit, true);
+    other = fixtures.squadron(tagged("Read other"), profit, true);
+    third = fixtures.squadron(tagged("Read third"), null, true);
   }
 
   @AfterEach
   void clearAuthentication() {
-    SecurityContextHolder.clearContext();
-    RequestContextHolder.resetRequestAttributes();
+    WriterRuleFixtures.signOut();
   }
 
   @Test
   void eachCurrentOwnRelationPutsTheOrderIntoTheReadSet() {
-    User member = member(true, false);
-    seat(member, own, MembershipRole.MEMBER);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, own, MembershipRole.MEMBER, false);
     JobOrder requested = order(other, own, JobOrderType.MATERIAL);
     JobOrder responsible = order(own, other, JobOrderType.ITEM);
     JobOrder supported = order(other, third, JobOrderType.MATERIAL);
@@ -126,8 +116,8 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @Test
   void oneOrderCarriesEveryRelationThatApplies() {
-    User member = member(true, false);
-    seat(member, own, MembershipRole.MEMBER);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, own, MembershipRole.MEMBER, false);
     JobOrder order = order(own, own, JobOrderType.MATERIAL);
     participation(order, own, true);
     assignee(order, member, null);
@@ -138,10 +128,10 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @Test
   void theLeadershipCascadeStaysOutside() {
-    User leader = member(true, false);
+    User leader = fixtures.member(true, false);
     Bereich area = bereich("Read area");
-    seat(leader, area, MembershipRole.BEREICHSLEITER);
-    Squadron below = squadron("Read below", area, true);
+    fixtures.seat(leader, area, MembershipRole.BEREICHSLEITER, false);
+    Squadron below = fixtures.squadron(tagged("Read below"), area, true);
     JobOrder ofTheArea = order(other, area, JobOrderType.MATERIAL);
     JobOrder cascaded = order(other, below, JobOrderType.MATERIAL);
 
@@ -150,8 +140,8 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @Test
   void theWebsWiderReachesStayOutside() {
-    User member = member(true, false);
-    seat(member, own, MembershipRole.MEMBER);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, own, MembershipRole.MEMBER, false);
     JobOrder profitWide = order(other, other, JobOrderType.MATERIAL);
     JobOrder endedSupport = order(other, third, JobOrderType.MATERIAL);
     participation(endedSupport, own, false);
@@ -172,9 +162,9 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @Test
   void aDeactivatedUnitRelatesNothing() {
-    User member = member(true, false);
-    Squadron dormant = squadron("Read dormant", null, false);
-    seat(member, dormant, MembershipRole.MEMBER);
+    User member = fixtures.member(true, false);
+    Squadron dormant = fixtures.squadron(tagged("Read dormant"), null, false);
+    fixtures.seat(member, dormant, MembershipRole.MEMBER, false);
     JobOrder order = order(other, dormant, JobOrderType.MATERIAL);
 
     assertThat(relationsOf(member, order)).isEmpty();
@@ -182,8 +172,8 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @Test
   void withoutKrtMemberOnlyTheAssigneeEntryCounts() {
-    User member = member(false, false);
-    seat(member, own, MembershipRole.MEMBER);
+    User member = fixtures.member(false, false);
+    fixtures.seat(member, own, MembershipRole.MEMBER, false);
     JobOrder requested = order(other, own, JobOrderType.MATERIAL);
     JobOrder assigned = order(other, third, JobOrderType.MATERIAL);
     assignee(assigned, member, null);
@@ -194,8 +184,8 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @Test
   void anAdministratorIsAPlainMember() {
-    User admin = member(true, true);
-    seat(admin, own, MembershipRole.MEMBER);
+    User admin = fixtures.member(true, true);
+    fixtures.seat(admin, own, MembershipRole.MEMBER, false);
     JobOrder mine = order(other, own, JobOrderType.MATERIAL);
     JobOrder foreign = order(other, third, JobOrderType.MATERIAL);
 
@@ -204,8 +194,8 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @Test
   void anUnknownOrderIsOutsideLikeAHiddenOne() {
-    User member = member(true, false);
-    seat(member, own, MembershipRole.MEMBER);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, own, MembershipRole.MEMBER, false);
     JobOrder hidden = order(other, third, JobOrderType.MATERIAL);
 
     assertThat(
@@ -216,23 +206,23 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @Test
   void theOwnRelationReadCheckDecidesTheReadSetOfTheRequestsMember() {
-    User member = member(true, false);
-    seat(member, own, MembershipRole.MEMBER);
+    User member = fixtures.member(true, false);
+    fixtures.seat(member, own, MembershipRole.MEMBER, false);
     JobOrder requested = order(other, own, JobOrderType.AUEC);
     JobOrder foreign = order(other, third, JobOrderType.AUEC);
 
     assertThat(accessPolicy.canRead(JobOrderReadCheck.OWN_RELATION, requested))
         .as("a request without a member")
         .isFalse();
-    authenticateForTheWeb(member);
+    fixtures.signInAsWebMember(member);
     assertThat(accessPolicy.canRead(JobOrderReadCheck.OWN_RELATION, requested)).isTrue();
     assertThat(accessPolicy.canRead(JobOrderReadCheck.OWN_RELATION, foreign)).isFalse();
   }
 
   @Test
   void onlyTheMembersOwnNoteIsRead() {
-    User member = member(true, false);
-    User colleague = member(true, false);
+    User member = fixtures.member(true, false);
+    User colleague = fixtures.member(true, false);
     JobOrder order = order(other, third, JobOrderType.MATERIAL);
     assignee(order, member, "mine");
     assignee(order, colleague, "theirs");
@@ -245,12 +235,12 @@ class JobOrderExchangeReadSetIntegrationTest {
 
   @Test
   void theReadSetNeverExceedsTheWebsReadForTheSameMember() {
-    User outsideProfit = member(true, false);
-    seat(outsideProfit, third, MembershipRole.MEMBER);
-    User insideProfit = member(true, false);
-    seat(insideProfit, own, MembershipRole.MEMBER);
-    User admin = member(true, true);
-    seat(admin, own, MembershipRole.MEMBER);
+    User outsideProfit = fixtures.member(true, false);
+    fixtures.seat(outsideProfit, third, MembershipRole.MEMBER, false);
+    User insideProfit = fixtures.member(true, false);
+    fixtures.seat(insideProfit, own, MembershipRole.MEMBER, false);
+    User admin = fixtures.member(true, true);
+    fixtures.seat(admin, own, MembershipRole.MEMBER, false);
     JobOrder requested = order(other, third, JobOrderType.MATERIAL);
     JobOrder responsible = order(own, other, JobOrderType.ITEM);
     JobOrder supported = order(other, other, JobOrderType.MATERIAL);
@@ -264,7 +254,7 @@ class JobOrderExchangeReadSetIntegrationTest {
     for (User reader : List.of(outsideProfit, insideProfit, admin)) {
       Set<UUID> exchange = relationsOf(reader, seeded.toArray(JobOrder[]::new)).keySet();
       assertThat(exchange).as("exchange read set of %s", reader.getUsername()).isNotEmpty();
-      authenticateForTheWeb(reader);
+      fixtures.signInAsWebMember(reader);
       for (UUID order : exchange) {
         assertThat(accessPolicy.canSeeJobOrder(order))
             .as("%s reads %s in the web", reader.getUsername(), order)
@@ -278,20 +268,6 @@ class JobOrderExchangeReadSetIntegrationTest {
     return readSet.relations(
         readSet.relatingMember(member.getId()),
         List.of(seeded).stream().map(JobOrder::getId).toList());
-  }
-
-  /** Authenticates the member with the web's authorities minted by the real converter, no pin. */
-  private void authenticateForTheWeb(User member) {
-    SecurityContextHolder.getContext()
-        .setAuthentication(
-            new JwtAuthenticationToken(
-                Jwt.withTokenValue("read-subset")
-                    .header("alg", "none")
-                    .subject(member.getId().toString())
-                    .build(),
-                converter.assembleFor(users.findById(member.getId()).orElseThrow())));
-    RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(new MockHttpServletRequest()));
   }
 
   private JobOrder order(OrgUnit responsible, OrgUnit requesting, JobOrderType kind) {
@@ -332,49 +308,15 @@ class JobOrderExchangeReadSetIntegrationTest {
         note);
   }
 
-  private Squadron squadron(String name, @Nullable OrgUnit parent, boolean active) {
-    String tag = name + " " + UUID.randomUUID().toString().substring(0, 8);
-    Squadron unit = new Squadron();
-    unit.setName(tag);
-    unit.setShorthand(tag);
-    unit.setParent(parent);
-    unit.setActive(active);
-    return units.save(unit);
-  }
-
   private Bereich bereich(String name) {
-    String tag = name + " " + UUID.randomUUID().toString().substring(0, 8);
+    String tag = tagged(name);
     Bereich unit = new Bereich();
     unit.setName(tag);
     unit.setShorthand(tag);
     return units.save(unit);
   }
 
-  private User member(boolean krtMember, boolean admin) {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    user.setUsername("read-set-" + user.getId());
-    user.setApprovalStatus(ApprovalStatus.ACTIVE);
-    user.setInKeycloak(true);
-    Set<Role> held = new HashSet<>();
-    if (krtMember) {
-      held.add(roles.findByCode(Roles.KRT_MEMBER).orElseThrow());
-    }
-    if (admin) {
-      held.add(roles.findByCode(Roles.ADMIN).orElseThrow());
-    }
-    user.setRoles(held);
-    return users.saveAndFlush(user);
-  }
-
-  private void seat(User user, OrgUnit unit, MembershipRole rank) {
-    OrgUnitMembership membership = new OrgUnitMembership();
-    membership.setId(new OrgUnitMembershipId(user.getId(), unit.getId()));
-    membership.setUser(user);
-    membership.setKind(unit.getKind());
-    membership.setRole(rank);
-    membership.setLogistician(false);
-    membership.setJoinedAt(Instant.now());
-    memberships.saveAndFlush(membership);
+  private static String tagged(String name) {
+    return name + " " + UUID.randomUUID().toString().substring(0, 8);
   }
 }
