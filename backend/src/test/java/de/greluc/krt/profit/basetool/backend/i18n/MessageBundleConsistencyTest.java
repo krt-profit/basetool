@@ -54,6 +54,16 @@ class MessageBundleConsistencyTest {
   /** Default (no-locale) fallback bundle under the module's main resources. */
   private static final Path DEFAULT = Path.of("src/main/resources/messages.properties");
 
+  /** Default Bean Validation bundle under the module's main resources. */
+  private static final Path VALIDATION = Path.of("src/main/resources/ValidationMessages.properties");
+
+  /** English Bean Validation bundle under the module's main resources. */
+  private static final Path VALIDATION_EN =
+      Path.of("src/main/resources/ValidationMessages_en.properties");
+
+  /** Every bundle of the module, the message bundles and the Bean Validation bundles alike. */
+  private static final List<Path> BUNDLES = List.of(DEFAULT, DE, EN, VALIDATION, VALIDATION_EN);
+
   /** Root of the module's production sources. */
   private static final Path MAIN_SOURCES = Path.of("src/main/java");
 
@@ -66,7 +76,7 @@ class MessageBundleConsistencyTest {
    * escapes inside {@code .properties} files. Declared as Java unicode escapes so this source file
    * itself stays pure ASCII.
    */
-  private static final String LITERAL_UMLAUTS = "äöüÄÖÜß";
+  private static final String LITERAL_UMLAUTS = "\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df";
 
   /**
    * Asserts the German and English bundles declare an identical key set, listing any key that
@@ -84,27 +94,27 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Asserts the German bundle contains no literal umlaut characters, enforcing the {@code \\uXXXX}
-   * escaping rule from AGENTS.md. Offending lines are reported with their 1-based line number.
+   * Asserts no bundle of the module contains a literal umlaut character, enforcing the {@code
+   * \\uXXXX} escaping rule from AGENTS.md. Offending lines are reported with their bundle and
+   * 1-based line number.
    *
-   * @throws IOException if the German bundle cannot be read from disk
+   * @throws IOException if a bundle cannot be read from disk
    */
   @Test
-  void germanBundleEscapesUmlautsAsUnicode() throws IOException {
+  void everyBundleEscapesUmlautsAsUnicode() throws IOException {
     List<String> offenders = new ArrayList<>();
-    List<String> lines = Files.readAllLines(DE, StandardCharsets.UTF_8);
-    for (int i = 0; i < lines.size(); i++) {
-      String line = lines.get(i);
-      for (int c = 0; c < line.length(); c++) {
-        if (LITERAL_UMLAUTS.indexOf(line.charAt(c)) >= 0) {
-          offenders.add((i + 1) + ": " + line);
-          break;
+    for (Path bundle : BUNDLES) {
+      List<String> lines = Files.readAllLines(bundle, StandardCharsets.UTF_8);
+      for (int i = 0; i < lines.size(); i++) {
+        String line = lines.get(i);
+        if (line.chars().anyMatch(c -> LITERAL_UMLAUTS.indexOf(c) >= 0)) {
+          offenders.add(bundle.getFileName() + ":" + (i + 1) + ": " + line);
         }
       }
     }
 
     assertThat(offenders)
-        .as("German umlauts must be written as \\uXXXX escapes in messages_de.properties")
+        .as("German umlauts must be written as \\uXXXX escapes in every bundle")
         .isEmpty();
   }
 
