@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.jetbrains.annotations.Contract;
@@ -32,35 +34,27 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The registry's content as the gateway sees it: the global switch, the bank switch, the two
- * job-order switches and every client by client id (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009). Two
- * snapshots are equal exactly when they grant the same access.
+ * The registry's content as the gateway sees it: the switches that are on and every client by
+ * client id (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009). Two snapshots are equal exactly when they
+ * grant the same access.
  *
- * @param enabled whether the exchange serves any request
- * @param bankEnabled whether the bank route family serves requests while the exchange is on
- * @param jobOrdersEnabled whether the job-order route family serves requests while the exchange is
- *     on
- * @param jobOrderWritesEnabled whether the job-order writes are served while the family is on
+ * @param switchedOn the switches that are on; every other one is off
  * @param clients every registry client by its Keycloak client id, sorted
  */
 public record ExchangeRegistrySnapshot(
-    boolean enabled,
-    boolean bankEnabled,
-    boolean jobOrdersEnabled,
-    boolean jobOrderWritesEnabled,
+    @NotNull @Unmodifiable Set<ExchangeSwitch> switchedOn,
     @NotNull @Unmodifiable SortedMap<String, Client> clients) {
 
   /**
-   * Copies the client map so the snapshot cannot change under its reader.
+   * Copies the switches and the client map so the snapshot cannot change under its reader.
    *
-   * @param enabled whether the exchange serves any request
-   * @param bankEnabled whether the bank route family serves requests while the exchange is on
-   * @param jobOrdersEnabled whether the job-order route family serves requests while the exchange
-   *     is on
-   * @param jobOrderWritesEnabled whether the job-order writes are served while the family is on
+   * @param switchedOn the switches that are on
    * @param clients every registry client by its Keycloak client id
    */
   public ExchangeRegistrySnapshot {
+    Set<ExchangeSwitch> on = EnumSet.noneOf(ExchangeSwitch.class);
+    on.addAll(switchedOn);
+    switchedOn = Collections.unmodifiableSet(on);
     clients = Collections.unmodifiableSortedMap(new TreeMap<>(clients));
   }
 
@@ -72,7 +66,18 @@ public record ExchangeRegistrySnapshot(
    */
   @NotNull
   public static ExchangeRegistrySnapshot switchedOff(@NotNull SortedMap<String, Client> clients) {
-    return new ExchangeRegistrySnapshot(false, false, false, false, clients);
+    return new ExchangeRegistrySnapshot(Set.of(), clients);
+  }
+
+  /**
+   * Tells whether a switch is on.
+   *
+   * @param target the switch
+   * @return {@code true} when it is on
+   */
+  @Contract(pure = true)
+  public boolean isOn(@NotNull ExchangeSwitch target) {
+    return switchedOn.contains(target);
   }
 
   /**
@@ -134,12 +139,13 @@ public record ExchangeRegistrySnapshot(
     if (settings == null) {
       return switchedOff(clients);
     }
-    return new ExchangeRegistrySnapshot(
-        settings.isEnabled(),
-        settings.isBankEnabled(),
-        settings.isJobOrdersEnabled(),
-        settings.isJobOrderWritesEnabled(),
-        clients);
+    Set<ExchangeSwitch> on = EnumSet.noneOf(ExchangeSwitch.class);
+    for (ExchangeSwitch target : ExchangeSwitch.values()) {
+      if (target.stateOf(settings).enabled()) {
+        on.add(target);
+      }
+    }
+    return new ExchangeRegistrySnapshot(on, clients);
   }
 
   /**
@@ -180,12 +186,10 @@ public record ExchangeRegistrySnapshot(
               then.requestsPerMinute(),
               then.writesPerDay()));
     }
-    return new ExchangeRegistrySnapshot(
-        before.enabled() && after.enabled(),
-        before.bankEnabled() && after.bankEnabled(),
-        before.jobOrdersEnabled() && after.jobOrdersEnabled(),
-        before.jobOrderWritesEnabled() && after.jobOrderWritesEnabled(),
-        merged);
+    Set<ExchangeSwitch> on = EnumSet.noneOf(ExchangeSwitch.class);
+    on.addAll(before.switchedOn());
+    on.retainAll(after.switchedOn());
+    return new ExchangeRegistrySnapshot(on, merged);
   }
 
   /**

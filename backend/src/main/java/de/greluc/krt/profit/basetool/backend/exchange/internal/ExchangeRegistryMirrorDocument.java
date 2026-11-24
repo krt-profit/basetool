@@ -20,44 +20,91 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import java.time.Instant;
-import java.util.SortedMap;
+import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
 import org.jetbrains.annotations.NotNull;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The JSON document the gateway reads from the mirror key (REQ-XCH-003).
- *
- * @param schemaVersion the document format, {@value #SCHEMA_VERSION} for this layout
- * @param revision grows with every write, across restarts
- * @param writtenAt when the backend wrote the document
- * @param enabled whether the exchange serves any request
- * @param bankEnabled whether the bank route family serves requests while the exchange is on
- * @param jobOrdersEnabled whether the job-order route family serves requests while the exchange is
- *     on; a document without it reads as off
- * @param jobOrderWritesEnabled whether the job-order writes are served while the family is on; a
- *     document without it reads as off
- * @param clients every registry client by its Keycloak client id
+ * The JSON document the gateway reads from the mirror key (REQ-XCH-003): {@code schemaVersion},
+ * {@code revision}, {@code writtenAt}, one boolean per {@link ExchangeSwitch} under its mirror
+ * field in declaration order, and {@code clients} by client id. A document without a switch's
+ * member reads that switch as off.
  */
-public record ExchangeRegistryMirrorDocument(
-    int schemaVersion,
-    long revision,
-    @NotNull Instant writtenAt,
-    boolean enabled,
-    boolean bankEnabled,
-    boolean jobOrdersEnabled,
-    boolean jobOrderWritesEnabled,
-    @NotNull SortedMap<String, ExchangeRegistrySnapshot.Client> clients) {
+final class ExchangeRegistryMirrorDocument {
 
   /** The current document format. */
-  public static final int SCHEMA_VERSION = 1;
+  static final int SCHEMA_VERSION = 1;
+
+  /** The member holding the document format. */
+  private static final String SCHEMA_VERSION_FIELD = "schemaVersion";
+
+  /** The member holding the clients by client id. */
+  private static final String CLIENTS_FIELD = "clients";
+
+  /** The type the clients member is read as. */
+  private static final TypeReference<TreeMap<String, ExchangeRegistrySnapshot.Client>>
+      CLIENTS_TYPE = new TypeReference<>() {};
+
+  private ExchangeRegistryMirrorDocument() {}
 
   /**
-   * Returns the registry content without revision and timestamp.
+   * Renders a snapshot as the document.
    *
-   * @return the snapshot this document carries
+   * @param mapper the mapper the document is written with
+   * @param snapshot the registry content
+   * @param revision grows with every write, across restarts
+   * @param writtenAt when the backend writes the document
+   * @return the document's JSON text
    */
   @NotNull
-  public ExchangeRegistrySnapshot snapshot() {
-    return new ExchangeRegistrySnapshot(
-        enabled, bankEnabled, jobOrdersEnabled, jobOrderWritesEnabled, clients);
+  static String write(
+      @NotNull JsonMapper mapper,
+      @NotNull ExchangeRegistrySnapshot snapshot,
+      long revision,
+      @NotNull Instant writtenAt) {
+    ObjectNode document = mapper.createObjectNode();
+    document.put(SCHEMA_VERSION_FIELD, SCHEMA_VERSION);
+    document.put("revision", revision);
+    document.set("writtenAt", mapper.valueToTree(writtenAt));
+    for (ExchangeSwitch target : ExchangeSwitch.values()) {
+      document.put(target.getMirrorField(), snapshot.isOn(target));
+    }
+    document.set(CLIENTS_FIELD, mapper.valueToTree(snapshot.clients()));
+    return mapper.writeValueAsString(document);
+  }
+
+  /**
+   * Parses the document back into the registry content it carries, without revision and write time.
+   *
+   * @param mapper the mapper the document is read with
+   * @param raw the document's JSON text
+   * @return the content, or empty for a document of another format
+   * @throws JacksonException when the text is no readable document
+   */
+  @NotNull
+  static Optional<ExchangeRegistrySnapshot> read(@NotNull JsonMapper mapper, @NotNull String raw) {
+    JsonNode document = mapper.readTree(raw);
+    JsonNode version = document.path(SCHEMA_VERSION_FIELD);
+    if (!version.isInt() || version.intValue() != SCHEMA_VERSION) {
+      return Optional.empty();
+    }
+    Set<ExchangeSwitch> on = EnumSet.noneOf(ExchangeSwitch.class);
+    for (ExchangeSwitch target : ExchangeSwitch.values()) {
+      JsonNode flag = document.path(target.getMirrorField());
+      if (flag.isBoolean() && flag.booleanValue()) {
+        on.add(target);
+      }
+    }
+    JsonNode clients = document.path(CLIENTS_FIELD);
+    return Optional.of(
+        new ExchangeRegistrySnapshot(
+            on, clients.isObject() ? mapper.convertValue(clients, CLIENTS_TYPE) : new TreeMap<>()));
   }
 }

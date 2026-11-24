@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -29,9 +30,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSwitch;
+import java.util.EnumMap;
+import java.util.Map;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -47,6 +53,7 @@ import org.springframework.web.context.WebApplicationContext;
 class AdminExchangeRegistryControllerTest {
 
   private static final String CLIENTS = "/api/v1/connected-apps/admin/clients";
+  private static final String SETTINGS = "/api/v1/connected-apps/admin/settings";
   private static final String BANK_SWITCH = "/api/v1/connected-apps/admin/settings/bank";
   private static final String JOB_ORDER_SWITCH = "/api/v1/connected-apps/admin/settings/job-orders";
   private static final String JOB_ORDER_WRITES_SWITCH =
@@ -417,6 +424,81 @@ class AdminExchangeRegistryControllerTest {
             .andExpect(status().isForbidden());
       }
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(ExchangeSwitch.class)
+  void everySwitchIsReadAndSetAloneThroughItsOwnEndpoint(@NotNull ExchangeSwitch target)
+      throws Exception {
+    Map<ExchangeSwitch, String> before = new EnumMap<>(ExchangeSwitch.class);
+    for (ExchangeSwitch any : ExchangeSwitch.values()) {
+      before.put(any, read(any));
+    }
+    boolean enabled = JsonPath.read(before.get(target), "$.enabled");
+    Number version = JsonPath.read(before.get(target), "$.version");
+
+    mockMvc
+        .perform(
+            put(path(target))
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":" + !enabled + ",\"version\":" + version + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enabled").value(!enabled))
+        .andExpect(jsonPath("$.version").value(version.longValue() + 1))
+        .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+
+    assertThat(JsonPath.<Boolean>read(read(target), "$.enabled")).isEqualTo(!enabled);
+    for (ExchangeSwitch other : ExchangeSwitch.values()) {
+      if (other != target) {
+        assertThat(read(other))
+            .as("%s after flipping %s", other, target)
+            .isEqualTo(before.get(other));
+      }
+    }
+  }
+
+  @Test
+  void anUnknownAreaSwitchIsNotFound() throws Exception {
+    mockMvc.perform(get(SETTINGS + "/garage").with(admin())).andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            put(SETTINGS + "/garage")
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true,\"version\":0}"))
+        .andExpect(status().isNotFound());
+  }
+
+  /**
+   * Reads one switch through its admin endpoint.
+   *
+   * @param target the switch
+   * @return the response body
+   * @throws Exception if the request fails
+   */
+  private @NotNull String read(@NotNull ExchangeSwitch target) throws Exception {
+    return mockMvc
+        .perform(get(path(target)).with(admin()))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * Names the admin endpoint of a switch.
+   *
+   * @param target the switch
+   * @return its path
+   */
+  private static @NotNull String path(@NotNull ExchangeSwitch target) {
+    return switch (target) {
+      case GLOBAL -> SETTINGS;
+      case BANK -> SETTINGS + "/bank";
+      case JOB_ORDERS -> SETTINGS + "/job-orders";
+      case JOB_ORDER_WRITES -> SETTINGS + "/job-order-writes";
+    };
   }
 
   /**

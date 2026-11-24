@@ -65,7 +65,7 @@ public class ExchangeRegistryMirrorSync {
    * @param meterRegistry the registry the write counter binds to
    * @param clientGauges the per-status client gauges every read of the registry refreshes
    * @param transactionManager the manager the resync's own transactions run in
-   * @param entityManager reloads the settings row after an area switch's own write
+   * @param entityManager writes an area switch alone and reloads the settings row after it
    */
   public ExchangeRegistryMirrorSync(
       @NotNull ExchangeRegistryMirror mirror,
@@ -153,17 +153,18 @@ public class ExchangeRegistryMirrorSync {
       @NotNull ExchangeSettings settings,
       boolean enabled,
       @NotNull Instant at) {
-    Short id = settings.getId();
-    switch (target) {
-      case GLOBAL -> {
-        settings.setEnabled(enabled);
-        return settingsRepository.saveAndFlush(settings);
-      }
-      case BANK -> settingsRepository.writeBankSwitch(id, enabled, at);
-      case JOB_ORDERS -> settingsRepository.writeJobOrdersSwitch(id, enabled, at);
-      case JOB_ORDER_WRITES -> settingsRepository.writeJobOrderWritesSwitch(id, enabled, at);
-      case null -> throw new IllegalArgumentException("A switch write names its switch");
+    Optional<ExchangeSwitch.Area> area = target.area();
+    if (area.isEmpty()) {
+      settings.setEnabled(enabled);
+      return settingsRepository.saveAndFlush(settings);
     }
+    entityManager.flush();
+    entityManager
+        .createNativeQuery(area.get().writeStatement())
+        .setParameter("enabled", enabled)
+        .setParameter("at", at)
+        .setParameter("id", settings.getId())
+        .executeUpdate();
     entityManager.refresh(settings);
     return settings;
   }
