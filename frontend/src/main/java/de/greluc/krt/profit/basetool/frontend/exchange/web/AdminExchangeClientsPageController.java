@@ -20,12 +20,15 @@
 package de.greluc.krt.profit.basetool.frontend.exchange.web;
 
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitch;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRunDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientUsageDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,10 +109,10 @@ public class AdminExchangeClientsPageController {
    *
    * @param fragment {@code registry} or {@code undoRuns} for a section fragment; anything else
    *     renders the page
-   * @param model receives {@code clients}, {@code settings}, {@code bankSwitch}, {@code
-   *     jobOrderSwitch}, {@code jobOrderWritesSwitch}, {@code usage} by client id, {@code
-   *     capabilities}, {@code grafanaUrl}, {@code undoRuns}, {@code undoRunning} and, on a failed
-   *     load, {@code error}
+   * @param model receives {@code clients}, {@code settings}, {@code areaSwitches} (every area
+   *     switch the backend answered, by {@link ExchangeAreaSwitch} in declaration order), {@code
+   *     usage} by client id, {@code capabilities}, {@code grafanaUrl}, {@code undoRuns}, {@code
+   *     undoRunning} and, on a failed load, {@code error}
    * @return {@code admin/exchange-clients}, or one of its fragments
    */
   @NotNull
@@ -122,15 +125,11 @@ public class AdminExchangeClientsPageController {
           List<ExchangeClientDto> clients = exchangeClient.clients();
           model.addAttribute("clients", clients == null ? List.of() : clients);
           model.addAttribute("settings", exchangeClient.settings());
-          model.addAttribute("bankSwitch", exchangeClient.bankSwitch());
-          model.addAttribute("jobOrderSwitch", exchangeClient.jobOrderSwitch());
-          model.addAttribute("jobOrderWritesSwitch", exchangeClient.jobOrderWritesSwitch());
+          model.addAttribute("areaSwitches", areaSwitches());
         })) {
       model.addAttribute("clients", List.of());
       model.addAttribute("settings", null);
-      model.addAttribute("bankSwitch", null);
-      model.addAttribute("jobOrderSwitch", null);
-      model.addAttribute("jobOrderWritesSwitch", null);
+      model.addAttribute("areaSwitches", Map.of());
       model.addAttribute("error", "admin.exchangeClients.error.load");
     }
     model.addAttribute("usage", usage());
@@ -145,6 +144,23 @@ public class AdminExchangeClientsPageController {
     return UNDO_RUNS_FRAGMENT.equals(fragment)
         ? "exchange/admin/exchange-clients :: " + UNDO_RUNS_FRAGMENT
         : "exchange/admin/exchange-clients";
+  }
+
+  /**
+   * Loads every area switch; one the backend answers without a body is left out.
+   *
+   * @return the area switches in declaration order
+   */
+  private @NotNull Map<ExchangeAreaSwitch, ExchangeAreaSwitchDto> areaSwitches() {
+    Map<ExchangeAreaSwitch, ExchangeAreaSwitchDto> switches =
+        new EnumMap<>(ExchangeAreaSwitch.class);
+    for (ExchangeAreaSwitch area : ExchangeAreaSwitch.values()) {
+      ExchangeAreaSwitchDto state = exchangeClient.areaSwitch(area);
+      if (state != null) {
+        switches.put(area, state);
+      }
+    }
+    return switches;
   }
 
   /**

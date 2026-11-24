@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRegistrySnapshot;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSwitch;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.RedisExchangeRegistryMirror;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationStreamService;
 import de.greluc.krt.profit.basetool.backend.notification.api.RedisNotificationFanout;
@@ -38,6 +39,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -169,10 +171,7 @@ class RedisAclBackendIntegrationTest {
         new RedisExchangeRegistryMirror(template, "exchange:registry", Clock.systemUTC());
     ExchangeRegistrySnapshot snapshot =
         new ExchangeRegistrySnapshot(
-            true,
-            false,
-            false,
-            false,
+            Set.of(ExchangeSwitch.GLOBAL),
             new TreeMap<>(
                 Map.of(
                     "versekit",

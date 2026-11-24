@@ -218,8 +218,8 @@ class ExchangeRegistryNoticeTest {
           return row;
         });
 
-    service.updateSettings(false, 1L);
-    service.updateSettings(true, 1L);
+    service.updateSwitch(ExchangeSwitch.GLOBAL, false, 1L);
+    service.updateSwitch(ExchangeSwitch.GLOBAL, true, 1L);
 
     List<NoticeEvent> sent = published(2);
     assertThat(sent.get(0).eventType()).isEqualTo(NotificationEventType.EXCHANGE_SWITCHED_OFF);
@@ -234,9 +234,9 @@ class ExchangeRegistryNoticeTest {
     when(mirrorSync.lockSettings()).thenReturn(settings);
     stubAreaSwitchWrites();
 
-    service.updateBankSwitch(true, 0L);
-    service.updateBankSwitch(false, 1L);
-    service.updateBankSwitch(false, 2L);
+    service.updateSwitch(ExchangeSwitch.BANK, true, 0L);
+    service.updateSwitch(ExchangeSwitch.BANK, false, 1L);
+    service.updateSwitch(ExchangeSwitch.BANK, false, 2L);
 
     List<NoticeEvent> sent = published(2);
     assertThat(sent.get(0).eventType()).isEqualTo(NotificationEventType.BANK_EXCHANGE_SWITCHED_ON);
@@ -266,10 +266,10 @@ class ExchangeRegistryNoticeTest {
     when(mirrorSync.lockSettings()).thenReturn(settings);
     stubAreaSwitchWrites();
 
-    service.updateJobOrdersSwitch(true, 0L);
-    service.updateJobOrderWritesSwitch(true, 0L);
-    service.updateJobOrderWritesSwitch(false, 1L);
-    service.updateJobOrderWritesSwitch(false, 2L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDERS, true, 0L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, true, 0L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, false, 1L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, false, 2L);
 
     List<NoticeEvent> sent = published(3);
     NoticeEvent familyOn = sent.get(0);
@@ -330,9 +330,9 @@ class ExchangeRegistryNoticeTest {
       assertThat(changes(action)).as(action).isZero();
     }
 
-    service.updateJobOrdersSwitch(true, 0L);
-    service.updateJobOrdersSwitch(false, 1L);
-    service.updateJobOrderWritesSwitch(true, 0L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDERS, true, 0L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDERS, false, 1L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, true, 0L);
     TransactionSynchronizationManager.getSynchronizations()
         .forEach(TransactionSynchronization::afterCommit);
 

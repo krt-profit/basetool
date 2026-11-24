@@ -116,14 +116,22 @@ function initAdminExchangeClients() {
         /** @type {string[]} */
         let loadedCapabilities = [];
 
+        /**
+         * Reads one localized text from an element's `data-*` attributes.
+         * @param {DOMStringMap} data the element's dataset
+         * @param {string} key the dataset key in camel case
+         * @returns {string}
+         */
+        function datasetText(data, key) {
+            const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+            return krtI18nText(data[key], attribute);
+        }
+
         function readMessages() {
             const holder = document.getElementById('xc-i18n');
             const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
             /** @param {string} key */
-            const text = function (key) {
-                const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-                return krtI18nText(data[key], attribute);
-            };
+            const text = (key) => datasetText(data, key);
             return {
                 saved: text('saved'),
                 suspended: text('suspended'),
@@ -143,21 +151,6 @@ function initAdminExchangeClients() {
                 confirmOnTitle: text('confirmOnTitle'),
                 confirmOnBody: text('confirmOnBody'),
                 confirmOnOk: text('confirmOnOk'),
-                bankSwitched: text('bankSwitched'),
-                confirmBankOffTitle: text('confirmBankOffTitle'),
-                confirmBankOffBody: text('confirmBankOffBody'),
-                confirmBankOnTitle: text('confirmBankOnTitle'),
-                confirmBankOnBody: text('confirmBankOnBody'),
-                jobOrderSwitched: text('jobOrderSwitched'),
-                confirmJobOrderOffTitle: text('confirmJobOrderOffTitle'),
-                confirmJobOrderOffBody: text('confirmJobOrderOffBody'),
-                confirmJobOrderOnTitle: text('confirmJobOrderOnTitle'),
-                confirmJobOrderOnBody: text('confirmJobOrderOnBody'),
-                jobOrderWritesSwitched: text('jobOrderWritesSwitched'),
-                confirmJobOrderWritesOffTitle: text('confirmJobOrderWritesOffTitle'),
-                confirmJobOrderWritesOffBody: text('confirmJobOrderWritesOffBody'),
-                confirmJobOrderWritesOnTitle: text('confirmJobOrderWritesOnTitle'),
-                confirmJobOrderWritesOnBody: text('confirmJobOrderWritesOnBody'),
                 formCreate: text('formCreate'),
                 formEdit: text('formEdit'),
             };
@@ -405,39 +398,27 @@ function initAdminExchangeClients() {
         };
 
         /**
-         * The area switches beside the global one, by the card id their button names in
-         * `data-xc-area-switch`; each echoes its own version.
-         * @type {Record<string, SwitchSpec>}
+         * Reads an area switch beside the global one from its card: the relay segment in
+         * `data-xc-area` and the success and confirmation texts; each echoes its own version.
+         * @param {HTMLElement} card the switch's card
+         * @returns {SwitchSpec}
          */
-        const areaSwitches = {
-            'xc-bank-switch': {
-                boxId: 'xc-bank-switch',
-                url: `${BASE}/settings/bank`,
-                switched: i18n.bankSwitched,
-                off: { title: i18n.confirmBankOffTitle, body: i18n.confirmBankOffBody },
-                on: { title: i18n.confirmBankOnTitle, body: i18n.confirmBankOnBody },
-            },
-            'xc-job-order-switch': {
-                boxId: 'xc-job-order-switch',
-                url: `${BASE}/settings/job-orders`,
-                switched: i18n.jobOrderSwitched,
-                off: { title: i18n.confirmJobOrderOffTitle, body: i18n.confirmJobOrderOffBody },
-                on: { title: i18n.confirmJobOrderOnTitle, body: i18n.confirmJobOrderOnBody },
-            },
-            'xc-job-order-writes-switch': {
-                boxId: 'xc-job-order-writes-switch',
-                url: `${BASE}/settings/job-order-writes`,
-                switched: i18n.jobOrderWritesSwitched,
+        function areaSwitch(card) {
+            const data = card.dataset;
+            return {
+                boxId: card.id,
+                url: `${BASE}/settings/${encodeURIComponent(data.xcArea || '')}`,
+                switched: datasetText(data, 'switched'),
                 off: {
-                    title: i18n.confirmJobOrderWritesOffTitle,
-                    body: i18n.confirmJobOrderWritesOffBody,
+                    title: datasetText(data, 'confirmOffTitle'),
+                    body: datasetText(data, 'confirmOffBody'),
                 },
                 on: {
-                    title: i18n.confirmJobOrderWritesOnTitle,
-                    body: i18n.confirmJobOrderWritesOnBody,
+                    title: datasetText(data, 'confirmOnTitle'),
+                    body: datasetText(data, 'confirmOnBody'),
                 },
-            },
-        };
+            };
+        }
 
         el.form.addEventListener('submit', onSubmit);
         const cancel = document.getElementById('xc-cancel');
@@ -457,9 +438,9 @@ function initAdminExchangeClients() {
             }
             const areaSwitchBtn = target.closest('[data-xc-area-switch]');
             if (areaSwitchBtn) {
-                const spec = areaSwitches[areaSwitchBtn.getAttribute('data-xc-area-switch') || ''];
-                if (spec) {
-                    toggle(spec, areaSwitchBtn);
+                const card = areaSwitchBtn.closest('[data-xc-area]');
+                if (card instanceof HTMLElement) {
+                    toggle(areaSwitch(card), areaSwitchBtn);
                 }
                 return;
             }

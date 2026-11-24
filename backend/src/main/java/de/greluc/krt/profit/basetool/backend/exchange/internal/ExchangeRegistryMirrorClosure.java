@@ -126,7 +126,7 @@ public class ExchangeRegistryMirrorClosure {
    */
   private boolean close() {
     Optional<ExchangeRegistrySnapshot> left = document.read();
-    if (left.isEmpty() || !left.get().enabled()) {
+    if (left.isEmpty() || !left.get().isOn(ExchangeSwitch.GLOBAL)) {
       return false;
     }
     Long revision = transaction.execute(_ -> settingsRepository.nextRevision());

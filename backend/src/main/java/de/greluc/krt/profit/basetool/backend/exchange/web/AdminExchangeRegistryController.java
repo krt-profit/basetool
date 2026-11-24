@@ -30,6 +30,9 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientUsa
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRegistryService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSwitch;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -51,15 +54,21 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The exchange client registry, the global exchange switch, the bank switch and the two job-order
- * switches, {@code ADMIN} only (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009).
+ * The exchange client registry, the global exchange switch and every area switch, {@code ADMIN}
+ * only (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009).
  */
 @RestController
-@RequestMapping("/api/v1/connected-apps/admin")
+@RequestMapping(AdminExchangeRegistryController.BASE_PATH)
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(name = "Admin — Exchange registry", description = "Approved third-party exchange clients")
 public class AdminExchangeRegistryController {
+
+  /** The path every endpoint of the controller lies under. */
+  static final String BASE_PATH = "/api/v1/connected-apps/admin";
+
+  /** The path of an area switch below {@link #BASE_PATH}, named by its segment. */
+  static final String AREA_SWITCH_PATH = "/settings/{area}";
 
   private final ExchangeRegistryService registryService;
   private final ExchangeClientMapper mapper;
@@ -218,115 +227,62 @@ public class AdminExchangeRegistryController {
   public ResponseEntity<ExchangeSettingsDto> updateSettings(
       @RequestBody @Valid @NotNull ExchangeSettingsUpdateRequest request) {
     return ResponseEntity.ok(
-        mapper.toDto(registryService.updateSettings(request.enabled(), request.version())));
+        mapper.toDto(
+            registryService.updateSwitch(
+                ExchangeSwitch.GLOBAL, request.enabled(), request.version())));
   }
 
   /**
-   * Reads the bank switch of the exchange.
+   * Reads one area switch of the exchange; {@link AreaSwitchOpenApi} documents it as one path per
+   * area.
    *
-   * @return the bank switch with its own version
+   * @param area the area's path segment, {@link ExchangeSwitch.Area#segment()}
+   * @return the area switch with its own version
+   * @throws NotFoundException when no area switch has that segment
    */
   @NotNull
-  @GetMapping("/settings/bank")
-  @Operation(summary = "Get the bank switch of the exchange")
-  @ApiResponse(responseCode = "200", description = "The bank switch")
-  public ResponseEntity<ExchangeAreaSwitchDto> getBankSwitch() {
-    return ResponseEntity.ok(mapper.toBankSwitchDto(registryService.getSettings()));
+  @GetMapping(AREA_SWITCH_PATH)
+  @Operation(summary = "Get an area switch of the exchange")
+  @ApiResponse(responseCode = "200", description = "The area switch")
+  public ResponseEntity<ExchangeAreaSwitchDto> getAreaSwitch(@PathVariable @NotNull String area) {
+    return ResponseEntity.ok(
+        mapper.toAreaSwitchDto(areaSwitch(area), registryService.getSettings()));
   }
 
   /**
-   * Turns the bank switch of the exchange on or off.
+   * Turns one area switch of the exchange on or off; {@link AreaSwitchOpenApi} documents it as one
+   * path per area.
    *
-   * @param request the new state and the bank switch's version last seen
-   * @return the saved bank switch
+   * @param area the area's path segment, {@link ExchangeSwitch.Area#segment()}
+   * @param request the new state and the area switch's version last seen
+   * @return the saved area switch
+   * @throws NotFoundException when no area switch has that segment
    */
   @NotNull
-  @PutMapping("/settings/bank")
+  @PutMapping(AREA_SWITCH_PATH)
   @Operation(
-      summary = "Set the bank switch of the exchange",
-      description =
-          "While it is off, every bank route answers 503 BANK_EXCHANGE_DISABLED; switching off"
-              + " reaches the gateway's mirror before the commit or not at all.")
-  @ApiResponse(responseCode = "200", description = "The saved bank switch")
+      summary = "Set an area switch of the exchange",
+      description = "Switching off reaches the gateway's mirror before the commit or not at all.")
+  @ApiResponse(responseCode = "200", description = "The saved area switch")
   @ApiResponse(responseCode = "409", description = "Stale version")
   @ApiResponse(responseCode = "502", description = "The registry mirror could not be written")
-  public ResponseEntity<ExchangeAreaSwitchDto> updateBankSwitch(
+  public ResponseEntity<ExchangeAreaSwitchDto> updateAreaSwitch(
+      @PathVariable @NotNull String area,
       @RequestBody @Valid @NotNull ExchangeAreaSwitchUpdateRequest request) {
+    ExchangeSwitch target = areaSwitch(area);
     return ResponseEntity.ok(
-        mapper.toBankSwitchDto(
-            registryService.updateBankSwitch(request.enabled(), request.version())));
+        mapper.toAreaSwitchDto(
+            target, registryService.updateSwitch(target, request.enabled(), request.version())));
   }
 
   /**
-   * Reads the job-order family switch of the exchange.
+   * Resolves the path segment of an area switch.
    *
-   * @return the family switch with its own version
+   * @param segment the last path segment
+   * @return the area switch
+   * @throws NotFoundException when no area switch has that segment
    */
-  @NotNull
-  @GetMapping("/settings/job-orders")
-  @Operation(summary = "Get the job-order switch of the exchange")
-  @ApiResponse(responseCode = "200", description = "The job-order switch")
-  public ResponseEntity<ExchangeAreaSwitchDto> getJobOrdersSwitch() {
-    return ResponseEntity.ok(mapper.toJobOrdersSwitchDto(registryService.getSettings()));
-  }
-
-  /**
-   * Turns the job-order family switch of the exchange on or off.
-   *
-   * @param request the new state and the family switch's version last seen
-   * @return the saved family switch
-   */
-  @NotNull
-  @PutMapping("/settings/job-orders")
-  @Operation(
-      summary = "Set the job-order switch of the exchange",
-      description =
-          "While it is off, every job-order route answers 503 JOB_ORDER_EXCHANGE_DISABLED;"
-              + " switching off reaches the gateway's mirror before the commit or not at all.")
-  @ApiResponse(responseCode = "200", description = "The saved job-order switch")
-  @ApiResponse(responseCode = "409", description = "Stale version")
-  @ApiResponse(responseCode = "502", description = "The registry mirror could not be written")
-  public ResponseEntity<ExchangeAreaSwitchDto> updateJobOrdersSwitch(
-      @RequestBody @Valid @NotNull ExchangeAreaSwitchUpdateRequest request) {
-    return ResponseEntity.ok(
-        mapper.toJobOrdersSwitchDto(
-            registryService.updateJobOrdersSwitch(request.enabled(), request.version())));
-  }
-
-  /**
-   * Reads the job-order writes switch of the exchange.
-   *
-   * @return the writes switch with its own version
-   */
-  @NotNull
-  @GetMapping("/settings/job-order-writes")
-  @Operation(summary = "Get the job-order writes switch of the exchange")
-  @ApiResponse(responseCode = "200", description = "The job-order writes switch")
-  public ResponseEntity<ExchangeAreaSwitchDto> getJobOrderWritesSwitch() {
-    return ResponseEntity.ok(mapper.toJobOrderWritesSwitchDto(registryService.getSettings()));
-  }
-
-  /**
-   * Turns the job-order writes switch of the exchange on or off.
-   *
-   * @param request the new state and the writes switch's version last seen
-   * @return the saved writes switch
-   */
-  @NotNull
-  @PutMapping("/settings/job-order-writes")
-  @Operation(
-      summary = "Set the job-order writes switch of the exchange",
-      description =
-          "While it is off, every job-order write answers 503 JOB_ORDER_WRITES_DISABLED and the"
-              + " reads go on; switching off reaches the gateway's mirror before the commit or"
-              + " not at all.")
-  @ApiResponse(responseCode = "200", description = "The saved job-order writes switch")
-  @ApiResponse(responseCode = "409", description = "Stale version")
-  @ApiResponse(responseCode = "502", description = "The registry mirror could not be written")
-  public ResponseEntity<ExchangeAreaSwitchDto> updateJobOrderWritesSwitch(
-      @RequestBody @Valid @NotNull ExchangeAreaSwitchUpdateRequest request) {
-    return ResponseEntity.ok(
-        mapper.toJobOrderWritesSwitchDto(
-            registryService.updateJobOrderWritesSwitch(request.enabled(), request.version())));
+  private static @NotNull ExchangeSwitch areaSwitch(@NotNull String segment) {
+    return Entities.require(ExchangeSwitch.ofSegment(segment), "No such exchange area switch");
   }
 }

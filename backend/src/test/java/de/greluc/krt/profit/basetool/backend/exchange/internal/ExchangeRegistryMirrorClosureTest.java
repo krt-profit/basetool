@@ -29,9 +29,11 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
@@ -195,7 +197,10 @@ class ExchangeRegistryMirrorClosureTest {
             null,
             null));
     new RedisExchangeRegistryMirror(admin, KEY, Clock.systemUTC())
-        .write(new ExchangeRegistrySnapshot(enabled, enabled, enabled, enabled, clients), revision);
+        .write(
+            new ExchangeRegistrySnapshot(
+                enabled ? EnumSet.allOf(ExchangeSwitch.class) : Set.of(), clients),
+            revision);
   }
 
   /**

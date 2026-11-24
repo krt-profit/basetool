@@ -31,6 +31,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeGateFilter;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRefusals;
@@ -187,11 +188,9 @@ class ExchangeRelayTest {
   @Test
   void theBackendGatesRefusalsPassThroughWithTheGatewayGatesCodeStatusAndDetail() {
     assertGate(503, "EXCHANGE_DISABLED", ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL);
-    assertGate(503, "BANK_EXCHANGE_DISABLED", ExchangeGateFilter.BANK_EXCHANGE_DISABLED_DETAIL);
-    assertGate(
-        503, "JOB_ORDER_EXCHANGE_DISABLED", ExchangeGateFilter.JOB_ORDER_EXCHANGE_DISABLED_DETAIL);
-    assertGate(
-        503, "JOB_ORDER_WRITES_DISABLED", ExchangeGateFilter.JOB_ORDER_WRITES_DISABLED_DETAIL);
+    assertGate(503, "BANK_EXCHANGE_DISABLED", AreaSwitch.BANK.getDetail());
+    assertGate(503, "JOB_ORDER_EXCHANGE_DISABLED", AreaSwitch.JOB_ORDERS.getDetail());
+    assertGate(503, "JOB_ORDER_WRITES_DISABLED", AreaSwitch.JOB_ORDER_WRITES.getDetail());
     assertGate(503, "REGISTRY_UNAVAILABLE", ExchangeGateFilter.REGISTRY_UNAVAILABLE_DETAIL);
     assertGate(403, "CLIENT_NOT_ALLOWED", ExchangeGateFilter.CLIENT_NOT_ALLOWED_DETAIL);
     assertGate(403, "CLIENT_SUSPENDED", ExchangeGateFilter.CLIENT_SUSPENDED_DETAIL);

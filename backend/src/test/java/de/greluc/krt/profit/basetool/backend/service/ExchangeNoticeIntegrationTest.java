@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeNotices;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSwitch;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -132,11 +133,11 @@ class ExchangeNoticeIntegrationTest {
 
   @Test
   void theGlobalSwitchReachesTheHoldersOfAnyInstallationUntilItIsSwitchedOn() {
-    creationService.createFromEvent(ExchangeNotices.switchedOff(ADMIN));
+    creationService.createFromEvent(ExchangeSwitch.GLOBAL.notice(false, ADMIN));
     assertThat(inbox(HOLDER)).containsExactly(NotificationType.EXCHANGE_SWITCHED_OFF);
     assertThat(inbox(STRANGER)).isEmpty();
 
-    creationService.createFromEvent(ExchangeNotices.switchedOn(ADMIN));
+    creationService.createFromEvent(ExchangeSwitch.GLOBAL.notice(true, ADMIN));
 
     assertThat(inbox(HOLDER)).isEmpty();
   }
