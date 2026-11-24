@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangeJobOrderSeed;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
@@ -32,30 +32,19 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientSta
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
-import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.identity.api.Role;
-import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -68,13 +57,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * A committed world for the job-order writes on an existing order through the relay: a registered
- * client with both job-order capabilities, both job-order switches on, a Profit unit and a
- * requesting unit with a direct Logistician, relayed requests through the real filter chain, and
- * the probes the route tests share. {@link #close()} removes everything it made, the orders of the
- * requesting unit included, and restores the switches.
+ * A committed world for the job-order routes through the relay, on top of the seeded rows: a
+ * registered client with both job-order capabilities, both job-order switches on, a Profit unit and
+ * a requesting unit with a direct Logistician, relayed requests through the real filter chain, and
+ * the probes the route tests share. {@link #close()} removes everything it made, the client's
+ * orders included, and restores the switches.
  */
-final class ExchangeJobOrderWorld {
+final class ExchangeJobOrderWorld extends ExchangeJobOrderSeed {
 
   /** The job-order routes on the backend. */
   static final String PATH = "/api/v1/exchange/job-orders";
@@ -85,29 +74,21 @@ final class ExchangeJobOrderWorld {
   /** The job-order read capability. */
   static final String READ = "exchange.joborders.read";
 
+  /** The installation key every relayed request carries. */
+  static final String INSTALLATION = "Kx9_" + "w".repeat(39);
+
   private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";
-  private static final String INSTALLATION = "Kx9_" + "w".repeat(39);
 
   private final JdbcTemplate jdbc;
   private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
-  private final UserRepository userRepository;
-  private final RoleRepository roleRepository;
-  private final ExchangeClientRepository clientRepository;
-  private final KnownExchangeClients knownClients;
   private final ExchangeSettingsRepository settingsRepository;
-  private final OrgUnitRepository orgUnitRepository;
-  private final List<UUID> orgUnits = new ArrayList<>();
-  private final List<UUID> users = new ArrayList<>();
 
   /** The relay's view of the backend, through the real filter chain. */
   @Getter private final MockMvc mockMvc;
 
   /** The registry client, an id of the longest length the registry admits, 63 characters. */
   @Getter private final String client;
-
-  /** The Profit area. */
-  @Getter private final UUID profit;
 
   /** An eligible Profit unit below the area, the responsible unit of the world's orders. */
   @Getter private final UUID responsible;
@@ -128,21 +109,16 @@ final class ExchangeJobOrderWorld {
    * @param context the application context the beans come from
    */
   ExchangeJobOrderWorld(@NotNull WebApplicationContext context) {
+    super(context);
     jdbc = context.getBean(JdbcTemplate.class);
     objectMapper = context.getBean(ObjectMapper.class);
     meterRegistry = context.getBean(MeterRegistry.class);
-    userRepository = context.getBean(UserRepository.class);
-    roleRepository = context.getBean(RoleRepository.class);
-    clientRepository = context.getBean(ExchangeClientRepository.class);
-    knownClients = context.getBean(KnownExchangeClients.class);
     settingsRepository = context.getBean(ExchangeSettingsRepository.class);
-    orgUnitRepository = context.getBean(OrgUnitRepository.class);
     mockMvc =
         MockMvcBuilders.webAppContextSetup(context)
             .addFilters(context.getBean(FilterChainProxy.class))
             .build();
-    profit = persistedProfitArea(orgUnitRepository).getId();
-    responsible = squadron("Write responsible", profit);
+    responsible = squadron("Write responsible", getProfit());
     requesting = squadron("Write requesting", null);
     logistician = user("write-logistician", false);
     seat(logistician, requesting, "MEMBER", true);
@@ -156,8 +132,8 @@ final class ExchangeJobOrderWorld {
             ExchangeCapability.CONNECT,
             ExchangeCapability.JOB_ORDERS_READ,
             ExchangeCapability.JOB_ORDERS_WRITE));
-    clientRepository.saveAndFlush(registered);
-    knownClients.invalidate();
+    context.getBean(ExchangeClientRepository.class).saveAndFlush(registered);
+    context.getBean(KnownExchangeClients.class).invalidate();
     ExchangeSettings settings =
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     wasEnabled = settings.isEnabled();
@@ -166,29 +142,15 @@ final class ExchangeJobOrderWorld {
     switches(true, true, true);
   }
 
-  /** Removes the orders of the requesting unit with their rows, the client, members and units. */
-  void close() {
-    List<UUID> orders =
-        jdbc.queryForList(
-            "SELECT id FROM job_order WHERE created_by_client_id = ? OR requesting_org_unit_id = ?",
-            UUID.class,
-            client,
-            requesting);
-    orders.forEach(id -> {
-      jdbc.update("DELETE FROM job_order_money_operation WHERE order_id = ?", id);
-      jdbc.update("DELETE FROM job_order_money_holder WHERE order_id = ?", id);
-      jdbc.update("DELETE FROM notification WHERE entity_id = ?", id);
-      jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", id);
-      jdbc.update("DELETE FROM job_order WHERE id = ?", id);
-    });
+  /**
+   * Removes the seeded rows and the client's orders, then the client, and restores the switches.
+   */
+  @Override
+  public void close() {
+    jdbc.queryForList("SELECT id FROM job_order WHERE created_by_client_id = ?", UUID.class, client)
+        .forEach(this::track);
+    super.close();
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
-    users.forEach(id -> {
-      jdbc.update("DELETE FROM notification WHERE recipient_user_id = ?", id);
-      jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
-      jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
-      jdbc.update("DELETE FROM app_user WHERE id = ?", id);
-    });
-    orgUnits.reversed().forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     switches(wasEnabled, wasJobOrdersEnabled, wasJobOrderWritesEnabled);
   }
 
@@ -238,23 +200,20 @@ final class ExchangeJobOrderWorld {
   }
 
   /**
-   * Inserts an open order of a stock kind between the world's units.
+   * Inserts an open order of a stock kind between the world's units, without lines or contact.
    *
    * @param type {@code MATERIAL} or {@code ITEM}
    * @return the new order's id
    */
   @NotNull
   UUID stockOrder(@NotNull String type) {
-    UUID order = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO job_order (id, priority, created_at, updated_at, version, status,"
-            + " requesting_org_unit_id, responsible_org_unit_id, type)"
-            + " VALUES (?, 2, now(), now(), 0, 'OPEN', ?, ?, ?)",
-        order,
-        requesting,
-        responsible,
-        type);
-    return order;
+    return order()
+        .requesting(requesting)
+        .responsible(responsible)
+        .type(type)
+        .handle(null)
+        .priority(2)
+        .create();
   }
 
   /**
@@ -276,85 +235,6 @@ final class ExchangeJobOrderWorld {
         .header(ActingMemberHeader.EXCHANGE_CLIENT_HEADER, client)
         .header(ActingMemberHeader.EXCHANGE_CAPABILITIES_HEADER, capabilities)
         .header(ActingMemberHeader.EXCHANGE_INSTALLATION_HEADER, INSTALLATION);
-  }
-
-  /**
-   * Creates an active account holding {@code KRT Member}.
-   *
-   * @param username the name's prefix
-   * @param admin whether the account also holds the administrator role
-   * @return the account's id
-   */
-  @NotNull
-  UUID user(@NotNull String username, boolean admin) {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    user.setUsername(username + "-" + UUID.randomUUID());
-    user.setApprovalStatus(ApprovalStatus.ACTIVE);
-    user.setInKeycloak(true);
-    Set<Role> roles = new HashSet<>();
-    roles.add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
-    if (admin) {
-      roles.add(roleRepository.findByCode(Roles.ADMIN).orElseThrow());
-    }
-    user.setRoles(roles);
-    UUID id = userRepository.saveAndFlush(user).getId();
-    users.add(id);
-    return id;
-  }
-
-  /**
-   * Seats a member in a unit.
-   *
-   * @param member the member
-   * @param unit the unit
-   * @param role the membership role
-   * @param logisticianFlag the Logistician flag
-   */
-  void seat(
-      @NotNull UUID member, @NotNull UUID unit, @NotNull String role, boolean logisticianFlag) {
-    jdbc.update(
-        "INSERT INTO org_unit_membership (user_id, org_unit_id, role, is_logistician)"
-            + " VALUES (?, ?, ?, ?)",
-        member,
-        unit,
-        role,
-        logisticianFlag);
-  }
-
-  /**
-   * Creates an active squadron.
-   *
-   * @param name the name's prefix
-   * @param parent the parent unit, or {@code null} for none
-   * @return the unit's id
-   */
-  @NotNull
-  UUID squadron(@NotNull String name, @Nullable UUID parent) {
-    return orgUnit("SQUADRON", name, parent);
-  }
-
-  /**
-   * Creates an active unit.
-   *
-   * @param kind the unit kind
-   * @param name the name's prefix
-   * @param parent the parent unit, or {@code null} for none
-   * @return the unit's id
-   */
-  @NotNull
-  UUID orgUnit(@NotNull String kind, @NotNull String name, @Nullable UUID parent) {
-    UUID id = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, parent_org_unit_id)"
-            + " VALUES (?, ?, ?, ?, TRUE, ?)",
-        id,
-        kind,
-        name + " " + id,
-        "W" + id.toString().substring(0, 7),
-        parent);
-    orgUnits.add(id);
-    return id;
   }
 
   /**

@@ -19,37 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.exchange.web.ExchangeJobOrderWorld.PATH;
+import static de.greluc.krt.profit.basetool.backend.exchange.web.ExchangeJobOrderWorld.READ;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.ExchangePublishedSchemas;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderFingerprintRecomputation;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderFingerprintRuns;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderWindowRun;
-import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -58,11 +39,8 @@ import java.sql.PreparedStatement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.jetbrains.annotations.NotNull;
@@ -72,10 +50,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.web.FilterChainProxy;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
@@ -90,21 +65,9 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest
 class ExchangeJobOrderFeedTest {
 
-  private static final String PATH = "/api/v1/exchange/job-orders";
-  private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";
-  private static final String KEY = "Kx9_" + "f".repeat(39);
-  private static final String READ = "exchange.joborders.read";
   private static final String PAGE_SCHEMA = "page.schema.json#/$defs/jobOrderPage";
 
   @Autowired private WebApplicationContext context;
-  @Autowired private UserRepository userRepository;
-  @Autowired private RoleRepository roleRepository;
-  @Autowired private ExchangeClientRepository clientRepository;
-  @Autowired private ExchangeSettingsRepository settingsRepository;
-  @Autowired private JobOrderRepository jobOrderRepository;
-  @Autowired private OrgUnitRepository orgUnitRepository;
-  @Autowired private MaterialRepository materialRepository;
-  @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private JobOrderFingerprintRecomputation recomputation;
   @Autowired private JobOrderWindowRun window;
   @Autowired private TransactionTemplate transactionTemplate;
@@ -113,78 +76,27 @@ class ExchangeJobOrderFeedTest {
   @Autowired private ObjectMapper objectMapper;
   @Autowired private MeterRegistry meterRegistry;
 
-  private final List<UUID> orders = new ArrayList<>();
-  private final List<UUID> orgUnits = new ArrayList<>();
-  private final List<UUID> users = new ArrayList<>();
-
-  private MockMvc mockMvc;
+  private ExchangeJobOrderWorld world;
   private UUID member;
   private UUID own;
   private UUID other;
   private UUID foreign;
   private UUID material;
-  private String client;
-  private boolean wasEnabled;
-  private boolean wasJobOrdersEnabled;
 
   @BeforeEach
   void setUp() {
-    mockMvc =
-        MockMvcBuilders.webAppContextSetup(context)
-            .addFilters(context.getBean(FilterChainProxy.class))
-            .build();
-    member = user("feed-member");
-    own = orgUnit("Own");
-    other = orgUnit("Other");
-    foreign = orgUnit("Foreign");
-    jdbc.update(
-        "INSERT INTO org_unit_membership (user_id, org_unit_id, role, is_logistician)"
-            + " VALUES (?, ?, 'MEMBER', false)",
-        member,
-        own);
-    material = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO material (id, name, type, quantity_type, is_manual_raw_material,"
-            + " is_job_order, is_visible, source_systems)"
-            + " VALUES (?, ?, 'REFINED', 'SCU', false, false, true, 'UEX_ONLY')",
-        material,
-        "Feed material " + material);
-    client = "vk-" + UUID.randomUUID().toString().substring(0, 8);
-    ExchangeClient registered = new ExchangeClient();
-    registered.setClientId(client);
-    registered.setDisplayName("VerseKit");
-    registered.setStatus(ExchangeClientStatus.ACTIVE);
-    registered.setCapabilities(
-        EnumSet.of(ExchangeCapability.CONNECT, ExchangeCapability.JOB_ORDERS_READ));
-    clientRepository.saveAndFlush(registered);
-    ExchangeSettings settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
-    wasEnabled = settings.isEnabled();
-    wasJobOrdersEnabled = settings.isJobOrdersEnabled();
-    settings.setEnabled(true);
-    settings.setJobOrdersEnabled(true);
-    settingsRepository.saveAndFlush(settings);
+    world = new ExchangeJobOrderWorld(context);
+    member = world.user("feed-member", false);
+    own = world.squadron("Own", world.getProfit());
+    other = world.squadron("Other", world.getProfit());
+    foreign = world.squadron("Foreign", world.getProfit());
+    world.seat(member, own, "MEMBER", false);
+    material = world.material("Feed material");
   }
 
   @AfterEach
   void tearDown() {
-    orders.forEach(id -> {
-      jdbc.update("DELETE FROM job_order_material WHERE job_order_id = ?", id);
-      jdbc.update("DELETE FROM job_order WHERE id = ?", id);
-    });
-    jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
-    users.forEach(id -> {
-      jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
-      jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
-      jdbc.update("DELETE FROM app_user WHERE id = ?", id);
-    });
-    orgUnits.forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
-    jdbc.update("DELETE FROM material WHERE id = ?", material);
-    ExchangeSettings settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
-    settings.setEnabled(wasEnabled);
-    settings.setJobOrdersEnabled(wasJobOrdersEnabled);
-    settingsRepository.saveAndFlush(settings);
+    world.close();
   }
 
   @Test
@@ -198,7 +110,7 @@ class ExchangeJobOrderFeedTest {
         meterRegistry.counter(
             ExchangeMetricNames.EXCHANGE_JOB_ORDER_READS,
             MetricNames.TAG_CLIENT_ID,
-            client,
+            world.getClient(),
             ExchangeMetricNames.TAG_ROUTE,
             "feed");
     double before = feedReads.count();
@@ -329,7 +241,7 @@ class ExchangeJobOrderFeedTest {
       jdbc.queryForObject(
           "SELECT set_config('basetool.change_source', ?, true)",
           String.class,
-          "client|" + client + "|" + KEY);
+          "client|" + world.getClient() + "|" + ExchangeJobOrderWorld.INSTALLATION);
       jdbc.update("UPDATE job_order SET comment = 'written by the client' WHERE id = ?", order);
     });
     drain(order);
@@ -369,12 +281,10 @@ class ExchangeJobOrderFeedTest {
   @Test
   void theFamilySwitchClosesTheFeed() throws Exception {
     String cursor = snapshotCursor();
-    ExchangeSettings settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
-    settings.setJobOrdersEnabled(false);
-    settingsRepository.saveAndFlush(settings);
+    world.switches(true, false, true);
 
-    mockMvc
+    world
+        .getMockMvc()
         .perform(relayed(get(PATH).param("cursor", cursor)))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.code").value("JOB_ORDER_EXCHANGE_DISABLED"));
@@ -409,7 +319,8 @@ class ExchangeJobOrderFeedTest {
 
   private JsonNode page(MockHttpServletRequestBuilder request) throws Exception {
     String body =
-        mockMvc
+        world
+            .getMockMvc()
             .perform(relayed(request))
             .andExpect(status().isOk())
             .andReturn()
@@ -433,59 +344,15 @@ class ExchangeJobOrderFeedTest {
 
   private @NotNull MockHttpServletRequestBuilder relayed(
       @NotNull MockHttpServletRequestBuilder request) {
-    return request
-        .with(jwt().jwt(t -> t.subject(GATEWAY).claim("azp", "test-ingest-gateway")))
-        .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, member.toString())
-        .header(ActingMemberHeader.EXCHANGE_CLIENT_HEADER, client)
-        .header(ActingMemberHeader.EXCHANGE_CAPABILITIES_HEADER, READ)
-        .header(ActingMemberHeader.EXCHANGE_INSTALLATION_HEADER, KEY);
-  }
-
-  private @NotNull UUID user(@NotNull String username) {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    user.setUsername(username + "-" + UUID.randomUUID());
-    user.setApprovalStatus(ApprovalStatus.ACTIVE);
-    user.setInKeycloak(true);
-    user.setRoles(new HashSet<>(Set.of(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow())));
-    UUID id = userRepository.saveAndFlush(user).getId();
-    users.add(id);
-    return id;
-  }
-
-  private @NotNull UUID orgUnit(@NotNull String name) {
-    UUID id = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, parent_org_unit_id)"
-            + " VALUES (?, 'SQUADRON', ?, ?, TRUE, ?)",
-        id,
-        name + " " + id,
-        "U" + id.toString().substring(0, 6),
-        persistedProfitArea(orgUnitRepository).getId());
-    orgUnits.add(id);
-    return id;
+    return world.relayed(request, member, READ);
   }
 
   private @NotNull UUID order(@NotNull UUID responsible, @NotNull UUID requesting) {
-    UUID id =
-        transactionTemplate.execute(_ -> {
-          JobOrder order =
-              JobOrder.builder()
-                  .responsibleOrgUnit(orgUnitRepository.getReferenceById(responsible))
-                  .requestingOrgUnit(orgUnitRepository.getReferenceById(requesting))
-                  .handle("feed-requester")
-                  .priority(1)
-                  .status(JobOrderStatus.OPEN)
-                  .build();
-          order.addMaterial(
-              JobOrderMaterial.builder()
-                  .material(materialRepository.getReferenceById(material))
-                  .qualityTier(qualityTierRepository.findByCode("NONE").orElseThrow())
-                  .amount(4.0)
-                  .build());
-          return jobOrderRepository.save(order).getId();
-        });
-    orders.add(Objects.requireNonNull(id));
-    return id;
+    return world
+        .order()
+        .requesting(requesting)
+        .responsible(responsible)
+        .material(material, "NONE", 4.0)
+        .create();
   }
 }

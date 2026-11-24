@@ -31,13 +31,10 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderFingerpri
 import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderFingerprintRuns;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
-import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -80,8 +77,6 @@ class ExchangeJobOrderFeedWritesTest {
   @Autowired private ObjectMapper objectMapper;
   @Autowired private JobOrderFingerprintRecomputation recomputation;
 
-  private final List<UUID> locations = new ArrayList<>();
-
   private ExchangeJobOrderWorld world;
   private UUID material;
   private UUID writer;
@@ -91,13 +86,7 @@ class ExchangeJobOrderFeedWritesTest {
   @BeforeEach
   void setUp() {
     world = new ExchangeJobOrderWorld(context);
-    material = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO material (id, name, type, quantity_type, is_manual_raw_material,"
-            + " is_job_order, is_visible, source_systems)"
-            + " VALUES (?, ?, 'REFINED', 'SCU', false, false, true, 'UEX_ONLY')",
-        material,
-        "Feed write material " + material);
+    material = world.material("Feed write material");
     writer = world.user("feed-writer", false);
     world.seat(writer, world.getRequesting(), "MEMBER", false);
     provider = world.user("feed-provider", false);
@@ -115,14 +104,7 @@ class ExchangeJobOrderFeedWritesTest {
         "UPDATE system_setting SET setting_value = ? WHERE setting_key = ?",
         feeRate,
         TRANSFER_FEE_RATE);
-    jdbc.update(
-        "DELETE FROM inventory_item_job_order_allocation WHERE inventory_item_id IN"
-            + " (SELECT id FROM inventory_item WHERE material_id = ?)",
-        material);
-    jdbc.update("DELETE FROM inventory_item WHERE material_id = ?", material);
     world.close();
-    locations.forEach(location -> TestPlaces.deleteLocation(jdbc, location));
-    jdbc.update("DELETE FROM material WHERE id = ?", material);
   }
 
   @ParameterizedTest
@@ -133,7 +115,10 @@ class ExchangeJobOrderFeedWritesTest {
         write == RacingWrite.MONEY
             ? world.createAuec(world.getLogistician(), 1000)
             : materialOrder();
-    UUID row = write == RacingWrite.EARMARK ? stockRow() : null;
+    UUID row =
+        write == RacingWrite.EARMARK
+            ? world.stockRow(world.getResponsible(), writer, material)
+            : null;
     drain(order);
     JsonNode snapshot = page(get(ExchangeJobOrderWorld.PATH));
     assertThat(snapshot.get("hasMore").asBoolean()).isFalse();
@@ -365,37 +350,12 @@ class ExchangeJobOrderFeedWritesTest {
    * @return the order's id
    */
   private UUID materialOrder() {
-    UUID order = world.stockOrder("MATERIAL");
-    jdbc.update(
-        "INSERT INTO job_order_material (id, job_order_id, material_id, quality_tier_id, amount,"
-            + " created_at, updated_at, version)"
-            + " SELECT gen_random_uuid(), ?, ?, id, 10, now(), now(), 0"
-            + " FROM quality_tier WHERE code = 'GOOD'",
-        order,
-        material);
-    return order;
-  }
-
-  /**
-   * Inserts 5 SCU of the test material at quality 700, owned by the responsible unit.
-   *
-   * @return the stock row's id
-   */
-  private UUID stockRow() {
-    UUID location = UUID.randomUUID();
-    TestPlaces.insertLocation(jdbc, location, "Feed write " + location);
-    locations.add(location);
-    UUID row = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,"
-            + " personal, stolen, owning_org_unit_id)"
-            + " VALUES (?, ?, ?, ?, 700, 5, false, false, ?)",
-        row,
-        writer,
-        material,
-        location,
-        world.getResponsible());
-    return row;
+    return world
+        .order()
+        .requesting(world.getRequesting())
+        .responsible(world.getResponsible())
+        .material(material, "GOOD", 10.0)
+        .create();
   }
 
   private String provide(UUID order, RequestPostProcessor caller, String amount) throws Exception {
