@@ -38,9 +38,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * One of the switches on the settings row (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009) and everything
  * that differs between them: the mirror document member the gateway reads it from, the settings
- * columns and admin endpoint of an area switch, how its state is read from the row, and how a flip
- * is audited, announced and counted. A new switch is one constant here, its columns in a migration
- * and its fields on {@link ExchangeSettings}.
+ * write and admin endpoint of an area switch, how its state is read from the row, and how a flip is
+ * audited, announced and counted. A new switch is one constant here, its columns in a migration,
+ * its fields on {@link ExchangeSettings} and its write on {@link ExchangeSettingsRepository}.
  */
 @RequiredArgsConstructor
 public enum ExchangeSwitch {
@@ -65,7 +65,11 @@ public enum ExchangeSwitch {
   /** The bank switch, guarded by its own {@code bankVersion}. */
   BANK(
       "bankEnabled",
-      new Area("bank", "bank", "bank", "every bank route answers 503 BANK_EXCHANGE_DISABLED"),
+      new Area(
+          "bank",
+          ExchangeSettingsRepository::writeBankSwitch,
+          "bank",
+          "every bank route answers 503 BANK_EXCHANGE_DISABLED"),
       settings ->
           new State(
               settings.isBankEnabled(), settings.getBankVersion(), settings.getBankUpdatedAt()),
@@ -86,7 +90,7 @@ public enum ExchangeSwitch {
       "jobOrdersEnabled",
       new Area(
           "job-orders",
-          "job_orders",
+          ExchangeSettingsRepository::writeJobOrdersSwitch,
           "job-order",
           "every job-order route answers 503 JOB_ORDER_EXCHANGE_DISABLED"),
       settings ->
@@ -111,7 +115,7 @@ public enum ExchangeSwitch {
       "jobOrderWritesEnabled",
       new Area(
           "job-order-writes",
-          "job_order_writes",
+          ExchangeSettingsRepository::writeJobOrderWritesSwitch,
           "job-order writes",
           "every job-order write answers 503 JOB_ORDER_WRITES_DISABLED and the reads go on"),
       settings ->
@@ -134,7 +138,7 @@ public enum ExchangeSwitch {
   /** The boolean member of the registry mirror document that carries the switch. */
   @Getter @NotNull private final String mirrorField;
 
-  /** The settings columns and the admin endpoint of a switch beside the global one. */
+  /** The settings write and the admin endpoint of a switch beside the global one. */
   @Nullable private final Area area;
 
   /** Reads the switch's state from the settings row. */
@@ -153,12 +157,36 @@ public enum ExchangeSwitch {
   @NotNull private final ExchangeSwitchNotice notice;
 
   /**
-   * The settings columns and the admin endpoint of an area switch.
+   * Writes one area switch alone on the settings row through a statement its repository declares.
+   */
+  @Immutable
+  @FunctionalInterface
+  public interface SettingsWrite {
+
+    /**
+     * Writes the switch.
+     *
+     * @param repository the settings repository that declares the statement
+     * @param id the settings row's id
+     * @param enabled the switch's new state
+     * @param at the change time
+     * @return the number of rows written, one
+     */
+    int apply(
+        @NotNull ExchangeSettingsRepository repository,
+        @NotNull Short id,
+        boolean enabled,
+        @NotNull Instant at);
+  }
+
+  /**
+   * The settings write and the admin endpoint of an area switch.
    *
    * @param segment the last path segment of its admin endpoint under {@code
    *     /api/v1/connected-apps/admin/settings/}
-   * @param column the stem of its {@code _enabled}, {@code _version} and {@code _updated_at}
-   *     columns on {@code exchange_settings}
+   * @param statement the repository statement that writes the switch alone: its state, its own
+   *     version counter and its change time, leaving the row's version and {@code updated_at} and
+   *     every other switch alone
    * @param label how the admin API document names the switch
    * @param offAnswer what the gateway answers while the switch is off, as the admin API document
    *     states it
@@ -166,24 +194,9 @@ public enum ExchangeSwitch {
   @Immutable
   public record Area(
       @NotNull String segment,
-      @NotNull String column,
+      @NotNull SettingsWrite statement,
       @NotNull String label,
-      @NotNull String offAnswer) {
-
-    /**
-     * Builds the statement that writes the switch alone: its state, its own version counter and its
-     * change time, leaving the row's version and {@code updated_at} and every other switch alone.
-     *
-     * @return the native {@code UPDATE} with the parameters {@code enabled}, {@code at} and {@code
-     *     id}
-     */
-    @NotNull
-    String writeStatement() {
-      return ("UPDATE exchange_settings SET %1$s_enabled = :enabled,"
-              + " %1$s_version = %1$s_version + 1, %1$s_updated_at = :at WHERE id = :id")
-          .formatted(column);
-    }
-  }
+      @NotNull String offAnswer) {}
 
   /**
    * A switch's state on the settings row.

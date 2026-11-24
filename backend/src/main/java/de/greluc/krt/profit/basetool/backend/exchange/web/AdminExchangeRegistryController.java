@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRegistryS
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSwitch;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import io.swagger.v3.oas.annotations.Operation;
@@ -282,7 +283,6 @@ public class AdminExchangeRegistryController {
    * @throws NotFoundException when no area switch has that segment
    */
   private static @NotNull ExchangeSwitch areaSwitch(@NotNull String segment) {
-    return ExchangeSwitch.ofSegment(segment)
-        .orElseThrow(() -> new NotFoundException("No such exchange area switch"));
+    return Entities.require(ExchangeSwitch.ofSegment(segment), "No such exchange area switch");
   }
 }

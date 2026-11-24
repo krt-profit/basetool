@@ -65,7 +65,7 @@ public class ExchangeRegistryMirrorSync {
    * @param meterRegistry the registry the write counter binds to
    * @param clientGauges the per-status client gauges every read of the registry refreshes
    * @param transactionManager the manager the resync's own transactions run in
-   * @param entityManager writes an area switch alone and reloads the settings row after it
+   * @param entityManager reloads the settings row after an area switch's own write
    */
   public ExchangeRegistryMirrorSync(
       @NotNull ExchangeRegistryMirror mirror,
@@ -158,13 +158,7 @@ public class ExchangeRegistryMirrorSync {
       settings.setEnabled(enabled);
       return settingsRepository.saveAndFlush(settings);
     }
-    entityManager.flush();
-    entityManager
-        .createNativeQuery(area.get().writeStatement())
-        .setParameter("enabled", enabled)
-        .setParameter("at", at)
-        .setParameter("id", settings.getId())
-        .executeUpdate();
+    area.get().statement().apply(settingsRepository, settings.getId(), enabled, at);
     entityManager.refresh(settings);
     return settings;
   }
