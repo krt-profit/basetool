@@ -279,7 +279,7 @@ interface KrtSwapOpts {
      * fragment param.
      */
     history?: boolean;
-    /** Unless false, the scroll position is restored after the swap. */
+    /** Unless false, the scroll position found at the write is restored after it (REQ-FE-039). */
     preserveScroll?: boolean;
     /**
      * Already-localized error toast shown when the response was redirected or not OK; omit to fail

@@ -844,7 +844,7 @@ val testKrtFetchReadJs =
 val testKrtFetchSwapPressJs =
   registerNodeScriptTest(
     "testKrtFetchSwapPressJs",
-    "Regression tests for the press guard of krtFetch.swap (REQ-FE-038).",
+    "Regression tests for the write of krtFetch.swap: the press guard and the kept scroll position (REQ-FE-038, REQ-FE-039).",
     "scripts/krt-fetch-swap-press.test.mjs",
     "npmSetup",
   ) {

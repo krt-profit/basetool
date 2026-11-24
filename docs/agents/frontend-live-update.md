@@ -25,7 +25,7 @@ or `XMLHttpRequest` fails `:frontend:lintJs` outside `krt-fetch.js` and `krt-cli
 
 **Wire a section-structured page through `krtPageSections.create`** (`kernel/krt-page-sections.js`, ADR-0289): declare the `topicClass`, the sections, the topic and the receiver once and use its `write` / `refresh` / `notify` / `receiver`; do not hand-roll a `reswap*` / `refresh*` helper, a `*_SECTIONS` map, a `createReceiver` call, a `dataset.version =` write or a 409 branch in a page module. A cross-topic poke goes through `krtPageSections.publish`.
 
-**Re-render a section through `krtFetch.swap`** (which `krtPageSections.refresh` uses), not `setTrustedHtml` on the section container: `swap` holds its write while a press inside the container is in progress, so a refresh, a peer's change or the page's own live-sync echo never removes the control under a press (REQ-FE-038, ADR-0405).
+**Re-render a section through `krtFetch.swap`** (which `krtPageSections.refresh` uses), not `setTrustedHtml` on the section container: `swap` holds its write while a press inside the container is in progress, so a refresh, a peer's change or the page's own live-sync echo never removes the control under a press (REQ-FE-038, ADR-0405); and it keeps the scroll position it finds at its write, so a scroll made while the fragment loaded stays (REQ-FE-039).
 
 **Live update and multi-user sync move with every feature — added, changed *or* removed.** Whenever
 you add, change or remove a frontend surface that participates in live update or live multi-user

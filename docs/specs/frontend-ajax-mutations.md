@@ -1272,6 +1272,30 @@ progress**, and writes once the press has ended:
 `FragmentSwapPressE2eTest` · **Code:** `krt-fetch.js` (`swap`), `krt-press.js` (`pressSettled`) ·
 **ADR:** ADR-0405
 
+### REQ-FE-039 — A fragment swap keeps the scroll position it finds at its write
+
+A swap with `preserveScroll` (every `krtPageSections` refresh) restores the window's scroll
+position after it replaces the container's markup, so the replacement does not move the page. The
+position it restores is the one **the write finds**, read right before the markup is replaced — not
+the one when the fetch started. A user scrolls while fragments load: right after a write, its own
+refresh and, 400–800 ms later, its echo (REQ-FE-038) are in flight, and a peer's change can start a
+refresh at any time. A position taken at the start would pull the page back to where it was when
+the fetch began; on a long page that moves every control away from the pointer, and a press that
+straddles the write releases on another element, so its `click` is lost — the hold of REQ-FE-038
+covers only a press inside the swapped container.
+
+**Acceptance**
+
+- [ ] A scroll made while a swap's fragment loads is still in place after the write.
+- [ ] A swap held by a press restores the position found when the hold ends, not the one at its
+  start.
+- [ ] A press on a control above a section, held across that section's swap after a scroll made
+  while its fragment loaded, still fires its `click` on release (an order's commitment dialog
+  opens).
+
+**Enforced by:** `:frontend:testKrtFetchSwapPressJs` (`scripts/krt-fetch-swap-press.test.mjs`) ·
+`FragmentSwapPressE2eTest` · **Code:** `krt-fetch.js` (`swap`, `writeFragment`)
+
 ### REQ-FE-014 — The mission edit modal saves only the sections the user changed
 
 The mission edit form fans out to up to three section PATCHes (`schedule` → `core` → `flags`), each

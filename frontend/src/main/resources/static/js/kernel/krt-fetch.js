@@ -1047,7 +1047,8 @@ function withoutFragmentParam(url, paramName) {
  *  - fragmentValue   query param value (default "results")
  *  - history         when true, the address-bar URL (minus the fragment param) is updated via
  *                    history.replaceState
- *  - preserveScroll  unless false, the window scroll position is restored after the swap
+ *  - preserveScroll  unless false, the window scroll position found at the write is restored
+ *                    after it
  *  - errorMessage    optional localized error toast when the response is redirected or not OK;
  *                    the container is then left untouched
  *
@@ -1071,7 +1072,6 @@ function swap(opts) {
     const paramName = opts.fragmentParam || 'fragment';
     const paramValue = opts.fragmentValue || 'results';
     const url = withFragmentParam(/** @type {string} */ (opts.url), paramName, paramValue);
-    const scrollY = window.scrollY;
 
     const seq = (container._krtSwapSeq = (container._krtSwapSeq || 0) + 1);
     if (container._krtSwapAbort) {
@@ -1133,7 +1133,7 @@ function swap(opts) {
                 if (!isCurrent()) {
                     return false;
                 }
-                writeFragment(container, html, opts, paramName, scrollY);
+                writeFragment(container, html, opts, paramName);
                 return true;
             });
         })
@@ -1151,15 +1151,16 @@ function swap(opts) {
 /**
  * Writes a fetched fragment into its container, then reopens the preserved `<details>`, binds the
  * anchor interception, dispatches `krt:swapped` and updates the address bar and scroll position as
- * the options ask.
+ * the options ask. The scroll position kept is the one the write finds, so a scroll made while the
+ * fragment was loading stays (REQ-FE-039).
  *
  * @param {SwapContainer} container the swapped container
  * @param {string} html the fragment markup
  * @param {KrtSwapOpts} opts the swap options
  * @param {string} paramName the fragment query parameter's name
- * @param {number} scrollY the window scroll position when the swap started
  */
-function writeFragment(container, html, opts, paramName, scrollY) {
+function writeFragment(container, html, opts, paramName) {
+    const scrollY = window.scrollY;
     const openDetails = Array.from(
         container.querySelectorAll('details[data-preserve-open][id][open]'),
         (details) => details.id,
