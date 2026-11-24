@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;
@@ -113,8 +114,9 @@ class RefineryModuleContractTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String tag = UUID.randomUUID().toString().substring(0, 6);
-    home = squadron("RefHome-" + tag, "R" + tag);
-    foreign = squadron("RefForeign-" + tag, "Q" + tag);
+    home = OrgUnitFixtures.persistedSquadron(squadronRepository, "RefHome-" + tag, "R" + tag, null);
+    foreign =
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "RefForeign-" + tag, "Q" + tag, null);
     owner = member("ref-owner", home);
     outsider = member("ref-outsider", foreign);
 
@@ -304,13 +306,6 @@ class RefineryModuleContractTest {
         "SELECT event_type FROM audit_event WHERE subject_id = ? ORDER BY occurred_at, event_type",
         String.class,
         id);
-  }
-
-  private Squadron squadron(String name, String shorthand) {
-    Squadron squadron = new Squadron();
-    squadron.setName(name);
-    squadron.setShorthand(shorthand);
-    return squadronRepository.save(squadron);
   }
 
   private User member(String username, Squadron unit) {

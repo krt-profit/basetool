@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;
@@ -122,8 +123,9 @@ class OperationModuleContractTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String tag = UUID.randomUUID().toString().substring(0, 6);
-    home = squadron("OpHome-" + tag, "H" + tag);
-    foreign = squadron("OpForeign-" + tag, "F" + tag);
+    home = OrgUnitFixtures.persistedSquadron(squadronRepository, "OpHome-" + tag, "H" + tag, null);
+    foreign =
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "OpForeign-" + tag, "F" + tag, null);
   }
 
   @Test
@@ -389,13 +391,6 @@ class OperationModuleContractTest {
             "{\"name\":\"Renamed\",\"status\":\"ACTIVE\",\"version\":"
                 + operation.getVersion()
                 + "}");
-  }
-
-  private Squadron squadron(String name, String shorthand) {
-    Squadron squadron = new Squadron();
-    squadron.setName(name);
-    squadron.setShorthand(shorthand);
-    return squadronRepository.save(squadron);
   }
 
   private User user(String username, Squadron unit) {

@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCod
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.events.PurchasingNotices;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyRaisingUnits;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -97,10 +98,7 @@ class PurchasingPauseServiceTest {
   }
 
   private static Squadron squadron(String name) {
-    Squadron squadron = new Squadron();
-    squadron.setId(UUID.randomUUID());
-    squadron.setName(name);
-    return squadron;
+    return OrgUnitFixtures.squadron(UUID.randomUUID(), name);
   }
 
   private static PurchasingUnitPause unitPause(UUID unitId, PauseReason reason) {
