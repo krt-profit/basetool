@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.exchange.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitch;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientCreateRequest;
@@ -151,48 +152,24 @@ public class AdminExchangeClientsRelayController {
   }
 
   /**
-   * Turns the bank switch of the exchange on or off (REQ-BXCH-006).
+   * Turns one area switch of the exchange on or off (REQ-BXCH-006, REQ-OXCH-009).
    *
-   * @param request the new state and the bank switch's version the admin last saw
-   * @return the bank switch, or the relayed backend error
+   * @param area the path segment of an {@link ExchangeAreaSwitch}
+   * @param request the new state and the switch's version the admin last saw
+   * @return the switch, the relayed backend error, or {@code 404} when no area switch has that
+   *     segment
    */
-  @PutMapping(value = "/settings/bank", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> updateBankSwitch(
+  @PutMapping(value = "/settings/{area}", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateAreaSwitch(
+      @PathVariable @NotNull String area,
       @RequestBody @NotNull ExchangeAreaSwitchUpdateRequest request) {
-    return relay(
-        log,
-        "switch the bank on the exchange (ajax)",
-        () -> ResponseEntity.ok(exchangeClient.updateBankSwitch(request)));
-  }
-
-  /**
-   * Turns the job-order family switch of the exchange on or off (REQ-OXCH-009).
-   *
-   * @param request the new state and the family switch's version the admin last saw
-   * @return the family switch, or the relayed backend error
-   */
-  @PutMapping(value = "/settings/job-orders", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> updateJobOrderSwitch(
-      @RequestBody @NotNull ExchangeAreaSwitchUpdateRequest request) {
-    return relay(
-        log,
-        "switch job orders on the exchange (ajax)",
-        () -> ResponseEntity.ok(exchangeClient.updateJobOrderSwitch(request)));
-  }
-
-  /**
-   * Turns the job-order writes switch of the exchange on or off (REQ-OXCH-009).
-   *
-   * @param request the new state and the writes switch's version the admin last saw
-   * @return the writes switch, or the relayed backend error
-   */
-  @PutMapping(value = "/settings/job-order-writes", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> updateJobOrderWritesSwitch(
-      @RequestBody @NotNull ExchangeAreaSwitchUpdateRequest request) {
-    return relay(
-        log,
-        "switch job-order writes on the exchange (ajax)",
-        () -> ResponseEntity.ok(exchangeClient.updateJobOrderWritesSwitch(request)));
+    return ExchangeAreaSwitch.ofSegment(area)
+        .map(target ->
+            relay(
+                log,
+                "switch the exchange area " + target.getSegment() + " (ajax)",
+                () -> ResponseEntity.ok(exchangeClient.updateAreaSwitch(target, request))))
+        .orElseGet(() -> ResponseEntity.notFound().build());
   }
 
   /**
