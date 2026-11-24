@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
 import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -121,7 +122,8 @@ class BankPdfFormatTest {
     UnaryOperator<String> label = UnaryOperator.identity();
     byte[] pdf;
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      try (KrtPdfDocument krt = new TaggedKrtPdfDocuments().open(baos, "VERTEILUNG")) {
+      try (KrtPdfDocument krt =
+          new TaggedKrtPdfDocuments(BackendMessages.bundle()).open(baos, "VERTEILUNG")) {
         BankPdfFormat.distributionTable(krt, distribution, label);
       }
       pdf = baos.toByteArray();

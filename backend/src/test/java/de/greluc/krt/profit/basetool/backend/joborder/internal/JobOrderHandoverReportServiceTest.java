@@ -28,8 +28,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
 import de.greluc.krt.profit.basetool.backend.support.PdfText;
 import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
@@ -44,9 +44,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openpdf.text.pdf.PdfReader;
 import org.springframework.context.MessageSource;
@@ -55,11 +53,8 @@ import org.springframework.context.MessageSource;
 class JobOrderHandoverReportServiceTest {
 
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
-  @Mock private MessageSource messageSource;
 
-  @InjectMocks private JobOrderHandoverReportService service;
-
-  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments();
+  private JobOrderHandoverReportService service;
 
   private UUID jobOrderId;
   private UUID handoverId;
@@ -68,6 +63,13 @@ class JobOrderHandoverReportServiceTest {
 
   @BeforeEach
   void setUp() {
+    MessageSource messages = BackendMessages.bundle();
+    service =
+        new JobOrderHandoverReportService(
+            jobOrderHandoverRepository,
+            new HandoverReportLabels(messages),
+            new TaggedKrtPdfDocuments(messages));
+
     jobOrderId = UUID.randomUUID();
     handoverId = UUID.randomUUID();
 

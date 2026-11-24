@@ -21,13 +21,11 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
-import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
-import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
 import java.io.ByteArrayOutputStream;
 import java.time.ZoneId;
@@ -35,13 +33,11 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,8 +54,6 @@ public class JobOrderItemHandoverReportService {
 
   private static final DateTimeFormatter DATE_PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy");
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
-  private static final String LOCAL_TIME_SUFFIX = " (Lokalzeit)";
-  private static final String UTC_SUFFIX = " (UTC)";
 
   /** Relative widths of the item and amount columns. */
   private static final float[] ITEM_WIDTHS = {4f, 1.5f};
@@ -69,7 +63,7 @@ public class JobOrderItemHandoverReportService {
           .thenComparing(Comparator.comparingInt(ItemRow::amount).reversed());
 
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
-  private final MessageSource messageSource;
+  private final HandoverReportLabels labels;
   private final KrtPdfDocuments pdfDocuments;
 
   /**
@@ -98,9 +92,8 @@ public class JobOrderItemHandoverReportService {
 
     String jobOrderNumber = "#" + handover.getJobOrder().getDisplayId();
     String handoverDate = dateFormatter.format(handover.getHandoverTime());
-    String handoverTime =
-        timeFormatter.format(handover.getHandoverTime())
-            + (userZone != null ? LOCAL_TIME_SUFFIX : UTC_SUFFIX);
+    String handoverTime = timeFormatter.format(handover.getHandoverTime());
+    boolean localTime = userZone != null;
 
     List<ItemRow> rows =
         handover.getEntries().stream()
@@ -114,28 +107,27 @@ public class JobOrderItemHandoverReportService {
             .toList();
 
     return buildPdf(
-        jobOrderNumber, handoverDate, handoverTime, handover.getRecipientHandle(), rows);
+        jobOrderNumber, handoverDate, handoverTime, localTime, handover.getRecipientHandle(), rows);
   }
 
   private byte @NotNull [] buildPdf(
       @NotNull String jobOrderNumber,
       @NotNull String handoverDate,
       @NotNull String handoverTime,
+      boolean localTime,
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      try (KrtPdfDocument pdf = pdfDocuments.open(baos, "ÜBERGABEPROTOKOLL")) {
+      try (KrtPdfDocument pdf = pdfDocuments.open(baos, labels.title())) {
         pdf.keyValueTable(
-            List.of(
-                new PdfKeyValue("AUFTRAGSNUMMER", jobOrderNumber),
-                new PdfKeyValue("DATUM DER ÜBERGABE", handoverDate),
-                new PdfKeyValue("UHRZEIT DER ÜBERGABE", handoverTime),
-                new PdfKeyValue(
-                    "EMPFÄNGER (HANDLE)",
-                    HandleAnonymisation.humaniseRequired(
-                        recipientHandle, label("general.anonymisedHandle")))));
-        pdf.heading("ÜBERGEBENE GÜTER");
-        try (PdfDataTable table = pdf.dataTable(ITEM_WIDTHS, List.of("GUT", "MENGE"))) {
+            labels.header(jobOrderNumber, handoverDate, handoverTime, localTime, recipientHandle));
+        pdf.heading(labels.resolve("pdf.handover.items"));
+        try (PdfDataTable table =
+            pdf.dataTable(
+                ITEM_WIDTHS,
+                List.of(
+                    labels.resolve("pdf.handover.items.col.item"),
+                    labels.resolve("pdf.handover.col.amount")))) {
           for (ItemRow row : rows) {
             table.row(
                 List.of(
@@ -143,7 +135,7 @@ public class JobOrderItemHandoverReportService {
                     PdfTableCell.centered(String.valueOf(row.amount()))));
           }
           if (rows.isEmpty()) {
-            table.emptyRow("Keine Güter vorhanden.");
+            table.emptyRow(labels.resolve("pdf.handover.items.empty"));
           }
         }
         pdf.footer();
@@ -156,15 +148,4 @@ public class JobOrderItemHandoverReportService {
 
   /** Internal value record for one delivered-item row in the PDF. */
   private record ItemRow(String itemName, int amount) {}
-
-  /**
-   * Resolves one German PDF label from the backend message bundle; the locale is fixed because the
-   * document is German.
-   *
-   * @param key the message key
-   * @return the resolved label
-   */
-  private @NotNull String label(@NotNull String key) {
-    return messageSource.getMessage(key, null, Locale.GERMAN);
-  }
 }
