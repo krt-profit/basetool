@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -38,7 +39,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import de.greluc.krt.profit.basetool.frontend.support.QualityTierTestData;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,48 +108,25 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
             1L);
 
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            42,
-            null,
-            null,
-            "Tester",
-            null,
-            1,
-            "OPEN",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(item),
-            List.of(
-                new AggregatedMaterialDto(
-                    quantanium,
-                    "NONE",
-                    QualityTierTestData.forCode("NONE"),
-                    10.0,
-                    10.0,
-                    0.0,
-                    4.0,
-                    List.of(),
-                    null)),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L,
-            0L,
-            null,
-            null);
+        jobOrder()
+            .id(orderId)
+            .displayId(42)
+            .handle("Tester")
+            .type("ITEM")
+            .items(List.of(item))
+            .aggregatedMaterials(
+                List.of(
+                    new AggregatedMaterialDto(
+                        quantanium,
+                        "NONE",
+                        QualityTierTestData.forCode("NONE"),
+                        10.0,
+                        10.0,
+                        0.0,
+                        4.0,
+                        List.of(),
+                        null)))
+            .build();
 
     when(reader.readOrderList(any()))
         .thenReturn(
@@ -283,38 +260,15 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
   private void givenOrderList(
       String type, List<JobOrderMaterialDto> materials, List<AggregatedMaterialDto> aggregated) {
     JobOrderDto order =
-        new JobOrderDto(
-            UUID.randomUUID(),
-            7,
-            null,
-            null,
-            "Tester",
-            null,
-            null,
-            "COMPLETED",
-            type,
-            true,
-            materials,
-            List.of(),
-            aggregated,
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L,
-            0L,
-            null,
-            null);
+        jobOrder()
+            .displayId(7)
+            .handle("Tester")
+            .priority(null)
+            .status("COMPLETED")
+            .type(type)
+            .materials(materials)
+            .aggregatedMaterials(aggregated)
+            .build();
     when(reader.readOrderList(any()))
         .thenReturn(
             JobOrderPageStubs.list(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of())));
@@ -324,38 +278,13 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
   @WithMockUser
   void viewOrders_RendersResponsibleOrgUnitUnderIdAndType() throws Exception {
     JobOrderDto order =
-        new JobOrderDto(
-            UUID.randomUUID(),
-            42,
-            new SquadronReferenceDto(UUID.randomUUID(), "Alpha Squadron", "ALP"),
-            null,
-            "Tester",
-            null,
-            1,
-            "OPEN",
-            "MATERIAL",
-            false,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L,
-            0L,
-            null,
-            null);
+        jobOrder()
+            .displayId(42)
+            .responsibleOrgUnit(
+                new SquadronReferenceDto(UUID.randomUUID(), "Alpha Squadron", "ALP"))
+            .handle("Tester")
+            .countBlueprintsWithVariants(false)
+            .build();
 
     when(reader.readOrderList(any()))
         .thenReturn(

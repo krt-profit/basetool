@@ -46,9 +46,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -120,8 +120,10 @@ class JobOrderMoneyIntegrationTest {
       String tag = UUID.randomUUID().toString();
       OrgUnit profit = ProfitHierarchyFixtures.persistedProfitArea(units);
       profitRoot = profit.getId();
-      responsible = squadron("Money responsible " + tag, profit).getId();
-      requester = squadron("Money requester " + tag, null).getId();
+      responsible =
+          OrgUnitFixtures.persistedSquadron(squadrons, "Money responsible " + tag, profit).getId();
+      requester =
+          OrgUnitFixtures.persistedSquadron(squadrons, "Money requester " + tag, null).getId();
       writer = member("money-writer-" + tag);
       reader = member("money-reader-" + tag);
       unitless = account("money-linked-" + tag).getId();
@@ -3178,13 +3180,5 @@ class JobOrderMoneyIntegrationTest {
     user.setUsername(name);
     user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     return users.saveAndFlush(user);
-  }
-
-  private Squadron squadron(String name, OrgUnit parent) {
-    Squadron unit = new Squadron();
-    unit.setName(name);
-    unit.setShorthand(name);
-    unit.setParent(parent);
-    return squadrons.saveAndFlush(unit);
   }
 }

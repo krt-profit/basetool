@@ -25,26 +25,15 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangeJobOrderChangeLog;
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangeJobOrderSeed;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +46,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
@@ -80,19 +68,12 @@ class JobOrderWindowRunIntegrationTest {
 
   @Autowired private WebApplicationContext context;
   @Autowired private JdbcTemplate jdbc;
-  @Autowired private TransactionTemplate transactions;
-  @Autowired private UserRepository users;
-  @Autowired private RoleRepository roles;
-  @Autowired private OrgUnitRepository orgUnits;
-  @Autowired private JobOrderRepository orders;
   @Autowired private JobOrderFingerprintRecomputation recomputation;
   @Autowired private JobOrderWindowRun window;
   @Autowired private DataExportService exports;
 
-  private final List<UUID> createdOrders = new ArrayList<>();
-  private final List<UUID> createdUnits = new ArrayList<>();
-  private final List<UUID> createdUsers = new ArrayList<>();
-
+  private ExchangeJobOrderSeed seed;
+  private ExchangeJobOrderChangeLog changes;
   private MockMvc mvc;
   private UUID requesting;
   private UUID responsible;
@@ -101,54 +82,45 @@ class JobOrderWindowRunIntegrationTest {
   private UUID writer;
 
   @BeforeEach
-  void seed() {
+  void setUp() {
+    seed = new ExchangeJobOrderSeed(context);
+    changes = new ExchangeJobOrderChangeLog(jdbc);
     mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    requesting = unit("Window requesting", null);
-    responsible =
-        unit("Window responsible", ProfitHierarchyFixtures.persistedProfitArea(orgUnits).getId());
-    assignee = user("window-assignee");
-    creatingMember = user("window-creator");
-    writer = user("window-writer");
+    requesting = seed.squadron("Window requesting", null);
+    responsible = seed.squadron("Window responsible", seed.getProfit());
+    assignee = seed.user("window-assignee", false);
+    creatingMember = seed.user("window-creator", false);
+    writer = seed.user("window-writer", false);
   }
 
   @AfterEach
   void clean() {
-    createdOrders.forEach(id -> {
-      jdbc.update("DELETE FROM job_order_assignees WHERE job_order_id = ?", id);
-      jdbc.update("DELETE FROM job_order_money_target WHERE order_id = ?", id);
-      jdbc.update("DELETE FROM notification WHERE entity_id = ?", id);
-      jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", id);
-      jdbc.update("DELETE FROM job_order WHERE id = ?", id);
-    });
-    createdUsers.forEach(id -> {
-      jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
-      jdbc.update("DELETE FROM app_user WHERE id = ?", id);
-    });
-    createdUnits.forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
+    seed.close();
   }
 
   @Test
   void anOrderWhoseSevenDaysEndedIsAnnouncedWhereItWasLastAnnounced() {
     UUID order = closedOrder();
     closedAgo(order, "7 days 1 minute");
-    long before = position();
+    long before = changes.position();
 
     window.ageOut();
 
-    assertThat(unitsAnnounced(order, before)).containsExactlyInAnyOrder(requesting, responsible);
-    assertThat(membersAnnounced(order, before)).containsExactly(assignee);
+    assertThat(changes.unitsAnnounced(order, before))
+        .containsExactlyInAnyOrder(requesting, responsible);
+    assertThat(changes.membersAnnounced(order, before)).containsExactly(assignee);
   }
 
   @Test
   void anOrderClosedJustUnderSevenDaysAgoStaysInTheSet() {
     UUID order = closedOrder();
     closedAgo(order, "6 days 23 hours 59 minutes");
-    long before = position();
+    long before = changes.position();
 
     window.ageOut();
 
-    assertThat(unitsAnnounced(order, before)).isEmpty();
-    assertThat(membersAnnounced(order, before)).isEmpty();
+    assertThat(changes.unitsAnnounced(order, before)).isEmpty();
+    assertThat(changes.membersAnnounced(order, before)).isEmpty();
   }
 
   @Test
@@ -156,12 +128,12 @@ class JobOrderWindowRunIntegrationTest {
     UUID order = closedOrder();
     closedAgo(order, "8 days");
     window.ageOut();
-    long before = position();
+    long before = changes.position();
 
     window.ageOut();
 
-    assertThat(unitsAnnounced(order, before)).isEmpty();
-    assertThat(membersAnnounced(order, before)).isEmpty();
+    assertThat(changes.unitsAnnounced(order, before)).isEmpty();
+    assertThat(changes.membersAnnounced(order, before)).isEmpty();
   }
 
   @Test
@@ -176,11 +148,12 @@ class JobOrderWindowRunIntegrationTest {
     JobOrderFingerprintRuns.drain(jdbc, recomputation, order);
     close(order);
     closedAgo(order, "8 days");
-    long before = position();
+    long before = changes.position();
 
     window.ageOut();
 
-    assertThat(unitsAnnounced(order, before)).containsExactlyInAnyOrder(requesting, responsible);
+    assertThat(changes.unitsAnnounced(order, before))
+        .containsExactlyInAnyOrder(requesting, responsible);
   }
 
   @Test
@@ -191,11 +164,11 @@ class JobOrderWindowRunIntegrationTest {
             + " closed_at = now() - INTERVAL '30 days' WHERE id = ?",
         order);
     JobOrderFingerprintRuns.drain(jdbc, recomputation, order);
-    long before = position();
+    long before = changes.position();
 
     window.ageOut();
 
-    assertThat(unitsAnnounced(order, before)).isEmpty();
+    assertThat(changes.unitsAnnounced(order, before)).isEmpty();
   }
 
   @Test
@@ -206,25 +179,26 @@ class JobOrderWindowRunIntegrationTest {
         "UPDATE exchange_job_order_fingerprint SET settlement_open = TRUE WHERE job_order_id = ?",
         order);
     closedAgo(order, "8 days");
-    long open = position();
+    long open = changes.position();
 
     window.ageOut();
 
-    assertThat(unitsAnnounced(order, open)).isEmpty();
+    assertThat(changes.unitsAnnounced(order, open)).isEmpty();
 
-    long settling = position();
+    long settling = changes.position();
     jdbc.update(
         "UPDATE exchange_job_order_fingerprint SET fingerprint = ?, changed_at = now(),"
             + " settlement_open = FALSE WHERE job_order_id = ?",
         hash(),
         order);
 
-    assertThat(unitsAnnounced(order, settling)).containsExactlyInAnyOrder(requesting, responsible);
+    assertThat(changes.unitsAnnounced(order, settling))
+        .containsExactlyInAnyOrder(requesting, responsible);
 
-    long settled = position();
+    long settled = changes.position();
     window.ageOut();
 
-    assertThat(unitsAnnounced(order, settled)).isEmpty();
+    assertThat(changes.unitsAnnounced(order, settled)).isEmpty();
   }
 
   @Test
@@ -345,17 +319,13 @@ class JobOrderWindowRunIntegrationTest {
   }
 
   /**
-   * Creates an open aUEC order with a target.
+   * Creates an open aUEC order with a target and an assignee.
    *
    * @return the order
    */
   private UUID auecOrder() {
-    UUID order = order();
-    jdbc.update("UPDATE job_order SET type = 'AUEC' WHERE id = ?", order);
-    jdbc.update(
-        "INSERT INTO job_order_money_target (order_id, amount, version) VALUES (?, 1000, 0)",
-        order);
-    return order;
+    return withAssignee(
+        seed.order().requesting(requesting).responsible(responsible).auec(1000).create());
   }
 
   private static byte[] hash() {
@@ -414,75 +384,12 @@ class JobOrderWindowRunIntegrationTest {
         "UPDATE job_order SET closed_at = now() - CAST(? AS INTERVAL) WHERE id = ?", ago, order);
   }
 
-  private long position() {
-    return Objects.requireNonNull(
-        jdbc.queryForObject("SELECT COALESCE(max(seq), 0) FROM exchange_change", Long.class));
-  }
-
-  private Set<UUID> unitsAnnounced(UUID order, long after) {
-    return new HashSet<>(
-        jdbc.queryForList(
-            "SELECT org_unit_id FROM exchange_change WHERE seq > ? AND resource = 'JOB_ORDER'"
-                + " AND entity_key = ? AND org_unit_id IS NOT NULL",
-            UUID.class,
-            after,
-            order.toString()));
-  }
-
-  private Set<UUID> membersAnnounced(UUID order, long after) {
-    return new HashSet<>(
-        jdbc.queryForList(
-            "SELECT user_id FROM exchange_change WHERE seq > ? AND resource = 'JOB_ORDER'"
-                + " AND entity_key = ? AND user_id IS NOT NULL",
-            UUID.class,
-            after,
-            order.toString()));
-  }
-
   private UUID order() {
-    UUID id =
-        transactions.execute(_ ->
-            orders
-                .saveAndFlush(
-                    JobOrder.builder()
-                        .requestingOrgUnit(orgUnits.getReferenceById(requesting))
-                        .responsibleOrgUnit(orgUnits.getReferenceById(responsible))
-                        .handle("window contact")
-                        .priority(1)
-                        .status(JobOrderStatus.OPEN)
-                        .build())
-                .getId());
-    createdOrders.add(Objects.requireNonNull(id));
-    jdbc.update(
-        "INSERT INTO job_order_assignees (id, job_order_id, user_id, version) VALUES (?, ?, ?, 0)",
-        UUID.randomUUID(),
-        id,
-        assignee);
-    return id;
+    return withAssignee(seed.order().requesting(requesting).responsible(responsible).create());
   }
 
-  private @NotNull UUID unit(@NotNull String name, @Nullable UUID parent) {
-    UUID id = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active, parent_org_unit_id)"
-            + " VALUES (?, 'SQUADRON', ?, ?, TRUE, ?)",
-        id,
-        name + " " + id,
-        "W" + id.toString().substring(0, 6),
-        parent);
-    createdUnits.add(id);
-    return id;
-  }
-
-  private @NotNull UUID user(@NotNull String username) {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    user.setUsername(username + "-" + UUID.randomUUID());
-    user.setApprovalStatus(ApprovalStatus.ACTIVE);
-    user.setInKeycloak(true);
-    user.setRoles(new HashSet<>(Set.of(roles.findByCode(Roles.KRT_MEMBER).orElseThrow())));
-    UUID id = users.saveAndFlush(user).getId();
-    createdUsers.add(id);
-    return id;
+  private UUID withAssignee(UUID order) {
+    seed.assignee(order, assignee, null);
+    return order;
   }
 }

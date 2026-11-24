@@ -38,6 +38,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +64,7 @@ class ProfitHierarchyStartupIntegrationTest {
   @Autowired private ApplicationContext context;
   @Autowired private TransactionTemplate transactions;
   @Autowired private OrgUnitRepository units;
+  @Autowired private SquadronRepository squadrons;
   @Autowired private JobOrderRepository orders;
   @Autowired private MaterialRepository materials;
   @Autowired private MaterialClaimRepository claims;
@@ -158,8 +161,10 @@ class ProfitHierarchyStartupIntegrationTest {
   private Fixture seed(boolean inactive) {
     OrgUnit profit = ProfitHierarchyFixtures.persistedProfitArea(units);
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron valid = squadron("Startup valid " + tag, profit);
-    Squadron invalid = squadron("Startup invalid " + tag, inactive ? profit : null);
+    Squadron valid = OrgUnitFixtures.persistedSquadron(squadrons, "Startup valid " + tag, profit);
+    Squadron invalid =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Startup invalid " + tag, inactive ? profit : null);
     invalid.setActive(!inactive);
     units.saveAndFlush(invalid);
     jdbc.update("UPDATE org_unit SET is_profit_eligible = false WHERE id = ?", valid.getId());
@@ -209,14 +214,6 @@ class ProfitHierarchyStartupIntegrationTest {
         legal.getId(),
         illegal.getId(),
         List.of(valid.getId(), invalid.getId(), responsible.getId()));
-  }
-
-  private Squadron squadron(String name, OrgUnit parent) {
-    Squadron unit = new Squadron();
-    unit.setName(name);
-    unit.setShorthand(name);
-    unit.setParent(parent);
-    return units.saveAndFlush(unit);
   }
 
   private static @NotNull List<Map<String, Object>> stableFacts(

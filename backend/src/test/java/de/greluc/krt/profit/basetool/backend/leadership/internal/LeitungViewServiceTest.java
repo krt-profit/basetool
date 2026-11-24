@@ -49,9 +49,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -120,11 +120,8 @@ class LeitungViewServiceTest {
   }
 
   private OrgUnit squadron(UUID id, String name) {
-    Squadron s = new Squadron();
-    s.setId(id);
-    s.setName(name);
-    s.setShorthand(name.substring(0, 3).toUpperCase(java.util.Locale.ROOT));
-    return s;
+    return OrgUnitFixtures.squadron(
+        id, name, name.substring(0, 3).toUpperCase(java.util.Locale.ROOT));
   }
 
   private OrgUnit specialCommand() {

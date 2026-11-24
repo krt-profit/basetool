@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -41,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -77,14 +77,6 @@ class OrgUnitBankResponsibilityServiceTest {
   @Mock private RoleRecipientDirectory roleRecipientDirectory;
 
   @InjectMocks private OrgUnitBankResponsibilityService service;
-
-  private static OrgUnit squadron(UUID id, String name, String shorthand) {
-    Squadron squadron = new Squadron();
-    squadron.setId(id);
-    squadron.setName(name);
-    squadron.setShorthand(shorthand);
-    return squadron;
-  }
 
   private static OrgUnit specialCommand(UUID id, String name, String shorthand) {
     SpecialCommand sk = new SpecialCommand();

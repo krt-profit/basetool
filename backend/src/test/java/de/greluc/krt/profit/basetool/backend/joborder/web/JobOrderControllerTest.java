@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,7 +32,6 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderCreation;
@@ -71,38 +71,12 @@ class JobOrderControllerTest {
   @InjectMocks private JobOrderController controller;
 
   private static JobOrderDto jobOrderDto(UUID id) {
-    return new JobOrderDto(
-        id,
-        1,
-        null,
-        null,
-        "alice",
-        "deliver to ArcCorp",
-        1,
-        JobOrderStatus.OPEN,
-        JobOrderType.MATERIAL,
-        true,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.parse("2026-01-01T00:00:00Z"),
-        1L,
-        null,
-        null,
-        false,
-        false,
-        null,
-        false,
-        false,
-        false,
-        0L,
-        0L,
-        0L,
-        null,
-        null);
+    return jobOrder()
+        .id(id)
+        .handle("alice")
+        .comment("deliver to ArcCorp")
+        .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+        .build();
   }
 
   @Test

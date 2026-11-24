@@ -21,28 +21,17 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangeJobOrderChangeLog;
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangeJobOrderSeed;
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The job-order change log against PostgreSQL (REQ-OXCH-003, REQ-XCH-013, ADR-0406): a changed
@@ -56,16 +45,11 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
 
   private static final SecureRandom RANDOM = new SecureRandom();
 
+  @Autowired private ApplicationContext context;
   @Autowired private JdbcTemplate jdbc;
-  @Autowired private TransactionTemplate transactions;
-  @Autowired private UserRepository users;
-  @Autowired private OrgUnitRepository orgUnits;
-  @Autowired private JobOrderRepository orders;
 
-  private final List<UUID> createdOrders = new ArrayList<>();
-  private final List<UUID> createdUnits = new ArrayList<>();
-  private final List<UUID> createdUsers = new ArrayList<>();
-
+  private ExchangeJobOrderSeed seed;
+  private ExchangeJobOrderChangeLog changes;
   private UUID requesting;
   private UUID responsible;
   private UUID supporting;
@@ -74,27 +58,20 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
   private UUID yuri;
 
   @BeforeEach
-  void seed() {
-    requesting = unit("Requesting");
-    responsible = unit("Responsible");
-    supporting = unit("Supporting");
-    formerSupporter = unit("Former supporter");
-    xena = user("feed-xena");
-    yuri = user("feed-yuri");
+  void setUp() {
+    seed = new ExchangeJobOrderSeed(context);
+    changes = new ExchangeJobOrderChangeLog(jdbc);
+    requesting = seed.squadron("Requesting", null);
+    responsible = seed.squadron("Responsible", null);
+    supporting = seed.squadron("Supporting", null);
+    formerSupporter = seed.squadron("Former supporter", null);
+    xena = seed.user("feed-xena", false);
+    yuri = seed.user("feed-yuri", false);
   }
 
   @AfterEach
   void clean() {
-    createdOrders.forEach(id -> {
-      jdbc.update("DELETE FROM job_order_assignees WHERE job_order_id = ?", id);
-      jdbc.update("DELETE FROM job_order WHERE id = ?", id);
-    });
-    createdUsers.forEach(id -> {
-      jdbc.update("DELETE FROM exchange_name_withholding WHERE user_id = ?", id);
-      jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
-      jdbc.update("DELETE FROM app_user WHERE id = ?", id);
-    });
-    createdUnits.forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
+    seed.close();
   }
 
   @Test
@@ -102,63 +79,63 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
     UUID order = order(requesting, responsible);
     support(order, supporting, true);
     support(order, formerSupporter, false);
-    assignee(order, xena);
-    assignee(order, yuri);
-    long before = position();
+    seed.assignee(order, xena, null);
+    seed.assignee(order, yuri, null);
+    long before = changes.position();
 
     fingerprint(order);
 
-    assertThat(unitsAnnounced(order, before))
+    assertThat(changes.unitsAnnounced(order, before))
         .containsExactlyInAnyOrder(requesting, responsible, supporting);
-    assertThat(membersAnnounced(order, before)).containsExactlyInAnyOrder(xena, yuri);
+    assertThat(changes.membersAnnounced(order, before)).containsExactlyInAnyOrder(xena, yuri);
   }
 
   @Test
   void aFirstFingerprintOutsideTheClientSetAnnouncesNothing() {
     UUID order = order(requesting, responsible);
-    assignee(order, xena);
+    seed.assignee(order, xena, null);
     close(order, "30 days");
-    long before = position();
+    long before = changes.position();
 
     fingerprint(order);
 
-    assertThat(unitsAnnounced(order, before)).isEmpty();
-    assertThat(membersAnnounced(order, before)).isEmpty();
+    assertThat(changes.unitsAnnounced(order, before)).isEmpty();
+    assertThat(changes.membersAnnounced(order, before)).isEmpty();
   }
 
   @Test
   void aChangedFingerprintAnnouncesTheOrderToTheOldAndTheNewUnitsAndAssignees() {
     UUID order = order(requesting, responsible);
-    assignee(order, xena);
+    seed.assignee(order, xena, null);
     fingerprint(order);
-    UUID newRequester = unit("New requester");
+    UUID newRequester = seed.squadron("New requester", null);
     jdbc.update(
         "UPDATE job_order SET requesting_org_unit_id = ? WHERE id = ?", newRequester, order);
     support(order, supporting, true);
     jdbc.update("DELETE FROM job_order_assignees WHERE job_order_id = ?", order);
-    assignee(order, yuri);
-    long before = position();
+    seed.assignee(order, yuri, null);
+    long before = changes.position();
 
     refingerprint(order);
 
-    assertThat(unitsAnnounced(order, before))
+    assertThat(changes.unitsAnnounced(order, before))
         .containsExactlyInAnyOrder(requesting, newRequester, responsible, supporting);
-    assertThat(membersAnnounced(order, before)).containsExactlyInAnyOrder(xena, yuri);
+    assertThat(changes.membersAnnounced(order, before)).containsExactlyInAnyOrder(xena, yuri);
 
-    long after = position();
+    long after = changes.position();
     jdbc.update("DELETE FROM job_order_participation WHERE job_order_id = ?", order);
     refingerprint(order);
 
-    assertThat(unitsAnnounced(order, after))
+    assertThat(changes.unitsAnnounced(order, after))
         .containsExactlyInAnyOrder(newRequester, responsible, supporting);
-    assertThat(membersAnnounced(order, after)).containsExactly(yuri);
+    assertThat(changes.membersAnnounced(order, after)).containsExactly(yuri);
   }
 
   @Test
   void anUnchangedFingerprintOrASettlementFlagAloneAnnouncesNothing() {
     UUID order = order(requesting, responsible);
     fingerprint(order);
-    long before = position();
+    long before = changes.position();
 
     jdbc.update(
         "UPDATE exchange_job_order_fingerprint SET fingerprint = fingerprint WHERE job_order_id ="
@@ -168,22 +145,23 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
         "UPDATE exchange_job_order_fingerprint SET settlement_open = TRUE WHERE job_order_id = ?",
         order);
 
-    assertThat(unitsAnnounced(order, before)).isEmpty();
+    assertThat(changes.unitsAnnounced(order, before)).isEmpty();
   }
 
   @Test
   void aHardDeleteAnnouncesTheOrderWhereItWasLastAnnounced() {
     UUID order = order(requesting, responsible);
-    assignee(order, xena);
+    seed.assignee(order, xena, null);
     fingerprint(order);
     jdbc.update("UPDATE job_order SET requesting_org_unit_id = ? WHERE id = ?", supporting, order);
-    long before = position();
+    long before = changes.position();
 
     jdbc.update("DELETE FROM job_order_assignees WHERE job_order_id = ?", order);
     jdbc.update("DELETE FROM job_order WHERE id = ?", order);
 
-    assertThat(unitsAnnounced(order, before)).containsExactlyInAnyOrder(requesting, responsible);
-    assertThat(membersAnnounced(order, before)).containsExactly(xena);
+    assertThat(changes.unitsAnnounced(order, before))
+        .containsExactlyInAnyOrder(requesting, responsible);
+    assertThat(changes.membersAnnounced(order, before)).containsExactly(xena);
   }
 
   @Test
@@ -195,13 +173,13 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
     UUID closedLongAgo = printedOrder(requesting, responsible);
     close(closedLongAgo, "30 days");
     UUID unrelated = printedOrder(responsible, supporting);
-    long before = position();
+    long before = changes.position();
 
-    join(xena, requesting);
+    seed.seat(xena, requesting, "MEMBER", false);
 
-    assertThat(ordersAnnouncedTo(xena, before))
+    assertThat(changes.ordersAnnouncedTo(xena, before))
         .containsExactlyInAnyOrder(requested.toString(), supported.toString());
-    assertThat(unitsAnnounced(unrelated, before)).isEmpty();
+    assertThat(changes.unitsAnnounced(unrelated, before)).isEmpty();
   }
 
   @Test
@@ -220,13 +198,13 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
         unannounced.toString());
     UUID closedLongAgo = printedOrder(responsible, supporting);
     close(closedLongAgo, "30 days");
-    join(xena, requesting);
-    long before = position();
+    seed.seat(xena, requesting, "MEMBER", false);
+    long before = changes.position();
 
     jdbc.update(
         "DELETE FROM org_unit_membership WHERE user_id = ? AND org_unit_id = ?", xena, requesting);
 
-    assertThat(ordersAnnouncedTo(xena, before))
+    assertThat(changes.ordersAnnouncedTo(xena, before))
         .containsExactlyInAnyOrder(
             requested.toString(), movedAway.toString(), unannounced.toString());
   }
@@ -235,8 +213,8 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
   void aMembershipMovingToAnotherUnitAnnouncesTheOrdersOfBoth() {
     UUID requested = printedOrder(requesting, formerSupporter);
     UUID responsibleFor = printedOrder(formerSupporter, responsible);
-    join(xena, requesting);
-    long before = position();
+    seed.seat(xena, requesting, "MEMBER", false);
+    long before = changes.position();
 
     jdbc.update(
         "UPDATE org_unit_membership SET org_unit_id = ? WHERE user_id = ? AND org_unit_id = ?",
@@ -244,26 +222,26 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
         xena,
         requesting);
 
-    assertThat(ordersAnnouncedTo(xena, before))
+    assertThat(changes.ordersAnnouncedTo(xena, before))
         .containsExactlyInAnyOrder(requested.toString(), responsibleFor.toString());
   }
 
   @Test
   void deactivatingOrActivatingAUnitAnnouncesItsOrdersToEveryMember() {
     UUID requested = printedOrder(requesting, responsible);
-    join(xena, requesting);
-    join(yuri, requesting);
-    long before = position();
+    seed.seat(xena, requesting, "MEMBER", false);
+    seed.seat(yuri, requesting, "MEMBER", false);
+    long before = changes.position();
 
     jdbc.update("UPDATE org_unit SET active = FALSE WHERE id = ?", requesting);
 
-    assertThat(ordersAnnouncedTo(xena, before)).containsExactly(requested.toString());
-    assertThat(ordersAnnouncedTo(yuri, before)).containsExactly(requested.toString());
+    assertThat(changes.ordersAnnouncedTo(xena, before)).containsExactly(requested.toString());
+    assertThat(changes.ordersAnnouncedTo(yuri, before)).containsExactly(requested.toString());
 
-    long deactivated = position();
+    long deactivated = changes.position();
     jdbc.update("UPDATE org_unit SET active = TRUE WHERE id = ?", requesting);
 
-    assertThat(ordersAnnouncedTo(xena, deactivated)).containsExactly(requested.toString());
+    assertThat(changes.ordersAnnouncedTo(xena, deactivated)).containsExactly(requested.toString());
   }
 
   @Test
@@ -271,64 +249,66 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
     UUID requested = printedOrder(requesting, responsible);
     UUID supported = order(responsible, formerSupporter);
     support(supported, requesting, true);
-    assignee(supported, yuri);
+    seed.assignee(supported, yuri, null);
     fingerprint(supported);
     UUID unrelated = printedOrder(responsible, formerSupporter);
-    long before = position();
+    long before = changes.position();
 
     jdbc.update("UPDATE org_unit SET name = name || ' renamed' WHERE id = ?", requesting);
 
-    assertThat(unitsAnnounced(requested, before))
+    assertThat(changes.unitsAnnounced(requested, before))
         .containsExactlyInAnyOrder(requesting, responsible);
-    assertThat(unitsAnnounced(supported, before))
+    assertThat(changes.unitsAnnounced(supported, before))
         .containsExactlyInAnyOrder(requesting, responsible, formerSupporter);
-    assertThat(membersAnnounced(supported, before)).containsExactly(yuri);
-    assertThat(unitsAnnounced(unrelated, before)).isEmpty();
+    assertThat(changes.membersAnnounced(supported, before)).containsExactly(yuri);
+    assertThat(changes.unitsAnnounced(unrelated, before)).isEmpty();
 
-    long renamed = position();
+    long renamed = changes.position();
     jdbc.update("UPDATE org_unit SET shorthand = 'R' || shorthand WHERE id = ?", requesting);
 
-    assertThat(unitsAnnounced(requested, renamed))
+    assertThat(changes.unitsAnnounced(requested, renamed))
         .containsExactlyInAnyOrder(requesting, responsible);
   }
 
   @Test
   void renamingAnAssigneeOrSwitchingTheirNameWithholdingAnnouncesTheirOrders() {
     UUID worked = order(requesting, responsible);
-    assignee(worked, xena);
-    assignee(worked, yuri);
+    seed.assignee(worked, xena, null);
+    seed.assignee(worked, yuri, null);
     fingerprint(worked);
     UUID closedLongAgo = order(requesting, responsible);
-    assignee(closedLongAgo, xena);
+    seed.assignee(closedLongAgo, xena, null);
     fingerprint(closedLongAgo);
     close(closedLongAgo, "30 days");
-    long before = position();
+    long before = changes.position();
 
     jdbc.update("UPDATE app_user SET display_name = 'Xena the Miner' WHERE id = ?", xena);
 
-    assertThat(unitsAnnounced(worked, before)).containsExactlyInAnyOrder(requesting, responsible);
-    assertThat(membersAnnounced(worked, before)).containsExactlyInAnyOrder(xena, yuri);
-    assertThat(membersAnnounced(closedLongAgo, before)).isEmpty();
+    assertThat(changes.unitsAnnounced(worked, before))
+        .containsExactlyInAnyOrder(requesting, responsible);
+    assertThat(changes.membersAnnounced(worked, before)).containsExactlyInAnyOrder(xena, yuri);
+    assertThat(changes.membersAnnounced(closedLongAgo, before)).isEmpty();
 
-    long renamed = position();
+    long renamed = changes.position();
     jdbc.update(
         "INSERT INTO exchange_name_withholding (user_id, withhold_name) VALUES (?, true)", xena);
 
-    assertThat(membersAnnounced(worked, renamed)).containsExactlyInAnyOrder(xena, yuri);
+    assertThat(changes.membersAnnounced(worked, renamed)).containsExactlyInAnyOrder(xena, yuri);
 
-    long withheld = position();
+    long withheld = changes.position();
     jdbc.update("DELETE FROM exchange_name_withholding WHERE user_id = ?", xena);
 
-    assertThat(unitsAnnounced(worked, withheld)).containsExactlyInAnyOrder(requesting, responsible);
+    assertThat(changes.unitsAnnounced(worked, withheld))
+        .containsExactlyInAnyOrder(requesting, responsible);
   }
 
   @Test
   void anAssigneesOwnNoteIsAnnouncedToThemAlone() {
     UUID worked = order(requesting, responsible);
-    assignee(worked, xena);
-    assignee(worked, yuri);
+    seed.assignee(worked, xena, null);
+    seed.assignee(worked, yuri, null);
     fingerprint(worked);
-    long before = position();
+    long before = changes.position();
 
     jdbc.update(
         "UPDATE job_order_assignees SET note = 'my own note' WHERE job_order_id = ? AND user_id ="
@@ -336,51 +316,8 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
         worked,
         xena);
 
-    assertThat(membersAnnounced(worked, before)).containsExactly(xena);
-    assertThat(unitsAnnounced(worked, before)).isEmpty();
-  }
-
-  private long position() {
-    return Objects.requireNonNull(
-        jdbc.queryForObject("SELECT COALESCE(max(seq), 0) FROM exchange_change", Long.class));
-  }
-
-  private Set<UUID> unitsAnnounced(UUID order, long after) {
-    return new HashSet<>(
-        jdbc.queryForList(
-            "SELECT org_unit_id FROM exchange_change WHERE seq > ? AND resource = 'JOB_ORDER'"
-                + " AND entity_key = ? AND org_unit_id IS NOT NULL",
-            UUID.class,
-            after,
-            order.toString()));
-  }
-
-  private Set<UUID> membersAnnounced(UUID order, long after) {
-    return new HashSet<>(
-        jdbc.queryForList(
-            "SELECT user_id FROM exchange_change WHERE seq > ? AND resource = 'JOB_ORDER'"
-                + " AND entity_key = ? AND user_id IS NOT NULL",
-            UUID.class,
-            after,
-            order.toString()));
-  }
-
-  private Set<String> ordersAnnouncedTo(UUID member, long after) {
-    return new HashSet<>(
-        jdbc.queryForList(
-            "SELECT entity_key FROM exchange_change WHERE seq > ? AND resource = 'JOB_ORDER'"
-                + " AND user_id = ?",
-            String.class,
-            after,
-            member));
-  }
-
-  private void join(UUID member, UUID unit) {
-    jdbc.update(
-        "INSERT INTO org_unit_membership (user_id, org_unit_id, role, is_logistician)"
-            + " VALUES (?, ?, 'MEMBER', false)",
-        member,
-        unit);
+    assertThat(changes.membersAnnounced(worked, before)).containsExactly(xena);
+    assertThat(changes.unitsAnnounced(worked, before)).isEmpty();
   }
 
   private UUID printedOrder(UUID requestingUnit, UUID responsibleUnit) {
@@ -420,20 +357,7 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
   }
 
   private UUID order(UUID requestingUnit, UUID responsibleUnit) {
-    UUID id =
-        transactions.execute(_ ->
-            orders
-                .saveAndFlush(
-                    JobOrder.builder()
-                        .requestingOrgUnit(orgUnits.getReferenceById(requestingUnit))
-                        .responsibleOrgUnit(orgUnits.getReferenceById(responsibleUnit))
-                        .handle("feed contact")
-                        .priority(1)
-                        .status(JobOrderStatus.OPEN)
-                        .build())
-                .getId());
-    createdOrders.add(Objects.requireNonNull(id));
-    return id;
+    return seed.order().requesting(requestingUnit).responsible(responsibleUnit).create();
   }
 
   private void support(UUID order, UUID unit, boolean active) {
@@ -444,36 +368,5 @@ class ExchangeJobOrderFeedTriggerIntegrationTest {
         order,
         unit,
         active);
-  }
-
-  private void assignee(UUID order, UUID user) {
-    jdbc.update(
-        "INSERT INTO job_order_assignees (id, job_order_id, user_id, version) VALUES (?, ?, ?, 0)",
-        UUID.randomUUID(),
-        order,
-        user);
-  }
-
-  private @NotNull UUID unit(@NotNull String name) {
-    UUID id = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO org_unit (id, kind, name, shorthand, active) VALUES (?, 'SQUADRON', ?, ?,"
-            + " TRUE)",
-        id,
-        name + " " + id,
-        "F" + id.toString().substring(0, 6));
-    createdUnits.add(id);
-    return id;
-  }
-
-  private @NotNull UUID user(@NotNull String username) {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    user.setUsername(username + "-" + UUID.randomUUID());
-    user.setApprovalStatus(ApprovalStatus.ACTIVE);
-    user.setInKeycloak(true);
-    UUID id = users.saveAndFlush(user).getId();
-    createdUsers.add(id);
-    return id;
   }
 }

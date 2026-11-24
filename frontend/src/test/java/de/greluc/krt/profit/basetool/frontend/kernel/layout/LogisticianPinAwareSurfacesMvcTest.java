@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -43,7 +44,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.
 import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
-import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -137,38 +137,16 @@ class LogisticianPinAwareSurfacesMvcTest {
     backendReports(CapabilitiesResponse.NONE);
     UUID orderId = UUID.randomUUID();
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            7,
-            new SquadronReferenceDto(UUID.randomUUID(), "Responsible", "RESP"),
-            new SquadronReferenceDto(UUID.randomUUID(), "Requester", "REQ"),
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            0L,
-            0L,
-            0L,
-            null,
-            null);
+        jobOrder()
+            .id(orderId)
+            .displayId(7)
+            .responsibleOrgUnit(new SquadronReferenceDto(UUID.randomUUID(), "Responsible", "RESP"))
+            .requestingOrgUnit(new SquadronReferenceDto(UUID.randomUUID(), "Requester", "REQ"))
+            .type("ITEM")
+            .canEdit(false)
+            .canManageAssignees(false)
+            .canTransferResponsibility(false)
+            .build();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
 
