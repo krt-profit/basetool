@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -31,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderResponsibilityGuard;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
@@ -164,12 +164,6 @@ class LogisticianPerUnitSurfacesTest {
     }
   }
 
-  private static Squadron unit(UUID id) {
-    Squadron squadron = new Squadron();
-    squadron.setId(id);
-    return squadron;
-  }
-
   private static void assertReaches(Caller caller, Predicate<UUID> surfaceOfUnit) {
     for (UUID unit : List.of(UNIT_A, UNIT_B, UNIT_C)) {
       assertThat(surfaceOfUnit.test(unit))
@@ -190,7 +184,7 @@ class LogisticianPerUnitSurfacesTest {
         unit -> {
           UUID id = UUID.randomUUID();
           InventoryItem item = new InventoryItem();
-          item.setOwningOrgUnit(unit(unit));
+          item.setOwningOrgUnit(squadron(unit));
           when(items.findById(id)).thenReturn(Optional.of(item));
           return policy.isLogisticianOfItem(id);
         });
@@ -218,7 +212,7 @@ class LogisticianPerUnitSurfacesTest {
   private static UUID orderOf(RefineryOrderRepository orders, UUID unit) {
     UUID id = UUID.randomUUID();
     RefineryOrder order = new RefineryOrder();
-    order.setOwningOrgUnit(unit(unit));
+    order.setOwningOrgUnit(squadron(unit));
     when(orders.findById(id)).thenReturn(Optional.of(order));
     return id;
   }
@@ -252,7 +246,7 @@ class LogisticianPerUnitSurfacesTest {
           UUID id = UUID.randomUUID();
           JobOrder order = new JobOrder();
           order.setId(id);
-          order.setResponsibleOrgUnit(unit(unit));
+          order.setResponsibleOrgUnit(squadron(unit));
           when(orders.findById(id)).thenReturn(Optional.of(order));
           return policy.canEditJobOrder(id) && policy.mayEditJobOrderEarmarks(id);
         });

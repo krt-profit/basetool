@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.persistedProfitSquadron;
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.persistedSquadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
@@ -913,10 +915,7 @@ class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
     UUID nonProfitSquadronId =
         transactionTemplate.execute(status -> {
           String tag = UUID.randomUUID().toString().substring(0, 8);
-          Squadron sq = new Squadron();
-          sq.setName("NonProfit-" + tag);
-          sq.setShorthand("N" + tag);
-          return squadronRepository.save(sq).getId();
+          return persistedSquadron(squadronRepository, "NonProfit-" + tag, "N" + tag, null).getId();
         });
 
     assertThatThrownBy(() ->
@@ -987,16 +986,12 @@ class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
           sk.setShorthand("O" + tag);
           withinProfit(sk, persistedProfitArea(orgUnitRepository));
           sk = specialCommandRepository.save(sk);
-          Squadron sqA = new Squadron();
-          sqA.setName("Orph-A-" + tag);
-          sqA.setShorthand("A" + tag);
-          withinProfit(sqA, persistedProfitArea(orgUnitRepository));
-          sqA = squadronRepository.save(sqA);
-          Squadron sqB = new Squadron();
-          sqB.setName("Orph-B-" + tag);
-          sqB.setShorthand("B" + tag);
-          withinProfit(sqB, persistedProfitArea(orgUnitRepository));
-          sqB = squadronRepository.save(sqB);
+          Squadron sqA =
+              persistedProfitSquadron(
+                  squadronRepository, orgUnitRepository, "Orph-A-" + tag, "A" + tag);
+          Squadron sqB =
+              persistedProfitSquadron(
+                  squadronRepository, orgUnitRepository, "Orph-B-" + tag, "B" + tag);
           Material matA = new Material();
           matA.setName("OrphMatA-" + tag);
           matA.setType(MaterialType.RAW);

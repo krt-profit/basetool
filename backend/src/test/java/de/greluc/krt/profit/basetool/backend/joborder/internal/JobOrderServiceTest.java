@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.profitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static de.greluc.krt.profit.basetool.backend.support.JobOrderDtoFixtures.jobOrder;
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -311,13 +312,9 @@ class JobOrderServiceTest {
 
     responsibleOrgUnitId = UUID.randomUUID();
     requestingOrgUnitId = UUID.randomUUID();
-    Squadron responsible = new Squadron();
-    responsible.setId(responsibleOrgUnitId);
-    responsible.setShorthand("RESP");
+    Squadron responsible = squadron(responsibleOrgUnitId, null, "RESP");
     withinProfit(responsible, profitArea);
-    Squadron requesting = new Squadron();
-    requesting.setId(requestingOrgUnitId);
-    requesting.setShorthand("Alpha");
+    Squadron requesting = squadron(requestingOrgUnitId, null, "Alpha");
     org.mockito.Mockito.lenient().when(authHelperService.isAuthenticated()).thenReturn(true);
     org.mockito.Mockito.lenient()
         .when(orgUnitRepository.findById(responsibleOrgUnitId))
@@ -1103,20 +1100,14 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrder_RetargetsRequesting_AndIgnoresResponsible() {
-    Squadron responsibleOriginal = new Squadron();
-    responsibleOriginal.setId(UUID.randomUUID());
-    responsibleOriginal.setShorthand("RESP");
+    Squadron responsibleOriginal = squadron(UUID.randomUUID(), null, "RESP");
     jobOrder.setResponsibleOrgUnit(responsibleOriginal);
 
-    Squadron requestingOriginal = new Squadron();
-    requestingOriginal.setId(UUID.randomUUID());
-    requestingOriginal.setShorthand("REQ");
+    Squadron requestingOriginal = squadron(UUID.randomUUID(), null, "REQ");
     jobOrder.setRequestingOrgUnit(requestingOriginal);
 
     UUID bravoId = UUID.randomUUID();
-    Squadron bravo = new Squadron();
-    bravo.setId(bravoId);
-    bravo.setShorthand("Bravo");
+    Squadron bravo = squadron(bravoId, null, "Bravo");
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
@@ -1144,9 +1135,7 @@ class JobOrderServiceTest {
 
   @Test
   void reassignResponsibleOrgUnit_currentWriter_movesToSpecialCommand() {
-    Squadron current = new Squadron();
-    current.setId(UUID.randomUUID());
-    current.setShorthand("CUR");
+    Squadron current = squadron(UUID.randomUUID(), null, "CUR");
     jobOrder.setResponsibleOrgUnit(current);
 
     UUID targetId = UUID.randomUUID();
@@ -1174,9 +1163,7 @@ class JobOrderServiceTest {
     newMaterial.setId(newMaterialId);
 
     UUID betaId = UUID.randomUUID();
-    Squadron beta = new Squadron();
-    beta.setId(betaId);
-    beta.setShorthand("Beta");
+    Squadron beta = squadron(betaId, null, "Beta");
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 650, 50.0);
     CreateJobOrderDto updateDto =
@@ -1207,9 +1194,7 @@ class JobOrderServiceTest {
   @Test
   void updateJobOrder_flushesSoReturnedVersionIsFresh() {
     UUID betaId = UUID.randomUUID();
-    Squadron beta = new Squadron();
-    beta.setId(betaId);
-    beta.setShorthand("Beta");
+    Squadron beta = squadron(betaId, null, "Beta");
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
         new CreateJobOrderDto(
@@ -1335,12 +1320,8 @@ class JobOrderServiceTest {
     itemOrder.setType(JobOrderType.ITEM);
     itemOrder.setVersion(1L);
     itemOrder.setHandle("Tester");
-    Squadron responsibleUnit = new Squadron();
-    responsibleUnit.setId(UUID.randomUUID());
-    responsibleUnit.setShorthand("RESP");
-    Squadron requestingUnit = new Squadron();
-    requestingUnit.setId(UUID.randomUUID());
-    requestingUnit.setShorthand("REQ");
+    Squadron responsibleUnit = squadron(UUID.randomUUID(), null, "RESP");
+    Squadron requestingUnit = squadron(UUID.randomUUID(), null, "REQ");
     itemOrder.setResponsibleOrgUnit(responsibleUnit);
     itemOrder.setRequestingOrgUnit(requestingUnit);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(itemOrder));
@@ -1398,12 +1379,8 @@ class JobOrderServiceTest {
     itemOrder.setType(JobOrderType.ITEM);
     itemOrder.setVersion(1L);
     itemOrder.setHandle("Tester");
-    Squadron responsibleUnit = new Squadron();
-    responsibleUnit.setId(UUID.randomUUID());
-    responsibleUnit.setShorthand("RESP");
-    Squadron requestingUnit = new Squadron();
-    requestingUnit.setId(UUID.randomUUID());
-    requestingUnit.setShorthand("REQ");
+    Squadron responsibleUnit = squadron(UUID.randomUUID(), null, "RESP");
+    Squadron requestingUnit = squadron(UUID.randomUUID(), null, "REQ");
     itemOrder.setResponsibleOrgUnit(responsibleUnit);
     itemOrder.setRequestingOrgUnit(requestingUnit);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(itemOrder));
@@ -1916,9 +1893,7 @@ class JobOrderServiceTest {
   @Test
   void reassignResponsibleOrgUnit_currentWriter_escalatesSquadronToSk() {
     UUID currentId = UUID.randomUUID();
-    Squadron current = new Squadron();
-    current.setId(currentId);
-    current.setShorthand("CUR");
+    Squadron current = squadron(currentId, null, "CUR");
     jobOrder.setResponsibleOrgUnit(current);
 
     UUID targetId = UUID.randomUUID();
@@ -1943,15 +1918,11 @@ class JobOrderServiceTest {
   @Test
   void reassignResponsibleOrgUnit_currentWriter_movesToAnotherSquadron() {
     UUID currentId = UUID.randomUUID();
-    Squadron current = new Squadron();
-    current.setId(currentId);
-    current.setShorthand("CUR");
+    Squadron current = squadron(currentId, null, "CUR");
     jobOrder.setResponsibleOrgUnit(current);
 
     UUID targetId = UUID.randomUUID();
-    Squadron target = new Squadron();
-    target.setId(targetId);
-    target.setShorthand("OTHER");
+    Squadron target = squadron(targetId, null, "OTHER");
     withinProfit(target, profitArea);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
@@ -1994,9 +1965,7 @@ class JobOrderServiceTest {
   @Test
   void reassignResponsibleOrgUnit_withoutCurrentWriter_isDenied() {
     UUID currentId = UUID.randomUUID();
-    Squadron current = new Squadron();
-    current.setId(currentId);
-    current.setShorthand("FOREIGN");
+    Squadron current = squadron(currentId, null, "FOREIGN");
     jobOrder.setResponsibleOrgUnit(current);
 
     UUID targetId = UUID.randomUUID();
