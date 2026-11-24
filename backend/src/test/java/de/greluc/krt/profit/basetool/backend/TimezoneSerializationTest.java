@@ -166,6 +166,7 @@ class TimezoneSerializationTest {
         "{"
             + "\"jobOrderNumber\":\"#42\","
             + "\"handoverTime\":\"2026-03-03T14:00:00\","
+            + "\"handingOverHandle\":\"Chewie\","
             + "\"recipientHandle\":\"HanSolo\","
             + "\"items\":[]"
             + "}";
@@ -186,7 +187,7 @@ class TimezoneSerializationTest {
       throws Exception {
     HandoverReportPreviewRequestDto dto =
         new HandoverReportPreviewRequestDto(
-            "#1", LocalDateTime.of(2026, 3, 3, 14, 0), "HanSolo", List.of());
+            "#1", LocalDateTime.of(2026, 3, 3, 14, 0), "Chewie", "HanSolo", List.of());
 
     String json = objectMapper.writeValueAsString(dto);
     HandoverReportPreviewRequestDto roundTripped =

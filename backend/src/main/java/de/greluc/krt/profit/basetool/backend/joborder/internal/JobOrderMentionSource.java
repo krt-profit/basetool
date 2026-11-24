@@ -52,8 +52,20 @@ public class JobOrderMentionSource implements PersonMentionSource {
             LinkKind.JOB_ORDER),
         new Target(
             "JOB_ORDER",
+            "job_order_handover",
+            "handing_over_handle",
+            "job_order_id",
+            LinkKind.JOB_ORDER),
+        new Target(
+            "JOB_ORDER",
             "job_order_item_handover",
             "recipient_handle",
+            "job_order_id",
+            LinkKind.JOB_ORDER),
+        new Target(
+            "JOB_ORDER",
+            "job_order_item_handover",
+            "handing_over_handle",
             "job_order_id",
             LinkKind.JOB_ORDER),
         new Target(

@@ -30,12 +30,25 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Frontend mirror of the backend's {@code JobOrderHandoverDto}, including the executing user and
  * squadron snapshot, which may be {@code null}.
+ *
+ * @param id the handover id
+ * @param jobOrderId the parent order id
+ * @param handoverTime when the handover occurred (UTC)
+ * @param handingOverHandle the handle snapshot of the member of the processing unit who handed the
+ *     materials over, or {@code null} when none was recorded
+ * @param recipientHandle the recipient's handle
+ * @param recipientSquadron the recipient's squadron name, or {@code null}
+ * @param executingUser slim reference to the user who recorded the handover, or {@code null}
+ * @param executingSquadron snapshot of that user's squadron, or {@code null}
+ * @param items the handed-over materials
+ * @param version optimistic-lock version
  */
 @DtoMirror
 public record JobOrderHandoverDto(
     UUID id,
     UUID jobOrderId,
     Instant handoverTime,
+    @Nullable String handingOverHandle,
     String recipientHandle,
     String recipientSquadron,
     @Nullable UserReferenceDto executingUser,

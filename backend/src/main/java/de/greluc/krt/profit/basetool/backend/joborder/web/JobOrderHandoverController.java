@@ -24,6 +24,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverGiverDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverGivers;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverCreateDto;
@@ -41,6 +43,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -71,6 +74,7 @@ public class JobOrderHandoverController {
   private final JobOrderItemHandoverReportService jobOrderItemHandoverReportService;
   private final JobOrderHandoverService jobOrderHandoverService;
   private final JobOrderHandoverReportService jobOrderHandoverReportService;
+  private final JobOrderHandoverGivers jobOrderHandoverGivers;
 
   /**
    * Records a materials handover for the job order, unlinking the handed-over items with a single
@@ -89,6 +93,24 @@ public class JobOrderHandoverController {
   public JobOrderHandoverDto createHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
     return jobOrderHandoverService.createHandover(id, dto);
+  }
+
+  /**
+   * Lists the members of the order's processing unit who may be named as handing a handover over
+   * (REQ-ORDERS-079). Same authorisation as recording a handover.
+   *
+   * @param id job-order id
+   * @return the active direct members of the processing unit, ordered by handle
+   */
+  @GetMapping("/{id}/handover-givers")
+  @Operation(
+      summary = "List the possible handing-over members",
+      description =
+          "Lists the active direct members of the order's processing unit, one of whom a material"
+              + " or item handover must name as handing it over.")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id)")
+  public List<JobOrderHandoverGiverDto> handoverGivers(@PathVariable UUID id) {
+    return jobOrderHandoverGivers.candidates(id);
   }
 
   /**

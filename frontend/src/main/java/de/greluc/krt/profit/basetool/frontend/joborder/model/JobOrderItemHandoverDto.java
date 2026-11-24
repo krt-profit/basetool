@@ -34,6 +34,8 @@ import org.jetbrains.annotations.Nullable;
  * @param id the handover id
  * @param jobOrderId the parent order id
  * @param handoverTime when the handover occurred (UTC)
+ * @param handingOverHandle the handle snapshot of the member of the processing unit who handed the
+ *     items over, or {@code null} when none was recorded
  * @param recipientHandle the recipient's handle
  * @param executingUser slim reference to the executing user, or {@code null}
  * @param executingSquadron snapshot of that user's squadron, or {@code null}
@@ -45,6 +47,7 @@ public record JobOrderItemHandoverDto(
     UUID id,
     UUID jobOrderId,
     Instant handoverTime,
+    @Nullable String handingOverHandle,
     String recipientHandle,
     @Nullable UserReferenceDto executingUser,
     @Nullable SquadronReferenceDto executingSquadron,

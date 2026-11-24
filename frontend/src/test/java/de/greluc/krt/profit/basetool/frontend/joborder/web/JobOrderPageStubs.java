@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateUnitOptionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverGiverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -98,6 +99,8 @@ final class JobOrderPageStubs {
     private JobOrderPageReader.Part<List<InventoryItemDto>> orphanedInventory =
         JobOrderPageReader.Part.absent();
     private List<OrgUnitMembershipOptionDto> claimingOptions = List.of();
+    private JobOrderPageReader.Part<List<JobOrderHandoverGiverDto>> handoverGivers =
+        JobOrderPageReader.Part.absent();
 
     private DetailBuilder(JobOrderDto order) {
       this.order = order;
@@ -200,6 +203,17 @@ final class JobOrderPageStubs {
     }
 
     /**
+     * Sets the members a handover may name as handing it over.
+     *
+     * @param givers the possible handing-over members
+     * @return this builder
+     */
+    DetailBuilder handoverGivers(List<JobOrderHandoverGiverDto> givers) {
+      this.handoverGivers = JobOrderPageReader.Part.of(givers);
+      return this;
+    }
+
+    /**
      * Builds the page with the default aging thresholds.
      *
      * @return the detail page
@@ -221,7 +235,8 @@ final class JobOrderPageStubs {
           List.of(),
           claimingOptions,
           JobOrderPageReader.Part.absent(),
-          JobOrderPageReader.Part.absent());
+          JobOrderPageReader.Part.absent(),
+          handoverGivers);
     }
   }
 

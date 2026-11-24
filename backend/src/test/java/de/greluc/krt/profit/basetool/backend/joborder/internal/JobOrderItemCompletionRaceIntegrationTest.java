@@ -77,8 +77,8 @@ class JobOrderItemCompletionRaceIntegrationTest extends MaterialContributionTest
     String gate = "item_delivery_gate_" + UUID.randomUUID().toString().replace("-", "");
     String firstTable = gate + "_a";
     String secondTable = gate + "_b";
-    String firstPayload = payload(fixture.firstLine());
-    String secondPayload = payload(fixture.secondLine());
+    String firstPayload = payload(fixture.actor(), fixture.firstLine());
+    String secondPayload = payload(fixture.actor(), fixture.secondLine());
     try {
       createGates(gate, firstTable, secondTable, fixture);
       AtomicInteger firstPid = new AtomicInteger();
@@ -144,10 +144,11 @@ class JobOrderItemCompletionRaceIntegrationTest extends MaterialContributionTest
     }
   }
 
-  private String payload(UUID line) {
+  private String payload(UUID giver, UUID line) {
     return json.writeValueAsString(
         new JobOrderItemHandoverCreateDto(
             Instant.now(),
+            giver,
             "Completion race recipient",
             List.of(new JobOrderItemHandoverEntryCreateDto(line, 1))));
   }
@@ -256,6 +257,10 @@ class JobOrderItemCompletionRaceIntegrationTest extends MaterialContributionTest
           actor.setInKeycloak(true);
           actor = users.saveAndFlush(actor);
           var order = jobOrderRepository.findById(base.orderId()).orElseThrow();
+          jdbc.update(
+              "INSERT INTO org_unit_membership (user_id, org_unit_id) VALUES (?, ?)",
+              actor.getId(),
+              order.getResponsibleOrgUnit().getId());
           order.setType(JobOrderType.ITEM);
           order.getMaterials().clear();
           List<UUID> itemIds = new ArrayList<>();
@@ -305,6 +310,7 @@ class JobOrderItemCompletionRaceIntegrationTest extends MaterialContributionTest
       blueprints.flush();
       gameItems.deleteAllById(fixture.items());
       materialRepository.deleteById(fixture.base().materialId());
+      jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", fixture.actor());
       users.deleteById(fixture.actor());
       orgUnitRepository.deleteAllById(
           List.of(
@@ -313,7 +319,8 @@ class JobOrderItemCompletionRaceIntegrationTest extends MaterialContributionTest
   }
 
   /**
-   * The independently persisted order, two completed production lines and their synthetic actor.
+   * The independently persisted order, two completed production lines and their synthetic actor, a
+   * direct member of the processing unit who is also named as handing the items over.
    */
   private record RaceFixture(
       Fixture base,

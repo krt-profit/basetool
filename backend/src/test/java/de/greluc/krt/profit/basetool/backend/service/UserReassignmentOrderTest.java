@@ -70,7 +70,9 @@ class UserReassignmentOrderTest {
           "100:JobOrderUserReassignment|job_order_assignees.user_id[job_order_id]"
               + ",job_order_money_holder.user_id[order_id],job_order_money_recipient.user_id"
               + "|job_order.created_by_member_id,"
-              + "job_order_handover.executing_user_id,job_order_item_handover.executing_user_id,"
+              + "job_order_handover.executing_user_id,job_order_handover.handing_over_user_id,"
+              + "job_order_item_handover.executing_user_id,"
+              + "job_order_item_handover.handing_over_user_id,"
               + "material_claim.claimed_by_user_id,job_order_money_operation.actor_id,"
               + "job_order_money_operation.selected_user_id,"
               + "job_order_linked_money_attempt.actor_id,job_order_linked_money_attempt.decision_actor_id,"
@@ -144,7 +146,7 @@ class UserReassignmentOrderTest {
   void noColumnIsDeclaredTwice() {
     List<String> all = new ArrayList<>(mergeService.followedColumns());
     all.addAll(mergeService.staysWithTheAct());
-    assertThat(all).doesNotHaveDuplicates().hasSize(90);
+    assertThat(all).doesNotHaveDuplicates().hasSize(92);
   }
 
   private static List<String> describe(List<UserReassignmentParticipant> participants) {

@@ -134,6 +134,13 @@ public final class HandleErasureCoverage {
               "A recipient with no user id beside them; matched by text, case-insensitively."),
           anonymised("job_order_item_handover.recipient_handle", "See job_order_handover."),
           anonymised(
+              "job_order_handover.handing_over_handle",
+              "The handing-over member's snapshot, matched by handing_over_user_id while the"
+                  + " account still exists."),
+          anonymised(
+              "job_order_item_handover.handing_over_handle",
+              "See job_order_handover.handing_over_handle."),
+          anonymised(
               "job_order_money_holder.accountless_name",
               "Replaces the linked holder's fallback label by account ID and accountless labels"
                   + " by whole spelling."),

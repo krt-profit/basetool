@@ -43,6 +43,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -69,20 +70,51 @@ class JobOrderNameRetentionTest {
   @Test
   void aClosedOrderLastChangedBeforeTheCutoffLosesItsNames() {
     UUID old = closedOrder("Old Requester", CUTOFF.minus(1, ChronoUnit.DAYS));
-    UUID oldHandover = handover(old, "Old Recipient");
+    UUID oldHandover = materialHandover(old, "Old Recipient", "Old Giver");
+    UUID oldHandoverWithoutGiver = materialHandover(old, "Second Recipient", null);
+    UUID oldItemHandover = itemHandover(old, "Old Item Recipient", "Old Item Giver");
+    UUID oldItemHandoverWithoutGiver = itemHandover(old, "Second Item Recipient", null);
     UUID oldHolder = accountlessHolder(old, "Old Holder");
     UUID recent = closedOrder("Recent Requester", CUTOFF.plus(1, ChronoUnit.DAYS));
-    UUID recentHandover = handover(recent, "Recent Recipient");
+    UUID recentHandover = materialHandover(recent, "Recent Recipient", "Recent Giver");
+    UUID recentItemHandover = itemHandover(recent, "Recent Item Recipient", "Recent Item Giver");
 
-    assertThat(retention.removeNamesBefore(CUTOFF)).isGreaterThanOrEqualTo(3);
+    assertThat(retention.removeNamesBefore(CUTOFF)).isGreaterThanOrEqualTo(6);
 
     assertThat(text("job_order", "handle", old)).isEqualTo(SENTINEL);
     assertThat(text("job_order_handover", "recipient_handle", oldHandover)).isEqualTo(SENTINEL);
+    assertThat(text("job_order_handover", "handing_over_handle", oldHandover)).isEqualTo(SENTINEL);
+    assertThat(text("job_order_handover", "recipient_handle", oldHandoverWithoutGiver))
+        .isEqualTo(SENTINEL);
+    assertThat(text("job_order_handover", "handing_over_handle", oldHandoverWithoutGiver)).isNull();
+    assertThat(text("job_order_item_handover", "recipient_handle", oldItemHandover))
+        .isEqualTo(SENTINEL);
+    assertThat(text("job_order_item_handover", "handing_over_handle", oldItemHandover))
+        .isEqualTo(SENTINEL);
+    assertThat(text("job_order_item_handover", "handing_over_handle", oldItemHandoverWithoutGiver))
+        .isNull();
     assertThat(text("job_order_money_holder", "accountless_name", oldHolder)).isEqualTo(SENTINEL);
     assertThat(text("job_order", "handle", recent)).isEqualTo("Recent Requester");
     assertThat(text("job_order_handover", "recipient_handle", recentHandover))
         .isEqualTo("Recent Recipient");
+    assertThat(text("job_order_handover", "handing_over_handle", recentHandover))
+        .isEqualTo("Recent Giver");
+    assertThat(text("job_order_item_handover", "handing_over_handle", recentItemHandover))
+        .isEqualTo("Recent Item Giver");
     assertThat(retention.removeNamesBefore(CUTOFF)).isZero();
+  }
+
+  /** An old order whose only remaining names are handing-over handles is still cleared. */
+  @Test
+  void anOrderWhoseOnlyNamesAreHandingOverHandlesIsCleared() {
+    UUID old = closedOrder(SENTINEL, CUTOFF.minus(1, ChronoUnit.DAYS));
+    UUID materialRow = materialHandover(old, SENTINEL, "Lone Giver");
+    UUID itemRow = itemHandover(old, SENTINEL, "Lone Item Giver");
+
+    assertThat(retention.removeNamesBefore(CUTOFF)).isGreaterThanOrEqualTo(2);
+
+    assertThat(text("job_order_handover", "handing_over_handle", materialRow)).isEqualTo(SENTINEL);
+    assertThat(text("job_order_item_handover", "handing_over_handle", itemRow)).isEqualTo(SENTINEL);
   }
 
   @Test
@@ -108,14 +140,26 @@ class JobOrderNameRetentionTest {
     return id;
   }
 
-  private UUID handover(UUID order, String recipient) {
+  private UUID materialHandover(UUID order, String recipient, @Nullable String handingOverHandle) {
+    return handover("job_order_handover", order, recipient, handingOverHandle);
+  }
+
+  private UUID itemHandover(UUID order, String recipient, @Nullable String handingOverHandle) {
+    return handover("job_order_item_handover", order, recipient, handingOverHandle);
+  }
+
+  private UUID handover(
+      String table, UUID order, String recipient, @Nullable String handingOverHandle) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO job_order_handover (id, job_order_id, handover_time, recipient_handle,"
-            + " created_at, updated_at, version) VALUES (?, ?, now(), ?, now(), now(), 0)",
+        "INSERT INTO "
+            + table
+            + " (id, job_order_id, handover_time, recipient_handle, handing_over_handle,"
+            + " created_at, updated_at, version) VALUES (?, ?, now(), ?, ?, now(), now(), 0)",
         id,
         order,
-        recipient);
+        recipient,
+        handingOverHandle);
     return id;
   }
 

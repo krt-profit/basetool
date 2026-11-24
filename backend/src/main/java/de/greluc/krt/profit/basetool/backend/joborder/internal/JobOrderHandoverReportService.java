@@ -110,7 +110,14 @@ public class JobOrderHandoverReportService {
             .sorted(ITEM_COMPARATOR)
             .toList();
 
-    return buildPdf(jobOrderNumber, handoverDate, handoverTime, localTime, recipientHandle, rows);
+    return buildPdf(
+        jobOrderNumber,
+        handoverDate,
+        handoverTime,
+        localTime,
+        handover.getHandingOverHandle(),
+        recipientHandle,
+        rows);
   }
 
   /**
@@ -139,7 +146,13 @@ public class JobOrderHandoverReportService {
             .toList();
 
     return buildPdf(
-        dto.jobOrderNumber(), handoverDate, handoverTime, true, dto.recipientHandle(), rows);
+        dto.jobOrderNumber(),
+        handoverDate,
+        handoverTime,
+        true,
+        dto.handingOverHandle(),
+        dto.recipientHandle(),
+        rows);
   }
 
   private static final Comparator<ItemRow> ITEM_COMPARATOR =
@@ -152,12 +165,19 @@ public class JobOrderHandoverReportService {
       @NotNull String handoverDate,
       @NotNull String handoverTime,
       boolean localTime,
+      @Nullable String handingOverHandle,
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
       try (KrtPdfDocument pdf = pdfDocuments.open(baos, labels.title())) {
         pdf.keyValueTable(
-            labels.header(jobOrderNumber, handoverDate, handoverTime, localTime, recipientHandle));
+            labels.header(
+                jobOrderNumber,
+                handoverDate,
+                handoverTime,
+                localTime,
+                handingOverHandle,
+                recipientHandle));
         pdf.heading(labels.resolve("pdf.handover.materials"));
         try (PdfDataTable table =
             pdf.dataTable(

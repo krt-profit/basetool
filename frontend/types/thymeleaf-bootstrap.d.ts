@@ -309,6 +309,8 @@ declare const MSG_HANDOVER_REPORT_VALIDATION_AMOUNT: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_HANDOVER_REPORT_VALIDATION_DATE: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
+declare const MSG_HANDOVER_REPORT_VALIDATION_HANDING_OVER: string;
+/** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_HANDOVER_REPORT_VALIDATION_HANDLE: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_HANDOVER_REPORT_VALIDATION_ITEMS: string;

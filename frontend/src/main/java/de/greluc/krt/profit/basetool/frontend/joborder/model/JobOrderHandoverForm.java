@@ -29,6 +29,10 @@ import lombok.Data;
 @Data
 public class JobOrderHandoverForm {
   private String handoverTime;
+
+  /** The member of the processing unit who handed the materials over (REQ-ORDERS-079). */
+  private UUID handingOverUserId;
+
   private String recipientHandle;
   private String recipientSquadron;
   private List<JobOrderHandoverItemForm> items = new ArrayList<>();

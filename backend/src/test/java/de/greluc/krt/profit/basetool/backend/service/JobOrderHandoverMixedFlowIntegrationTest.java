@@ -206,6 +206,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
     JobOrderHandoverCreateDto firstDto =
         new JobOrderHandoverCreateDto(
             Instant.now(),
+            f.actorId(),
             "swing-by",
             "KARTELL",
             List.of(
@@ -248,6 +249,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
     JobOrderHandoverCreateDto secondDto =
         new JobOrderHandoverCreateDto(
             Instant.now(),
+            f.actorId(),
             "swing-by",
             "KARTELL",
             List.of(new JobOrderHandoverItemCreateDto(f.invItem2Id(), 3.7, null, null)));

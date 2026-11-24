@@ -62,6 +62,7 @@ class JobOrderItemHandoverPlanningIntegrationTest extends MaterialContributionTe
     var request =
         new JobOrderItemHandoverCreateDto(
             Instant.now(),
+            handingOverMember(fixture),
             "Handover recipient",
             sources.stream()
                 .map(source -> new JobOrderItemHandoverEntryCreateDto(source.lineId(), 1))
@@ -127,6 +128,7 @@ class JobOrderItemHandoverPlanningIntegrationTest extends MaterialContributionTe
     var request =
         new JobOrderItemHandoverCreateDto(
             Instant.now(),
+            handingOverMember(fixture),
             "Handover recipient",
             sources.stream()
                 .map(source -> new JobOrderItemHandoverEntryCreateDto(source.lineId(), 2))

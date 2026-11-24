@@ -29,12 +29,14 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -65,6 +67,7 @@ import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -82,6 +85,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 })
 class JobOrderItemHandoverServiceTest {
 
+  private static final UUID GIVER_ID = UUID.randomUUID();
+  private static final String GIVER_HANDLE = "Chewie";
+
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
 
   @Mock private JobOrderRepository jobOrderRepository;
@@ -94,9 +100,11 @@ class JobOrderItemHandoverServiceTest {
   @Mock private UserService userService;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private AuditService auditService;
+  @Mock private JobOrderHandoverGivers givers;
   private JobOrderItemHandoverService service;
   private final Map<UUID, InventoryItem> sourceRows = new HashMap<>();
 
+  private User giver;
   private UUID orderId;
   private UUID lineId;
   private UUID gameItemId;
@@ -166,7 +174,8 @@ class JobOrderItemHandoverServiceTest {
             userService,
             null,
             orgUnitRepository,
-            auditService);
+            auditService,
+            givers);
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     gameItemId = UUID.randomUUID();
@@ -189,6 +198,13 @@ class JobOrderItemHandoverServiceTest {
         JobOrder.builder().id(orderId).type(JobOrderType.ITEM).status(JobOrderStatus.OPEN).build();
     order.addItem(line);
 
+    giver = new User();
+    giver.setId(GIVER_ID);
+    giver.setUsername("chewie");
+    giver.setDisplayName(GIVER_HANDLE);
+    lenient()
+        .when(givers.require(order, GIVER_ID))
+        .thenReturn(new JobOrderHandoverGivers.Giver(giver, GIVER_HANDLE));
     lenient().when(userService.getCurrentUser()).thenReturn(Optional.empty());
     lenient()
         .when(jobOrderItemHandoverRepository.save(any(JobOrderItemHandover.class)))
@@ -210,6 +226,7 @@ class JobOrderItemHandoverServiceTest {
                 UUID.randomUUID(),
                 orderId,
                 Instant.parse("2026-01-01T00:00:00Z"),
+                "Giver",
                 "recipient",
                 null,
                 null,
@@ -295,6 +312,61 @@ class JobOrderItemHandoverServiceTest {
     assertThatThrownBy(() -> service.createItemHandover(orderId, payload(lineId, 1)))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(JobOrderStockErrors.ITEM_ORDER_REQUIRED);
+  }
+
+  /**
+   * The item handover names the member who handed it over with their handle snapshot, and the audit
+   * event targets that member (REQ-ORDERS-079).
+   */
+  @Test
+  void createItemHandoverStampsTheHandingOverMemberAndAuditsThemAsTarget() {
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+    service.createItemHandover(orderId, payload(lineId, 2));
+
+    ArgumentCaptor<JobOrderItemHandover> saved =
+        ArgumentCaptor.forClass(JobOrderItemHandover.class);
+    verify(jobOrderItemHandoverRepository).save(saved.capture());
+    assertThat(saved.getValue().getHandingOverUser()).isSameAs(giver);
+    assertThat(saved.getValue().getHandingOverHandle()).isEqualTo(GIVER_HANDLE);
+    assertThat(saved.getValue().getRecipientHandle()).isEqualTo("recipient");
+    verify(auditService)
+        .record(
+            eq(AuditEventType.JOB_ORDER_ITEM_HANDOVER_CREATED),
+            eq(orderId),
+            any(),
+            eq(GIVER_ID),
+            any());
+  }
+
+  /**
+   * A handing-over member outside the processing unit fails the item handover before any delivered
+   * count, stock row or record is touched (REQ-ORDERS-079).
+   */
+  @Test
+  void createItemHandoverRejectsAGiverOutsideTheProcessingUnitBeforeAnyChange() {
+    UUID outsider = UUID.randomUUID();
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(givers.require(order, outsider))
+        .thenThrow(new BadRequestException(JobOrderStockErrors.HANDING_OVER_NOT_MEMBER));
+    JobOrderItemHandoverCreateDto dto =
+        new JobOrderItemHandoverCreateDto(
+            Instant.parse("2026-01-01T00:00:00Z"),
+            outsider,
+            "recipient",
+            List.of(new JobOrderItemHandoverEntryCreateDto(lineId, 2)));
+
+    assertThatThrownBy(() -> service.createItemHandover(orderId, dto))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(JobOrderStockErrors.HANDING_OVER_NOT_MEMBER);
+    assertThat(line.getDeliveredAmount()).isZero();
+    verifyNoInteractions(
+        inventoryItemRepository,
+        offerRatchet,
+        responsibilityGuard,
+        jobOrderItemHandoverRepository,
+        jobOrderService,
+        auditService);
   }
 
   @Test
@@ -440,6 +512,7 @@ class JobOrderItemHandoverServiceTest {
         orderId,
         new JobOrderItemHandoverCreateDto(
             Instant.parse("2026-01-01T00:00:00Z"),
+            GIVER_ID,
             "recipient",
             List.of(
                 new JobOrderItemHandoverEntryCreateDto(lineId, 3),
@@ -540,6 +613,7 @@ class JobOrderItemHandoverServiceTest {
   private static JobOrderItemHandoverCreateDto payload(UUID jobOrderItemId, int amount) {
     return new JobOrderItemHandoverCreateDto(
         Instant.parse("2026-01-01T00:00:00Z"),
+        GIVER_ID,
         "recipient",
         List.of(new JobOrderItemHandoverEntryCreateDto(jobOrderItemId, amount)));
   }

@@ -107,7 +107,13 @@ public class JobOrderItemHandoverReportService {
             .toList();
 
     return buildPdf(
-        jobOrderNumber, handoverDate, handoverTime, localTime, handover.getRecipientHandle(), rows);
+        jobOrderNumber,
+        handoverDate,
+        handoverTime,
+        localTime,
+        handover.getHandingOverHandle(),
+        handover.getRecipientHandle(),
+        rows);
   }
 
   private byte @NotNull [] buildPdf(
@@ -115,12 +121,19 @@ public class JobOrderItemHandoverReportService {
       @NotNull String handoverDate,
       @NotNull String handoverTime,
       boolean localTime,
+      @Nullable String handingOverHandle,
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
       try (KrtPdfDocument pdf = pdfDocuments.open(baos, labels.title())) {
         pdf.keyValueTable(
-            labels.header(jobOrderNumber, handoverDate, handoverTime, localTime, recipientHandle));
+            labels.header(
+                jobOrderNumber,
+                handoverDate,
+                handoverTime,
+                localTime,
+                handingOverHandle,
+                recipientHandle));
         pdf.heading(labels.resolve("pdf.handover.items"));
         try (PdfDataTable table =
             pdf.dataTable(

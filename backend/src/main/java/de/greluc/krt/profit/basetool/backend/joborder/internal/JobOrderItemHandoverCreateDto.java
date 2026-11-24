@@ -26,15 +26,19 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Create payload for an item handover of one or more produced item quantities to a recipient.
  *
  * @param handoverTime when the handover occurred (UTC)
+ * @param handingOverUserId the member of the processing unit who handed the items over
+ *     (REQ-ORDERS-079)
  * @param recipientHandle the recipient's handle (≤ 255 chars)
  * @param entries the delivered item-line quantities (at least one)
  */
 public record JobOrderItemHandoverCreateDto(
     @NotNull Instant handoverTime,
+    @NotNull UUID handingOverUserId,
     @NotBlank @Size(max = 255) String recipientHandle,
     @NotEmpty List<@Valid JobOrderItemHandoverEntryCreateDto> entries) {}

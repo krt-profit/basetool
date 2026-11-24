@@ -601,7 +601,7 @@ class JobOrderPageReaderTest {
   void itemEditBlocksAnOrderWithItemHandovers() {
     JobOrderItemHandoverDto handover =
         new JobOrderItemHandoverDto(
-            UUID.randomUUID(), ID, Instant.now(), "R", null, null, List.of(), 1L);
+            UUID.randomUUID(), ID, Instant.now(), null, "R", null, null, List.of(), 1L);
     when(client.order(ID)).thenReturn(order("ITEM", false, List.of(handover)));
 
     JobOrderPageReader.ItemEditPage edit = reader.readItemEdit(ID);

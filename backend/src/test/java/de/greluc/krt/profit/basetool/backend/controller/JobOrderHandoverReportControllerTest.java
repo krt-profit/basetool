@@ -105,6 +105,7 @@ class JobOrderHandoverReportControllerTest {
         new HandoverReportPreviewRequestDto(
             "#42",
             LocalDateTime.now(),
+            "Giver",
             "PreviewPilot",
             List.of(
                 new HandoverReportPreviewRequestDto.HandoverReportItemDto(
@@ -129,7 +130,7 @@ class JobOrderHandoverReportControllerTest {
   void previewHandoverReport_shouldPropagateServiceException() {
     UUID jobOrderId = UUID.randomUUID();
     HandoverReportPreviewRequestDto dto =
-        new HandoverReportPreviewRequestDto("#1", LocalDateTime.now(), "Pilot", List.of());
+        new HandoverReportPreviewRequestDto("#1", LocalDateTime.now(), "Giver", "Pilot", List.of());
 
     when(jobOrderHandoverReportService.generateHandoverReportPreview(any()))
         .thenThrow(new RuntimeException("PDF generation failed"));

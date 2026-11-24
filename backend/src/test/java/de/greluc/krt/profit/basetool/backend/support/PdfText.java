@@ -19,18 +19,20 @@
 
 package de.greluc.krt.profit.basetool.backend.support;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.io.IOException;
 import org.jetbrains.annotations.NotNull;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
 
-/** Extracts the visible text of a rendered PDF so a test can assert on what a reader sees. */
+/** Reads the text a reader sees in a rendered PDF, for assertions on generated reports. */
 public final class PdfText {
 
   private PdfText() {}
 
   /**
-   * Returns the text of every page, one page per line block.
+   * Extracts the text of every page in page order.
    *
    * @param pdf the rendered PDF
    * @return the text of all pages, each followed by a line break
@@ -48,5 +50,25 @@ public final class PdfText {
     } finally {
       reader.close();
     }
+  }
+
+  /**
+   * Returns the value of a label/value row: the text between its label and the label of the row
+   * after it, trimmed. Every whitespace run counts as one space, so a wrapped cell still matches.
+   *
+   * @param text the extracted text
+   * @param label the row's label
+   * @param nextLabel the label of the following row
+   * @return the row's value
+   */
+  public static @NotNull String rowValue(
+      @NotNull String text, @NotNull String label, @NotNull String nextLabel) {
+    String flat = text.replaceAll("\\s+", " ");
+    int start = flat.indexOf(label);
+    assertThat(start).as("label '%s' in:%n%s", label, text).isNotNegative();
+    int valueStart = start + label.length();
+    int end = flat.indexOf(nextLabel, valueStart);
+    assertThat(end).as("label '%s' after '%s' in:%n%s", nextLabel, label, text).isNotNegative();
+    return flat.substring(valueStart, end).strip();
   }
 }

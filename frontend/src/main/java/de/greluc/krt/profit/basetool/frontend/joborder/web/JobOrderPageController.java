@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendCli
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverForm;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverGiverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
@@ -380,15 +381,20 @@ public class JobOrderPageController {
     model.addAttribute("ageYellowDays", detail.ageYellowDays());
     model.addAttribute("ageRedDays", detail.ageRedDays());
 
+    addPart(model, "handoverGivers", detail.handoverGivers());
+    UUID defaultGiver = defaultHandoverGiver(detail);
     if (!model.containsAttribute("handoverForm")) {
       JobOrderHandoverForm handoverForm = new JobOrderHandoverForm();
+      handoverForm.setHandingOverUserId(defaultGiver);
       handoverForm.setRecipientSquadron(
           order.requestingOrgUnit() != null ? order.requestingOrgUnit().shorthand() : null);
       model.addAttribute("handoverForm", handoverForm);
     }
 
     if (!model.containsAttribute("itemHandoverForm")) {
-      model.addAttribute("itemHandoverForm", new JobOrderItemHandoverForm());
+      JobOrderItemHandoverForm itemHandoverForm = new JobOrderItemHandoverForm();
+      itemHandoverForm.setHandingOverUserId(defaultGiver);
+      model.addAttribute("itemHandoverForm", itemHandoverForm);
     }
     model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
     model.addAttribute("isFullyDelivered", isFullyDelivered(order));
@@ -398,6 +404,24 @@ public class JobOrderPageController {
     addPart(model, "itemBlueprintOwners", detail.blueprintOwners());
     addPart(model, "itemStockByGameItem", detail.itemStockByGameItem());
     addPart(model, "orphanedInventory", detail.orphanedInventory());
+  }
+
+  /**
+   * Picks the member both handover forms name by default: the caller, when they may be named
+   * (REQ-ORDERS-079).
+   *
+   * @param detail the detail page
+   * @return the caller's user id when it is among the possible handing-over members, else {@code
+   *     null}
+   */
+  @Nullable
+  private static UUID defaultHandoverGiver(@NotNull JobOrderPageReader.OrderDetailPage detail) {
+    List<JobOrderHandoverGiverDto> givers = detail.handoverGivers().value();
+    return detail
+        .currentUserId()
+        .filter(caller ->
+            givers != null && givers.stream().anyMatch(giver -> caller.equals(giver.id())))
+        .orElse(null);
   }
 
   /**

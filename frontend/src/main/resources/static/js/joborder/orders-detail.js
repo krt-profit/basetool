@@ -193,7 +193,7 @@ export function _odEditVersionInput(name = 'version') {
 /**
  * Collects the material handover form into the request body.
  *
- * @returns {{handoverTime: string, recipientHandle: string, recipientSquadron: string, items: OdHandoverItem[]}} the body
+ * @returns {{handoverTime: string, handingOverUserId: string | null, recipientHandle: string, recipientSquadron: string, items: OdHandoverItem[]}} the body
  */
 export function _serializeHandoverForm() {
     /** @type {OdHandoverItem[]} */
@@ -225,6 +225,7 @@ export function _serializeHandoverForm() {
     });
     return {
         handoverTime: _odFieldValue('handoverTime'),
+        handingOverUserId: _odFieldValue('handingOverUserId') || null,
         recipientHandle: _odFieldValue('recipientHandle'),
         recipientSquadron: _odFieldValue('recipientSquadron'),
         items,
@@ -234,7 +235,7 @@ export function _serializeHandoverForm() {
 /**
  * Collects the item handover form into the request body.
  *
- * @returns {{handoverTime: string, recipientHandle: string, entries: Array<{jobOrderItemId: string, amount: number}>}} the body
+ * @returns {{handoverTime: string, handingOverUserId: string | null, recipientHandle: string, entries: Array<{jobOrderItemId: string, amount: number}>}} the body
  */
 export function _serializeItemHandoverForm() {
     /** @type {Array<{jobOrderItemId: string, amount: number}>} */
@@ -253,6 +254,7 @@ export function _serializeItemHandoverForm() {
     });
     return {
         handoverTime: _odFieldValue('itemHandoverTime'),
+        handingOverUserId: _odFieldValue('itemHandingOverUserId') || null,
         recipientHandle: _odFieldValue('itemRecipientHandle'),
         entries,
     };

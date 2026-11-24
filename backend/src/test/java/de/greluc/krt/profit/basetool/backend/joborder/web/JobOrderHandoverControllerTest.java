@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverGiverDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverGivers;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto;
@@ -47,8 +49,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Pure-Mockito unit tests for the handover, production and report endpoints of {@link
- * JobOrderHandoverController}.
+ * Pure-Mockito unit tests for the handover, handing-over candidate, production and report endpoints
+ * of {@link JobOrderHandoverController}.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderHandoverControllerTest {
@@ -56,20 +58,39 @@ class JobOrderHandoverControllerTest {
   @Mock private JobOrderHandoverService jobOrderHandoverService;
   @Mock private JobOrderItemProductionService jobOrderItemProductionService;
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
+  @Mock private JobOrderHandoverGivers jobOrderHandoverGivers;
 
   @InjectMocks private JobOrderHandoverController controller;
+
+  @Test
+  void handoverGivers_delegatesToTheCandidatesOfTheOrder() {
+    UUID jobOrderId = UUID.randomUUID();
+    List<JobOrderHandoverGiverDto> candidates =
+        List.of(new JobOrderHandoverGiverDto(UUID.randomUUID(), "alice"));
+    when(jobOrderHandoverGivers.candidates(jobOrderId)).thenReturn(candidates);
+
+    List<JobOrderHandoverGiverDto> result = controller.handoverGivers(jobOrderId);
+
+    assertThat(result).isSameAs(candidates);
+    verify(jobOrderHandoverGivers).candidates(jobOrderId);
+  }
 
   @Test
   void createHandover_delegatesToHandoverServiceWithBody() {
     UUID jobOrderId = UUID.randomUUID();
     JobOrderHandoverCreateDto dto =
         new JobOrderHandoverCreateDto(
-            Instant.parse("2026-05-01T12:00:00Z"), "alice", "DAS KARTELL", List.of());
+            Instant.parse("2026-05-01T12:00:00Z"),
+            UUID.randomUUID(),
+            "alice",
+            "DAS KARTELL",
+            List.of());
     JobOrderHandoverDto persisted =
         new JobOrderHandoverDto(
             UUID.randomUUID(),
             jobOrderId,
             dto.handoverTime(),
+            "bob",
             "alice",
             "DAS KARTELL",
             null,
@@ -148,7 +169,7 @@ class JobOrderHandoverControllerTest {
     UUID jobOrderId = UUID.randomUUID();
     HandoverReportPreviewRequestDto dto =
         new HandoverReportPreviewRequestDto(
-            "#42", LocalDateTime.of(2026, 5, 1, 12, 0), "alice", List.of());
+            "#42", LocalDateTime.of(2026, 5, 1, 12, 0), "bob", "alice", List.of());
     byte[] pdf = new byte[] {0x25, 0x50, 0x44, 0x46};
     when(jobOrderHandoverReportService.generateHandoverReportPreview(dto)).thenReturn(pdf);
 

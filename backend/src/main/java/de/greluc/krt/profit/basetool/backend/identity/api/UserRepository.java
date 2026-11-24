@@ -221,6 +221,23 @@ public interface UserRepository
       Pageable pageable);
 
   /**
+   * Projects the active accounts (approved, present and enabled in Keycloak) among the given users
+   * to {@link UserReferenceDto}, in no particular order.
+   *
+   * @param userIds the users to look at; never empty, since JPQL rejects an empty IN list
+   * @return the active accounts among them
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto(u.id,
+      u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
+      '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE u.id IN :userIds
+      AND u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
+      AND u.inKeycloak = true AND u.enabledInKeycloak = true
+      """)
+  List<UserReferenceDto> findActiveReferencesByIds(@Param("userIds") Collection<UUID> userIds);
+
+  /**
    * Loads a user by id with {@code roles} and {@code roles.permissions} fetched in the same query —
    * for the authentication path and the caller's own {@code /users/me}, which assemble authorities
    * from both. A caller that only needs the user as a foreign-key target or reads a scalar uses the

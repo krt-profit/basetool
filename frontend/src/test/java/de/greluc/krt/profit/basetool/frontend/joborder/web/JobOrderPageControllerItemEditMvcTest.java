@@ -105,7 +105,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
     UUID blueprintId = UUID.randomUUID();
     JobOrderItemHandoverDto handover =
         new JobOrderItemHandoverDto(
-            UUID.randomUUID(), id, Instant.now(), "R", null, null, List.of(), 1L);
+            UUID.randomUUID(), id, Instant.now(), null, "R", null, null, List.of(), 1L);
     JobOrderDto order = order(id, "ITEM", List.of(handover), true);
     when(reader.readItemEdit(id))
         .thenReturn(JobOrderPageStubs.editable(order, List.of(), List.of()));
@@ -268,7 +268,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
     UUID id = UUID.randomUUID();
     JobOrderItemHandoverDto handover =
         new JobOrderItemHandoverDto(
-            UUID.randomUUID(), id, Instant.now(), "R", null, null, List.of(), 1L);
+            UUID.randomUUID(), id, Instant.now(), null, "R", null, null, List.of(), 1L);
     when(reader.readItemEdit(id))
         .thenReturn(
             JobOrderPageStubs.blocked(

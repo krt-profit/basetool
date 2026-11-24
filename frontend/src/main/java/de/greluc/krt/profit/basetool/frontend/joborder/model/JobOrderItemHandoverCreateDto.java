@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code JobOrderItemHandoverCreateDto}: the create payload the
@@ -29,11 +30,13 @@ import java.util.List;
  * delivered ordered-item lines (one {@link JobOrderItemHandoverEntryCreateDto} per line).
  *
  * @param handoverTime when the handover occurred (UTC)
+ * @param handingOverUserId the member of the processing unit who handed the items over
  * @param recipientHandle the recipient's handle
  * @param entries the delivered item-line quantities (at least one)
  */
 @DtoMirror
 public record JobOrderItemHandoverCreateDto(
     Instant handoverTime,
+    UUID handingOverUserId,
     String recipientHandle,
     List<JobOrderItemHandoverEntryCreateDto> entries) {}

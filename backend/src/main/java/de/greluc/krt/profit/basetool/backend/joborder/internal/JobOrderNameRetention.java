@@ -33,8 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Replaces the names in closed job orders whose last change lies more than the name retention ago
  * (REQ-DATA-047): the requester handle, accountless holders, recipients and submitted names, the
- * names of holder changes and linked attempts, and handover recipients. The amounts and the order
- * stay.
+ * names of holder changes and linked attempts, and handover recipients and handing-over members.
+ * The amounts and the order stay.
  */
 @Component
 @RequiredArgsConstructor
@@ -69,8 +69,8 @@ public class JobOrderNameRetention implements NameRetentionParticipant {
             + holders.clearLinkedAttemptNames(orderIds)
             + holderChanges.clearNames(orderIds, sentinel)
             + recipients.clearNames(orderIds, sentinel)
-            + handovers.clearRecipientHandles(orderIds, sentinel)
-            + itemHandovers.clearRecipientHandles(orderIds, sentinel);
+            + handovers.clearNames(orderIds, sentinel)
+            + itemHandovers.clearNames(orderIds, sentinel);
     moneyPrivacy.publishChanges(orderIds);
     return changed;
   }

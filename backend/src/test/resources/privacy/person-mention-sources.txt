@@ -25,8 +25,10 @@ target|DELETION_REQUEST|deletion_request|decision_note|id|null
 target|HANGAR|ship|name|id|null
 target|INVENTORY|inventory_item|note|id|INVENTORY
 target|JOB_ORDER|job_order_assignees|note|job_order_id|JOB_ORDER
+target|JOB_ORDER|job_order_handover|handing_over_handle|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_handover|recipient_handle|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_handover|recipient_squadron|job_order_id|JOB_ORDER
+target|JOB_ORDER|job_order_item_handover|handing_over_handle|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_item_handover|recipient_handle|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_linked_money_attempt|counterparty_name|order_id|JOB_ORDER
 target|JOB_ORDER|job_order_linked_money_attempt|selected_accountless_name|order_id|JOB_ORDER
