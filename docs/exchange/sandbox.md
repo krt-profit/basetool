@@ -707,8 +707,10 @@ ones as dry runs, which must be accepted, and invalid ones, which must be refuse
 `--proof-limit` it finally floods the gateway until [the proof cap](#the-members-proof-cap)
 answers; the member is then refused for about 30 seconds.
 It needs only Python 3 and runs again on the same data; `--user` and `--password` pick another
-account, and `--demand withheld` expects the withheld org demand of `sandbox-member-2`. CI runs it
-against the published images after every publish and once a week.
+account, and `--demand withheld` expects the withheld org demand of `sandbox-member-2`. With
+`--job-orders`, signed in as `sandbox-logistician`, it reads only the job-order snapshot and the
+create options and checks them against the seed of [job orders](#job-orders). CI runs it against
+the published images after every publish and once a week.
 
 ```sh
 python3 scripts/sandbox-smoke.py --conformance

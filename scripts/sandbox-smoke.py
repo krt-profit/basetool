@@ -9,8 +9,11 @@ gateway checks every answer against its v1 schema, so a passing run also proves 
 contract. With `--conformance` it also sends every change-set conformance fixture of
 `docs/exchange/examples/v1`: each valid one as a dry run, which must be accepted, and each invalid
 one, which must be refused. With `--proof-limit` it finally sends fresh proofs until the member's
-cap answers `429 DPOP_PROOF_LIMIT`. The login and the calls are `scripts/sandbox_client.py`, which
-signs with the DPoP reference in `docs/exchange/dpop-reference`, standard library only.
+cap answers `429 DPOP_PROOF_LIMIT`. With `--job-orders`, signed in as `sandbox-logistician`, it
+reads only the job-order snapshot and create options and checks them against the seed; `--selftest`
+runs those checks on the conformance examples without a sandbox. The login and the calls are
+`scripts/sandbox_client.py`, which signs with the DPoP reference in `docs/exchange/dpop-reference`,
+standard library only.
 """
 
 from __future__ import annotations
@@ -31,6 +34,17 @@ from sandbox_client import (
     delete_installation_key,
     open_installation_key,
 )
+
+IRIDIUM = "00000000-0000-0000-0000-000000000001"
+SANDBOX_SQUADRON = "5a4d0000-0000-4000-8000-000000000101"
+SANDBOX_PROFIT = "5a4d0000-0000-4000-8000-000000000102"
+MATERIAL_ORDER = "5a4d0000-0000-4000-8000-000000002201"
+ITEM_ORDER = "5a4d0000-0000-4000-8000-000000002202"
+SQUADRON_ORDER = "5a4d0000-0000-4000-8000-000000002203"
+AUEC_ORDER = "5a4d0000-0000-4000-8000-000000002204"
+CLOSED_ORDER = "5a4d0000-0000-4000-8000-000000002205"
+# aUEC the seed hands over to sandbox-logistician on AUEC_ORDER.
+SEEDED_HANDOVER = 100000
 
 
 class Smoke:
@@ -91,9 +105,17 @@ class Smoke:
             time.sleep(10)
 
     def run(self) -> None:
-        """Signs in and exercises the exchange."""
+        """Signs in and exercises the exchange: the job-order family alone, or every other one."""
         self.login()
         self.wait_for_exchange()
+        if self.args.job_orders:
+            self.job_orders()
+        else:
+            self.families()
+        print(f"all {self.count} steps passed")
+
+    def families(self) -> None:
+        """Reads every resource, resolves and syncs, and runs the refinery and blueprint checks."""
         for label, method, path, body in [
             ("the service document", "GET", "/exchange/v1", None),
             (
@@ -186,7 +208,36 @@ class Smoke:
             self.conformance()
         if self.args.proof_limit:
             self.proof_limit()
-        print(f"all {self.count} steps passed")
+
+    def job_orders(self) -> None:
+        """Reads the job-order snapshot to its end and the create options, checking the seed."""
+        orders: list[dict] = []
+        path = "/exchange/v1/job-orders"
+        while True:
+            status, answer = self.call("GET", path)
+            self.step(
+                "a job-order snapshot page", status == 200, f"{status} {json.dumps(answer)[:300]}"
+            )
+            orders.extend(answer["items"])
+            if not answer["hasMore"]:
+                break
+            path = "/exchange/v1/job-orders?" + urllib.parse.urlencode(
+                {"cursor": answer["nextCursor"]}
+            )
+        problems = job_order_problems(orders)
+        self.step(
+            "the job orders are the seeded ones of IRIDIUM", not problems, "; ".join(problems)
+        )
+        status, answer = self.call("GET", "/exchange/v1/job-orders/create-options")
+        self.step(
+            "the job-order create options", status == 200, f"{status} {json.dumps(answer)[:300]}"
+        )
+        problems = create_option_problems(answer)
+        self.step(
+            "the create options offer IRIDIUM and the Profit units",
+            not problems,
+            "; ".join(problems),
+        )
 
     def check_org_demand(self, answer: dict) -> None:
         """Checks the seeded demand of both memberships or the withheld response."""
@@ -394,6 +445,184 @@ class Smoke:
                 )
 
 
+def job_order_problems(orders: list[dict]) -> list[str]:
+    """Names what in `sandbox-logistician`'s job-order snapshot differs from the seed.
+
+    The logistician, a Logistician of IRIDIUM, reads the material, the item and both aUEC orders
+    IRIDIUM requested and never the Sandbox Squadron order; the in-progress aUEC order carries the
+    100 000 aUEC handed over to the logistician, and the cancelled one stays in the read.
+
+    Args:
+        orders: the items of every snapshot page.
+
+    Returns:
+        one line per difference, empty when the snapshot matches the seed.
+    """
+    by_id = {order["id"]: order for order in orders}
+    problems = [
+        f"the seeded order {order_id} is missing"
+        for order_id in (MATERIAL_ORDER, ITEM_ORDER, AUEC_ORDER, CLOSED_ORDER)
+        if order_id not in by_id
+    ]
+    if SQUADRON_ORDER in by_id:
+        problems.append(f"the Sandbox Squadron order {SQUADRON_ORDER} is read")
+    auec = by_id.get(AUEC_ORDER)
+    if auec is not None and (
+        auec.get("status") != "IN_PROGRESS" or auec.get("netHandedOver") != SEEDED_HANDOVER
+    ):
+        problems.append(
+            f"the aUEC order {AUEC_ORDER} reads {auec.get('status')} with"
+            f" {auec.get('netHandedOver')} handed over, not IN_PROGRESS with {SEEDED_HANDOVER}"
+        )
+    closed = by_id.get(CLOSED_ORDER)
+    if closed is not None and closed.get("status") != "CANCELLED":
+        problems.append(f"the order {CLOSED_ORDER} reads {closed.get('status')}, not CANCELLED")
+    return problems
+
+
+def create_option_problems(options: dict) -> list[str]:
+    """Names what in `sandbox-logistician`'s create options differs from the seed.
+
+    The logistician requests for IRIDIUM alone, may name Sandbox Profit and Sandbox Squadron as
+    responsible with Sandbox Profit suggested, and the job-order writes are switched on.
+
+    Args:
+        options: the create options.
+
+    Returns:
+        one line per difference, empty when the options match the seed.
+    """
+    problems = []
+    requesting = [unit["id"] for unit in options.get("requestingUnits", [])]
+    if requesting != [IRIDIUM]:
+        problems.append(f"the requesting units are {requesting}, not IRIDIUM alone")
+    responsible = {unit["id"] for unit in options.get("responsibleUnits", [])}
+    missing = sorted({SANDBOX_PROFIT, SANDBOX_SQUADRON} - responsible)
+    if missing:
+        problems.append(f"the responsible units lack {missing}")
+    if options.get("suggestedResponsible") != SANDBOX_PROFIT:
+        problems.append(
+            f"the suggested responsible unit is {options.get('suggestedResponsible')},"
+            f" not Sandbox Profit"
+        )
+    if options.get("writesEnabled") is not True:
+        problems.append("the job-order writes are not enabled")
+    return problems
+
+
+def names_only(problems: list[str], named: str | None) -> bool:
+    """Tells whether a check found exactly what a self-test case expects.
+
+    Args:
+        problems: what the check found.
+        named: the text the one expected problem names, or `None` when none is expected.
+
+    Returns:
+        `True` for no problem where none is expected, or for one problem that names `named`.
+    """
+    if named is None:
+        return not problems
+    return len(problems) == 1 and named in problems[0]
+
+
+def selftest() -> int:
+    """Runs the job-order seed checks on the documented answer shapes, without a sandbox.
+
+    The seeded snapshot and create options are built from the valid conformance examples of
+    `docs/exchange/examples/v1` with the seed's ids, so a renamed field fails here first. Each
+    changed case must name exactly its one difference.
+
+    Returns:
+        0 when every case passed, 1 otherwise.
+    """
+    examples = ROOT / "docs" / "exchange" / "examples" / "v1"
+    page = json.loads(
+        (examples / "page--jobOrderPage" / "valid" / "snapshot.json").read_text(encoding="utf-8")
+    )
+    template = {order["kind"]: order for order in page["items"]}
+    seeded = [
+        dict(template["MATERIAL"], id=MATERIAL_ORDER),
+        dict(template["ITEM"], id=ITEM_ORDER),
+        dict(
+            template["AUEC"],
+            id=AUEC_ORDER,
+            status="IN_PROGRESS",
+            target=250000,
+            netHandedOver=SEEDED_HANDOVER,
+            remaining=150000,
+            overpaid=0,
+            settlementOpen=False,
+        ),
+        dict(template["AUEC"], id=CLOSED_ORDER, status="CANCELLED"),
+    ]
+    material, item, auec, closed = seeded
+    options = json.loads(
+        (examples / "job-order-create-options" / "valid" / "logistician.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    requesting = dict(options["requestingUnits"][0], id=IRIDIUM)
+    profit = dict(options["responsibleUnits"][0], id=SANDBOX_PROFIT)
+    squadron = dict(options["responsibleUnits"][1], id=SANDBOX_SQUADRON)
+    offered = dict(
+        options,
+        requestingUnits=[requesting],
+        responsibleUnits=[profit, squadron],
+        suggestedResponsible=SANDBOX_PROFIT,
+    )
+    cases = [
+        ("the seeded snapshot passes", job_order_problems(seeded), None),
+        ("a missing order is named", job_order_problems([item, auec, closed]), MATERIAL_ORDER),
+        (
+            "the Sandbox Squadron order is named",
+            job_order_problems([*seeded, dict(material, id=SQUADRON_ORDER)]),
+            SQUADRON_ORDER,
+        ),
+        (
+            "an aUEC order without the handover is named",
+            job_order_problems([material, item, dict(auec, netHandedOver=0), closed]),
+            AUEC_ORDER,
+        ),
+        (
+            "a closed order that is no longer cancelled is named",
+            job_order_problems([material, item, auec, dict(closed, status="OPEN")]),
+            CLOSED_ORDER,
+        ),
+        ("the seeded create options pass", create_option_problems(offered), None),
+        (
+            "a second requesting unit is named",
+            create_option_problems(dict(offered, requestingUnits=[requesting, squadron])),
+            "requesting",
+        ),
+        (
+            "a missing responsible unit is named",
+            create_option_problems(dict(offered, responsibleUnits=[profit])),
+            SANDBOX_SQUADRON,
+        ),
+        (
+            "another suggested unit is named",
+            create_option_problems(dict(offered, suggestedResponsible=SANDBOX_SQUADRON)),
+            "suggested",
+        ),
+        (
+            "switched-off writes are named",
+            create_option_problems(dict(offered, writesEnabled=False)),
+            "writes",
+        ),
+    ]
+    failures = [
+        f"{label}: {problems}"
+        for label, problems, named in cases
+        if not names_only(problems, named)
+    ]
+    for failure in failures:
+        print(f"selftest FAIL {failure}")
+    if failures:
+        return 1
+    print(f"selftest: ok ({len(cases)} cases)")
+    return 0
+
+
 def main() -> int:
     """Parses the command line and runs the smoke test with a throwaway key.
 
@@ -424,7 +653,20 @@ def main() -> int:
         help="finally flood the gateway until the member's proof cap answers "
         "429 DPOP_PROOF_LIMIT; the member is refused for about 30 s after",
     )
+    parser.add_argument(
+        "--job-orders",
+        action="store_true",
+        help="read only the job-order snapshot and create options and check what the seed gives "
+        "sandbox-logistician; sign in with --user sandbox-logistician",
+    )
+    parser.add_argument(
+        "--selftest",
+        action="store_true",
+        help="check the job-order seed checks on the conformance examples, without a sandbox",
+    )
     args = parser.parse_args()
+    if args.selftest:
+        return selftest()
     with tempfile.TemporaryDirectory() as tmp:
         key_file = pathlib.Path(tmp) / "smoke-dpop.pem"
         name = f"basetool-sandbox-smoke-{uuid.uuid4().hex[:8]}"

@@ -130,11 +130,8 @@ public class ExchangeDemandService {
           ExchangeOrgDemandDto.Reason.NOT_PERMITTED, clock.instant());
     }
     Set<UUID> units = membershipRepository.findActiveOrgUnitIdsByUserId(member);
-    Set<UUID> logisticianUnits = new HashSet<>();
-    if (details && !units.isEmpty()) {
-      logisticianUnits.addAll(orgUnitService.logisticianUnits(member));
-      logisticianUnits.retainAll(units);
-    }
+    Set<UUID> logisticianUnits =
+        details && !units.isEmpty() ? orgUnitService.directLogisticianUnits(member) : Set.of();
     List<JobOrder> orders =
         units.isEmpty()
             ? List.of()

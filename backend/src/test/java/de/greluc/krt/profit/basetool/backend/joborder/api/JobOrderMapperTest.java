@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientNames;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.HashSet;
@@ -92,7 +93,8 @@ class JobOrderMapperTest {
         .thenReturn(Map.of("versekit", "VerseKit"));
     mapper.setClientNames(
         new JobOrderClientNames(
-            clientDirectory, org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class)));
+            new ClientNames(clientDirectory),
+            org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class)));
   }
 
   @Test

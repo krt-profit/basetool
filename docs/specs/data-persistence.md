@@ -1862,8 +1862,8 @@ existing contracts.
 
 ### REQ-DATA-040 — Transaction resources follow suspension and resumption
 
-Inventory, mission and refinery use `TransactionMemo` for transaction binding and typed
-persistence-context scans. The inventory memo keeps caller-visible mission details separate
+Inventory, mission, refinery, job orders and the platform's client names (`ClientNames`) use
+`TransactionMemo` for transaction binding and typed persistence-context scans. The inventory memo keeps caller-visible mission details separate
 from the lookup for existing allocations (REQ-INV-027).
 
 Live-sync flushes and transaction-local mission, inventory and refinery memos unbind when their

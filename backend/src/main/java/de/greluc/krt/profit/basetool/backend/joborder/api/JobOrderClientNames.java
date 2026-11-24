@@ -20,14 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.TransactionMemo;
-import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientNames;
 import jakarta.persistence.EntityManager;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.List;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -37,16 +34,16 @@ import org.springframework.stereotype.Component;
  * Names the exchange clients job-order writes came through by the registry's display name, or by
  * the client id once the registry no longer holds it (REQ-ORDERS-078).
  *
- * <p>The names are memoised per transaction: the first miss reads the names of every client the
- * orders of the persistence context carry, together with the primed ones, in one query, so a page
- * of orders costs one registry read, not one per row (REQ-DATA-003).
+ * <p>The names come from {@link ClientNames}, memoised per transaction: a miss reads the names of
+ * every client the orders of the persistence context carry, together with the primed ones, in one
+ * query, so a page of orders costs one registry read, not one per row (REQ-DATA-003).
  */
 @Component
 @RequiredArgsConstructor
 public class JobOrderClientNames {
 
-  /** The exchange registry's display names. */
-  private final ClientDirectory clientDirectory;
+  /** The registry's display names, memoised per transaction. */
+  private final ClientNames clientNames;
 
   /** The persistence context the orders of the running transaction live in. */
   private final EntityManager entityManager;
@@ -59,16 +56,7 @@ public class JobOrderClientNames {
    *     web
    */
   public @Nullable String nameOf(@Nullable String clientId) {
-    if (clientId == null) {
-      return null;
-    }
-    Map<String, String> names = memo();
-    String known = names.get(clientId);
-    if (known != null) {
-      return known;
-    }
-    read(names, Set.of(clientId));
-    return names.get(clientId);
+    return clientNames.nameOf(clientId, this::clientsInContext);
   }
 
   /**
@@ -89,40 +77,17 @@ public class JobOrderClientNames {
    * @param clientIds the client ids; {@code null} entries are skipped
    */
   public void prime(@NotNull Collection<String> clientIds) {
-    read(memo(), clientIds);
+    clientNames.prime(clientIds, this::clientsInContext);
   }
 
-  private @NotNull Map<String, String> memo() {
-    return TransactionMemo.bound(this, Memo.class, Memo::new).names;
-  }
-
-  private void read(@NotNull Map<String, String> names, @NotNull Collection<String> requested) {
-    Set<String> wanted = new LinkedHashSet<>();
-    requested.stream().filter(Objects::nonNull).forEach(wanted::add);
-    for (JobOrder order : TransactionMemo.entitiesInContext(entityManager, JobOrder.class)) {
-      addIfPresent(wanted, order.getCreatedByClientId());
-      addIfPresent(wanted, order.getCommentClientId());
-    }
-    wanted.removeAll(names.keySet());
-    if (wanted.isEmpty()) {
-      return;
-    }
-    Map<String, String> found = clientDirectory.displayNames(wanted);
-    for (String id : wanted) {
-      names.put(id, found.getOrDefault(id, id));
-    }
-  }
-
-  private static void addIfPresent(@NotNull Set<String> ids, @Nullable String clientId) {
-    if (clientId != null) {
-      ids.add(clientId);
-    }
-  }
-
-  /** One transaction's memo. */
-  private static final class Memo {
-
-    /** The display names by client id; an unregistered id maps to itself. */
-    private final Map<String, String> names = new HashMap<>();
+  /**
+   * Lists the clients the orders of the persistence context were created and commented through.
+   *
+   * @return the client ids, {@code null} for a write in the web
+   */
+  private @NotNull List<String> clientsInContext() {
+    return TransactionMemo.entitiesInContext(entityManager, JobOrder.class).stream()
+        .flatMap(order -> Stream.of(order.getCreatedByClientId(), order.getCommentClientId()))
+        .toList();
   }
 }

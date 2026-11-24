@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientNames;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +51,7 @@ class JobOrderClientNamesTest {
   void setUp() {
     clientDirectory = mock(ClientDirectory.class);
     when(clientDirectory.displayNames(anyCollection())).thenReturn(Map.of("versekit", "VerseKit"));
-    names = new JobOrderClientNames(clientDirectory, mock(EntityManager.class));
+    names = new JobOrderClientNames(new ClientNames(clientDirectory), mock(EntityManager.class));
   }
 
   @AfterEach
