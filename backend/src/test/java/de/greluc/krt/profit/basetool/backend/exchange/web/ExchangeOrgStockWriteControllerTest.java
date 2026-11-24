@@ -578,6 +578,38 @@ class ExchangeOrgStockWriteControllerTest {
   }
 
   @Test
+  void aBereichLogisticianWhoIsNoDirectMemberOfAUnitBelowNeitherWritesNorReadsItsPool()
+      throws Exception {
+    UUID bereich = orgUnit("BEREICH", null);
+    UUID below = orgUnit("SQUADRON", bereich);
+    joins(member, bereich, "BEREICHSLEITER", false);
+    joins(holder, below, false);
+    UUID titanium = material("SCU");
+    UUID inBelow = stock(holder, titanium, location(), 5, below, false);
+
+    roster(bereich);
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(bookOut(below, inBelow, 0, "1", "SCU"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].reason").value("NOT_PERMITTED"));
+    mockMvc
+        .perform(relayed(get(MEMBERS).param("unit", below.toString()), WRITE))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            relayed(
+                get(TARGETS).param("unit", below.toString()).param("material", titanium.toString()),
+                WRITE))
+        .andExpect(status().isForbidden());
+
+    assertThat(amountOf(inBelow)).isEqualTo(5);
+  }
+
+  @Test
   void aStaleVersionIsAVersionConflictAndChangesNothing() throws Exception {
     UUID staffel = orgUnit();
     joins(member, staffel, true);
@@ -2326,37 +2358,63 @@ class ExchangeOrgStockWriteControllerTest {
   }
 
   /**
-   * Seeds an active org unit of a kind.
+   * Seeds an active top-level org unit of a kind.
    *
    * @param kind the kind
    * @return its id
    */
   private @NotNull UUID orgUnit(@NotNull String kind) {
+    return orgUnit(kind, null);
+  }
+
+  /**
+   * Seeds an active org unit of a kind.
+   *
+   * @param kind the kind
+   * @param parent the parent unit, or {@code null} for a top-level unit
+   * @return its id
+   */
+  private @NotNull UUID orgUnit(@NotNull String kind, @Nullable UUID parent) {
     UUID id = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active,"
-            + " is_profit_eligible) VALUES (?, ?, ?, ?, TRUE, FALSE)",
+            + " is_profit_eligible, parent_org_unit_id) VALUES (?, ?, ?, ?, TRUE, FALSE, ?)",
         id,
         kind,
         "Pool " + id,
-        "W" + id.toString().substring(0, 8));
+        "W" + id.toString().substring(0, 8),
+        parent);
     orgUnits.add(id);
     return id;
   }
 
   /**
-   * Makes a user a direct member of an org unit.
+   * Makes a user a plain direct member of an org unit.
    *
    * @param user the user
    * @param orgUnit the org unit
    * @param logistician whether the membership carries the Logistician flag
    */
   private void joins(@NotNull UUID user, @NotNull UUID orgUnit, boolean logistician) {
+    joins(user, orgUnit, "MEMBER", logistician);
+  }
+
+  /**
+   * Makes a user a direct member of an org unit in a role.
+   *
+   * @param user the user
+   * @param orgUnit the org unit
+   * @param role the membership role
+   * @param logistician whether the membership carries the Logistician flag
+   */
+  private void joins(
+      @NotNull UUID user, @NotNull UUID orgUnit, @NotNull String role, boolean logistician) {
     jdbc.update(
         "INSERT INTO org_unit_membership (user_id, org_unit_id, role, is_logistician)"
-            + " VALUES (?, ?, 'MEMBER', ?)",
+            + " VALUES (?, ?, ?, ?)",
         user,
         orgUnit,
+        role,
         logistician);
   }
 

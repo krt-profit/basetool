@@ -108,7 +108,7 @@ public class ExchangeUndoService {
         Entities.require(
             clientRepository.findWithCapabilitiesByClientId(clientId), () -> "Client not found");
     Outcome outcome =
-        perform(member, clientId, since, null, null, orgUnitService.logisticianUnits(member));
+        perform(member, clientId, since, null, null, orgUnitService.directLogisticianUnits(member));
     auditRecorder.record(
         AuditEventType.EXCHANGE_CHANGES_UNDONE,
         client.getId(),

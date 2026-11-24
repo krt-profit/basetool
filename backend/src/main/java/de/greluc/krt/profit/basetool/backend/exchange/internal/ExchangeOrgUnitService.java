@@ -88,7 +88,8 @@ public class ExchangeOrgUnitService {
 
   /**
    * Returns the units of which the member is a Logistician, by membership or by the cascade of a
-   * Bereich or Organisationsleitung membership (REQ-XCH-043).
+   * Bereich or Organisationsleitung membership: the units in which a refinery pickup may book for
+   * others (REQ-SEC-039, REQ-XCH-054).
    *
    * @param member the member the current request acts for
    * @return the unit ids, possibly empty
@@ -96,5 +97,17 @@ public class ExchangeOrgUnitService {
   @Transactional(readOnly = true)
   public @NotNull Set<UUID> logisticianUnits(@NotNull UUID member) {
     return membershipQueryService.findLogisticianOrgUnitIds(member);
+  }
+
+  /**
+   * Returns the units the member directly belongs to and is a Logistician of, the units whose org
+   * stock the member reads by entry and writes (REQ-XCH-043, REQ-XCH-045).
+   *
+   * @param member the member the current request acts for
+   * @return the unit ids, possibly empty
+   */
+  @Transactional(readOnly = true)
+  public @NotNull Set<UUID> directLogisticianUnits(@NotNull UUID member) {
+    return membershipQueryService.findDirectLogisticianOrgUnitIds(member);
   }
 }
