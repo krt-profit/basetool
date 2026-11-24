@@ -461,8 +461,11 @@ alike, by `OrgUnitCascadeService#unitsBelow` behind
 `RequestScopeResolver#currentGrantedOrgUnitIds(role)`; every per-unit gate and list scope reads that
 set inside the active context (`currentGrantedOrgUnitIdsInActiveContext(role)`:
 `hasRoleInOrgUnit`, `canActAsLogisticianIn`, `currentLogisticianScope`, `canManageMissionsOf`, the
-supply and purchasing managed units), the exchange's `findLogisticianOrgUnitIds` and the supply and
-purchasing tab decisions (ADR-0329) the whole set, never the raw contextual authorities. A pin
+supply and purchasing managed units), the exchange's `findLogisticianOrgUnitIds` (the refinery
+store receivers, REQ-SEC-039) and the supply and purchasing tab decisions (ADR-0329) the whole set,
+never the raw contextual authorities. The exchange's org stock and demand details take no cascade:
+they count only the membership in the unit itself
+(`findLogisticianOrgUnitIdsByOwnMembership`, REQ-XCH-043, REQ-XCH-045…047). A pin
 covers exactly the pinned unit when it lies in the set — a Bereich or Organisationsleitung pin is
 that unit alone, not the units below it — and nothing when it does not (REQ-ORG-032). An admin
 passes within their own scope: every unit unpinned, the pinned unit pinned. The aggregate access
@@ -1284,7 +1287,8 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   (owner decision, REQ-ORG-032). The same holds wherever else a membership is read: the reach and
   the switcher, the effective Logistiker and Einsatzleiter flags of the user DTO the frontend
   mirrors into its session (`UserMapper`, `UserMapperTest`), the exchange's Logistician
-  units (`OrgUnitMembershipQueryService#findLogisticianOrgUnitIds`), the oversight scope of the
+  units (`OrgUnitMembershipQueryService#findLogisticianOrgUnitIds`,
+  `#findLogisticianOrgUnitIdsByOwnMembership`), the oversight scope of the
   blueprint overview and the org-unit bank balances, the Leitung page and the delegated
   appointment, Kommandogruppe and SK-roster verdicts behind it (`OrgRoleManagementSecurityService`,
   `SpecialCommandSecurityService`, REQ-ROLE-004), and every seat-derived bank

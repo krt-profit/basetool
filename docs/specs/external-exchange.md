@@ -2919,9 +2919,12 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
   or a leadership rank — `SK_LEAD`, `STAFFELLEITER`, `KOMMANDOLEITER`, `STELLV_KOMMANDOLEITER`,
   `ENSIGN`, `BEREICHSLEITER`, `BEREICHSKOORDINATOR`, `BEREICHSOPERATOR` or `OL_MEMBER`. The rule is
   read from the database by one method that the web's `CustomJwtGrantedAuthoritiesConverter` uses
-  for its own-unit contextual `LOGISTICIAN` authority too. A Logistician of a Bereich or of the
-  Organisationsleitung is one of the units below it as well (REQ-SEC-005), and the `OFFICER` realm
-  role plays no part.
+  for its own-unit contextual `LOGISTICIAN` authority too. Only that membership counts: the cascade
+  of a Bereich or Organisationsleitung grant to the units below it (REQ-SEC-005) does not, so a
+  Logistician of a Bereich, by flag or rank, who is a plain member of a unit below it is no
+  Logistician of that unit here (ADR-0257; owner decision of 2026-11-24, "Doku gilt"). The
+  `OFFICER` realm role plays no part. The same rule decides the writes, the roster, the targets and
+  the writer's undo (REQ-XCH-045, REQ-XCH-046) and the demand details (REQ-XCH-047).
 - **An entry** carries its id and `version`, the holder, the amount, the note, the job-order
   earmarks (order id, `number` = `displayId`, amount, delivered) and the mission earmarks (mission
   id, name, amount) with the unearmarked rest per dimension (`free`) — what the web's entry row
@@ -2938,29 +2941,36 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
 - **The capability** gates no route of its own: a request without it is answered without entries,
   never refused. Like every capability it admits the routes any capability serves. A membership that
   starts or stops making its member a Logistician of the unit (the flag or the rank changes)
-  announces the unit's pool in the feed (`V297`) and, for a Bereich or the Organisationsleitung, the
-  pools below it (`V317`), so the entries appear or vanish without a new snapshot. The capability itself is the client's: a client whose token gains it reads a new
+  announces the unit's pool in the feed (`V297`), so the entries appear or vanish without a new
+  snapshot. For a Bereich or the Organisationsleitung it also announces the pools below it
+  (`V317`); no member's entries change there, so those lots arrive unchanged. The capability itself is the client's: a client whose token gains it reads a new
   snapshot, and one whose token loses it drops the entries it kept.
 
 **Acceptance**
 
 - [x] A member with `is_logistician` in a unit, and one holding any leadership rank there without
-  the flag get entries for that unit's pool; a plain member gets none; a Bereich rank gets entries
-  for the pools of the units below the Bereich and none for a unit outside it.
+  the flag get entries for that unit's pool; a plain member gets none; a Bereich rank or a Bereich
+  Logistician flag gets entries for the Bereich's own pool and none for a unit below it in which
+  the member is a plain member, and that unit is listed with `logistician: false`.
   *`ExchangeOrgStockDetailsControllerTest`.*
 - [x] Without `exchange.orgstock.details` granted and consented, no lot carries entries.
   *`ExchangeOrgStockDetailsControllerTest`.*
 - [x] The converter and the exchange answer "Logistician of this unit" through the same method; a
   test pins every `MembershipRole` against it. *`OrgUnitMembershipTest`;
-  `OrgUnitMembershipQueryService#findLogisticianOrgUnitIds` reads it for the exchange.*
+  `OrgUnitMembershipQueryService#findLogisticianOrgUnitIdsByOwnMembership` reads it for the org
+  stock and the demand details, without the cascade, only for a `KRT Member` and only on active
+  units (`OrgUnitMembershipQueryServiceTest`, `RetainedSeatWithoutKrtMemberIntegrationTest`,
+  `DeactivatedOrgUnitConfersNothingIntegrationTest`).*
 - [x] One member's `ref` is stable across requests of one client and differs between two clients;
   every client holds its own 32-byte salt. *`ExchangeOrgStockDetailsControllerTest`,
   `ExchangeHolderRefsTest`.*
 - [x] Editing a note, adding an earmark, renaming a holder and renaming an earmarked mission each
   produce a feed entry whose lot carries the new details. *`ExchangeOrgStockDetailsControllerTest`.*
 
-**Code:** `ExchangeOrgStockService`, `ExchangeHolderRefs`, `ExchangeGate#holds`,
-`StockReads#exchangeOrgEntries`, `org-stock-lot.schema.json#/$defs/entry`, `V297` ·
+**Code:** `ExchangeOrgStockService`, `ExchangeOrgUnitService#logisticianUnitsByOwnMembership`,
+`OrgUnitMembershipQueryService#findLogisticianOrgUnitIdsByOwnMembership`, `ExchangeHolderRefs`,
+`ExchangeGate#holds`, `StockReads#exchangeOrgEntries`, `org-stock-lot.schema.json#/$defs/entry`,
+`V297` ·
 **Status:** implemented (#2588); the rule `OrgUnitMembership#isLogisticianOfOwnUnit` (#2584)
 
 ### REQ-XCH-044 — A member can withhold their name from connected applications
@@ -3002,8 +3012,9 @@ it (#2588), the roster and the book-in too (#2589)
 
 `POST /exchange/v1/org-stock/changes` (`exchange.orgstock.write`) applies a batch of ops in one
 transaction under an idempotency key (REQ-XCH-020), within the batch cap of `/me/stock`. Every op
-names its pool, and the writer must be a Logistician of that unit (REQ-XCH-043) and a direct member
-of it; any other op is refused `NOT_PERMITTED`. An op that names an entry carries its `version`, and
+names its pool, and the writer must be a Logistician of that unit by their own membership in it
+(REQ-XCH-043, no cascade from a Bereich or the Organisationsleitung); any other op is refused
+`NOT_PERMITTED`. An op that names an entry carries its `version`, and
 a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only shared rows of the named pool are ever touched.
 
 - **Ops** — each through the Lager service the web uses for it, with its rules:
@@ -3039,7 +3050,7 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
 - **Roster.** `GET /exchange/v1/org-stock/members?unit=<unit>` (backend
   `GET /api/v1/exchange/org-stock/members`) lists the unit's direct members with `ref` and name,
   ordered by name, without those who withhold their name, as `org-stock-members.schema.json`; a unit
-  the member is not a Logistician and direct member of is `403 NOT_PERMITTED`. The unit is a query
+  the member is not a Logistician of by their own membership is `403 NOT_PERMITTED`. The unit is a query
   parameter so that every acting path stays literal (REQ-SEC-080).
 - **Targets.** `GET /exchange/v1/org-stock/targets?unit=<unit>&material=<bt>` (backend
   `GET /api/v1/exchange/org-stock/targets`) lists the job orders and missions the web's
@@ -3051,8 +3062,8 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   Lager's mission picker for the unit, with id, name and status, and none for an item. The picker
   uses the selected pool's context. A new earmark write checks mission visibility for the reduced
   acting member, whose Exchange request carries no web pin (REQ-XCH-009). An id that
-  names neither answers empty lists; a unit the member is not a Logistician and direct member of is
-  `403 NOT_PERMITTED`. The answer is `org-stock-targets.schema.json`.
+  names neither answers empty lists; a unit the member is not a Logistician of by their own
+  membership is `403 NOT_PERMITTED`. The answer is `org-stock-targets.schema.json`.
 - **Side effects as in the web.** Reservations are protected (`STOCK_EARMARKED`, `OVER_ALLOCATION`),
   Materialbörse offers follow, the web's notifications are sent, peers see the change live
   (REQ-XCH-030), and the Lager audit records each op with the writer and the external client.
@@ -3103,10 +3114,11 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
   *`ExchangeOrgStockWriteControllerTest`.*
 - [x] An op on a pool where the writer is not a Logistician, on a personal row or on a row of
   another pool is refused `NOT_PERMITTED` and changes nothing. *`ExchangeOrgStockWriteControllerTest`.*
-- [x] A Logistician of a Bereich or of the Organisationsleitung who is no direct member of a unit
-  below it is refused that unit's ops (`NOT_PERMITTED`), roster and targets (`403`), as one query
-  of the direct Logistician units decides for the reads, the roster, the targets and the ops.
-  *`ExchangeOrgStockWriteControllerTest`.*
+- [x] A Logistician of a Bereich or of the Organisationsleitung is refused the ops
+  (`NOT_PERMITTED`), the roster and the targets (`403`) of a unit below it that they do not belong
+  to or belong to only as a plain member, as one query of the units whose own membership makes the
+  writer a Logistician decides for the reads, the roster, the targets and the ops; a Staffel rank
+  in that unit still writes its pool. *`ExchangeOrgStockWriteControllerTest`.*
 - [x] A `book-in` naming a member who withholds their name, or who is not a member of the unit, is
   refused `HOLDER_UNKNOWN`, and so is a `move-holder` to such a member; a `move-holder` into a unit
   the writer is not a Logistician of is `NOT_PERMITTED`. *`ExchangeOrgStockWriteControllerTest`.*
@@ -3172,7 +3184,8 @@ last write left it — the journaled state after that write, version included, o
 write removed it; otherwise it is skipped as `CHANGED_AFTERWARDS`. One whose earlier state names a
 material, item, location, pool, holder or earmark target that is gone, or a holder who no longer
 directly belongs to the pool, is skipped as `GONE`, and so is, in the writer's own undo, an entry
-of a pool whose unit the writer is no longer a Logistician and direct member of; the admin's run
+of a pool whose unit the writer is no longer a Logistician of by their own membership
+(REQ-XCH-043); the admin's run
 restores every pool. An entry's writes are taken in the order of their transactions and, within
 one change set, of the versions they started from. Every lot an entry lies in and goes back to, and
 the writer's own lots the same undo sets back, take their advisory locks in one ascending pass
@@ -3212,9 +3225,10 @@ the guard (`ExchangeOrgStockWriteService#applyConfirmed`).
   *`ExchangeOrgStockUndoControllerTest`.*
 - [x] The holders of the entries cannot undo the writer's changes, and a writer who is no longer a
   Logistician of the pool cannot undo its entries. *`ExchangeOrgStockUndoControllerTest`.*
-- [x] A writer who left the pool's unit and reaches it only as a Logistician of a Bereich or of the
-  Organisationsleitung above it cannot undo its entries either (`GONE`), as the writer's undo takes
-  the same direct Logistician units as the ops. *`ExchangeOrgStockUndoControllerTest`.*
+- [x] A writer who left the pool's unit, or stays in it only as a plain member, and reaches it only
+  as a Logistician of a Bereich or of the Organisationsleitung above it cannot undo its entries
+  either (`GONE`), as the writer's undo takes the same Logistician units as the ops.
+  *`ExchangeOrgStockUndoControllerTest`.*
 
 **Code:** `ExchangeUndoService`, `PoolEntryCommands#restore` / `InventoryPoolRestorer`,
 `ExchangeMassChangeGuard#requiresPoolConfirmation`, `ExchangeOrgStockWriteService#applyConfirmed`,
@@ -3225,9 +3239,10 @@ journal built (#2589); the undo and the guard built (#2592)
 
 With `exchange.demand.details` in addition to `.read`, `GET /exchange/v1/me/org-demand` adds
 `orders[]` for the open and in-progress orders whose responsible unit is one of the member's
-Logistician units (REQ-XCH-043): order id, number (`#displayId`), type, status, priority, the
-responsible unit (`unit`), the requesting unit, the Auftraggeber (`handle`), the comment and the
-open lines. The `handle` and the comment are free text the order's author typed, not a member
+Logistician units — the units whose own membership makes the member a Logistician, without the
+cascade of a Bereich or Organisationsleitung grant (REQ-XCH-043): order id, number
+(`#displayId`), type, status, priority, the responsible unit (`unit`), the requesting unit, the
+Auftraggeber (`handle`), the comment and the open lines. The `handle` and the comment are free text the order's author typed, not a member
 account, so REQ-XCH-044 does not apply to them; no assignee is named. The summed `materials[]` and
 `items[]` are unchanged, and orders of the member's other units stay summed only. The job-order
 gate of REQ-XCH-018 applies first.
@@ -3251,6 +3266,9 @@ per game item. Lines with nothing open are left out. The published schema (`org-
   (not relayed, or not granted) get the answer of REQ-XCH-018 unchanged, and the orders of the
   member's other units stay summed only. *`ExchangeDemandDetailsControllerTest`,
   `ExchangeDemandServiceTest`.*
+- [x] A Logistician of a Bereich gets no orders of a unit below it in which they are a plain
+  member; those orders stay summed only, while a unit below in which they carry the flag gives its
+  orders. *`ExchangeDemandDetailsControllerTest`.*
 - [x] The job-order gate of REQ-XCH-018 applies first, and the capability alone opens no route.
   *`ExchangeDemandDetailsControllerTest`, `ExchangeDemandServiceTest`.*
 - [x] No answer names an assignee; the schema pins the field set. *`ExchangeDemandDetailsControllerTest`

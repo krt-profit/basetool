@@ -141,8 +141,8 @@ public class ExchangeOrgStockWriteService
    * @param caller the client and writer
    * @param unit the unit
    * @return the unit and its members who do not withhold their name
-   * @throws AccessDeniedException when the writer is not a Logistician and direct member of the
-   *     unit
+   * @throws AccessDeniedException when the writer's own membership in the unit does not make them
+   *     its Logistician
    */
   @Transactional(readOnly = true)
   public @NotNull ExchangeOrgStockMembersDto members(
@@ -162,8 +162,8 @@ public class ExchangeOrgStockWriteService
    * @param unit the unit
    * @param material the material or item, as the org stock's lots name it
    * @return the unit and its targets; no targets for an id that names no material or item
-   * @throws AccessDeniedException when the writer is not a Logistician and direct member of the
-   *     unit
+   * @throws AccessDeniedException when the writer's own membership in the unit does not make them
+   *     its Logistician
    */
   @Transactional(readOnly = true)
   public @NotNull ExchangeOrgStockTargetsDto targets(
@@ -179,12 +179,12 @@ public class ExchangeOrgStockWriteService
    * @param caller the writer
    * @param unit the unit
    * @return the unit's id and name
-   * @throws AccessDeniedException when the writer is not a Logistician and direct member of the
-   *     unit
+   * @throws AccessDeniedException when the writer's own membership in the unit does not make them
+   *     its Logistician
    */
   private @NotNull ExchangeOrgStockUnitDto logisticianUnit(
       @NotNull ExchangeCaller caller, @NotNull UUID unit) {
-    if (orgUnitService.directLogisticianUnits(caller.member()).contains(unit)) {
+    if (orgUnitService.logisticianUnitsByOwnMembership(caller.member()).contains(unit)) {
       for (ExchangeOrgUnitDto named : orgUnitService.orgUnits(caller.member()).items()) {
         if (named.id().equals(unit)) {
           return new ExchangeOrgStockUnitDto(named.id(), named.name());
@@ -192,7 +192,7 @@ public class ExchangeOrgStockWriteService
       }
     }
     throw new AccessDeniedException(
-        "The member is not a Logistician and direct member of the unit");
+        "The member's own membership in the unit does not make them its Logistician");
   }
 
   /**

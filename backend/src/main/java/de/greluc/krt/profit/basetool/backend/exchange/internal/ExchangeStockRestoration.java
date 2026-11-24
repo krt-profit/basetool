@@ -100,7 +100,7 @@ class ExchangeStockRestoration {
             intents(preliminary),
             _ -> {
               Set<UUID> currentPools =
-                  initialPools == null ? null : orgUnits.directLogisticianUnits(member);
+                  initialPools == null ? null : orgUnits.logisticianUnitsByOwnMembership(member);
               finalEntries.removeIf(entry -> !orgJournal.permitted(entry, currentPools));
               var currentLots = catalogue.resolve(personalKeys(personalGroups));
               var currentLatest = latest(member, personalGroups);

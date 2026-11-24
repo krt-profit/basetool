@@ -159,25 +159,45 @@ class ExchangeOrgStockDetailsControllerTest {
   }
 
   @Test
-  void aBereichRankGetsEntriesForItsOwnPoolAndTheUnitsBelowButNoneOutsideIt() throws Exception {
+  void aBereichRankGetsEntriesForItsOwnPoolButNoneForAUnitBelowItIsAPlainMemberOf()
+      throws Exception {
     UUID bereich = orgUnit("BEREICH", null);
-    UUID child = orgUnit("SPECIAL_COMMAND", bereich);
-    UUID otherBereich = orgUnit("BEREICH", null);
-    UUID outside = orgUnit("SPECIAL_COMMAND", otherBereich);
+    UUID plainBelow = orgUnit("SPECIAL_COMMAND", bereich);
+    UUID flaggedBelow = orgUnit("SPECIAL_COMMAND", bereich);
     joins(member, bereich, "BEREICHSLEITER", false);
-    joins(member, child, "MEMBER", false);
-    joins(member, outside, "MEMBER", false);
+    joins(member, plainBelow, "MEMBER", false);
+    joins(member, flaggedBelow, "MEMBER", true);
     UUID titanium = material();
     UUID area18 = location();
     stock(holder, titanium, area18, 4, bereich);
-    stock(holder, titanium, area18, 5, child);
-    stock(holder, titanium, area18, 6, outside);
+    stock(holder, titanium, area18, 5, plainBelow);
+    stock(holder, titanium, area18, 6, flaggedBelow);
 
     String body = body(relayed(get(PATH), DETAILS));
 
     assertThat(entriesOf(body, bereich)).hasSize(1);
-    assertThat(entriesOf(body, child)).hasSize(1);
-    assertThat(JsonPath.<List<Object>>read(body, unitLots(outside) + ".entries")).isEmpty();
+    assertThat(JsonPath.<List<Object>>read(body, unitLots(plainBelow) + ".entries")).isEmpty();
+    assertThat(entriesOf(body, flaggedBelow)).hasSize(1);
+    assertThat(logisticianFlags(body, plainBelow)).containsExactly(false);
+    assertThat(logisticianFlags(body, flaggedBelow)).containsExactly(true);
+  }
+
+  @Test
+  void aBereichLogisticianGetsNoEntriesForAStaffelBelowItIsAPlainMemberOf() throws Exception {
+    UUID bereich = orgUnit("BEREICH", null);
+    UUID staffel = orgUnit("SQUADRON", bereich);
+    joins(member, bereich, "MEMBER", true);
+    joins(member, staffel, "MEMBER", false);
+    UUID titanium = material();
+    UUID area18 = location();
+    stock(holder, titanium, area18, 4, bereich);
+    stock(holder, titanium, area18, 5, staffel);
+
+    String body = body(relayed(get(PATH), DETAILS));
+
+    assertThat(entriesOf(body, bereich)).hasSize(1);
+    assertThat(JsonPath.<List<Object>>read(body, unitLots(staffel) + ".entries")).isEmpty();
+    assertThat(logisticianFlags(body, staffel)).containsExactly(false);
   }
 
   @Test
@@ -427,6 +447,17 @@ class ExchangeOrgStockDetailsControllerTest {
     List<List<Map<String, Object>>> lots = JsonPath.read(body, unitLots(unit) + ".entries");
     assertThat(lots).hasSize(1);
     return lots.getFirst();
+  }
+
+  /**
+   * Reads the {@code logistician} flag a page's unit list gives one unit.
+   *
+   * @param body the page
+   * @param unit the unit
+   * @return the flag of every listed unit with that id
+   */
+  private static @NotNull List<Boolean> logisticianFlags(@NotNull String body, @NotNull UUID unit) {
+    return JsonPath.read(body, "$.units[?(@.id == '" + unit + "')].logistician");
   }
 
   /**
