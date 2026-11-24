@@ -131,7 +131,9 @@ public class ExchangeDemandService {
     }
     Set<UUID> units = membershipRepository.findActiveOrgUnitIdsByUserId(member);
     Set<UUID> logisticianUnits =
-        details && !units.isEmpty() ? orgUnitService.directLogisticianUnits(member) : Set.of();
+        details && !units.isEmpty()
+            ? orgUnitService.logisticianUnitsByOwnMembership(member)
+            : Set.of();
     List<JobOrder> orders =
         units.isEmpty()
             ? List.of()
