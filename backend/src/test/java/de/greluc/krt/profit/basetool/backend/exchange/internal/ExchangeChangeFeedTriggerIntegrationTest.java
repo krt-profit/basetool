@@ -664,20 +664,22 @@ class ExchangeChangeFeedTriggerIntegrationTest {
   }
 
   @Test
-  void aBereichLogisticianFlagAnnouncesThePoolsBelowTheBereichOnly() {
+  void aBereichLogisticianFlagAnnouncesTheBereichPoolButNoPoolBelowIt() {
     UUID bereich = orgUnit("feed-area", "BEREICH", null);
     UUID child = orgUnit("feed-area-child", "SQUADRON", bereich);
     UUID outside =
         orgUnit("feed-area-outside", "SQUADRON", orgUnit("feed-area-other", "BEREICH", null));
     UUID material = material("feed-cascade-gold");
     UUID location = location("feed-cascade-hurston");
+    stock(bob, material, location, 1, false, false, bereich);
     stock(bob, material, location, 1, false, false, child);
     stock(bob, material, location, 1, false, false, outside);
     jdbc.update(
         "INSERT INTO org_unit_membership (user_id, org_unit_id, role) VALUES (?, ?, 'MEMBER')",
         alice,
         bereich);
-    int before = orgChanges(child).size();
+    int before = orgChanges(bereich).size();
+    int beforeChild = orgChanges(child).size();
     int beforeOutside = orgChanges(outside).size();
 
     jdbc.update(
@@ -686,24 +688,27 @@ class ExchangeChangeFeedTriggerIntegrationTest {
         alice,
         bereich);
 
-    assertThat(orgChanges(child).subList(before, orgChanges(child).size()))
+    assertThat(orgChanges(bereich).subList(before, orgChanges(bereich).size()))
         .extracting(OrgChange::key)
-        .containsExactly(orgLot(child, material, location, 1, false));
+        .containsExactly(orgLot(bereich, material, location, 1, false));
+    assertThat(orgChanges(child)).hasSize(beforeChild);
     assertThat(orgChanges(outside)).hasSize(beforeOutside);
   }
 
   @Test
-  void anOrganisationsleitungLogisticianFlagAnnouncesEveryPool() {
+  void anOrganisationsleitungLogisticianFlagAnnouncesItsOwnPoolButNoOther() {
     UUID leadership = orgUnit("feed-ol", "ORGANISATIONSLEITUNG", null);
     UUID pool = orgUnit("feed-ol-pool", "SQUADRON", orgUnit("feed-ol-area", "BEREICH", null));
     UUID material = material("feed-cascade-iron");
     UUID location = location("feed-cascade-arccorp");
+    stock(bob, material, location, 1, false, false, leadership);
     stock(bob, material, location, 1, false, false, pool);
     jdbc.update(
         "INSERT INTO org_unit_membership (user_id, org_unit_id, role) VALUES (?, ?, 'MEMBER')",
         alice,
         leadership);
-    int before = orgChanges(pool).size();
+    int before = orgChanges(leadership).size();
+    int beforePool = orgChanges(pool).size();
 
     jdbc.update(
         "UPDATE org_unit_membership SET is_logistician = TRUE WHERE user_id = ? AND org_unit_id ="
@@ -711,9 +716,33 @@ class ExchangeChangeFeedTriggerIntegrationTest {
         alice,
         leadership);
 
-    assertThat(orgChanges(pool).subList(before, orgChanges(pool).size()))
+    assertThat(orgChanges(leadership).subList(before, orgChanges(leadership).size()))
         .extracting(OrgChange::key)
-        .containsExactly(orgLot(pool, material, location, 1, false));
+        .containsExactly(orgLot(leadership, material, location, 1, false));
+    assertThat(orgChanges(pool)).hasSize(beforePool);
+  }
+
+  @Test
+  void joiningABereichAsItsLogisticianAnnouncesNoPoolBelowIt() {
+    UUID bereich = orgUnit("feed-join-area", "BEREICH", null);
+    UUID child = orgUnit("feed-join-area-child", "SQUADRON", bereich);
+    UUID material = material("feed-cascade-copper");
+    UUID location = location("feed-cascade-crusader");
+    stock(bob, material, location, 1, false, false, bereich);
+    stock(bob, material, location, 1, false, false, child);
+    int before = orgChanges(bereich).size();
+    int beforeChild = orgChanges(child).size();
+
+    jdbc.update(
+        "INSERT INTO org_unit_membership (user_id, org_unit_id, role, is_logistician)"
+            + " VALUES (?, ?, 'MEMBER', TRUE)",
+        alice,
+        bereich);
+
+    assertThat(orgChanges(bereich).subList(before, orgChanges(bereich).size()))
+        .extracting(OrgChange::key)
+        .containsExactly(orgLot(bereich, material, location, 1, false));
+    assertThat(orgChanges(child)).hasSize(beforeChild);
   }
 
   @Test
