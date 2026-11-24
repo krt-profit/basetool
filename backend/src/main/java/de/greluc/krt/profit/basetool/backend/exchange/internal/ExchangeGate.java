@@ -26,13 +26,16 @@ import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -40,21 +43,23 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * The backend's own check of an exchange request, used as {@code @exchangeGate} in {@code
  * PreAuthorize} on every exchange controller method (REQ-XCH-004): the caller is an acting member
  * relayed for a registry client, the global switch is on, the bank switch is on for a request of
- * the bank route family (REQ-BXCH-006, {@link BankExchangeRoutes}), the client is active, the
- * member has not disconnected the installation or, after the connection was made, the client
- * (REQ-XCH-008), and the needed capability was both relayed and granted in the registry. Every
- * refusal is counted; a relayed request is refused with the code and status the gateway's own gate
- * answers for the same situation (REQ-XCH-025), so a client sees one code whichever side refuses
- * it.
+ * the bank route family (REQ-BXCH-006, {@link BankExchangeRoutes}), the job-order family switch is
+ * on for a request of the job-order route family and the job-order writes switch for its writes
+ * (REQ-OXCH-009, {@link JobOrderExchangeRoutes}), the client is active, the member has not
+ * disconnected the installation or, after the connection was made, the client (REQ-XCH-008), and
+ * the needed capability was both relayed and granted in the registry. Every refusal is counted; a
+ * relayed request is refused with the code and status the gateway's own gate answers for the same
+ * situation (REQ-XCH-025), so a client sees one code whichever side refuses it.
  */
 @Slf4j
 @Component("exchangeGate")
-@RequiredArgsConstructor
 public class ExchangeGate {
 
   /** Refusal reason: the caller is not an acting member relayed for an external client. */
@@ -65,6 +70,15 @@ public class ExchangeGate {
 
   /** Refusal reason: the bank switch is off and the request is for the bank route family. */
   static final String REASON_BANK_SWITCH_OFF = "bank_switch_off";
+
+  /**
+   * Refusal reason: the job-order family switch is off and the request is for the job-order route
+   * family.
+   */
+  static final String REASON_JOB_ORDER_SWITCH_OFF = "job_order_switch_off";
+
+  /** Refusal reason: the job-order writes switch is off and the request is a job-order write. */
+  static final String REASON_JOB_ORDER_WRITES_SWITCH_OFF = "job_order_writes_switch_off";
 
   /** Refusal reason: the relayed client is not in the registry. */
   static final String REASON_CLIENT_UNKNOWN = "client_unknown";
@@ -91,27 +105,55 @@ public class ExchangeGate {
   private final ExchangeRevocationMirror revocationMirror;
   private final MeterRegistry meterRegistry;
 
-  /** Counts a bank route refused while the bank switch is off. */
-  private final ExchangeBankMetrics bankMetrics;
+  /** How each switch refuses a request it stops, iterated in the switches' declaration order. */
+  private final EnumMap<ExchangeSwitch, ExchangeSwitchRefusal> switchRefusals;
+
+  /**
+   * Creates the gate.
+   *
+   * @param clientRepository reads the registry client and its grants
+   * @param settingsRepository reads the switches
+   * @param installationRepository reads the member's installation revocations
+   * @param clientRevocationRepository reads the member's stored client revocations
+   * @param revocationMirror reads the client revocations the gateway reads
+   * @param meterRegistry holds the gate's refusal counter
+   * @param bankMetrics counts a bank route refused while the bank switch is off
+   * @param jobOrderMetrics counts a job-order route refused while a job-order switch is off
+   */
+  public ExchangeGate(
+      ExchangeClientRepository clientRepository,
+      ExchangeSettingsRepository settingsRepository,
+      ExchangeInstallationRepository installationRepository,
+      ExchangeClientRevocationRepository clientRevocationRepository,
+      ExchangeRevocationMirror revocationMirror,
+      MeterRegistry meterRegistry,
+      ExchangeBankMetrics bankMetrics,
+      ExchangeJobOrderMetrics jobOrderMetrics) {
+    this.clientRepository = clientRepository;
+    this.settingsRepository = settingsRepository;
+    this.installationRepository = installationRepository;
+    this.clientRevocationRepository = clientRevocationRepository;
+    this.revocationMirror = revocationMirror;
+    this.meterRegistry = meterRegistry;
+    this.switchRefusals = ExchangeSwitchRefusal.byArea(bankMetrics, jobOrderMetrics);
+  }
 
   /** Registers the refusal counter for every reason at zero, so a first refusal is an increase. */
   @PostConstruct
   void registerRefusalCounters() {
-    for (String reason :
-        new String[] {
-          REASON_NOT_RELAYED,
-          REASON_SWITCH_OFF,
-          REASON_BANK_SWITCH_OFF,
-          REASON_CLIENT_UNKNOWN,
-          REASON_CLIENT_SUSPENDED,
-          REASON_SCOPE_MISSING,
-          REASON_INSTALLATION_REVOKED,
-          REASON_CLIENT_REVOKED,
-          REASON_REVOCATIONS_UNREADABLE
-        }) {
-      meterRegistry.counter(
-          ExchangeMetricNames.EXCHANGE_GATE_REFUSED, MetricNames.TAG_REASON, reason);
-    }
+    Stream.concat(
+            Stream.of(
+                REASON_NOT_RELAYED,
+                REASON_CLIENT_UNKNOWN,
+                REASON_CLIENT_SUSPENDED,
+                REASON_SCOPE_MISSING,
+                REASON_INSTALLATION_REVOKED,
+                REASON_CLIENT_REVOKED,
+                REASON_REVOCATIONS_UNREADABLE),
+            switchRefusals.values().stream().map(ExchangeSwitchRefusal::reason))
+        .forEach(reason ->
+            meterRegistry.counter(
+                ExchangeMetricNames.EXCHANGE_GATE_REFUSED, MetricNames.TAG_REASON, reason));
   }
 
   /**
@@ -198,16 +240,7 @@ public class ExchangeGate {
       count(REASON_NOT_RELAYED);
       return Optional.empty();
     }
-    Optional<ExchangeSettings> settings =
-        settingsRepository.findById(ExchangeSettings.SINGLETON_ID);
-    if (!settings.map(ExchangeSettings::isEnabled).orElse(false)) {
-      throw refuse(REASON_SWITCH_OFF, ExchangeProblemException.exchangeDisabled());
-    }
-    if (BankExchangeRoutes.isCurrentRequestBank()
-        && !settings.map(ExchangeSettings::isBankEnabled).orElse(false)) {
-      bankMetrics.countRefused(BankExchangeRefusal.SWITCHED_OFF);
-      throw refuse(REASON_BANK_SWITCH_OFF, ExchangeProblemException.bankExchangeDisabled());
-    }
+    refuseBySwitch(settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElse(null));
     ExchangeClient client =
         clientRepository
             .findWithCapabilitiesByClientId(subject.externalClient())
@@ -234,6 +267,41 @@ public class ExchangeGate {
             .filter(granted::contains)
             .collect(Collectors.toSet());
     return Optional.of(relayed);
+  }
+
+  /**
+   * Refuses a request the first switch that is off and covers it stops, in the switches'
+   * declaration order, which is the gateway's order (REQ-XCH-025): the global switch for every
+   * route, the bank switch for the bank route family (REQ-BXCH-006), the job-order family switch
+   * for the job-order route family and then the job-order writes switch for its {@code POST}s
+   * (REQ-OXCH-009). A missing settings row counts as every switch off.
+   *
+   * @param settings the settings row, or {@code null} when it is missing
+   * @throws ExchangeProblemException with the gateway's code for the switch that stops the request
+   */
+  private void refuseBySwitch(@Nullable ExchangeSettings settings) {
+    HttpServletRequest request = currentRequest();
+    String method = request == null ? null : request.getMethod();
+    String path = request == null ? null : request.getRequestURI();
+    for (Map.Entry<ExchangeSwitch, ExchangeSwitchRefusal> entry : switchRefusals.entrySet()) {
+      boolean on = settings != null && entry.getKey().isOn(settings);
+      ExchangeSwitchRefusal refusal = entry.getValue();
+      if (!on && refusal.covers().test(method, path)) {
+        refusal.countFamily().run();
+        throw refuse(refusal.reason(), refusal.problem().get());
+      }
+    }
+  }
+
+  /**
+   * Returns the servlet request bound to the current thread.
+   *
+   * @return the request, or {@code null} outside a servlet request
+   */
+  private static @Nullable HttpServletRequest currentRequest() {
+    return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes servlet
+        ? servlet.getRequest()
+        : null;
   }
 
   /**

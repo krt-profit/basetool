@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,11 +37,11 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
-import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -117,36 +118,31 @@ class OrdersListPatternRenderTest {
    * @return the page
    */
   private static @NotNull PageResponse<JobOrderDto> onePage(@NotNull String status) {
+    return onePage(status, null);
+  }
+
+  /**
+   * A one-order page as the backend returns it, of an order created through a client or in the web.
+   *
+   * @param status the backend status string
+   * @param createdClient the client the order was created through, or {@code null} for the web
+   * @return the page
+   */
+  private static @NotNull PageResponse<JobOrderDto> onePage(
+      @NotNull String status, @Nullable String createdClient) {
     JobOrderDto order =
-        new JobOrderDto(
-            UUID.fromString(ORDER_ID),
-            42,
-            new SquadronReferenceDto(UUID.randomUUID(), "Alpha Squadron", "ALP"),
-            new SquadronReferenceDto(UUID.randomUUID(), "Nova Squadron", "NOV"),
-            "Tester",
-            null,
-            3,
-            status,
-            "MATERIAL",
-            false,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(UUID.fromString(ORDER_ID))
+            .displayId(42)
+            .responsibleOrgUnit(
+                new SquadronReferenceDto(UUID.randomUUID(), "Alpha Squadron", "ALP"))
+            .requestingOrgUnit(new SquadronReferenceDto(UUID.randomUUID(), "Nova Squadron", "NOV"))
+            .handle("Tester")
+            .priority(3)
+            .status(status)
+            .countBlueprintsWithVariants(false)
+            .createdClient(createdClient)
+            .build();
     return new PageResponse<>(List.of(order), 0, 100, 1L, 1, List.of());
   }
 
@@ -220,6 +216,36 @@ class OrdersListPatternRenderTest {
         .doesNotContain(">Details<")
         .contains("data-list-total=\"1\"")
         .contains("1–1 von 1");
+  }
+
+  /**
+   * An order a client created carries the chip next to its number in the overview row, inside the
+   * results the live frames refresh (REQ-ORDERS-078).
+   */
+  @Test
+  @WithMockUser
+  void aClientsOrderCarriesTheCreatorChipNextToItsNumber() throws Exception {
+    when(backendApiClient.get(
+            eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS")))
+        .thenReturn(onePage("OPEN", "VerseKit"));
+
+    String results = render(true, "fragment=results");
+
+    assertThat(results)
+        .containsPattern(
+            "class=\"order-id-display\"[^>]*>#42</span>\\s*<span class=\"chip chip--info\""
+                + " data-testid=\"order-created-client\"[^>]*>über VerseKit</span>");
+  }
+
+  /** An order created in the web carries no creator chip (REQ-ORDERS-078). */
+  @Test
+  @WithMockUser
+  void aWebOrderCarriesNoCreatorChip() throws Exception {
+    when(backendApiClient.get(
+            eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS")))
+        .thenReturn(onePage("OPEN"));
+
+    assertThat(render(true, "fragment=results")).doesNotContain("order-created-client");
   }
 
   /** An empty result renders the empty state and no table. */

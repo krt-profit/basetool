@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.lenient;
@@ -81,8 +82,7 @@ class OrgRoleManagementSecurityServiceTest {
   }
 
   private Squadron squadronUnder(UUID id, OrgUnit parent) {
-    Squadron s = new Squadron();
-    s.setId(id);
+    Squadron s = squadron(id);
     s.setParent(parent);
     return s;
   }

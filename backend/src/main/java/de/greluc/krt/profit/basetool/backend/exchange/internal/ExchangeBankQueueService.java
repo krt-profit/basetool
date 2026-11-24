@@ -57,7 +57,7 @@ public class ExchangeBankQueueService {
   static final Duration OVERDUE_AFTER = Duration.ofDays(2);
 
   /** The Basetool page of one request; the request id follows. */
-  static final String LINK_PREFIX = "https://profit-base.online/bank/requests/";
+  static final String LINK_PREFIX = ExchangeLinks.BASETOOL + "/bank/requests/";
 
   private final ExchangeBankActors bankActors;
   private final BankStaffQueueReads queueReads;

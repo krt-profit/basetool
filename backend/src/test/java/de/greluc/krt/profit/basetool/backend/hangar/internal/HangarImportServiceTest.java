@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -103,8 +104,7 @@ class HangarImportServiceTest {
             auditService,
             unitLiveSync);
     de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron stubSquadron =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    stubSquadron.setId(UUID.randomUUID());
+        squadron(UUID.randomUUID());
     org.mockito.Mockito.lenient()
         .when(orgUnitStampingService.resolveOrgUnitForImport(any()))
         .thenReturn(stubSquadron);

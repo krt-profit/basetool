@@ -83,6 +83,11 @@ and **do not add it back**. The server refuses such an add per op with `REMOVED_
 tombstone lives (90 days). If you believe the entry should come back, ask the member; only after they
 agree resend the op with `override: true`.
 
+Job orders are the exception: their removed entries carry only `key` and `removedAt`, because an
+order that left the member's set looks the same whether a relation ended, its 7 days ended or it
+was deleted. Drop the order locally; it comes back as an item if it returns to the set
+([job orders](resources/job-orders.md#the-feed)).
+
 ## Patch changes
 
 When a patch change asks the members for a new home location, the Basetool relocates each member's
@@ -152,6 +157,11 @@ Every change set and draft carries an `Idempotency-Key` of 8 to 128 characters o
   `422 IDEMPOTENCY_KEY_REUSED`.
 - Keys are kept per client and member, not per installation: two installations of your client for
   one member share them. Random keys never collide.
+- A [bank raise](resources/bank.md) and a [job-order create](resources/job-orders.md#the-create)
+  keep their key with what they created, so a retry under the key answers the first request or order
+  even after the hour and after a `5xx`. A write on an existing job order keeps none: after the
+  hour its moved version answers `409 VERSION_CONFLICT`
+  ([writes on an existing order](resources/job-orders.md#writes-on-an-existing-order)).
 
 `401`, `403`, `413`, `415`, `429`, `5xx`, `409 MASS_CHANGE_CONFIRMATION_REQUIRED` and the
 `400 SCHEMA_INVALID` for a body that is not a JSON document are never cached, and

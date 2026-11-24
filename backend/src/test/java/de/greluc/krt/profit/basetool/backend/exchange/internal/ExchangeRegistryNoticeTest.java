@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
@@ -41,6 +42,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -52,6 +54,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
@@ -75,6 +78,7 @@ class ExchangeRegistryNoticeTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private AuthHelperService authHelperService;
 
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
   private ExchangeRegistryService service;
   private ExchangeClient client;
 
@@ -86,7 +90,7 @@ class ExchangeRegistryNoticeTest {
             clientRepository,
             mirrorSync,
             auditRecorder,
-            new SimpleMeterRegistry(),
+            meterRegistry,
             knownExchangeClients,
             installationRepository,
             firstPartyClientIds,
@@ -203,10 +207,19 @@ class ExchangeRegistryNoticeTest {
     settings.setEnabled(true);
     settings.setVersion(1L);
     when(mirrorSync.lockSettings()).thenReturn(settings);
-    when(mirrorSync.saveSettings(any(ExchangeSettings.class))).thenAnswer(i -> i.getArgument(0));
+    when(mirrorSync.saveSwitch(
+            eq(ExchangeSwitch.GLOBAL),
+            any(ExchangeSettings.class),
+            anyBoolean(),
+            any(Instant.class)))
+        .thenAnswer(i -> {
+          ExchangeSettings row = i.getArgument(1);
+          row.setEnabled(i.getArgument(2));
+          return row;
+        });
 
-    service.updateSettings(false, 1L);
-    service.updateSettings(true, 1L);
+    service.updateSwitch(ExchangeSwitch.GLOBAL, false, 1L);
+    service.updateSwitch(ExchangeSwitch.GLOBAL, true, 1L);
 
     List<NoticeEvent> sent = published(2);
     assertThat(sent.get(0).eventType()).isEqualTo(NotificationEventType.EXCHANGE_SWITCHED_OFF);
@@ -219,17 +232,11 @@ class ExchangeRegistryNoticeTest {
     ExchangeSettings settings = new ExchangeSettings();
     settings.setEnabled(true);
     when(mirrorSync.lockSettings()).thenReturn(settings);
-    when(mirrorSync.saveBankSwitch(any(ExchangeSettings.class), anyBoolean(), any(Instant.class)))
-        .thenAnswer(i -> {
-          ExchangeSettings row = i.getArgument(0);
-          row.setBankEnabled(i.getArgument(1));
-          row.setBankVersion(row.getBankVersion() + 1);
-          return row;
-        });
+    stubAreaSwitchWrites();
 
-    service.updateBankSwitch(true, 0L);
-    service.updateBankSwitch(false, 1L);
-    service.updateBankSwitch(false, 2L);
+    service.updateSwitch(ExchangeSwitch.BANK, true, 0L);
+    service.updateSwitch(ExchangeSwitch.BANK, false, 1L);
+    service.updateSwitch(ExchangeSwitch.BANK, false, 2L);
 
     List<NoticeEvent> sent = published(2);
     assertThat(sent.get(0).eventType()).isEqualTo(NotificationEventType.BANK_EXCHANGE_SWITCHED_ON);
@@ -250,6 +257,137 @@ class ExchangeRegistryNoticeTest {
             isNull(),
             isNull(),
             any(AuditDetails.class));
+  }
+
+  @Test
+  void flippingAJobOrderSwitchTellsTheAdminsWhichSwitchAndSupersedesOnlyThatSwitchsNotice() {
+    ExchangeSettings settings = new ExchangeSettings();
+    settings.setEnabled(true);
+    when(mirrorSync.lockSettings()).thenReturn(settings);
+    stubAreaSwitchWrites();
+
+    service.updateSwitch(ExchangeSwitch.JOB_ORDERS, true, 0L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, true, 0L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, false, 1L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, false, 2L);
+
+    List<NoticeEvent> sent = published(3);
+    NoticeEvent familyOn = sent.get(0);
+    NoticeEvent writesOn = sent.get(1);
+    NoticeEvent writesOff = sent.get(2);
+    assertThat(familyOn.eventType())
+        .isEqualTo(NotificationEventType.JOB_ORDER_EXCHANGE_SWITCHED_ON);
+    assertThat(familyOn.renderParams()).containsExactly(Map.entry("switchCode", "family"));
+    assertThat(writesOn.eventType())
+        .isEqualTo(NotificationEventType.JOB_ORDER_EXCHANGE_SWITCHED_ON);
+    assertThat(writesOn.renderParams()).containsExactly(Map.entry("switchCode", "writes"));
+    assertThat(writesOff.eventType())
+        .isEqualTo(NotificationEventType.JOB_ORDER_EXCHANGE_SWITCHED_OFF);
+    assertThat(writesOff.actorSub()).isEqualTo(ADMIN);
+    assertThat(writesOff.contextAllExchangeClients())
+        .as("the job-order notice goes to roles, not to installation holders")
+        .isFalse();
+    assertThat(writesOff.resolvesNotificationTypes())
+        .containsExactlyInAnyOrder(
+            NotificationType.JOB_ORDER_EXCHANGE_SWITCHED_ON,
+            NotificationType.JOB_ORDER_EXCHANGE_SWITCHED_OFF);
+    assertThat(writesOff.entityType())
+        .as("a writes notice supersedes the writes switch's notice only")
+        .isEqualTo(writesOn.entityType())
+        .isNotEqualTo(familyOn.entityType());
+    assertThat(settings.getJobOrdersVersion()).isEqualTo(1L);
+    assertThat(settings.getJobOrderWritesVersion()).isEqualTo(2L);
+    assertThat(settings.getBankVersion()).isZero();
+    ArgumentCaptor<AuditDetails> details = ArgumentCaptor.forClass(AuditDetails.class);
+    verify(auditRecorder, times(3))
+        .record(
+            eq(AuditEventType.JOB_ORDER_EXCHANGE_SWITCH_CHANGED),
+            isNull(),
+            isNull(),
+            isNull(),
+            details.capture());
+    assertThat(details.getAllValues())
+        .extracting(AuditDetails::toString)
+        .containsExactly(
+            "switch=family enabled=true",
+            "switch=writes enabled=true",
+            "switch=writes enabled=false");
+  }
+
+  @Test
+  void everyJobOrderSwitchActionIsRegisteredAtZeroAndCountedOncePerCommittedFlip() {
+    ExchangeSettings settings = new ExchangeSettings();
+    settings.setEnabled(true);
+    when(mirrorSync.lockSettings()).thenReturn(settings);
+    stubAreaSwitchWrites();
+    service.registerChangeCounters();
+    for (String action :
+        List.of(
+            "job_order_switch_on",
+            "job_order_switch_off",
+            "job_order_writes_switch_on",
+            "job_order_writes_switch_off")) {
+      assertThat(changes(action)).as(action).isZero();
+    }
+
+    service.updateSwitch(ExchangeSwitch.JOB_ORDERS, true, 0L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDERS, false, 1L);
+    service.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, true, 0L);
+    TransactionSynchronizationManager.getSynchronizations()
+        .forEach(TransactionSynchronization::afterCommit);
+
+    assertThat(changes("job_order_switch_on")).isEqualTo(1.0d);
+    assertThat(changes("job_order_switch_off")).isEqualTo(1.0d);
+    assertThat(changes("job_order_writes_switch_on")).isEqualTo(1.0d);
+    assertThat(changes("job_order_writes_switch_off")).isZero();
+  }
+
+  /**
+   * Reads one registry change counter.
+   *
+   * @param action the {@code action} label
+   * @return the count
+   */
+  private double changes(String action) {
+    return meterRegistry
+        .get(ExchangeMetricNames.EXCHANGE_REGISTRY_CHANGES)
+        .tag(ExchangeMetricNames.TAG_ACTION, action)
+        .counter()
+        .count();
+  }
+
+  /**
+   * Answers an area switch write as the database does: it sets that switch alone and bumps its own
+   * version.
+   */
+  private void stubAreaSwitchWrites() {
+    when(mirrorSync.saveSwitch(
+            any(ExchangeSwitch.class),
+            any(ExchangeSettings.class),
+            anyBoolean(),
+            any(Instant.class)))
+        .thenAnswer(i -> {
+          ExchangeSwitch area = i.getArgument(0);
+          ExchangeSettings row = i.getArgument(1);
+          boolean enabled = i.getArgument(2);
+          switch (area) {
+            case GLOBAL -> row.setEnabled(enabled);
+            case BANK -> {
+              row.setBankEnabled(enabled);
+              row.setBankVersion(row.getBankVersion() + 1);
+            }
+            case JOB_ORDERS -> {
+              row.setJobOrdersEnabled(enabled);
+              row.setJobOrdersVersion(row.getJobOrdersVersion() + 1);
+            }
+            case JOB_ORDER_WRITES -> {
+              row.setJobOrderWritesEnabled(enabled);
+              row.setJobOrderWritesVersion(row.getJobOrderWritesVersion() + 1);
+            }
+            case null -> throw new AssertionError("a switch write names its switch");
+          }
+          return row;
+        });
   }
 
   @Test

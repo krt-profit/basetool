@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,15 +50,10 @@ class ProfitHierarchyIntegrationTest {
   void activeHierarchyAdmitsTheProfitAreaAndItsChildrenWithoutAnIndependentSwitch() {
     String tag = UUID.randomUUID().toString();
     OrgUnit root = activeRoot(tag);
-    Squadron inside = new Squadron();
-    inside.setName("Inside " + tag);
-    inside.setShorthand("I" + tag);
-    inside.setParent(root);
-    inside = squadrons.saveAndFlush(inside);
-    Squadron outside = new Squadron();
-    outside.setName("Outside " + tag);
-    outside.setShorthand("O" + tag);
-    outside = squadrons.saveAndFlush(outside);
+    Squadron inside =
+        OrgUnitFixtures.persistedSquadron(squadrons, "Inside " + tag, "I" + tag, root);
+    Squadron outside =
+        OrgUnitFixtures.persistedSquadron(squadrons, "Outside " + tag, "O" + tag, null);
 
     assertThat(profitHierarchy.isEligible(root.getId())).isTrue();
     assertThat(profitHierarchy.isEligible(inside.getId())).isTrue();
@@ -108,11 +104,8 @@ class ProfitHierarchyIntegrationTest {
     } else {
       root = units.findById(roots.getFirst()).orElseThrow();
     }
-    Squadron child = new Squadron();
-    child.setName("Snapshot child " + tag);
-    child.setShorthand("C" + tag);
-    child.setParent(root);
-    child = squadrons.saveAndFlush(child);
+    Squadron child =
+        OrgUnitFixtures.persistedSquadron(squadrons, "Snapshot child " + tag, "C" + tag, root);
     profitHierarchy.lockForOrderWrite();
     assertThat(profitHierarchy.isEligible(child.getId())).isTrue();
 

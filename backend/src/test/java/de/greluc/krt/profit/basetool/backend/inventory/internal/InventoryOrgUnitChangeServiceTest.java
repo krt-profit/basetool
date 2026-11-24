@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -91,8 +92,7 @@ class InventoryOrgUnitChangeServiceTest {
             inventoryCheckoutService,
             inventoryItemMapper,
             auditService);
-    alpha = new Squadron();
-    alpha.setId(UUID.randomUUID());
+    alpha = squadron(UUID.randomUUID());
   }
 
   @Test

@@ -64,9 +64,6 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Exchange — bank", description = "The bank accounts the member views")
 public class ExchangeBankRequestController {
 
-  /** The shape of an idempotency key, as the gateway admits it (REQ-XCH-020). */
-  private static final String IDEMPOTENCY_KEY = "[A-Za-z0-9._~-]{8,128}";
-
   /** Serves the snapshot and the feed of the member's own requests. */
   private final ExchangeBankRequestService requestService;
 
@@ -129,7 +126,7 @@ public class ExchangeBankRequestController {
   public ResponseEntity<ExchangeBankRequestWrittenDto> raise(
       @NotNull @Valid @RequestBody ExchangeBankRequestCreateDto body,
       @Nullable
-          @Pattern(regexp = IDEMPOTENCY_KEY)
+          @Pattern(regexp = ActingMemberHeader.EXCHANGE_IDEMPOTENCY_KEY_PATTERN)
           @RequestHeader(
               value = ActingMemberHeader.EXCHANGE_IDEMPOTENCY_KEY_HEADER,
               required = false)

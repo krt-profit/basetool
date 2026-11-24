@@ -21,7 +21,8 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 /**
  * The access a job-order edit demands of its caller, decided by {@link JobOrderAccessPolicy} on the
- * already-loaded order (ADR-0236 §6, ADR-0287).
+ * already-loaded order (ADR-0236 §6, ADR-0287). A status change carries no gate: its caller passes
+ * the writer rule and the read check (ADR-0408).
  */
 public enum JobOrderGate {
 
@@ -33,17 +34,6 @@ public enum JobOrderGate {
 
   /** The responsible writer or a current Staffel writer may coordinate support. */
   SUPPORT,
-
-  /** The responsible-unit writer may change the ordinary lifecycle status. */
-  STATUS,
-
-  /** Either current unit writer may cancel active work. */
-  CANCEL,
-
-  /**
-   * Either current unit writer may reopen a cancellation, otherwise only the responsible writer.
-   */
-  SET_OPEN,
 
   /** Current responsible-unit authority permits recovery despite ineligible responsibility. */
   TRANSFER,

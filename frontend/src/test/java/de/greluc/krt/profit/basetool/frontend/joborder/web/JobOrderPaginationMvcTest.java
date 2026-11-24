@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,9 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -116,35 +115,7 @@ class JobOrderPaginationMvcTest extends JobOrderPageMvcTestBase {
    */
   private static PageResponse<JobOrderDto> pageWithOneOrder(int total) {
     JobOrderDto order =
-        new JobOrderDto(
-            UUID.randomUUID(),
-            7,
-            null,
-            null,
-            "Tester",
-            null,
-            1,
-            "OPEN",
-            "MATERIAL",
-            false,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder().displayId(7).handle("Tester").countBlueprintsWithVariants(false).build();
     int totalPages = (int) Math.ceil((double) total / 100);
     return new PageResponse<>(List.of(order), 0, 100, total, totalPages, List.of());
   }

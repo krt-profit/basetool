@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -27,7 +28,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -68,11 +68,7 @@ class OrgUnitBankVisibleAccountsQueryTest {
   }
 
   private static OrgUnit unit(UUID id) {
-    Squadron squadron = new Squadron();
-    squadron.setId(id);
-    squadron.setName("Unit " + id);
-    squadron.setShorthand("U");
-    return squadron;
+    return squadron(id, "Unit " + id, "U");
   }
 
   private static BankAccount account(String id, String accountNo, BankAccountType type, UUID unit) {

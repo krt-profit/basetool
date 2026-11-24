@@ -19,15 +19,18 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend's {@code CreateJobOrderDto}. {@link #responsibleOrgUnitId} is the
  * eligible Profit Bereich, Staffel or SK that processes the order; {@link #requestingOrgUnitId} is
- * the customer, which may be any org unit.
+ * the customer, which may be any org unit. An update echoes the {@link #observed} versions, which
+ * travel as the flat {@code version} and {@code commentVersion} fields; a create sends both empty.
  */
 @DtoMirror
 public record CreateJobOrderDto(
@@ -36,4 +39,4 @@ public record CreateJobOrderDto(
     String handle,
     String comment,
     List<CreateJobOrderMaterialDto> materials,
-    Long version) {}
+    @JsonUnwrapped @NotNull JobOrderObservedVersions observed) {}

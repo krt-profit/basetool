@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -2303,8 +2304,7 @@ class InventoryItemServiceTest {
     when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
     when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
 
-    Squadron resolved = new Squadron();
-    resolved.setId(pickedOrgUnitId);
+    Squadron resolved = squadron(pickedOrgUnitId);
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
         .thenReturn(resolved);
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
@@ -2386,8 +2386,7 @@ class InventoryItemServiceTest {
     Location location = new Location();
     location.setId(locationId);
 
-    Squadron orgB = new Squadron();
-    orgB.setId(pickedOrgUnitId);
+    Squadron orgB = squadron(pickedOrgUnitId);
 
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));

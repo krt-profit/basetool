@@ -38,8 +38,8 @@ may fall below, lose or move its handed-over credit (REQ-ORDERS-077). For ITEM,
 `PUT /orders/{id}/items/requested` reconciles persistent line identities in place. Recorded
 handovers and manufactured and delivered quantities survive.
 A produced line remains present with the same item and an amount that covers booked quantities.
-Both edits use the observed need version, reconcile material promises atomically, and preserve
-the current lifecycle. The central detail exposes the appropriate existing editor.
+Both edits use the observed need version and comment version (REQ-ORDERS-066), reconcile material
+promises atomically, and preserve the current lifecycle. The central detail exposes the appropriate existing editor.
 A valid responsibility transfer is required before editing an order with invalid responsibility.
 
 Requester writes retain the existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` audit events

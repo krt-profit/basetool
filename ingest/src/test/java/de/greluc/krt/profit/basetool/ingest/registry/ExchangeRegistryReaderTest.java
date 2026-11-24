@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeGatewayProperties;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRegistryMirrorAge;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
@@ -114,11 +115,11 @@ class ExchangeRegistryReaderTest {
     when(values.get(KEY))
         .thenReturn(
             DOCUMENT.replace("\"enabled\":true,", "\"enabled\":true,\"bankEnabled\":true,"));
-    assertThat(reader.current().bankEnabled()).isTrue();
+    assertThat(reader.current().isOn(AreaSwitch.BANK)).isTrue();
 
     assertThat(
             ExchangeRegistryReader.parse(JsonMapper.builder().build().readTree(DOCUMENT))
-                .bankEnabled())
+                .isOn(AreaSwitch.BANK))
         .isFalse();
     assertThat(
             ExchangeRegistryReader.parse(
@@ -127,7 +128,38 @@ class ExchangeRegistryReaderTest {
                         .readTree(
                             DOCUMENT.replace(
                                 "\"enabled\":true,", "\"enabled\":true,\"bankEnabled\":\"yes\",")))
-                .bankEnabled())
+                .isOn(AreaSwitch.BANK))
+        .isFalse();
+  }
+
+  @Test
+  void theJobOrderSwitchesAreReadAndEachCountsAsOffWhenAbsentOrMalformed() {
+    when(values.get(KEY))
+        .thenReturn(
+            DOCUMENT.replace(
+                "\"enabled\":true,",
+                "\"enabled\":true,\"jobOrdersEnabled\":true,\"jobOrderWritesEnabled\":true,"));
+    ExchangeRegistry both = reader.current();
+    assertThat(both.isOn(AreaSwitch.JOB_ORDERS)).isTrue();
+    assertThat(both.isOn(AreaSwitch.JOB_ORDER_WRITES)).isTrue();
+
+    ExchangeRegistry absent =
+        ExchangeRegistryReader.parse(JsonMapper.builder().build().readTree(DOCUMENT));
+    assertThat(absent.isOn(AreaSwitch.JOB_ORDERS)).isFalse();
+    assertThat(absent.isOn(AreaSwitch.JOB_ORDER_WRITES)).isFalse();
+
+    ExchangeRegistry familyOnly =
+        ExchangeRegistryReader.parse(
+            JsonMapper.builder()
+                .build()
+                .readTree(
+                    DOCUMENT.replace(
+                        "\"enabled\":true,",
+                        "\"enabled\":true,\"jobOrdersEnabled\":true,"
+                            + "\"jobOrderWritesEnabled\":\"yes\",")));
+    assertThat(familyOnly.isOn(AreaSwitch.JOB_ORDERS)).isTrue();
+    assertThat(familyOnly.isOn(AreaSwitch.JOB_ORDER_WRITES))
+        .as("a mirror document without a usable writes field reads as off")
         .isFalse();
   }
 

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -65,10 +66,7 @@ class KommandoGroupServiceTest {
   @BeforeEach
   void setUp() {
     squadronId = UUID.randomUUID();
-    squadron = new Squadron();
-    squadron.setId(squadronId);
-    squadron.setName("Alpha");
-    squadron.setShorthand("ALF");
+    squadron = squadron(squadronId, "Alpha", "ALF");
   }
 
   @Test

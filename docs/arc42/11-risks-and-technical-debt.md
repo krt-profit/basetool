@@ -379,6 +379,20 @@ since the go-live of 2026-09-28, so these risks hold now.
   `exchange.demand.details` a Logistician of the unit gets the orders by number with their
   Auftraggeber and comment, free text that may name a person and that no name withholding covers
   (REQ-XCH-047, ADR-0257).
+- **Job orders on third-party devices** (owner decision in #3608, ADR-0407). A connected
+  application holds the orders of the member's direct units and own assignee entries — units,
+  contact on material and item orders, comment, progress and assignee names — on a device the
+  Basetool does not control. The read set is narrower than the web's (no Profit-wide read, no
+  cascade, no holder link), carries no holder, amount per person or Bank state, leaves out members
+  who withhold their name, and is decided anew on every request; the client keeps it at most
+  7 days, outside cloud-synced folders, backups and diagnostics, as an approval criterion that only
+  the release review checks.
+- **The job-order feed names orders a client never held** (owner decision in #3615, ADR-0406). A
+  "gone" entry `{ key, removedAt }` reaches every member who may have read the order through a
+  unit, for example after joining a unit an order had moved away from, or after leaving a unit,
+  whose log is announced to the member whole; the client learns only a UUID that answers `404`
+  and ignores it. A change reaches the feed a few seconds late through the fingerprint worker, and
+  a closed order can stay one nightly run past its 7 days (REQ-OXCH-003).
 - **Overwriting ship updates pass the mass-change guard.** A ship counts as removed only when one
   `upsert` changes both its name and its type; nothing compares it with its state at window start,
   as the stock rule does. A batch that retypes every ship or clears their names and locations is

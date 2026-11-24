@@ -32,7 +32,7 @@ registry client id) and exclude the admin.
 
 ### REQ-XCH-041 — Switching the exchange off tells every holder
 
-`updateSettings` publishes `EXCHANGE_SWITCHED_OFF` when the global switch goes off; the default rule
+`updateSwitch` publishes `EXCHANGE_SWITCHED_OFF` when the global switch goes off; the default rule
 notifies the holders of any installation of any client (`contextAllExchangeClients`). Switching it on
 publishes `EXCHANGE_SWITCHED_ON`, which creates no notice and clears the switched-off notices.
 

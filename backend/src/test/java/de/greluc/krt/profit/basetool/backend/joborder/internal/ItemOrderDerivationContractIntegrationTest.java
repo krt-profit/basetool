@@ -82,7 +82,12 @@ class ItemOrderDerivationContractIntegrationTest extends MaterialContributionTes
             null);
     var request =
         new CreateJobOrderItemRequestDto(
-            null, null, before.handle(), null, List.of(line), before.version());
+            null,
+            null,
+            before.handle(),
+            null,
+            List.of(line),
+            new JobOrderObservedVersions(before.version(), before.commentVersion()));
     String body =
         mvc()
             .perform(

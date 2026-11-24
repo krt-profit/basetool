@@ -45,6 +45,14 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeHomeL
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeHomeLocationChosenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationLabelRequest;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCancelDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCommentDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangeDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWithTargetDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockChangeSet;
@@ -100,9 +108,12 @@ class ExchangeFieldRatchetTest {
   /** The listed class of every published leaf property. */
   private static final String CLASSES = "/exchange/field-classes.txt";
 
-  /** Every DTO the backend reads from or writes to the exchange, with its published schema. */
-  private static final Map<Class<?>, String> PUBLISHED =
-      Map.ofEntries(
+  /**
+   * Every DTO the backend reads from or writes to the exchange, with each published schema it
+   * answers or reads.
+   */
+  private static final List<Map.Entry<Class<?>, String>> PUBLISHED =
+      List.of(
           Map.entry(ExchangeInstallationDto.class, "installation.schema.json"),
           Map.entry(ExchangeInstallationLabelRequest.class, "installation.schema.json"),
           Map.entry(ExchangeAccountCheckRequest.class, "account-check-request.schema.json"),
@@ -121,6 +132,20 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeBankBalanceSeriesDto.class, "bank-balance-series.schema.json"),
           Map.entry(ExchangeBankQueueDto.class, "bank-queue.schema.json"),
           Map.entry(ExchangeBankRequestPageDto.class, "page.schema.json#/$defs/bankRequestPage"),
+          Map.entry(ExchangeJobOrderPageDto.class, "page.schema.json#/$defs/jobOrderPage"),
+          Map.entry(ExchangeJobOrderCreateOptionsDto.class, "job-order-create-options.schema.json"),
+          Map.entry(ExchangeJobOrderCreateDto.class, "job-order-write.schema.json#/$defs/create"),
+          Map.entry(
+              ExchangeJobOrderWithTargetDto.class, "job-order-write.schema.json#/$defs/created"),
+          Map.entry(ExchangeJobOrderCancelDto.class, "job-order-write.schema.json#/$defs/cancel"),
+          Map.entry(ExchangeJobOrderCommentDto.class, "job-order-write.schema.json#/$defs/comment"),
+          Map.entry(ExchangeJobOrderWrittenDto.class, "job-order-write.schema.json#/$defs/written"),
+          Map.entry(
+              ExchangeJobOrderTargetChangeDto.class,
+              "job-order-write.schema.json#/$defs/targetChange"),
+          Map.entry(
+              ExchangeJobOrderWithTargetDto.class,
+              "job-order-write.schema.json#/$defs/targetChanged"),
           Map.entry(
               ExchangeBankRequestCreateDto.class, "bank-request-write.schema.json#/$defs/raise"),
           Map.entry(
@@ -191,8 +216,10 @@ class ExchangeFieldRatchetTest {
     Map<String, JsonNode> documents = published();
     Set<String> undeclared = new TreeSet<>();
     Set<Class<?>> reached = new HashSet<>();
-    PUBLISHED.forEach((dto, schema) ->
-        undeclared.addAll(ExchangeFieldRatchet.undeclaredFields(documents, dto, schema, reached)));
+    PUBLISHED.forEach(entry ->
+        undeclared.addAll(
+            ExchangeFieldRatchet.undeclaredFields(
+                documents, entry.getKey(), entry.getValue(), reached)));
     assertThat(undeclared).as("DTO fields their v1 schema does not declare").isEmpty();
   }
 
@@ -200,8 +227,9 @@ class ExchangeFieldRatchetTest {
   void everyExchangeDtoIsPublishedOrNamedInternal() throws IOException {
     Map<String, JsonNode> documents = published();
     Set<Class<?>> reached = new HashSet<>();
-    PUBLISHED.forEach(
-        (dto, schema) -> ExchangeFieldRatchet.undeclaredFields(documents, dto, schema, reached));
+    PUBLISHED.forEach(entry ->
+        ExchangeFieldRatchet.undeclaredFields(
+            documents, entry.getKey(), entry.getValue(), reached));
     Set<String> unreached =
         exchangeDtoRecords().stream()
             .filter(type -> !reached.contains(type))

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -217,9 +217,7 @@ class HangarAccessPolicyDifferentialTest {
       user.setId(owner);
       ship.setOwner(user);
       if (unit != null) {
-        Squadron squadron = new Squadron();
-        squadron.setId(unit);
-        ship.setOwningOrgUnit(squadron);
+        ship.setOwningOrgUnit(squadron(unit));
       }
       when(repository.findById(id)).thenReturn(Optional.of(ship));
       ships.put(label, id);

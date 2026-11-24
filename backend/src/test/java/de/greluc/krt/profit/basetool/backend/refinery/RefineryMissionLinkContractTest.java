@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
@@ -105,10 +106,8 @@ class RefineryMissionLinkContractTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String tag = UUID.randomUUID().toString().substring(0, 6);
-    home = new Squadron();
-    home.setName("LinkHome-" + tag);
-    home.setShorthand("L" + tag);
-    home = squadronRepository.save(home);
+    home =
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "LinkHome-" + tag, "L" + tag, null);
     admin = user("link-admin");
   }
 

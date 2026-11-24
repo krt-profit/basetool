@@ -518,6 +518,15 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "jobOrdersCreatedThroughClients",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "job_order" : <n>,
+      "client" : "zzz-export-client",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "marketRequests",
     "legalBasis" : "ART_15_20",
     "rows" : [ {

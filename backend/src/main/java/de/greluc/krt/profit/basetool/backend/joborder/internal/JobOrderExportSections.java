@@ -26,7 +26,10 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
-/** Exports the member's job-order assignments, material claims and directly related money facts. */
+/**
+ * Exports the member's job-order assignments, material claims, directly related money facts and the
+ * orders they created through a connected application.
+ */
 @Component
 public class JobOrderExportSections implements PersonalDataExportSection {
 
@@ -195,7 +198,18 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                 + "WHERE correction.actor_id = :userId OR "
                 + MONEY_PERSON
                 + "ORDER BY c.id"),
-        linkedMoneyAttempts());
+        linkedMoneyAttempts(),
+        new Section(
+            314,
+            "jobOrdersCreatedThroughClients",
+            ART_15_20,
+            "The aUEC orders the member created through a connected application, while the order"
+                + " keeps its creator.",
+            """
+            SELECT o.display_id AS job_order, o.created_by_client_id AS client, o.created_at
+            FROM job_order o
+            WHERE o.created_by_member_id = :userId ORDER BY o.created_at, o.id
+            """));
   }
 
   private static Section linkedMoneyAttempts() {

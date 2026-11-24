@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -102,10 +103,12 @@ class OfficerCutReportIntegrationTest {
     user(SEAT_WITH_ROLE, "cut-seat-with", Set.of(krtMember, officer));
     user(PLAIN_MEMBER, "cut-plain", Set.of());
     user(OFFICER_WITHOUT_SEAT, "cut-officer", Set.of(krtMember, officer));
-    squadron = new Squadron();
-    squadron.setName("Officer Cut " + UUID.randomUUID());
-    squadron.setShorthand("OC" + UUID.randomUUID().toString().substring(0, 6));
-    squadron = squadronRepository.saveAndFlush(squadron);
+    squadron =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository,
+            "Officer Cut " + UUID.randomUUID(),
+            "OC" + UUID.randomUUID().toString().substring(0, 6),
+            null);
     membership(SEAT_WITHOUT_ROLE, MembershipRole.STAFFELLEITER);
     membership(SEAT_WITH_ROLE, MembershipRole.ENSIGN);
     membership(PLAIN_MEMBER, MembershipRole.MEMBER);

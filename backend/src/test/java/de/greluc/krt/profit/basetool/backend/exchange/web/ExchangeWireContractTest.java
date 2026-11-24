@@ -47,6 +47,10 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBluep
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeHomeLocationChosenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWithTargetDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockMembersDto;
@@ -161,6 +165,28 @@ class ExchangeWireContractTest {
           "/bank/requests");
 
   /**
+   * The job-order reads, which answer only with the job-order switch on; {@code
+   * ExchangeJobOrderSnapshotTest}, {@code ExchangeJobOrderFeedTest} and {@code
+   * ExchangeJobOrderCreateTest} check their snapshot, feed and create-options answers against the
+   * published schemas on a seeded world.
+   */
+  private static final Set<String> JOB_ORDER_READS =
+      Set.of("/job-orders", "/job-orders/create-options");
+
+  /**
+   * The job-order writes, which answer only with both job-order switches on and a member who writes
+   * for a unit; {@code ExchangeJobOrderCreateTest}, {@code ExchangeJobOrderCancelTest}, {@code
+   * ExchangeJobOrderTargetTest} and {@code ExchangeJobOrderCommentTest} send them on a seeded
+   * world.
+   */
+  private static final Set<String> JOB_ORDER_WRITES =
+      Set.of(
+          "/job-orders",
+          "/job-orders/{id}/cancel",
+          "/job-orders/{id}/target",
+          "/job-orders/{id}/comment");
+
+  /**
    * The bank request writes, which answer only with the bank switched on and a seeded bank world;
    * {@code ExchangeBankRequestWritesTest} sends them on one.
    */
@@ -190,6 +216,11 @@ class ExchangeWireContractTest {
           Map.entry("bank-balance-series", ExchangeBankBalanceSeriesDto.class),
           Map.entry("bank-queue", ExchangeBankQueueDto.class),
           Map.entry("page--bankRequestPage", ExchangeBankRequestPageDto.class),
+          Map.entry("page--jobOrderPage", ExchangeJobOrderPageDto.class),
+          Map.entry("job-order-write--created", ExchangeJobOrderWithTargetDto.class),
+          Map.entry("job-order-write--written", ExchangeJobOrderWrittenDto.class),
+          Map.entry("job-order-write--targetChanged", ExchangeJobOrderWithTargetDto.class),
+          Map.entry("job-order-create-options", ExchangeJobOrderCreateOptionsDto.class),
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),
           Map.entry("org-stock-members", ExchangeOrgStockMembersDto.class),
@@ -285,6 +316,7 @@ class ExchangeWireContractTest {
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
       if (operation.requestSchema() == null
           || BANK_WRITES.contains(operation.relayPath())
+          || JOB_ORDER_WRITES.contains(operation.relayPath())
           || HOME_LOCATION_CHOICE.equals(operation.relayPath())) {
         continue;
       }
@@ -333,7 +365,9 @@ class ExchangeWireContractTest {
     seed();
     Map<String, Integer> items = new TreeMap<>();
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
-      if (!"GET".equals(operation.method()) || BANK_READS.contains(operation.relayPath())) {
+      if (!"GET".equals(operation.method())
+          || BANK_READS.contains(operation.relayPath())
+          || JOB_ORDER_READS.contains(operation.relayPath())) {
         continue;
       }
       String path = ExchangeSeam.RELAY_PREFIX + operation.relayPath();
@@ -384,7 +418,9 @@ class ExchangeWireContractTest {
     seed();
     Map<String, String> cursors = new TreeMap<>();
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
-      if (operation.paged() && !BANK_READS.contains(operation.relayPath())) {
+      if (operation.paged()
+          && !BANK_READS.contains(operation.relayPath())
+          && !JOB_ORDER_READS.contains(operation.relayPath())) {
         JsonNode snapshot =
             mapper.readTree(read(ExchangeSeam.RELAY_PREFIX + operation.relayPath()));
         assertThat(snapshot.path("hasMore").asBoolean()).isFalse();

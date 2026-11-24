@@ -31,6 +31,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeGateFilter;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRefusals;
@@ -46,6 +47,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -186,17 +188,30 @@ class ExchangeRelayTest {
   @Test
   void theBackendGatesRefusalsPassThroughWithTheGatewayGatesCodeStatusAndDetail() {
     assertGate(503, "EXCHANGE_DISABLED", ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL);
-    assertGate(503, "BANK_EXCHANGE_DISABLED", ExchangeGateFilter.BANK_EXCHANGE_DISABLED_DETAIL);
+    assertGate(503, "BANK_EXCHANGE_DISABLED", AreaSwitch.BANK.getDetail());
+    assertGate(503, "JOB_ORDER_EXCHANGE_DISABLED", AreaSwitch.JOB_ORDERS.getDetail());
+    assertGate(503, "JOB_ORDER_WRITES_DISABLED", AreaSwitch.JOB_ORDER_WRITES.getDetail());
     assertGate(503, "REGISTRY_UNAVAILABLE", ExchangeGateFilter.REGISTRY_UNAVAILABLE_DETAIL);
     assertGate(403, "CLIENT_NOT_ALLOWED", ExchangeGateFilter.CLIENT_NOT_ALLOWED_DETAIL);
     assertGate(403, "CLIENT_SUSPENDED", ExchangeGateFilter.CLIENT_SUSPENDED_DETAIL);
     assertGate(401, "INSTALLATION_REVOKED", ExchangeGateFilter.INSTALLATION_REVOKED_DETAIL);
     assertGate(401, "CLIENT_REVOKED", ExchangeGateFilter.CLIENT_REVOKED_DETAIL);
     assertGate(403, "SCOPE_MISSING", ExchangeGateFilter.SCOPE_MISSING_DETAIL);
-    assertThat(ExchangeRelay.GATE_STATUSES).hasSize(8);
-    assertThat(count("refused")).isEqualTo(8.0d);
+    assertThat(ExchangeRelay.GATE_STATUSES).hasSize(10);
+    assertThat(count("refused")).isEqualTo(10.0d);
     assertThat(ExchangeRelay.retryAfterSeconds("BANK_EXCHANGE_DISABLED")).isEqualTo("300");
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_EXCHANGE_DISABLED")).isEqualTo("300");
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_WRITES_DISABLED")).isEqualTo("300");
     assertThat(ExchangeRelay.retryAfterSeconds("EXCHANGE_DISABLED")).isEqualTo("30");
+    assertThat(ExchangeRelay.retryAfterSeconds(null)).isNull();
+  }
+
+  @Test
+  void aJobOrderSwitchCodeArrivingWithAnotherStatusIsARelayFailure() {
+    assertThat(interpret(502, "{\"code\":\"JOB_ORDER_EXCHANGE_DISABLED\"}").code())
+        .isEqualTo("BACKEND_RELAY_FAILED");
+    assertThat(interpret(409, "{\"code\":\"JOB_ORDER_WRITES_DISABLED\"}").code())
+        .isEqualTo("BACKEND_RELAY_FAILED");
   }
 
   @Test
@@ -211,6 +226,25 @@ class ExchangeRelayTest {
         .isEqualTo("BACKEND_RELAY_FAILED");
     assertThat(interpret(502, "{\"code\":\"EXTERNAL_SERVICE_ERROR\"}").status()).isEqualTo(502);
     assertThat(count("failed")).isEqualTo(5.0d);
+  }
+
+  @Test
+  void theJobOrderCapsPassWithTheirFixedDetailAndOnlyTheDailyCapWaitsForTheNextUtcDay() {
+    for (String cap : List.of("JOB_ORDER_OPEN_ORDER_CAP", "JOB_ORDER_DAILY_CREATE_CAP")) {
+      ExchangeRelay.Result result =
+          interpret(409, "{\"code\":\"" + cap + "\",\"detail\":\"Backend words.\"}");
+
+      assertThat(result.status()).isEqualTo(409);
+      assertThat(result.code()).isEqualTo(cap);
+      assertThat(result.detail()).isNotBlank().doesNotContain("Backend words.");
+      assertThat(ExchangeRelay.retryAfterSeconds(cap)).isNull();
+    }
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_DAILY_CREATE_CAP", () -> 3600L))
+        .isEqualTo("3600");
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_OPEN_ORDER_CAP", () -> 3600L)).isNull();
+    assertThat(ExchangeRelay.retryAfterSeconds(null, () -> 3600L)).isNull();
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_WRITES_DISABLED", () -> 3600L))
+        .isEqualTo("300");
   }
 
   @Test

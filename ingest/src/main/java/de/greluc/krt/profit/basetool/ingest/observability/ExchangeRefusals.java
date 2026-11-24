@@ -19,13 +19,17 @@
 
 package de.greluc.krt.profit.basetool.ingest.observability;
 
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistry;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistryReader;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeUnavailableException;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Function;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -60,9 +64,6 @@ public class ExchangeRefusals {
 
   /** The exchange is switched off. */
   public static final String EXCHANGE_DISABLED = "EXCHANGE_DISABLED";
-
-  /** The bank switch is off and the request is for the bank route family. */
-  public static final String BANK_EXCHANGE_DISABLED = "BANK_EXCHANGE_DISABLED";
 
   /** The token's client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
@@ -109,32 +110,36 @@ public class ExchangeRefusals {
   /** The gateway already relays as many large change sets as it admits at once. */
   public static final String RELAY_BUSY = "RELAY_BUSY";
 
-  /** Every code this counter knows, registered at zero. */
+  /** Every code this counter knows, registered at zero; each {@link AreaSwitch} adds its own. */
   public static final @Unmodifiable List<String> CODES =
-      List.of(
-          DPOP_REQUIRED,
-          DPOP_INVALID,
-          DPOP_PROOF_LIMIT,
-          UNAUTHENTICATED,
-          NOT_FOUND,
-          REGISTRY_UNAVAILABLE,
-          EXCHANGE_DISABLED,
-          BANK_EXCHANGE_DISABLED,
-          CLIENT_NOT_ALLOWED,
-          CLIENT_SUSPENDED,
-          ORIGIN_NOT_ALLOWED,
-          INSTALLATION_REVOKED,
-          CLIENT_REVOKED,
-          SCOPE_MISSING,
-          CLIENT_VERSION_UNSUPPORTED,
-          RATE_LIMITED,
-          QUOTA_EXCEEDED,
-          SERVICE_UNAVAILABLE,
-          IDEMPOTENCY_KEY_MISSING,
-          IDEMPOTENCY_KEY_REUSED,
-          IDEMPOTENCY_IN_PROGRESS,
-          EXCHANGE_BUDGET_EXHAUSTED,
-          RELAY_BUSY);
+      Stream.of(
+              Stream.of(
+                  DPOP_REQUIRED,
+                  DPOP_INVALID,
+                  DPOP_PROOF_LIMIT,
+                  UNAUTHENTICATED,
+                  NOT_FOUND,
+                  REGISTRY_UNAVAILABLE,
+                  EXCHANGE_DISABLED),
+              Arrays.stream(AreaSwitch.values()).map(AreaSwitch::getCode),
+              Stream.of(
+                  CLIENT_NOT_ALLOWED,
+                  CLIENT_SUSPENDED,
+                  ORIGIN_NOT_ALLOWED,
+                  INSTALLATION_REVOKED,
+                  CLIENT_REVOKED,
+                  SCOPE_MISSING,
+                  CLIENT_VERSION_UNSUPPORTED,
+                  RATE_LIMITED,
+                  QUOTA_EXCEEDED,
+                  SERVICE_UNAVAILABLE,
+                  IDEMPOTENCY_KEY_MISSING,
+                  IDEMPOTENCY_KEY_REUSED,
+                  IDEMPOTENCY_IN_PROGRESS,
+                  EXCHANGE_BUDGET_EXHAUSTED,
+                  RELAY_BUSY))
+          .flatMap(Function.identity())
+          .toList();
 
   private final MeterRegistry meterRegistry;
 

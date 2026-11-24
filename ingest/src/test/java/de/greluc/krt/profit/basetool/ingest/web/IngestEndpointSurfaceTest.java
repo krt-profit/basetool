@@ -84,6 +84,18 @@ class IngestEndpointSurfaceTest {
           new Call(
               HttpMethod.POST,
               "/exchange/v1/bank/requests/00000000-0000-4000-8000-000000000000/cancel"),
+          new Call(HttpMethod.GET, "/exchange/v1/job-orders"),
+          new Call(HttpMethod.GET, "/exchange/v1/job-orders/create-options"),
+          new Call(HttpMethod.POST, "/exchange/v1/job-orders"),
+          new Call(
+              HttpMethod.POST,
+              "/exchange/v1/job-orders/00000000-0000-4000-8000-000000000000/cancel"),
+          new Call(
+              HttpMethod.POST,
+              "/exchange/v1/job-orders/00000000-0000-4000-8000-000000000000/target"),
+          new Call(
+              HttpMethod.POST,
+              "/exchange/v1/job-orders/00000000-0000-4000-8000-000000000000/comment"),
           new Call(HttpMethod.POST, "/exchange/v1/org-stock/changes"),
           new Call(HttpMethod.POST, "/exchange/v1/me/blueprints/changes"),
           new Call(HttpMethod.POST, "/exchange/v1/me/stock/changes"),

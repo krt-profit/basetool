@@ -83,7 +83,12 @@ class ItemOrderRecipeFreshnessIntegrationTest extends MaterialContributionTestSu
             null);
     var update =
         new CreateJobOrderItemRequestDto(
-            null, null, before.handle(), null, List.of(line), before.version());
+            null,
+            null,
+            before.handle(),
+            null,
+            List.of(line),
+            new JobOrderObservedVersions(before.version(), before.commentVersion()));
     var allocation =
         Map.of(
             "field",
@@ -174,7 +179,12 @@ class ItemOrderRecipeFreshnessIntegrationTest extends MaterialContributionTestSu
     assertThat(onlyBucket(fixture.orderId()).openRemaining()).isEqualTo(9.0);
     var retry =
         new CreateJobOrderItemRequestDto(
-            null, null, refused.handle(), null, List.of(line), refused.version());
+            null,
+            null,
+            refused.handle(),
+            null,
+            List.of(line),
+            new JobOrderObservedVersions(refused.version(), refused.commentVersion()));
     String body =
         mvc()
             .perform(

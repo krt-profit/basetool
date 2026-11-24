@@ -40,9 +40,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipService;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,10 +92,9 @@ class DelegatedAppointmentControllerSecurityTest {
    */
   private UUID seedStaffel() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron staffel = new Squadron();
-    staffel.setName("Pin-Staffel-" + tag);
-    staffel.setShorthand("PS" + tag);
-    return squadronRepository.save(staffel).getId();
+    return OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Pin-Staffel-" + tag, "PS" + tag, null)
+        .getId();
   }
 
   /**

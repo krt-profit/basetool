@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -138,9 +139,7 @@ class PurchasingDeliveryServiceTest {
     material.setName("Quantanium");
     location = new Location();
     location.setId(LOCATION);
-    unit = new Squadron();
-    unit.setId(UNIT);
-    unit.setName("Alpha");
+    unit = squadron(UNIT, "Alpha");
     deal = new PurchasingDeal();
     deal.setId(DEAL);
     deal.setDealNo(42L);

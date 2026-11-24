@@ -108,6 +108,7 @@ SANDBOX = Target(
         {"id": "5a4d0000-0000-4000-8000-000000000001", "username": "sandbox-member"},
         {"id": "5a4d0000-0000-4000-8000-000000000002", "username": "sandbox-member-2"},
         {"id": "5a4d0000-0000-4000-8000-000000000003", "username": "sandbox-admin"},
+        {"id": "5a4d0000-0000-4000-8000-000000000004", "username": "sandbox-logistician"},
         *(
             {
                 "id": f"5a4d0000-0000-4000-8000-0000000002{n:02d}",
@@ -120,6 +121,7 @@ SANDBOX = Target(
         "sandbox-member",
         "sandbox-member-2",
         "sandbox-admin",
+        "sandbox-logistician",
         *(f"sandbox-load-{n:02d}" for n in range(1, LOAD_MEMBERS + 1)),
     ),
     fixed_ids=True,

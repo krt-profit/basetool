@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -399,8 +400,7 @@ class MissionServiceTest {
 
   @Test
   void createMission_stampsOwningSquadronFromOwnerSquadron() {
-    Squadron home = new Squadron();
-    home.setId(UUID.randomUUID());
+    Squadron home = squadron(UUID.randomUUID());
     User caller = new User();
     caller.setId(UUID.randomUUID());
 
@@ -470,8 +470,7 @@ class MissionServiceTest {
 
   @Test
   void createMission_fallsBackToCurrentSquadronScopeWhenNoOwnerResolved() {
-    Squadron scopeSquadron = new Squadron();
-    scopeSquadron.setId(UUID.randomUUID());
+    Squadron scopeSquadron = squadron(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.empty());
     when(requestScopeResolver.currentOrgUnit()).thenReturn(Optional.of(scopeSquadron));
@@ -490,8 +489,7 @@ class MissionServiceTest {
   void createMission_honoursOwningOrgUnitIdFromTheRequestViaPickerResolver() {
     User caller = new User();
     caller.setId(UUID.randomUUID());
-    Squadron picked = new Squadron();
-    picked.setId(UUID.randomUUID());
+    Squadron picked = squadron(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
     when(orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, picked.getId()))
@@ -523,8 +521,7 @@ class MissionServiceTest {
 
   @Test
   void addSubMission_inheritsOwningSquadronFromParent_ignoringScopeAndCaller() {
-    Squadron parentSquadron = new Squadron();
-    parentSquadron.setId(UUID.randomUUID());
+    Squadron parentSquadron = squadron(UUID.randomUUID());
     UUID parentId = UUID.randomUUID();
     Mission parent = new Mission();
     parent.setId(parentId);

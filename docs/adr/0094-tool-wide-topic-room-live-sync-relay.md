@@ -1,6 +1,6 @@
 # ADR-0094 — Tool-wide topic-room live sync over one multiplexed WebSocket with Redis pub/sub fan-out
 
-- **Status:** Accepted (amended 2026-10-01, 2026-11-14)
+- **Status:** Accepted (amended 2026-10-01, 2026-11-14, 2026-11-23 — the job-order create publishes from the backend, [ADR-0407](0407-job-orders-on-the-exchange.md))
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
 - **Related:** REQ-FE-015 · REQ-FE-010 · REQ-NOTIF-006/-010 · REQ-OBS-011 · ADR-0031 (mission relay — generalized here) · ADR-0016 (notification SSE — its Redis deferral is discharged here) · ADR-0079 (Redis AOF/noeviction) · ADR-0084 (readiness excludes optional externals) · ADR-0085 (5000-account capacity) · #1102 · #1115 · #1120 · #1241 · #1243 (publish-amplification bounds) · #1236 (legacy-alias removal) · #1307/#1309 (Lager) · #1235 (Phase-3 completion)
@@ -95,8 +95,8 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
   capped multiplexed one.
 - **Server-side publish hook** (`LiveSyncLocalBus.publish`, delegating to
   `LiveSyncWebSocketHandler.publishFromServer`) exists for mutations that reach the frontend
-  without a client socket: first consumer is the job-order create path, whose anonymous-guest
-  submissions must still refresh the staff queue.
+  without a client socket. The job-order create no longer uses it: the backend publishes the
+  create's `orders/queue` frame after the commit for the web and the exchange alike (ADR-0407).
 
 ### Redis pub/sub fan-out — frontend relay and backend SSE
 
@@ -313,8 +313,8 @@ class without a fallback ignores the field. Owner decision of 2026-11-14 (REQ-FE
 - **Server-side triggers on every write route (interceptor + endpoint→section map).**
   Cleanest trust model, but duplicates the mutation→section knowledge that already lives in
   the page seam maps across ~dozens of routes, and diverges from the shipped chokepoint
-  pattern. The `LiveSyncLocalBus` seam keeps this door open per-endpoint (used for the
-  anonymous order-create hook) without adopting it wholesale.
+  pattern. The `LiveSyncLocalBus` seam keeps this door open per-endpoint without adopting it
+  wholesale.
 - **Uniform Redis path (origin instance consumes its own message instead of local-first).**
   Rejected: makes local delivery depend on Redis health, so a Redis outage would break
   single-instance live sync — a regression the local-first + origin-skip flow avoids at the

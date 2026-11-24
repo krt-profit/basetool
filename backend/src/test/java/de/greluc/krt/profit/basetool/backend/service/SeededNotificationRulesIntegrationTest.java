@@ -309,6 +309,16 @@ class SeededNotificationRulesIntegrationTest {
             SelectorKind.ROLE,
             SelectorKind.ROLE),
         rule(
+            NotificationEventType.JOB_ORDER_EXCHANGE_SWITCHED_ON,
+            NotificationType.JOB_ORDER_EXCHANGE_SWITCHED_ON,
+            true,
+            SelectorKind.ROLE),
+        rule(
+            NotificationEventType.JOB_ORDER_EXCHANGE_SWITCHED_OFF,
+            NotificationType.JOB_ORDER_EXCHANGE_SWITCHED_OFF,
+            true,
+            SelectorKind.ROLE),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -60,7 +61,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.math.BigDecimal;
@@ -427,13 +427,6 @@ class ExchangeDemandServiceTest {
     line.setAmount(amount);
     line.setDeliveredAmount(delivered);
     return line;
-  }
-
-  private static @NotNull Squadron squadron(@NotNull UUID id, @NotNull String name) {
-    Squadron squadron = new Squadron();
-    squadron.setId(id);
-    squadron.setName(name);
-    return squadron;
   }
 
   private static @NotNull GameItem gameItem(@NotNull String name) {

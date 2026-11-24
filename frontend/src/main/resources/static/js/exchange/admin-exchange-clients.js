@@ -116,14 +116,22 @@ function initAdminExchangeClients() {
         /** @type {string[]} */
         let loadedCapabilities = [];
 
+        /**
+         * Reads one localized text from an element's `data-*` attributes.
+         * @param {DOMStringMap} data the element's dataset
+         * @param {string} key the dataset key in camel case
+         * @returns {string}
+         */
+        function datasetText(data, key) {
+            const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+            return krtI18nText(data[key], attribute);
+        }
+
         function readMessages() {
             const holder = document.getElementById('xc-i18n');
             const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
             /** @param {string} key */
-            const text = function (key) {
-                const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-                return krtI18nText(data[key], attribute);
-            };
+            const text = (key) => datasetText(data, key);
             return {
                 saved: text('saved'),
                 suspended: text('suspended'),
@@ -143,11 +151,6 @@ function initAdminExchangeClients() {
                 confirmOnTitle: text('confirmOnTitle'),
                 confirmOnBody: text('confirmOnBody'),
                 confirmOnOk: text('confirmOnOk'),
-                bankSwitched: text('bankSwitched'),
-                confirmBankOffTitle: text('confirmBankOffTitle'),
-                confirmBankOffBody: text('confirmBankOffBody'),
-                confirmBankOnTitle: text('confirmBankOnTitle'),
-                confirmBankOnBody: text('confirmBankOnBody'),
                 formCreate: text('formCreate'),
                 formEdit: text('formEdit'),
             };
@@ -394,14 +397,28 @@ function initAdminExchangeClients() {
             on: { title: i18n.confirmOnTitle, body: i18n.confirmOnBody },
         };
 
-        /** @type {SwitchSpec} */
-        const bankSwitch = {
-            boxId: 'xc-bank-switch',
-            url: `${BASE}/settings/bank`,
-            switched: i18n.bankSwitched,
-            off: { title: i18n.confirmBankOffTitle, body: i18n.confirmBankOffBody },
-            on: { title: i18n.confirmBankOnTitle, body: i18n.confirmBankOnBody },
-        };
+        /**
+         * Reads an area switch beside the global one from its card: the relay segment in
+         * `data-xc-area` and the success and confirmation texts; each echoes its own version.
+         * @param {HTMLElement} card the switch's card
+         * @returns {SwitchSpec}
+         */
+        function areaSwitch(card) {
+            const data = card.dataset;
+            return {
+                boxId: card.id,
+                url: `${BASE}/settings/${encodeURIComponent(data.xcArea || '')}`,
+                switched: datasetText(data, 'switched'),
+                off: {
+                    title: datasetText(data, 'confirmOffTitle'),
+                    body: datasetText(data, 'confirmOffBody'),
+                },
+                on: {
+                    title: datasetText(data, 'confirmOnTitle'),
+                    body: datasetText(data, 'confirmOnBody'),
+                },
+            };
+        }
 
         el.form.addEventListener('submit', onSubmit);
         const cancel = document.getElementById('xc-cancel');
@@ -419,9 +436,12 @@ function initAdminExchangeClients() {
                 toggle(globalSwitch, switchBtn);
                 return;
             }
-            const bankSwitchBtn = target.closest('[data-xc-bank-switch]');
-            if (bankSwitchBtn) {
-                toggle(bankSwitch, bankSwitchBtn);
+            const areaSwitchBtn = target.closest('[data-xc-area-switch]');
+            if (areaSwitchBtn) {
+                const card = areaSwitchBtn.closest('[data-xc-area]');
+                if (card instanceof HTMLElement) {
+                    toggle(areaSwitch(card), areaSwitchBtn);
+                }
                 return;
             }
             if (target.closest('[data-xc-new]')) {

@@ -87,6 +87,51 @@ class PrivacyControllerTest {
   }
 
   /**
+   * The connected-applications section names what job orders on a client disclose and store: the
+   * read with its window and the assignee names, the creator kept until the order leaves the
+   * client's set, no undo under „Verbundene Anwendungen", the withheld name missing from the
+   * assignees and job orders in the legal basis, in both languages (REQ-OXCH-010).
+   *
+   * @param lang the language requested through the {@code lang} parameter
+   * @param read the opening of the job-order read item
+   * @param stored a phrase of the stored creator item
+   * @param undo the sentence that job-order changes are not undone
+   * @param withheld the phrase that a withheld name is missing from the assignees
+   * @param basis the phrase of the legal basis that names job orders
+   * @throws Exception if the request fails
+   */
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "de|<strong>Aufträge lesen:</strong> die Aufträge der Einheiten, denen Sie direkt"
+            + " angehören, und die Aufträge, die Sie bearbeiten – offene,"
+            + " abgeschlossene bis 7 Tage nach dem Abschluss und aUEC-Aufträge, solange ihre"
+            + " Abrechnung offen ist –|die Anwendung, das anlegende Mitglied und die Kennung"
+            + " seiner Anfrage|Änderungen an Aufträgen nehmen Sie dort nicht zurück"
+            + "|sowie bei den Bearbeitern von Aufträgen|Raffinerie, Bank und Aufträgen",
+        "en|<strong>Reading job orders:</strong> the job orders of the units you belong to"
+            + " directly and the job orders you work on – open ones, closed ones for up to 7"
+            + " days after closing and aUEC job orders while their settlement is open –"
+            + "|the application, the member who created it and the identifier of their request"
+            + "|You do not undo changes to job orders there|and from the assignees of job orders"
+            + "|refinery, bank and job orders"
+      })
+  void rendersWhatJobOrdersOnAConnectedApplicationDiscloseAndStore(
+      String lang, String read, String stored, String undo, String withheld, String basis)
+      throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/privacy").param("lang", lang))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).contains(read, stored, undo, withheld, basis).doesNotContain("??privacy.");
+  }
+
+  /**
    * The notice names the e-mail relay as a processor and states the right to object in its own
    * highlighted box, as Art. 21(4) GDPR requires, in both languages.
    *

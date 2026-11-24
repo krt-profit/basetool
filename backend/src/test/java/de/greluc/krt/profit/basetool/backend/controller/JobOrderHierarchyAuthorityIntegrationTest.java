@@ -72,10 +72,14 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -140,8 +144,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
         roots.isEmpty()
             ? hierarchy.createBereich("Profit " + tag, "P" + tag, null, null, Department.PROFIT)
             : units.findById(roots.getFirst()).orElseThrow();
-    responsible = squadron("Responsible " + tag, profit);
-    requester = squadron("Requester " + tag, null);
+    responsible = OrgUnitFixtures.persistedSquadron(squadrons, "Responsible " + tag, profit);
+    requester = OrgUnitFixtures.persistedSquadron(squadrons, "Requester " + tag, null);
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("hierarchy-" + tag);
@@ -299,7 +303,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     blueprintOwner("Command producer", processingUnit(), false);
     User globalOwner = blueprintOwner("Global producer", requester, true);
     blueprintOwner("Private outsider", requester, false);
-    Squadron inactiveChild = squadron("Inactive producer " + UUID.randomUUID(), profit);
+    Squadron inactiveChild =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Inactive producer " + UUID.randomUUID(), profit);
     blueprintOwner("Inactive child producer", inactiveChild, false);
     inactiveChild.setActive(false);
     squadrons.saveAndFlush(inactiveChild);
@@ -469,8 +475,12 @@ class JobOrderHierarchyAuthorityIntegrationTest {
       throws Exception {
     memberships.deleteById(new OrgUnitMembershipId(caller, requester.getId()));
     memberships.flush();
-    Squadron customer = squadron("Historical customer " + UUID.randomUUID(), null);
-    Squadron target = squadron("Historical target " + UUID.randomUUID(), profit);
+    Squadron customer =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Historical customer " + UUID.randomUUID(), null);
+    Squadron target =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Historical target " + UUID.randomUUID(), profit);
     JobOrder order =
         orders.saveAndFlush(
             JobOrder.builder()
@@ -518,7 +528,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
       throws Exception {
     memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
     memberships.flush();
-    Squadron newRequester = squadron("New customer " + UUID.randomUUID(), null);
+    Squadron newRequester =
+        OrgUnitFixtures.persistedSquadron(squadrons, "New customer " + UUID.randomUUID(), null);
     JobOrder order =
         orders.saveAndFlush(
             JobOrder.builder()
@@ -529,7 +540,12 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     String payload =
         createBody().replace(requester.getId().toString(), newRequester.getId().toString());
     payload =
-        payload.substring(0, payload.length() - 1) + ",\"version\":" + order.getVersion() + "}";
+        payload.substring(0, payload.length() - 1)
+            + ",\"version\":"
+            + order.getVersion()
+            + ",\"commentVersion\":"
+            + order.getCommentVersion()
+            + "}";
 
     as(
             put("/api/v1/orders/" + order.getId())
@@ -651,13 +667,13 @@ class JobOrderHierarchyAuthorityIntegrationTest {
   void invalidResponsibilityInEveryStatusAllowsConcreteReadingAndImmediateValidTransferOnly(
       JobOrderStatus state) throws Exception {
     JobOrder order =
-        orders.saveAndFlush(
-            JobOrder.builder()
-                .responsibleOrgUnit(responsible)
-                .requestingOrgUnit(requester)
-                .status(state)
-                .handle("Recoverable")
-                .build());
+        JobOrder.builder()
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(requester)
+            .handle("Recoverable")
+            .build();
+    order.setStatus(state);
+    orders.saveAndFlush(order);
     hierarchy.setParent(responsible.getId(), null, responsible.getVersion());
     String path = "/api/v1/orders/" + order.getId();
 
@@ -880,7 +896,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             .amount(10.0)
             .build());
     order = orders.saveAndFlush(order);
-    Squadron supporter = squadron("Lifecycle supporter " + UUID.randomUUID(), profit);
+    Squadron supporter =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Lifecycle supporter " + UUID.randomUUID(), profit);
     var promise =
         claims.saveAndFlush(
             MaterialClaim.builder()
@@ -928,6 +946,48 @@ class JobOrderHierarchyAuthorityIntegrationTest {
         .andExpect(jsonPath("$[0].supporting").value(true));
   }
 
+  @ParameterizedTest
+  @EnumSource(
+      value = JobOrderType.class,
+      names = {"MATERIAL", "ITEM"})
+  void statusWritesRecordTheClosingInstantAndEveryReopenClearsIt(JobOrderType kind)
+      throws Exception {
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .type(kind)
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .handle("Closing instant")
+                .build());
+    Instant beforeCompletion = Instant.now().truncatedTo(ChronoUnit.MICROS);
+
+    Instant completed = writeStatus(order, "COMPLETED", 0);
+    assertThat(completed).isBetween(beforeCompletion, Instant.now());
+    assertThat(writeStatus(order, "REJECTED", 1)).isEqualTo(completed);
+    assertThat(writeStatus(order, "IN_PROGRESS", 2)).isNull();
+    assertThat(writeStatus(order, "REJECTED", 3)).isAfter(completed);
+    assertThat(writeStatus(order, "OPEN", 4)).isNull();
+    Instant beforeCancellation = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    assertThat(writeStatus(order, "CANCELLED", 5)).isBetween(beforeCancellation, Instant.now());
+    assertThat(writeStatus(order, "OPEN", 6)).isNull();
+  }
+
+  private @Nullable Instant writeStatus(JobOrder order, String status, long version)
+      throws Exception {
+    mvc.perform(
+            put("/api/v1/orders/" + order.getId() + "/status")
+                .with(contextualWriter(responsible.getId()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"" + status + "\",\"version\":" + version + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(status));
+    Timestamp closedAt =
+        jdbc.queryForObject(
+            "SELECT closed_at FROM job_order WHERE id = ?", Timestamp.class, order.getId());
+    return closedAt == null ? null : closedAt.toInstant();
+  }
+
   @Test
   void currentResponsibleContextCanEditOrderAndPriorityWithoutAFlatRole() throws Exception {
     JobOrder order =
@@ -947,8 +1007,15 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             .getResponse()
             .getContentAsString();
     long needVersion = json.readTree(reordered).path("version").asLong();
+    long commentVersion = json.readTree(reordered).path("commentVersion").asLong();
     String body = createBody();
-    body = body.substring(0, body.length() - 1) + ",\"version\":" + needVersion + "}";
+    body =
+        body.substring(0, body.length() - 1)
+            + ",\"version\":"
+            + needVersion
+            + ",\"commentVersion\":"
+            + commentVersion
+            + "}";
     mvc.perform(put(endpoint).with(writer).contentType(MediaType.APPLICATION_JSON).content(body))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.handle").value("Hierarchy test"));
@@ -962,6 +1029,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     String body =
         "{\"version\":"
             + order.getVersion()
+            + ",\"commentVersion\":"
+            + order.getCommentVersion()
             + ",\"comment\":\"Remaining items\",\"items\":[{\"id\":\""
             + line.getId()
             + "\",\"gameItemId\":\""
@@ -1050,9 +1119,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             .responsibleOrgUnit(responsible)
             .requestingOrgUnit(requester)
             .type(JobOrderType.ITEM)
-            .status(status)
             .handle("Partial item order")
             .build();
+    order.setStatus(status);
     JobOrderItem line =
         JobOrderItem.builder()
             .gameItem(gameItems.getReferenceById(gameItemId))
@@ -1119,7 +1188,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             .build());
     handovers.saveAndFlush(delivery);
 
-    Squadron supporter = squadron("Requester edit supporter " + UUID.randomUUID(), profit);
+    Squadron supporter =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Requester edit supporter " + UUID.randomUUID(), profit);
     var promise =
         claims.saveAndFlush(
             MaterialClaim.builder()
@@ -1133,6 +1204,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     String updatedNeed =
         "{\"version\":"
             + order.getVersion()
+            + ",\"commentVersion\":"
+            + order.getCommentVersion()
             + ",\"materials\":[{\"materialId\":\""
             + material
             + "\",\"minQuality\":"
@@ -1159,7 +1232,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
   void claimingOptionsPreserveOwnSquadronWritesWithoutGrantingProcessingOrForeignClaims()
       throws Exception {
     SpecialCommand processing = processingUnit();
-    Squadron foreign = squadron("Foreign claimant " + UUID.randomUUID(), profit);
+    Squadron foreign =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Foreign claimant " + UUID.randomUUID(), profit);
     var quality = tiers.findByCode("GOOD").orElseThrow();
     JobOrder order =
         JobOrder.builder()
@@ -1286,14 +1361,14 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     processing.setParent(profit);
     processing = units.saveAndFlush(processing);
     JobOrder order =
-        orders.saveAndFlush(
-            JobOrder.builder()
-                .type(kind)
-                .responsibleOrgUnit(processing)
-                .requestingOrgUnit(requester)
-                .status(JobOrderStatus.COMPLETED)
-                .handle("Delete fixture")
-                .build());
+        JobOrder.builder()
+            .type(kind)
+            .responsibleOrgUnit(processing)
+            .requestingOrgUnit(requester)
+            .handle("Delete fixture")
+            .build();
+    order.setStatus(JobOrderStatus.COMPLETED);
+    orders.saveAndFlush(order);
     MaterialClaim archived =
         claims.saveAndFlush(
             MaterialClaim.builder()
@@ -1431,14 +1506,6 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     unit.setShorthand("CP" + tag);
     unit.setParent(profit);
     return units.saveAndFlush(unit);
-  }
-
-  private Squadron squadron(String name, OrgUnit parent) {
-    Squadron row = new Squadron();
-    row.setName(name);
-    row.setShorthand(name);
-    row.setParent(parent);
-    return squadrons.saveAndFlush(row);
   }
 
   private void join(User user, OrgUnit unit) {

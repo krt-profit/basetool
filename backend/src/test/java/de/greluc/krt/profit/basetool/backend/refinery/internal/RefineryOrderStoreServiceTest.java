@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -556,9 +557,7 @@ class RefineryOrderStoreServiceTest {
     @Test
     void threadsItemOwningOrgUnitIdIntoResolver_andStampsResolvedOrgUnit() {
       stubLookupsForSingleItem();
-      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
-          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-      resolved.setId(OWNING_OU_ID);
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved = squadron(OWNING_OU_ID);
       when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(owner, OWNING_OU_ID))
           .thenReturn(resolved);
 

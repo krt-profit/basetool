@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.example;
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.ok;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -41,8 +43,6 @@ import de.greluc.krt.profit.basetool.ingest.store.ExchangeBudget;
 import de.greluc.krt.profit.basetool.ingest.store.ExchangeIdempotency;
 import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
 import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -59,7 +59,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The refinery-order read and write routes and the store-choice reads through both gates, with the
@@ -71,10 +70,8 @@ class ExchangeRefineryOrderRouteTest {
   private static final String TOKEN = "refinery-order-token";
   private static final String CHANGES = "/exchange/v1/me/refinery-orders/changes";
   private static final String BACKEND_CHANGES = "/api/v1/exchange/me/refinery-orders/changes";
-  private static final Path EXAMPLES = Path.of("../docs/exchange/examples/v1");
   private static final String RESULT =
       "{\"dryRun\":false,\"applied\":3,\"unchanged\":0,\"notApplied\":0,\"results\":[]}";
-  private static final JsonMapper MAPPER = JsonMapper.builder().build();
   private static final String PAGE =
       """
       {"items":[{"id":"%s","versions":{"gameData":2,"finances":0},"status":"IN_PROGRESS",
@@ -328,26 +325,5 @@ class ExchangeRefineryOrderRouteTest {
   private ResultActions post(@NotNull String json) throws Exception {
     return ExchangeTestSupport.call(
         mockMvc, key, TOKEN, HttpMethod.POST, CHANGES, json, "VerseKit/2.1.0");
-  }
-
-  /**
-   * Reads a published example.
-   *
-   * @param name its path below the examples folder
-   * @return its text
-   * @throws Exception if it cannot be read
-   */
-  private static @NotNull String example(@NotNull String name) throws Exception {
-    return Files.readString(EXAMPLES.resolve(name));
-  }
-
-  /**
-   * A usable relay answer.
-   *
-   * @param json the body
-   * @return the result
-   */
-  private static ExchangeRelay.Result ok(@NotNull String json) {
-    return new ExchangeRelay.Result(200, MAPPER.readTree(json), null, null);
   }
 }

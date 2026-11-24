@@ -1,0 +1,12 @@
+{
+  "requestingUnits": [],
+  "responsibleUnits": [],
+  "suggestedResponsible": null,
+  "writesEnabled": false,
+  "limits": {
+    "openOrderCap": 20,
+    "openOrders": 0,
+    "dailyCreateCap": 20,
+    "createdToday": 0
+  }
+}

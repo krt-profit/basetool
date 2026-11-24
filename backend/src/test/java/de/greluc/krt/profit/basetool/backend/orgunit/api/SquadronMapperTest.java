@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
@@ -32,10 +33,7 @@ class SquadronMapperTest {
 
   @Test
   void toDto_and_back_shouldPreserveFields() {
-    Squadron s = new Squadron();
-    s.setId(UUID.randomUUID());
-    s.setName("Vanguard");
-    s.setShorthand("VAN");
+    Squadron s = squadron(UUID.randomUUID(), "Vanguard", "VAN");
     s.setDescription("Test squad");
 
     SquadronDto dto = mapper.toDto(s);
@@ -60,10 +58,7 @@ class SquadronMapperTest {
 
   @Test
   void orgUnitToReferenceDto_shouldProjectSquadronOwner() {
-    Squadron squadron = new Squadron();
-    squadron.setId(UUID.randomUUID());
-    squadron.setName("ALPHA");
-    squadron.setShorthand("ALP");
+    Squadron squadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
 
     SquadronReferenceDto ref = mapper.orgUnitToReferenceDto(squadron);
 

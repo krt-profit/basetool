@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
@@ -383,12 +384,8 @@ class PurchasingReportServiceTest {
     delivered.setSettlementDueAt(Instant.now().plus(Duration.ofDays(3)));
     UUID unitOne = UUID.randomUUID();
     UUID unitTwo = UUID.randomUUID();
-    Squadron alpha = new Squadron();
-    alpha.setId(unitOne);
-    alpha.setName("Alpha");
-    Squadron aegis = new Squadron();
-    aegis.setId(unitTwo);
-    aegis.setName("Aegis");
+    Squadron alpha = squadron(unitOne, "Alpha");
+    Squadron aegis = squadron(unitTwo, "Aegis");
     Specification<PurchasingDeal> everything = (_, _, cb) -> cb.conjunction();
     when(accessPolicy.canReadReport()).thenReturn(true);
     when(dealService.visibleToCaller()).thenReturn(everything);

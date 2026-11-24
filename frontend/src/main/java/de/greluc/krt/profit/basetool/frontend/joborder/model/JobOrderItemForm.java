@@ -31,7 +31,7 @@ import lombok.Data;
  * (Spring auto-grows the lists on bind), so they start empty.
  */
 @Data
-public class JobOrderItemForm {
+public class JobOrderItemForm implements JobOrderVersionEcho {
 
   /**
    * The profit-eligible org unit that will process the order (responsible picker output); ignored
@@ -48,8 +48,11 @@ public class JobOrderItemForm {
   /** Optional free-text comment. */
   private String comment;
 
-  /** Optimistic-lock version (unused on create). */
+  /** The order version the edit page observed; empty on a create. */
   private Long version;
+
+  /** The comment version the edit page observed, echoed beside {@link #version}. */
+  private Long commentVersion;
 
   /** Selects the restricted requesting-unit update for an existing order. */
   private boolean requesterEdit;

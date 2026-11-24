@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthorityFlags;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReadSet;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
@@ -37,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -65,6 +68,7 @@ public class JobOrderAccessPolicy
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderUnitReadHistoryRepository unitReadHistory;
   private final JobOrderParticipationRepository participations;
+  private final JobOrderExchangeReadSet exchangeReadSet;
 
   /**
    * Checks complete current order reading, including personal and observed unit relationships
@@ -98,6 +102,35 @@ public class JobOrderAccessPolicy
                 .currentUserId()
                 .map(caller -> jobOrderRepository.hasMoneyPersonalReadGrant(order.getId(), caller))
                 .orElse(false));
+  }
+
+  /**
+   * Decides the read check a command's caller passed on the loaded order, for the request's caller
+   * (ADR-0408); a request that names no member passes no exchange read check.
+   *
+   * @param read the read check
+   * @param order the loaded order
+   * @return {@code true} iff the order passes the read check
+   */
+  public boolean canRead(@NotNull JobOrderReadCheck read, @NotNull JobOrder order) {
+    return switch (read) {
+      case CONTEXTUAL -> canSeeJobOrder(order);
+      case OWN_RELATION ->
+          authHelper.currentUserId().map(member -> relatesTo(member, order)).orElse(false);
+    };
+  }
+
+  /**
+   * Decides the exchange read set of one member for one order (REQ-OXCH-001).
+   *
+   * @param member the member whose own relations decide
+   * @param order the loaded order
+   * @return {@code true} iff the member has a current own relation to the order
+   */
+  private boolean relatesTo(UUID member, JobOrder order) {
+    return exchangeReadSet
+        .relations(exchangeReadSet.relatingMember(member), List.of(order.getId()))
+        .containsKey(order.getId());
   }
 
   /**
@@ -201,14 +234,10 @@ public class JobOrderAccessPolicy
     return switch (gate) {
       case TRANSFER -> canTransferResponsibility(order);
       case ADMIN_DELETE -> authHelper.isAdmin();
-      case EDIT, STATUS -> canEditJobOrderRow(order);
+      case EDIT -> canEditJobOrderRow(order);
       case SUPPORT ->
           canTransferResponsibility(order)
               || accessGateService.canActAsLogisticianInActiveContext();
-      case CANCEL -> canTransferResponsibility(order) || isRequesterWriter(order);
-      case SET_OPEN ->
-          canTransferResponsibility(order)
-              || (order.getStatus() == JobOrderStatus.CANCELLED && isRequesterWriter(order));
       case REQUESTER -> isRequesterWriter(order);
     };
   }
@@ -289,18 +318,6 @@ public class JobOrderAccessPolicy
   public boolean canTransferResponsibility(@NotNull JobOrder order) {
     return accessGateService.canActAsLogisticianInOwner(
         OrgUnit.idOf(order.getResponsibleOrgUnit()));
-  }
-
-  /**
-   * Checks the current writer of either proposed side before creation.
-   *
-   * @param responsible the proposed responsible unit
-   * @param requesting the requesting unit
-   * @return whether the caller currently writes either side
-   */
-  public boolean canCreate(OrgUnit responsible, OrgUnit requesting) {
-    return accessGateService.canActAsLogisticianIn(responsible.getId())
-        || accessGateService.canActAsLogisticianIn(requesting.getId());
   }
 
   private boolean hasHistoricalUnitRead(@NotNull JobOrder order) {

@@ -21,14 +21,17 @@ package de.greluc.krt.profit.basetool.backend.joborder.api.events;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Domain event published when a requesting owner (Auftraggeber) edits one of their own job orders
@@ -46,6 +49,8 @@ import org.jetbrains.annotations.Nullable;
  * @param requestingOrgUnitShorthand the requesting org unit's shorthand, for rendering
  * @param actorSub the editing user's sub, or {@code null} when not resolvable
  * @param observedRevision the order revisions observed when the requester edited it
+ * @param app the display name of the connected application the requester edited through, or {@code
+ *     null} for an edit in the web (REQ-ORDERS-078)
  */
 public record JobOrderUpdatedByRequesterEvent(
     UUID jobOrderId,
@@ -56,11 +61,15 @@ public record JobOrderUpdatedByRequesterEvent(
     @Nullable OrgUnitRef requestingOrgUnit,
     @Nullable String requestingOrgUnitShorthand,
     @Nullable UUID actorSub,
-    @NotNull NotificationRevision observedRevision)
+    @NotNull NotificationRevision observedRevision,
+    @Nullable String app)
     implements NotificationEvent {
 
   /** Loose entity-type tag stored on the produced notifications (shared with the create event). */
   public static final String ENTITY_TYPE = "JOB_ORDER";
+
+  private static final Set<NotificationType> COALESCED =
+      Set.of(NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER);
 
   @NotNull
   @Override
@@ -85,6 +94,19 @@ public record JobOrderUpdatedByRequesterEvent(
     return ENTITY_TYPE;
   }
 
+  /**
+   * The new notice replaces its recipient's unread requester-edit notice of the order
+   * (REQ-NOTIF-017).
+   *
+   * @return {@link NotificationType#JOB_ORDER_UPDATED_BY_REQUESTER}
+   */
+  @NotNull
+  @Unmodifiable
+  @Override
+  public Set<NotificationType> replacesUnreadNotificationTypes() {
+    return COALESCED;
+  }
+
   @Override
   public UUID entityId() {
     return jobOrderId;
@@ -106,6 +128,7 @@ public record JobOrderUpdatedByRequesterEvent(
     if (requestingOrgUnitShorthand != null && !requestingOrgUnitShorthand.isBlank()) {
       params.put("requester", requestingOrgUnitShorthand);
     }
+    JobOrderNotices.addApplication(params, app);
     return params;
   }
 }

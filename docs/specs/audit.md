@@ -175,6 +175,27 @@ web, naming its client (REQ-AUDIT-005):
   `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the assignee reads the order anyway as a member
   of the Profit hierarchy; the assignee is the
   target user, and the details carry only `assignee=<id>` — no handle, unit name or free text.
+  A member's create of an aUEC order through a connected application records
+  `JOB_ORDER_CREATED_VIA_CLIENT` instead of `JOB_ORDER_CREATED`, one row per create, with
+  `requestingOrgUnit`, `responsibleOrgUnit` (each `id(KIND)`) and `target`, and the client in
+  `client_id` as on every row (REQ-AUDIT-005); the contact and the comment are never recorded, and
+  an idempotent replay and a refused create record nothing
+  ([REQ-OXCH-004](orders-exchange.md#req-oxch-004--create-options-and-the-create-of-an-auec-order),
+  ADR-0407).
+  A member's cancel of an aUEC order through a connected application records
+  `JOB_ORDER_CANCELLED_VIA_CLIENT` with `previousStatus` instead of `JOB_ORDER_STATUS_CHANGED`, one
+  row per cancel, with the client in `client_id`; a refused cancel records nothing
+  ([REQ-OXCH-006](orders-exchange.md#req-oxch-006--cancel-an-auec-order)).
+  A member's target change of an aUEC order through a connected application records
+  `JOB_ORDER_TARGET_CHANGED_VIA_CLIENT` with `previousTarget` and `target` instead of
+  `JOB_ORDER_MONEY_TARGET_CHANGED`, one row per change, with the client in `client_id`; a refused
+  change records nothing
+  ([REQ-OXCH-007](orders-exchange.md#req-oxch-007--change-an-auec-orders-target)).
+  A member's comment change of an aUEC order through a connected application records
+  `JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT` without details instead of `JOB_ORDER_UPDATED`, one row per
+  change, with the client in `client_id`; the text is never recorded, and a refused or unchanged
+  comment records nothing
+  ([REQ-OXCH-008](orders-exchange.md#req-oxch-008--change-the-comment-of-an-auec-order)).
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX sync (one summary event per run and catalogue — `REFINERY_METHODS_SYNCED` /
   `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion
@@ -341,7 +362,9 @@ web, naming its client (REQ-AUDIT-005):
   changed fields and the added and removed scopes), suspending and activating it
   (`EXCHANGE_CLIENT_SUSPENDED` / `_ACTIVATED`, only on a change) and the global exchange switch
   (`EXCHANGE_SWITCH_CHANGED`, the new state), the bank switch of the exchange
-  (`BANK_EXCHANGE_SWITCH_CHANGED`, the new state, REQ-BXCH-006), and a member disconnecting a whole client
+  (`BANK_EXCHANGE_SWITCH_CHANGED`, the new state, REQ-BXCH-006),
+  the two job-order switches of the exchange (`JOB_ORDER_EXCHANGE_SWITCH_CHANGED`, the switch
+  `family` or `writes` and the new state, REQ-OXCH-009), and a member disconnecting a whole client
   (`EXCHANGE_CLIENT_DISCONNECTED`) or one installation (`EXCHANGE_INSTALLATION_DISCONNECTED`,
   REQ-XCH-008; the installation's label never enters the row), and the system ending a departed
   member's exchange access (`EXCHANGE_MEMBER_DEPARTED`: the reason, the number of clients, and

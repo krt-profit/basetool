@@ -22,8 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.exchange.client;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeRequestDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeResultDto;
-import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchDto;
-import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitch;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoInstallationDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
@@ -53,8 +54,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * Typed backend client of the exchange domain: the admin client registry, the global switch, the
- * bulk undo runs and the member's connected apps (REQ-XCH-003, REQ-XCH-008, REQ-XCH-021,
- * REQ-XCH-034), over {@link BackendApiClient} (plan §5.9, ADR-0032).
+ * area switches, the bulk undo runs and the member's connected apps (REQ-XCH-003, REQ-XCH-008,
+ * REQ-XCH-021, REQ-XCH-034, REQ-BXCH-006, REQ-OXCH-009), over {@link BackendApiClient} (plan §5.9,
+ * ADR-0032).
  */
 @Service
 @RequiredArgsConstructor
@@ -66,7 +68,8 @@ public class ExchangeBackendClient {
   /** The backend's global switch endpoint. */
   private static final String SETTINGS = "/api/v1/connected-apps/admin/settings";
 
-  private static final String BANK_SWITCH = SETTINGS + "/bank";
+  /** The backend's endpoint of an area switch, named by its path segment. */
+  private static final String AREA_SWITCH = SETTINGS + "/{area}";
 
   /** The backend's bulk undo runs. */
   private static final String UNDO_RUNS = "/api/v1/connected-apps/admin/undo-runs";
@@ -229,24 +232,28 @@ public class ExchangeBackendClient {
   }
 
   /**
-   * Reads the bank switch of the exchange (REQ-BXCH-006).
+   * Reads one area switch of the exchange (REQ-BXCH-006, REQ-OXCH-009).
    *
-   * @return the bank switch, or {@code null} when the backend sent no body
+   * @param area the area switch
+   * @return the switch with its own version, or {@code null} when the backend sent no body
    */
   @Nullable
-  public ExchangeBankSwitchDto bankSwitch() {
-    return backendApiClient.get(BANK_SWITCH, ExchangeBankSwitchDto.class);
+  public ExchangeAreaSwitchDto areaSwitch(@NotNull ExchangeAreaSwitch area) {
+    return backendApiClient.get(AREA_SWITCH, ExchangeAreaSwitchDto.class, area.getSegment());
   }
 
   /**
-   * Turns the bank switch of the exchange on or off (REQ-BXCH-006).
+   * Turns one area switch of the exchange on or off (REQ-BXCH-006, REQ-OXCH-009).
    *
-   * @param request the new state and the bank switch's version the admin last saw
-   * @return the bank switch
+   * @param area the area switch
+   * @param request the new state and the switch's version the admin last saw
+   * @return the switch
    */
   @Nullable
-  public ExchangeBankSwitchDto updateBankSwitch(@NotNull ExchangeBankSwitchUpdateRequest request) {
-    return backendApiClient.put(BANK_SWITCH, request, ExchangeBankSwitchDto.class);
+  public ExchangeAreaSwitchDto updateAreaSwitch(
+      @NotNull ExchangeAreaSwitch area, @NotNull ExchangeAreaSwitchUpdateRequest request) {
+    return backendApiClient.put(
+        AREA_SWITCH, request, ExchangeAreaSwitchDto.class, area.getSegment());
   }
 
   /**

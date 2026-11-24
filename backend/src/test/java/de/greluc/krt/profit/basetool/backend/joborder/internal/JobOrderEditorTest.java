@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -36,8 +37,10 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
@@ -167,6 +170,49 @@ class JobOrderEditorTest {
   }
 
   @Test
+  void aCommentEditWithAStaleOrMissingCommentVersionIsAConflictWithoutMutation() {
+    order.setCommentVersion(3L);
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderAccessPolicy.canEdit(order, JobOrderGate.EDIT)).thenReturn(true);
+
+    assertThatThrownBy(() ->
+            editor.editPlannedWithComment(
+                id,
+                JobOrderGate.EDIT,
+                new JobOrderObservedVersions(5L, 2L),
+                _ -> JobOrderEditPlan.of(statusChanged())))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    assertThatThrownBy(() ->
+            editor.editPlannedWithComment(
+                id,
+                JobOrderGate.EDIT,
+                new JobOrderObservedVersions(5L, null),
+                _ -> JobOrderEditPlan.of(statusChanged())))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+    assertThat(mutations).hasValue(0);
+    verifyNoInteractions(auditRecorder, effects, jobOrderStockProjectionService);
+  }
+
+  @Test
+  void aCommentEditWithBothVersionsCurrentRunsOnce() {
+    order.setCommentVersion(3L);
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderAccessPolicy.canEdit(order, JobOrderGate.EDIT)).thenReturn(true);
+    when(jobOrderStockProjectionService.mapToDtoWithStock(order)).thenReturn(projected);
+
+    JobOrderDto result =
+        editor.editPlannedWithComment(
+            id,
+            JobOrderGate.EDIT,
+            new JobOrderObservedVersions(5L, 3L),
+            _ -> JobOrderEditPlan.of(statusChanged()));
+
+    assertThat(result).isSameAs(projected);
+    assertThat(mutations).hasValue(1);
+  }
+
+  @Test
   void aDeniedCallerIsRefusedBeforeTheVersionIsChecked() {
     when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
     when(jobOrderAccessPolicy.canEdit(order, JobOrderGate.EDIT)).thenReturn(false);
@@ -176,6 +222,110 @@ class JobOrderEditorTest {
 
     assertThat(mutations).hasValue(0);
     verifyNoInteractions(auditRecorder, effects, jobOrderStockProjectionService);
+  }
+
+  @Test
+  void aLifecycleEditTheReadCheckOrTheWriterRefusesIsDeniedBeforeTheVersionIsChecked() {
+    order.setLifecycleVersion(2L);
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderAccessPolicy.canRead(JobOrderReadCheck.CONTEXTUAL, order)).thenReturn(false, true);
+
+    assertThatThrownBy(() -> lifecycleEdit(1L, true)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> lifecycleEdit(1L, false)).isInstanceOf(AccessDeniedException.class);
+
+    assertThat(mutations).hasValue(0);
+    verifyNoInteractions(auditRecorder, effects, jobOrderStockProjectionService);
+  }
+
+  @Test
+  void anInvalidResponsibilityRefusesALifecycleEditBeforeTheReadCheckIsAsked() {
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    doThrow(new BadRequestException("orders.responsibility.invalid"))
+        .when(responsibilityGuard)
+        .assertWritable(order);
+
+    assertThatThrownBy(() -> lifecycleEdit(0L, true)).isInstanceOf(BadRequestException.class);
+
+    assertThat(mutations).hasValue(0);
+    verify(jobOrderAccessPolicy, never()).canRead(any(), any());
+    verifyNoInteractions(auditRecorder, effects);
+  }
+
+  @Test
+  void aLifecycleEditChecksTheLifecycleVersionAndNotTheOrderVersion() {
+    order.setLifecycleVersion(2L);
+    order.setVersion(9L);
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderAccessPolicy.canRead(JobOrderReadCheck.CONTEXTUAL, order)).thenReturn(true);
+
+    assertThatThrownBy(() -> lifecycleEdit(9L, true))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    JobOrder edited = lifecycleEdit(2L, true);
+
+    assertThat(edited).isSameAs(order);
+    assertThat(mutations).hasValue(1);
+    verify(auditRecorder)
+        .record(
+            eq(AuditEventType.JOB_ORDER_STATUS_CHANGED),
+            eq(id),
+            eq("#42"),
+            isNull(),
+            sameDetails(AuditDetails.of("to", "IN_PROGRESS")));
+    verifyNoInteractions(jobOrderStockProjectionService);
+  }
+
+  private JobOrder lifecycleEdit(long lifecycleVersion, boolean writes) {
+    return editor.editLifecycle(
+        id,
+        lifecycleVersion,
+        JobOrderReadCheck.CONTEXTUAL,
+        _ -> writes,
+        _ -> JobOrderEditPlan.of(statusChanged()));
+  }
+
+  @Test
+  void aMoneyEditRunsTheCallersChecksBeforeAndAgainUnderTheOrderLock() {
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderRepository.lockForScopedEdit(id)).thenReturn(Optional.of(id));
+    AtomicInteger checks = new AtomicInteger();
+
+    Integer checksBeforeMutation =
+        editor.editMoney(
+            id,
+            _ -> checks.incrementAndGet(),
+            _ -> false,
+            (o, _) -> new JobOrderEditor.MoneyEdit<>(checks.get(), JobOrderEdit.unchanged(o)));
+
+    assertThat(checksBeforeMutation).isEqualTo(2);
+    InOrder sequence = inOrder(jobOrderRepository);
+    sequence.verify(jobOrderRepository).findById(id);
+    sequence.verify(jobOrderRepository).lockForScopedEdit(id);
+    verifyNoInteractions(jobOrderAccessPolicy, responsibilityGuard, auditRecorder, effects);
+  }
+
+  @Test
+  void aMoneyEditTheChecksRefuseUnderTheOrderLockLeavesTheOrderUntouched() {
+    when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
+    when(jobOrderRepository.lockForScopedEdit(id)).thenReturn(Optional.of(id));
+    AtomicInteger checks = new AtomicInteger();
+
+    assertThatThrownBy(() ->
+            editor.editMoney(
+                id,
+                _ -> {
+                  if (checks.incrementAndGet() == 2) {
+                    throw new AccessDeniedException("refused under the lock");
+                  }
+                },
+                _ -> false,
+                (o, _) -> {
+                  mutations.incrementAndGet();
+                  return new JobOrderEditor.MoneyEdit<>(o, JobOrderEdit.unchanged(o));
+                }))
+        .isInstanceOf(AccessDeniedException.class);
+
+    assertThat(mutations).hasValue(0);
+    verifyNoInteractions(auditRecorder, effects);
   }
 
   @Test

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.MAPPER;
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.ok;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -54,7 +56,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The org demand route through both gates, with the backend relay mocked, and the schema that keeps
@@ -65,7 +66,6 @@ import tools.jackson.databind.json.JsonMapper;
 class ExchangeOrgDemandRouteTest {
 
   private static final String TOKEN = "demand-token";
-  private static final JsonMapper MAPPER = JsonMapper.builder().build();
   private static final Path SCHEMAS = Path.of("src/main/resources/exchange/v1/schemas");
   private static final String DEMAND =
       """
@@ -258,15 +258,5 @@ class ExchangeOrgDemandRouteTest {
     Set<String> names = new TreeSet<>();
     properties.propertyNames().forEach(names::add);
     return names;
-  }
-
-  /**
-   * A usable relay answer.
-   *
-   * @param json the body
-   * @return the result
-   */
-  private static ExchangeRelay.Result ok(@NotNull String json) {
-    return new ExchangeRelay.Result(200, MAPPER.readTree(json), null, null);
   }
 }

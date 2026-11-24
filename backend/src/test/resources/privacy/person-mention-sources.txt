@@ -179,6 +179,9 @@ exempt-column|frequency_type.created_by
 exempt-column|frequency_type.description
 exempt-column|frequency_type.name
 exempt-column|frequency_type.updated_by
+exempt-column|job_order.comment_client_id
+exempt-column|job_order.create_idempotency_key
+exempt-column|job_order.created_by_client_id
 exempt-column|job_order.status
 exempt-column|job_order.type
 exempt-column|job_order_handover_item.location_name
@@ -191,6 +194,7 @@ exempt-column|job_order_money_commitment_change.reason
 exempt-column|job_order_money_holder_change.kind
 exempt-column|job_order_money_operation.kind
 exempt-column|job_order_money_operation.selection_kind
+exempt-column|job_order_money_target_change.client_id
 exempt-column|job_type.archetype
 exempt-column|job_type.description
 exempt-column|job_type.name

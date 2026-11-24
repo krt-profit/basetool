@@ -109,6 +109,8 @@ class ExchangeRegistryMirrorIntegrationTest {
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(false);
     settings.setBankEnabled(false);
+    settings.setJobOrdersEnabled(false);
+    settings.setJobOrderWritesEnabled(false);
     settingsRepository.saveAndFlush(settings);
     auditEventRepository.deleteAll(
         auditEventRepository.findAll().stream()
@@ -220,7 +222,7 @@ class ExchangeRegistryMirrorIntegrationTest {
     assertThat(mirrorSync.resync(ExchangeMirrorPhase.RECONCILE)).isTrue();
 
     ExchangeRegistrySnapshot healed = mirrored();
-    assertThat(healed.enabled()).isFalse();
+    assertThat(healed.isOn(ExchangeSwitch.GLOBAL)).isFalse();
     assertThat(healed.clients()).containsKey("versekit");
     assertThat(mirrorSync.resync(ExchangeMirrorPhase.RECONCILE))
         .as("an agreeing mirror is not rewritten")
@@ -249,7 +251,8 @@ class ExchangeRegistryMirrorIntegrationTest {
   void removingACapabilityAndSwitchingOffAreMirroredBeforeTheCommit() {
     ExchangeClient client = register("versekit");
     ExchangeSettings settings =
-        registryService.updateSettings(true, registryService.getSettings().getVersion());
+        registryService.updateSwitch(
+            ExchangeSwitch.GLOBAL, true, registryService.getSettings().getVersion());
 
     inOuterTransaction(
         () -> {
@@ -263,15 +266,15 @@ class ExchangeRegistryMirrorIntegrationTest {
                   null,
                   null,
                   client.getVersion()));
-          registryService.updateSettings(false, settings.getVersion());
+          registryService.updateSwitch(ExchangeSwitch.GLOBAL, false, settings.getVersion());
           ExchangeRegistrySnapshot during = mirrored();
-          assertThat(during.enabled()).isFalse();
+          assertThat(during.isOn(ExchangeSwitch.GLOBAL)).isFalse();
           assertThat(during.clients().get("versekit").capabilities())
               .containsExactly("exchange.connect");
         },
         false);
 
-    assertThat(mirrored().enabled()).isFalse();
+    assertThat(mirrored().isOn(ExchangeSwitch.GLOBAL)).isFalse();
   }
 
   @Test
@@ -279,7 +282,8 @@ class ExchangeRegistryMirrorIntegrationTest {
     ExchangeSettings start = registryService.getSettings();
     long globalVersion = start.getVersion();
 
-    ExchangeSettings bankOn = registryService.updateBankSwitch(true, start.getBankVersion());
+    ExchangeSettings bankOn =
+        registryService.updateSwitch(ExchangeSwitch.BANK, true, start.getBankVersion());
 
     assertThat(bankOn.isBankEnabled()).isTrue();
     assertThat(bankOn.getBankVersion()).isEqualTo(start.getBankVersion() + 1);
@@ -287,14 +291,16 @@ class ExchangeRegistryMirrorIntegrationTest {
         .as("the global switch's version is untouched")
         .isEqualTo(globalVersion);
 
-    ExchangeSettings globalOn = registryService.updateSettings(true, globalVersion);
+    ExchangeSettings globalOn =
+        registryService.updateSwitch(ExchangeSwitch.GLOBAL, true, globalVersion);
     assertThat(globalOn.isEnabled()).isTrue();
     assertThat(registryService.getSettings().getBankVersion())
         .as("the bank switch's version is untouched")
         .isEqualTo(bankOn.getBankVersion());
     assertThat(registryService.getSettings().isBankEnabled()).isTrue();
 
-    assertThatThrownBy(() -> registryService.updateBankSwitch(false, start.getBankVersion()))
+    assertThatThrownBy(
+            () -> registryService.updateSwitch(ExchangeSwitch.BANK, false, start.getBankVersion()))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
   }
 
@@ -302,7 +308,8 @@ class ExchangeRegistryMirrorIntegrationTest {
   void theBankSwitchKeepsItsOwnTimeAndLeavesTheGlobalSwitchsTimeAlone() {
     ExchangeSettings start = registryService.getSettings();
 
-    registryService.updateBankSwitch(!start.isBankEnabled(), start.getBankVersion());
+    registryService.updateSwitch(
+        ExchangeSwitch.BANK, !start.isBankEnabled(), start.getBankVersion());
 
     ExchangeSettings after = registryService.getSettings();
     assertThat(after.getUpdatedAt()).as("the global switch's time").isEqualTo(start.getUpdatedAt());
@@ -312,19 +319,20 @@ class ExchangeRegistryMirrorIntegrationTest {
   @Test
   void switchingTheBankOffReachesTheMirrorBeforeTheCommitAndIsAudited() {
     ExchangeSettings on =
-        registryService.updateBankSwitch(true, registryService.getSettings().getBankVersion());
-    assertThat(mirrored().bankEnabled()).isTrue();
+        registryService.updateSwitch(
+            ExchangeSwitch.BANK, true, registryService.getSettings().getBankVersion());
+    assertThat(mirrored().isOn(ExchangeSwitch.BANK)).isTrue();
 
     inOuterTransaction(
         () -> {
-          registryService.updateBankSwitch(false, on.getBankVersion());
-          assertThat(mirrored().bankEnabled())
+          registryService.updateSwitch(ExchangeSwitch.BANK, false, on.getBankVersion());
+          assertThat(mirrored().isOn(ExchangeSwitch.BANK))
               .as("written before the outer transaction commits")
               .isFalse();
         },
         false);
 
-    assertThat(mirrored().bankEnabled()).isFalse();
+    assertThat(mirrored().isOn(ExchangeSwitch.BANK)).isFalse();
     assertThat(
             auditEventRepository.findAll().stream()
                 .filter(
@@ -339,12 +347,105 @@ class ExchangeRegistryMirrorIntegrationTest {
 
     inOuterTransaction(
         () -> {
-          registryService.updateBankSwitch(true, bankVersion);
-          assertThat(mirrored().bankEnabled()).as("not before the commit").isFalse();
+          registryService.updateSwitch(ExchangeSwitch.BANK, true, bankVersion);
+          assertThat(mirrored().isOn(ExchangeSwitch.BANK)).as("not before the commit").isFalse();
         },
         false);
 
-    assertThat(mirrored().bankEnabled()).isTrue();
+    assertThat(mirrored().isOn(ExchangeSwitch.BANK)).isTrue();
+  }
+
+  @Test
+  void eachJobOrderSwitchKeepsItsOwnVersionAndTimeAndLeavesEveryOtherSwitchsAlone() {
+    ExchangeSettings start = registryService.getSettings();
+    assertThat(start.isJobOrdersEnabled()).as("the family starts off").isFalse();
+    assertThat(start.isJobOrderWritesEnabled()).as("the writes start off").isFalse();
+
+    ExchangeSettings familyOn =
+        registryService.updateSwitch(ExchangeSwitch.JOB_ORDERS, true, start.getJobOrdersVersion());
+
+    assertThat(familyOn.isJobOrdersEnabled()).isTrue();
+    assertThat(familyOn.getJobOrdersVersion()).isEqualTo(start.getJobOrdersVersion() + 1);
+    assertThat(familyOn.getJobOrdersUpdatedAt())
+        .isNotNull()
+        .isNotEqualTo(start.getJobOrdersUpdatedAt());
+    ExchangeSettings afterFamily = registryService.getSettings();
+    assertThat(afterFamily.getVersion()).isEqualTo(start.getVersion());
+    assertThat(afterFamily.getUpdatedAt()).isEqualTo(start.getUpdatedAt());
+    assertThat(afterFamily.getBankVersion()).isEqualTo(start.getBankVersion());
+    assertThat(afterFamily.getBankUpdatedAt()).isEqualTo(start.getBankUpdatedAt());
+    assertThat(afterFamily.getJobOrderWritesVersion()).isEqualTo(start.getJobOrderWritesVersion());
+    assertThat(afterFamily.getJobOrderWritesUpdatedAt())
+        .isEqualTo(start.getJobOrderWritesUpdatedAt());
+
+    ExchangeSettings writesOn =
+        registryService.updateSwitch(
+            ExchangeSwitch.JOB_ORDER_WRITES, true, start.getJobOrderWritesVersion());
+
+    assertThat(writesOn.isJobOrderWritesEnabled()).isTrue();
+    assertThat(writesOn.getJobOrderWritesVersion()).isEqualTo(start.getJobOrderWritesVersion() + 1);
+    ExchangeSettings afterWrites = registryService.getSettings();
+    assertThat(afterWrites.getJobOrdersVersion()).isEqualTo(familyOn.getJobOrdersVersion());
+    assertThat(afterWrites.getJobOrdersUpdatedAt()).isEqualTo(familyOn.getJobOrdersUpdatedAt());
+    assertThat(afterWrites.getVersion()).isEqualTo(start.getVersion());
+    assertThat(afterWrites.getBankVersion()).isEqualTo(start.getBankVersion());
+
+    registryService.updateSwitch(ExchangeSwitch.BANK, true, start.getBankVersion());
+    registryService.updateSwitch(ExchangeSwitch.GLOBAL, true, start.getVersion());
+    ExchangeSettings afterOthers = registryService.getSettings();
+    assertThat(afterOthers.getJobOrdersVersion()).isEqualTo(familyOn.getJobOrdersVersion());
+    assertThat(afterOthers.getJobOrderWritesVersion())
+        .isEqualTo(writesOn.getJobOrderWritesVersion());
+
+    assertThatThrownBy(() ->
+            registryService.updateSwitch(
+                ExchangeSwitch.JOB_ORDERS, false, start.getJobOrdersVersion()))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    assertThatThrownBy(() ->
+            registryService.updateSwitch(
+                ExchangeSwitch.JOB_ORDER_WRITES, false, start.getJobOrderWritesVersion()))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+  }
+
+  @Test
+  void switchingAJobOrderSwitchOffReachesTheMirrorBeforeTheCommitAndOnOnlyAfterIt() {
+    ExchangeSettings familyOn =
+        registryService.updateSwitch(
+            ExchangeSwitch.JOB_ORDERS, true, registryService.getSettings().getJobOrdersVersion());
+    assertThat(mirrored().isOn(ExchangeSwitch.JOB_ORDERS)).isTrue();
+    long writesVersion = registryService.getSettings().getJobOrderWritesVersion();
+
+    inOuterTransaction(
+        () -> {
+          registryService.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, true, writesVersion);
+          assertThat(mirrored().isOn(ExchangeSwitch.JOB_ORDER_WRITES))
+              .as("not before the commit")
+              .isFalse();
+        },
+        false);
+    assertThat(mirrored().isOn(ExchangeSwitch.JOB_ORDER_WRITES)).isTrue();
+
+    inOuterTransaction(
+        () -> {
+          registryService.updateSwitch(
+              ExchangeSwitch.JOB_ORDERS, false, familyOn.getJobOrdersVersion());
+          registryService.updateSwitch(ExchangeSwitch.JOB_ORDER_WRITES, false, writesVersion + 1);
+          ExchangeRegistrySnapshot during = mirrored();
+          assertThat(during.isOn(ExchangeSwitch.JOB_ORDERS))
+              .as("written before the outer transaction commits")
+              .isFalse();
+          assertThat(during.isOn(ExchangeSwitch.JOB_ORDER_WRITES)).isFalse();
+        },
+        false);
+
+    assertThat(mirrored().isOn(ExchangeSwitch.JOB_ORDERS)).isFalse();
+    assertThat(mirrored().isOn(ExchangeSwitch.JOB_ORDER_WRITES)).isFalse();
+    assertThat(
+            auditEventRepository.findAll().stream()
+                .filter(event ->
+                    event.getEventType() == AuditEventType.JOB_ORDER_EXCHANGE_SWITCH_CHANGED)
+                .count())
+        .isEqualTo(4);
   }
 
   /**

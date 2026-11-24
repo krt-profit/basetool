@@ -85,7 +85,8 @@ class RuleEvaluationServiceTest {
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
         "MATERIAL",
         actorSub,
-        new NotificationRevision(0, 0));
+        new NotificationRevision(0, 0),
+        null);
   }
 
   private static NotificationRule ruleWithOfficerAndAdmin(boolean excludeActor) {
@@ -368,7 +369,8 @@ class RuleEvaluationServiceTest {
             null,
             "MATERIAL",
             ACTOR,
-            new NotificationRevision(0, 0));
+            new NotificationRevision(0, 0),
+            null);
     NotificationRule rule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,

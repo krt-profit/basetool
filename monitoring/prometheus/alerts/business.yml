@@ -183,7 +183,7 @@ groups:
           description: "For two days no game item has a row in game_item_stat from either source, neither source=\"P4K\" nor source=\"SCWIKI\", so the blueprint recipe view in Mein Inventar shows only the quality factors instead of the crafted item's values (REQ-P4K-030, REQ-OBS-023, ADR-0342). The P4K import writes the values of every catalogue item from the item's stats; the SC-Wiki item sync fills the items the catalogue does not cover. Check that a P4K APPLY ran and that its catalogue still carries stats blocks (P4kItemStatExtractor); for the Wiki, fetch one blueprint output with GET https://api.star-citizen.wiki/api/items/{uuid} and compare its fields with ScWikiItemStatExtractor."
 
       - alert: ScheduledJobStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention|audit_retention|exchange_change_retention|exchange_connection_retention|name_retention"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="notification_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="rejected_registration_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="audit_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="audit_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_change_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_change_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_connection_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_connection_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="name_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="name_retention"} == 1))
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention|audit_retention|exchange_change_retention|exchange_connection_retention|name_retention|job_order_exchange_window"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="notification_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="rejected_registration_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="audit_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="audit_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_change_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_change_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_connection_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_connection_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="name_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="name_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_exchange_window"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="job_order_exchange_window"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -210,7 +210,7 @@ groups:
           description: "The hourly job-order integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and JobOrderItemBlueprintDrift cannot fire — a blueprint re-point would go undetected. Restore the sweep before trusting a 'no drift' reading."
 
       - alert: ExchangeRegistryChanged
-        expr: sum by (action) (increase(basetool_exchange_registry_changes_total{action!~"bank_switch_on|bank_switch_off"}[10m])) > 0
+        expr: sum by (action) (increase(basetool_exchange_registry_changes_total{action!~"bank_switch_on|bank_switch_off|job_order_switch_on|job_order_switch_off|job_order_writes_switch_on|job_order_writes_switch_off"}[10m])) > 0
         labels:
           severity: warning
         annotations:
@@ -408,6 +408,57 @@ groups:
         annotations:
           summary: "Bank exchange switch changed ({{ $labels.action }})"
           description: "An admin switched the bank part of the third-party exchange on or off ({{ $labels.action }}). While it is off the gateway refuses every bank exchange request, the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event BANK_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned (REQ-OBS-024)."
+
+      - alert: JobOrderExchangeSwitchChanged
+        expr: sum by (action) (increase(basetool_exchange_registry_changes_total{action=~"job_order_switch_on|job_order_switch_off|job_order_writes_switch_on|job_order_writes_switch_off"}[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order exchange switch changed ({{ $labels.action }})"
+          description: "An admin switched job orders or their writes on the third-party exchange on or off ({{ $labels.action }}). While the job-order switch is off the gateway refuses every job-order request; while the writes switch is off it refuses every job-order write and the reads go on; the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event JOB_ORDER_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned; switching the writes off is the first step of „Faulty release on job orders“ in arc42 §6 (REQ-OBS-025)."
+
+      - alert: JobOrderExchangeFeedLagging
+        expr: max(basetool_exchange_job_order_dirty_oldest_age_seconds) > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order exchange feed lags behind by over 5 minutes"
+          description: "For 5 minutes the oldest job order marked for a fingerprint recomputation has waited more than 5 minutes, so connected applications see job-order changes late. Either the fingerprint worker stopped (JobOrderFingerprintWorkerStale) or it falls behind the marks (JobOrderFingerprintChurn). Check the backlog and the worker runs in the „Job orders“ row of the Exchange dashboard and the backend log of job_order_exchange_fingerprint; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
+
+      - alert: JobOrderFingerprintWorkerStale
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_exchange_fingerprint"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_exchange_fingerprint"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="job_order_exchange_fingerprint"} == 1))
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order fingerprint worker stale >10m"
+          description: "The job-order fingerprint worker, which runs every few seconds, last succeeded more than 10 minutes ago, or never since the backend started. While it is stale no job-order change reaches the exchange feed, even when nothing is marked. Check the backend log of job_order_exchange_fingerprint for the failing run (ScheduledJobFailureStreak) and the database; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
+
+      - alert: JobOrderFingerprintChurn
+        expr: sum(increase(basetool_exchange_job_order_fingerprints_total{outcome="changed"}[1h])) > 1000
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order fingerprints keep changing"
+          description: "For 2 hours more than 1000 job-order fingerprints an hour changed. A hierarchy change is a single burst, so a sustained rate looks like a trigger loop or a bulk job rewriting carried fields over and over, which floods the exchange feed. Check the changed-against-unchanged recomputations in the „Job orders“ row of the Exchange dashboard and which writes keep marking orders; if a client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-003, REQ-OBS-025)."
+
+      - alert: JobOrderExchangeCapHit
+        expr: sum(increase(basetool_exchange_job_order_refused_total{reason=~"open_order_cap|daily_create_cap"}[1h])) > 10
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order creates keep hitting the caps on client creates"
+          description: "For 30 minutes more than 10 job-order creates an hour were refused with 409 JOB_ORDER_OPEN_ORDER_CAP or 409 JOB_ORDER_DAILY_CREATE_CAP, because members already held 20 open orders created through clients or created 20 through clients today. A client keeps creating without reading its limits, or loops on creates and cancels, which notifies the writers of both units each time. Check the job-order refusals and the job-order writes per client in the „Job orders“ row of the Exchange dashboard and contact the client's author; if one client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-009, REQ-OBS-025)."
+
+      - alert: JobOrderExchangeNotFoundSpike
+        expr: sum(increase(basetool_exchange_job_order_refused_total{reason="not_found"}[1h])) > 50
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order exchange writes keep hitting unknown orders"
+          description: "The backend answered more than 50 job-order writes of connected applications in the last hour with 404 NOT_FOUND, because the order is unknown, deleted or outside the member's read set, which answer alike. A client keeps writing on orders it should have dropped, or a client or a member is probing order ids. Check the job-order refusals and the job-order writes per client in the „Job orders“ row of the Exchange dashboard and the gateway logs for the members behind them; if one client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-005, REQ-OBS-025)."
 
       - alert: BusinessMetricsStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="business_metrics"} == 1))

@@ -2186,6 +2186,371 @@
           }
         ]
       }
+    },
+    "/exchange/v1/job-orders": {
+      "get": {
+        "operationId": "job_orders",
+        "summary": "The job orders the member relates to: snapshot and change feed of the member's job-order set.",
+        "description": "Orders of all three kinds that a unit the member directly belongs to requests, is responsible for or actively supports, and those the member works on as an assignee: active, closed within 7 days, and aUEC orders while settlementOpen holds. Each order carries the member's relations, the assignees under per-client refs, the member's own note, the section versions and its kind's progress; no holder, amount per person, provision, Bank state, commitment or claim. The snapshot pages by id and its last page hands over the feed cursor, one cursor for all three kinds. With a feed cursor the page holds the orders announced since: each order still in the member's set as an item, every other key as a removed entry { key, removedAt } that names no writer, so a lost relation, the end of the window and a deletion look alike. While the job-order switch is off the route answers 503 JOB_ORDER_EXCHANGE_DISABLED with Retry-After: 300. Retention class: job-order data, kept at most 7 days, in memory only.",
+        "tags": [
+          "job-orders"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.joborders.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/jobOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque position from a previous page. Without it the response is a new snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "job_order_create",
+        "summary": "Create an aUEC order on behalf of one of the member's units.",
+        "description": "Creates an aUEC order with one of the member's requestingUnits from the create options as the requesting unit and one of its responsibleUnits as the responsible unit, through the Basetool's own create: the same checks, notices and live update. A pair that is not among the create options (an unknown unit, a unit the member does not write for, a responsible unit outside the Profit units) answers 400 JOB_ORDER_UNITS_NOT_OFFERED and names no side. While the member holds the open-order cap of open orders created through clients the create answers 409 JOB_ORDER_OPEN_ORDER_CAP; once they created the daily create cap of orders through clients in the UTC day it answers 409 JOB_ORDER_DAILY_CREATE_CAP with Retry-After until the next UTC midnight; the create options carry both caps and the member's figures as limits. A create under an Idempotency-Key the client already created an order of the member with answers that order with 201 and its current state, also after the one-hour cache and whatever the caps; changed terms are never applied. The answer names only the order's id, status, versions and stored target. Counts one unit of the daily write quota, a cap refusal included. While the job-order writes switch is off the route answers 503 JOB_ORDER_WRITES_DISABLED with Retry-After: 300. Moves no money; there is no undo: cancel the order instead.",
+        "tags": [
+          "job-orders"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.joborders.write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/create"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/created"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/job-orders/create-options": {
+      "get": {
+        "operationId": "job_order_create_options",
+        "summary": "Where the member may create an aUEC order.",
+        "description": "The member's requesting units (the active units they directly belong to and are a Logistician of), the eligible Profit units as responsible units, the canonical Profit area to preselect, whether job-order writes are switched on, and as limits the open-order and daily create caps with the member's own open orders and creates of the UTC day through clients. Empty lists mean the client offers no create; a reached cap means a create would be refused. Read it when the create form opens, not on every sync pass. Names no member. While the job-order switch is off the route answers 503 JOB_ORDER_EXCHANGE_DISABLED with Retry-After: 300.",
+        "tags": [
+          "job-orders"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.joborders.write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-create-options.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/job-orders/{id}/cancel": {
+      "post": {
+        "operationId": "job_order_cancel",
+        "summary": "Cancel an aUEC order of one of the member's units before any money moved.",
+        "description": "Cancels an open or in-progress aUEC order whose requesting unit is one of the member's requestingUnits, through the Basetool's own status change: the same locks, notices and live update. Checked in this order: an unknown, hidden or deleted order answers 404 NOT_FOUND alike; an order the member reads but does not write for, and any MATERIAL or ITEM order, 403 NOT_PERMITTED; a stale lifecycleVersion 409 VERSION_CONFLICT, which a retry after the one-hour cache answers too; an invalid responsibility 409 JOB_ORDER_RESPONSIBILITY_INVALID; an order that is not OPEN or IN_PROGRESS 409 JOB_ORDER_CLOSED; an order a money operation of which was accepted 409 JOB_ORDER_MONEY_STARTED, naming no money fact. The answer names only the order's id, status and new versions. Counts one unit of the daily write quota, a refusal included. While the job-order writes switch is off the route answers 503 JOB_ORDER_WRITES_DISABLED with Retry-After: 300. There is no undo and no reopen through a client: reopen a mistaken cancel in the Basetool.",
+        "tags": [
+          "job-orders"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.joborders.write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The order's id as the job-order read answers it; a malformed id answers 400 SCHEMA_INVALID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/cancel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/written"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/job-orders/{id}/target": {
+      "post": {
+        "operationId": "job_order_target",
+        "summary": "Change the target of an aUEC order of one of the member's units above its net handover.",
+        "description": "Raises or lowers the target of an open or in-progress aUEC order whose requesting unit is one of the member's requestingUnits, through the Basetool's own target change: the same locks, target history naming the application, need-change notice and live update. Checked in this order: an unknown, hidden or deleted order answers 404 NOT_FOUND alike; an order the member reads but does not write for, and any MATERIAL or ITEM order, 403 NOT_PERMITTED; a stale targetVersion 409 VERSION_CONFLICT, which a retry after the one-hour cache answers too; an invalid responsibility 409 JOB_ORDER_RESPONSIBILITY_INVALID; an order that is not OPEN or IN_PROGRESS 409 JOB_ORDER_CLOSED; a target at or below the order's netHandedOver 409 JOB_ORDER_TARGET_TOO_LOW, so the change never completes or reopens the order. The answer names only the order's id, status, new versions and stored target. Counts one unit of the daily write quota, a refusal included. While the job-order writes switch is off the route answers 503 JOB_ORDER_WRITES_DISABLED with Retry-After: 300. There is no undo through a client: set a wrong target right in the Basetool.",
+        "tags": [
+          "job-orders"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.joborders.write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The order's id as the job-order read answers it; a malformed id answers 400 SCHEMA_INVALID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/targetChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/targetChanged"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/job-orders/{id}/comment": {
+      "post": {
+        "operationId": "job_order_comment",
+        "summary": "Change the comment of an aUEC order of one of the member's units.",
+        "description": "Replaces the comment of an aUEC order whose requesting unit is one of the member's requestingUnits, through the Basetool's own information change under the comment's own version: the same locks, notice and live update. The contact is never written, so a contact change in the Basetool never conflicts with it. Checked in this order: an unknown, hidden or deleted order answers 404 NOT_FOUND alike; an order the member reads but does not write for, and any MATERIAL or ITEM order, 403 NOT_PERMITTED; a stale commentVersion 409 VERSION_CONFLICT, which a retry after the one-hour cache answers too; an invalid responsibility 409 JOB_ORDER_RESPONSIBILITY_INVALID; a CANCELLED order 409 JOB_ORDER_CLOSED. The comment shows the application's name until it is changed in the Basetool, and the responsible unit is told of the change, naming the application. The answer names only the order's id, status and new versions. Counts one unit of the daily write quota, a refusal included. While the job-order writes switch is off the route answers 503 JOB_ORDER_WRITES_DISABLED with Retry-After: 300. There is no undo through a client.",
+        "tags": [
+          "job-orders"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.joborders.write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The order's id as the job-order read answers it; a malformed id answers 400 SCHEMA_INVALID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/comment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json#/$defs/written"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

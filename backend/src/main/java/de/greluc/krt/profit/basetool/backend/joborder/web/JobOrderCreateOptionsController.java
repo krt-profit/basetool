@@ -19,8 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreationOptions;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,15 +39,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderCreateOptionsController {
 
   private final JobOrderCreationOptions creationOptions;
+  private final AuthHelperService authHelper;
 
   /**
-   * Returns current eligible choices and the writer capability of each offered side.
+   * Returns current eligible choices and the writer capability of each offered side, under the
+   * caller's contextual authorities and the honoured pin.
    *
    * @return current creation options, including a false capability when none is available
    */
   @GetMapping
   @Operation(summary = "Get current order creation capability and unit choices")
   public JobOrderCreateOptionsDto current() {
-    return creationOptions.current();
+    return creationOptions.current(
+        JobOrderWriterRule.CONTEXTUAL, JobOrderActor.Web.current(authHelper));
   }
 }

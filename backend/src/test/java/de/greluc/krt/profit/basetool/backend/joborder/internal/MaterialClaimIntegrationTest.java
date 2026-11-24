@@ -134,7 +134,7 @@ class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
             observed.handle(),
             null,
             List.of(new CreateJobOrderMaterialDto(f.materialId(), 650, 6.0)),
-            observed.version()));
+            new JobOrderObservedVersions(observed.version(), observed.commentVersion())));
 
     assertThat(onlyBucket(f.orderId()).claims())
         .filteredOn(c -> c.claimingOrgUnit().id().equals(f.squadronAId()))
@@ -1035,7 +1035,8 @@ class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
             "orph",
             null,
             List.of(new CreateJobOrderMaterialDto(s.matA(), 650, 10.0)),
-            jobOrderRepository.findById(s.orderId()).orElseThrow().getVersion());
+            new JobOrderObservedVersions(
+                jobOrderRepository.findById(s.orderId()).orElseThrow().getVersion(), 0L));
     jobOrderService.updateJobOrder(s.orderId(), update);
 
     List<MaterialClaim> remaining =

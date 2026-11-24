@@ -31,8 +31,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -71,10 +71,9 @@ class JobOrderRepositoryActiveLookupOrderingTest {
   @Test
   void findAllActiveWithMaterials_ordersByPriorityAscNullsLastThenDisplayIdDesc() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("Prio-Order-" + tag);
-    squadron.setShorthand("PO" + tag);
-    OrgUnit owner = squadronRepository.save(squadron);
+    OrgUnit owner =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Prio-Order-" + tag, "PO" + tag, null);
 
     UUID prio30 = saveActiveOrder(owner, 30);
     UUID prio10 = saveActiveOrder(owner, 10);
@@ -186,10 +185,8 @@ class JobOrderRepositoryActiveLookupOrderingTest {
    * @return the persisted squadron as an {@link OrgUnit}.
    */
   private OrgUnit newSquadron(String tag) {
-    Squadron squadron = new Squadron();
-    squadron.setName("Dedup-Order-" + tag);
-    squadron.setShorthand("DO" + tag);
-    return squadronRepository.save(squadron);
+    return OrgUnitFixtures.persistedSquadron(
+        squadronRepository, "Dedup-Order-" + tag, "DO" + tag, null);
   }
 
   /**

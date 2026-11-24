@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
@@ -65,23 +67,51 @@ class ExchangeRegistrySnapshotTest {
     ExchangeRegistrySnapshot after = snapshot(false, client(ExchangeClientStatus.ACTIVE, "a"));
 
     assertThat(ExchangeRegistrySnapshot.restricts(before, after)).isTrue();
-    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(before, after).enabled()).isFalse();
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(before, after).isOn(ExchangeSwitch.GLOBAL))
+        .isFalse();
   }
 
   @Test
   void switchingTheBankOffIsARestrictionAndSwitchingItOnIsNot() {
-    ExchangeRegistrySnapshot bankOn = new ExchangeRegistrySnapshot(true, true, new TreeMap<>());
-    ExchangeRegistrySnapshot bankOff = new ExchangeRegistrySnapshot(true, false, new TreeMap<>());
+    ExchangeRegistrySnapshot bankOn = allOnBut();
+    ExchangeRegistrySnapshot bankOff = allOnBut(ExchangeSwitch.BANK);
 
     assertThat(ExchangeRegistrySnapshot.restricts(bankOn, bankOff)).isTrue();
-    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(bankOn, bankOff).bankEnabled()).isFalse();
-    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(bankOn, bankOff).enabled()).isTrue();
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(bankOn, bankOff).isOn(ExchangeSwitch.BANK))
+        .isFalse();
+    assertThat(
+            ExchangeRegistrySnapshot.restrictiveMerge(bankOn, bankOff).isOn(ExchangeSwitch.GLOBAL))
+        .isTrue();
     assertThat(ExchangeRegistrySnapshot.restricts(bankOff, bankOn)).isFalse();
   }
 
   @Test
+  void switchingAJobOrderSwitchOffIsARestrictionThatTouchesOnlyThatSwitch() {
+    ExchangeRegistrySnapshot allOn = allOnBut();
+    ExchangeRegistrySnapshot familyOff = allOnBut(ExchangeSwitch.JOB_ORDERS);
+    ExchangeRegistrySnapshot writesOff = allOnBut(ExchangeSwitch.JOB_ORDER_WRITES);
+
+    assertThat(ExchangeRegistrySnapshot.restricts(allOn, familyOff)).isTrue();
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(allOn, familyOff)).isEqualTo(familyOff);
+    assertThat(ExchangeRegistrySnapshot.restricts(allOn, writesOff)).isTrue();
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(allOn, writesOff)).isEqualTo(writesOff);
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(familyOff, writesOff))
+        .isEqualTo(allOnBut(ExchangeSwitch.JOB_ORDERS, ExchangeSwitch.JOB_ORDER_WRITES));
+    assertThat(ExchangeRegistrySnapshot.restricts(familyOff, allOn)).isFalse();
+    assertThat(ExchangeRegistrySnapshot.restricts(writesOff, allOn)).isFalse();
+  }
+
+  @Test
+  void aMissingSettingsRowAndASwitchedOffSnapshotGrantNoSwitch() {
+    ExchangeRegistrySnapshot none = ExchangeRegistrySnapshot.of(null, List.of());
+
+    assertThat(none).isEqualTo(allOnBut(ExchangeSwitch.values()));
+    assertThat(ExchangeRegistrySnapshot.switchedOff(new TreeMap<>())).isEqualTo(none);
+  }
+
+  @Test
   void aNewClientStaysOutOfTheMergeAndAMissingOneIsARestriction() {
-    ExchangeRegistrySnapshot empty = new ExchangeRegistrySnapshot(true, true, new TreeMap<>());
+    ExchangeRegistrySnapshot empty = allOnBut();
     ExchangeRegistrySnapshot withClient = snapshot(true, client(ExchangeClientStatus.ACTIVE, "a"));
 
     assertThat(ExchangeRegistrySnapshot.restricts(empty, withClient)).isFalse();
@@ -94,8 +124,7 @@ class ExchangeRegistrySnapshotTest {
     ExchangeRegistrySnapshot before = snapshot(true, client(ExchangeClientStatus.ACTIVE, "a"));
     ExchangeRegistrySnapshot after =
         new ExchangeRegistrySnapshot(
-            true,
-            true,
+            EnumSet.allOf(ExchangeSwitch.class),
             new TreeMap<>(
                 Map.of(
                     "app",
@@ -115,13 +144,29 @@ class ExchangeRegistrySnapshotTest {
   /**
    * Builds a snapshot with one client called {@code app}.
    *
-   * @param enabled the switch
+   * @param enabled the global switch; every other switch is on
    * @param client the client
    * @return the snapshot
    */
   private static @NotNull ExchangeRegistrySnapshot snapshot(
       boolean enabled, @NotNull ExchangeRegistrySnapshot.Client client) {
-    return new ExchangeRegistrySnapshot(enabled, true, new TreeMap<>(Map.of("app", client)));
+    Set<ExchangeSwitch> on = EnumSet.allOf(ExchangeSwitch.class);
+    if (!enabled) {
+      on.remove(ExchangeSwitch.GLOBAL);
+    }
+    return new ExchangeRegistrySnapshot(on, new TreeMap<>(Map.of("app", client)));
+  }
+
+  /**
+   * Builds a snapshot without clients with every switch on but the given ones.
+   *
+   * @param off the switches that are off
+   * @return the snapshot
+   */
+  private static @NotNull ExchangeRegistrySnapshot allOnBut(@NotNull ExchangeSwitch... off) {
+    Set<ExchangeSwitch> on = EnumSet.allOf(ExchangeSwitch.class);
+    List.of(off).forEach(on::remove);
+    return new ExchangeRegistrySnapshot(on, new TreeMap<>());
   }
 
   /**

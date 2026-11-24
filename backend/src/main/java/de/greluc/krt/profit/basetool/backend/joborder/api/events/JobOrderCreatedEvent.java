@@ -45,6 +45,8 @@ import org.jetbrains.annotations.Nullable;
  * @param jobOrderType the order type name ({@code MATERIAL} / {@code ITEM})
  * @param actorSub the creating user's sub, or {@code null} when anonymous/guest
  * @param observedRevision the order revisions at creation
+ * @param app the display name of the connected application the order was created through, or {@code
+ *     null} for a create in the web (REQ-ORDERS-078)
  */
 public record JobOrderCreatedEvent(
     UUID jobOrderId,
@@ -55,7 +57,8 @@ public record JobOrderCreatedEvent(
     @Nullable OrgUnitRef requestingOrgUnit,
     @Nullable String jobOrderType,
     @Nullable UUID actorSub,
-    @NotNull NotificationRevision observedRevision)
+    @NotNull NotificationRevision observedRevision,
+    @Nullable String app)
     implements NotificationEvent {
 
   /** Loose entity-type tag stored on the produced notifications. */
@@ -105,6 +108,7 @@ public record JobOrderCreatedEvent(
     if (jobOrderType != null) {
       params.put("jobOrderType", jobOrderType);
     }
+    JobOrderNotices.addApplication(params, app);
     return params;
   }
 }

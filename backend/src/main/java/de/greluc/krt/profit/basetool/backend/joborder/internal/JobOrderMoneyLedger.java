@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeRead.AuecProgress;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyAvailability.AccountReceipt;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import java.math.BigDecimal;
@@ -372,6 +374,25 @@ class JobOrderMoneyLedger {
     BigDecimal holdings() {
       return Stream.concat(balances.values().stream(), accountBalances.values().stream())
           .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * Reports the order's progress toward its target as the requester sees it: the settlement stays
+     * open while a terminal order still holds funds or was overpaid (REQ-ORDERS-063).
+     *
+     * @param target the order's target
+     * @param status the order's lifecycle status
+     * @return the target, the net handover, the remaining and overpaid amounts and the settlement
+     *     flag
+     */
+    AuecProgress progress(BigDecimal target, JobOrderStatus status) {
+      BigDecimal outstanding = target.subtract(handedOver);
+      return new AuecProgress(
+          target,
+          handedOver,
+          outstanding.max(BigDecimal.ZERO),
+          outstanding.negate().max(BigDecimal.ZERO),
+          !status.isActive() && (holdings().signum() > 0 || outstanding.signum() < 0));
     }
 
     JobOrderMoneyHolder holder(UUID id) {

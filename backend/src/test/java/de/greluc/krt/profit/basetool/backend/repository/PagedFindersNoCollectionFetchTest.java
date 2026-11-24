@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import java.util.Collection;
 import java.util.List;
@@ -209,10 +210,7 @@ class PagedFindersNoCollectionFetchTest {
   }
 
   private Squadron seedStaffel(String tag) {
-    Squadron staffel = new Squadron();
-    staffel.setName("Paged-" + tag);
-    staffel.setShorthand("PG" + tag);
-    return squadronRepository.save(staffel);
+    return OrgUnitFixtures.persistedSquadron(squadronRepository, "Paged-" + tag, "PG" + tag, null);
   }
 
   private void seedMission(User participantUser) {

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -120,9 +121,7 @@ class OperationServiceTest {
     de.greluc.krt.profit.basetool.backend.identity.api.User caller =
         new de.greluc.krt.profit.basetool.backend.identity.api.User();
     caller.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron picked =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    picked.setId(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron picked = squadron(UUID.randomUUID());
     UUID pickedOrgUnitId = picked.getId();
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
@@ -165,8 +164,7 @@ class OperationServiceTest {
     User caller = new User();
     caller.setId(UUID.randomUUID());
     de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron stamped =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    stamped.setId(UUID.randomUUID());
+        squadron(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
     when(orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, null))

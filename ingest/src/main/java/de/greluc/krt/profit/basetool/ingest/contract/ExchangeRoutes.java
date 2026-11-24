@@ -75,6 +75,13 @@ public final class ExchangeRoutes {
    */
   public static final String BANK_PATH = "/exchange/v1/bank";
 
+  /**
+   * The root of the job-order route family, which the job-order family switch gates and, for its
+   * {@code POST}s, the job-order writes switch (REQ-OXCH-009): every path at or below it, whether a
+   * route serves it or not.
+   */
+  public static final String JOB_ORDERS_PATH = "/exchange/v1/job-orders";
+
   /** Every authenticated exchange route. */
   public static final @Unmodifiable List<Route> ROUTES =
       List.of(
@@ -124,11 +131,21 @@ public final class ExchangeRoutes {
           route(HttpMethod.GET, BANK_PATH + "/requests", "exchange.bank.read"),
           write(HttpMethod.POST, BANK_PATH + "/requests", "exchange.bank.request"),
           write(HttpMethod.POST, BANK_PATH + "/requests/{id}/correction", "exchange.bank.request"),
-          write(HttpMethod.POST, BANK_PATH + "/requests/{id}/cancel", "exchange.bank.request"));
+          write(HttpMethod.POST, BANK_PATH + "/requests/{id}/cancel", "exchange.bank.request"),
+          route(HttpMethod.GET, JOB_ORDERS_PATH, "exchange.joborders.read"),
+          route(HttpMethod.GET, JOB_ORDERS_PATH + "/create-options", "exchange.joborders.write"),
+          write(HttpMethod.POST, JOB_ORDERS_PATH, "exchange.joborders.write"),
+          write(HttpMethod.POST, JOB_ORDERS_PATH + "/{id}/cancel", "exchange.joborders.write"),
+          write(HttpMethod.POST, JOB_ORDERS_PATH + "/{id}/target", "exchange.joborders.write"),
+          write(HttpMethod.POST, JOB_ORDERS_PATH + "/{id}/comment", "exchange.joborders.write"));
 
   /** The bank route family as a pattern, matched against the decoded path segments. */
   private static final PathPattern BANK_FAMILY =
       PathPatternParser.defaultInstance.parse(BANK_PATH + "/**");
+
+  /** The job-order route family as a pattern, matched against the decoded path segments. */
+  private static final PathPattern JOB_ORDER_FAMILY =
+      PathPatternParser.defaultInstance.parse(JOB_ORDERS_PATH + "/**");
 
   /** Not instantiable. */
   private ExchangeRoutes() {}
@@ -156,6 +173,17 @@ public final class ExchangeRoutes {
    */
   public static boolean isBank(@NotNull String path) {
     return BANK_FAMILY.matches(PathContainer.parsePath(path));
+  }
+
+  /**
+   * Tells whether a request path belongs to the job-order route family, judged on the decoded
+   * segments as {@link #find} matches them, so a percent-encoded spelling is in the family too.
+   *
+   * @param path the raw request path
+   * @return {@code true} for {@link #JOB_ORDERS_PATH} and every path below it
+   */
+  public static boolean isJobOrder(@NotNull String path) {
+    return JOB_ORDER_FAMILY.matches(PathContainer.parsePath(path));
   }
 
   /**

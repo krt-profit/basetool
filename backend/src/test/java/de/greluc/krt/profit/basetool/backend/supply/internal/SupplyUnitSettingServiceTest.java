@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
@@ -79,11 +80,8 @@ class SupplyUnitSettingServiceTest {
   }
 
   private static Squadron unit(String name) {
-    Squadron unit = new Squadron();
-    unit.setId(UUID.randomUUID());
-    unit.setName(name);
-    unit.setShorthand(name.substring(0, 3).toUpperCase(java.util.Locale.ROOT));
-    return unit;
+    return squadron(
+        UUID.randomUUID(), name, name.substring(0, 3).toUpperCase(java.util.Locale.ROOT));
   }
 
   private SupplyUnitSetting setting(UUID id, boolean raise, boolean accept, long version) {

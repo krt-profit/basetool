@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -29,10 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -113,34 +112,13 @@ class JobOrderListAuthorityMvcTest extends JobOrderPageMvcTestBase {
   }
 
   private static JobOrderDto order(boolean canEdit, boolean invalid, Integer priority) {
-    return new JobOrderDto(
-        UUID.randomUUID(),
-        7,
-        null,
-        null,
-        "Handle",
-        null,
-        priority,
-        "OPEN",
-        "MATERIAL",
-        true,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.now(),
-        1L,
-        canEdit,
-        false,
-        invalid,
-        false,
-        false,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .displayId(7)
+        .priority(priority)
+        .canEdit(canEdit)
+        .canManageAssignees(false)
+        .responsibilityInvalid(invalid)
+        .canTransferResponsibility(false)
+        .build();
   }
 }

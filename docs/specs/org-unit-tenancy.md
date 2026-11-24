@@ -113,7 +113,9 @@ honours counts; any other pin is no pin.
   (REQ-ORDERS-053). Blueprint producers, Mission details, unrelated Inventory, Bank and Exchange
   remain independently authorized. External consumers use the narrow general Profit capability
   (`canViewJobOrders`) and the reduced tenancy scope (`canSeeJobOrderInScope`); web-wide
-  readability is no gateway expansion.
+  readability is no gateway expansion. The exchange's job-order family uses neither: it reads only
+  the orders of the member's direct active units and own assignee entries, decided from the database
+  (`JobOrderExchangeReadSet`, REQ-OXCH-001).
 
   Stock linked to the concrete order is readable inside its order UI without opening a foreign
   Lager view or unrelated stock rows.

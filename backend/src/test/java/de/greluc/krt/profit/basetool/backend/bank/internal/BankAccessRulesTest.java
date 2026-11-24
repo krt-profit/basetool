@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -648,10 +649,7 @@ class BankAccessRulesTest {
   }
 
   private static Squadron staffel(UUID id) {
-    Squadron squadron = new Squadron();
-    squadron.setId(id);
-    squadron.setName("Staffel " + id);
-    return squadron;
+    return OrgUnitFixtures.squadron(id, "Staffel " + id);
   }
 
   private static BankAccount account(

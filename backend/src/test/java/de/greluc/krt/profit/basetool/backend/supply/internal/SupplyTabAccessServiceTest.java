@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -87,8 +88,7 @@ class SupplyTabAccessServiceTest {
   }
 
   private static Squadron unit(UUID id, boolean active) {
-    Squadron unit = new Squadron();
-    unit.setId(id);
+    Squadron unit = squadron(id);
     unit.setActive(active);
     return unit;
   }

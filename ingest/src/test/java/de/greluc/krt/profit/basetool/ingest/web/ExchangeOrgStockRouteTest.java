@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.ok;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -52,7 +53,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The org stock through both gates, with the backend relay mocked: relayed with its page parameters
@@ -65,7 +65,6 @@ class ExchangeOrgStockRouteTest {
   private static final String STOCK_ONLY = "orgstock-stock-only-token";
   private static final String PATH = "/exchange/v1/org-stock";
   private static final String BACKEND = "/api/v1/exchange/org-stock";
-  private static final JsonMapper MAPPER = JsonMapper.builder().build();
   private static final UUID UNIT = UUID.randomUUID();
   private static final UUID MATERIAL = UUID.randomUUID();
   private static final String PAGE =
@@ -304,15 +303,5 @@ class ExchangeOrgStockRouteTest {
   private ResultActions call(@NotNull String token, @NotNull String target) throws Exception {
     return ExchangeTestSupport.call(
         mockMvc, key, token, HttpMethod.GET, target, null, "VerseKit/2.1.0");
-  }
-
-  /**
-   * A usable relay answer.
-   *
-   * @param json the body
-   * @return the result
-   */
-  private static ExchangeRelay.Result ok(@NotNull String json) {
-    return new ExchangeRelay.Result(200, MAPPER.readTree(json), null, null);
   }
 }

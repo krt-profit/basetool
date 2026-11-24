@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.Optional;
@@ -93,8 +93,7 @@ class MissionAccessPolicyGateTest {
   @Test
   void canManageMission_MissionManagerGrantInOwningUnit_ShouldReturnTrue() {
     UUID unitId = UUID.randomUUID();
-    OrgUnit unit = new Squadron();
-    unit.setId(unitId);
+    OrgUnit unit = squadron(unitId);
     mission.setOwningOrgUnit(unit);
     when(authentication.isAuthenticated()).thenReturn(true);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
@@ -144,8 +143,7 @@ class MissionAccessPolicyGateTest {
   @Test
   void canManageMission_ManagerList_MissionManagerForeignOrgUnit_ShouldReturnFalse() {
     UUID foreignUnitId = UUID.randomUUID();
-    OrgUnit foreignUnit = new Squadron();
-    foreignUnit.setId(foreignUnitId);
+    OrgUnit foreignUnit = squadron(foreignUnitId);
     mission.setOwningOrgUnit(foreignUnit);
     when(authentication.isAuthenticated()).thenReturn(true);
     when(accessGateService.canManageMissionsOf(foreignUnitId)).thenReturn(false);
@@ -661,8 +659,7 @@ class MissionAccessPolicyGateTest {
 
   private UUID givenOwnedMission() {
     UUID unitId = UUID.randomUUID();
-    OrgUnit unit = new Squadron();
-    unit.setId(unitId);
+    OrgUnit unit = squadron(unitId);
     mission.setOwningOrgUnit(unit);
     lenient()
         .when(missionRepository.findByIdForAuthorization(missionId))

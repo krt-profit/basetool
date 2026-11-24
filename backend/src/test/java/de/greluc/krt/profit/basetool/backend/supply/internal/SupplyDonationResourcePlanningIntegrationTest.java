@@ -48,8 +48,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Duration;
 import java.util.List;
@@ -83,7 +83,7 @@ class SupplyDonationResourcePlanningIntegrationTest {
   @Autowired private TransactionTemplate transactions;
   @Autowired private UserRepository users;
   @Autowired private MaterialRepository materials;
-  @Autowired private OrgUnitRepository units;
+  @Autowired private SquadronRepository squadrons;
   @Autowired private SupplyUnitSettingRepository unitSettings;
   @Autowired private LocationRepository locations;
   @Autowired private CityRepository cities;
@@ -475,10 +475,11 @@ class SupplyDonationResourcePlanningIntegrationTest {
 
   /** Creates an active unit outside the valid Profit order-processing hierarchy. */
   private OrgUnit unit() {
-    Squadron unit = new Squadron();
-    unit.setName("Donation pool " + UUID.randomUUID());
-    unit.setShorthand("DP" + UUID.randomUUID().toString().substring(0, 6));
-    return units.saveAndFlush(unit);
+    return OrgUnitFixtures.persistedSquadron(
+        squadrons,
+        "Donation pool " + UUID.randomUUID(),
+        "DP" + UUID.randomUUID().toString().substring(0, 6),
+        null);
   }
 
   /** Creates the scalar physical stock fixture without exercising a mutation under test. */

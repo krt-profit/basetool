@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-24.
-> **Owner area:** API · **Related ADRs:** ADR-0406
+> **Owner area:** API · **Related ADRs:** ADR-0409
 
 # File exports follow the current standard of their format
 
@@ -56,7 +56,7 @@ Every PDF the backend renders is opened by `KrtPdfSupport.open` and written as P
   DeviceRGB colours and the logo, and `DisplayDocTitle`, so a viewer shows the title;
 - every font is embedded — the text, spacers included, is set in the bundled Lato;
 - the `Info` dictionary holds only `ModDate`, written in the PDF 2.0 date form `D:YYYYMMDDHHmmSSZ`,
-  beside a catalog `PieceInfo` entry with the same date (ADR-0406: OpenPDF always writes an
+  beside a catalog `PieceInfo` entry with the same date (ADR-0409: OpenPDF always writes an
   `Info` dictionary, and PDF/A-4 6.1.3 admits one only in this form).
 
 The document title is the heading of its first page; metadata and heading cannot drift apart.
@@ -115,7 +115,7 @@ the bytes are UTF-8 without a byte order mark.
 
 - **PDF/UA-2 (ISO 14289-2:2024).** A tagged, accessible PDF needs a structure tree in the PDF 2.0
   namespace around every paragraph and table cell; OpenPDF 3.0.6 tags nothing on its own and knows
-  no structure namespaces (ADR-0406).
+  no structure namespaces (ADR-0409).
 - **Spreadsheet behaviour.** RFC 4180 does not define how a spreadsheet opens a file; REQ-PUR-023
   names the supported import workflow.
 - **Exchange documents** (`/exchange/v1/openapi.json`, `/exchange/v1/schemas/*`) are served inline,

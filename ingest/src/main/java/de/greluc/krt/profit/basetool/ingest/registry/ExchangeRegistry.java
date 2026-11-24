@@ -19,30 +19,48 @@
 
 package de.greluc.krt.profit.basetool.ingest.registry;
 
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The exchange registry as the gateway reads it from the backend's Redis mirror (REQ-XCH-003,
- * REQ-BXCH-006).
+ * REQ-BXCH-006, REQ-OXCH-009).
  *
  * @param revision the mirror document's revision
  * @param enabled whether the exchange serves any request
- * @param bankEnabled whether the bank route family serves requests while the exchange is on
+ * @param areasOn the area switches that are on while the exchange is on; every other one is off
  * @param clients every registry client by its Keycloak client id
  */
 public record ExchangeRegistry(
     long revision,
     boolean enabled,
-    boolean bankEnabled,
+    @NotNull @Unmodifiable Set<AreaSwitch> areasOn,
     @NotNull @Unmodifiable Map<String, Client> clients) {
 
-  /** Copies the clients. */
+  /** Copies the area switches and the clients. */
   public ExchangeRegistry {
+    Set<AreaSwitch> on = EnumSet.noneOf(AreaSwitch.class);
+    on.addAll(areasOn);
+    areasOn = Collections.unmodifiableSet(on);
     clients = Map.copyOf(clients);
+  }
+
+  /**
+   * Tells whether an area switch is on.
+   *
+   * @param area the area switch
+   * @return {@code true} when it is on
+   */
+  @Contract(pure = true)
+  public boolean isOn(@NotNull AreaSwitch area) {
+    return areasOn.contains(area);
   }
 
   /**

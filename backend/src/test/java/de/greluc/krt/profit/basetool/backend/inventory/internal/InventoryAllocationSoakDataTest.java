@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
@@ -47,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.UUID;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -134,12 +133,10 @@ class InventoryAllocationSoakDataTest {
   }
 
   private Fixture seedLinkedItem(double amount, boolean gameItemStock) {
-    Squadron unit = new Squadron();
     String suffix = UUID.randomUUID().toString().substring(0, 8);
-    unit.setName("Allocation unit " + suffix);
-    unit.setShorthand("AL" + suffix);
-    withinProfit(unit, persistedProfitArea(orgUnitRepository));
-    squadronRepository.saveAndFlush(unit);
+    Squadron unit =
+        OrgUnitFixtures.persistedProfitSquadron(
+            squadronRepository, orgUnitRepository, "Allocation unit " + suffix, "AL" + suffix);
     JobOrder order =
         JobOrder.builder()
             .responsibleOrgUnit(unit)

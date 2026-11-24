@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
@@ -106,8 +106,7 @@ class InventoryPoolCommandsTest {
     location = new Location();
     location.setId(UUID.randomUUID());
     location.setName("Lorville");
-    pool = new Squadron();
-    pool.setId(UUID.randomUUID());
+    pool = squadron(UUID.randomUUID());
     donor = new User();
     donor.setId(DONOR);
     holder = new User();

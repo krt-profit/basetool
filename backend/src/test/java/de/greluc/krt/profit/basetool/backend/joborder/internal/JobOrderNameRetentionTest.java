@@ -101,7 +101,8 @@ class JobOrderNameRetentionTest {
   private UUID closedOrder(String handle, Instant lastChange) {
     UUID id = order(handle);
     jdbc.update(
-        "UPDATE job_order SET status = 'COMPLETED', updated_at = ? WHERE id = ?",
+        "UPDATE job_order SET status = 'COMPLETED', updated_at = ?, closed_at = ? WHERE id = ?",
+        Timestamp.from(lastChange),
         Timestamp.from(lastChange),
         id);
     return id;

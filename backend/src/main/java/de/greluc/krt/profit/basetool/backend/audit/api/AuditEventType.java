@@ -177,6 +177,8 @@ public enum AuditEventType {
   INVENTORY_AUDIT_PURGED(AuditDomain.INVENTORY),
   /** A material job order was created. */
   JOB_ORDER_CREATED(AuditDomain.JOB_ORDER),
+  /** A member created an aUEC order through an exchange client (REQ-OXCH-004). */
+  JOB_ORDER_CREATED_VIA_CLIENT(AuditDomain.JOB_ORDER),
   /** Actual aUEC reported as purpose-bound to one order. */
   JOB_ORDER_MONEY_PROVIDED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_MOVED(AuditDomain.JOB_ORDER),
@@ -187,6 +189,8 @@ public enum AuditEventType {
   JOB_ORDER_MONEY_HOLDER_IDENTITY_CHANGED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_RECIPIENT_CHANGED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_TARGET_CHANGED(AuditDomain.JOB_ORDER),
+  /** A member changed an aUEC order's target through an exchange client (REQ-OXCH-007). */
+  JOB_ORDER_TARGET_CHANGED_VIA_CLIENT(AuditDomain.JOB_ORDER),
   /** A unit's outstanding aUEC commitment changed. */
   JOB_ORDER_MONEY_COMMITMENT_CHANGED(AuditDomain.JOB_ORDER),
   /**
@@ -199,10 +203,17 @@ public enum AuditEventType {
   JOB_ORDER_ITEM_CREATED(AuditDomain.JOB_ORDER),
   /** A material job order was edited (materials/handle/requesting unit). */
   JOB_ORDER_UPDATED(AuditDomain.JOB_ORDER),
+  /**
+   * A member changed an aUEC order's comment through an exchange client; the text is never recorded
+   * (REQ-OXCH-008).
+   */
+  JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT(AuditDomain.JOB_ORDER),
   /** An item job order was edited (item lines rebuilt). */
   JOB_ORDER_ITEM_UPDATED(AuditDomain.JOB_ORDER),
   /** A job order's status was changed via the status endpoint. */
   JOB_ORDER_STATUS_CHANGED(AuditDomain.JOB_ORDER),
+  /** A member cancelled an aUEC order through an exchange client (REQ-OXCH-006). */
+  JOB_ORDER_CANCELLED_VIA_CLIENT(AuditDomain.JOB_ORDER),
   /** A job order was moved to a new priority slot. */
   JOB_ORDER_PRIORITY_CHANGED(AuditDomain.JOB_ORDER),
   /**
@@ -636,6 +647,11 @@ public enum AuditEventType {
   EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
   /** The bank switch of the exchange was turned on or off; the details carry the new state. */
   BANK_EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
+  /**
+   * The job-order family switch or the job-order writes switch of the exchange was turned on or
+   * off; the details carry the switch and its new state (REQ-OXCH-009).
+   */
+  JOB_ORDER_EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
   /** A member disconnected a whole exchange client from their account (REQ-XCH-008). */
   EXCHANGE_CLIENT_DISCONNECTED(AuditDomain.CONNECTED_APPS),
   /** A member disconnected one installation of an exchange client (REQ-XCH-008). */

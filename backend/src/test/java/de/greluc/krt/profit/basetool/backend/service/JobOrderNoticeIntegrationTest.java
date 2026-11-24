@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
@@ -27,13 +28,17 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderUpdatedByRequesterEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
@@ -55,10 +60,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The job-order notices end to end against Postgres (REQ-ORDERS-041…044): the seeded rules reach
- * the leadership of the right unit, a member only while they hold {@code KRT Member}; an assignment
- * is cleared for the one member only, and the closed order's earlier creation notices go. Runs in a
- * rolled-back transaction.
+ * The job-order notices end to end against Postgres (REQ-ORDERS-041…044, REQ-NOTIF-017): the seeded
+ * rules reach the leadership of the right unit, a member only while they hold {@code KRT Member};
+ * an assignment is cleared for the one member only, the closed order's earlier creation notices go,
+ * and a need-change notice replaces only its recipient's unread one of the same type and order.
+ * Runs in a rolled-back transaction.
  */
 @SpringBootTest
 @Transactional
@@ -75,6 +81,7 @@ class JobOrderNoticeIntegrationTest {
 
   @Autowired private NotificationCreationService creationService;
   @Autowired private NotificationRepository notificationRepository;
+  @Autowired private NotificationService notificationService;
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
   @Autowired private OrgUnitMembershipRepository membershipRepository;
@@ -117,6 +124,22 @@ class JobOrderNoticeIntegrationTest {
         .getContent();
   }
 
+  private static NoticeEvent responsibleChanged(UUID order) {
+    return JobOrderNotices.needChanged(
+        order,
+        12,
+        "Ada",
+        Map.of(NotificationContextRole.RESPONSIBLE, IRIDIUM),
+        new NotificationRevision(0, 1),
+        ACTOR,
+        null);
+  }
+
+  private static JobOrderUpdatedByRequesterEvent requesterChanged(UUID order) {
+    return new JobOrderUpdatedByRequesterEvent(
+        order, 12, "Ada", IRIDIUM, "IRI", null, null, ACTOR, new NotificationRevision(0, 1), null);
+  }
+
   @Test
   void aFinishedOrderTellsTheLogisticianOfTheRequestingUnitButNotTheActor() {
     creationService.createFromEvent(
@@ -128,7 +151,8 @@ class JobOrderNoticeIntegrationTest {
             "IRI",
             "COMPLETED",
             Set.of(),
-            ACTOR));
+            ACTOR,
+            null));
 
     assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_FINISHED);
     assertThat(inbox(ACTOR)).isEmpty();
@@ -145,7 +169,8 @@ class JobOrderNoticeIntegrationTest {
             "IRI",
             "COMPLETED",
             Set.of(),
-            ACTOR));
+            ACTOR,
+            null));
 
     assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_FINISHED);
     assertThat(inbox(FORMER_LOGISTICIAN)).isEmpty();
@@ -162,7 +187,8 @@ class JobOrderNoticeIntegrationTest {
             "IRI",
             "DELETED",
             Set.of(),
-            ACTOR));
+            ACTOR,
+            null));
 
     assertThat(
             notificationRepository
@@ -175,7 +201,8 @@ class JobOrderNoticeIntegrationTest {
   @Test
   void anOrderWithoutAnyUnitOrAssigneeTellsNobodyAboutItsEnd() {
     creationService.createFromEvent(
-        JobOrderNotices.finished(orderId, 12, "Ada", Map.of(), null, "REJECTED", Set.of(), ACTOR));
+        JobOrderNotices.finished(
+            orderId, 12, "Ada", Map.of(), null, "REJECTED", Set.of(), ACTOR, null));
 
     assertThat(inbox(LOGISTICIAN)).isEmpty();
   }
@@ -213,6 +240,57 @@ class JobOrderNoticeIntegrationTest {
     creationService.createFromEvent(JobOrderNotices.assigneeRemoved(orderId, ASSIGNEE, ACTING));
 
     assertThat(inbox(ASSIGNEE)).isEmpty();
+  }
+
+  @Test
+  void aLoopOfResponsibleNeedChangesLeavesOneUnreadNoticePerRecipient() {
+    for (int edit = 0; edit < 3; edit++) {
+      assertThat(creationService.createFromEvent(responsibleChanged(orderId)))
+          .as("members pushed the unread signal")
+          .contains(LOGISTICIAN);
+    }
+
+    assertThat(inbox(LOGISTICIAN))
+        .containsExactly(NotificationType.JOB_ORDER_UPDATED_BY_RESPONSIBLE);
+  }
+
+  @Test
+  void aReadNeedChangeNoticeStaysBesideTheNewUnreadOne() {
+    creationService.createFromEvent(responsibleChanged(orderId));
+    notificationService.markAllRead(LOGISTICIAN);
+
+    creationService.createFromEvent(responsibleChanged(orderId));
+
+    assertThat(notificationService.listOwn(LOGISTICIAN, PageRequest.of(0, 50)).getContent())
+        .extracting(NotificationDto::type, NotificationDto::read)
+        .containsExactlyInAnyOrder(
+            tuple(NotificationType.JOB_ORDER_UPDATED_BY_RESPONSIBLE.name(), true),
+            tuple(NotificationType.JOB_ORDER_UPDATED_BY_RESPONSIBLE.name(), false));
+  }
+
+  @Test
+  void aNeedChangeLeavesTheUnreadNoticeOfAnotherOrder() {
+    UUID otherOrder = UUID.randomUUID();
+    creationService.createFromEvent(responsibleChanged(otherOrder));
+
+    creationService.createFromEvent(responsibleChanged(orderId));
+
+    assertThat(notificationRepository.findAllByRecipientUserId(LOGISTICIAN, PageRequest.of(0, 50)))
+        .extracting(Notification::getEntityId)
+        .containsExactlyInAnyOrder(otherOrder, orderId);
+  }
+
+  @Test
+  void requesterAndResponsibleNeedChangesCoalesceApart() {
+    for (int edit = 0; edit < 2; edit++) {
+      creationService.createFromEvent(requesterChanged(orderId));
+      creationService.createFromEvent(responsibleChanged(orderId));
+    }
+
+    assertThat(inbox(LOGISTICIAN))
+        .containsExactlyInAnyOrder(
+            NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER,
+            NotificationType.JOB_ORDER_UPDATED_BY_RESPONSIBLE);
   }
 
   @Test

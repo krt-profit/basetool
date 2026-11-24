@@ -1457,6 +1457,522 @@
           }
         }
       ]
+    },
+    {
+      "id": 35,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 124
+      },
+      "type": "row",
+      "title": "Job orders",
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 36,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 125
+      },
+      "type": "timeseries",
+      "title": "Gateway refusals/hour while a job-order switch is off",
+      "description": "Job-order exchange requests of the selected clients the ingest gateway refused per hour because a job-order switch is off: job_order_exchange_disabled for any path of the family while the job-order switch is off, job_order_writes_disabled for a write while only the writes switch is off; the rest of the exchange keeps working (REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id, reason) (increase(basetool_ingest_exchange_refused_total{reason=~\"job_order_exchange_disabled|job_order_writes_disabled\", client_id=~\"$client_id\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}} {{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 125
+      },
+      "type": "timeseries",
+      "title": "Job-order switch changes/day",
+      "description": "Committed changes of the job-order switch and of the job-order writes switch per day, by switch and direction; each one fires JobOrderExchangeSwitchChanged and is logged as JOB_ORDER_EXCHANGE_SWITCH_CHANGED in the Verbundene Anwendungen audit log (REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (action) (increase(basetool_exchange_registry_changes_total{action=~\"job_order_.*\"}[1d]))",
+          "refId": "A",
+          "legendFormat": "{{action}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 133
+      },
+      "type": "timeseries",
+      "title": "Backend job-order refusals/hour",
+      "description": "Job-order exchange requests the backend refused per hour, by reason: switched_off and writes_switched_off when the backend's exchange gate rechecks a job-order switch, the other reasons from the job-order routes. open_order_cap and daily_create_cap are creates refused at the caps on client creates; more than 10 of them an hour for 30 minutes fires JobOrderExchangeCapHit (REQ-OXCH-009, REQ-OBS-025). not_found, not_permitted, version_conflict, responsibility_invalid and closed refuse a write on an existing order, money_started a cancel after the first accepted money operation; more than 50 not_found an hour fires JobOrderExchangeNotFoundSpike (REQ-OXCH-005, REQ-OXCH-006). target_too_low refuses a target change at or below the order's net handover (REQ-OXCH-007).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (increase(basetool_exchange_job_order_refused_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 141
+      },
+      "type": "timeseries",
+      "title": "Job-order fingerprint backlog",
+      "description": "Job orders marked for a fingerprint recomputation and the age of the oldest mark, sampled every 60 s by the business-metrics collector, not by the worker; an oldest mark above 5 minutes for 5 minutes fires JobOrderExchangeFeedLagging (REQ-OXCH-003, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "max(basetool_exchange_job_order_dirty_count)",
+          "refId": "A",
+          "legendFormat": "marked orders",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "max(basetool_exchange_job_order_dirty_oldest_age_seconds)",
+          "refId": "B",
+          "legendFormat": "oldest mark",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 141
+      },
+      "type": "timeseries",
+      "title": "Job-order fingerprint recomputations/hour",
+      "description": "Job orders the fingerprint worker recomputed per hour, changed against unchanged; only a changed fingerprint moves the job-order feed, and more than 1000 changed an hour for 2 hours fires JobOrderFingerprintChurn (REQ-OXCH-003, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (increase(basetool_exchange_job_order_fingerprints_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 149
+      },
+      "type": "timeseries",
+      "title": "Job-order fingerprint worker runs/hour",
+      "description": "Runs of the job-order fingerprint worker per hour by outcome, and the orders it recomputed; a last success older than 10 minutes fires JobOrderFingerprintWorkerStale (REQ-OXCH-003, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (increase(basetool_scheduled_job_executions_total{task=\"job_order_exchange_fingerprint\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "runs {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(increase(basetool_scheduled_job_items_total{task=\"job_order_exchange_fingerprint\"}[1h]))",
+          "refId": "B",
+          "legendFormat": "orders recomputed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 149
+      },
+      "type": "timeseries",
+      "title": "Job-order reads/hour",
+      "description": "Job-order reads served per hour by client and route: the snapshot and the change feed of the member's job-order set, where a syncing client reads one feed page per pass (REQ-OXCH-003), and the create options under the write scope (REQ-OXCH-004, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id, route) (increase(basetool_exchange_job_order_reads_total{client_id=~\"$client_id\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}} {{route}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 157
+      },
+      "type": "timeseries",
+      "title": "Job-order writes/day",
+      "description": "Job-order writes through clients per day by client and outcome: applied creates, including a retry answered from the stored key, and rejected ones; a pair that is not offered also counts as units_not_offered, a create at a cap as open_order_cap or daily_create_cap in the backend refusals panel (REQ-OXCH-004, REQ-OXCH-009, REQ-OBS-025). Cancels count the same way, a refused one also under its reason in the backend refusals panel (REQ-OXCH-006). Target changes (REQ-OXCH-007) and comment changes (REQ-OXCH-008) count the same way too.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id, outcome) (increase(basetool_exchange_writes_total{resource=\"job_order\", client_id=~\"$client_id\"}[1d]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}} {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 157
+      },
+      "type": "timeseries",
+      "title": "Job-order window runs/day",
+      "description": "The nightly job-order window run per day by outcome, with the orders it aged out of the client set after their 7 days; it runs whatever the job-order switches say, and ScheduledJobStale fires when it has not succeeded for more than 26 hours (REQ-OXCH-003, REQ-OBS-025).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (increase(basetool_scheduled_job_executions_total{task=\"job_order_exchange_window\"}[1d]))",
+          "refId": "A",
+          "legendFormat": "runs {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(increase(basetool_scheduled_job_items_total{task=\"job_order_exchange_window\"}[1d]))",
+          "refId": "B",
+          "legendFormat": "orders aged out",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

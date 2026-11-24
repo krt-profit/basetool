@@ -20,29 +20,28 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.TransactionMemo;
-import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientNames;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderProvenanceDto;
 import jakarta.persistence.EntityManager;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.List;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Names the clients of an order's provenance from the exchange registry, memoised per transaction:
- * the first miss reads the names of every client the orders of the persistence context carry in one
- * query, so a page of orders costs one registry read, not one per row (REQ-DATA-003).
+ * Names the clients of an order's provenance from the exchange registry through {@link
+ * ClientNames}, memoised per transaction: the first miss reads the names of every client the orders
+ * of the persistence context carry in one query, so a page of orders costs one registry read, not
+ * one per row (REQ-DATA-003).
  */
 @Component
 @RequiredArgsConstructor
 public class RefineryOrderProvenanceView implements RefineryOrderProvenanceLookup {
 
-  /** The exchange registry's display names. */
-  private final ClientDirectory clientDirectory;
+  /** The registry's display names, memoised per transaction. */
+  private final ClientNames clientNames;
 
   /** The persistence context the orders of the running transaction live in. */
   private final EntityManager entityManager;
@@ -69,46 +68,23 @@ public class RefineryOrderProvenanceView implements RefineryOrderProvenanceLooku
    * @return the name, or {@code null} for the web
    */
   private @Nullable String nameOf(@Nullable String clientId) {
-    if (clientId == null) {
-      return null;
-    }
-    Map<String, String> names = TransactionMemo.bound(this, Memo.class, Memo::new).names;
-    String known = names.get(clientId);
-    if (known != null) {
-      return known;
-    }
-    Set<String> wanted = clientsInContext();
-    wanted.add(clientId);
-    wanted.removeAll(names.keySet());
-    Map<String, String> found = clientDirectory.displayNames(wanted);
-    for (String id : wanted) {
-      names.put(id, found.getOrDefault(id, id));
-    }
-    return names.get(clientId);
+    return clientNames.nameOf(clientId, this::clientsInContext);
   }
 
-  private @NotNull Set<String> clientsInContext() {
-    Set<String> ids = new LinkedHashSet<>();
-    for (RefineryOrder order :
-        TransactionMemo.entitiesInContext(entityManager, RefineryOrder.class)) {
-      RefineryOrderProvenance provenance = order.getProvenance();
-      addIfPresent(ids, provenance.getCreatedClient());
-      addIfPresent(ids, provenance.getLastChangeClient());
-      addIfPresent(ids, provenance.getPickedUpClient());
-    }
-    return ids;
-  }
-
-  private static void addIfPresent(@NotNull Set<String> ids, @Nullable String clientId) {
-    if (clientId != null) {
-      ids.add(clientId);
-    }
-  }
-
-  /** One transaction's memo. */
-  private static final class Memo {
-
-    /** The display names by client id; an unregistered id maps to itself. */
-    private final Map<String, String> names = new HashMap<>();
+  /**
+   * Lists the clients the orders of the persistence context were created, changed and picked up
+   * through.
+   *
+   * @return the client ids, {@code null} for a step in the web
+   */
+  private @NotNull List<String> clientsInContext() {
+    return TransactionMemo.entitiesInContext(entityManager, RefineryOrder.class).stream()
+        .map(RefineryOrder::getProvenance)
+        .flatMap(provenance ->
+            Stream.of(
+                provenance.getCreatedClient(),
+                provenance.getLastChangeClient(),
+                provenance.getPickedUpClient()))
+        .toList();
   }
 }

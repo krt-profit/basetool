@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -550,9 +551,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void reconcileStaffelMemberships_addsFirstStaffel_promotesInventoryAndAuditsGranted() {
     UUID squadronA = UUID.randomUUID();
-    Squadron sqA = new Squadron();
-    sqA.setId(squadronA);
-    sqA.setShorthand("ALP");
+    Squadron sqA = squadron(squadronA, null, "ALP");
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
     when(squadronRepository.findById(squadronA)).thenReturn(Optional.of(sqA));
     when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
@@ -572,12 +571,8 @@ class OrgUnitMembershipServiceTest {
   void reconcileStaffelMemberships_addsTwoStaffelnToZeroMembership_adoptsNameSortedPrimary() {
     UUID squadronZeta = UUID.randomUUID();
     UUID squadronAlpha = UUID.randomUUID();
-    Squadron sqZeta = new Squadron();
-    sqZeta.setId(squadronZeta);
-    sqZeta.setName("Zeta");
-    Squadron sqAlpha = new Squadron();
-    sqAlpha.setId(squadronAlpha);
-    sqAlpha.setName("Alpha");
+    Squadron sqZeta = squadron(squadronZeta, "Zeta");
+    Squadron sqAlpha = squadron(squadronAlpha, "Alpha");
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
     when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
@@ -599,13 +594,9 @@ class OrgUnitMembershipServiceTest {
   void reconcileStaffelMemberships_firstStaffelnAdoptIntoTheActiveOneOnly() {
     UUID retiredId = UUID.randomUUID();
     UUID activeId = UUID.randomUUID();
-    Squadron retired = new Squadron();
-    retired.setId(retiredId);
-    retired.setName("Alpha");
+    Squadron retired = squadron(retiredId, "Alpha");
     retired.setActive(false);
-    Squadron active = new Squadron();
-    active.setId(activeId);
-    active.setName("Zeta");
+    Squadron active = squadron(activeId, "Zeta");
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
     when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
@@ -717,8 +708,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void reconcileStaffelMemberships_patchesFlagsInPlace_whenSquadronStays() {
     UUID squadronA = UUID.randomUUID();
-    Squadron sqA = new Squadron();
-    sqA.setId(squadronA);
+    Squadron sqA = squadron(squadronA);
     OrgUnitMembership rowA = new OrgUnitMembership();
     rowA.setId(new OrgUnitMembershipId(userId, squadronA));
     rowA.setLogistician(false);
@@ -920,8 +910,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void addBereichLeader_notABereich_throwsBadRequest() {
     UUID notBereichId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(notBereichId);
+    Squadron squadron = squadron(notBereichId);
     when(orgUnitRepository.findById(notBereichId)).thenReturn(Optional.of(squadron));
 
     assertThrows(
@@ -1115,8 +1104,7 @@ class OrgUnitMembershipServiceTest {
   void assignSquadronRank_kommandoleiterWithGroup_grants() {
     UUID squadronId = UUID.randomUUID();
     UUID groupId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
+    Squadron squadron = squadron(squadronId);
     KommandoGroup group =
         KommandoGroup.builder().squadron(squadron).name("Alpha").sortIndex(0).build();
     group.setId(groupId);
@@ -1231,10 +1219,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void patchSquadronMemberFlagsDto_carriesTheFlushedVersion() {
     UUID squadronId = UUID.randomUUID();
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
-    squadron.setName("Alpha");
-    squadron.setShorthand("ALF");
+    Squadron squadron = squadron(squadronId, "Alpha", "ALF");
     OrgUnitMembership m = new OrgUnitMembership();
     m.setId(new OrgUnitMembershipId(userId, squadronId));
     m.setKind(OrgUnitKind.SQUADRON);

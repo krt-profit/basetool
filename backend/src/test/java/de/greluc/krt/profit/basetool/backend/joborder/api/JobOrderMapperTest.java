@@ -31,10 +31,13 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientNames;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,6 +87,36 @@ class JobOrderMapperTest {
                       _ -> new JobOrderAuthorityFlags(false, true, true, false, true, false)));
         });
     mapper.setOrderAuthority(authority);
+    ClientDirectory clientDirectory = org.mockito.Mockito.mock(ClientDirectory.class);
+    org.mockito.Mockito.when(
+            clientDirectory.displayNames(org.mockito.ArgumentMatchers.anyCollection()))
+        .thenReturn(Map.of("versekit", "VerseKit"));
+    mapper.setClientNames(
+        new JobOrderClientNames(
+            new ClientNames(clientDirectory),
+            org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class)));
+  }
+
+  @Test
+  void toDto_namesTheClientsOfTheCreateAndOfTheCommentsLastWrite() {
+    JobOrder clientOrder = new JobOrder();
+    clientOrder.setId(UUID.randomUUID());
+    clientOrder.setComment("Deliver to Area18");
+    clientOrder.recordClientCreate(
+        new JobOrderActor.Client(UUID.randomUUID(), "versekit"), "create-key");
+    JobOrder webOrder = new JobOrder();
+    webOrder.setId(UUID.randomUUID());
+    webOrder.setCommentClientId("gone-app");
+
+    JobOrderDto client = mapper.toDto(clientOrder);
+    JobOrderDto web = mapper.toDto(webOrder);
+
+    assertNotNull(client);
+    assertEquals("VerseKit", client.createdClient());
+    assertEquals("VerseKit", client.commentClient());
+    assertNotNull(web);
+    assertNull(web.createdClient());
+    assertEquals("gone-app", web.commentClient());
   }
 
   @Test

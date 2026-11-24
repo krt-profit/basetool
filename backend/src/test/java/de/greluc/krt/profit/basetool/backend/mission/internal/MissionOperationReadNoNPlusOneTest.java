@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -85,11 +84,9 @@ class MissionOperationReadNoNPlusOneTest {
   @BeforeEach
   void signInAsAdmin() {
     String tag = UUID.randomUUID().toString().substring(0, 6);
-    Squadron squadron = new Squadron();
-    squadron.setName("Embed Unit " + tag);
-    squadron.setShorthand("M" + tag);
-    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
-    unit = squadronRepository.save(squadron);
+    unit =
+        OrgUnitFixtures.persistedProfitSquadron(
+            squadronRepository, orgUnitRepository, "Embed Unit " + tag, "M" + tag);
     SecurityContextHolder.getContext()
         .setAuthentication(
             new JwtAuthenticationToken(

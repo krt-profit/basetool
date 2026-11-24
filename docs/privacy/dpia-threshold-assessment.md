@@ -72,6 +72,21 @@ account balance for the Bankleitung and on granted accounts. Still the A3 bank d
 people as in the Basetool, read-only, under the same 7-day memory-only condition and the same name
 withholding; no new trigger. **Still no DPIA required.**
 
+### Re-checked 2026-11-24 — job orders on connected applications (A11)
+
+The job-order reads (REQ-OXCH-002, -003) put other members' and other units' order data on
+third-party devices: the job orders of the units the member directly belongs to and those the
+member works on, with the assignees' names, the contact handle on material and item orders, the
+comment and the progress. The writes (REQ-OXCH-004…008) let a Logistician of the requesting unit
+create aUEC orders, cancel them before any money moved and change their target and comment. They
+meet none of the triggers above: no new data category (the A2 order data, shown to members who
+already read it in the Basetool, through a read set narrower than the web's), no profiling or
+automated decision, no monitoring and no money moved; every money operation and Bank decision stays
+in the Basetool. A client keeps job-order data for at most 7 days, outside cloud-synced folders and
+never in a backup (REQ-OXCH-010), a member can withhold their name from the assignees, and the tool
+keeps the creating member of a client's create only until the order leaves the client set. **Still
+no DPIA required.**
+
 ---
 
 ## Art. 37 GDPR / § 38 BDSG — Data protection officer: not required

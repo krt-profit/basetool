@@ -59,6 +59,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -465,7 +466,8 @@ public class NotificationPageController {
   /**
    * Renders a notification into the member's language: the type's template with every parameter
    * filled in, a parameter named {@code <name>Code} also giving {@code {<name>}} its localized word
-   * (REQ-NOTIF-028).
+   * and picking the type's variant {@code notifications.type.<type>.<name>.<code>} where the bundle
+   * holds one (REQ-NOTIF-028).
    *
    * @param type the notification type
    * @param params the stored render parameters, or {@code null}
@@ -474,8 +476,11 @@ public class NotificationPageController {
    */
   String render(String type, Map<String, String> params, Locale locale) {
     String key = "notifications.type." + type;
-    String template = messageSource.getMessage(key, null, key, locale);
-    if (template == null || template.equals(key)) {
+    String template = variant(key, params, locale);
+    if (template == null) {
+      template = message(key, locale);
+    }
+    if (template == null) {
       template =
           messageSource.getMessage("notifications.type.generic", null, "Notification", locale);
     }
@@ -528,6 +533,43 @@ public class NotificationPageController {
       grouped.append(decimalSeparator).append(unsigned, dot + 1, unsigned.length());
     }
     return negative ? "-" + grouped : grouped.toString();
+  }
+
+  /**
+   * Finds the type's template variant a coded parameter picks, the first in parameter order.
+   *
+   * @param key the type's own template key
+   * @param params the stored render parameters, or {@code null}
+   * @param locale the member's locale
+   * @return the variant template, or {@code null} when no code has one
+   */
+  private @Nullable String variant(
+      String key, @Nullable Map<String, String> params, Locale locale) {
+    if (params == null) {
+      return null;
+    }
+    for (Map.Entry<String, String> entry : params.entrySet()) {
+      if (isCodeParameter(entry.getKey()) && entry.getValue() != null) {
+        String name = entry.getKey().substring(0, entry.getKey().length() - CODE_SUFFIX.length());
+        String variant = message(key + "." + name + "." + entry.getValue(), locale);
+        if (variant != null) {
+          return variant;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Reads a message of the member's language.
+   *
+   * @param key the message key
+   * @param locale the member's locale
+   * @return the message, or {@code null} when no bundle holds the key
+   */
+  private @Nullable String message(String key, Locale locale) {
+    String message = messageSource.getMessage(key, null, key, locale);
+    return message == null || message.equals(key) ? null : message;
   }
 
   /**

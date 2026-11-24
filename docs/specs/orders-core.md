@@ -16,6 +16,9 @@ Kind-specific homes remain [production](orders-item-production.md),
 [material promises](orders-material-claims.md), [money](orders-auec.md) and
 [optional Bank integration](orders-auec-bank.md).
 
+Job orders on the connected-applications exchange, with their switches, live in
+[`orders-exchange.md`](orders-exchange.md) (`REQ-OXCH-*`).
+
 ## Requirements
 
 ### REQ-ORDERS-049 — Every order has exactly one kind
@@ -177,10 +180,22 @@ currently permitted proposed pair. The projection also carries the canonical act
 as the aUEC responsible suggestion when available among the eligible choices. It uses the
 same writable requester and falls back to the generic responsible suggestion if the root is
 unavailable in the choices. The frontend consumes the projected suggestions and writer flags.
-The backend revalidates the selected pair when creating. All create transports consume the
-returned order identity and open its central detail page. A reader without a permitted pair gets
+The backend revalidates the selected pair when creating. The create command and the projection
+take the writer rule and the actor as parameters, and every kind's create runs one create path;
+the web passes its contextual authorities with the honoured pin and the requesting member
+(ADR-0408). All create transports consume the returned order identity and open its central detail
+page. A reader without a permitted pair gets
 no create action and cannot open the form. Workspace and unit-work view capabilities remain
 independent of creation and individual action rights.
+
+**Through a client** the rule is narrower ([REQ-OXCH-001](orders-exchange.md#req-oxch-001--scopes-and-the-one-decision-point),
+[REQ-OXCH-004](orders-exchange.md#req-oxch-004--create-options-and-the-create-of-an-auec-order)):
+the exchange passes the writer rule `DIRECT_LOGISTICIAN` — a unit the member directly belongs to
+and is a Logistician of, decided from the database, with an administrator as a plain member — and
+only the requesting side counts. A client therefore creates only aUEC orders on behalf of one of
+the member's own writer units, for any eligible Profit unit; a writer of the responsible unit
+creates on behalf of another unit only in the web. The same create path and the same projection
+serve both, so every pair a client may create is one the web permits.
 
 
 | Actor | Order write scope |
@@ -192,7 +207,9 @@ independent of creation and individual action rights.
 | Personally linked holder/recipient | Their own financial involvement under the money rules. |
 | Any full reader | May provide their own money, creating their own explicitly linked holder. Read alone does not grant assignee enrollment. |
 
-Current authority is rechecked on each action. A genuine own transfer may introduce a new
+Current authority is rechecked on each action. The status, target and information commands take
+the writer rule, the read check and the actor as parameters, like the create command
+(REQ-ORDERS-054, REQ-ORDERS-066, ADR-0408). A genuine own transfer may introduce a new
 counterparty with exactly that transfer's credit, not fabricate provision for another holder.
 Active account search is scoped to the permitted action. Display names alone grant no rights.
 Requesters may safely edit MATERIAL requested amounts and ITEM quantities after partial work,
@@ -207,8 +224,13 @@ recorded facts are not discarded.
 
 **Enforced by:** `JobOrderCreateOptionsIntegrationTest`, `JobOrderCreationWorkspaceMvcTest` and
 `JobOrderAssigneeGrantIntegrationTest` cover current creation and personal-entry capabilities.
+`JobOrderAuecCreateAuthorityIntegrationTest` pins who may create an aUEC order in the web, and
+`JobOrderDirectLogisticianRuleIntegrationTest` the database writer rule at the create seam and
+that every pair it permits is one the web permits for the same member.
 `JobOrderHierarchyAuthorityIntegrationTest` covers safe MATERIAL and ITEM requester edits
-after booked work. The money workflow follows its own implementation slice. **Issues:** #3197, #3200
+after booked work. `ExchangeJobOrderCreateTest` pins the requester-only create through a client.
+The money workflow follows its own implementation slice. **Issues:** #3197, #3200, #3640, #3641,
+#3646
 
 ### REQ-ORDERS-054 — Lifecycle distinguishes kind-specific fulfillment
 
@@ -217,8 +239,21 @@ the strict money fulfillment contract. MATERIAL and ITEM retain automatic comple
 complete final handover and permit responsible-unit manual early completion. Their other
 ordinary status changes remain responsible-unit writes. Both requesting and responsible writers
 may cancel an active order and explicitly reopen a cancellation to OPEN. Each status write uses
-the observed lifecycle version. MATERIAL and ITEM need edits preserve the current lifecycle,
-including manual completion and cancellation. aUEC target-change effects follow its money spec.
+the observed lifecycle version. The status command takes the writer rule, the read check and the
+actor as parameters, and decides them with the responsibility gate under the order locks; the web
+passes its contextual authorities with the honoured pin, its complete-order read and the
+requesting member, and a status change answers an invalid responsibility before the read check,
+the writer and the version (ADR-0408). Through a client the status write is narrower
+([REQ-OXCH-006](orders-exchange.md#req-oxch-006--cancel-an-auec-order)): only a direct Logistician
+of the requesting unit cancels, only an active aUEC order and only before its first accepted money
+operation, and no client reopens a cancellation; the client's command decides the exchange's order
+of refusals (read set, writer, version, responsibility, status, money) under the same locks, while
+the web keeps its own. A client's information write is narrower as well
+([REQ-OXCH-008](orders-exchange.md#req-oxch-008--change-the-comment-of-an-auec-order)): it changes
+the comment of an aUEC order alone, under the comment's own version, never the contact, and keeps
+the web's status rule that a cancelled order takes no comment. MATERIAL and ITEM need edits
+preserve the current lifecycle, including manual completion and cancellation. aUEC target-change
+effects follow its money spec.
 
 Cancelling MATERIAL/ITEM stops ordinary fulfillment and releases order stock earmarks without
 deleting physical stock, booked
@@ -228,12 +263,24 @@ show unmet quantities; the UI must not imply full physical delivery.
 Lifecycle changes refresh a peer's support actions on the order page, including when the order has
 no open promises.
 
+Every order records its closing instant (`job_order.closed_at`). The transition from OPEN or
+IN_PROGRESS into COMPLETED, CANCELLED or REJECTED sets it, whatever causes it: a status write, the
+final MATERIAL or ITEM handover, or an aUEC handover, target change or correction. A change between
+terminal statuses keeps the first closing instant: a MATERIAL or ITEM status write between
+COMPLETED and REJECTED, and a final handover that completes an order already REJECTED. Every
+reopen clears it, including an aUEC return, target raise or correction that reopens a completed
+order. A database `CHECK` holds it present exactly while the status is terminal, so a write path
+that misses it fails. Orders already terminal when the column was added carry their last change.
+The web does not show it.
+
 **Acceptance**
 
 - [ ] Manual early MATERIAL/ITEM completion remains; aUEC cannot complete below its threshold.
 - [ ] Cancellation releases MATERIAL/ITEM earmarks and open promises without deleting history.
 - [ ] Need edits do not silently reopen manual completion or cancellation.
 - [ ] A peer sees the material handover action return in place after explicit reopening.
+- [ ] Every transition into a terminal status records the closing instant for all three kinds, a
+      change between terminal statuses keeps it, and every reopen clears it.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest` covers MATERIAL and ITEM lifecycle
 rights, cancellation and the preservation of historical promises and booked work. The ITEM
@@ -243,7 +290,18 @@ writer closes the order. `JobOrderStatusE2eTest` covers early MATERIAL completio
 `JobOrderStatusQueueRaceIntegrationTest` covers terminal queue changes. The Bank-free completion,
 return and settlement cases are part of the
 [money lifecycle contract](orders-auec.md#req-orders-063--auec-lifecycle-follows-effective-net-handover).
-**Issues:** #3195, #3200, #3201
+The closing instant is covered by `JobOrderClosingInstantTest` (the entity rule),
+`V443JobOrderClosedAtMigrationTest` (backfill and `CHECK`), the MATERIAL and ITEM status writes in
+`JobOrderHierarchyAuthorityIntegrationTest`, the final handovers in
+`JobOrderHandoverCompletionIntegrationTest` and `JobOrderItemHandoverPlanningIntegrationTest`, and
+the aUEC handover, target changes and status writes in `JobOrderMoneyIntegrationTest`.
+`JobOrderWebWriteCommandsIntegrationTest` pins who changes an aUEC order's status in the web,
+the order of the refusals, the audit event and the notices without the actor, and
+`JobOrderWriteRuleIntegrationTest` the database writer rule at the status command and that every
+status write it permits is one the web permits for the same member. `ExchangeJobOrderCancelTest`
+covers a client's cancel and its order of refusals, `ExchangeJobOrderCommentTest` a client's
+comment change and its order of refusals.
+**Issues:** #3195, #3200, #3201, #3637, #3641, #3650, #3652
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
 
@@ -331,16 +389,82 @@ reload-safe identity and outcome lookup. There is no durable manager of unsubmit
 Notification preferences, recipient deduplication and privacy gates remain; see
 [notifications](orders-notifications.md) and the [money journey](orders-auec.md).
 
+A new order reaches every open overview without a reload, whichever channel created it. The shared
+create command of every kind publishes the `orders` room from the backend after the commit: the
+`queue` section, and for MATERIAL and ITEM also `demand`, since the new order adds to the material
+demand. A refused or rolled-back create publishes nothing. The frontend publishes no frame of its
+own for a create, so each create is announced exactly once.
+
 **Acceptance**
 
 - [ ] Scopes/type filters work across all kinds and preserve the permitted order set.
 - [ ] Creation opens the detail; peer updates preserve an open edit.
+- [ ] A create of every kind publishes one `orders` frame after its commit, `queue` plus `demand`
+  for MATERIAL and ITEM and `queue` for aUEC; a peer's open overview gains the order without a
+  reload, and the creator's open overview receives no second frame.
 - [ ] Retry after an unknown submitted money outcome cannot duplicate its effects.
 
 **Enforced by:** `JobOrderSupportReadIntegrationTest`, `JobOrderHierarchyAuthorityIntegrationTest`,
 `OrdersListPatternRenderTest`, `JobOrderCreationWorkspaceMvcTest`, `JobOrderCreateE2eTest` and
 `JobOrderSharedWorkspaceE2eTest` cover the MATERIAL/ITEM workspace. The initial aUEC create and
-recovery journey is covered by `JobOrderMoneyE2eTest`. **Issues:** #3201, #3202
+recovery journey is covered by `JobOrderMoneyE2eTest`. `JobOrderServiceTest` covers the create's
+frame per kind, `JobOrderCreationWorkspaceMvcTest` that a web create publishes no frame of its own
+and `JobOrderQueueLiveSyncE2eTest` the peer's overview and the single frame. **Issues:** #3201,
+#3202, #3639
+
+### REQ-ORDERS-078 — An order shows the application behind its creation, target and comment
+
+Decided in [#3617](https://github.com/krt-profit/basetool/issues/3617), after the model of
+REQ-REFINERY-027 and REQ-BANK-067. A job-order write through a connected application
+([orders-exchange](orders-exchange.md)) leaves a visible origin on the order. Nothing is specific to
+one application: the name shown is the registry's display name of the client (REQ-XCH-003), or the
+client id once the registry no longer holds it.
+
+- **Creator chip.** An order a client created (`job_order.created_by_client_id`, REQ-OXCH-004)
+  carries an info chip (`.chip--info`) "über <App>" next to its number in the overview row and next
+  to the status badge in the detail head. It never changes; an order created in the web has none.
+- **Target history.** Each target change records the client it came through
+  (`job_order_money_target_change.client_id`); an entry written through a client reads
+  "Erfasst von: <name> über <App>", a web entry "Erfasst von: <name>".
+- **Comment.** The comment records the client of its last write beside its revision
+  (`job_order.comment_client_id`): a client's write sets it, a client's create with a comment
+  included, and a web write of the comment clears it; a write that leaves the text as it is moves
+  neither. While it is set the comment shows "über <App>", so a client's comment on a web order is
+  never shown without its origin.
+- **No marker for a cancel.** A client's cancel shows no marker on the page, as a web cancel names
+  nobody; the audit carries it (REQ-AUDIT-001).
+- **One write path.** The shared status, target and information commands write the markers from the
+  actor they are given (`JobOrderActor#clientId`, ADR-0408), so every client write of these parts
+  records its origin through the same code as the web.
+- **Live.** The overview chip renders in the results the `orders/queue` frame refreshes, the comment
+  marker in the `header` section and the target-history line in the `money` section their frames
+  refresh (REQ-XCH-030); the detail head's chip never changes.
+- **One query.** The read DTOs carry the names (`JobOrderDto.createdClient`, `commentClient`,
+  `JobOrderMoneyTargetChangeView.client`); a transaction reads the names of every client the orders
+  of its persistence context carry in one registry query through the platform's `ClientNames`, as
+  the refinery's provenance does (REQ-DATA-003).
+- **Notices.** A client's create, need-change and cancel notices name the application
+  (REQ-NOTIF-008, REQ-NOTIF-017, REQ-ORDERS-042, REQ-NOTIF-028).
+- **Storage and privacy.** V450 adds both client columns; they hold registry client ids the server
+  writes, so the Personensuche lists them as exempt (REQ-SEC-060).
+
+Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`).
+
+**Acceptance**
+
+- [x] An order a client created names the client on the chip in the overview row and the detail
+  head; a web order carries no chip.
+- [x] A client's target change records the client and its history entry names it; a web change
+  names the member alone.
+- [x] A client's comment write marks the comment; a web write of the comment clears the marker and
+  keeps the chip.
+- [x] A page of orders names its clients in one registry query.
+
+**Enforced by:** `JobOrderCommentTest`, `JobOrderClientNamesTest`, `ClientNamesTest`, `JobOrderMapperTest`,
+`JobOrderClientOriginIntegrationTest` (backend) · `OrdersListPatternRenderTest`,
+`OrdersDetailPatternRenderTest`, `JobOrderClientOriginE2eTest` (frontend) ·
+`joborder/fragments/order-origin` · V450 · **Related:** REQ-OXCH-004, REQ-REFINERY-027,
+REQ-BANK-067, REQ-XCH-030 · **Issues:** #3617, #3648
 
 ## Out of scope
 

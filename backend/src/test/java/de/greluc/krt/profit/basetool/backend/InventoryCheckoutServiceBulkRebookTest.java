@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -61,7 +62,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.util.List;
@@ -365,8 +365,7 @@ class InventoryCheckoutServiceBulkRebookTest {
     InventoryItem item = row(UUID.randomUUID(), here, 4.0);
     given(item);
     when(locationRepository.findById(there.getId())).thenReturn(Optional.of(there));
-    OrgUnit pool = new Squadron();
-    pool.setId(UUID.randomUUID());
+    OrgUnit pool = squadron(UUID.randomUUID());
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(any(), any()))
         .thenReturn(pool);
 
@@ -461,8 +460,7 @@ class InventoryCheckoutServiceBulkRebookTest {
     InventoryItem personalRow = row(UUID.randomUUID(), here, 9.0);
     personalRow.setPersonal(true);
     given(personalRow);
-    OrgUnit pool = new Squadron();
-    pool.setId(UUID.randomUUID());
+    OrgUnit pool = squadron(UUID.randomUUID());
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(any(), any()))
         .thenReturn(pool);
 

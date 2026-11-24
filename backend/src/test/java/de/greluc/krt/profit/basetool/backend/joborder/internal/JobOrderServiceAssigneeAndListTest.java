@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderDtoFixtures.jobOrder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -154,7 +155,7 @@ class JobOrderServiceAssigneeAndListTest {
             itemFulfillment,
             profitHierarchy,
             responsibilityGuard,
-            jobOrderAccessPolicy,
+            org.mockito.Mockito.mock(JobOrderWriters.class),
             new JobOrderMaterialLines(materialRepository, null),
             new InventoryStockReads(
                 inventoryItemRepository,
@@ -205,10 +206,11 @@ class JobOrderServiceAssigneeAndListTest {
                     de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
                         .class)),
             liveSyncPublisher,
-            org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
+            new JobOrderQueueFrame(liveSyncPublisher),
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
-            org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class));
+            org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     queryService =
         new JobOrderQueryService(
@@ -236,35 +238,17 @@ class JobOrderServiceAssigneeAndListTest {
         .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
         .thenAnswer(inv -> {
           JobOrder o = inv.getArgument(0);
-          return new JobOrderDto(
-              o.getId(),
-              o.getDisplayId(),
-              null,
-              null,
-              o.getHandle(),
-              o.getComment(),
-              o.getPriority(),
-              o.getStatus(),
-              JobOrderType.MATERIAL,
-              o.isCountBlueprintsWithVariants(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              null,
-              o.getVersion(),
-              null,
-              null,
-              false,
-              false,
-              null,
-              false,
-              false,
-              false,
-              0L,
-              0L);
+          return jobOrder()
+              .id(o.getId())
+              .displayId(o.getDisplayId())
+              .handle(o.getHandle())
+              .comment(o.getComment())
+              .priority(o.getPriority())
+              .status(o.getStatus())
+              .countBlueprintsWithVariants(o.isCountBlueprintsWithVariants())
+              .createdAt(null)
+              .version(o.getVersion())
+              .build();
         });
     lenient().when(orderLinkedStockRows.materialStockOfOrders(any())).thenReturn(List.of());
     lenient().when(materialClaimService.getClaimBucketsForOrders(any())).thenReturn(Map.of());
@@ -1194,35 +1178,18 @@ class JobOrderServiceAssigneeAndListTest {
    * @return the populated order DTO.
    */
   private JobOrderDto jobOrderDtoWithMaterials(JobOrder order, JobOrderMaterialDto... materials) {
-    return new JobOrderDto(
-        order.getId(),
-        order.getDisplayId(),
-        null,
-        null,
-        order.getHandle(),
-        order.getComment(),
-        order.getPriority(),
-        order.getStatus(),
-        JobOrderType.MATERIAL,
-        order.isCountBlueprintsWithVariants(),
-        List.of(materials),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        null,
-        order.getVersion(),
-        null,
-        null,
-        false,
-        false,
-        null,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .id(order.getId())
+        .displayId(order.getDisplayId())
+        .handle(order.getHandle())
+        .comment(order.getComment())
+        .priority(order.getPriority())
+        .status(order.getStatus())
+        .countBlueprintsWithVariants(order.isCountBlueprintsWithVariants())
+        .materials(List.of(materials))
+        .createdAt(null)
+        .version(order.getVersion())
+        .build();
   }
 
   private Squadron processingUnit() {

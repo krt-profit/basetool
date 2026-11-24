@@ -74,7 +74,8 @@ class ExchangeGateTest {
           clientRevocationRepository,
           revocationMirror,
           meterRegistry,
-          new ExchangeBankMetrics(meterRegistry));
+          new ExchangeBankMetrics(meterRegistry),
+          new ExchangeJobOrderMetrics(meterRegistry));
 
   private ExchangeClient client;
   private ExchangeSettings settings;
@@ -194,6 +195,85 @@ class ExchangeGateTest {
     assertThat(gate.allows("exchange.stock.read", acting("versekit", "exchange.stock.read")))
         .isTrue();
     onPath("/api/v1/exchange/bankers");
+    assertThat(gate.allowsAny(acting("versekit", "exchange.connect"))).isTrue();
+  }
+
+  @Test
+  void refusesTheJobOrderFamilyWhileItsSwitchIsOffAsTheGatewayDoes() {
+    settings.setJobOrderWritesEnabled(true);
+
+    onRequest("GET", "/api/v1/exchange/job-orders");
+    assertRefused(
+        () -> gate.allowsAny(acting("versekit", "exchange.connect")),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "JOB_ORDER_EXCHANGE_DISABLED");
+    onRequest("POST", "/api/v1/exchange/job-orders/1/cancel");
+    assertRefused(
+        () -> gate.allows("exchange.stock.read", acting("versekit", "exchange.stock.read")),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "JOB_ORDER_EXCHANGE_DISABLED");
+    onRequest("GET", "/api/v1/exchange/job%2Dorders/feed");
+    assertRefused(
+        () -> gate.allowsAny(acting("versekit", "exchange.connect")),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "JOB_ORDER_EXCHANGE_DISABLED");
+
+    assertThat(refused(ExchangeGate.REASON_JOB_ORDER_SWITCH_OFF)).isEqualTo(3);
+    assertThat(jobOrderRefused("switched_off")).isEqualTo(3);
+    assertThat(jobOrderRefused("writes_switched_off")).isZero();
+  }
+
+  @Test
+  void refusesAJobOrderWriteWhileTheWritesSwitchIsOffAndKeepsTheReads() {
+    settings.setJobOrdersEnabled(true);
+
+    onRequest("POST", "/api/v1/exchange/job-orders");
+    assertRefused(
+        () -> gate.allowsAny(acting("versekit", "exchange.connect")),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "JOB_ORDER_WRITES_DISABLED");
+    onRequest("POST", "/api/v1/exchange/job-orders/1/target");
+    assertRefused(
+        () -> gate.allowsAny(acting("versekit", "exchange.connect")),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "JOB_ORDER_WRITES_DISABLED");
+    onRequest("GET", "/api/v1/exchange/job-orders/create-options");
+    assertThat(gate.allowsAny(acting("versekit", "exchange.connect"))).isTrue();
+
+    assertThat(refused(ExchangeGate.REASON_JOB_ORDER_WRITES_SWITCH_OFF)).isEqualTo(2);
+    assertThat(jobOrderRefused("writes_switched_off")).isEqualTo(2);
+    assertThat(jobOrderRefused("switched_off")).isZero();
+  }
+
+  @Test
+  void theGlobalSwitchWinsOverTheJobOrderSwitches() {
+    settings.setEnabled(false);
+    onRequest("POST", "/api/v1/exchange/job-orders");
+
+    assertRefused(
+        () -> gate.allowsAny(acting("versekit", "exchange.connect")),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "EXCHANGE_DISABLED");
+    assertThat(refused(ExchangeGate.REASON_JOB_ORDER_SWITCH_OFF)).isZero();
+    assertThat(refused(ExchangeGate.REASON_JOB_ORDER_WRITES_SWITCH_OFF)).isZero();
+  }
+
+  @Test
+  void admitsJobOrderWritesWhileBothJobOrderSwitchesAreOn() {
+    settings.setJobOrdersEnabled(true);
+    settings.setJobOrderWritesEnabled(true);
+    onRequest("POST", "/api/v1/exchange/job-orders/1/comment");
+
+    assertThat(gate.allowsAny(acting("versekit", "exchange.connect"))).isTrue();
+  }
+
+  @Test
+  void theJobOrderSwitchesLeaveEveryOtherRouteAlone() {
+    onRequest("POST", "/api/v1/exchange/me/stock/changes");
+    assertThat(gate.allowsAny(acting("versekit", "exchange.connect"))).isTrue();
+    onRequest("GET", "/api/v1/exchange/me/store-choices/job-orders");
+    assertThat(gate.allowsAny(acting("versekit", "exchange.connect"))).isTrue();
+    onRequest("POST", "/api/v1/exchange/job-orders-archive");
     assertThat(gate.allowsAny(acting("versekit", "exchange.connect"))).isTrue();
   }
 
@@ -327,8 +407,30 @@ class ExchangeGateTest {
    * @param path the request URI
    */
   private static void onPath(@NotNull String path) {
+    onRequest("GET", path);
+  }
+
+  /**
+   * Binds a request with a method and a backend path to the current thread, as the dispatcher does.
+   *
+   * @param method the HTTP method
+   * @param path the request URI
+   */
+  private static void onRequest(@NotNull String method, @NotNull String path) {
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(new MockHttpServletRequest("GET", path)));
+        new ServletRequestAttributes(new MockHttpServletRequest(method, path)));
+  }
+
+  /**
+   * Reads one job-order refusal counter.
+   *
+   * @param reason the reason
+   * @return the count
+   */
+  private double jobOrderRefused(@NotNull String reason) {
+    return meterRegistry
+        .counter(ExchangeMetricNames.EXCHANGE_JOB_ORDER_REFUSED, MetricNames.TAG_REASON, reason)
+        .count();
   }
 
   /**

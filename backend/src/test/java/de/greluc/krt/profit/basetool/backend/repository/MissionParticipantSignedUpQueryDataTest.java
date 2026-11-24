@@ -28,8 +28,8 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -97,10 +97,8 @@ class MissionParticipantSignedUpQueryDataTest {
 
   private Mission newMission() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("Signed-Up-" + tag);
-    squadron.setShorthand("SU" + tag);
-    OrgUnit owner = squadronRepository.save(squadron);
+    OrgUnit owner =
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Signed-Up-" + tag, "SU" + tag, null);
 
     Mission mission = new Mission();
     mission.setName("Signed-Up-Mission-" + tag);

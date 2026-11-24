@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
@@ -573,9 +574,7 @@ class PurchasingDealAssemblerTest {
   @Test
   void unitAndLocationNamesAreResolvedAndFallBackToADash() {
     PurchasingDeal deal = deal(DealStatus.IN_DELIVERY);
-    Squadron unit = new Squadron();
-    unit.setId(UNIT);
-    unit.setName("Staffel Alpha");
+    Squadron unit = squadron(UNIT, "Staffel Alpha");
     UUID knownLocation = UUID.randomUUID();
     UUID goneLocation = UUID.randomUUID();
     Location location = new Location();

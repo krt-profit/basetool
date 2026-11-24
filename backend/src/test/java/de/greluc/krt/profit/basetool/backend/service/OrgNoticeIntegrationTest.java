@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.events.OrgNotices;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -82,10 +83,12 @@ class OrgNoticeIntegrationTest {
     user(ADMIN, "org-admin", Set.of(admin));
     user(LEADER, "org-leader", Set.of(krtMember));
     user(MEMBER, "org-member", Set.of());
-    squadron = new Squadron();
-    squadron.setName("Org Notice " + UUID.randomUUID());
-    squadron.setShorthand("ON" + UUID.randomUUID().toString().substring(0, 6));
-    squadron = squadronRepository.saveAndFlush(squadron);
+    squadron =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository,
+            "Org Notice " + UUID.randomUUID(),
+            "ON" + UUID.randomUUID().toString().substring(0, 6),
+            null);
     membership(LEADER, MembershipRole.STAFFELLEITER);
     membership(MEMBER, MembershipRole.MEMBER);
   }

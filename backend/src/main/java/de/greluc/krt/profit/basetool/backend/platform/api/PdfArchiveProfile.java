@@ -47,7 +47,7 @@ import org.openpdf.text.xml.xmp.XmpWriter;
 /**
  * Writes every backend PDF as PDF/A-4 (ISO 19005-4:2020) on PDF 2.0 (ISO 32000-2:2020): XMP
  * identification and metadata, an sRGB output intent, the document language and a title the viewer
- * shows (REQ-API-026, ADR-0406).
+ * shows (REQ-API-026, ADR-0409).
  *
  * <p>OpenPDF always writes a trailer {@code Info} dictionary, which PDF/A-4 6.1.3 admits only
  * beside a catalog {@code PieceInfo} and with nothing but {@code ModDate}; the profile therefore

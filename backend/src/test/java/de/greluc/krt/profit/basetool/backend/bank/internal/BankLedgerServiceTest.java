@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -986,10 +987,8 @@ class BankLedgerServiceTest {
 
   /** Creates a persisted Staffel — an {@code org_unit} row, so it satisfies the counterparty FK. */
   private Squadron newSquadron(String name) {
-    Squadron squadron = new Squadron();
-    squadron.setName(name);
-    squadron.setShorthand("S" + UUID.randomUUID().toString().substring(0, 8));
-    return squadronRepository.save(squadron);
+    return OrgUnitFixtures.persistedSquadron(
+        squadronRepository, name, "S" + UUID.randomUUID().toString().substring(0, 8), null);
   }
 
   /** Links a user to a Staffel as a plain member (the {@code kind} column is trigger-managed). */

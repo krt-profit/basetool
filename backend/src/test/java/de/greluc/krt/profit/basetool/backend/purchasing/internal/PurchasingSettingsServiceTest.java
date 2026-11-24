@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -293,8 +294,7 @@ class PurchasingSettingsServiceTest {
 
   @Test
   void theGoverningUnitMustBeABereich() {
-    Squadron squadron = new Squadron();
-    squadron.setId(UUID.randomUUID());
+    Squadron squadron = squadron(UUID.randomUUID());
     when(settingRepository.findById(PurchasingSetting.SINGLETON_ID))
         .thenReturn(Optional.of(setting(0L)));
     when(orgUnitRepository.findById(squadron.getId())).thenReturn(Optional.of(squadron));

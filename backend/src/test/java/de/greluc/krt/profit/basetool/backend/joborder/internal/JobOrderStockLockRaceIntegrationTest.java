@@ -57,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAutho
 import de.greluc.krt.profit.basetool.backend.support.LockRace;
 import de.greluc.krt.profit.basetool.backend.support.LockRace.Caller;
 import de.greluc.krt.profit.basetool.backend.support.LockRace.Held;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -139,11 +140,10 @@ class JobOrderStockLockRaceIntegrationTest {
     createdProfitRoot = orgUnitRepository.findActiveProfitRootIds().isEmpty();
     var profit = ProfitHierarchyFixtures.persistedProfitArea(orgUnitRepository);
     profitRootId = profit.getId();
-    Squadron unit = new Squadron();
-    unit.setName("Order lock " + tag);
-    unit.setShorthand("O" + tag.substring(0, 4));
-    ProfitHierarchyFixtures.withinProfit(unit, profit);
-    unitId = squadronRepository.save(unit).getId();
+    unitId =
+        OrgUnitFixtures.persistedSquadron(
+                squadronRepository, "Order lock " + tag, "O" + tag.substring(0, 4), profit)
+            .getId();
     var membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(logistician.getId(), unitId));
     membership.setUser(logistician);

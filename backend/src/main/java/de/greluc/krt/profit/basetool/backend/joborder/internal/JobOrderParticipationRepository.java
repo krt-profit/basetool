@@ -62,6 +62,14 @@ public interface JobOrderParticipationRepository
   boolean existsByClaimingOrgUnitIdInAndActiveTrue(Collection<UUID> claimingOrgUnitIds);
 
   /**
+   * Loads the active support of many orders in one query (REQ-DATA-003).
+   *
+   * @param jobOrderIds the orders
+   * @return their active participations, ended support left out
+   */
+  List<JobOrderParticipation> findByActiveTrueAndJobOrderIdIn(Collection<UUID> jobOrderIds);
+
+  /**
    * Loads a bounded batch of current participations in ineligible units.
    *
    * @param unitIds units whose current eligibility was removed

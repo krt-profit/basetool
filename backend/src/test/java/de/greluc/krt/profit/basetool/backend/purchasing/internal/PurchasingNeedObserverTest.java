@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -85,9 +86,7 @@ class PurchasingNeedObserverTest {
   void aReleasedNeedIsAnnouncedToTheActiveDelegates() {
     UUID first = UUID.randomUUID();
     UUID second = UUID.randomUUID();
-    Squadron unit = new Squadron();
-    unit.setId(UNIT);
-    unit.setName("Alpha");
+    Squadron unit = squadron(UNIT, "Alpha");
     when(settingsService.isEnabled()).thenReturn(true);
     when(delegateRepository.findActiveUserIds(any(Instant.class)))
         .thenReturn(List.of(first, second));
