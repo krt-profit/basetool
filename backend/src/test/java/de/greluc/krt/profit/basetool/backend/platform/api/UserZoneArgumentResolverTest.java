@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
-import java.lang.reflect.Method;
+import java.time.Clock;
 import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -46,15 +46,13 @@ class UserZoneArgumentResolverTest {
 
   private final UserZoneArgumentResolver resolver = new UserZoneArgumentResolver();
 
-  /** Reflection target providing a {@link UserZone} and a plain {@link ZoneId} parameter. */
-  @SuppressWarnings("unused")
-  private void handlers(UserZone zone, ZoneId plain) {}
+  private static MethodParameter userZoneParameter() throws NoSuchMethodException {
+    return new MethodParameter(
+        ZoneProbeController.class.getDeclaredMethod("probe", UserZone.class), 0);
+  }
 
-  private static MethodParameter param(int index) throws NoSuchMethodException {
-    Method method =
-        UserZoneArgumentResolverTest.class.getDeclaredMethod(
-            "handlers", UserZone.class, ZoneId.class);
-    return new MethodParameter(method, index);
+  private static MethodParameter plainZoneIdParameter() throws NoSuchMethodException {
+    return new MethodParameter(Clock.class.getMethod("system", ZoneId.class), 0);
   }
 
   /** Echoes the zone Spring MVC bound to its {@link UserZone} parameter. */
@@ -75,19 +73,19 @@ class UserZoneArgumentResolverTest {
 
   @Test
   void supportsUserZoneParameter() throws Exception {
-    assertThat(resolver.supportsParameter(param(0))).isTrue();
+    assertThat(resolver.supportsParameter(userZoneParameter())).isTrue();
   }
 
   @Test
   void rejectsPlainZoneIdParameter() throws Exception {
-    assertThat(resolver.supportsParameter(param(1))).isFalse();
+    assertThat(resolver.supportsParameter(plainZoneIdParameter())).isFalse();
   }
 
   @Test
   void resolvesValidZoneFromHeader() throws Exception {
     NativeWebRequest request = mock(NativeWebRequest.class);
     when(request.getHeader(UserZoneArgumentResolver.HEADER)).thenReturn("Europe/Berlin");
-    assertThat(resolver.resolveArgument(param(0), null, request, null))
+    assertThat(resolver.resolveArgument(userZoneParameter(), null, request, null))
         .isEqualTo(new UserZone(ZoneId.of("Europe/Berlin")));
   }
 
@@ -95,7 +93,7 @@ class UserZoneArgumentResolverTest {
   void resolvesToEmptyZoneWhenHeaderAbsent() throws Exception {
     NativeWebRequest request = mock(NativeWebRequest.class);
     when(request.getHeader(UserZoneArgumentResolver.HEADER)).thenReturn(null);
-    assertThat(resolver.resolveArgument(param(0), null, request, null))
+    assertThat(resolver.resolveArgument(userZoneParameter(), null, request, null))
         .isEqualTo(new UserZone(null));
   }
 
