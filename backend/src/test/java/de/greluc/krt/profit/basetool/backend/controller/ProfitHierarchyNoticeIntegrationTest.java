@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import static de.greluc.krt.profit.basetool.backend.support.JobOrderParticipationFixtures.persistedParticipation;
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.persistedSquadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -65,6 +66,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import java.time.Duration;
@@ -117,6 +119,7 @@ class ProfitHierarchyNoticeIntegrationTest {
   @Autowired private WebApplicationContext context;
   @Autowired private TransactionTemplate transactions;
   @Autowired private OrgUnitRepository units;
+  @Autowired private SquadronRepository squadrons;
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private UserRepository users;
   @Autowired private RoleRepository roles;
@@ -598,15 +601,10 @@ class ProfitHierarchyNoticeIntegrationTest {
           jdbc.update(
               "UPDATE job_order_material SET amount = 1000 WHERE job_order_id = ?",
               fixture.order());
-          List<Squadron> legacyUnits = new java.util.ArrayList<>();
+          List<Squadron> saved = new java.util.ArrayList<>();
           for (int index = 0; index < 200; index++) {
-            Squadron unit = new Squadron();
-            String label = "Startup legacy " + UUID.randomUUID();
-            unit.setName(label);
-            unit.setShorthand(label);
-            legacyUnits.add(unit);
+            saved.add(persistedSquadron(squadrons, "Startup legacy " + UUID.randomUUID(), null));
           }
-          List<Squadron> saved = units.saveAllAndFlush(legacyUnits);
           var order = orders.getReferenceById(fixture.order());
           var material = materials.getReferenceById(fixture.materials().getFirst());
           var quality = tiers.findByCode("GOOD").orElseThrow();
@@ -1098,11 +1096,7 @@ class ProfitHierarchyNoticeIntegrationTest {
     outside.setName("Notice outside " + tag);
     outside.setShorthand("NO" + tag);
     outside = units.saveAndFlush(outside);
-    Squadron claiming = new Squadron();
-    claiming.setName("Notice claiming " + tag);
-    claiming.setShorthand("NC" + tag);
-    claiming.setParent(profit);
-    claiming = units.saveAndFlush(claiming);
+    Squadron claiming = persistedSquadron(squadrons, "Notice claiming " + tag, "NC" + tag, profit);
     SpecialCommand responsible = new SpecialCommand();
     responsible.setName("Notice responsible " + tag);
     responsible.setShorthand("NR" + tag);

@@ -337,10 +337,7 @@ class OrgUnitMembershipQueryServiceTest {
     row.setId(new OrgUnitMembershipId(userId, squadronId));
     row.setKind(OrgUnitKind.SQUADRON);
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(row));
-    Squadron staffel = new Squadron();
-    staffel.setId(squadronId);
-    staffel.setName("ALPHA");
-    staffel.setShorthand("ALP");
+    Squadron staffel = squadron(squadronId, "ALPHA", "ALP");
     when(orgUnitRepository.findAllById(any())).thenReturn(List.of(staffel));
 
     List<OrgUnitMembershipOptionDto> options = queryService.listOptionsForUser(userId);
@@ -371,10 +368,7 @@ class OrgUnitMembershipQueryServiceTest {
     when(membershipRepository.findAllByIdUserId(userId))
         .thenReturn(List.of(rowSkBravo, rowStaffel, rowSkAlpha));
 
-    Squadron staffel = new Squadron();
-    staffel.setId(staffelId);
-    staffel.setName("ALPHA");
-    staffel.setShorthand("ALP");
+    Squadron staffel = squadron(staffelId, "ALPHA", "ALP");
 
     SpecialCommand skBravo = new SpecialCommand();
     skBravo.setId(skBravoId);
@@ -450,10 +444,7 @@ class OrgUnitMembershipQueryServiceTest {
     bereich.setId(bereichId);
     bereich.setName("Profit");
     bereich.setShorthand("PRF");
-    Squadron staffel = new Squadron();
-    staffel.setId(staffelId);
-    staffel.setName("Alpha");
-    staffel.setShorthand("ALF");
+    Squadron staffel = squadron(staffelId, "Alpha", "ALF");
     when(orgUnitRepository.findAllById(any())).thenReturn(List.of(staffel, bereich));
 
     List<OrgUnitMembershipOptionDto> options =
@@ -506,10 +497,7 @@ class OrgUnitMembershipQueryServiceTest {
     ol.setId(olId);
     ol.setName("Organisationsleitung");
     ol.setShorthand("OL");
-    Squadron staffel = new Squadron();
-    staffel.setId(staffelId);
-    staffel.setName("ALPHA");
-    staffel.setShorthand("ALP");
+    Squadron staffel = squadron(staffelId, "ALPHA", "ALP");
     SpecialCommand sk = new SpecialCommand();
     sk.setId(skId);
     sk.setName("SK ROTFUCHS");
@@ -547,9 +535,7 @@ class OrgUnitMembershipQueryServiceTest {
         .thenReturn(List.of(activeRow, retiredRow));
     when(orgUnitCascadeService.expandWithDescendants(any()))
         .thenReturn(new java.util.LinkedHashSet<>(List.of(activeId, retiredId)));
-    Squadron active = new Squadron();
-    active.setId(activeId);
-    active.setName("Hel");
+    Squadron active = squadron(activeId, "Hel");
     SpecialCommand retired = new SpecialCommand();
     retired.setId(retiredId);
     retired.setName("Argon");
@@ -564,9 +550,7 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listAllPinnableOptions_coversAllFourKindsTopDown() {
-    Squadron staffel = new Squadron();
-    staffel.setId(UUID.randomUUID());
-    staffel.setName("ALPHA");
+    Squadron staffel = squadron(UUID.randomUUID(), "ALPHA");
     SpecialCommand sk = new SpecialCommand();
     sk.setId(UUID.randomUUID());
     sk.setName("SK ROTFUCHS");
@@ -600,14 +584,8 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listAllActiveOptions_mixed_sortsStaffelFirstThenSkAlphabetical() {
-    Squadron alphaSquadron = new Squadron();
-    alphaSquadron.setId(UUID.randomUUID());
-    alphaSquadron.setName("ALPHA");
-    alphaSquadron.setShorthand("ALP");
-    Squadron khg = new Squadron();
-    khg.setId(UUID.randomUUID());
-    khg.setName("KHG");
-    khg.setShorthand("KHG");
+    Squadron alphaSquadron = squadron(UUID.randomUUID(), "ALPHA", "ALP");
+    Squadron khg = squadron(UUID.randomUUID(), "KHG", "KHG");
     when(squadronRepository.findAllByActiveTrue()).thenReturn(List.of(alphaSquadron, khg));
 
     SpecialCommand bravo = new SpecialCommand();
@@ -639,10 +617,7 @@ class OrgUnitMembershipQueryServiceTest {
     UUID bereichId = UUID.randomUUID();
     when(membershipRepository.findActiveOrgUnitIdsByUserId(userId))
         .thenReturn(Set.of(squadronId, bereichId));
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
-    squadron.setName("Staffel Rot");
-    squadron.setShorthand("ROT");
+    Squadron squadron = squadron(squadronId, "Staffel Rot", "ROT");
     Bereich bereich = new Bereich();
     bereich.setId(bereichId);
     bereich.setName("Bereich Logistik");
@@ -673,10 +648,7 @@ class OrgUnitMembershipQueryServiceTest {
     bereich.setId(bereichId);
     bereich.setName("Bereich Logistik");
     bereich.setShorthand("LOG");
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
-    squadron.setName("Staffel Rot");
-    squadron.setShorthand("ROT");
+    Squadron squadron = squadron(squadronId, "Staffel Rot", "ROT");
     SpecialCommand sk = new SpecialCommand();
     sk.setId(skId);
     sk.setName("Spezialkommando Alpha");
@@ -700,9 +672,7 @@ class OrgUnitMembershipQueryServiceTest {
     UUID bereichId = UUID.randomUUID();
     when(membershipRepository.findActiveOrgUnitIdsByUserId(userId))
         .thenReturn(Set.of(squadronId, bereichId));
-    Squadron squadron = new Squadron();
-    squadron.setId(squadronId);
-    squadron.setName("Staffel Rot");
+    Squadron squadron = squadron(squadronId, "Staffel Rot");
     Bereich bereich = new Bereich();
     bereich.setId(bereichId);
     bereich.setName("Bereich Logistik");
