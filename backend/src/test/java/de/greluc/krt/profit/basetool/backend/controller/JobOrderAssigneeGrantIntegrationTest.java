@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -49,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -113,8 +113,11 @@ class JobOrderAssigneeGrantIntegrationTest {
     adminId = UUID.randomUUID();
     transactionTemplate.executeWithoutResult(_ -> {
       tag = UUID.randomUUID().toString().substring(0, 8);
-      Squadron unitA = newSquadron("Grant-A-" + tag, "GA" + tag, true);
-      Squadron unitB = newSquadron("Grant-B-" + tag, "GB" + tag, false);
+      Squadron unitA =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Grant-A-" + tag, "GA" + tag);
+      Squadron unitB =
+          OrgUnitFixtures.persistedSquadron(squadronRepository, "Grant-B-" + tag, "GB" + tag, null);
       unitAId = unitA.getId();
       unitBId = unitB.getId();
       User assignee = newUser("grant-assignee-" + tag);
@@ -128,7 +131,9 @@ class JobOrderAssigneeGrantIntegrationTest {
       unitAMemberId = unitAMember.getId();
       joinUnit(unitAMember, unitA);
       String otherTag = UUID.randomUUID().toString().substring(0, 8);
-      Squadron unitC = newSquadron("Grant-C-" + otherTag, "GC" + otherTag, true);
+      Squadron unitC =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Grant-C-" + otherTag, "GC" + otherTag);
       User unitCMember = newUser("grant-cmember-" + otherTag);
       unitCMemberId = unitCMember.getId();
       joinUnit(unitCMember, unitC);
@@ -455,16 +460,6 @@ class JobOrderAssigneeGrantIntegrationTest {
                     + " LIMIT 1",
                 String.class,
                 orderId));
-  }
-
-  private Squadron newSquadron(String name, String shorthand, boolean insideProfit) {
-    Squadron s = new Squadron();
-    s.setName(name);
-    s.setShorthand(shorthand);
-    if (insideProfit) {
-      withinProfit(s, persistedProfitArea(orgUnitRepository));
-    }
-    return squadronRepository.save(s);
   }
 
   private User newUser(String username) {

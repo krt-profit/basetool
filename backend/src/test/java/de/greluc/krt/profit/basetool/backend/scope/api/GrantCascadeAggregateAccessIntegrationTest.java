@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -51,7 +49,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
@@ -61,6 +58,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.List;
@@ -92,8 +90,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  */
 @SpringBootTest
 class GrantCascadeAggregateAccessIntegrationTest {
-
-  @Autowired private OrgUnitRepository orgUnitRepository;
 
   @Autowired private MissionAccessPolicy missionAccessPolicy;
 
@@ -134,9 +130,14 @@ class GrantCascadeAggregateAccessIntegrationTest {
       bereich.setShorthand("CB" + tag);
       bereich = bereichRepository.save(bereich);
       bereichId = bereich.getId();
-      Squadron child = newSquadron("Cascade-Child-" + tag, "CC" + tag, bereich);
+      Squadron child =
+          OrgUnitFixtures.persistedSquadron(
+              squadronRepository, "Cascade-Child-" + tag, "CC" + tag, bereich);
       childId = child.getId();
-      siblingId = newSquadron("Cascade-Sibling-" + tag, "CS" + tag, bereich).getId();
+      siblingId =
+          OrgUnitFixtures.persistedSquadron(
+                  squadronRepository, "Cascade-Sibling-" + tag, "CS" + tag, bereich)
+              .getId();
 
       User caller = newUser("cascade-caller-" + tag);
       callerId = caller.getId();
@@ -441,15 +442,6 @@ class GrantCascadeAggregateAccessIntegrationTest {
 
   private static String flatRole(GrantedAuthority grant) {
     return ((OrgUnitContextualAuthority) grant).roleName();
-  }
-
-  private Squadron newSquadron(String name, String shorthand, Bereich parent) {
-    Squadron s = new Squadron();
-    s.setName(name);
-    s.setShorthand(shorthand);
-    withinProfit(s, persistedProfitArea(orgUnitRepository));
-    s.setParent(parent);
-    return squadronRepository.save(s);
   }
 
   private User newUser(String username) {
