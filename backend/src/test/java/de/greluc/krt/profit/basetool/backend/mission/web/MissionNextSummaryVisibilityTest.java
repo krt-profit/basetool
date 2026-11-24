@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -85,7 +86,8 @@ class MissionNextSummaryVisibilityTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    unitB = newSquadron("Summary-B-" + tag, "SB" + tag, null);
+    unitB =
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Summary-B-" + tag, "SB" + tag, null);
     internalParent = newMission("Internal parent", unitB, true, null, 1);
     publicChild = newMission("Public child", unitB, false, internalParent, 2);
   }
@@ -131,7 +133,9 @@ class MissionNextSummaryVisibilityTest {
     bereich.setName("Summary-Bereich-" + tag);
     bereich.setShorthand("SBE" + tag);
     bereich = bereichRepository.save(bereich);
-    Squadron below = newSquadron("Summary-Below-" + tag, "SW" + tag, bereich);
+    Squadron below =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Summary-Below-" + tag, "SW" + tag, bereich);
     Mission internal = newMission("Internal below", below, true, null, 3);
     User caller = newUser("summary-grantee");
     OrgUnitMembership membership = new OrgUnitMembership();
@@ -160,14 +164,6 @@ class MissionNextSummaryVisibilityTest {
     return jwt()
         .jwt(builder -> builder.subject(caller.getId().toString()))
         .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"));
-  }
-
-  private Squadron newSquadron(String name, String shorthand, Bereich parent) {
-    Squadron squadron = new Squadron();
-    squadron.setName(name);
-    squadron.setShorthand(shorthand);
-    squadron.setParent(parent);
-    return squadronRepository.save(squadron);
   }
 
   private User newUser(String username) {

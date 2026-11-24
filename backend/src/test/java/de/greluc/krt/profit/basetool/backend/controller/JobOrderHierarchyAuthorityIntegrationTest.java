@@ -72,6 +72,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -143,8 +144,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
         roots.isEmpty()
             ? hierarchy.createBereich("Profit " + tag, "P" + tag, null, null, Department.PROFIT)
             : units.findById(roots.getFirst()).orElseThrow();
-    responsible = squadron("Responsible " + tag, profit);
-    requester = squadron("Requester " + tag, null);
+    responsible = OrgUnitFixtures.persistedSquadron(squadrons, "Responsible " + tag, profit);
+    requester = OrgUnitFixtures.persistedSquadron(squadrons, "Requester " + tag, null);
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("hierarchy-" + tag);
@@ -302,7 +303,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     blueprintOwner("Command producer", processingUnit(), false);
     User globalOwner = blueprintOwner("Global producer", requester, true);
     blueprintOwner("Private outsider", requester, false);
-    Squadron inactiveChild = squadron("Inactive producer " + UUID.randomUUID(), profit);
+    Squadron inactiveChild =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Inactive producer " + UUID.randomUUID(), profit);
     blueprintOwner("Inactive child producer", inactiveChild, false);
     inactiveChild.setActive(false);
     squadrons.saveAndFlush(inactiveChild);
@@ -472,8 +475,12 @@ class JobOrderHierarchyAuthorityIntegrationTest {
       throws Exception {
     memberships.deleteById(new OrgUnitMembershipId(caller, requester.getId()));
     memberships.flush();
-    Squadron customer = squadron("Historical customer " + UUID.randomUUID(), null);
-    Squadron target = squadron("Historical target " + UUID.randomUUID(), profit);
+    Squadron customer =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Historical customer " + UUID.randomUUID(), null);
+    Squadron target =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Historical target " + UUID.randomUUID(), profit);
     JobOrder order =
         orders.saveAndFlush(
             JobOrder.builder()
@@ -521,7 +528,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
       throws Exception {
     memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
     memberships.flush();
-    Squadron newRequester = squadron("New customer " + UUID.randomUUID(), null);
+    Squadron newRequester =
+        OrgUnitFixtures.persistedSquadron(squadrons, "New customer " + UUID.randomUUID(), null);
     JobOrder order =
         orders.saveAndFlush(
             JobOrder.builder()
@@ -888,7 +896,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             .amount(10.0)
             .build());
     order = orders.saveAndFlush(order);
-    Squadron supporter = squadron("Lifecycle supporter " + UUID.randomUUID(), profit);
+    Squadron supporter =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Lifecycle supporter " + UUID.randomUUID(), profit);
     var promise =
         claims.saveAndFlush(
             MaterialClaim.builder()
@@ -1178,7 +1188,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             .build());
     handovers.saveAndFlush(delivery);
 
-    Squadron supporter = squadron("Requester edit supporter " + UUID.randomUUID(), profit);
+    Squadron supporter =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Requester edit supporter " + UUID.randomUUID(), profit);
     var promise =
         claims.saveAndFlush(
             MaterialClaim.builder()
@@ -1220,7 +1232,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
   void claimingOptionsPreserveOwnSquadronWritesWithoutGrantingProcessingOrForeignClaims()
       throws Exception {
     SpecialCommand processing = processingUnit();
-    Squadron foreign = squadron("Foreign claimant " + UUID.randomUUID(), profit);
+    Squadron foreign =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Foreign claimant " + UUID.randomUUID(), profit);
     var quality = tiers.findByCode("GOOD").orElseThrow();
     JobOrder order =
         JobOrder.builder()
@@ -1492,14 +1506,6 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     unit.setShorthand("CP" + tag);
     unit.setParent(profit);
     return units.saveAndFlush(unit);
-  }
-
-  private Squadron squadron(String name, OrgUnit parent) {
-    Squadron row = new Squadron();
-    row.setName(name);
-    row.setShorthand(name);
-    row.setParent(parent);
-    return squadrons.saveAndFlush(row);
   }
 
   private void join(User user, OrgUnit unit) {

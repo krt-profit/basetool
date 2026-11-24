@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -35,7 +36,6 @@ import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,38 +96,7 @@ class JobOrderHandoverButtonLayoutTest {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            1,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "MATERIAL",
-            true,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            true,
-            null,
-            false,
-            false,
-            true,
-            false,
-            false,
-            false,
-            0L,
-            0L,
-            0L,
-            null,
-            null);
+        jobOrder().id(orderId).canEdit(true).canTransferResponsibility(true).build();
 
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);

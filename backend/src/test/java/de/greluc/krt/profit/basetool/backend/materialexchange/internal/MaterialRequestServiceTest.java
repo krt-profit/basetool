@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -58,7 +59,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -735,13 +735,5 @@ class MaterialRequestServiceTest {
     membership.setId(new OrgUnitMembershipId(userId, orgUnitId));
     membership.setKind(kind);
     return membership;
-  }
-
-  private static Squadron squadron(UUID id, String name, String shorthand) {
-    Squadron squadron = new Squadron();
-    squadron.setId(id);
-    squadron.setName(name);
-    squadron.setShorthand(shorthand);
-    return squadron;
   }
 }

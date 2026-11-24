@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,7 +37,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
-import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -131,38 +131,18 @@ class OrdersListPatternRenderTest {
   private static @NotNull PageResponse<JobOrderDto> onePage(
       @NotNull String status, @Nullable String createdClient) {
     JobOrderDto order =
-        new JobOrderDto(
-            UUID.fromString(ORDER_ID),
-            42,
-            new SquadronReferenceDto(UUID.randomUUID(), "Alpha Squadron", "ALP"),
-            new SquadronReferenceDto(UUID.randomUUID(), "Nova Squadron", "NOV"),
-            "Tester",
-            null,
-            3,
-            status,
-            "MATERIAL",
-            false,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L,
-            0L,
-            createdClient,
-            null);
+        jobOrder()
+            .id(UUID.fromString(ORDER_ID))
+            .displayId(42)
+            .responsibleOrgUnit(
+                new SquadronReferenceDto(UUID.randomUUID(), "Alpha Squadron", "ALP"))
+            .requestingOrgUnit(new SquadronReferenceDto(UUID.randomUUID(), "Nova Squadron", "NOV"))
+            .handle("Tester")
+            .priority(3)
+            .status(status)
+            .countBlueprintsWithVariants(false)
+            .createdClient(createdClient)
+            .build();
     return new PageResponse<>(List.of(order), 0, 100, 1L, 1, List.of());
   }
 

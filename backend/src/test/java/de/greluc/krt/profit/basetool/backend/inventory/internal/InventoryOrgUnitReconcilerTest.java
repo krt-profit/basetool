@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -35,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,7 +87,7 @@ class InventoryOrgUnitReconcilerTest {
   @Test
   void onUserGainedFirstOrgUnit_stampsEveryOwnerlessSharedRowWithTheNewOrg() {
     UUID userId = UUID.randomUUID();
-    OrgUnit org = squadron();
+    OrgUnit org = squadron(UUID.randomUUID());
     InventoryItem r1 = sharedRow(null, 5.0, matA, 900);
     InventoryItem r2 = sharedRow(null, 3.0, matB, 800);
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(r1, r2));
@@ -102,8 +102,8 @@ class InventoryOrgUnitReconcilerTest {
   @Test
   void onUserLostLastOrgUnit_demotesToNullWithoutMerging() {
     UUID userId = UUID.randomUUID();
-    OrgUnit orgA = squadron();
-    OrgUnit orgB = squadron();
+    OrgUnit orgA = squadron(UUID.randomUUID());
+    OrgUnit orgB = squadron(UUID.randomUUID());
     InventoryItem a = sharedRow(orgA, 4.0, matA, 900);
     InventoryItem b = sharedRow(orgB, 6.0, matA, 900);
     InventoryItem c = sharedRow(orgA, 2.0, matB, 900);
@@ -123,7 +123,7 @@ class InventoryOrgUnitReconcilerTest {
   @Test
   void onUserLostLastOrgUnit_distinctStacks_demoteWithoutMerging() {
     UUID userId = UUID.randomUUID();
-    OrgUnit orgA = squadron();
+    OrgUnit orgA = squadron(UUID.randomUUID());
     InventoryItem a = sharedRow(orgA, 4.0, matA, 900);
     InventoryItem b = sharedRow(orgA, 6.0, matB, 900);
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(a, b));
@@ -150,7 +150,7 @@ class InventoryOrgUnitReconcilerTest {
   @Test
   void gainedFirstOrgUnit_recordsRestampAudit() {
     UUID userId = UUID.randomUUID();
-    OrgUnit org = squadron();
+    OrgUnit org = squadron(UUID.randomUUID());
     InventoryItem row = sharedRow(null, 5.0, matA, 900);
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(row));
 
@@ -163,7 +163,7 @@ class InventoryOrgUnitReconcilerTest {
   @Test
   void lostLastOrgUnit_recordsRestampAudit() {
     UUID userId = UUID.randomUUID();
-    InventoryItem row = sharedRow(squadron(), 5.0, matA, 900);
+    InventoryItem row = sharedRow(squadron(UUID.randomUUID()), 5.0, matA, 900);
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(row));
 
     reconciler.onUserLostLastOrgUnit(userId);
@@ -177,7 +177,7 @@ class InventoryOrgUnitReconcilerTest {
     UUID userId = UUID.randomUUID();
     when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of());
 
-    reconciler.onUserGainedFirstOrgUnit(userId, squadron());
+    reconciler.onUserGainedFirstOrgUnit(userId, squadron(UUID.randomUUID()));
 
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
@@ -194,12 +194,6 @@ class InventoryOrgUnitReconcilerTest {
     assertNull(a.getOwningOrgUnit());
     assertNull(b.getOwningOrgUnit());
     verify(auditService, never()).record(any(), any(), any(), any(), any());
-  }
-
-  private static OrgUnit squadron() {
-    Squadron s = new Squadron();
-    s.setId(UUID.randomUUID());
-    return s;
   }
 
   private InventoryItem sharedRow(OrgUnit org, double amount, Material material, int quality) {

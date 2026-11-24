@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
@@ -233,37 +234,18 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
   }
 
   private static JobOrderDto createdOrder(String type) {
-    return new JobOrderDto(
-        CREATED_ID,
-        53,
-        null,
-        null,
-        "Creator",
-        null,
-        null,
-        "OPEN",
-        type,
-        false,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.parse("2026-11-09T10:00:00Z"),
-        0L,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        0L,
-        0L,
-        0L,
-        null,
-        null);
+    return jobOrder()
+        .id(CREATED_ID)
+        .displayId(53)
+        .handle("Creator")
+        .priority(null)
+        .type(type)
+        .countBlueprintsWithVariants(false)
+        .createdAt(Instant.parse("2026-11-09T10:00:00Z"))
+        .version(0L)
+        .canEdit(false)
+        .canManageAssignees(false)
+        .canTransferResponsibility(false)
+        .build();
   }
 }

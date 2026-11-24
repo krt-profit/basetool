@@ -27,41 +27,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangeJobOrderChangeLog;
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangeJobOrderSeed;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeRead;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReads;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
-import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
-import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -96,14 +78,7 @@ import tools.jackson.databind.json.JsonMapper;
 class JobOrderFingerprintWorkerIntegrationTest {
 
   @Autowired private WebApplicationContext context;
-  @Autowired private OrgUnitRepository units;
-  @Autowired private SquadronRepository squadrons;
-  @Autowired private UserRepository users;
-  @Autowired private RoleRepository roles;
-  @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private JobOrderRepository orders;
-  @Autowired private MaterialRepository materials;
-  @Autowired private QualityTierRepository tiers;
   @Autowired private TransactionTemplate transactions;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private DataSource dataSource;
@@ -113,59 +88,31 @@ class JobOrderFingerprintWorkerIntegrationTest {
   @Autowired private JobOrderExchangeReads reads;
   @Autowired private MeterRegistry meterRegistry;
 
+  private ExchangeJobOrderSeed seed;
+  private ExchangeJobOrderChangeLog changes;
   private MockMvc mvc;
   private UUID responsible;
   private UUID requester;
   private UUID writer;
   private UUID reader;
   private UUID material;
-  private final List<UUID> createdOrders = new ArrayList<>();
-  private final List<UUID> createdLocations = new ArrayList<>();
   private String feeRate = "0";
 
   @BeforeEach
-  void seed() {
+  void setUp() {
     mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    transactions.executeWithoutResult(_ -> {
-      String tag = UUID.randomUUID().toString().substring(0, 8);
-      OrgUnit profit = ProfitHierarchyFixtures.persistedProfitArea(units);
-      responsible =
-          OrgUnitFixtures.persistedSquadron(squadrons, "Fingerprint responsible " + tag, profit)
-              .getId();
-      requester =
-          OrgUnitFixtures.persistedSquadron(squadrons, "Fingerprint requester " + tag, null)
-              .getId();
-      writer = member("fingerprint-writer-" + tag);
-      reader = member("fingerprint-reader-" + tag);
-      Material created = new Material();
-      created.setName("Fingerprint material " + tag);
-      created.setType(MaterialType.RAW);
-      material = materials.saveAndFlush(created).getId();
-    });
+    seed = new ExchangeJobOrderSeed(context);
+    changes = new ExchangeJobOrderChangeLog(jdbc);
+    responsible = seed.squadron("Fingerprint responsible", seed.getProfit());
+    requester = seed.squadron("Fingerprint requester", null);
+    writer = member("fingerprint-writer");
+    reader = member("fingerprint-reader");
+    material = seed.material("Fingerprint material");
   }
 
   @AfterEach
   void clean() {
-    transactions.executeWithoutResult(_ -> {
-      for (UUID id : createdOrders) {
-        jdbc.update("DELETE FROM inventory_item_job_order_allocation WHERE job_order_id = ?", id);
-        jdbc.update("DELETE FROM job_order_money_correction_entry WHERE order_id = ?", id);
-        jdbc.update("DELETE FROM job_order_money_commitment_change WHERE order_id = ?", id);
-        jdbc.update("DELETE FROM job_order_money_operation WHERE order_id = ?", id);
-        jdbc.update("DELETE FROM notification WHERE entity_id = ?", id);
-        jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", id);
-        orders.deleteById(id);
-      }
-      orders.flush();
-      jdbc.update("DELETE FROM inventory_item WHERE material_id = ?", material);
-      createdLocations.forEach(location -> TestPlaces.deleteLocation(jdbc, location));
-      materials.deleteById(material);
-      memberships.deleteById(new OrgUnitMembershipId(writer, requester));
-      memberships.deleteById(new OrgUnitMembershipId(reader, requester));
-      memberships.flush();
-      users.deleteAllById(List.of(writer, reader));
-      units.deleteAllById(List.of(responsible, requester));
-    });
+    seed.close();
   }
 
   @Test
@@ -252,7 +199,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
   void aWriteThatCommitsWhileTheWorkerRunsIsRecomputedOnTheNextRun(RacingWrite write)
       throws Exception {
     UUID order = write == RacingWrite.MONEY ? auecOrder() : materialOrder(JobOrderStatus.OPEN);
-    UUID row = write == RacingWrite.EARMARK ? stockRow() : null;
+    UUID row = write == RacingWrite.EARMARK ? seed.stockRow(responsible, writer, material) : null;
     drain(order);
     jdbc.update("UPDATE job_order SET comment = 'committed before the run' WHERE id = ?", order);
 
@@ -263,7 +210,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
       drain(order);
       Stored beforeCommit = Objects.requireNonNull(stored(order));
       assertThat(beforeCommit.fingerprint()).isEqualTo(JobOrderFingerprints.of(readOf(order)));
-      long logged = logPosition();
+      long logged = changes.position();
 
       racing.commit();
       assertThat(markCount(order)).isPositive();
@@ -273,7 +220,8 @@ class JobOrderFingerprintWorkerIntegrationTest {
       assertThat(afterCommit.fingerprint())
           .isNotEqualTo(beforeCommit.fingerprint())
           .isEqualTo(JobOrderFingerprints.of(readOf(order)));
-      assertThat(unitsAnnounced(order, logged)).containsExactlyInAnyOrder(responsible, requester);
+      assertThat(changes.unitsAnnounced(order, logged))
+          .containsExactlyInAnyOrder(responsible, requester);
     }
   }
 
@@ -319,7 +267,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
       drain(order);
       Stored inProgress = Objects.requireNonNull(stored(order));
       double unchangedBefore = fingerprints("unchanged");
-      long quiet = logPosition();
+      long quiet = changes.position();
 
       provide(order, writerCall(), "6000000");
       move(
@@ -362,7 +310,7 @@ class JobOrderFingerprintWorkerIntegrationTest {
 
       assertThat(stored(order)).isEqualTo(inProgress);
       assertThat(fingerprints("unchanged") - unchangedBefore).isEqualTo(1.0d);
-      assertThat(unitsAnnounced(order, quiet)).isEmpty();
+      assertThat(changes.unitsAnnounced(order, quiet)).isEmpty();
 
       String recipient = recipient(order);
       move(
@@ -377,7 +325,8 @@ class JobOrderFingerprintWorkerIntegrationTest {
 
       assertThat(Objects.requireNonNull(stored(order)).fingerprint())
           .isNotEqualTo(inProgress.fingerprint());
-      assertThat(unitsAnnounced(order, quiet)).containsExactlyInAnyOrder(responsible, requester);
+      assertThat(changes.unitsAnnounced(order, quiet))
+          .containsExactlyInAnyOrder(responsible, requester);
     } finally {
       restoreFeeRate();
     }
@@ -390,7 +339,6 @@ class JobOrderFingerprintWorkerIntegrationTest {
     jdbc.update("UPDATE job_order SET comment = 'gone soon' WHERE id = ?", order);
 
     transactions.executeWithoutResult(_ -> orders.deleteById(order));
-    createdOrders.remove(order);
 
     assertThat(markCount(order)).isZero();
     assertThat(stored(order)).isNull();
@@ -466,21 +414,6 @@ class JobOrderFingerprintWorkerIntegrationTest {
     JobOrderFingerprintRuns.drain(jdbc, recomputation, fixtureOrders);
   }
 
-  private long logPosition() {
-    return Objects.requireNonNull(
-        jdbc.queryForObject("SELECT COALESCE(max(seq), 0) FROM exchange_change", Long.class));
-  }
-
-  private Set<UUID> unitsAnnounced(UUID order, long after) {
-    return Set.copyOf(
-        jdbc.queryForList(
-            "SELECT DISTINCT org_unit_id FROM exchange_change WHERE seq > ?"
-                + " AND resource = 'JOB_ORDER' AND entity_key = ? AND org_unit_id IS NOT NULL",
-            UUID.class,
-            after,
-            order.toString()));
-  }
-
   private int markCount(UUID order) {
     return Objects.requireNonNull(
         jdbc.queryForObject(
@@ -516,59 +449,21 @@ class JobOrderFingerprintWorkerIntegrationTest {
 
   private UUID materialOrder(JobOrderStatus status) {
     UUID order =
-        Objects.requireNonNull(
-            transactions.execute(_ -> {
-              JobOrder created =
-                  JobOrder.builder()
-                      .responsibleOrgUnit(units.getReferenceById(responsible))
-                      .requestingOrgUnit(units.getReferenceById(requester))
-                      .handle("Fingerprint contact")
-                      .priority(status.isActive() ? 1 : null)
-                      .status(JobOrderStatus.OPEN)
-                      .build();
-              created.addMaterial(
-                  JobOrderMaterial.builder()
-                      .material(materials.getReferenceById(material))
-                      .qualityTier(tiers.findByCode("GOOD").orElseThrow())
-                      .amount(10.0)
-                      .build());
-              return orders.saveAndFlush(created).getId();
-            }));
+        seed.order()
+            .requesting(requester)
+            .responsible(responsible)
+            .priority(status.isActive() ? 1 : null)
+            .material(material, "GOOD", 10.0)
+            .create();
     if (!status.isActive()) {
       jdbc.update(
           "UPDATE job_order SET status = ?, closed_at = now() WHERE id = ?", status.name(), order);
     }
-    createdOrders.add(order);
     return order;
   }
 
   private UUID auecOrder() {
-    UUID order = materialOrder(JobOrderStatus.OPEN);
-    jdbc.update("DELETE FROM job_order_material WHERE job_order_id = ?", order);
-    jdbc.update("UPDATE job_order SET type = 'AUEC' WHERE id = ?", order);
-    jdbc.update(
-        "INSERT INTO job_order_money_target (order_id, amount, version) VALUES (?, 1000, 0)",
-        order);
-    return order;
-  }
-
-  private UUID stockRow() {
-    UUID location = UUID.randomUUID();
-    TestPlaces.insertLocation(jdbc, location, "Fingerprint " + location);
-    createdLocations.add(location);
-    UUID row = UUID.randomUUID();
-    jdbc.update(
-        """
-        INSERT INTO inventory_item (id, user_id, material_id, location_id, quality, amount,
-                                    personal, stolen, owning_org_unit_id)
-        VALUES (?, ?, ?, ?, 700, 5, false, false, ?)
-        """,
-        row,
-        writer,
-        material,
-        location,
-        responsible);
-    return row;
+    return seed.order().requesting(requester).responsible(responsible).auec(1000).create();
   }
 
   private UUID createAuecOrder() throws Exception {
@@ -590,11 +485,8 @@ class JobOrderFingerprintWorkerIntegrationTest {
                                 "10000000"))))
             .andExpect(status().isCreated())
             .andReturn();
-    UUID order =
-        UUID.fromString(
-            json.readTree(created.getResponse().getContentAsString()).get("id").asString());
-    createdOrders.add(order);
-    return order;
+    return UUID.fromString(
+        json.readTree(created.getResponse().getContentAsString()).get("id").asString());
   }
 
   private String provide(UUID order, RequestPostProcessor caller, String amount) throws Exception {
@@ -699,17 +591,8 @@ class JobOrderFingerprintWorkerIntegrationTest {
   }
 
   private UUID member(String name) {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    user.setUsername(name);
-    user.getRoles().add(roles.findByCode(Roles.KRT_MEMBER).orElseThrow());
-    users.saveAndFlush(user);
-    OrgUnitMembership membership = new OrgUnitMembership();
-    membership.setId(new OrgUnitMembershipId(user.getId(), requester));
-    membership.setUser(user);
-    membership.setKind(units.findById(requester).orElseThrow().getKind());
-    membership.setJoinedAt(Instant.now());
-    memberships.saveAndFlush(membership);
-    return user.getId();
+    UUID member = seed.user(name, false);
+    seed.seat(member, requester, "MEMBER", false);
+    return member;
   }
 }

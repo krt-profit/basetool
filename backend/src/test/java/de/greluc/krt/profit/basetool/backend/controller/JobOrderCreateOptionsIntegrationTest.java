@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -89,9 +90,10 @@ class JobOrderCreateOptionsIntegrationTest {
                 "Creation Profit " + tag, "CP" + tag, null, null, Department.PROFIT)
             : units.findById(roots.getFirst()).orElseThrow();
     profitRootId = profit.getId();
-    responsible = squadron("0 Creation responsible " + tag, profit);
-    requester = squadron("Creation requester " + tag, null);
-    unrelated = squadron("Creation unrelated " + tag, null);
+    responsible =
+        OrgUnitFixtures.persistedSquadron(squadrons, "0 Creation responsible " + tag, profit);
+    requester = OrgUnitFixtures.persistedSquadron(squadrons, "Creation requester " + tag, null);
+    unrelated = OrgUnitFixtures.persistedSquadron(squadrons, "Creation unrelated " + tag, null);
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("creation-" + tag);
@@ -256,13 +258,5 @@ class JobOrderCreateOptionsIntegrationTest {
     return List.of(
         new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
         new SimpleGrantedAuthority(Roles.authority(Roles.ADMIN)));
-  }
-
-  private Squadron squadron(String name, OrgUnit parent) {
-    Squadron unit = new Squadron();
-    unit.setName(name);
-    unit.setShorthand(name);
-    unit.setParent(parent);
-    return squadrons.saveAndFlush(unit);
   }
 }
