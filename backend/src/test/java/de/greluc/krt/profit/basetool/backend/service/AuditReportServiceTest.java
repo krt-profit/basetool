@@ -37,6 +37,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditReportService;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -49,6 +51,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
@@ -69,6 +72,8 @@ class AuditReportServiceTest {
   @Mock private MessageSource messageSource;
 
   @InjectMocks private AuditReportService auditReportService;
+
+  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments();
 
   /**
    * Expected {@code AuditDomain -> *_AUDIT_EXPORTED} mapping, kept independent of the production

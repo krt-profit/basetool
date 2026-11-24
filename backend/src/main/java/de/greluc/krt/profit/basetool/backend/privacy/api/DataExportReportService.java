@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.privacy.api;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import java.util.Locale;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ import org.springframework.stereotype.Service;
 public class DataExportReportService {
 
   private final MessageSource messageSource;
+  private final KrtPdfDocuments pdfDocuments;
 
   /**
    * Renders an already-assembled export as a PDF, so the caller keeps the export for auditing.
@@ -43,7 +45,7 @@ public class DataExportReportService {
    * @return the PDF bytes
    */
   public byte @NotNull [] renderPdf(@NotNull DataExportService.DataExport export) {
-    return DataExportPdfFormat.render(export, this::label);
+    return DataExportPdfFormat.render(pdfDocuments, export, this::label);
   }
 
   /**

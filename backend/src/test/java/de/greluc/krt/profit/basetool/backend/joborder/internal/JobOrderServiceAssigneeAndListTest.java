@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import static de.greluc.krt.profit.basetool.backend.support.JobOrderDtoFixtures.jobOrder;
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -1193,9 +1194,7 @@ class JobOrderServiceAssigneeAndListTest {
   }
 
   private Squadron processingUnit() {
-    Squadron unit = new Squadron();
-    unit.setId(PROCESSING_UNIT_ID);
-    return unit;
+    return squadron(PROCESSING_UNIT_ID);
   }
 
   private User newUser(UUID id) {

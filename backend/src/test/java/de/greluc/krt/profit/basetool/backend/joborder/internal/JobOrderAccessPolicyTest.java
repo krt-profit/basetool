@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -97,8 +98,7 @@ class JobOrderAccessPolicyTest {
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReadSet.class));
 
-    Squadron foreign = new Squadron();
-    foreign.setId(foreignUnitId);
+    Squadron foreign = squadron(foreignUnitId);
     order = new JobOrder();
     order.setId(UUID.randomUUID());
     order.setResponsibleOrgUnit(foreign);

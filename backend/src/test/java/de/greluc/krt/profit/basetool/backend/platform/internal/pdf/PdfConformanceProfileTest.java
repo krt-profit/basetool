@@ -17,15 +17,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.platform.api;
+package de.greluc.krt.profit.basetool.backend.platform.internal.pdf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
+import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
@@ -36,61 +41,46 @@ import org.openpdf.text.pdf.PdfArray;
 import org.openpdf.text.pdf.PdfDictionary;
 import org.openpdf.text.pdf.PdfName;
 import org.openpdf.text.pdf.PdfObject;
-import org.openpdf.text.pdf.PdfPTable;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.PdfWriter;
+import org.verapdf.pdfa.flavours.PDFAFlavour;
 
 /**
- * Pins the file format of every backend PDF (REQ-API-026): PDF/A-4 as veraPDF validates it, plus
- * the ISO 32000-2 points that matter to a reader — the PDF 2.0 header, an {@code Info} dictionary
- * of nothing but a PDF 2.0 {@code ModDate}, XMP with title, language and the PDF/A-4
- * identification, the catalog language, an sRGB output intent, the title shown by the viewer and
- * only embedded fonts.
+ * Pins the file format of every backend PDF (REQ-API-026, REQ-API-029): the profiles as veraPDF
+ * validates them, plus the ISO 32000-2 points that matter to a reader — the PDF 2.0 header, an
+ * {@code Info} dictionary of nothing but a PDF 2.0 {@code ModDate}, XMP with title, language, the
+ * PDF/A-4 and PDF/UA-2 identification and the WTPDF declarations, the catalog language, an sRGB
+ * output intent, the title shown by the viewer and only embedded fonts.
  */
-class PdfArchiveProfileTest {
+class PdfConformanceProfileTest {
 
   private static byte[] pdf;
 
   @BeforeAll
   static void render() throws IOException {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(out, "KONTOAUSZUG ÄÖÜ – €");
-      PdfPTable meta = KrtPdfSupport.newMetaTable();
-      KrtPdfSupport.addMetaRow(meta, "ZEITRAUM", "01.01.2026 – 31.01.2026");
-      krt.document().add(meta);
-      KrtPdfSupport.addSectionHeader(krt, "BUCHUNGEN");
-      PdfPTable table = new PdfPTable(2);
-      KrtPdfSupport.addTableHeader(table, "DATUM");
-      KrtPdfSupport.addTableHeader(table, "BETRAG");
-      KrtPdfSupport.addTableCell(table, "15.01.2026", KrtPdfSupport.rowBackground(false), false);
-      KrtPdfSupport.addTableCell(table, "+1.000", KrtPdfSupport.rowBackground(false), true);
-      KrtPdfSupport.addDetailSubRow(
-          table,
-          "Begründung",
-          "Spende",
-          "Notiz",
-          "",
-          "Notiz Bank",
-          "",
-          KrtPdfSupport.COLOR_CANVAS,
-          2);
-      KrtPdfSupport.addEmptyRow(table, "Keine Buchungen", 2);
-      krt.document().add(table);
-      krt.document().add(KrtPdfSupport.spacer(12));
-      KrtPdfSupport.addNote(krt, "Hinweis");
-      KrtPdfSupport.addFooter(krt);
-      krt.document().close();
+      try (KrtPdfDocument krt = new TaggedKrtPdfDocuments().open(out, "KONTOAUSZUG ÄÖÜ – €")) {
+        krt.keyValueTable(List.of(new PdfKeyValue("ZEITRAUM", "01.01.2026 – 31.01.2026")));
+        krt.heading("BUCHUNGEN");
+        try (PdfDataTable table = krt.dataTable(new float[] {1f, 1f}, List.of("DATUM", "BETRAG"))) {
+          table.row(List.of(PdfTableCell.text("15.01.2026"), PdfTableCell.centered("+1.000")));
+          table.detailRow(List.of(new PdfKeyValue("Begründung", "Spende")));
+          table.emptyRow("Keine Buchungen");
+        }
+        krt.note("Hinweis");
+        krt.footer();
+      }
       pdf = out.toByteArray();
     }
   }
 
   @Test
-  void aKrtDocumentIsPdfA4() throws Exception {
-    PdfA4Conformance.assertConformant(pdf);
+  void aKrtDocumentConformsToEveryProfile() throws Exception {
+    PdfConformance.assertConformant(pdf);
   }
 
   @Test
-  void theValidatorRejectsAPlainOpenPdfFile() throws IOException {
+  void theValidatorRejectsAPlainOpenPdfFile() throws Exception {
     byte[] plain;
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       Document document = new Document();
@@ -101,13 +91,24 @@ class PdfArchiveProfileTest {
       plain = out.toByteArray();
     }
 
-    assertThatThrownBy(() -> PdfA4Conformance.assertConformant(plain))
-        .isInstanceOf(AssertionError.class)
-        .hasMessageContaining("6.1.3-4")
-        .hasMessageContaining("6.1.3-5")
-        .hasMessageContaining("6.7.2.1-1")
-        .hasMessageContaining("6.2.10.4.1-1")
-        .hasMessageContaining("6.2.4.3-4");
+    assertThat(PdfConformance.failures(plain, List.of(PDFAFlavour.PDFA_4)))
+        .contains("6.1.3-4")
+        .contains("6.1.3-5")
+        .contains("6.7.2.1-1")
+        .contains("6.2.10.4.1-1")
+        .contains("6.2.4.3-4");
+  }
+
+  @Test
+  void theProfileRefusesAnUntaggedWriter() throws IOException {
+    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      Document document = new Document();
+      PdfWriter writer = PdfWriter.getInstance(document, out);
+      document.open();
+
+      assertThatThrownBy(() -> PdfConformanceProfile.afterOpen(writer, "UNGETAGGT", Instant.now()))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
   }
 
   @Test
@@ -135,7 +136,7 @@ class PdfArchiveProfileTest {
   }
 
   @Test
-  void theXmpNamesTitleLanguageGeneratorAndPdfA4() throws IOException {
+  void theXmpNamesTitleLanguageGeneratorAndEveryProfile() throws IOException {
     PdfReader reader = new PdfReader(pdf);
     try {
       String xmp = new String(reader.getMetadata(), StandardCharsets.UTF_8);
@@ -143,11 +144,20 @@ class PdfArchiveProfileTest {
           .containsPattern(
               "<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\"\\s*>KONTOAUSZUG ÄÖÜ – €</rdf:li>")
           .contains("<dc:format>application/pdf</dc:format>")
-          .contains("<rdf:li>" + PdfArchiveProfile.LANGUAGE + "</rdf:li>")
-          .contains("<xmp:CreatorTool>" + PdfArchiveProfile.CREATOR_TOOL + "</xmp:CreatorTool>")
+          .contains("<rdf:li>" + PdfConformanceProfile.LANGUAGE + "</rdf:li>")
+          .contains("<xmp:CreatorTool>" + PdfConformanceProfile.CREATOR_TOOL + "</xmp:CreatorTool>")
           .contains("<pdfaid:part>4</pdfaid:part>")
           .contains("<pdfaid:rev>2020</pdfaid:rev>")
-          .doesNotContain("pdfaid:conformance");
+          .doesNotContain("pdfaid:conformance")
+          .contains("<pdfuaid:part>2</pdfuaid:part>")
+          .contains("<pdfuaid:rev>2024</pdfuaid:rev>")
+          .contains("xmlns:pdfd=\"http://pdfa.org/declarations/\"")
+          .contains(
+              "<pdfd:conformsTo>"
+                  + PdfConformanceProfile.WTPDF_ACCESSIBILITY
+                  + "</pdfd:conformsTo>")
+          .contains("<pdfd:conformsTo>" + PdfConformanceProfile.WTPDF_REUSE + "</pdfd:conformsTo>")
+          .contains("<pdfd:claimBy>" + PdfConformanceProfile.CREATOR_TOOL + "</pdfd:claimBy>");
     } finally {
       reader.close();
     }
@@ -159,7 +169,7 @@ class PdfArchiveProfileTest {
     try {
       PdfDictionary catalog = reader.getCatalog();
       assertThat(catalog.getAsString(PdfName.LANG).toString())
-          .isEqualTo(PdfArchiveProfile.LANGUAGE);
+          .isEqualTo(PdfConformanceProfile.LANGUAGE);
       PdfDictionary intent = catalog.getAsArray(PdfName.OUTPUTINTENTS).getAsDict(0);
       assertThat(intent.getAsName(PdfName.S)).isEqualTo(PdfName.GTS_PDFA1);
       assertThat(intent.get(PdfName.DESTOUTPUTPROFILE)).isNotNull();

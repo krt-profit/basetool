@@ -577,9 +577,12 @@ Accounts and holder totals are paged into the same repeatable-read snapshot. Ren
 one account section and one 500-row chunk at a time. The chart consumes every posting while
 retaining only each horizontal display column's chronological first, last, minimum and maximum
 points. Exact opening/closing balances and global extrema are preserved, with at most 1,782
-vector vertices for the 445-point plot; the itemized ledger remains complete. PDF-writer page
-metadata still grows with the number of output pages, while row, leg, table and chart working
-sets remain bounded by their chunk or viewport sizes.
+vector vertices for the 445-point plot; the itemized ledger remains complete. The chart is a
+tagged `Figure` whose alternate description names the account, the window, the opening and
+closing balance and the lowest and highest balance (`pdf.bank.report.chart.alt`, REQ-API-029).
+PDF-writer page metadata and the parent tree of the tagged structure (one object reference per
+tagged cell) still grow with the output, while row, leg, table and chart working sets remain
+bounded by their chunk or viewport sizes.
 
 **Acceptance**
 
@@ -3124,7 +3127,7 @@ expandable) • **Code:** `bank/internal/BankTransaction`, `bank/internal/BankBo
 `bank/internal/ConfirmBankBookingRequest`, `bank/internal/BankBookingRow`,
 `model/dto/Bank{Booking,BookingRequest}Dto`, `bank/internal/BankPostingWriter`, `bank/internal/BankLedgerService`,
 `bank/internal/BankBookingRequestService`, `bank/internal/OrgUnitBankAccessService`,
-`service/Bank{Statement,Management}ReportService`, `platform/api/KrtPdfSupport`, `db/migration/V231`
+`service/Bank{Statement,Management}ReportService`, `platform/api/pdf/KrtPdfDocuments`, `db/migration/V231`
 
 ### REQ-BANK-055 — Empfänger on a withdrawal request
 
