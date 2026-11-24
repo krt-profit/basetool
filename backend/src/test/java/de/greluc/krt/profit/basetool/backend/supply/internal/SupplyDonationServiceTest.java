@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,7 +53,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.supply.api.DeclineReason;
 import de.greluc.krt.profit.basetool.backend.supply.api.DonationStatus;
@@ -146,9 +146,7 @@ class SupplyDonationServiceTest {
     location = new Location();
     location.setId(UUID.randomUUID());
     location.setName("Lorville");
-    unit = new Squadron();
-    unit.setId(UUID.randomUUID());
-    unit.setName("Bereich Profit");
+    unit = squadron(UUID.randomUUID(), "Bereich Profit");
     donor = new User();
     donor.setId(DONOR);
   }

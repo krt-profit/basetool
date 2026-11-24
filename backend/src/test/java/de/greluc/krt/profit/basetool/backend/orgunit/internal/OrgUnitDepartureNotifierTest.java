@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -80,10 +81,7 @@ class OrgUnitDepartureNotifierTest {
     bereich = new Bereich();
     bereich.setId(UUID.randomUUID());
     bereich.setName("Nord");
-    squadron = new Squadron();
-    squadron.setId(UUID.randomUUID());
-    squadron.setName("Alpha");
-    squadron.setShorthand("ALP");
+    squadron = squadron(UUID.randomUUID(), "Alpha", "ALP");
     squadron.setParent(bereich);
   }
 

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -85,8 +86,7 @@ class InventoryMergeProbeTest {
   @Test
   void answersTrueWhenARowWithTheResolvedIdentityExists() {
     UUID unitId = UUID.randomUUID();
-    Squadron unit = new Squadron();
-    unit.setId(unitId);
+    Squadron unit = squadron(unitId);
     when(userRepository.findById(CALLER)).thenReturn(Optional.of(caller));
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
         .thenReturn(unit);

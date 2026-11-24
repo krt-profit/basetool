@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -252,8 +253,7 @@ class MissionAccessPolicyDifferentialTest {
       mission.setIsInternal(internal);
       mission.setParent(parent);
       if (unit != null) {
-        Squadron squadron = new Squadron();
-        squadron.setId(unit);
+        Squadron squadron = squadron(unit);
         mission.setOwningOrgUnit(squadron);
       }
       return mission;

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -262,8 +263,7 @@ class OperationAccessPolicyDifferentialTest {
       Operation operation = new Operation();
       operation.setId(id);
       if (owner != null) {
-        Squadron unit = new Squadron();
-        unit.setId(owner);
+        Squadron unit = squadron(owner);
         operation.setOwningOrgUnit(unit);
       }
       return operation;

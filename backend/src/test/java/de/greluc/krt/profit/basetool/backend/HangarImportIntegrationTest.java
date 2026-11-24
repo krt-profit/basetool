@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -214,10 +215,12 @@ class HangarImportIntegrationTest {
 
   @Test
   void importFleetview_memberOfSeveralUnitsWithoutPin_importsShipsWithoutUnit() throws Exception {
-    Squadron second = new Squadron();
-    second.setName("Import Second Staffel");
-    second.setShorthand("S" + UUID.randomUUID().toString().substring(0, 8));
-    second = squadronRepository.save(second);
+    Squadron second =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository,
+            "Import Second Staffel",
+            "S" + UUID.randomUUID().toString().substring(0, 8),
+            null);
     OrgUnitMembership secondMembership = new OrgUnitMembership();
     secondMembership.setId(new OrgUnitMembershipId(user1.getId(), second.getId()));
     secondMembership.setUser(user1);

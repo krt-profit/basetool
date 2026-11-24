@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.HashSet;
@@ -231,9 +232,7 @@ class UserMappingNoNPlusOneTest {
   }
 
   private Squadron newStaffel(String name) {
-    Squadron staffel = new Squadron();
-    staffel.setName(name);
-    staffel.setShorthand(name.substring(name.length() - 4));
-    return squadronRepository.save(staffel);
+    return OrgUnitFixtures.persistedSquadron(
+        squadronRepository, name, name.substring(name.length() - 4), null);
   }
 }

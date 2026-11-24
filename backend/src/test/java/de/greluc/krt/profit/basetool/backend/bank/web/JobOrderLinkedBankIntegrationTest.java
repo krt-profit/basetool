@@ -43,9 +43,10 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCurrencyWipe;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -105,6 +106,7 @@ class JobOrderLinkedBankIntegrationTest {
   @Autowired private ConfigurableWebApplicationContext context;
   @Autowired private CustomJwtGrantedAuthoritiesConverter authorities;
   @Autowired private OrgUnitRepository units;
+  @Autowired private SquadronRepository squadrons;
   @Autowired private UserRepository users;
   @Autowired private JsonMapper json;
   @Autowired private JdbcTemplate jdbc;
@@ -137,12 +139,14 @@ class JobOrderLinkedBankIntegrationTest {
       ownsProfit = units.findActiveProfitRootIds().isEmpty();
       world = new BankAccessSeeder(context).seedLinkedOrder();
       profit = units.findActiveProfitRootIds().getFirst();
-      var processingUnit = new Squadron();
       String tag = UUID.randomUUID().toString().substring(0, 8);
-      processingUnit.setName("Linked order processing " + tag);
-      processingUnit.setShorthand("L" + tag);
-      processingUnit.setParent(units.findById(profit).orElseThrow());
-      responsible = units.saveAndFlush(processingUnit).getId();
+      responsible =
+          OrgUnitFixtures.persistedSquadron(
+                  squadrons,
+                  "Linked order processing " + tag,
+                  "L" + tag,
+                  units.findById(profit).orElseThrow())
+              .getId();
     });
     committedWorld = true;
   }

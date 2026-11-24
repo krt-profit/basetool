@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureSe
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.List;
 import java.util.UUID;
 import org.hamcrest.Matchers;
@@ -90,10 +91,8 @@ class MissionUnitShipOptionsTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     Squadron iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
-    Squadron otherOrgUnit = new Squadron();
-    otherOrgUnit.setName("Other Squadron");
-    otherOrgUnit.setShorthand("OTH");
-    otherOrgUnit = squadronRepository.save(otherOrgUnit);
+    Squadron otherOrgUnit =
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Other Squadron", "OTH", null);
 
     shipType = new ShipType();
     shipType.setName("Fighter");

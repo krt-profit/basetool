@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -78,10 +79,8 @@ class MissionParticipantOrgUnitTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    testStaffel = new Squadron();
-    testStaffel.setName("Test Staffel");
-    testStaffel.setShorthand("TST");
-    testStaffel = squadronRepository.save(testStaffel);
+    testStaffel =
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Test Staffel", "TST", null);
 
     testSk = new SpecialCommand();
     testSk.setName("Test Spezialkommando");

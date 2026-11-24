@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.*;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -117,10 +118,7 @@ class MissionValidationTest {
     userRepository.save(officerUser);
     saveIridiumMembership(officerUser);
 
-    testSquadron = new Squadron();
-    testSquadron.setName("Test Sq");
-    testSquadron.setShorthand("TS");
-    testSquadron = squadronRepository.save(testSquadron);
+    testSquadron = OrgUnitFixtures.persistedSquadron(squadronRepository, "Test Sq", "TS", null);
 
     ShipType st = new ShipType();
     st.setName("Fighter");

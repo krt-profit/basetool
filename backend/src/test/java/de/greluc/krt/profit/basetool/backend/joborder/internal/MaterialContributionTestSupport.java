@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -124,17 +125,13 @@ abstract class MaterialContributionTestSupport {
       withinProfit(sk, persistedProfitArea(orgUnitRepository));
       sk = specialCommandRepository.save(sk);
 
-      Squadron sqA = new Squadron();
-      sqA.setName("Claim-A-" + tag);
-      sqA.setShorthand("A" + tag);
-      withinProfit(sqA, persistedProfitArea(orgUnitRepository));
-      sqA = squadronRepository.save(sqA);
+      Squadron sqA =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Claim-A-" + tag, "A" + tag);
 
-      Squadron sqB = new Squadron();
-      sqB.setName("Claim-B-" + tag);
-      sqB.setShorthand("B" + tag);
-      withinProfit(sqB, persistedProfitArea(orgUnitRepository));
-      sqB = squadronRepository.save(sqB);
+      Squadron sqB =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Claim-B-" + tag, "B" + tag);
 
       Material mat = new Material();
       mat.setName("ClaimMat-" + tag);

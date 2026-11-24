@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -178,11 +179,9 @@ class MissionNoticeIntegrationTest {
     assertThat(inbox(BOB)).isEmpty();
     assertThat(reminderProducer.produce(Instant.now(), 100)).isEqualTo(1);
 
-    Squadron other = new Squadron();
-    other.setName("Other notice unit");
-    other.setShorthand("ON");
     mission = missionRepository.findById(mission.getId()).orElseThrow();
-    mission.setOwningOrgUnit(squadronRepository.saveAndFlush(other));
+    mission.setOwningOrgUnit(
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Other notice unit", "ON", null));
     missionRepository.saveAndFlush(mission);
     creationService.createFromEvent(
         MissionNotices.cancelled(mission.getId(), mission.getName(), ACTOR));

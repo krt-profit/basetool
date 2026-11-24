@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
@@ -109,8 +110,7 @@ class OrgUnitStampingServiceOwnerRequiredTest {
     when(seatEligibility.findStampableOrgUnitIds(targetUser.getId()))
         .thenReturn(Set.of(pinned, UUID.randomUUID()));
     when(requestScopeResolver.currentPin()).thenReturn(Optional.of(pinned));
-    Squadron squadron = new Squadron();
-    squadron.setId(pinned);
+    Squadron squadron = squadron(pinned);
     when(orgUnitRepository.findById(pinned)).thenReturn(Optional.of(squadron));
 
     assertThat(service.resolveOrgUnitForPickerOutputNullable(targetUser, null)).isSameAs(squadron);

@@ -64,6 +64,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -132,11 +133,9 @@ class InventoryJobOrderScopeIntegrationTest {
     iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     withinProfit(iridium, persistedProfitArea(orgUnitRepository));
     iridium = squadronRepository.save(iridium);
-    foreign = new Squadron();
-    foreign.setName("Lager-Foreign");
-    foreign.setShorthand("LFX");
-    withinProfit(foreign, persistedProfitArea(orgUnitRepository));
-    foreign = squadronRepository.save(foreign);
+    foreign =
+        OrgUnitFixtures.persistedProfitSquadron(
+            squadronRepository, orgUnitRepository, "Lager-Foreign", "LFX");
 
     member = new User();
     member.setId(UUID.randomUUID());

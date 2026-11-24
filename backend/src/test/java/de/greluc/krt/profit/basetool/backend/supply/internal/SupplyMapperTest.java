@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -81,10 +82,7 @@ class SupplyMapperTest {
             mock(AuthHelperService.class),
             mock(JobOrderMaterialCoverage.class),
             mock(SupplyPatchLabels.class));
-    unit = new Squadron();
-    unit.setId(UUID.randomUUID());
-    unit.setName("Alpha");
-    unit.setShorthand("ALP");
+    unit = squadron(UUID.randomUUID(), "Alpha", "ALP");
     material = new Material();
     material.setId(UUID.randomUUID());
     material.setName("Quantainium");

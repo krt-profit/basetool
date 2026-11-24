@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -70,15 +71,8 @@ class SupplyStatsServiceTest {
             settingsService,
             accessPolicy,
             authHelperService);
-    mine = unit("Alpha");
-    other = unit("Bravo");
-  }
-
-  private static Squadron unit(String name) {
-    Squadron unit = new Squadron();
-    unit.setId(UUID.randomUUID());
-    unit.setName(name);
-    return unit;
+    mine = squadron(UUID.randomUUID(), "Alpha");
+    other = squadron(UUID.randomUUID(), "Bravo");
   }
 
   private DonationStatRow statRow(Squadron unit, long donations, long donors) {

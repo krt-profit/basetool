@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -51,10 +52,7 @@ class OrgStructureAuditorTest {
   @BeforeEach
   void setUp() {
     auditor = new OrgStructureAuditor(auditRecorder);
-    staffel = new Squadron();
-    staffel.setId(UUID.randomUUID());
-    staffel.setName("Iridium");
-    staffel.setShorthand("IRI");
+    staffel = squadron(UUID.randomUUID(), "Iridium", "IRI");
   }
 
   @Test

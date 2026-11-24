@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -622,8 +623,7 @@ class JobOrderItemProductionServiceTest {
     location.setId(locationId);
     location.setName("ARC-L1");
     UUID orgUnitId = UUID.randomUUID();
-    Squadron orgUnit = new Squadron();
-    orgUnit.setId(orgUnitId);
+    Squadron orgUnit = squadron(orgUnitId);
     when(bookInPolicy.mayBookInFor(ownerId)).thenReturn(true);
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));

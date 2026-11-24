@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -51,8 +52,7 @@ class OperationAccessPolicyClearPayoutTest {
     Operation operation = new Operation();
     operation.setId(operationId);
     if (unitId != null) {
-      Squadron unit = new Squadron();
-      unit.setId(unitId);
+      Squadron unit = squadron(unitId);
       operation.setOwningOrgUnit(unit);
     }
     when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));

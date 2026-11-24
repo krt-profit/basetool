@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.measured;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -45,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -108,11 +107,9 @@ class JobOrderLinkedStockReadNoNPlusOneTest {
   @BeforeEach
   void signInAsAdmin() {
     String tag = UUID.randomUUID().toString().substring(0, 6);
-    Squadron squadron = new Squadron();
-    squadron.setName("Linked Unit " + tag);
-    squadron.setShorthand("L" + tag);
-    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
-    unit = squadronRepository.save(squadron);
+    unit =
+        OrgUnitFixtures.persistedProfitSquadron(
+            squadronRepository, orgUnitRepository, "Linked Unit " + tag, "L" + tag);
     SecurityContextHolder.getContext()
         .setAuthentication(
             new JwtAuthenticationToken(

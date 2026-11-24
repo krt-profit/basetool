@@ -51,7 +51,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -76,6 +78,7 @@ class JobOrderSupportReadIntegrationTest {
   @Autowired private WebApplicationContext context;
   @Autowired private OrgHierarchyService hierarchy;
   @Autowired private OrgUnitRepository units;
+  @Autowired private SquadronRepository squadrons;
   @Autowired private UserRepository users;
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private JobOrderRepository orders;
@@ -110,15 +113,11 @@ class JobOrderSupportReadIntegrationTest {
     command.setShorthand("SProc" + tag);
     command.setParent(profit);
     responsible = units.saveAndFlush(command);
-    support = new Squadron();
-    support.setName("Supporting squadron " + tag);
-    support.setShorthand("SS" + tag);
-    support.setParent(profit);
-    support = units.saveAndFlush(support);
-    Squadron customer = new Squadron();
-    customer.setName("Support customer " + tag);
-    customer.setShorthand("SC" + tag);
-    requester = units.saveAndFlush(customer);
+    support =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Supporting squadron " + tag, "SS" + tag, profit);
+    requester =
+        OrgUnitFixtures.persistedSquadron(squadrons, "Support customer " + tag, "SC" + tag, null);
     caller = new User();
     caller.setId(UUID.randomUUID());
     caller.setUsername("support-reader-" + tag);
@@ -333,11 +332,9 @@ class JobOrderSupportReadIntegrationTest {
   @Test
   void transferEndsTheFormerRemainderAndRetainsThePromotedCommitment() throws Exception {
     String tag = UUID.randomUUID().toString();
-    var outgoing = new Squadron();
-    outgoing.setName("Outgoing commitment " + tag);
-    outgoing.setShorthand("OC" + tag);
-    outgoing.setParent(profit);
-    outgoing = units.saveAndFlush(outgoing);
+    var outgoing =
+        OrgUnitFixtures.persistedSquadron(
+            squadrons, "Outgoing commitment " + tag, "OC" + tag, profit);
     String path = "/api/v1/orders/" + createMoneyOrder(outgoing);
     String participationPath = path + "/participations";
     String oldPath = participationPath + "/" + outgoing.getId();

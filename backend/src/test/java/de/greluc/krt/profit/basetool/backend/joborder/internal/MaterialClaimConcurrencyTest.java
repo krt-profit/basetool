@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -261,11 +262,9 @@ class MaterialClaimConcurrencyTest {
       withinProfit(sk, persistedProfitArea(orgUnitRepository));
       sk = specialCommandRepository.save(sk);
 
-      Squadron sq = new Squadron();
-      sq.setName("ClaimRace-A-" + tag);
-      sq.setShorthand("A" + tag);
-      withinProfit(sq, persistedProfitArea(orgUnitRepository));
-      sq = squadronRepository.save(sq);
+      Squadron sq =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "ClaimRace-A-" + tag, "A" + tag);
 
       Material mat = new Material();
       mat.setName("ClaimRaceMat-" + tag);
@@ -384,17 +383,13 @@ class MaterialClaimConcurrencyTest {
       withinProfit(sk, persistedProfitArea(orgUnitRepository));
       sk = specialCommandRepository.save(sk);
 
-      Squadron sqA = new Squadron();
-      sqA.setName("ClaimRace-A-" + tag);
-      sqA.setShorthand("A" + tag);
-      withinProfit(sqA, persistedProfitArea(orgUnitRepository));
-      sqA = squadronRepository.save(sqA);
+      Squadron sqA =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "ClaimRace-A-" + tag, "A" + tag);
 
-      Squadron sqB = new Squadron();
-      sqB.setName("ClaimRace-B-" + tag);
-      sqB.setShorthand("B" + tag);
-      withinProfit(sqB, persistedProfitArea(orgUnitRepository));
-      sqB = squadronRepository.save(sqB);
+      Squadron sqB =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "ClaimRace-B-" + tag, "B" + tag);
 
       Material mat = new Material();
       mat.setName("ClaimRaceMat-" + tag);

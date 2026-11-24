@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -114,10 +115,9 @@ class UserDirectoryQueriesDataTest {
    */
   private UUID createSecondSquadron() {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("DirectoryTest Beta " + suffix);
-    squadron.setShorthand("DTB" + suffix);
-    return squadronRepository.saveAndFlush(squadron).getId();
+    return OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "DirectoryTest Beta " + suffix, "DTB" + suffix, null)
+        .getId();
   }
 
   /**

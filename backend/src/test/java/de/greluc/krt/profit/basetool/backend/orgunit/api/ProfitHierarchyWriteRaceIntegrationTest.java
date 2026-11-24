@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryServ
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -122,11 +123,7 @@ class ProfitHierarchyWriteRaceIntegrationTest {
             ? hierarchy.createBereich(
                 "Race Profit " + tag, "P" + tag, null, null, Department.PROFIT)
             : units.findById(roots.getFirst()).orElseThrow();
-    Squadron unit = new Squadron();
-    unit.setName("Race " + tag);
-    unit.setShorthand("R" + tag);
-    unit.setParent(root);
-    unit = squadrons.saveAndFlush(unit);
+    Squadron unit = OrgUnitFixtures.persistedSquadron(squadrons, "Race " + tag, "R" + tag, root);
     JobOrder order =
         orders.saveAndFlush(
             JobOrder.builder()

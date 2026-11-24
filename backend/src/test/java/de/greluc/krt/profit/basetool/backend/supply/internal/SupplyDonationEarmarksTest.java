@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -61,9 +62,7 @@ class SupplyDonationEarmarksTest {
 
   @Test
   void aPledgeIsNamedByItsReceivingUnit() {
-    Squadron unit = new Squadron();
-    unit.setId(UUID.randomUUID());
-    unit.setName("Bereich Profit");
+    Squadron unit = squadron(UUID.randomUUID(), "Bereich Profit");
     SupplyDonation donation = new SupplyDonation();
     donation.setId(UUID.randomUUID());
     donation.setReceivingOrgUnitId(unit.getId());

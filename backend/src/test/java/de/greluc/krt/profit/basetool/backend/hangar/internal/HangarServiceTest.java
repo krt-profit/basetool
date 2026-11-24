@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -307,12 +308,8 @@ class HangarServiceTest {
     UUID userId = UUID.randomUUID();
     User owner = new User();
     owner.setId(userId);
-    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron from =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    from.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron target =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    target.setId(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron from = squadron(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron target = squadron(UUID.randomUUID());
     Ship inFrom = new Ship();
     inFrom.setId(UUID.randomUUID());
     inFrom.setOwner(owner);
@@ -344,9 +341,7 @@ class HangarServiceTest {
     ship.setOwner(owner);
     ship.setShipType(type);
     ship.setName("Private free-text name");
-    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron unit =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    unit.setId(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron unit = squadron(UUID.randomUUID());
     ship.setOwningOrgUnit(unit);
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
     when(shipDeletionObserver.beforeShipDelete(shipId)).thenReturn(1);
@@ -598,9 +593,7 @@ class HangarServiceTest {
     shipType.setId(shipTypeId);
     shipType.setP4kUuid(UUID.randomUUID());
 
-    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    resolved.setId(pickedOrgUnitId);
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved = squadron(pickedOrgUnitId);
 
     org.mockito.Mockito.when(userRepository.findPlainById(userId))
         .thenReturn(java.util.Optional.of(user));
@@ -691,7 +684,7 @@ class HangarServiceTest {
     inScopeShip.setShipType(fighter);
     inScopeShip.setOwner(owner);
     inScopeShip.setFitted(true);
-    inScopeShip.setOwningOrgUnit(unit(squadronId));
+    inScopeShip.setOwningOrgUnit(squadron(squadronId));
     when(accessGateService.canActAsOfficerInOwner(squadronId)).thenReturn(true);
     when(shipRepository.findByShipTypeInScoped(List.of(fighter), false, squadronId, Set.of()))
         .thenReturn(List.of(inScopeShip));
@@ -1049,12 +1042,6 @@ class HangarServiceTest {
     verify(shipRepository, never()).setLocationForOwner(any(), any());
   }
 
-  private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(UUID id) {
-    var unit = new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
-    unit.setId(id);
-    return unit;
-  }
-
   private static Ship shipOf(ShipType type, String ownerName, UUID unitId) {
     User owner = new User();
     owner.setId(UUID.randomUUID());
@@ -1062,7 +1049,7 @@ class HangarServiceTest {
     Ship ship = new Ship();
     ship.setShipType(type);
     ship.setOwner(owner);
-    ship.setOwningOrgUnit(unitId == null ? null : unit(unitId));
+    ship.setOwningOrgUnit(unitId == null ? null : squadron(unitId));
     return ship;
   }
 }

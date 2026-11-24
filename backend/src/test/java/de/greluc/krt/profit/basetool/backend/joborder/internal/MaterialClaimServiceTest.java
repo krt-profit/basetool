@@ -40,6 +40,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionHi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +63,7 @@ class MaterialClaimServiceTest {
   @Autowired private TransactionTemplate transactions;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private OrgUnitRepository units;
+  @Autowired private SquadronRepository squadrons;
   @Autowired private MaterialRepository materials;
   @Autowired private QualityTierRepository tiers;
   @Autowired private JobOrderRepository orders;
@@ -83,11 +86,9 @@ class MaterialClaimServiceTest {
           responsible.setShorthand("L" + tag);
           withinProfit(responsible, persistedProfitArea(units));
           responsible = units.saveAndFlush(responsible);
-          Squadron unit = new Squadron();
-          unit.setName("Lifecycle Staffel " + tag);
-          unit.setShorthand("S" + tag);
-          withinProfit(unit, persistedProfitArea(units));
-          unit = units.saveAndFlush(unit);
+          Squadron unit =
+              OrgUnitFixtures.persistedProfitSquadron(
+                  squadrons, units, "Lifecycle Staffel " + tag, "S" + tag);
           Material material = new Material();
           material.setName("Lifecycle material " + tag);
           material.setType(MaterialType.RAW);
