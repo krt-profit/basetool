@@ -27,17 +27,6 @@ COMMENT ON COLUMN exchange_job_order_fingerprint.announced_unit_ids IS
 COMMENT ON COLUMN exchange_job_order_fingerprint.announced_member_ids IS
     'The assignees as of the fingerprint: the member logs the order was last announced to (REQ-OXCH-003).';
 
-CREATE FUNCTION exchange_job_order_in_window(
-    p_status VARCHAR, p_closed_at TIMESTAMP WITH TIME ZONE, p_type VARCHAR,
-    p_settlement_open BOOLEAN)
-RETURNS BOOLEAN AS $$
-    SELECT p_status IN ('OPEN', 'IN_PROGRESS')
-        OR p_closed_at >= now() - INTERVAL '7 days'
-        OR (p_type = 'AUEC' AND COALESCE(p_settlement_open, FALSE));
-$$ LANGUAGE sql STABLE;
-
-COMMENT ON FUNCTION exchange_job_order_in_window(VARCHAR, TIMESTAMP WITH TIME ZONE, VARCHAR, BOOLEAN) IS
-    'The window of the client set: an active order, one closed within 7 days, or an aUEC order whose last fingerprint says settlementOpen (REQ-OXCH-003).';
 
 CREATE FUNCTION exchange_job_order_in_client_set(p_order UUID) RETURNS BOOLEAN AS $$
     SELECT EXISTS (SELECT 1
@@ -51,14 +40,6 @@ $$ LANGUAGE sql STABLE;
 COMMENT ON FUNCTION exchange_job_order_in_client_set(UUID) IS
     'Whether a job order lies in the window of the client set (REQ-OXCH-003).';
 
-CREATE OR REPLACE FUNCTION exchange_mark_job_order_client_set() RETURNS VOID AS $$
-    INSERT INTO exchange_job_order_dirty (job_order_id, tx)
-    SELECT o.id, (pg_current_xact_id()::text)::bigint
-      FROM job_order o
-      LEFT JOIN exchange_job_order_fingerprint f ON f.job_order_id = o.id
-     WHERE exchange_job_order_in_window(o.status, o.closed_at, o.type, f.settlement_open)
-    ON CONFLICT (job_order_id, tx) DO NOTHING;
-$$ LANGUAGE sql;
 
 CREATE FUNCTION exchange_job_order_units(p_order UUID) RETURNS UUID[] AS $$
     SELECT COALESCE(array_agg(DISTINCT u.unit_id ORDER BY u.unit_id), '{}')
