@@ -141,7 +141,7 @@ public record ExchangeRegistrySnapshot(
     }
     Set<ExchangeSwitch> on = EnumSet.noneOf(ExchangeSwitch.class);
     for (ExchangeSwitch target : ExchangeSwitch.values()) {
-      if (target.stateOf(settings).enabled()) {
+      if (target.isOn(settings)) {
         on.add(target);
       }
     }

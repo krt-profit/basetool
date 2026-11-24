@@ -460,7 +460,7 @@ or closed account answers the same `404`.
 - [x] `409 BANK_OPEN_REQUEST_CAP` is answered by the request writes (REQ-BXCH-004,
   `ExchangeBankRequestWritesTest`).
 
-**Enforced by:** `ExchangeGate`, `BankExchangeRoutes`, `ExchangeSwitch`,
+**Enforced by:** `ExchangeGate`, `ExchangeSwitchRefusal`, `BankExchangeRoutes`, `ExchangeSwitch`,
 `ExchangeRegistryService#updateSwitch`, `ExchangeRegistrySnapshot`, `BankExchangeProperties`
 (backend) · `ExchangeGateFilter`, `AreaSwitch`, `ExchangeRoutes#isBank`, `ExchangeRelay` (gateway) ·
 `ExchangeSeam.BANK_PATH`, `ExchangeSeam.GATE_STATUSES` (shared seam) · V361 · **Related:**

@@ -40,7 +40,9 @@ import org.jetbrains.annotations.Nullable;
  * that differs between them: the mirror document member the gateway reads it from, the settings
  * write and admin endpoint of an area switch, how its state is read from the row, and how a flip is
  * audited, announced and counted. A new switch is one constant here, its columns in a migration,
- * its fields on {@link ExchangeSettings} and its write on {@link ExchangeSettingsRepository}.
+ * its fields on {@link ExchangeSettings}, its write on {@link ExchangeSettingsRepository} and its
+ * refusal in {@link ExchangeSwitchRefusal}. The declaration order is the order in which the gates
+ * check the switches.
  */
 @RequiredArgsConstructor
 public enum ExchangeSwitch {
@@ -49,7 +51,8 @@ public enum ExchangeSwitch {
   GLOBAL(
       "enabled",
       null,
-      settings -> new State(settings.isEnabled(), settings.getVersion(), settings.getUpdatedAt()),
+      ExchangeSettings::isEnabled,
+      (settings, enabled) -> new State(enabled, settings.getVersion(), settings.getUpdatedAt()),
       AuditEventType.EXCHANGE_SWITCH_CHANGED,
       ExchangeRegistryAction.SWITCH_ON,
       ExchangeRegistryAction.SWITCH_OFF,
@@ -70,9 +73,9 @@ public enum ExchangeSwitch {
           ExchangeSettingsRepository::writeBankSwitch,
           "bank",
           "every bank route answers 503 BANK_EXCHANGE_DISABLED"),
-      settings ->
-          new State(
-              settings.isBankEnabled(), settings.getBankVersion(), settings.getBankUpdatedAt()),
+      ExchangeSettings::isBankEnabled,
+      (settings, enabled) ->
+          new State(enabled, settings.getBankVersion(), settings.getBankUpdatedAt()),
       AuditEventType.BANK_EXCHANGE_SWITCH_CHANGED,
       ExchangeRegistryAction.BANK_SWITCH_ON,
       ExchangeRegistryAction.BANK_SWITCH_OFF,
@@ -93,11 +96,9 @@ public enum ExchangeSwitch {
           ExchangeSettingsRepository::writeJobOrdersSwitch,
           "job-order",
           "every job-order route answers 503 JOB_ORDER_EXCHANGE_DISABLED"),
-      settings ->
-          new State(
-              settings.isJobOrdersEnabled(),
-              settings.getJobOrdersVersion(),
-              settings.getJobOrdersUpdatedAt()),
+      ExchangeSettings::isJobOrdersEnabled,
+      (settings, enabled) ->
+          new State(enabled, settings.getJobOrdersVersion(), settings.getJobOrdersUpdatedAt()),
       AuditEventType.JOB_ORDER_EXCHANGE_SWITCH_CHANGED,
       ExchangeRegistryAction.JOB_ORDER_SWITCH_ON,
       ExchangeRegistryAction.JOB_ORDER_SWITCH_OFF,
@@ -118,11 +119,10 @@ public enum ExchangeSwitch {
           ExchangeSettingsRepository::writeJobOrderWritesSwitch,
           "job-order writes",
           "every job-order write answers 503 JOB_ORDER_WRITES_DISABLED and the reads go on"),
-      settings ->
+      ExchangeSettings::isJobOrderWritesEnabled,
+      (settings, enabled) ->
           new State(
-              settings.isJobOrderWritesEnabled(),
-              settings.getJobOrderWritesVersion(),
-              settings.getJobOrderWritesUpdatedAt()),
+              enabled, settings.getJobOrderWritesVersion(), settings.getJobOrderWritesUpdatedAt()),
       AuditEventType.JOB_ORDER_EXCHANGE_SWITCH_CHANGED,
       ExchangeRegistryAction.JOB_ORDER_WRITES_SWITCH_ON,
       ExchangeRegistryAction.JOB_ORDER_WRITES_SWITCH_OFF,
@@ -141,7 +141,10 @@ public enum ExchangeSwitch {
   /** The settings write and the admin endpoint of a switch beside the global one. */
   @Nullable private final Area area;
 
-  /** Reads the switch's state from the settings row. */
+  /** Reads whether the switch is on from the settings row. */
+  @NotNull private final FlagRead flag;
+
+  /** Reads the switch's counter and change time from the settings row beside its flag. */
   @NotNull private final StateRead state;
 
   /** The audit event every flip writes. */
@@ -209,7 +212,21 @@ public enum ExchangeSwitch {
   @Immutable
   public record State(boolean enabled, long version, @Nullable Instant updatedAt) {}
 
-  /** Reads a switch's state from the settings row. */
+  /** Reads whether a switch is on from the settings row. */
+  @Immutable
+  @FunctionalInterface
+  interface FlagRead {
+
+    /**
+     * Reads the flag.
+     *
+     * @param settings the settings row
+     * @return {@code true} when the switch is on
+     */
+    boolean of(@NotNull ExchangeSettings settings);
+  }
+
+  /** Reads a switch's state from the settings row, given its flag. */
   @Immutable
   @FunctionalInterface
   interface StateRead {
@@ -218,10 +235,11 @@ public enum ExchangeSwitch {
      * Reads the state.
      *
      * @param settings the settings row
+     * @param enabled the switch's flag, as {@link FlagRead} read it
      * @return the switch's state
      */
     @NotNull
-    State of(@NotNull ExchangeSettings settings);
+    State of(@NotNull ExchangeSettings settings, boolean enabled);
   }
 
   /**
@@ -255,7 +273,17 @@ public enum ExchangeSwitch {
    */
   @NotNull
   public State stateOf(@NotNull ExchangeSettings settings) {
-    return state.of(settings);
+    return state.of(settings, flag.of(settings));
+  }
+
+  /**
+   * Tells whether the switch is on, reading its flag alone.
+   *
+   * @param settings the settings row
+   * @return {@code true} when the switch is on
+   */
+  public boolean isOn(@NotNull ExchangeSettings settings) {
+    return flag.of(settings);
   }
 
   /**
