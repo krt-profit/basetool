@@ -54,7 +54,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -225,7 +224,7 @@ public class OrgUnitBankController {
    * @param id the account
    * @param from period start (inclusive, ISO-8601 instant)
    * @param to period end (inclusive, ISO-8601 instant)
-   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
+   * @param userZone the caller's {@code X-User-Time-Zone} zone; without one the PDF uses UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @GetMapping("/accounts/{id}/statement")
@@ -240,9 +239,10 @@ public class OrgUnitBankController {
       @PathVariable @NotNull UUID id,
       @RequestParam @NotNull Instant from,
       @RequestParam @NotNull Instant to,
-      @UserZone ZoneId userZone,
+      UserZone userZone,
       HttpServletRequest request) {
-    BankPdfExport pdf = orgUnitBankAccessService.exportViewableStatement(id, from, to, userZone);
+    BankPdfExport pdf =
+        orgUnitBankAccessService.exportViewableStatement(id, from, to, userZone.zone());
     return BankReportCleanupFilter.attachment(request, pdf, "kontoauszug-" + id + ".pdf");
   }
 

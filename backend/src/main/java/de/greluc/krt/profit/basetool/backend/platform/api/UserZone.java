@@ -19,20 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.time.ZoneId;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Binds the caller's {@code X-User-Time-Zone} header, parsed to a {@link java.time.ZoneId}, to a
- * controller method parameter.
+ * The caller's display time zone from the {@code X-User-Time-Zone} header, bound by {@link
+ * UserZoneArgumentResolver} to every controller parameter of this type.
  *
- * <p>Resolved by {@link UserZoneArgumentResolver}; an absent, blank or invalid zone yields {@code
- * null}, and callers then render in UTC.
+ * <p>It is a type of its own because Spring MVC's built-in {@code
+ * ServletRequestMethodArgumentResolver} answers every {@link ZoneId} parameter with the server's
+ * zone before a custom resolver is asked.
+ *
+ * @param zone the parsed IANA zone, or {@code null} when the header is absent, blank or invalid;
+ *     callers then render in UTC
  */
-@Target(ElementType.PARAMETER)
-@Retention(RetentionPolicy.RUNTIME)
-@Documented
-public @interface UserZone {}
+public record UserZone(@Nullable ZoneId zone) {}

@@ -68,11 +68,11 @@ public class JobOrderHandoverReportService {
    *
    * @param jobOrderId the job order ID
    * @param handoverId the handover ID
-   * @param userZone the display time zone; {@code null} means UTC
+   * @param userZone the display time zone; {@code null} renders and labels the time as UTC
    * @return PDF as byte array
    */
   public byte @NotNull [] generateHandoverReport(
-      @NotNull UUID jobOrderId, @NotNull UUID handoverId, ZoneId userZone) {
+      @NotNull UUID jobOrderId, @NotNull UUID handoverId, @Nullable ZoneId userZone) {
     log.debug(
         "Generating handover report for jobOrderId={}, handoverId={}, userZone={}",
         jobOrderId,
@@ -94,6 +94,7 @@ public class JobOrderHandoverReportService {
     String recipientHandle = handover.getRecipientHandle();
     String handoverDate = dateFormatter.format(handover.getHandoverTime());
     String handoverTime = timeFormatter.format(handover.getHandoverTime());
+    boolean localTime = userZone != null;
 
     List<ItemRow> rows =
         handover.getItems().stream()
@@ -113,6 +114,7 @@ public class JobOrderHandoverReportService {
         jobOrderNumber,
         handoverDate,
         handoverTime,
+        localTime,
         handover.getHandingOverHandle(),
         recipientHandle,
         rows);
@@ -147,6 +149,7 @@ public class JobOrderHandoverReportService {
         dto.jobOrderNumber(),
         handoverDate,
         handoverTime,
+        true,
         dto.handingOverHandle(),
         dto.recipientHandle(),
         rows);
@@ -161,6 +164,7 @@ public class JobOrderHandoverReportService {
       @NotNull String jobOrderNumber,
       @NotNull String handoverDate,
       @NotNull String handoverTime,
+      boolean localTime,
       @Nullable String handingOverHandle,
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
@@ -168,7 +172,12 @@ public class JobOrderHandoverReportService {
       try (KrtPdfDocument pdf = pdfDocuments.open(baos, labels.title())) {
         pdf.keyValueTable(
             labels.header(
-                jobOrderNumber, handoverDate, handoverTime, handingOverHandle, recipientHandle));
+                jobOrderNumber,
+                handoverDate,
+                handoverTime,
+                localTime,
+                handingOverHandle,
+                recipientHandle));
         pdf.heading(labels.resolve("pdf.handover.materials"));
         try (PdfDataTable table =
             pdf.dataTable(

@@ -59,12 +59,14 @@ class HandoverReportLabels {
 
   /**
    * Builds the header table both handover reports open with: order number, handover date, handover
-   * time marked as local time, the handing-over member of the processing unit (REQ-ORDERS-079) and
-   * the recipient handle; an erased handle shows as the anonymised placeholder (REQ-SEC-062).
+   * time marked as local time or as UTC, the handing-over member of the processing unit
+   * (REQ-ORDERS-079) and the recipient handle; an erased handle shows as the anonymised placeholder
+   * (REQ-SEC-062).
    *
    * @param jobOrderNumber the order number including its leading {@code #}
    * @param handoverDate the formatted handover date
-   * @param handoverTime the formatted handover time in the reader's zone
+   * @param handoverTime the formatted handover time
+   * @param localTime whether the time is in the reader's zone; {@code false} labels it as UTC
    * @param handingOverHandle the stored handing-over handle, possibly the erasure sentinel, or
    *     {@code null} when the handover names nobody (shown as a dash)
    * @param recipientHandle the stored recipient handle, possibly the erasure sentinel
@@ -75,6 +77,7 @@ class HandoverReportLabels {
       @NotNull String jobOrderNumber,
       @NotNull String handoverDate,
       @NotNull String handoverTime,
+      boolean localTime,
       @Nullable String handingOverHandle,
       @NotNull String recipientHandle) {
     return List.of(
@@ -83,7 +86,9 @@ class HandoverReportLabels {
         new PdfKeyValue(
             resolve("pdf.handover.time"),
             messageSource.getMessage(
-                "pdf.handover.localTime", new Object[] {handoverTime}, REPORT_LOCALE)),
+                localTime ? "pdf.handover.localTime" : "pdf.handover.utcTime",
+                new Object[] {handoverTime},
+                REPORT_LOCALE)),
         new PdfKeyValue(
             resolve("pdf.handover.handingOver"),
             Objects.requireNonNullElse(

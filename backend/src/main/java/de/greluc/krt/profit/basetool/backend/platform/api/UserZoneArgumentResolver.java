@@ -30,8 +30,8 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
- * Resolves {@link UserZone}-annotated {@link ZoneId} parameters from the {@code X-User-Time-Zone}
- * header. The value is trimmed; an absent, blank or invalid zone resolves to {@code null}.
+ * Resolves {@link UserZone} parameters from the {@code X-User-Time-Zone} header. The value is
+ * trimmed; an absent, blank or invalid zone resolves to a {@link UserZone} without a zone.
  */
 public class UserZoneArgumentResolver implements HandlerMethodArgumentResolver {
 
@@ -39,15 +39,14 @@ public class UserZoneArgumentResolver implements HandlerMethodArgumentResolver {
   static final String HEADER = "X-User-Time-Zone";
 
   /**
-   * Claims {@link ZoneId} parameters annotated with {@link UserZone}.
+   * Claims every parameter of type {@link UserZone}.
    *
    * @param parameter the candidate controller parameter
-   * @return {@code true} for a {@code ZoneId} parameter carrying {@link UserZone}
+   * @return {@code true} for a {@link UserZone} parameter
    */
   @Override
   public boolean supportsParameter(@NotNull MethodParameter parameter) {
-    return parameter.hasParameterAnnotation(UserZone.class)
-        && ZoneId.class.equals(parameter.getParameterType());
+    return UserZone.class.equals(parameter.getParameterType());
   }
 
   /**
@@ -58,16 +57,16 @@ public class UserZoneArgumentResolver implements HandlerMethodArgumentResolver {
    * @param mavContainer unused MVC container
    * @param webRequest the current request, source of the header
    * @param binderFactory unused data-binder factory
-   * @return the parsed {@link ZoneId}, or {@code null} when the header is absent/blank/invalid
+   * @return the caller's zone, empty when the header is absent, blank or invalid
    */
   @Override
-  @Nullable
-  public Object resolveArgument(
+  @NotNull
+  public UserZone resolveArgument(
       @NotNull MethodParameter parameter,
       @Nullable ModelAndViewContainer mavContainer,
       @NotNull NativeWebRequest webRequest,
       @Nullable WebDataBinderFactory binderFactory) {
-    return parse(webRequest.getHeader(HEADER));
+    return new UserZone(parse(webRequest.getHeader(HEADER)));
   }
 
   /**

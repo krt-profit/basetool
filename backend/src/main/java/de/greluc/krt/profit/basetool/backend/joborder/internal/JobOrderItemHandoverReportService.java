@@ -43,8 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Generates the item-handover delivery-note PDF in KRT Corporate Design, the item-order counterpart
- * of {@link JobOrderHandoverReportService}. The UTC handover time is rendered in the caller's zone,
- * falling back to UTC.
+ * of {@link JobOrderHandoverReportService}. The handover time is rendered in the caller's zone,
+ * falling back to UTC and labelled as such.
  */
 @Service
 @RequiredArgsConstructor
@@ -71,12 +71,13 @@ public class JobOrderItemHandoverReportService {
    *
    * @param jobOrderId the item order id (validated against the handover's parent)
    * @param handoverId the item-handover id
-   * @param userZone the zone to render the handover time in; {@code null} falls back to UTC
+   * @param userZone the zone to render the handover time in; {@code null} renders and labels it as
+   *     UTC
    * @return the PDF as a byte array
    * @throws NotFoundException when the handover is unknown or belongs to a different order
    */
   public byte @NotNull [] generateItemHandoverReport(
-      @NotNull UUID jobOrderId, @NotNull UUID handoverId, ZoneId userZone) {
+      @NotNull UUID jobOrderId, @NotNull UUID handoverId, @Nullable ZoneId userZone) {
     JobOrderItemHandover handover =
         Entities.require(
             jobOrderItemHandoverRepository.findById(handoverId), "Item handover not found");
@@ -92,6 +93,7 @@ public class JobOrderItemHandoverReportService {
     String jobOrderNumber = "#" + handover.getJobOrder().getDisplayId();
     String handoverDate = dateFormatter.format(handover.getHandoverTime());
     String handoverTime = timeFormatter.format(handover.getHandoverTime());
+    boolean localTime = userZone != null;
 
     List<ItemRow> rows =
         handover.getEntries().stream()
@@ -108,6 +110,7 @@ public class JobOrderItemHandoverReportService {
         jobOrderNumber,
         handoverDate,
         handoverTime,
+        localTime,
         handover.getHandingOverHandle(),
         handover.getRecipientHandle(),
         rows);
@@ -117,6 +120,7 @@ public class JobOrderItemHandoverReportService {
       @NotNull String jobOrderNumber,
       @NotNull String handoverDate,
       @NotNull String handoverTime,
+      boolean localTime,
       @Nullable String handingOverHandle,
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
@@ -124,7 +128,12 @@ public class JobOrderItemHandoverReportService {
       try (KrtPdfDocument pdf = pdfDocuments.open(baos, labels.title())) {
         pdf.keyValueTable(
             labels.header(
-                jobOrderNumber, handoverDate, handoverTime, handingOverHandle, recipientHandle));
+                jobOrderNumber,
+                handoverDate,
+                handoverTime,
+                localTime,
+                handingOverHandle,
+                recipientHandle));
         pdf.heading(labels.resolve("pdf.handover.items"));
         try (PdfDataTable table =
             pdf.dataTable(

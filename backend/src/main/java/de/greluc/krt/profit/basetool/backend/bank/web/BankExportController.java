@@ -28,7 +28,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.servlet.http.HttpServletRequest;
-import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
@@ -54,7 +53,7 @@ public class BankExportController {
    * header overrides UTC for the document timestamps; an invalid IANA zone is silently dropped.
    * Each export is audit-logged.
    *
-   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
+   * @param userZone the caller's {@code X-User-Time-Zone} zone; without one the PDF uses UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @Operation(summary = "Download the management three-month report PDF")
@@ -66,8 +65,8 @@ public class BankExportController {
       required = false,
       schema = @Schema(type = "string"))
   public ResponseEntity<Resource> downloadThreeMonthReport(
-      @UserZone ZoneId userZone, HttpServletRequest request) {
-    BankPdfExport pdf = bankManagementReportService.generateThreeMonthReport(userZone);
+      UserZone userZone, HttpServletRequest request) {
+    BankPdfExport pdf = bankManagementReportService.generateThreeMonthReport(userZone.zone());
     return BankReportCleanupFilter.attachment(request, pdf, "bank-3-monats-report.pdf");
   }
 }

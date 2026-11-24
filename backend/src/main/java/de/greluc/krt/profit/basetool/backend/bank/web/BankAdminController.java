@@ -36,7 +36,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -131,7 +130,7 @@ public class BankAdminController {
    *
    * @param from period start (inclusive, ISO instant)
    * @param to period end (inclusive, ISO instant); must not be before {@code from}
-   * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
+   * @param userZone the caller's {@code X-User-Time-Zone} zone; without one the PDF uses UTC
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @Operation(summary = "Export the bank audit log as a PDF for a period (admin)")
@@ -144,8 +143,8 @@ public class BankAdminController {
   public ResponseEntity<byte[]> exportAuditLog(
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-      @UserZone ZoneId userZone) {
-    byte[] pdf = bankAuditReportService.generateAuditLogPdf(from, to, userZone);
+      UserZone userZone) {
+    byte[] pdf = bankAuditReportService.generateAuditLogPdf(from, to, userZone.zone());
     return AttachmentResponses.pdf(pdf, "audit-bank.pdf");
   }
 

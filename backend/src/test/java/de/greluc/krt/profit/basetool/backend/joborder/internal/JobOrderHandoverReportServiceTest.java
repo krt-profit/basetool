@@ -290,8 +290,8 @@ class JobOrderHandoverReportServiceTest {
 
     assertTrue(text.contains("#42"), "Job order number '#42' must appear");
     assertTrue(text.contains("15.06.2025"), "Handover date must appear in dd.MM.yyyy");
-    assertTrue(text.contains("10:30"), "Handover time must appear in HH:mm");
-    assertTrue(text.contains("(Lokalzeit)"), "Local-time annotation must appear");
+    assertTrue(text.contains("10:30 (UTC)"), "Without a zone the time must be labelled UTC");
+    assertFalse(text.contains("(Lokalzeit)"), "A UTC time must not claim to be local time");
     assertTrue(text.contains("TestPilot"), "Recipient handle must appear");
   }
 
