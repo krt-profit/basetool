@@ -924,10 +924,10 @@ the backend counts each committed flip on `basetool_exchange_registry_changes_to
   `ExchangeJobOrderWriteRouteTest`, both `ExchangeRelaySeamParityTest`s, `ExchangeContractTest`).
 
 **Enforced by:** `ExchangeGate`, `JobOrderExchangeRoutes`, `ExchangeSwitch`,
-`ExchangeRegistryService#updateJobOrdersSwitch`, `#updateJobOrderWritesSwitch`,
-`ExchangeRegistrySnapshot`, `ExchangeJobOrderMetrics`, `ExchangeJobOrderCreateService` (backend) ·
-`JobOrderClientCreateCapService`, `JobOrderExchangeProperties`, `JobOrderClientCreateRepository`
-(job orders) · `ExchangeGateFilter`, `ExchangeRoutes#isJobOrder`, `ExchangeRegistryReader`,
+`ExchangeRegistryService#updateSwitch`, `ExchangeRegistrySnapshot`, `ExchangeJobOrderMetrics`,
+`ExchangeJobOrderCreateService` (backend) · `JobOrderClientCreateCapService`,
+`JobOrderExchangeProperties`, `JobOrderClientCreateRepository` (job orders) · `ExchangeGateFilter`,
+`AreaSwitch`, `ExchangeRoutes#isJobOrder`, `ExchangeRegistryReader`,
 `ExchangeRelay`, `ExchangeRelayResponses` (gateway) · `ExchangeSeam.GATE_STATUSES`,
 `ExchangeSeam.PASSED_THROUGH_CODES`, `ExchangeSeam.REGISTRY_DOCUMENT_FIELDS` (shared seam) · V444 ·
 **Related:** REQ-XCH-003, REQ-XCH-023, REQ-XCH-025, REQ-BXCH-006, REQ-AUDIT-001, REQ-NOTIF-008,
