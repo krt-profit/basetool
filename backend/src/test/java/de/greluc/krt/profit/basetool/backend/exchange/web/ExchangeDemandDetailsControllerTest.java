@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
@@ -253,6 +254,32 @@ class ExchangeDemandDetailsControllerTest {
         .perform(relayed(get(PATH), DETAILS))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.orders.length()").value(1));
+  }
+
+  @Test
+  void aBereichLogisticianGetsNoOrdersOfAStaffelBelowItIsAPlainMemberOf() throws Exception {
+    UUID profit = persistedProfitArea(orgUnitRepository).getId();
+    UUID plain = orgUnit(true);
+    UUID flagged = orgUnit(true);
+    joins(profit, "MEMBER", true);
+    joins(plain, "MEMBER", false);
+    joins(flagged, "MEMBER", true);
+    UUID summedOnly = openOrder(plain, plain, material("Hadanite"), 2.0, "comment");
+    UUID visible = openOrder(flagged, flagged, material("Aphorite"), 3.0, null);
+
+    String body =
+        mockMvc
+            .perform(relayed(get(PATH), DETAILS))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(JsonPath.<List<String>>read(body, "$.orders[*].id"))
+        .contains(visible.toString())
+        .doesNotContain(summedOnly.toString());
+    assertThat(JsonPath.<List<String>>read(body, "$.orders[*].unit.id"))
+        .doesNotContain(plain.toString());
   }
 
   @Test

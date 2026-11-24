@@ -108,7 +108,13 @@ public class ExchangeUndoService {
         Entities.require(
             clientRepository.findWithCapabilitiesByClientId(clientId), () -> "Client not found");
     Outcome outcome =
-        perform(member, clientId, since, null, null, orgUnitService.directLogisticianUnits(member));
+        perform(
+            member,
+            clientId,
+            since,
+            null,
+            null,
+            orgUnitService.logisticianUnitsByOwnMembership(member));
     auditRecorder.record(
         AuditEventType.EXCHANGE_CHANGES_UNDONE,
         client.getId(),
@@ -168,7 +174,7 @@ public class ExchangeUndoService {
    * @param since the start of the span; clamped to the retention
    * @param installationKey the one installation to undo, or {@code null} for all
    * @param resource the one resource to undo, or {@code null} for all
-   * @param pools the units the member is a Logistician and direct member of now, whose org-stock
+   * @param pools the units whose own membership makes the member a Logistician now, whose org-stock
    *     entries alone the member may set back; {@code null} for an admin's run, which sets back
    *     every one
    * @return the outcome

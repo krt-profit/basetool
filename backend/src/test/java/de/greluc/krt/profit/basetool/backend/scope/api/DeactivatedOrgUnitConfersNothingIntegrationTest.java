@@ -106,6 +106,8 @@ class DeactivatedOrgUnitConfersNothingIntegrationTest {
         .containsExactly(hel.getId());
     assertThat(membershipQueryService.findLogisticianOrgUnitIds(member.getId()))
         .containsExactly(hel.getId());
+    assertThat(membershipQueryService.findLogisticianOrgUnitIdsByOwnMembership(member.getId()))
+        .containsExactly(hel.getId());
   }
 
   @Test

@@ -611,6 +611,63 @@ class ExchangeOrgStockWriteControllerTest {
   }
 
   @Test
+  void aBereichLogisticianWhoIsAPlainMemberOfAStaffelBelowNeitherWritesNorReadsItsPool()
+      throws Exception {
+    UUID bereich = orgUnit("BEREICH", null);
+    UUID staffel = orgUnit("SQUADRON", bereich);
+    joins(member, bereich, true);
+    joins(member, staffel, false);
+    joins(holder, staffel, false);
+    UUID titanium = material("SCU");
+    UUID inStaffel = stock(holder, titanium, location(), 5, staffel, false);
+
+    roster(bereich);
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(bookOut(staffel, inStaffel, 0, "1", "SCU"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].reason").value("NOT_PERMITTED"));
+    mockMvc
+        .perform(relayed(get(MEMBERS).param("unit", staffel.toString()), WRITE))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            relayed(
+                get(TARGETS)
+                    .param("unit", staffel.toString())
+                    .param("material", titanium.toString()),
+                WRITE))
+        .andExpect(status().isForbidden());
+
+    assertThat(amountOf(inStaffel)).isEqualTo(5);
+  }
+
+  @Test
+  void aStaffelRankWritesItsOwnStaffelsPoolBelowABereichTheWriterIsALogisticianOf()
+      throws Exception {
+    UUID bereich = orgUnit("BEREICH", null);
+    UUID staffel = orgUnit("SQUADRON", bereich);
+    joins(member, bereich, true);
+    joins(member, staffel, "STAFFELLEITER", false);
+    joins(holder, staffel, false);
+    UUID entry = stock(holder, material("SCU"), location(), 5, staffel, false);
+
+    roster(staffel);
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(bookOut(staffel, entry, 0, "1", "SCU"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(amountOf(entry)).isEqualTo(4);
+  }
+
+  @Test
   void aStaleVersionIsAVersionConflictAndChangesNothing() throws Exception {
     UUID staffel = orgUnit();
     joins(member, staffel, true);

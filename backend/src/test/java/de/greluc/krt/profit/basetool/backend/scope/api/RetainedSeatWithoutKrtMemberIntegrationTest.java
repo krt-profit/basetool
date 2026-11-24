@@ -174,12 +174,20 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
 
     assertThat(membershipQueryService.findLogisticianOrgUnitIds(seat.getId())).isEmpty();
     assertThat(membershipQueryService.findLogisticianOrgUnitIds(flagged.getId())).isEmpty();
+    assertThat(membershipQueryService.findLogisticianOrgUnitIdsByOwnMembership(seat.getId()))
+        .isEmpty();
+    assertThat(membershipQueryService.findLogisticianOrgUnitIdsByOwnMembership(flagged.getId()))
+        .isEmpty();
 
     withStoredKrtMember(seat);
     withStoredKrtMember(flagged);
     assertThat(membershipQueryService.findLogisticianOrgUnitIds(seat.getId()))
         .contains(bereich.getId(), squadron.getId());
     assertThat(membershipQueryService.findLogisticianOrgUnitIds(flagged.getId()))
+        .containsExactly(squadron.getId());
+    assertThat(membershipQueryService.findLogisticianOrgUnitIdsByOwnMembership(seat.getId()))
+        .containsExactly(bereich.getId());
+    assertThat(membershipQueryService.findLogisticianOrgUnitIdsByOwnMembership(flagged.getId()))
         .containsExactly(squadron.getId());
   }
 

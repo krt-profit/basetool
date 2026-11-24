@@ -49,7 +49,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 /**
  * Unit tests for {@link OrgUnitMembershipQueryService}: option lists and their orderings, the
  * descendant-expanding picker, the SK roster, the DTO projections through the real mapper, the
- * name-sorted Staffel accessors (REQ-ORG-017) and the direct Logistician units (REQ-XCH-045).
+ * name-sorted Staffel accessors (REQ-ORG-017), the direct Logistician units and the Logistician
+ * units by own membership (REQ-XCH-043).
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitMembershipQueryServiceTest {
@@ -198,6 +199,65 @@ class OrgUnitMembershipQueryServiceTest {
 
     assertTrue(queryService.findDirectLogisticianOrgUnitIds(userId).isEmpty());
     verify(membershipRepository, never()).findActiveOrgUnitIdsByUserId(any());
+  }
+
+  @Test
+  void findLogisticianOrgUnitIdsByOwnMembership_countsTheFlagAndARankButNoCascade() {
+    UUID bereichId = UUID.randomUUID();
+    UUID plainStaffelId = UUID.randomUUID();
+    UUID flaggedSkId = UUID.randomUUID();
+    UUID ledStaffelId = UUID.randomUUID();
+    when(seatEligibility.holdsKrtMember(userId)).thenReturn(true);
+    OrgUnitMembership flaggedSk = membership(flaggedSkId, OrgUnitKind.SPECIAL_COMMAND);
+    flaggedSk.setLogistician(true);
+    when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId))
+        .thenReturn(
+            List.of(
+                membership(bereichId, OrgUnitKind.BEREICH, MembershipRole.BEREICHSLEITER),
+                membership(plainStaffelId, OrgUnitKind.SQUADRON, MembershipRole.MEMBER),
+                flaggedSk,
+                membership(ledStaffelId, OrgUnitKind.SQUADRON, MembershipRole.STAFFELLEITER)));
+
+    assertEquals(
+        Set.of(bereichId, flaggedSkId, ledStaffelId),
+        queryService.findLogisticianOrgUnitIdsByOwnMembership(userId));
+    verify(orgUnitCascadeService, never()).grantedUnits(any(), any());
+    verify(orgUnitCascadeService, never()).unitsBelow(any());
+  }
+
+  @Test
+  void findLogisticianOrgUnitIdsByOwnMembership_withoutKrtMember_returnsEmptyWithoutReading() {
+    when(seatEligibility.holdsKrtMember(userId)).thenReturn(false);
+
+    assertTrue(queryService.findLogisticianOrgUnitIdsByOwnMembership(userId).isEmpty());
+    verify(membershipRepository, never()).findAllOnActiveOrgUnitsByIdUserId(any());
+  }
+
+  /**
+   * Builds a membership row of {@link #userId} in a unit, as a plain member without the flag.
+   *
+   * @param orgUnitId the unit
+   * @param kind the unit's kind
+   * @return the row
+   */
+  private OrgUnitMembership membership(UUID orgUnitId, OrgUnitKind kind) {
+    return membership(orgUnitId, kind, MembershipRole.MEMBER);
+  }
+
+  /**
+   * Builds a membership row of {@link #userId} in a unit with a rank and without the flag.
+   *
+   * @param orgUnitId the unit
+   * @param kind the unit's kind
+   * @param role the rank
+   * @return the row
+   */
+  private OrgUnitMembership membership(UUID orgUnitId, OrgUnitKind kind, MembershipRole role) {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, orgUnitId));
+    m.setKind(kind);
+    m.setRole(role);
+    return m;
   }
 
   @Test

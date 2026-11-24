@@ -100,7 +100,7 @@ class OrgStockPlanner {
       @NotNull ExchangeCaller caller, @NotNull ExchangeOrgStockChangeSet changeSet) {
     List<ExchangeOrgStockChangeSet.Op> ops = changeSet.ops();
     ops.forEach(OrgStockPlanner::requireFields);
-    Set<UUID> pools = orgUnitService.directLogisticianUnits(caller.member());
+    Set<UUID> pools = orgUnitService.logisticianUnitsByOwnMembership(caller.member());
     Map<Integer, ExchangeLotCatalogue.Entry> catalogue = resolveBookIns(ops);
     Map<UUID, Map<String, UUID>> rosters = new HashMap<>();
     List<Planned<PoolWrite>> plan = new ArrayList<>(ops.size());
@@ -204,7 +204,7 @@ class OrgStockPlanner {
    *
    * @param caller the writer
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @param entry the op's material or item, or the result that ends it
    * @param rosters each unit's roster read so far, ref to member
    * @return the plan
@@ -263,7 +263,7 @@ class OrgStockPlanner {
    *
    * @param caller the writer
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @return the plan
    */
   private static @NotNull Planned<PoolWrite> planBookOut(
@@ -279,7 +279,7 @@ class OrgStockPlanner {
    *
    * @param caller the writer
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @return the plan
    */
   private static @NotNull Planned<PoolWrite> planSell(
@@ -302,7 +302,7 @@ class OrgStockPlanner {
    *
    * @param caller the writer
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @return the plan
    */
   private @NotNull Planned<PoolWrite> planMoveLocation(
@@ -333,7 +333,7 @@ class OrgStockPlanner {
    *
    * @param caller the writer
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @param rosters each unit's roster read so far, ref to member
    * @return the plan
    */
@@ -366,7 +366,7 @@ class OrgStockPlanner {
    *
    * @param caller the writer
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @return the plan
    */
   private static @NotNull Planned<PoolWrite> planMovePool(
@@ -404,7 +404,7 @@ class OrgStockPlanner {
    *
    * @param caller the writer
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @return the plan
    */
   private static @NotNull Planned<PoolWrite> planNote(
@@ -429,7 +429,7 @@ class OrgStockPlanner {
    *
    * @param caller the writer
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @return the plan
    */
   private static @NotNull Planned<PoolWrite> planStolen(
@@ -464,7 +464,7 @@ class OrgStockPlanner {
    * Decides what an earmark write will do, before anything is locked.
    *
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @param change whether the earmark is added, changed or removed
    * @return the plan
    */
@@ -503,7 +503,7 @@ class OrgStockPlanner {
    * amount and the plans, and an amount that rounds to nothing.
    *
    * @param op the op
-   * @param pools the units the writer is a Logistician and direct member of
+   * @param pools the units whose own membership makes the writer a Logistician
    * @return the result that ends the op, or {@code null} when the Lager decides it
    */
   private static @Nullable Planned<PoolWrite> checkTake(
