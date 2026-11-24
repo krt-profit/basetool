@@ -238,7 +238,7 @@ class ExchangeDemandServiceTest {
     order.getItems().add(line(shield, "FR-66", 2, 0));
     order.getItems().add(line(helmet, "ORC-mkX Helmet", 1, 0));
     givenOrders(order);
-    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
+    when(orgUnitService.directLogisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
     when(requirementResolver.requirementsOf(any())).thenReturn(List.of());
 
     ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
@@ -280,7 +280,7 @@ class ExchangeDemandServiceTest {
     when(membershipRepository.findActiveOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of(UNIT, other));
     when(jobOrderRepository.findOpenForExchangeDemand(any(), any()))
         .thenReturn(List.of(mine, foreign));
-    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
+    when(orgUnitService.directLogisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
     requires(mine, QualityTierFixtures.goodDto(), 10.0, 4.0);
     requires(foreign, QualityTierFixtures.goodDto(), 3.0, 0.0);
 
@@ -322,7 +322,7 @@ class ExchangeDemandServiceTest {
     GameItem helmet = gameItem("ORC-mkX Helmet");
     items.getItems().add(line(helmet, "ORC-mkX Helmet", 5, 1));
     givenOrders(covered, items);
-    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
+    when(orgUnitService.directLogisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
     requires(covered, QualityTierFixtures.noneDto(), 2.0, 5.0);
     requires(items, QualityTierFixtures.noneDto(), 3.0, 1.0);
     when(stockReads.gameItemStockOfOrders(any()))
@@ -351,7 +351,7 @@ class ExchangeDemandServiceTest {
     JobOrder order = order(JobOrderType.MATERIAL);
     order.setResponsibleOrgUnit(squadron(UNIT, "Alpha"));
     givenOrders(order);
-    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UUID.randomUUID()));
+    when(orgUnitService.directLogisticianUnits(MEMBER)).thenReturn(Set.of());
     requires(order, QualityTierFixtures.noneDto(), 8.0, 0.0);
 
     ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
@@ -363,7 +363,7 @@ class ExchangeDemandServiceTest {
   @Test
   void aLogisticianWithNothingOpenGetsAnEmptyOrderList() {
     givenOrders();
-    when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
+    when(orgUnitService.directLogisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
 
     ExchangeOrgDemandDto demand = service.demand(MEMBER, true);
 

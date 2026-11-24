@@ -52,6 +52,11 @@ jobs:
           python3 scripts/sandbox-smoke.py --user sandbox-member-2
           --password sandbox-member-2-pw-do-not-use-in-prod --demand withheld
 
+      - name: The logistician reads the seeded job orders and create options
+        run: >-
+          python3 scripts/sandbox-smoke.py --user sandbox-logistician
+          --password sandbox-logistician-pw-do-not-use-in-prod --job-orders
+
       - name: Logs of a failed run
         if: ${{ failure() }}
         run: >-
