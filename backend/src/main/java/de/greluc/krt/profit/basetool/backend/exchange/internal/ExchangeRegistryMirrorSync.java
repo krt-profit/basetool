@@ -153,17 +153,12 @@ public class ExchangeRegistryMirrorSync {
       @NotNull ExchangeSettings settings,
       boolean enabled,
       @NotNull Instant at) {
-    Short id = settings.getId();
-    switch (target) {
-      case GLOBAL -> {
-        settings.setEnabled(enabled);
-        return settingsRepository.saveAndFlush(settings);
-      }
-      case BANK -> settingsRepository.writeBankSwitch(id, enabled, at);
-      case JOB_ORDERS -> settingsRepository.writeJobOrdersSwitch(id, enabled, at);
-      case JOB_ORDER_WRITES -> settingsRepository.writeJobOrderWritesSwitch(id, enabled, at);
-      case null -> throw new IllegalArgumentException("A switch write names its switch");
+    Optional<ExchangeSwitch.Area> area = target.area();
+    if (area.isEmpty()) {
+      settings.setEnabled(enabled);
+      return settingsRepository.saveAndFlush(settings);
     }
+    area.get().statement().apply(settingsRepository, settings.getId(), enabled, at);
     entityManager.refresh(settings);
     return settings;
   }

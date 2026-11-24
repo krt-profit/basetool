@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.relay;
 
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeGateFilter;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRefusals;
@@ -33,12 +34,16 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -150,139 +155,141 @@ public class ExchangeRelay {
 
   /**
    * The codes of the gateway's registry gate, each with the only status it may arrive with: the
-   * backend's exchange gate answers the same situation with the same code and status (REQ-XCH-025).
+   * backend's exchange gate answers the same situation with the same code and status (REQ-XCH-025);
+   * every {@link AreaSwitch} adds its code with {@code 503}.
    */
   static final Map<String, Integer> GATE_STATUSES =
-      Map.ofEntries(
-          Map.entry(ExchangeRefusals.EXCHANGE_DISABLED, HttpStatus.SERVICE_UNAVAILABLE.value()),
-          Map.entry(
-              ExchangeRefusals.BANK_EXCHANGE_DISABLED, HttpStatus.SERVICE_UNAVAILABLE.value()),
-          Map.entry(
-              ExchangeRefusals.JOB_ORDER_EXCHANGE_DISABLED, HttpStatus.SERVICE_UNAVAILABLE.value()),
-          Map.entry(
-              ExchangeRefusals.JOB_ORDER_WRITES_DISABLED, HttpStatus.SERVICE_UNAVAILABLE.value()),
-          Map.entry(ExchangeRefusals.REGISTRY_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE.value()),
-          Map.entry(ExchangeRefusals.CLIENT_NOT_ALLOWED, HttpStatus.FORBIDDEN.value()),
-          Map.entry(ExchangeRefusals.CLIENT_SUSPENDED, HttpStatus.FORBIDDEN.value()),
-          Map.entry(ExchangeRefusals.INSTALLATION_REVOKED, HttpStatus.UNAUTHORIZED.value()),
-          Map.entry(ExchangeRefusals.CLIENT_REVOKED, HttpStatus.UNAUTHORIZED.value()),
-          Map.entry(ExchangeRefusals.SCOPE_MISSING, HttpStatus.FORBIDDEN.value()));
+      withAreaSwitches(
+          Map.ofEntries(
+              Map.entry(ExchangeRefusals.EXCHANGE_DISABLED, HttpStatus.SERVICE_UNAVAILABLE.value()),
+              Map.entry(
+                  ExchangeRefusals.REGISTRY_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE.value()),
+              Map.entry(ExchangeRefusals.CLIENT_NOT_ALLOWED, HttpStatus.FORBIDDEN.value()),
+              Map.entry(ExchangeRefusals.CLIENT_SUSPENDED, HttpStatus.FORBIDDEN.value()),
+              Map.entry(ExchangeRefusals.INSTALLATION_REVOKED, HttpStatus.UNAUTHORIZED.value()),
+              Map.entry(ExchangeRefusals.CLIENT_REVOKED, HttpStatus.UNAUTHORIZED.value()),
+              Map.entry(ExchangeRefusals.SCOPE_MISSING, HttpStatus.FORBIDDEN.value())),
+          area -> HttpStatus.SERVICE_UNAVAILABLE.value());
 
   /**
    * The registry codes a backend refusal may reach a client with, each with the fixed detail the
-   * client sees in place of the backend's; a gate code carries the gateway gate's own detail.
+   * client sees in place of the backend's; a gate code carries the gateway gate's own detail, and
+   * every {@link AreaSwitch} adds its code with its detail.
    */
   static final Map<String, String> DETAILS =
-      Map.ofEntries(
-          Map.entry(
-              "TERMS_NOT_ACCEPTED",
-              "The member has not accepted the current terms of use; they accept them in the"
-                  + " Basetool."),
-          Map.entry("PENDING_APPROVAL", "The member's registration is still awaiting approval."),
-          Map.entry("NO_ROLE", "The member holds no role in the Basetool."),
-          Map.entry(
-              "ACTING_MEMBER_REFUSED", "The Basetool refused the member this request acts for."),
-          Map.entry("NOT_PERMITTED", "The member may not do this."),
-          Map.entry(
-              ExchangeRefusals.NOT_FOUND,
-              "No such resource, or the member may not see it; both answer alike."),
-          Map.entry(
-              "NOT_BANK_STAFF",
-              "The member holds no bank role and no grant, and no request waits for their"
-                  + " approval."),
-          Map.entry("SCHEMA_INVALID", "The Basetool refused the request's content as malformed."),
-          Map.entry(
-              "VERSION_CONFLICT", "The entry changed since it was read; pull, merge and retry."),
-          Map.entry(
-              "PESSIMISTIC_LOCK",
-              "Another write held an entry the change set needs; nothing was applied, retry it."),
-          Map.entry(
-              "CURSOR_EXPIRED",
-              "The cursor is older than the retained changes; reconcile against a full snapshot."),
-          Map.entry(
-              "MASS_CHANGE_CONFIRMATION_REQUIRED",
-              "The change set removes more than the mass-change guard allows without"
-                  + " confirmation."),
-          Map.entry(
-              "RELOCATION_PENDING",
-              "A stock lot or ship from before the patch change stays locked until its holder has"
-                  + " chosen a new home location in the Basetool; nothing was applied."),
-          Map.entry(
-              "HOME_LOCATION_NOT_ASKED",
-              "No open home-location phase asks the member for a choice; nothing was moved."),
-          Map.entry(
-              "HOME_LOCATION_ALREADY_CHOSEN",
-              "The member has chosen the home location for this patch change already; the choice"
-                  + " is final."),
-          Map.entry(
-              "HOME_LOCATION_PHASE_CHANGED",
-              "Another home-location phase is open than the one the choice names; read the patch"
-                  + " change again; nothing was moved."),
-          Map.entry(
-              "HOME_LOCATION_NOT_OFFERED",
-              "The location is not one of the home locations on offer; nothing was moved."),
-          Map.entry(
-              "BANK_JUSTIFICATION_REQUIRED",
-              "A withdrawal or transfer from this account needs a justification."),
-          Map.entry(
-              "BANK_SELF_TRANSFER", "Source and destination account of a transfer must differ."),
-          Map.entry("BANK_REQUEST_NOT_PENDING", "The booking request is no longer pending."),
-          Map.entry(
-              "BANK_REQUEST_ALREADY_APPROVED",
-              "The booking request was approved already; cancel it and raise a new one."),
-          Map.entry(
-              "BANK_OPEN_REQUEST_CAP",
-              "The member holds the most pending booking requests a client may add to."),
-          Map.entry(
-              "JOB_ORDER_UNITS_NOT_OFFERED",
-              "The requesting and responsible unit are not a pair the create options offer; read"
-                  + " them again and let the member choose; nothing was created."),
-          Map.entry(
-              "JOB_ORDER_OPEN_ORDER_CAP",
-              "The member holds the most open orders created through clients; create again once"
-                  + " one of them closes; nothing was created."),
-          Map.entry(
-              JOB_ORDER_DAILY_CREATE_CAP,
-              "The member created the most orders through clients allowed for this UTC day;"
-                  + " create again after Retry-After; nothing was created."),
-          Map.entry(
-              "JOB_ORDER_RESPONSIBILITY_INVALID",
-              "The order's responsibility no longer fits the Profit hierarchy; it takes no write"
-                  + " through a client until it is set anew in the Basetool; nothing was written."),
-          Map.entry(
-              "JOB_ORDER_CLOSED",
-              "The order's status does not admit the write; read the order again; nothing was"
-                  + " written."),
-          Map.entry(
-              "JOB_ORDER_MONEY_STARTED",
-              "Money was accepted for the order already, so it is cancelled only in the Basetool;"
-                  + " nothing was written."),
-          Map.entry(
-              "JOB_ORDER_TARGET_TOO_LOW",
-              "The new target does not lie above the order's net handover; read netHandedOver"
-                  + " again, and complete the order in the Basetool; nothing was written."),
-          Map.entry(
-              ExchangeRefusals.EXCHANGE_DISABLED, ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL),
-          Map.entry(
-              ExchangeRefusals.BANK_EXCHANGE_DISABLED,
-              ExchangeGateFilter.BANK_EXCHANGE_DISABLED_DETAIL),
-          Map.entry(
-              ExchangeRefusals.JOB_ORDER_EXCHANGE_DISABLED,
-              ExchangeGateFilter.JOB_ORDER_EXCHANGE_DISABLED_DETAIL),
-          Map.entry(
-              ExchangeRefusals.JOB_ORDER_WRITES_DISABLED,
-              ExchangeGateFilter.JOB_ORDER_WRITES_DISABLED_DETAIL),
-          Map.entry(
-              ExchangeRefusals.REGISTRY_UNAVAILABLE,
-              ExchangeGateFilter.REGISTRY_UNAVAILABLE_DETAIL),
-          Map.entry(
-              ExchangeRefusals.CLIENT_NOT_ALLOWED, ExchangeGateFilter.CLIENT_NOT_ALLOWED_DETAIL),
-          Map.entry(ExchangeRefusals.CLIENT_SUSPENDED, ExchangeGateFilter.CLIENT_SUSPENDED_DETAIL),
-          Map.entry(
-              ExchangeRefusals.INSTALLATION_REVOKED,
-              ExchangeGateFilter.INSTALLATION_REVOKED_DETAIL),
-          Map.entry(ExchangeRefusals.CLIENT_REVOKED, ExchangeGateFilter.CLIENT_REVOKED_DETAIL),
-          Map.entry(ExchangeRefusals.SCOPE_MISSING, ExchangeGateFilter.SCOPE_MISSING_DETAIL));
+      withAreaSwitches(
+          Map.ofEntries(
+              Map.entry(
+                  "TERMS_NOT_ACCEPTED",
+                  "The member has not accepted the current terms of use; they accept them in the"
+                      + " Basetool."),
+              Map.entry(
+                  "PENDING_APPROVAL", "The member's registration is still awaiting approval."),
+              Map.entry("NO_ROLE", "The member holds no role in the Basetool."),
+              Map.entry(
+                  "ACTING_MEMBER_REFUSED",
+                  "The Basetool refused the member this request acts for."),
+              Map.entry("NOT_PERMITTED", "The member may not do this."),
+              Map.entry(
+                  ExchangeRefusals.NOT_FOUND,
+                  "No such resource, or the member may not see it; both answer alike."),
+              Map.entry(
+                  "NOT_BANK_STAFF",
+                  "The member holds no bank role and no grant, and no request waits for their"
+                      + " approval."),
+              Map.entry(
+                  "SCHEMA_INVALID", "The Basetool refused the request's content as malformed."),
+              Map.entry(
+                  "VERSION_CONFLICT",
+                  "The entry changed since it was read; pull, merge and retry."),
+              Map.entry(
+                  "PESSIMISTIC_LOCK",
+                  "Another write held an entry the change set needs; nothing was applied, retry"
+                      + " it."),
+              Map.entry(
+                  "CURSOR_EXPIRED",
+                  "The cursor is older than the retained changes; reconcile against a full"
+                      + " snapshot."),
+              Map.entry(
+                  "MASS_CHANGE_CONFIRMATION_REQUIRED",
+                  "The change set removes more than the mass-change guard allows without"
+                      + " confirmation."),
+              Map.entry(
+                  "RELOCATION_PENDING",
+                  "A stock lot or ship from before the patch change stays locked until its holder"
+                      + " has chosen a new home location in the Basetool; nothing was applied."),
+              Map.entry(
+                  "HOME_LOCATION_NOT_ASKED",
+                  "No open home-location phase asks the member for a choice; nothing was moved."),
+              Map.entry(
+                  "HOME_LOCATION_ALREADY_CHOSEN",
+                  "The member has chosen the home location for this patch change already; the"
+                      + " choice is final."),
+              Map.entry(
+                  "HOME_LOCATION_PHASE_CHANGED",
+                  "Another home-location phase is open than the one the choice names; read the"
+                      + " patch change again; nothing was moved."),
+              Map.entry(
+                  "HOME_LOCATION_NOT_OFFERED",
+                  "The location is not one of the home locations on offer; nothing was moved."),
+              Map.entry(
+                  "BANK_JUSTIFICATION_REQUIRED",
+                  "A withdrawal or transfer from this account needs a justification."),
+              Map.entry(
+                  "BANK_SELF_TRANSFER",
+                  "Source and destination account of a transfer must differ."),
+              Map.entry("BANK_REQUEST_NOT_PENDING", "The booking request is no longer pending."),
+              Map.entry(
+                  "BANK_REQUEST_ALREADY_APPROVED",
+                  "The booking request was approved already; cancel it and raise a new one."),
+              Map.entry(
+                  "BANK_OPEN_REQUEST_CAP",
+                  "The member holds the most pending booking requests a client may add to."),
+              Map.entry(
+                  "JOB_ORDER_UNITS_NOT_OFFERED",
+                  "The requesting and responsible unit are not a pair the create options offer;"
+                      + " read them again and let the member choose; nothing was created."),
+              Map.entry(
+                  "JOB_ORDER_OPEN_ORDER_CAP",
+                  "The member holds the most open orders created through clients; create again once"
+                      + " one of them closes; nothing was created."),
+              Map.entry(
+                  JOB_ORDER_DAILY_CREATE_CAP,
+                  "The member created the most orders through clients allowed for this UTC day;"
+                      + " create again after Retry-After; nothing was created."),
+              Map.entry(
+                  "JOB_ORDER_RESPONSIBILITY_INVALID",
+                  "The order's responsibility no longer fits the Profit hierarchy; it takes no"
+                      + " write through a client until it is set anew in the Basetool; nothing was"
+                      + " written."),
+              Map.entry(
+                  "JOB_ORDER_CLOSED",
+                  "The order's status does not admit the write; read the order again; nothing was"
+                      + " written."),
+              Map.entry(
+                  "JOB_ORDER_MONEY_STARTED",
+                  "Money was accepted for the order already, so it is cancelled only in the"
+                      + " Basetool; nothing was written."),
+              Map.entry(
+                  "JOB_ORDER_TARGET_TOO_LOW",
+                  "The new target does not lie above the order's net handover; read netHandedOver"
+                      + " again, and complete the order in the Basetool; nothing was written."),
+              Map.entry(
+                  ExchangeRefusals.EXCHANGE_DISABLED, ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL),
+              Map.entry(
+                  ExchangeRefusals.REGISTRY_UNAVAILABLE,
+                  ExchangeGateFilter.REGISTRY_UNAVAILABLE_DETAIL),
+              Map.entry(
+                  ExchangeRefusals.CLIENT_NOT_ALLOWED,
+                  ExchangeGateFilter.CLIENT_NOT_ALLOWED_DETAIL),
+              Map.entry(
+                  ExchangeRefusals.CLIENT_SUSPENDED, ExchangeGateFilter.CLIENT_SUSPENDED_DETAIL),
+              Map.entry(
+                  ExchangeRefusals.INSTALLATION_REVOKED,
+                  ExchangeGateFilter.INSTALLATION_REVOKED_DETAIL),
+              Map.entry(ExchangeRefusals.CLIENT_REVOKED, ExchangeGateFilter.CLIENT_REVOKED_DETAIL),
+              Map.entry(ExchangeRefusals.SCOPE_MISSING, ExchangeGateFilter.SCOPE_MISSING_DETAIL)),
+          AreaSwitch::getDetail);
 
   /** Backend codes the exchange contract names and a client may see as they are. */
   static final Set<String> PASSED_THROUGH = DETAILS.keySet();
@@ -292,10 +299,9 @@ public class ExchangeRelay {
    * ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS} seconds of {@code Retry-After}.
    */
   private static final Set<String> AREA_SWITCH_CODES =
-      Set.of(
-          ExchangeRefusals.BANK_EXCHANGE_DISABLED,
-          ExchangeRefusals.JOB_ORDER_EXCHANGE_DISABLED,
-          ExchangeRefusals.JOB_ORDER_WRITES_DISABLED);
+      Arrays.stream(AreaSwitch.values())
+          .map(AreaSwitch::getCode)
+          .collect(Collectors.toUnmodifiableSet());
 
   /** Outcome: the backend answered 2xx and the gateway passed the answer on. */
   static final String OUTCOME_OK = "ok";
@@ -607,9 +613,7 @@ public class ExchangeRelay {
   /**
    * Returns the fixed {@code Retry-After} of a code: for a relayed refusal the same the gateway's
    * gate sends with that code, for {@code RELAY_BUSY} {@value #BUSY_RETRY_AFTER_SECONDS} and for
-   * the codes of the area switches ({@code BANK_EXCHANGE_DISABLED}, {@code
-   * JOB_ORDER_EXCHANGE_DISABLED}, {@code JOB_ORDER_WRITES_DISABLED}) {@value
-   * ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS}.
+   * the code of every {@link AreaSwitch} {@value ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS}.
    *
    * @param code a problem code, or {@code null}
    * @return the seconds, or {@code null} when the code carries no fixed wait
@@ -625,6 +629,25 @@ public class ExchangeRelay {
             || ExchangeRefusals.REGISTRY_UNAVAILABLE.equals(code)
         ? ExchangeGateFilter.RETRY_AFTER_SECONDS
         : null;
+  }
+
+  /**
+   * Adds one entry per {@link AreaSwitch}, keyed by its problem code, to the entries of every other
+   * code.
+   *
+   * @param others the entries of every other code
+   * @param value the value of an area switch's entry
+   * @param <V> the value type
+   * @return the combined map
+   * @throws IllegalStateException when an area switch's code is among the others
+   */
+  private static <V> @NotNull Map<String, V> withAreaSwitches(
+      @NotNull Map<String, V> others, @NotNull Function<AreaSwitch, V> value) {
+    return Stream.concat(
+            others.entrySet().stream(),
+            Arrays.stream(AreaSwitch.values())
+                .map(area -> Map.entry(area.getCode(), value.apply(area))))
+        .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   /**

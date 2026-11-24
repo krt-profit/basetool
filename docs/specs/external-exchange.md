@@ -304,9 +304,20 @@ reserved: it joins the exchange as a registry client of its own at the go-live.
   member disconnected the client); the error rate per client is linked in Grafana
   (`APP_GRAFANA_OPERATIONS_DASHBOARD_URL`, owner decision 2026-09-27). *`AdminExchangeClientUsageTest`,
   `AdminExchangeClientsPageControllerMvcTest`.*
+- [x] Every switch is one `ExchangeSwitch` constant in the backend (its mirror member, its audit
+  event, notice and metric action, and for an area switch its `ExchangeSettingsRepository` write and
+  its admin path `/api/v1/connected-apps/admin/settings/<segment>`); every area switch is also one
+  `AreaSwitch` in the gateway (its mirror member, the routes it stops, its `503` code and detail)
+  and one `ExchangeAreaSwitch` on the admin page (its relay path
+  `/admin/exchange-clients/settings/<segment>`, its card and its bundle keys). The mirror document
+  carries one boolean per switch, `enabled` first, in declaration order; a document without one
+  reads that switch as off. Each constant round-trips its mirror member, its endpoint and the
+  snapshot. *`ExchangeSwitchRoundTripTest`, `AdminExchangeRegistryControllerTest`,
+  `AreaSwitchOpenApiTest`, gateway `AreaSwitchRoundTripTest`,
+  `AdminExchangeClientsPageControllerMvcTest`.*
 
 **Enforced by:** `ExchangeRegistryMirrorIntegrationTest`, `ExchangeRegistryMirrorClosureTest`,
-`ExchangeRegistrySnapshotTest`,
+`ExchangeRegistrySnapshotTest`, `ExchangeSwitchRoundTripTest`, `AreaSwitchRoundTripTest`,
 `AdminExchangeRegistryControllerTest`, `AdminExchangeClientsE2eTest`, `ExchangeConnectionsE2eTest`,
 `RedisAclBackendIntegrationTest`,
 `RedisAclIngestIntegrationTest`, `monitoring/prometheus/tests/exchange_registry_alerts_test.yml` ·

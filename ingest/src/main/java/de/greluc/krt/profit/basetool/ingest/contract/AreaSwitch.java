@@ -17,13 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.ingest.gate;
+package de.greluc.krt.profit.basetool.ingest.contract;
 
-import de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes;
-import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRefusals;
-import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistry;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.BiPredicate;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -32,27 +30,46 @@ import org.springframework.http.HttpMethod;
 
 /**
  * A switch of one area of the exchange beside the global switch, in the order the gate checks them
- * (REQ-BXCH-006, REQ-OXCH-009): which requests it stops and what it answers while it is off, always
- * {@code 503} with {@code Retry-After} {@value ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS}.
+ * (REQ-BXCH-006, REQ-OXCH-009): the registry mirror member that carries it, which requests it stops
+ * and the {@code 503} problem code and detail it answers with while it is off. A new area switch is
+ * one constant here.
  */
 @RequiredArgsConstructor
-enum AreaSwitch {
+public enum AreaSwitch {
 
   /** The bank switch: every path at or below {@link ExchangeRoutes#BANK_PATH}. */
-  BANK(ExchangeRefusals.BANK_EXCHANGE_DISABLED, ExchangeGateFilter.BANK_EXCHANGE_DISABLED_DETAIL),
+  BANK(
+      "bankEnabled",
+      (method, path) -> ExchangeRoutes.isBank(path),
+      "BANK_EXCHANGE_DISABLED",
+      "The bank is switched off for connected applications; every other area keeps working."),
 
   /** The job-order family switch: every path at or below {@link ExchangeRoutes#JOB_ORDERS_PATH}. */
   JOB_ORDERS(
-      ExchangeRefusals.JOB_ORDER_EXCHANGE_DISABLED,
-      ExchangeGateFilter.JOB_ORDER_EXCHANGE_DISABLED_DETAIL),
+      "jobOrdersEnabled",
+      (method, path) -> ExchangeRoutes.isJobOrder(path),
+      "JOB_ORDER_EXCHANGE_DISABLED",
+      "Job orders are switched off for connected applications; every other area keeps working."),
 
   /**
    * The job-order writes switch: every {@code POST} at or below {@link
    * ExchangeRoutes#JOB_ORDERS_PATH}, since every job-order write is a {@code POST}.
    */
   JOB_ORDER_WRITES(
-      ExchangeRefusals.JOB_ORDER_WRITES_DISABLED,
-      ExchangeGateFilter.JOB_ORDER_WRITES_DISABLED_DETAIL);
+      "jobOrderWritesEnabled",
+      (method, path) -> HttpMethod.POST.matches(method) && ExchangeRoutes.isJobOrder(path),
+      "JOB_ORDER_WRITES_DISABLED",
+      "Job-order writes are switched off for connected applications; job-order reads and every"
+          + " other area keep working.");
+
+  /**
+   * The boolean member of the registry mirror document that carries the switch; a document without
+   * it reads the switch as off.
+   */
+  @Getter @NotNull private final String mirrorField;
+
+  /** Tells from a request's HTTP method and raw path whether it lies in the switch's area. */
+  @NotNull private final BiPredicate<String, String> area;
 
   /** The problem code of the refusal while the switch is off. */
   @Getter @NotNull private final String code;
@@ -67,9 +84,9 @@ enum AreaSwitch {
    * @param path the raw request path
    * @return the gating switches, empty for a request outside every switched area
    */
-  static @NotNull @Unmodifiable List<AreaSwitch> gating(
+  public static @NotNull @Unmodifiable List<AreaSwitch> gating(
       @NotNull String method, @NotNull String path) {
-    return Arrays.stream(values()).filter(area -> area.gates(method, path)).toList();
+    return Arrays.stream(values()).filter(target -> target.gates(method, path)).toList();
   }
 
   /**
@@ -79,25 +96,7 @@ enum AreaSwitch {
    * @param path the raw request path
    * @return {@code true} when the request lies in this switch's area
    */
-  boolean gates(@NotNull String method, @NotNull String path) {
-    return switch (this) {
-      case BANK -> ExchangeRoutes.isBank(path);
-      case JOB_ORDERS -> ExchangeRoutes.isJobOrder(path);
-      case JOB_ORDER_WRITES -> HttpMethod.POST.matches(method) && ExchangeRoutes.isJobOrder(path);
-    };
-  }
-
-  /**
-   * Tells whether this switch is off in the registry.
-   *
-   * @param registry the registry
-   * @return {@code true} when the switch stops its area
-   */
-  boolean isOff(@NotNull ExchangeRegistry registry) {
-    return switch (this) {
-      case BANK -> !registry.bankEnabled();
-      case JOB_ORDERS -> !registry.jobOrdersEnabled();
-      case JOB_ORDER_WRITES -> !registry.jobOrderWritesEnabled();
-    };
+  public boolean gates(@NotNull String method, @NotNull String path) {
+    return area.test(method, path);
   }
 }

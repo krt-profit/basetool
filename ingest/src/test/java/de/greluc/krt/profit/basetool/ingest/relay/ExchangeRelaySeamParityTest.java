@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeGatewayProperties;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes;
 import de.greluc.krt.profit.basetool.ingest.handoff.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
@@ -42,6 +43,7 @@ import java.lang.reflect.RecordComponent;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -236,9 +238,9 @@ class ExchangeRelaySeamParityTest {
     Set<String> gateConstants =
         Set.of(
             ExchangeRefusals.EXCHANGE_DISABLED,
-            ExchangeRefusals.BANK_EXCHANGE_DISABLED,
-            ExchangeRefusals.JOB_ORDER_EXCHANGE_DISABLED,
-            ExchangeRefusals.JOB_ORDER_WRITES_DISABLED,
+            AreaSwitch.BANK.getCode(),
+            AreaSwitch.JOB_ORDERS.getCode(),
+            AreaSwitch.JOB_ORDER_WRITES.getCode(),
             ExchangeRefusals.REGISTRY_UNAVAILABLE,
             ExchangeRefusals.CLIENT_NOT_ALLOWED,
             ExchangeRefusals.CLIENT_SUSPENDED,
@@ -307,9 +309,7 @@ class ExchangeRelaySeamParityTest {
     return new ExchangeRegistry(
         ExchangeSeam.REGISTRY_SAMPLE_REVISION,
         true,
-        true,
-        true,
-        true,
+        EnumSet.allOf(AreaSwitch.class),
         Map.of(
             "versekit",
             new ExchangeRegistry.Client(
