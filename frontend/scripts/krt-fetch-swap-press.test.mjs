@@ -18,9 +18,10 @@
  */
 
 /**
- * Regression tests for the press guard of krtFetch.swap (REQ-FE-038, ADR-0405): the transport and
- * krt-press.js run in a vm context over one fake container, with scripted pointer events, a
- * scripted fetch and manual timers, so the moment of each fragment write is observable.
+ * Regression tests for the write of krtFetch.swap — the press guard (REQ-FE-038, ADR-0405) and the
+ * scroll position it keeps (REQ-FE-039): the transport and krt-press.js run in a vm context over one
+ * fake container, with scripted pointer events, a scripted fetch, a scriptable window scroll and
+ * manual timers, so the moment of each fragment write is observable.
  */
 
 import assert from 'node:assert/strict';
@@ -60,6 +61,7 @@ function harness() {
     const outside = new FakeNode();
     const writes = [];
     const swapped = [];
+    const scrolls = [];
     const timers = [];
     const listeners = new Map();
     let requests = 0;
@@ -125,7 +127,9 @@ function harness() {
             });
         },
         scrollY: 0,
-        scrollTo() {},
+        scrollTo(x, y) {
+            scrolls.push([x, y]);
+        },
     };
     context.window = context;
     context.location = { origin: 'https://example.test' };
@@ -147,6 +151,11 @@ function harness() {
     return {
         writes,
         swapped,
+        scrolls,
+        /** Moves the window's vertical scroll position, as a user's scroll does. */
+        scrollWindow(y) {
+            context.scrollY = y;
+        },
         live: () => timers.filter((timer) => timer.live),
         /** Runs the timers that are due now and lets their effects settle. */
         async runTimers() {
@@ -277,6 +286,28 @@ await test('a new press inside the container keeps holding a swap the last press
     await h.runTimers();
     assert.deepEqual(h.writes, ['fragment 1']);
     assert.equal(await swap, true);
+});
+
+await test('a scroll made while the fragment loads is kept by the write', async () => {
+    const h = harness();
+    const swap = h.swap();
+    h.scrollWindow(640);
+    assert.equal(await swap, true);
+    assert.deepEqual(h.writes, ['fragment 1']);
+    assert.deepEqual(h.scrolls, [[0, 640]]);
+});
+
+await test('a swap held by a press keeps the scroll position found at its write', async () => {
+    const h = harness();
+    h.press();
+    const swap = h.swap();
+    await idle();
+    h.scrollWindow(640);
+    h.release();
+    h.click();
+    await h.runTimers();
+    assert.equal(await swap, true);
+    assert.deepEqual(h.scrolls, [[0, 640]]);
 });
 
 if (failures > 0) {

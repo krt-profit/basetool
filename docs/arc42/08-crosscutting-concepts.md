@@ -293,7 +293,8 @@ Two binding rules shape every UI change:
   the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
   peer's change propagates without a manual reload. A fragment swap waits for a press inside its
   container to end, so a re-render never removes the control under a press (REQ-FE-038,
-  ADR-0405).
+  ADR-0405), and keeps the scroll position it finds at its write, so a scroll made while the
+  fragment loaded stays (REQ-FE-039).
 - **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): any
   `fetch` or `XMLHttpRequest` outside the transport fails `:frontend:lintJs` — writes go through
   `krtFetch.write` / `submitForm` (REQ-FE-002), reads through `krtFetch.get` / `getJson`, which
