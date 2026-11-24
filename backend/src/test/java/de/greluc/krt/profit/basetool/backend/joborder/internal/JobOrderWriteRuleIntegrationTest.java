@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientWriteRefusedException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderInformationCommand;
@@ -98,7 +99,6 @@ class JobOrderWriteRuleIntegrationTest {
   private Squadron staffel;
   private Bereich area;
   private SpecialCommand areaCommand;
-  private Squadron outside;
 
   @BeforeEach
   void seed() {
@@ -108,7 +108,6 @@ class JobOrderWriteRuleIntegrationTest {
     staffel = seeded.staffel();
     area = seeded.area();
     areaCommand = seeded.areaCommand();
-    outside = seeded.outside();
   }
 
   @AfterEach
@@ -122,7 +121,7 @@ class JobOrderWriteRuleIntegrationTest {
     UUID order = createAuec(member, staffel);
 
     WriterRuleFixtures.signInAsExchangeMember(member);
-    statusCommand.cancel(order, 0L, rule(), read(), client(member));
+    statusCommand.cancel(order, 0L, caller(member));
 
     JobOrder cancelled = orders.findById(order).orElseThrow();
     assertThat(cancelled.getStatus()).isEqualTo(JobOrderStatus.CANCELLED);
@@ -135,7 +134,7 @@ class JobOrderWriteRuleIntegrationTest {
     UUID order = createAuec(member, staffel);
 
     WriterRuleFixtures.signInAsExchangeMember(member);
-    targetCommand.changeTarget(order, new BigDecimal("300000"), 0L, rule(), read(), client(member));
+    targetCommand.changeTarget(order, new BigDecimal("300000"), 0L, caller(member));
 
     assertThat(targets.findById(order).orElseThrow().getAmount()).isEqualByComparingTo("300000");
     assertThat(targetHistory.findAll())
@@ -153,18 +152,37 @@ class JobOrderWriteRuleIntegrationTest {
     orders.saveAndFlush(contactChanged);
 
     WriterRuleFixtures.signInAsExchangeMember(member);
-    informationCommand.changeComment(
-        order, " Deliver to Area18 ", 0L, rule(), read(), client(member));
+    informationCommand.changeComment(order, " Deliver to Area18 ", 0L, caller(member));
 
     JobOrder written = orders.findById(order).orElseThrow();
     assertThat(written.getComment()).isEqualTo("Deliver to Area18");
     assertThat(written.getCommentVersion()).isEqualTo(1L);
     assertThat(written.getHandle()).isEqualTo("Rule contact");
     assertThat(written.getMoneyInformationVersion()).isEqualTo(3L);
-    assertThatThrownBy(() ->
-            informationCommand.changeComment(
-                order, "Late note", 0L, rule(), read(), client(member)))
+    assertThatThrownBy(
+            () -> informationCommand.changeComment(order, "Late note", 0L, caller(member)))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+  }
+
+  @Test
+  void aMemberWhoseAccountIsNoLongerActiveChangesNeitherTheTargetNorTheComment() {
+    User member = requestingLogistician();
+    UUID order = createAuec(member, staffel);
+    member.setEnabledInKeycloak(false);
+    users.saveAndFlush(member);
+
+    WriterRuleFixtures.signInAsExchangeMember(member);
+
+    assertThatThrownBy(
+            () -> targetCommand.changeTarget(order, new BigDecimal("300000"), 0L, caller(member)))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> informationCommand.changeComment(order, "Note", 0L, caller(member)))
+        .isInstanceOf(AccessDeniedException.class);
+    JobOrder unchanged = orders.findById(order).orElseThrow();
+    assertThat(unchanged.getComment()).isNull();
+    assertThat(unchanged.getCommentVersion()).isZero();
+    assertThat(targets.findById(order).orElseThrow().getAmount()).isEqualByComparingTo("250000");
+    assertThat(targetHistory.findAll()).noneMatch(change -> change.getOrderId().equals(order));
   }
 
   @Test
@@ -215,22 +233,7 @@ class JobOrderWriteRuleIntegrationTest {
 
   @Test
   void everyWriteTheExchangeRulePermitsIsOneTheWebPermitsForTheSameMemberWithoutAPin() {
-    User flagged = fixtures.member(true, false);
-    fixtures.seat(flagged, staffel, MembershipRole.MEMBER, true);
-    fixtures.seat(flagged, profitStaffel, MembershipRole.MEMBER, true);
-    User squadronLead = fixtures.member(true, false);
-    fixtures.seat(squadronLead, outside, MembershipRole.STAFFELLEITER, false);
-    fixtures.seat(squadronLead, staffel, MembershipRole.MEMBER, false);
-    User areaLead = fixtures.member(true, false);
-    fixtures.seat(areaLead, area, MembershipRole.BEREICHSLEITER, false);
-    fixtures.seat(areaLead, areaCommand, MembershipRole.MEMBER, false);
-    User leitungMember = fixtures.member(true, false);
-    fixtures.seat(leitungMember, fixtures.leitung(), MembershipRole.OL_MEMBER, false);
-    fixtures.seat(leitungMember, areaCommand, MembershipRole.MEMBER, true);
-    User admin = fixtures.member(true, true);
-    fixtures.seat(admin, staffel, MembershipRole.MEMBER, true);
-
-    for (User member : List.of(flagged, squadronLead, areaLead, leitungMember, admin)) {
+    for (User member : fixtures.seatParityMembers(seeded)) {
       Set<List<Object>> exchange = permittedWrites(JobOrderWriterRule.DIRECT_LOGISTICIAN, member);
       Set<List<Object>> web = permittedWrites(JobOrderWriterRule.CONTEXTUAL, member);
 
@@ -292,14 +295,11 @@ class JobOrderWriteRuleIntegrationTest {
    */
   private void assertRefusedEveryWrite(
       UUID order, User member, Class<? extends RuntimeException> refusal) {
-    assertThatThrownBy(() -> statusCommand.cancel(order, 0L, rule(), read(), client(member)))
+    assertThatThrownBy(() -> statusCommand.cancel(order, 0L, caller(member))).isInstanceOf(refusal);
+    assertThatThrownBy(
+            () -> targetCommand.changeTarget(order, new BigDecimal("300000"), 0L, caller(member)))
         .isInstanceOf(refusal);
-    assertThatThrownBy(() ->
-            targetCommand.changeTarget(
-                order, new BigDecimal("300000"), 0L, rule(), read(), client(member)))
-        .isInstanceOf(refusal);
-    assertThatThrownBy(() ->
-            informationCommand.changeComment(order, "Note", 0L, rule(), read(), client(member)))
+    assertThatThrownBy(() -> informationCommand.changeComment(order, "Note", 0L, caller(member)))
         .isInstanceOf(refusal);
     JobOrder unchanged = orders.findById(order).orElseThrow();
     assertThat(unchanged.getStatus()).isEqualTo(JobOrderStatus.OPEN);
@@ -326,12 +326,9 @@ class JobOrderWriteRuleIntegrationTest {
         "rule-key-" + UUID.randomUUID());
   }
 
-  private static JobOrderWriterRule rule() {
-    return JobOrderWriterRule.DIRECT_LOGISTICIAN;
-  }
-
-  private static JobOrderReadCheck read() {
-    return JobOrderReadCheck.CONTEXTUAL;
+  private static JobOrderCaller caller(User member) {
+    return new JobOrderCaller(
+        JobOrderWriterRule.DIRECT_LOGISTICIAN, JobOrderReadCheck.CONTEXTUAL, client(member));
   }
 
   private static JobOrderActor.Client client(User member) {

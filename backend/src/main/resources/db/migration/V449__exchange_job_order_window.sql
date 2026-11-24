@@ -10,7 +10,8 @@ UPDATE exchange_job_order_fingerprint f
   FROM job_order o
  WHERE o.id = f.job_order_id
    AND NOT exchange_job_order_in_window(o.status, o.closed_at, o.type, f.settlement_open)
-   AND f.changed_at >= o.closed_at + INTERVAL '7 days';
+   AND NOT exchange_job_order_in_window(o.status, o.closed_at, o.type, f.settlement_open,
+                                        f.changed_at);
 
 CREATE FUNCTION exchange_job_order_fingerprint_window() RETURNS TRIGGER AS $$
 BEGIN

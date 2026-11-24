@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockRe
 import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
@@ -261,9 +262,7 @@ class JobOrderServiceTest {
     lenient().when(jobOrderAccessPolicy.canRead(any(), any())).thenReturn(true);
     lenient()
         .when(writers.resolve(any(), any()))
-        .thenReturn(
-            new JobOrderWriters.Scope(
-                JobOrderWriterRule.CONTEXTUAL, new ScopePredicate(true, null, Set.of())));
+        .thenReturn(WriterRuleFixtures.everyUnitWriterScope());
     jobOrderQueryService =
         new JobOrderQueryService(
             jobOrderRepository,
@@ -490,10 +489,7 @@ class JobOrderServiceTest {
   }
 
   private void permitEveryPair() {
-    when(writers.resolve(any(), any()))
-        .thenReturn(
-            new JobOrderWriters.Scope(
-                JobOrderWriterRule.CONTEXTUAL, new ScopePredicate(true, null, Set.of())));
+    when(writers.resolve(any(), any())).thenReturn(WriterRuleFixtures.everyUnitWriterScope());
   }
 
   private void stubCreate() {

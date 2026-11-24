@@ -41,10 +41,10 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -116,9 +116,12 @@ class JobOrderWebWriteCommandsIntegrationTest {
     transactions.executeWithoutResult(_ -> {
       String tag = UUID.randomUUID().toString();
       OrgUnit profit = ProfitHierarchyFixtures.persistedProfitArea(units);
-      responsible = squadron("Write responsible " + tag, profit).getId();
-      requesting = squadron("Write requesting " + tag, null).getId();
-      elsewhere = squadron("Write elsewhere " + tag, null).getId();
+      responsible =
+          OrgUnitFixtures.persistedSquadron(squadrons, "Write responsible " + tag, profit).getId();
+      requesting =
+          OrgUnitFixtures.persistedSquadron(squadrons, "Write requesting " + tag, null).getId();
+      elsewhere =
+          OrgUnitFixtures.persistedSquadron(squadrons, "Write elsewhere " + tag, null).getId();
       responsibleWriter = account("write-responsible-" + tag);
       requestingWriter = account("write-requesting-" + tag);
       reader = account("write-reader-" + tag);
@@ -507,13 +510,5 @@ class JobOrderWebWriteCommandsIntegrationTest {
     membership.setLogistician(logistician);
     membership.setJoinedAt(Instant.now());
     memberships.saveAndFlush(membership);
-  }
-
-  private Squadron squadron(String name, @Nullable OrgUnit parent) {
-    Squadron unit = new Squadron();
-    unit.setName(name);
-    unit.setShorthand(name);
-    unit.setParent(parent);
-    return squadrons.saveAndFlush(unit);
   }
 }

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.ok;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -60,7 +61,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The first relayed exchange routes end to end through both gates, with the backend relay mocked
@@ -70,7 +70,6 @@ import tools.jackson.databind.json.JsonMapper;
 class ExchangeControllerTest {
 
   private static final String TOKEN = "controller-token";
-  private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
   /** The longest name the published {@code location} schema allows. */
   private static final int PUBLISHED_NAME = 200;
@@ -515,16 +514,5 @@ class ExchangeControllerTest {
             "VerseKit/2.1.0")
         .andExpect(status().isBadGateway())
         .andExpect(jsonPath("$.code").value("BACKEND_RELAY_FAILED"));
-  }
-
-  /**
-   * Builds a usable relay result.
-   *
-   * @param json the backend's answer
-   * @return the result
-   */
-  private static ExchangeRelay.Result ok(String json) {
-    JsonNode node = MAPPER.readTree(json);
-    return new ExchangeRelay.Result(200, node, null, null);
   }
 }

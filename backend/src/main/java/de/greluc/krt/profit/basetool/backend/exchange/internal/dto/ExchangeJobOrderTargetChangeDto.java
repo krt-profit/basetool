@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -30,5 +31,5 @@ import jakarta.validation.constraints.NotNull;
  * @param targetVersion the order's target version as the client last read it
  */
 public record ExchangeJobOrderTargetChangeDto(
-    @NotNull @Min(1) @Max(ExchangeJobOrderCreateDto.TARGET_MAX) Long target,
+    @NotNull @Min(1) @Max(BankAmounts.MAX_WHOLE_AUEC) Long target,
     @NotNull @Min(0) Long targetVersion) {}

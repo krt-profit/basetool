@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.UUID;
@@ -53,13 +54,13 @@ class JobOrderMoneyAccess {
    * @return the web caller
    */
   JobOrderCaller webCaller() {
-    return JobOrderCaller.web(auth.currentUserId().orElse(null));
+    return JobOrderCaller.web(auth);
   }
 
   /**
    * Returns the member a caller's actor acts as.
    *
-   * @param actor the actor
+   * @param actor the caller's actor
    * @return the actor's member
    * @throws AccessDeniedException when the actor resolves to no member
    */
@@ -74,7 +75,7 @@ class JobOrderMoneyAccess {
   /**
    * Requires the member to hold an active account.
    *
-   * @param member the member
+   * @param member the acting member
    * @return the member's id
    * @throws AccessDeniedException when the account is not active
    */

@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderInformationCommand;
@@ -140,9 +141,8 @@ class JobOrderClientOriginIntegrationTest {
         order,
         new BigDecimal("300000"),
         0L,
-        JobOrderWriterRule.DIRECT_LOGISTICIAN,
-        JobOrderReadCheck.CONTEXTUAL,
-        client(APP));
+        new JobOrderCaller(
+            JobOrderWriterRule.DIRECT_LOGISTICIAN, JobOrderReadCheck.CONTEXTUAL, client(APP)));
     fixtures.signInAsWebMember(member);
     entityManager.flush();
     long targetVersion = targets.findById(order).orElseThrow().getVersion();
@@ -164,9 +164,8 @@ class JobOrderClientOriginIntegrationTest {
         order,
         "Deliver to Area18",
         0L,
-        JobOrderWriterRule.DIRECT_LOGISTICIAN,
-        JobOrderReadCheck.CONTEXTUAL,
-        client(APP));
+        new JobOrderCaller(
+            JobOrderWriterRule.DIRECT_LOGISTICIAN, JobOrderReadCheck.CONTEXTUAL, client(APP)));
 
     assertThat(readAsAdministrator(order).commentClient()).isEqualTo(APP_NAME);
 
@@ -206,9 +205,8 @@ class JobOrderClientOriginIntegrationTest {
         order,
         comment,
         commentVersion,
-        JobOrderWriterRule.DIRECT_LOGISTICIAN,
-        JobOrderReadCheck.CONTEXTUAL,
-        client(APP));
+        new JobOrderCaller(
+            JobOrderWriterRule.DIRECT_LOGISTICIAN, JobOrderReadCheck.CONTEXTUAL, client(APP)));
   }
 
   /**

@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,9 +86,9 @@ class JobOrderAuecCreateAuthorityIntegrationTest {
     mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String tag = UUID.randomUUID().toString();
     OrgUnit profit = ProfitHierarchyFixtures.persistedProfitArea(units);
-    responsible = squadron("Auec responsible " + tag, profit);
-    requester = squadron("Auec requester " + tag, null);
-    unrelated = squadron("Auec unrelated " + tag, null);
+    responsible = OrgUnitFixtures.persistedSquadron(squadrons, "Auec responsible " + tag, profit);
+    requester = OrgUnitFixtures.persistedSquadron(squadrons, "Auec requester " + tag, null);
+    unrelated = OrgUnitFixtures.persistedSquadron(squadrons, "Auec unrelated " + tag, null);
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("auec-create-" + tag);
@@ -203,14 +204,6 @@ class JobOrderAuecCreateAuthorityIntegrationTest {
     List<GrantedAuthority> authorities = new ArrayList<>(member());
     authorities.add(new SimpleGrantedAuthority(Roles.authority(Roles.ADMIN)));
     return authorities;
-  }
-
-  private Squadron squadron(String name, @Nullable OrgUnit parent) {
-    Squadron unit = new Squadron();
-    unit.setName(name);
-    unit.setShorthand(name);
-    unit.setParent(parent);
-    return squadrons.saveAndFlush(unit);
   }
 
   private void join(User user, OrgUnit unit) {

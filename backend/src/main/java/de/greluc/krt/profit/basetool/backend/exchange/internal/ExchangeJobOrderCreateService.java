@@ -22,24 +22,19 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWithTargetDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientCreateCapException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientCreateCaps;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateUnitOptionDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreationOptions;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeRead;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.AccessDeniedException;
@@ -65,7 +60,7 @@ public class ExchangeJobOrderCreateService {
   private final JobOrderCreationOptions creationOptions;
   private final JobOrderCreateCommand createCommand;
   private final JobOrderClientCreateCaps caps;
-  private final JobOrderExchangeReads reads;
+  private final ExchangeJobOrderAnswers answers;
   private final ExchangeSettingsRepository settingsRepository;
   private final ExchangeJobOrderMetrics metrics;
 
@@ -83,7 +78,7 @@ public class ExchangeJobOrderCreateService {
   @NotNull
   public ExchangeJobOrderCreateOptionsDto options(@NotNull ExchangeCaller caller) {
     JobOrderCreateOptionsDto options =
-        creationOptions.current(JobOrderWriterRule.DIRECT_LOGISTICIAN, actor(caller));
+        creationOptions.current(JobOrderWriterRule.DIRECT_LOGISTICIAN, caller.jobOrderActor());
     boolean writesEnabled =
         settingsRepository
             .findById(ExchangeSettings.SINGLETON_ID)
@@ -112,7 +107,7 @@ public class ExchangeJobOrderCreateService {
    *     JOB_ORDER_DAILY_CREATE_CAP} when the create would pass a cap on client creates
    */
   @NotNull
-  public ExchangeJobOrderCreatedDto create(
+  public ExchangeJobOrderWithTargetDto create(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeJobOrderCreateDto body,
       @NotNull String idempotencyKey) {
@@ -124,68 +119,39 @@ public class ExchangeJobOrderCreateService {
             body.comment(),
             BigDecimal.valueOf(body.target()));
     try {
-      ExchangeJobOrderCreatedDto created =
+      ExchangeJobOrderWithTargetDto created =
           Objects.requireNonNull(
               transaction.execute(_ ->
-                  answer(
+                  answers.withTarget(
                       createCommand.createAuec(
                           order,
                           JobOrderWriterRule.DIRECT_LOGISTICIAN,
-                          actor(caller),
+                          caller.jobOrderActor(),
                           idempotencyKey))));
       metrics.countWrite(caller.clientId(), ExchangeOps.APPLIED);
       return created;
     } catch (BadRequestException | AccessDeniedException e) {
-      metrics.countRefused(JobOrderExchangeRefusal.UNITS_NOT_OFFERED);
-      metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
-      throw ExchangeProblemException.jobOrderUnitsNotOffered(e);
+      throw metrics.refusedWrite(
+          caller.clientId(),
+          JobOrderExchangeRefusal.UNITS_NOT_OFFERED,
+          ExchangeProblemException.jobOrderUnitsNotOffered(e));
     } catch (JobOrderClientCreateCapException e) {
-      metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
-      throw capRefusal(e);
+      throw switch (e.getCap()) {
+        case OPEN_ORDERS ->
+            metrics.refusedWrite(
+                caller.clientId(),
+                JobOrderExchangeRefusal.OPEN_ORDER_CAP,
+                ExchangeProblemException.jobOrderOpenOrderCap(e));
+        case DAILY_CREATES ->
+            metrics.refusedWrite(
+                caller.clientId(),
+                JobOrderExchangeRefusal.DAILY_CREATE_CAP,
+                ExchangeProblemException.jobOrderDailyCreateCap(e));
+      };
     } catch (RuntimeException e) {
       metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
       throw e;
     }
-  }
-
-  /**
-   * Counts a cap refusal under its reason and turns it into the cap's exchange code.
-   *
-   * @param refusal the create command's cap refusal
-   * @return the {@code 409} refusal with the cap's code
-   */
-  private @NotNull ExchangeProblemException capRefusal(
-      @NotNull JobOrderClientCreateCapException refusal) {
-    return switch (refusal.getCap()) {
-      case OPEN_ORDERS -> {
-        metrics.countRefused(JobOrderExchangeRefusal.OPEN_ORDER_CAP);
-        yield ExchangeProblemException.jobOrderOpenOrderCap(refusal);
-      }
-      case DAILY_CREATES -> {
-        metrics.countRefused(JobOrderExchangeRefusal.DAILY_CREATE_CAP);
-        yield ExchangeProblemException.jobOrderDailyCreateCap(refusal);
-      }
-    };
-  }
-
-  /**
-   * Reads the created order's terse answer in the create's transaction.
-   *
-   * @param orderId the created or earlier order
-   * @return its id, status, versions and stored target
-   */
-  private @NotNull ExchangeJobOrderCreatedDto answer(@NotNull UUID orderId) {
-    JobOrderExchangeRead read =
-        Objects.requireNonNull(reads.project(List.of(orderId)).get(orderId), "created order");
-    return new ExchangeJobOrderCreatedDto(
-        read.id(),
-        read.status(),
-        ExchangeJobOrderDto.Versions.of(read.versions()),
-        ExchangeAmounts.auecTarget(read));
-  }
-
-  private static @NotNull JobOrderActor.Client actor(@NotNull ExchangeCaller caller) {
-    return new JobOrderActor.Client(caller.member(), caller.clientId());
   }
 
   private static @NotNull List<ExchangeOrgUnitDto> units(

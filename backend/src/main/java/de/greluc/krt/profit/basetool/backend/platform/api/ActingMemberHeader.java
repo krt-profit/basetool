@@ -63,6 +63,9 @@ public final class ActingMemberHeader {
    */
   public static final String EXCHANGE_IDEMPOTENCY_KEY_HEADER = "X-Exchange-Idempotency-Key";
 
+  /** The shape of an idempotency key, as the gateway admits it (REQ-XCH-020). */
+  public static final String EXCHANGE_IDEMPOTENCY_KEY_PATTERN = "[A-Za-z0-9._~-]{8,128}";
+
   /** Not instantiable: a constant holder, not a component. */
   private ActingMemberHeader() {}
 }

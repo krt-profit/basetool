@@ -85,6 +85,7 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
   @Autowired private OrgUnitMembershipRepository memberships;
 
   private WriterRuleFixtures fixtures;
+  private WriterRuleFixtures.Units seededUnits;
   private OrgUnit profit;
   private Squadron profitStaffel;
   private Squadron staffel;
@@ -96,7 +97,7 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
   @BeforeEach
   void seed() {
     fixtures = new WriterRuleFixtures(units, leitungen, users, roles, memberships, converter);
-    WriterRuleFixtures.Units seededUnits = fixtures.seedUnits();
+    seededUnits = fixtures.seedUnits();
     profit = seededUnits.profit();
     profitStaffel = seededUnits.profitStaffel();
     staffel = seededUnits.staffel();
@@ -281,22 +282,7 @@ class JobOrderDirectLogisticianRuleIntegrationTest {
 
   @Test
   void everyPairTheExchangeRulePermitsIsOneTheWebPermitsForTheSameMemberWithoutAPin() {
-    User flagged = fixtures.member(true, false);
-    fixtures.seat(flagged, staffel, MembershipRole.MEMBER, true);
-    fixtures.seat(flagged, profitStaffel, MembershipRole.MEMBER, true);
-    User squadronLead = fixtures.member(true, false);
-    fixtures.seat(squadronLead, outside, MembershipRole.STAFFELLEITER, false);
-    fixtures.seat(squadronLead, staffel, MembershipRole.MEMBER, false);
-    User areaLead = fixtures.member(true, false);
-    fixtures.seat(areaLead, area, MembershipRole.BEREICHSLEITER, false);
-    fixtures.seat(areaLead, areaCommand, MembershipRole.MEMBER, false);
-    User leitungMember = fixtures.member(true, false);
-    fixtures.seat(leitungMember, fixtures.leitung(), MembershipRole.OL_MEMBER, false);
-    fixtures.seat(leitungMember, areaCommand, MembershipRole.MEMBER, true);
-    User admin = fixtures.member(true, true);
-    fixtures.seat(admin, staffel, MembershipRole.MEMBER, true);
-
-    for (User member : List.of(flagged, squadronLead, areaLead, leitungMember, admin)) {
+    for (User member : fixtures.seatParityMembers(seededUnits)) {
       Set<List<UUID>> exchange = permittedPairs(JobOrderWriterRule.DIRECT_LOGISTICIAN, member);
       Set<List<UUID>> web = permittedPairs(JobOrderWriterRule.CONTEXTUAL, member);
 

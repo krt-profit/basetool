@@ -17,23 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
-
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
-import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
+package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 /**
- * The terse answer to a client's target change (REQ-OXCH-007), read from the stored order after the
- * write.
- *
- * @param id the order
- * @param status the order's lifecycle status, unchanged by the write
- * @param versions the section versions the next write echoes
- * @param target the stored target in whole aUEC
+ * The Basetool links an exchange answer carries. The published v1 schemas pin every {@code link} to
+ * {@code ^https://profit-base\.online/}, and a client opens one only after checking that host, so
+ * the host is part of the contract rather than configuration.
  */
-public record ExchangeJobOrderTargetChangedDto(
-    @NotNull UUID id,
-    @NotNull JobOrderStatus status,
-    @NotNull ExchangeJobOrderDto.Versions versions,
-    long target) {}
+final class ExchangeLinks {
+
+  /** The Basetool's origin every link of an exchange answer starts with. */
+  static final String BASETOOL = "https://profit-base.online";
+
+  /** Not instantiable. */
+  private ExchangeLinks() {}
+}

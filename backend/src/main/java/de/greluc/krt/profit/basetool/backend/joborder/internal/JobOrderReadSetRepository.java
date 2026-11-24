@@ -98,7 +98,7 @@ public interface JobOrderReadSetRepository extends Repository<JobOrder, UUID> {
    * The member's own note on one order.
    *
    * @param orderId the order
-   * @param note the note
+   * @param note the text of the member's assignee note on the order
    */
   record OwnNote(@NotNull UUID orderId, @NotNull String note) {}
 }

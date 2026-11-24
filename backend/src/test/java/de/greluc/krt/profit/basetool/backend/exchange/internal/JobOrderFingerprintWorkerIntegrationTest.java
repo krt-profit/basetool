@@ -47,9 +47,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -129,8 +129,12 @@ class JobOrderFingerprintWorkerIntegrationTest {
     transactions.executeWithoutResult(_ -> {
       String tag = UUID.randomUUID().toString().substring(0, 8);
       OrgUnit profit = ProfitHierarchyFixtures.persistedProfitArea(units);
-      responsible = squadron("Fingerprint responsible " + tag, profit).getId();
-      requester = squadron("Fingerprint requester " + tag, null).getId();
+      responsible =
+          OrgUnitFixtures.persistedSquadron(squadrons, "Fingerprint responsible " + tag, profit)
+              .getId();
+      requester =
+          OrgUnitFixtures.persistedSquadron(squadrons, "Fingerprint requester " + tag, null)
+              .getId();
       writer = member("fingerprint-writer-" + tag);
       reader = member("fingerprint-reader-" + tag);
       Material created = new Material();
@@ -707,13 +711,5 @@ class JobOrderFingerprintWorkerIntegrationTest {
     membership.setJoinedAt(Instant.now());
     memberships.saveAndFlush(membership);
     return user.getId();
-  }
-
-  private Squadron squadron(String name, @Nullable OrgUnit parent) {
-    Squadron unit = new Squadron();
-    unit.setName(name);
-    unit.setShorthand(name);
-    unit.setParent(parent);
-    return squadrons.saveAndFlush(unit);
   }
 }

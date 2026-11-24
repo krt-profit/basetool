@@ -31,6 +31,9 @@ import org.jetbrains.annotations.NotNull;
  */
 public final class BankAmounts {
 
+  /** The largest amount in whole aUEC a client may book or set as a target. */
+  public static final long MAX_WHOLE_AUEC = 1_000_000_000_000L;
+
   /** Not instantiable. */
   private BankAmounts() {}
 

@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -587,17 +588,33 @@ public class ExchangeRelay {
   }
 
   /**
-   * Returns the fixed {@code Retry-After} a relay result carries: for a relayed refusal the same
-   * the gateway's gate sends with that code, for {@code RELAY_BUSY} {@value
-   * #BUSY_RETRY_AFTER_SECONDS} and for the codes of the area switches ({@code
-   * BANK_EXCHANGE_DISABLED}, {@code JOB_ORDER_EXCHANGE_DISABLED}, {@code
-   * JOB_ORDER_WRITES_DISABLED}) {@value ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS}. A code that
-   * {@link #waitsForNextUtcDay(String)} has none here.
+   * Returns the {@code Retry-After} a relay result carries: for {@code JOB_ORDER_DAILY_CREATE_CAP}
+   * the seconds until UTC midnight, the day boundary of the daily caps, and every other code's
+   * fixed wait of {@link #retryAfterSeconds(String)}.
    *
    * @param code a problem code, or {@code null}
+   * @param secondsUntilNextUtcDay the seconds until the next UTC day, asked only for a code that
+   *     waits for it
    * @return the seconds, or {@code null} when the code carries none
    */
-  public static @Nullable String retryAfterSeconds(@Nullable String code) {
+  public static @Nullable String retryAfterSeconds(
+      @Nullable String code, @NotNull LongSupplier secondsUntilNextUtcDay) {
+    return JOB_ORDER_DAILY_CREATE_CAP.equals(code)
+        ? String.valueOf(secondsUntilNextUtcDay.getAsLong())
+        : retryAfterSeconds(code);
+  }
+
+  /**
+   * Returns the fixed {@code Retry-After} of a code: for a relayed refusal the same the gateway's
+   * gate sends with that code, for {@code RELAY_BUSY} {@value #BUSY_RETRY_AFTER_SECONDS} and for
+   * the codes of the area switches ({@code BANK_EXCHANGE_DISABLED}, {@code
+   * JOB_ORDER_EXCHANGE_DISABLED}, {@code JOB_ORDER_WRITES_DISABLED}) {@value
+   * ExchangeGateFilter#AREA_RETRY_AFTER_SECONDS}.
+   *
+   * @param code a problem code, or {@code null}
+   * @return the seconds, or {@code null} when the code carries no fixed wait
+   */
+  static @Nullable String retryAfterSeconds(@Nullable String code) {
     if (ExchangeRefusals.RELAY_BUSY.equals(code)) {
       return BUSY_RETRY_AFTER_SECONDS;
     }
@@ -608,18 +625,6 @@ public class ExchangeRelay {
             || ExchangeRefusals.REGISTRY_UNAVAILABLE.equals(code)
         ? ExchangeGateFilter.RETRY_AFTER_SECONDS
         : null;
-  }
-
-  /**
-   * Tells whether a relayed refusal waits for the next UTC day, so its {@code Retry-After} is the
-   * seconds until UTC midnight, the day boundary of the daily write quota; such a code carries no
-   * fixed wait in {@link #retryAfterSeconds(String)}.
-   *
-   * @param code a problem code, or {@code null}
-   * @return {@code true} for {@code JOB_ORDER_DAILY_CREATE_CAP}
-   */
-  public static boolean waitsForNextUtcDay(@Nullable String code) {
-    return JOB_ORDER_DAILY_CREATE_CAP.equals(code);
   }
 
   /**

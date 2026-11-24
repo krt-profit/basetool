@@ -57,9 +57,6 @@ import tools.jackson.databind.JsonNode;
 @PreAuthorize("isAuthenticated()")
 public class ExchangeJobOrderWriteController {
 
-  /** The job-order routes below the relay prefix. */
-  private static final String JOB_ORDERS = "/job-orders";
-
   /** The schema of the job-order writes' bodies and answers. */
   private static final String WRITE_SCHEMA = "job-order-write.schema.json#/$defs/";
 
@@ -86,7 +83,7 @@ public class ExchangeJobOrderWriteController {
     return responses.relayed(
         relay.forward(
             HttpMethod.GET,
-            ExchangeController.BACKEND + JOB_ORDERS + "/create-options",
+            ExchangeController.BACKEND + ExchangeJobOrderController.JOB_ORDERS + "/create-options",
             null,
             context,
             acceptLanguage),
@@ -115,7 +112,7 @@ public class ExchangeJobOrderWriteController {
         HttpMethod.POST,
         body,
         WRITE_SCHEMA + "create",
-        JOB_ORDERS,
+        ExchangeJobOrderController.JOB_ORDERS,
         WRITE_SCHEMA + "created",
         HttpStatus.CREATED,
         request,
@@ -211,7 +208,7 @@ public class ExchangeJobOrderWriteController {
         HttpMethod.POST,
         body,
         WRITE_SCHEMA + requestDef,
-        JOB_ORDERS + "/" + id.toLowerCase(Locale.ROOT) + "/" + action,
+        ExchangeJobOrderController.JOB_ORDERS + "/" + id.toLowerCase(Locale.ROOT) + "/" + action,
         WRITE_SCHEMA + answerDef,
         request,
         acceptLanguage);

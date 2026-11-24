@@ -73,6 +73,9 @@ public class JobOrder extends AbstractEntity<UUID> {
    */
   public static final int COMMENT_MAX_LENGTH = 1000;
 
+  /** Maximum length, in characters, of the contact {@link #handle} every create and edit admits. */
+  public static final int CONTACT_MAX_LENGTH = 200;
+
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)

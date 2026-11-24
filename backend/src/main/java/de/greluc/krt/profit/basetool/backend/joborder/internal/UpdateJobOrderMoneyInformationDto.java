@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.jetbrains.annotations.Nullable;
@@ -32,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
  * @param commentVersion the observed comment revision
  */
 public record UpdateJobOrderMoneyInformationDto(
-    @NotBlank @Size(max = 200) String handle,
+    @NotBlank @Size(max = JobOrder.CONTACT_MAX_LENGTH) String handle,
     @Nullable @Size(max = 1000) String comment,
     @Nullable Long version,
     @Nullable Long commentVersion) {}

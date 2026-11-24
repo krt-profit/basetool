@@ -38,9 +38,8 @@ public interface JobOrderStatusCommand {
    *
    * @param orderId the order
    * @param lifecycleVersion the lifecycle version the caller last read
-   * @param rule the authority that decides whether the actor writes the order
-   * @param read the read check the order must pass
-   * @param actor who cancels; the notices exclude its member
+   * @param caller the writer rule that decides whether the actor writes the order, the read check
+   *     the order must pass and who cancels; the notices exclude the actor's member
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order is
    *     unknown or fails the read check, alike
    * @throws org.springframework.security.access.AccessDeniedException when the order is no aUEC
@@ -50,10 +49,5 @@ public interface JobOrderStatusCommand {
    * @throws JobOrderClientWriteRefusedException when the responsibility is invalid, the order is
    *     not active or its money started
    */
-  void cancel(
-      @NotNull UUID orderId,
-      long lifecycleVersion,
-      @NotNull JobOrderWriterRule rule,
-      @NotNull JobOrderReadCheck read,
-      @NotNull JobOrderActor actor);
+  void cancel(@NotNull UUID orderId, long lifecycleVersion, @NotNull JobOrderCaller caller);
 }

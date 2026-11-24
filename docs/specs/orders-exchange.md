@@ -861,7 +861,7 @@ each counted per member from the orders themselves (`created_by_member_id` and
   instant and whatever their status since; a cancelled order still counts. At the cap the next
   client create answers `409 JOB_ORDER_DAILY_CREATE_CAP`; the gateway adds `Retry-After` with the
   seconds until the next UTC midnight, from the same day boundary as its daily write quota
-  (`ExchangeRelay.waitsForNextUtcDay`, `ExchangeQuotas#secondsUntilTomorrow`).
+  (`ExchangeRelay.retryAfterSeconds`, `ExchangeQuotas#secondsUntilTomorrow`).
 - Both are checked after the pair and before the insert, the open-order cap first, under the
   member's client-create lock (REQ-OXCH-004); a create under a known key answers `201` whatever the
   caps say.
@@ -940,10 +940,10 @@ REQ-NOTIF-028, REQ-OXCH-004, REQ-OBS-025 · **Issues:** #3618, #3621, #3642, #36
 > decided in #3619 and #3620.
 
 **The client keeps job-order data 7 days at most.** Job-order data of every kind, the member's own
-orders included, is the retention class „job-order data" of `docs/exchange/resources/job-orders.md`,
-whose table has a client keep it in memory. The approval holds a client to the org-demand rule of
-`docs/exchange/client-security.md`, with no exception for own data: it stores job-order data for at
-most 7 days, outside cloud-synced folders, never in a backup or diagnostics, and never forwards it.
+orders included, is the retention class „job-order data" of `docs/exchange/resources/job-orders.md`.
+The approval holds a client to the org-demand rule of `docs/exchange/client-security.md`, with no
+exception for own data: it stores job-order data for at most 7 days, outside cloud-synced folders,
+never in a backup or diagnostics, and never forwards it.
 
 **Two approval criteria** in `docs/exchange/onboarding.md`, each named by the approval
 (REQ-XCH-002) and each confirmed in the client application issue template

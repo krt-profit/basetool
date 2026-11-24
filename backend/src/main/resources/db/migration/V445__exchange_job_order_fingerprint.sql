@@ -45,14 +45,24 @@ COMMENT ON FUNCTION exchange_mark_job_order(UUID) IS
 
 -- The client set of REQ-OXCH-003: active, closed within 7 days, or aUEC with an open settlement,
 -- read from the last fingerprint because settlementOpen is derived in Java.
+CREATE FUNCTION exchange_job_order_in_window(
+    p_status VARCHAR, p_closed_at TIMESTAMP WITH TIME ZONE, p_type VARCHAR,
+    p_settlement_open BOOLEAN, p_at TIMESTAMP WITH TIME ZONE DEFAULT now())
+RETURNS BOOLEAN AS $$
+    SELECT p_status IN ('OPEN', 'IN_PROGRESS')
+        OR p_closed_at >= p_at - INTERVAL '7 days'
+        OR (p_type = 'AUEC' AND COALESCE(p_settlement_open, FALSE));
+$$ LANGUAGE sql STABLE;
+
+COMMENT ON FUNCTION exchange_job_order_in_window(VARCHAR, TIMESTAMP WITH TIME ZONE, VARCHAR, BOOLEAN, TIMESTAMP WITH TIME ZONE) IS
+    'The window of the client set at an instant, now by default: an active order, one closed within the 7 days before it, or an aUEC order whose last fingerprint says settlementOpen (REQ-OXCH-003).';
+
 CREATE FUNCTION exchange_mark_job_order_client_set() RETURNS VOID AS $$
     INSERT INTO exchange_job_order_dirty (job_order_id, tx)
     SELECT o.id, (pg_current_xact_id()::text)::bigint
       FROM job_order o
       LEFT JOIN exchange_job_order_fingerprint f ON f.job_order_id = o.id
-     WHERE o.status IN ('OPEN', 'IN_PROGRESS')
-        OR o.closed_at >= now() - INTERVAL '7 days'
-        OR (o.type = 'AUEC' AND f.settlement_open)
+     WHERE exchange_job_order_in_window(o.status, o.closed_at, o.type, f.settlement_open)
     ON CONFLICT (job_order_id, tx) DO NOTHING;
 $$ LANGUAGE sql;
 

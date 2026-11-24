@@ -123,8 +123,8 @@ public class JobOrderAccessPolicy
   /**
    * Decides the exchange read set of one member for one order (REQ-OXCH-001).
    *
-   * @param member the member
-   * @param order the order
+   * @param member the member whose own relations decide
+   * @param order the loaded order
    * @return {@code true} iff the member has a current own relation to the order
    */
   private boolean relatesTo(UUID member, JobOrder order) {

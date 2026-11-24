@@ -75,7 +75,8 @@ while the commands live in `joborder.internal`.
    [#3611](https://github.com/krt-profit/basetool/issues/3611) for job orders.
 7. **The status, target and information commands** (the status command of `JobOrderService`,
    `JobOrderMoneyOrderChanges.target` and `.information`, through `JobOrderEditor`) take the same
-   writer rule and actor and, beside them, a `JobOrderReadCheck`.
+   writer rule and actor and, beside them, a `JobOrderReadCheck`; the three travel together as one
+   `JobOrderCaller` in `joborder.api`, and `JobOrderCaller.web` builds the web's.
    - `JobOrderReadCheck.CONTEXTUAL` is the web's complete-order read (REQ-ORDERS-052) of the
      signed-in caller; the exchange's read set comes with the read slice
      ([#3644](https://github.com/krt-profit/basetool/issues/3644)). The read check, like the rule,
@@ -113,7 +114,8 @@ while the commands live in `joborder.internal`.
    responsibility first with `400`. The order is one unit, `JobOrderClientWriteRules`, which a port
    passes to the shared command as the checks of its edit; the edit module runs them on the loaded
    order before and again under the order locks. The web's entry points pass their own checks and
-   never see the unit, so the web keeps its codes and order. The cancel adds its own rule after the
+   never see the unit, so the web keeps its codes and order; both channels then run one target body
+   and one information body under the locks, the client's information write with the comment alone. The cancel adds its own rule after the
    shared ones: no money operation of the order reached its accepted, durable submission boundary
    (REQ-ORDERS-063). The rules refuse with the web's exceptions for a hidden order (`404`, like an
    unknown one), a write the actor may not make (`403`) and a stale version (`409`), and with
@@ -124,10 +126,10 @@ while the commands live in `joborder.internal`.
 - **Positive.** The web and the exchange share one create path and one status, target and
   information command each, so validation, the locks, the eligible-Profit check, the versions, the
   audit event, the notices and the live update cannot drift between them. The exchange depends on
-  five narrow ports in `joborder.api` and on three small value types. The web's behaviour is
+  five narrow ports in `joborder.api` and on four small value types. The web's behaviour is
   unchanged, pinned by characterisation tests of the create, the options and the three commands.
-- **Negative / cost.** Each command carries two or three more parameters, and the web entry points
-  build the `CONTEXTUAL` rule and read check and the request's actor themselves.
+- **Negative / cost.** Each command carries one or two more parameters, and the web entry points
+  build the `CONTEXTUAL` rule and read check and the request's actor through `JobOrderCaller.web`.
   `JobOrderCreationOptions` became an interface implemented in `joborder.internal`. The database
   rule reads the member's memberships on every call.
 - **Neutral.** The web's refusals keep their codes: `400` for an unknown or ineligible unit before

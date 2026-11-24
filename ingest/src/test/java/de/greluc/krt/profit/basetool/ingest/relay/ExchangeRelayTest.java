@@ -240,9 +240,12 @@ class ExchangeRelayTest {
       assertThat(result.detail()).isNotBlank().doesNotContain("Backend words.");
       assertThat(ExchangeRelay.retryAfterSeconds(cap)).isNull();
     }
-    assertThat(ExchangeRelay.waitsForNextUtcDay("JOB_ORDER_DAILY_CREATE_CAP")).isTrue();
-    assertThat(ExchangeRelay.waitsForNextUtcDay("JOB_ORDER_OPEN_ORDER_CAP")).isFalse();
-    assertThat(ExchangeRelay.waitsForNextUtcDay(null)).isFalse();
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_DAILY_CREATE_CAP", () -> 3600L))
+        .isEqualTo("3600");
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_OPEN_ORDER_CAP", () -> 3600L)).isNull();
+    assertThat(ExchangeRelay.retryAfterSeconds(null, () -> 3600L)).isNull();
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_WRITES_DISABLED", () -> 3600L))
+        .isEqualTo("300");
   }
 
   @Test

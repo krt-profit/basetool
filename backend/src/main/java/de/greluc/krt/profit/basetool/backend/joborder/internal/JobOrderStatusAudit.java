@@ -53,7 +53,7 @@ final class JobOrderStatusAudit {
           AuditEventType.JOB_ORDER_COMPLETED,
           AuditDetails.of("from", previous).with("autoCompleted", "false"));
     }
-    if (status == JobOrderStatus.CANCELLED && actor instanceof JobOrderActor.Client) {
+    if (status == JobOrderStatus.CANCELLED && actor.viaClient()) {
       return JobOrderEdit.audited(
           order,
           AuditEventType.JOB_ORDER_CANCELLED_VIA_CLIENT,

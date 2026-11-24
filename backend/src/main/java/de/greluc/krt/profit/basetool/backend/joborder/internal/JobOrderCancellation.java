@@ -20,13 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientWriteRefusedException;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatusCommand;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -48,12 +46,7 @@ public class JobOrderCancellation implements JobOrderStatusCommand {
   private final JobOrderRepository repository;
 
   @Override
-  public void cancel(
-      @NotNull UUID orderId,
-      long lifecycleVersion,
-      @NotNull JobOrderWriterRule rule,
-      @NotNull JobOrderReadCheck read,
-      @NotNull JobOrderActor actor) {
+  public void cancel(@NotNull UUID orderId, long lifecycleVersion, @NotNull JobOrderCaller caller) {
     JobOrderClientWriteRules.Write cancel =
         new JobOrderClientWriteRules.Write(
             (writes, order) -> writes.permitsStatus(order, JobOrderStatus.CANCELLED),
@@ -63,8 +56,8 @@ public class JobOrderCancellation implements JobOrderStatusCommand {
     orders.changeStatus(
         orderId,
         JobOrderStatus.CANCELLED,
-        actor,
-        rules.checks(new JobOrderCaller(rule, read, actor), cancel).andThen(this::requireNoMoney));
+        caller.actor(),
+        rules.checks(caller, cancel).andThen(this::requireNoMoney));
   }
 
   /**

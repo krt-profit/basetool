@@ -42,9 +42,8 @@ public interface JobOrderInformationCommand {
    * @param orderId the aUEC order
    * @param comment the new comment, at most 1000 characters; trimmed, and blank clears it
    * @param commentVersion the comment version the caller last read
-   * @param rule the authority that decides whether the actor writes the order
-   * @param read the read check the order must pass
-   * @param actor who changes the comment; the notice excludes its member
+   * @param caller the writer rule that decides whether the actor writes the order, the read check
+   *     the order must pass and who changes the comment; the notice excludes the actor's member
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order is
    *     unknown or fails the read check, alike
    * @throws org.springframework.security.access.AccessDeniedException when the order is no aUEC
@@ -58,7 +57,5 @@ public interface JobOrderInformationCommand {
       @NotNull UUID orderId,
       @Nullable String comment,
       long commentVersion,
-      @NotNull JobOrderWriterRule rule,
-      @NotNull JobOrderReadCheck read,
-      @NotNull JobOrderActor actor);
+      @NotNull JobOrderCaller caller);
 }

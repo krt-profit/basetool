@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
@@ -72,7 +71,7 @@ import org.springframework.stereotype.Component;
 class ExchangeJobOrderShaper {
 
   /** The detail page of an order in the Basetool; the order's id follows. */
-  static final String LINK_PREFIX = "https://profit-base.online/orders/";
+  static final String LINK_PREFIX = ExchangeLinks.BASETOOL + "/orders/";
 
   private final JobOrderExchangeReads reads;
   private final JobOrderExchangeReadSet readSet;
@@ -275,10 +274,7 @@ class ExchangeJobOrderShaper {
 
     ExchangeJobOrderDto.MaterialLine materialLine(MaterialLine line) {
       Material material = Objects.requireNonNull(materials.get(line.materialId()));
-      String unit =
-          material.getQuantityType() == QuantityType.PIECE
-              ? QuantityType.PIECE.name()
-              : QuantityType.SCU.name();
+      String unit = ExchangeLotCatalogue.unitOf(material);
       return new ExchangeJobOrderDto.MaterialLine(
           new ExchangeItemRefDto(
               material.getId().toString(), ExchangeNames.cut(material.getName())),

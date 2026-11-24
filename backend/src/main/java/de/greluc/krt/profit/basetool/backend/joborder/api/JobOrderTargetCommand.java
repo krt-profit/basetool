@@ -41,10 +41,9 @@ public interface JobOrderTargetCommand {
    * @param orderId the aUEC order
    * @param target the new positive whole aUEC amount
    * @param targetVersion the target version the caller last read
-   * @param rule the authority that decides whether the actor writes the order
-   * @param read the read check the order must pass
-   * @param actor who changes the target; the history entry names its member and client, and the
-   *     notice excludes the member
+   * @param caller the writer rule that decides whether the actor writes the order, the read check
+   *     the order must pass and who changes the target; the history entry names the actor's member
+   *     and client, and the notice excludes the member
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order is
    *     unknown or fails the read check, alike
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the target is not
@@ -60,7 +59,5 @@ public interface JobOrderTargetCommand {
       @NotNull UUID orderId,
       @NotNull BigDecimal target,
       long targetVersion,
-      @NotNull JobOrderWriterRule rule,
-      @NotNull JobOrderReadCheck read,
-      @NotNull JobOrderActor actor);
+      @NotNull JobOrderCaller caller);
 }

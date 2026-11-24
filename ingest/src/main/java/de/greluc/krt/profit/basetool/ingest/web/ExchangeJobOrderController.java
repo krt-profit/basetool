@@ -45,8 +45,8 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("isAuthenticated()")
 public class ExchangeJobOrderController {
 
-  /** The job-order routes below the relay prefix. */
-  private static final String JOB_ORDERS = "/job-orders";
+  /** The job-order routes below the relay prefix, which the write controller shares. */
+  static final String JOB_ORDERS = "/job-orders";
 
   private final ExchangeRelayResponses responses;
 

@@ -86,6 +86,11 @@ class SandboxSeedJobOrdersTest {
   private static final UUID IRIDIUM = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final UUID SANDBOX_SQUADRON =
       UUID.fromString("5a4d0000-0000-4000-8000-000000000101");
+  private static final UUID MATERIAL_ORDER =
+      UUID.fromString("5a4d0000-0000-4000-8000-000000002201");
+  private static final UUID ITEM_ORDER = UUID.fromString("5a4d0000-0000-4000-8000-000000002202");
+  private static final UUID SQUADRON_ORDER =
+      UUID.fromString("5a4d0000-0000-4000-8000-000000002203");
   private static final UUID AUEC_ORDER = UUID.fromString("5a4d0000-0000-4000-8000-000000002204");
   private static final UUID CLOSED_ORDER = UUID.fromString("5a4d0000-0000-4000-8000-000000002205");
 
@@ -125,13 +130,52 @@ class SandboxSeedJobOrdersTest {
   }
 
   @Test
+  void theLogisticianStartsBelowBothCaps() {
+    assertThat(createOptions.options(caller(LOGISTICIAN)).limits())
+        .isEqualTo(new ExchangeJobOrderCreateOptionsDto.Limits(20, 0, 20, 0));
+  }
+
+  @Test
   void theMembersMayCreateNoOrder() {
     for (UUID member : List.of(MEMBER, MEMBER_2)) {
       ExchangeJobOrderCreateOptionsDto options = createOptions.options(caller(member));
 
       assertThat(options.requestingUnits()).isEmpty();
       assertThat(options.responsibleUnits()).isEmpty();
+      assertThat(options.suggestedResponsible()).isNull();
     }
+  }
+
+  @Test
+  void theLogisticianReadsTheFourOrdersForIridiumInTheWindow() {
+    List<UUID> seeded =
+        List.of(MATERIAL_ORDER, ITEM_ORDER, SQUADRON_ORDER, AUEC_ORDER, CLOSED_ORDER);
+
+    assertThat(readSet.relations(readSet.relatingMember(LOGISTICIAN), seeded))
+        .containsOnlyKeys(MATERIAL_ORDER, ITEM_ORDER, AUEC_ORDER, CLOSED_ORDER);
+    for (UUID order : seeded) {
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT exchange_job_order_in_client_set(?)", Boolean.class, order))
+          .as("order %s in the window", order)
+          .isTrue();
+    }
+  }
+
+  @Test
+  void theAuecOrdersCarryTheVersionsTheScenariosEcho() {
+    assertThat(read(AUEC_ORDER).versions())
+        .satisfies(versions -> {
+          assertThat(versions.lifecycle()).isEqualTo(1L);
+          assertThat(versions.target()).isZero();
+          assertThat(versions.comment()).isZero();
+        });
+    assertThat(read(CLOSED_ORDER).versions())
+        .satisfies(versions -> {
+          assertThat(versions.lifecycle()).isEqualTo(1L);
+          assertThat(versions.target()).isZero();
+          assertThat(versions.comment()).isZero();
+        });
   }
 
   @Test
@@ -204,9 +248,22 @@ class SandboxSeedJobOrdersTest {
   }
 
   @Test
-  void aSecondRunChangesNoFigure() throws IOException {
+  void aSecondRunChangesNoFigureAndBringsTheClosedOrderBackIntoTheWindow() throws IOException {
+    jdbc.update(
+        "UPDATE job_order SET closed_at = now() - INTERVAL '30 days' WHERE id = ?", CLOSED_ORDER);
+
     applySeed();
 
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT closed_at = now() - INTERVAL '1 day' FROM job_order WHERE id = ?",
+                Boolean.class,
+                CLOSED_ORDER))
+        .isTrue();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT exchange_job_order_in_client_set(?)", Boolean.class, CLOSED_ORDER))
+        .isTrue();
     assertThat(read(AUEC_ORDER).progress())
         .isInstanceOfSatisfying(
             AuecProgress.class,

@@ -47,9 +47,6 @@ import org.jetbrains.annotations.Nullable;
  */
 final class JobOrderFingerprints {
 
-  /** The length of a fingerprint in bytes. */
-  static final int LENGTH = 32;
-
   private static final byte NULL = 0;
   private static final byte FALSE = 1;
   private static final byte TRUE = 2;
@@ -70,7 +67,7 @@ final class JobOrderFingerprints {
    * Fingerprints one read.
    *
    * @param read the order's member-independent read
-   * @return the {@value #LENGTH}-byte fingerprint
+   * @return the 32-byte SHA-256 fingerprint
    * @throws IllegalStateException when the read holds a value type the encoding does not know
    */
   static byte @NotNull [] of(@NotNull JobOrderExchangeRead read) {

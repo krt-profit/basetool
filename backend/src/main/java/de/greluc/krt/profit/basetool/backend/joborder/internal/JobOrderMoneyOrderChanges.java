@@ -23,13 +23,12 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientWriteRefusedException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderInformationCommand;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderTargetCommand;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
@@ -37,6 +36,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -45,7 +45,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Applies independent target and contextual information changes for aUEC orders, for the web and
- * for a caller that passes its own writer rule, read check and actor (ADR-0408).
+ * for a caller that passes its own writer rule, read check and actor (ADR-0408). Both channels run
+ * one target body and one information body under the order locks; each channel brings only its own
+ * checks.
  */
 @Service
 @RequiredArgsConstructor
@@ -73,7 +75,17 @@ public class JobOrderMoneyOrderChanges
    * @param dto the amount and its observed target revision
    */
   public void target(UUID orderId, UpdateJobOrderMoneyTargetDto dto) {
-    writeTarget(orderId, WholeAuec.positive(dto.target()), dto.version(), access.webCaller());
+    BigDecimal requested = WholeAuec.positive(dto.target());
+    Channel web = web();
+    lockAccounts(web);
+    editor.editMoney(
+        orderId,
+        web.checks(),
+        order -> {
+          web.writer().require(order);
+          return changesState(order.getStatus(), requested, ledger.delivered(orderId));
+        },
+        (order, queueLocked) -> targetLocked(order, requested, dto.version(), web, queueLocked));
   }
 
   @Override
@@ -81,25 +93,22 @@ public class JobOrderMoneyOrderChanges
       @NotNull UUID orderId,
       @NotNull BigDecimal target,
       long targetVersion,
-      @NotNull JobOrderWriterRule rule,
-      @NotNull JobOrderReadCheck read,
-      @NotNull JobOrderActor actor) {
-    BigDecimal requested = WholeAuec.positive(target.toPlainString());
-    JobOrderCaller caller = new JobOrderCaller(rule, read, actor);
-    UUID member = access.memberOf(actor);
-    identityLock.lockAccounts(member);
-    JobOrderClientWriteRules.Write change =
-        new JobOrderClientWriteRules.Write(
-            JobOrderWriters.Scope::writesEitherSide,
-            order -> targets.versionFor(order.getId()).orElse(null),
-            targetVersion,
-            JobOrderStatus::isActive);
+      @NotNull JobOrderCaller caller) {
+    BigDecimal requested = WholeAuec.positive(target);
+    Channel client =
+        client(
+            caller,
+            new JobOrderClientWriteRules.Write(
+                JobOrderWriters.Scope::writesEitherSide,
+                order -> targets.versionFor(order.getId()).orElse(null),
+                targetVersion,
+                JobOrderStatus::isActive));
+    lockAccounts(client);
     editor.editMoney(
         orderId,
-        clientRules.checks(caller, change).andThen(order -> requireAboveHandover(order, requested)),
+        client.checks().andThen(order -> requireAboveHandover(order, requested)),
         _ -> false,
-        (order, queueLocked) ->
-            targetLocked(order, requested, targetVersion, member, caller, queueLocked));
+        (order, queueLocked) -> targetLocked(order, requested, targetVersion, client, queueLocked));
   }
 
   /**
@@ -117,30 +126,18 @@ public class JobOrderMoneyOrderChanges
     }
   }
 
-  /** The web's target command, under the account and order locks, in the web's refusal order. */
-  private void writeTarget(
-      UUID orderId, BigDecimal requested, @Nullable Long version, JobOrderCaller caller) {
-    UUID member = access.memberOf(caller.actor());
-    identityLock.lockAccounts(member);
-    editor.editMoney(
-        orderId,
-        caller.read(),
-        order -> {
-          requireWriter(order, member, caller);
-          return changesState(order.getStatus(), requested, ledger.delivered(orderId));
-        },
-        (order, queueLocked) ->
-            targetLocked(order, requested, version, member, caller, queueLocked));
-  }
-
+  /**
+   * Replaces the target of the checked, locked order for either channel, records its history and
+   * reconciles completion; a client's change records its own audit type (REQ-AUDIT-001, ADR-0407).
+   */
   private JobOrderEditor.MoneyEdit<JobOrder> targetLocked(
       JobOrder order,
       BigDecimal requested,
       @Nullable Long version,
-      UUID member,
-      JobOrderCaller caller,
+      Channel channel,
       boolean queueLocked) {
-    final JobOrderWriters.Scope scope = requireWriter(order, member, caller);
+    final JobOrderWriters.Scope scope = channel.writer().require(order);
+    final JobOrderActor actor = channel.caller().actor();
     JobOrderMoneyTarget target = targets.findById(order.getId()).orElseThrow();
     OptimisticLock.check(target.getVersion(), version, JobOrderMoneyTarget.class, order.getId());
     BigDecimal prior = target.getAmount();
@@ -155,7 +152,7 @@ public class JobOrderMoneyOrderChanges
     target.replace(requested);
     history.save(
         new JobOrderMoneyTargetChange(
-            order.getId(), member, caller.actor().clientId(), prior, requested));
+            order.getId(), access.memberOf(actor), actor.clientId(), prior, requested));
     if (lifecycleChanged) {
       if (order.getStatus() == JobOrderStatus.COMPLETED) {
         lifecycle.reopenUnderfulfilledMoneyOrder(order);
@@ -167,23 +164,14 @@ public class JobOrderMoneyOrderChanges
     JobOrderEdit audit =
         JobOrderEdit.audited(
             order,
-            targetChanged(caller.actor()),
+            actor.viaClient()
+                ? AuditEventType.JOB_ORDER_TARGET_CHANGED_VIA_CLIENT
+                : AuditEventType.JOB_ORDER_MONEY_TARGET_CHANGED,
             AuditDetails.of("previousTarget", prior).with("target", requested));
     if (!lifecycleChanged) {
-      audit = audit.notifying(List.of(needChanged(order, member, scope, caller.actor())));
+      audit = audit.notifying(List.of(needChanged(order, scope, actor)));
     }
     return new JobOrderEditor.MoneyEdit<>(order, audit);
-  }
-
-  /**
-   * Names the audit event of a target change: a client's records its own type instead of the web's
-   * (REQ-AUDIT-001, ADR-0407).
-   */
-  private static AuditEventType targetChanged(JobOrderActor actor) {
-    return switch (actor) {
-      case JobOrderActor.Client _ -> AuditEventType.JOB_ORDER_TARGET_CHANGED_VIA_CLIENT;
-      case JobOrderActor.Web _ -> AuditEventType.JOB_ORDER_MONEY_TARGET_CHANGED;
-    };
   }
 
   /**
@@ -197,31 +185,11 @@ public class JobOrderMoneyOrderChanges
    * @param dto the information fields and their observed revisions
    */
   public void information(UUID orderId, UpdateJobOrderMoneyInformationDto dto) {
-    JobOrderCaller caller = access.webCaller();
-    UUID member = access.memberOf(caller.actor());
-    identityLock.lockAccounts(member);
-    editor.editMoney(
+    writeInformation(
         orderId,
-        caller.read(),
-        _ -> false,
-        (order, _) -> {
-          final JobOrderWriters.Scope scope = requireWriter(order, member, caller);
-          OptimisticLock.check(
-              order.getMoneyInformationVersion(), dto.version(), JobOrder.class, orderId);
-          JobOrderComment.check(order, dto.commentVersion());
-          boolean contactChanged = replaceContact(order, dto.handle());
-          boolean commentChanged = JobOrderComment.replace(order, dto.comment(), caller.actor());
-          if (!contactChanged && !commentChanged) {
-            return new JobOrderEditor.MoneyEdit<>(order, JobOrderEdit.unchanged(order));
-          }
-          return informationChanged(
-              order,
-              JobOrderEdit.audited(
-                  order, AuditEventType.JOB_ORDER_UPDATED, AuditDetails.of("information", true)),
-              member,
-              scope,
-              caller.actor());
-        });
+        new Information(
+            new Contact(dto.handle(), dto.version()), dto.comment(), dto.commentVersion()),
+        web());
   }
 
   @Override
@@ -229,68 +197,93 @@ public class JobOrderMoneyOrderChanges
       @NotNull UUID orderId,
       @Nullable String comment,
       long commentVersion,
-      @NotNull JobOrderWriterRule rule,
-      @NotNull JobOrderReadCheck read,
-      @NotNull JobOrderActor actor) {
-    JobOrderCaller caller = new JobOrderCaller(rule, read, actor);
-    UUID member = access.memberOf(actor);
-    identityLock.lockAccounts(member);
-    editor.editMoney(
+      @NotNull JobOrderCaller caller) {
+    writeInformation(
         orderId,
-        clientRules.checks(
+        new Information(null, comment, commentVersion),
+        client(
             caller,
             new JobOrderClientWriteRules.Write(
                 JobOrderWriters.Scope::writesEitherSide,
                 JobOrder::getCommentVersion,
                 commentVersion,
-                JobOrderMoneyOrderChanges::openForEdits)),
+                JobOrderMoneyOrderChanges::openForEdits)));
+  }
+
+  /** Runs one information write of either channel under the account and order locks. */
+  private void writeInformation(UUID orderId, Information change, Channel channel) {
+    lockAccounts(channel);
+    editor.editMoney(
+        orderId,
+        channel.checks(),
         _ -> false,
-        (order, _) -> commentLocked(order, comment, member, caller));
+        (order, _) -> informationLocked(order, change, channel));
   }
 
   /**
-   * Replaces the comment of the checked, locked order for a client's write and audits it with the
-   * client's own type and no details, since the text is never recorded (REQ-OXCH-008).
+   * Replaces the contact, when the change carries one, and the comment of the checked, locked
+   * order. Each part checks and raises only its own revision; a client's change records its own
+   * audit type and no details, since the text is never recorded (REQ-OXCH-008).
    */
-  private JobOrderEditor.MoneyEdit<JobOrder> commentLocked(
-      JobOrder order, @Nullable String comment, UUID member, JobOrderCaller caller) {
-    access.requireActive(member);
-    if (!JobOrderComment.replace(order, comment, caller.actor())) {
+  private JobOrderEditor.MoneyEdit<JobOrder> informationLocked(
+      JobOrder order, Information change, Channel channel) {
+    final JobOrderWriters.Scope scope = channel.writer().require(order);
+    JobOrderActor actor = channel.caller().actor();
+    Contact contact = change.contact();
+    if (contact != null) {
+      OptimisticLock.check(
+          order.getMoneyInformationVersion(), contact.version(), JobOrder.class, order.getId());
+    }
+    JobOrderComment.check(order, change.commentVersion());
+    boolean contactChanged = contact != null && replaceContact(order, contact.handle());
+    boolean commentChanged = JobOrderComment.replace(order, change.comment(), actor);
+    if (!contactChanged && !commentChanged) {
       return new JobOrderEditor.MoneyEdit<>(order, JobOrderEdit.unchanged(order));
     }
-    return informationChanged(
-        order,
-        JobOrderEdit.audited(order, AuditEventType.JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT, null),
-        member,
-        writers.resolve(caller.rule(), caller.actor()),
-        caller.actor());
-  }
-
-  /**
-   * Completes an information write that changed the order: the live update of its section, then the
-   * audit with the need-change notice.
-   */
-  private JobOrderEditor.MoneyEdit<JobOrder> informationChanged(
-      JobOrder order,
-      JobOrderEdit audit,
-      UUID member,
-      JobOrderWriters.Scope scope,
-      JobOrderActor actor) {
     effects.informationChanged(order);
+    JobOrderEdit audit =
+        actor.viaClient()
+            ? JobOrderEdit.audited(order, AuditEventType.JOB_ORDER_COMMENT_CHANGED_VIA_CLIENT, null)
+            : JobOrderEdit.audited(
+                order, AuditEventType.JOB_ORDER_UPDATED, AuditDetails.of("information", true));
     return new JobOrderEditor.MoneyEdit<>(
-        order, audit.notifying(List.of(needChanged(order, member, scope, actor))));
+        order, audit.notifying(List.of(needChanged(order, scope, actor))));
   }
 
   /**
-   * Requires an active member who writes either side of the order under the caller's rule, and an
-   * order that is not cancelled.
+   * The web channel: the editor's read checks of the contextual read, and under the order lock an
+   * active member who writes either side of an order that is not cancelled.
    */
-  private JobOrderWriters.Scope requireWriter(JobOrder order, UUID member, JobOrderCaller caller) {
-    access.requireActive(member);
-    JobOrderWriters.Scope scope = writers.resolve(caller.rule(), caller.actor());
-    access.requireUnitWriter(order, scope);
-    requireOpenForEdits(order);
-    return scope;
+  private Channel web() {
+    JobOrderCaller caller = access.webCaller();
+    return new Channel(
+        caller,
+        editor.moneyChecks(caller.read()),
+        order -> {
+          JobOrderWriters.Scope scope = activeWriter(caller);
+          access.requireUnitWriter(order, scope);
+          requireOpenForEdits(order);
+          return scope;
+        });
+  }
+
+  /**
+   * A client's channel: the shared checks of a client write decide the writer and the status before
+   * and under the order lock, so the bodies add only the active account of the actor's member.
+   */
+  private Channel client(JobOrderCaller caller, JobOrderClientWriteRules.Write write) {
+    return new Channel(caller, clientRules.checks(caller, write), _ -> activeWriter(caller));
+  }
+
+  /** Requires an active account of the caller's member and resolves the caller's writer units. */
+  private JobOrderWriters.Scope activeWriter(JobOrderCaller caller) {
+    access.requireActive(access.memberOf(caller.actor()));
+    return writers.resolve(caller.rule(), caller.actor());
+  }
+
+  /** Serialises the write with the other money writes of the caller's member. */
+  private void lockAccounts(Channel channel) {
+    identityLock.lockAccounts(access.memberOf(channel.caller().actor()));
   }
 
   /**
@@ -298,9 +291,9 @@ public class JobOrderMoneyOrderChanges
    * application a client's write came through (REQ-ORDERS-078).
    */
   private NotificationEvent needChanged(
-      JobOrder order, UUID member, JobOrderWriters.Scope scope, JobOrderActor actor) {
+      JobOrder order, JobOrderWriters.Scope scope, JobOrderActor actor) {
     return JobOrderLifecycleNotices.needChanged(
-        order, member, scope.writesResponsible(order), clientNames.appOf(actor));
+        order, access.memberOf(actor), scope.writesResponsible(order), clientNames.appOf(actor));
   }
 
   private static boolean replaceContact(JobOrder order, String handle) {
@@ -329,4 +322,51 @@ public class JobOrderMoneyOrderChanges
     boolean met = delivered.compareTo(target) >= 0;
     return (status.isActive() && met) || (status == JobOrderStatus.COMPLETED && !met);
   }
+
+  /**
+   * One channel of a target or information write: its caller, the checks it runs on the loaded
+   * order before and after the order row lock, and its writer decision on the locked order, which
+   * the shared bodies run before they change it.
+   *
+   * @param caller the writer rule, read check and actor
+   * @param checks the channel's checks in its order of refusals; each refusal is an exception
+   * @param writer refuses a locked order the caller may not write, else names the caller's writer
+   *     units
+   */
+  private record Channel(
+      @NotNull JobOrderCaller caller,
+      @NotNull Consumer<JobOrder> checks,
+      @NotNull WriterCheck writer) {}
+
+  /** A channel's writer decision on the locked order. */
+  @FunctionalInterface
+  private interface WriterCheck {
+
+    /**
+     * Refuses an order the caller may not write, else names the caller's writer units.
+     *
+     * @param order the loaded order
+     * @return the caller's writer units
+     */
+    @NotNull
+    JobOrderWriters.Scope require(@NotNull JobOrder order);
+  }
+
+  /**
+   * One information write: the contact a web write replaces beside the comment, and the comment.
+   *
+   * @param contact the new contact and its observed revision, {@code null} to leave it untouched
+   * @param comment the requested comment; blank clears it
+   * @param commentVersion the observed comment revision; {@code null} is a conflict
+   */
+  private record Information(
+      @Nullable Contact contact, @Nullable String comment, @Nullable Long commentVersion) {}
+
+  /**
+   * The contact part of a web information write.
+   *
+   * @param handle the requested contact, stripped before it is stored
+   * @param version the observed contact revision; {@code null} is a conflict
+   */
+  private record Contact(@NotNull String handle, @Nullable Long version) {}
 }

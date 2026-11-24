@@ -19,8 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import java.util.UUID;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -48,5 +53,27 @@ public record ExchangeCaller(
       throw new IllegalStateException("Not an exchange client request");
     }
     return new ExchangeCaller(UUID.fromString(authentication.subject()), client, key);
+  }
+
+  /**
+   * The member acting through the client, as the job-order commands attribute a write to it.
+   *
+   * @return the client actor of the member and the client
+   */
+  @Contract(" -> new")
+  public @NotNull JobOrderActor.Client jobOrderActor() {
+    return new JobOrderActor.Client(member, clientId);
+  }
+
+  /**
+   * The authority a client's write on an existing job order runs under (ADR-0408): the member's
+   * direct Logistician units, the read of the orders the member relates to, and the client actor.
+   *
+   * @return the job-order caller of the client write
+   */
+  @Contract(" -> new")
+  public @NotNull JobOrderCaller jobOrderCaller() {
+    return new JobOrderCaller(
+        JobOrderWriterRule.DIRECT_LOGISTICIAN, JobOrderReadCheck.OWN_RELATION, jobOrderActor());
   }
 }

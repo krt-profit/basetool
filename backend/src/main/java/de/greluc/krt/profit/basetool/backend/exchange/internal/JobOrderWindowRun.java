@@ -60,7 +60,7 @@ public class JobOrderWindowRun {
       return 0;
     }
     Instant now = clock.instant();
-    Instant closedSince = now.minus(ExchangeJobOrderReadService.CLOSED_WINDOW);
+    Instant closedSince = JobOrderClientWindow.closedSince(now);
     int agedOut = fingerprints.markLeftSet(closedSince, now);
     int cleared =
         creators.clearCreators(fingerprints.findOutsideWithCreator(closedSince), closedSince);

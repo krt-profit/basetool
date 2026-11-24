@@ -26,14 +26,16 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * A snapshot page of the member's job-order set (REQ-OXCH-003); its last page hands over to the
- * feed.
+ * A snapshot or feed page of the member's job-order set (REQ-OXCH-003); a snapshot's last page
+ * hands over to the feed.
  *
- * @param items the orders of the page, ascending by id
+ * @param items the orders of the page: on a snapshot page ascending by id, on a feed page in the
+ *     order their changes were announced
  * @param removed the orders that left the set, each without the reason; always empty on a snapshot
  *     page
- * @param nextCursor the cursor of the next page, a feed cursor on the snapshot's last page
- * @param hasMore whether the snapshot continues
+ * @param nextCursor the cursor of the next page, a feed cursor on a snapshot's last page and on
+ *     every feed page
+ * @param hasMore whether the snapshot or the feed continues
  */
 public record ExchangeJobOrderPageDto(
     @NotNull @Unmodifiable List<ExchangeJobOrderDto> items,

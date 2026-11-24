@@ -5,5 +5,3 @@
   solange er offen oder in Bearbeitung ist und noch kein Geld für ihn angenommen wurde. Die
   Stornierung läuft wie im Basetool, die Benachrichtigung nennt die Anwendung; wieder öffnen lässt
   sich der Auftrag nur im Basetool.
-- **Administration.** Das Audit-Log führt „Auftrag über verbundene Anwendung storniert" als eigenen
-  Ereignistyp, mit der Anwendung im Client-Filter.
