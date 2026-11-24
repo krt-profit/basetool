@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
@@ -66,6 +67,7 @@ class BankExportTransactionBoundaryMvcTest {
   @Autowired private BankReportRenderer renderer;
   @Autowired private ObjectMapper mapper;
   @Autowired private MessageSource messages;
+  @Autowired private KrtPdfDocuments pdfDocuments;
   @Autowired private DataSource dataSource;
   @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private BankReportCleanupFilter cleanup;
@@ -84,7 +86,7 @@ class BankExportTransactionBoundaryMvcTest {
     account.setAreaName("Synthetic transaction-boundary area");
     account.setStatus(BankAccountStatus.ACTIVE);
     accountRepository.save(account);
-    BankReportRenderer realRenderer = new BankReportRenderer(mapper, messages);
+    BankReportRenderer realRenderer = new BankReportRenderer(mapper, messages, pdfDocuments);
     doAnswer(
             invocation -> {
               assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();

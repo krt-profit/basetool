@@ -20,11 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.privacy.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
-import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService.DataExport;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService.ExportSection;
-import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.ZoneOffset;
@@ -34,7 +37,6 @@ import java.util.Map;
 import java.util.function.UnaryOperator;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.openpdf.text.pdf.PdfPTable;
 
 /**
  * Renders a data export as the human-readable summary of the Art. 15 answer (REQ-SEC-058); the JSON
@@ -53,6 +55,12 @@ public final class DataExportPdfFormat {
    */
   private static final String EMPTY_VALUE = "–";
 
+  /** Relative widths of the section, row-count and legal-basis columns of the inventory. */
+  private static final float[] INVENTORY_WIDTHS = {4f, 1.2f, 2f};
+
+  /** Relative widths of the field and value columns of a verbatim section. */
+  private static final float[] SECTION_WIDTHS = {1.4f, 3f};
+
   /** Not instantiable. */
   private DataExportPdfFormat() {}
 
@@ -69,86 +77,107 @@ public final class DataExportPdfFormat {
   /**
    * Renders the export.
    *
+   * @param documents opens the tagged PDF
    * @param export the assembled export
    * @param label resolves a message key to its German label
    * @return the PDF bytes
    */
   public static byte @NotNull [] render(
-      @NotNull DataExport export, @NotNull UnaryOperator<String> label) {
+      @NotNull KrtPdfDocuments documents,
+      @NotNull DataExport export,
+      @NotNull UnaryOperator<String> label) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-      PdfPTable meta = KrtPdfSupport.newMetaTable();
-      KrtPdfSupport.addMetaRow(
-          meta, label.apply("pdf.export.meta.subject"), export.subjectHandle());
-      KrtPdfSupport.addMetaRow(
-          meta, label.apply("pdf.export.meta.generatedAt"), TIMESTAMP.format(export.generatedAt()));
-      KrtPdfSupport.addMetaRow(
-          meta, label.apply("pdf.export.meta.totalRows"), String.valueOf(export.totalRows()));
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(out, label.apply("pdf.export.title"));
-      krt.document().add(meta);
+      try (KrtPdfDocument pdf = documents.open(out, label.apply("pdf.export.title"))) {
+        pdf.keyValueTable(
+            List.of(
+                new PdfKeyValue(label.apply("pdf.export.meta.subject"), export.subjectHandle()),
+                new PdfKeyValue(
+                    label.apply("pdf.export.meta.generatedAt"),
+                    TIMESTAMP.format(export.generatedAt())),
+                new PdfKeyValue(
+                    label.apply("pdf.export.meta.totalRows"), String.valueOf(export.totalRows()))));
 
-      KrtPdfSupport.addNote(krt, label.apply("pdf.export.note.summary"));
-      if (export.thirdPartyHandlesRemoved()) {
-        KrtPdfSupport.addNote(krt, label.apply("pdf.export.note.thirdParty"));
-      }
-
-      KrtPdfSupport.addSectionHeader(krt, label.apply("pdf.export.inventory"));
-      PdfPTable inventory = new PdfPTable(3);
-      inventory.setWidthPercentage(100);
-      inventory.setWidths(new float[] {4f, 1.2f, 2f});
-      KrtPdfSupport.addTableHeader(inventory, label.apply("pdf.export.col.section"));
-      KrtPdfSupport.addTableHeader(inventory, label.apply("pdf.export.col.rows"));
-      KrtPdfSupport.addTableHeader(inventory, label.apply("pdf.export.col.basis"));
-      boolean alt = false;
-      for (ExportSection section : export.sections()) {
-        Color bg = KrtPdfSupport.rowBackground(alt);
-        alt = !alt;
-        KrtPdfSupport.addTableCell(
-            inventory, label.apply("pdf.export.section." + section.key()), bg, false);
-        KrtPdfSupport.addTableCell(
-            inventory, section.rows().size() + (section.truncated() ? "+" : ""), bg, true);
-        KrtPdfSupport.addTableCell(
-            inventory,
-            label.apply(
-                LegalBasis.ART_15_20.name().equals(section.legalBasis())
-                    ? "pdf.export.basis.art1520"
-                    : "pdf.export.basis.art15"),
-            bg,
-            false);
-      }
-      krt.document().add(inventory);
-
-      for (ExportSection section : export.sections()) {
-        if (!VERBATIM_SECTIONS.contains(section.key()) || section.rows().isEmpty()) {
-          continue;
+        pdf.note(label.apply("pdf.export.note.summary"));
+        if (export.thirdPartyHandlesRemoved()) {
+          pdf.note(label.apply("pdf.export.note.thirdParty"));
         }
-        KrtPdfSupport.addSectionHeader(krt, label.apply("pdf.export.section." + section.key()));
-        PdfPTable table = new PdfPTable(2);
-        table.setWidthPercentage(100);
-        table.setWidths(new float[] {1.4f, 3f});
-        KrtPdfSupport.addTableHeader(table, label.apply("pdf.export.col.field"));
-        KrtPdfSupport.addTableHeader(table, label.apply("pdf.export.col.value"));
-        boolean rowAlt = false;
-        for (Map<String, Object> row : section.rows()) {
-          for (Map.Entry<String, Object> cell : row.entrySet()) {
-            Color bg = KrtPdfSupport.rowBackground(rowAlt);
-            rowAlt = !rowAlt;
-            KrtPdfSupport.addTableCell(
-                table, label.apply("pdf.export.field." + cell.getKey()), bg, false);
-            KrtPdfSupport.addTableCell(table, renderValue(cell.getValue()), bg, false);
+
+        pdf.heading(label.apply("pdf.export.inventory"));
+        inventory(pdf, export, label);
+
+        for (ExportSection section : export.sections()) {
+          if (VERBATIM_SECTIONS.contains(section.key()) && !section.rows().isEmpty()) {
+            verbatim(pdf, section, label);
           }
         }
-        krt.document().add(table);
-      }
 
-      KrtPdfSupport.addSectionHeader(krt, label.apply("pdf.export.outOfScope"));
-      for (String key : export.outOfScope()) {
-        KrtPdfSupport.addNote(krt, label.apply("pdf.export.outOfScope." + key));
+        pdf.heading(label.apply("pdf.export.outOfScope"));
+        for (String key : export.outOfScope()) {
+          pdf.note(label.apply("pdf.export.outOfScope." + key));
+        }
       }
-
-      krt.document().close();
       return out.toByteArray();
     } catch (IOException e) {
       throw new ReportGenerationException("Could not render the data-export PDF", e);
+    }
+  }
+
+  /**
+   * Adds the inventory table: one row per section with its row count and legal basis.
+   *
+   * @param pdf the open document
+   * @param export the assembled export
+   * @param label resolves a message key to its German label
+   */
+  private static void inventory(
+      @NotNull KrtPdfDocument pdf,
+      @NotNull DataExport export,
+      @NotNull UnaryOperator<String> label) {
+    try (PdfDataTable inventory =
+        pdf.dataTable(
+            INVENTORY_WIDTHS,
+            List.of(
+                label.apply("pdf.export.col.section"),
+                label.apply("pdf.export.col.rows"),
+                label.apply("pdf.export.col.basis")))) {
+      for (ExportSection section : export.sections()) {
+        inventory.row(
+            List.of(
+                PdfTableCell.text(label.apply("pdf.export.section." + section.key())),
+                PdfTableCell.centered(section.rows().size() + (section.truncated() ? "+" : "")),
+                PdfTableCell.text(
+                    label.apply(
+                        LegalBasis.ART_15_20.name().equals(section.legalBasis())
+                            ? "pdf.export.basis.art1520"
+                            : "pdf.export.basis.art15"))));
+      }
+    }
+  }
+
+  /**
+   * Adds a section printed in full under its heading: one field/value row per projected column.
+   *
+   * @param pdf the open document
+   * @param section the section, with at least one row
+   * @param label resolves a message key to its German label
+   */
+  private static void verbatim(
+      @NotNull KrtPdfDocument pdf,
+      @NotNull ExportSection section,
+      @NotNull UnaryOperator<String> label) {
+    pdf.heading(label.apply("pdf.export.section." + section.key()));
+    try (PdfDataTable table =
+        pdf.dataTable(
+            SECTION_WIDTHS,
+            List.of(label.apply("pdf.export.col.field"), label.apply("pdf.export.col.value")))) {
+      for (Map<String, Object> row : section.rows()) {
+        for (Map.Entry<String, Object> cell : row.entrySet()) {
+          table.row(
+              List.of(
+                  PdfTableCell.text(label.apply("pdf.export.field." + cell.getKey())),
+                  PdfTableCell.text(renderValue(cell.getValue()))));
+        }
+      }
     }
   }
 

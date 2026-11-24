@@ -29,8 +29,11 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
 import de.greluc.krt.profit.basetool.backend.support.PdfText;
+import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -45,6 +48,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openpdf.text.pdf.PdfReader;
 import org.springframework.context.MessageSource;
@@ -60,6 +64,8 @@ class JobOrderHandoverReportServiceTest {
   @Mock private MessageSource messageSource;
 
   @InjectMocks private JobOrderHandoverReportService service;
+
+  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments();
 
   private UUID jobOrderId;
   private UUID handoverId;
@@ -95,7 +101,22 @@ class JobOrderHandoverReportServiceTest {
 
     assertNotNull(pdf, "PDF must not be null");
     assertTrue(pdf.length > 0, "PDF must not be empty");
-    PdfA4Conformance.assertConformant(pdf);
+    PdfConformance.assertConformant(pdf);
+    TaggedStructure structure = TaggedStructure.read(pdf);
+    assertEquals(List.of("H1", "Table", "H2", "Table", "P"), structure.kidTypes());
+    assertEquals(
+        List.of("TH", "TH", "TH", "TH"), structure.kids().get(3).kids().getFirst().kidTypes());
+    assertEquals(
+        "/Row",
+        structure
+            .kids()
+            .get(1)
+            .kids()
+            .getFirst()
+            .kids()
+            .getFirst()
+            .attributes()
+            .get("Table.Scope"));
   }
 
   @Test
@@ -142,7 +163,7 @@ class JobOrderHandoverReportServiceTest {
   }
 
   @Test
-  void generateHandoverReport_shouldNotContainPreviousOwnerName() {
+  void generateHandoverReport_shouldNotContainPreviousOwnerName() throws IOException {
     Material material = buildMaterial("Titanium", QuantityType.SCU);
     JobOrderHandoverItem item = buildItem(material, 10.0, 75, "New Babbage");
     handover.setItems(Set.of(item));
@@ -153,7 +174,7 @@ class JobOrderHandoverReportServiceTest {
     byte[] pdf = service.generateHandoverReport(jobOrderId, handoverId, null);
 
     assertNotNull(pdf);
-    String pdfContent = new String(pdf, java.nio.charset.StandardCharsets.ISO_8859_1);
+    String pdfContent = PdfText.of(pdf);
     assertTrue(pdfContent.contains("RecipientOnly"), "Recipient handle must be present in PDF");
     assertFalse(pdfContent.contains("BESITZER"), "Previous owner must NOT appear in PDF");
     assertFalse(pdfContent.contains("OWNER"), "Previous owner must NOT appear in PDF");
@@ -175,11 +196,12 @@ class JobOrderHandoverReportServiceTest {
 
     assertNotNull(pdf, "Preview PDF must not be null");
     assertTrue(pdf.length > 0, "Preview PDF must not be empty");
-    PdfA4Conformance.assertConformant(pdf);
+    PdfConformance.assertConformant(pdf);
   }
 
   @Test
-  void generateHandoverReportPreview_shouldSortItemsAlphabeticallyThenQualityDescThenAmountDesc() {
+  void generateHandoverReportPreview_shouldSortItemsAlphabeticallyThenQualityDescThenAmountDesc()
+      throws IOException {
     List<HandoverReportPreviewRequestDto.HandoverReportItemDto> items =
         List.of(
             new HandoverReportPreviewRequestDto.HandoverReportItemDto(
@@ -201,7 +223,7 @@ class JobOrderHandoverReportServiceTest {
 
     assertNotNull(pdf);
     assertTrue(pdf.length > 0);
-    String pdfContent = new String(pdf, java.nio.charset.StandardCharsets.ISO_8859_1);
+    String pdfContent = PdfText.of(pdf);
     assertTrue(pdfContent.contains("Agricium"));
     assertTrue(pdfContent.contains("Laranite"));
     assertTrue(pdfContent.contains("Titanium"));
@@ -220,7 +242,7 @@ class JobOrderHandoverReportServiceTest {
   }
 
   @Test
-  void generateHandoverReportPreview_shouldNotContainOwnerField() {
+  void generateHandoverReportPreview_shouldNotContainOwnerField() throws IOException {
     HandoverReportPreviewRequestDto dto =
         new HandoverReportPreviewRequestDto(
             "#5",
@@ -234,7 +256,7 @@ class JobOrderHandoverReportServiceTest {
     byte[] pdf = service.generateHandoverReportPreview(dto);
 
     assertNotNull(pdf);
-    String pdfContent = new String(pdf, java.nio.charset.StandardCharsets.ISO_8859_1);
+    String pdfContent = PdfText.of(pdf);
     assertFalse(pdfContent.contains("BESITZER"), "Owner field must NOT appear in preview PDF");
     assertFalse(pdfContent.contains("OWNER"), "Owner field must NOT appear in preview PDF");
   }

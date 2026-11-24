@@ -34,7 +34,8 @@ import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSect
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportReportService;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
-import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
+import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
+import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -300,7 +301,7 @@ class DataExportIntegrationTest {
   }
 
   @Test
-  void thePdfRendersAsPdfA4() throws Exception {
+  void thePdfConformsToEveryProfileAndIsTagged() throws Exception {
     UUID subject = user("ZzzPdfZzz");
 
     DataExportService.DataExport export = dataExportService.export(subject);
@@ -310,6 +311,11 @@ class DataExportIntegrationTest {
     assertThat(pdf).isNotEmpty();
     assertThat(new String(pdf, 0, 5, java.nio.charset.StandardCharsets.ISO_8859_1))
         .isEqualTo("%PDF-");
-    PdfA4Conformance.assertConformant(pdf);
+    PdfConformance.assertConformant(pdf);
+    TaggedStructure structure = TaggedStructure.read(pdf);
+    assertThat(structure.kidTypes()).startsWith("H1", "Table", "P");
+    assertThat(structure.kidTypes()).doesNotContain("H3").contains("H2");
+    assertThat(structure.all("Table").get(1).kids().getFirst().kidTypes())
+        .containsExactly("TH", "TH", "TH");
   }
 }

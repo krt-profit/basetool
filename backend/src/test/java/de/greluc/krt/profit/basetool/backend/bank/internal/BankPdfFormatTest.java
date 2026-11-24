@@ -23,7 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -31,7 +32,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
-import org.openpdf.text.pdf.PdfPTable;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
 
@@ -40,7 +40,7 @@ import org.openpdf.text.pdf.parser.PdfTextExtractor;
  * ledger-scale dropping, the signed-column sign rule — REQ-BANK-005) that every bank statement and
  * three-month report renders with, and the holder-balance table's zero-balance skip plus
  * empty-state fallback (ADR-0039). The formatting is asserted directly on the static helpers; the
- * table is rendered into a throwaway {@link KrtPdfSupport.KrtDocument} and read back via {@code
+ * table is rendered into a throwaway {@link KrtPdfDocument} and read back via {@code
  * PdfTextExtractor}, the same channel the report integration tests use. The message resolver is
  * stubbed as an identity {@link UnaryOperator} so the assertions can match the literal bundle keys.
  */
@@ -121,10 +121,9 @@ class BankPdfFormatTest {
     UnaryOperator<String> label = UnaryOperator.identity();
     byte[] pdf;
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos, "VERTEILUNG");
-      PdfPTable table = BankPdfFormat.distributionTable(distribution, label);
-      krt.document().add(table);
-      krt.document().close();
+      try (KrtPdfDocument krt = new TaggedKrtPdfDocuments().open(baos, "VERTEILUNG")) {
+        BankPdfFormat.distributionTable(krt, distribution, label);
+      }
       pdf = baos.toByteArray();
     }
     PdfReader reader = new PdfReader(pdf);
