@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYP – Loaner</title>
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+{{SPRITE}}
+<header>
+  <nav>
+    <button class="hamburger-btn" type="button" aria-label="Menü"><span></span><span></span><span></span></button>
+    <a href="#" class="brand"><span class="logo-text">Profit Basetool</span></a>
+    <span class="header-spacer"></span>
+    <span class="admin-mode-chip">ADMIN</span>
+    <button type="button" class="palette-trigger" aria-haspopup="dialog">
+      <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"></use></svg>
+      <span class="palette-trigger-text">Seite oder Aktion suchen …</span>
+      <span class="nav-kbd" aria-hidden="true">STRG K</span>
+    </button>
+    <div class="notification-bell">
+      <button type="button" class="notification-bell-btn" aria-label="Benachrichtigungen">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bell"></use></svg>
+      </button>
+    </div>
+  </nav>
+</header>
+<main id="app" class="ln-main"></main>
+<div id="dialog-root"></div>
+<div id="toast-root" class="ln-toasts" aria-live="polite"></div>
+<div id="proto-root"></div>
+<script>
+{{JS}}
+</script>
+</body>
+</html>
