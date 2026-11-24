@@ -2411,10 +2411,12 @@ admin suspension), `ExchangeSyncE2eTest` (corpus round trip, confirmed mass chan
       a default blueprint, with `--conformance` every change-set fixture of
       `docs/exchange/examples/v1` (valid ones as dry runs accepted, invalid ones refused) and with
       `--proof-limit` a flood until `429 DPOP_PROOF_LIMIT`; then the same without the fixtures and
-      the flood as the second member, whose org demand must be withheld (`--demand withheld`).
-      Because that job runs only after a merge, `repo-lint.yml` loads `sandbox-smoke.py` and
-      `sandbox-load.py` with `--help` on every pull request, so a script that no longer imports
-      fails before the merge. Both take the DPoP reference's keys from `scripts/sandbox_client.py`,
+      the flood as the second member, whose org demand must be withheld (`--demand withheld`);
+      then, as `sandbox-logistician` with `--job-orders`, the job-order snapshot and create options
+      against the seed. Because that job runs only after a merge, `repo-lint.yml` loads
+      `sandbox-smoke.py` and `sandbox-load.py` with `--help` on every pull request, so a script
+      that no longer imports fails before the merge, and runs `sandbox-smoke.py --selftest`, which
+      checks the job-order seed checks on the conformance examples. Both take the DPoP reference's keys from `scripts/sandbox_client.py`,
       the one module that puts the reference on `sys.path`.*
 - [x] The E2E stack with the sandbox Keycloak and the ingest gateway, and the exchange round trip on
       it. *`E2eStackExtension`, `docker-compose.e2e.yml`, `ExchangeRoundTripE2eTest`, the
