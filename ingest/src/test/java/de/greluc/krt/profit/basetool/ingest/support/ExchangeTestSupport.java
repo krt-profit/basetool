@@ -29,6 +29,7 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import de.greluc.krt.profit.basetool.ingest.auth.ExchangeTokenGateFilter;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeLogContext;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistry;
@@ -41,6 +42,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -246,9 +248,7 @@ public final class ExchangeTestSupport {
     return new ExchangeRegistry(
         1L,
         enabled,
-        false,
-        false,
-        false,
+        Set.of(),
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client("VerseKit", active, capabilities, minVersion, null, null)));
@@ -285,9 +285,7 @@ public final class ExchangeTestSupport {
     return new ExchangeRegistry(
         1L,
         true,
-        bankEnabled,
-        false,
-        false,
+        bankEnabled ? Set.of(AreaSwitch.BANK) : Set.of(),
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client(
@@ -308,9 +306,7 @@ public final class ExchangeTestSupport {
     return new ExchangeRegistry(
         1L,
         true,
-        true,
-        true,
-        true,
+        EnumSet.allOf(AreaSwitch.class),
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client(

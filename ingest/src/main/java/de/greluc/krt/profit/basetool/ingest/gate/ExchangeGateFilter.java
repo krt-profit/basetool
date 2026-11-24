@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.ingest.gate;
 import de.greluc.krt.profit.basetool.ingest.auth.ExchangeTokenGateFilter;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeCorsProperties;
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeLogContext;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRefusals;
@@ -82,19 +83,6 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
    * JOB_ORDER_WRITES_DISABLED}); the switch is an admin's decision, so the wait is longer.
    */
   public static final String AREA_RETRY_AFTER_SECONDS = "300";
-
-  /** The detail of {@code 503 BANK_EXCHANGE_DISABLED}. */
-  public static final String BANK_EXCHANGE_DISABLED_DETAIL =
-      "The bank is switched off for connected applications; every other area keeps working.";
-
-  /** The detail of {@code 503 JOB_ORDER_EXCHANGE_DISABLED}. */
-  public static final String JOB_ORDER_EXCHANGE_DISABLED_DETAIL =
-      "Job orders are switched off for connected applications; every other area keeps working.";
-
-  /** The detail of {@code 503 JOB_ORDER_WRITES_DISABLED}. */
-  public static final String JOB_ORDER_WRITES_DISABLED_DETAIL =
-      "Job-order writes are switched off for connected applications; job-order reads and every"
-          + " other area keep working.";
 
   /** The detail of {@code 503 REGISTRY_UNAVAILABLE}. */
   public static final String REGISTRY_UNAVAILABLE_DETAIL =
@@ -345,7 +333,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
       return true;
     }
     for (AreaSwitch area : areas) {
-      if (area.isOff(registry)) {
+      if (!registry.isOn(area)) {
         response.setHeader(HttpHeaders.RETRY_AFTER, AREA_RETRY_AFTER_SECONDS);
         refuse(label, response, HttpStatus.SERVICE_UNAVAILABLE, area.getCode(), area.getDetail());
         return true;

@@ -41,6 +41,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.nimbusds.jose.jwk.ECKey;
 import de.greluc.krt.profit.basetool.ingest.auth.ExchangeTokenGateFilter;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.edge.CorrelationIdFilter;
 import de.greluc.krt.profit.basetool.ingest.edge.RequestLoggingFilter;
 import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
@@ -194,9 +195,7 @@ class ExchangeGateTest {
             new ExchangeRegistry(
                 1L,
                 true,
-                false,
-                false,
-                false,
+                Set.of(),
                 Map.of(
                     "someone-else",
                     new ExchangeRegistry.Client(
@@ -311,7 +310,7 @@ class ExchangeGateTest {
 
   @Test
   void theJobOrderFamilyIsRefusedOnEveryPathAndMethodWhileItsSwitchIsOff() throws Exception {
-    switchRegistry(true, true, false, false);
+    switchRegistry(true, AreaSwitch.BANK);
     double before = refused("job_order_exchange_disabled");
 
     call(HttpMethod.GET, "/exchange/v1/job-orders")
@@ -335,7 +334,7 @@ class ExchangeGateTest {
 
   @Test
   void aJobOrderWriteIsRefusedWhileTheWritesSwitchIsOffBeforeItCountsAWrite() throws Exception {
-    switchRegistry(true, false, true, false);
+    switchRegistry(true, AreaSwitch.JOB_ORDERS);
     double before = refused("job_order_writes_disabled");
 
     call(HttpMethod.POST, "/exchange/v1/job-orders")
@@ -355,7 +354,7 @@ class ExchangeGateTest {
 
   @Test
   void theGlobalSwitchWinsOverTheJobOrderSwitches() throws Exception {
-    switchRegistry(false, true, false, false);
+    switchRegistry(false, AreaSwitch.BANK);
 
     call(HttpMethod.POST, "/exchange/v1/job-orders")
         .andExpect(status().isServiceUnavailable())
@@ -365,7 +364,7 @@ class ExchangeGateTest {
 
   @Test
   void theJobOrderSwitchesLeaveEveryOtherRouteAndLookalikePathAlone() throws Exception {
-    switchRegistry(true, true, false, false);
+    switchRegistry(true, AreaSwitch.BANK);
 
     call(HttpMethod.GET, STOCK).andExpect(status().isOk());
     call(HttpMethod.GET, "/exchange/v1/job-orders-archive")
@@ -378,7 +377,7 @@ class ExchangeGateTest {
 
   @Test
   void aJobOrderPathWithoutARouteIsNotFoundWhileBothJobOrderSwitchesAreOn() throws Exception {
-    switchRegistry(true, false, true, true);
+    switchRegistry(true, AreaSwitch.JOB_ORDERS, AreaSwitch.JOB_ORDER_WRITES);
 
     call(HttpMethod.POST, "/exchange/v1/job-orders/1/no-such-write")
         .andExpect(status().isNotFound())
@@ -417,8 +416,7 @@ class ExchangeGateTest {
 
   @Test
   void aClientOutsideTheRegistryIsNotAllowed() throws Exception {
-    when(registryReader.current())
-        .thenReturn(new ExchangeRegistry(1L, true, false, false, false, Map.of()));
+    when(registryReader.current()).thenReturn(new ExchangeRegistry(1L, true, Set.of(), Map.of()));
     double unregistered = refusedBy("client_not_allowed", MetricNames.EXCHANGE_CLIENT_UNREGISTERED);
 
     call(HttpMethod.GET, STOCK)
@@ -749,30 +747,26 @@ class ExchangeGateTest {
    * @param bankEnabled the bank switch
    */
   private void bankRegistry(boolean enabled, boolean bankEnabled) {
-    switchRegistry(enabled, bankEnabled, false, false);
+    if (bankEnabled) {
+      switchRegistry(enabled, AreaSwitch.BANK);
+    } else {
+      switchRegistry(enabled);
+    }
   }
 
   /**
    * Stubs the registry with an active client holding the stock capability and the given switches.
    *
    * @param enabled the global switch
-   * @param bankEnabled the bank switch
-   * @param jobOrdersEnabled the job-order family switch
-   * @param jobOrderWritesEnabled the job-order writes switch
+   * @param on the area switches that are on
    */
-  private void switchRegistry(
-      boolean enabled,
-      boolean bankEnabled,
-      boolean jobOrdersEnabled,
-      boolean jobOrderWritesEnabled) {
+  private void switchRegistry(boolean enabled, @NotNull AreaSwitch... on) {
     when(registryReader.current())
         .thenReturn(
             new ExchangeRegistry(
                 1L,
                 enabled,
-                bankEnabled,
-                jobOrdersEnabled,
-                jobOrderWritesEnabled,
+                Set.of(on),
                 Map.of(
                     CLIENT,
                     new ExchangeRegistry.Client(
