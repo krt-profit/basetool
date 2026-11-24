@@ -172,6 +172,8 @@ class JobOrderServiceTest {
 
   private JobOrderService jobOrderService;
 
+  private JobOrderCreation jobOrderCreation;
+
   private JobOrderQueryService jobOrderQueryService;
 
   private Material material;
@@ -196,6 +198,26 @@ class JobOrderServiceTest {
             org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
             auditService,
             jobOrderStockProjectionService);
+    LiveSyncPublisher liveSyncPublisher =
+        new LiveSyncPublisher(liveSyncFanout, new SimpleMeterRegistry());
+    JobOrderQueueFrame queueFrame = new JobOrderQueueFrame(liveSyncPublisher);
+    jobOrderCreation =
+        new JobOrderCreation(
+            jobOrderRepository,
+            profitHierarchy,
+            jobOrderOrgUnitResolver,
+            writers,
+            new JobOrderMaterialLines(materialRepository, qualityTierService),
+            jobOrderItemService,
+            new JobOrderItemReconciliation(jobOrderItemService),
+            org.mockito.Mockito.mock(JobOrderUnitHistory.class),
+            jobOrderPriorityService,
+            effects,
+            clientNames,
+            queueFrame,
+            auditService,
+            jobOrderStockProjectionService,
+            authHelperService);
     jobOrderService =
         new JobOrderService(
             jobOrderRepository,
@@ -252,9 +274,8 @@ class JobOrderServiceTest {
                 org.mockito.Mockito.mock(
                     de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
                         .class)),
-            new LiveSyncPublisher(liveSyncFanout, new SimpleMeterRegistry()),
-            org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
+            liveSyncPublisher,
+            queueFrame,
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
             org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class),
             clientNames);
@@ -514,7 +535,7 @@ class JobOrderServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     stubTierResolution();
 
-    jobOrderService.createJobOrder(
+    jobOrderCreation.createMaterialOrder(
         new CreateJobOrderDto(
             responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, lines, null, null));
 
@@ -539,7 +560,7 @@ class JobOrderServiceTest {
   void createAuecJobOrder_announcesTheNewOrderToTheQueueOnlyOnceAfterTheCommit() {
     stubPersistence();
 
-    jobOrderService.createAuecJobOrder(
+    jobOrderCreation.createAuecOrder(
         new JobOrderCreateCommand.AuecOrder(
             responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
         JobOrderWriterRule.CONTEXTUAL,
@@ -560,7 +581,7 @@ class JobOrderServiceTest {
     UUID member = UUID.randomUUID();
     JobOrderActor actor = new JobOrderActor.Client(member, "client");
 
-    jobOrderService.createAuecJobOrder(
+    jobOrderCreation.createAuecOrder(
         new JobOrderCreateCommand.AuecOrder(
             responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
         JobOrderWriterRule.DIRECT_LOGISTICIAN,
@@ -581,7 +602,7 @@ class JobOrderServiceTest {
     JobOrderActor actor = new JobOrderActor.Client(UUID.randomUUID(), "versekit");
     when(clientNames.appOf(actor)).thenReturn("VerseKit");
 
-    jobOrderService.createAuecJobOrder(
+    jobOrderCreation.createAuecOrder(
         new JobOrderCreateCommand.AuecOrder(
             responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
         JobOrderWriterRule.DIRECT_LOGISTICIAN,
@@ -609,7 +630,7 @@ class JobOrderServiceTest {
     assertThrows(
         AccessDeniedException.class,
         () ->
-            jobOrderService.createAuecJobOrder(
+            jobOrderCreation.createAuecOrder(
                 new JobOrderCreateCommand.AuecOrder(
                     responsibleOrgUnitId,
                     requestingOrgUnitId,
@@ -626,7 +647,7 @@ class JobOrderServiceTest {
   void createItemJobOrder_announcesTheNewOrderToTheQueueAndTheDemandOnceAfterTheCommit() {
     stubCreate();
 
-    jobOrderService.createItemJobOrder(
+    jobOrderCreation.createItemOrder(
         new CreateJobOrderItemRequestDto(
             responsibleOrgUnitId,
             requestingOrgUnitId,
@@ -752,7 +773,7 @@ class JobOrderServiceTest {
     stubTierResolution();
     stubLinkedStock(700, 25.0);
 
-    JobOrderDto result = jobOrderService.createJobOrder(createDto);
+    JobOrderDto result = jobOrderCreation.createMaterialOrder(createDto);
 
     assertNotNull(result);
     assertEquals(orderId, result.id());
@@ -798,7 +819,7 @@ class JobOrderServiceTest {
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
-    jobOrderService.createJobOrder(createDto);
+    jobOrderCreation.createMaterialOrder(createDto);
 
     verify(qualityTierService).resolveForRequirement(null, 650, Set.of());
     verify(jobOrderRepository)
@@ -837,7 +858,7 @@ class JobOrderServiceTest {
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
-    jobOrderService.createJobOrder(createDto);
+    jobOrderCreation.createMaterialOrder(createDto);
 
     verify(jobOrderRepository)
         .save(
@@ -863,7 +884,7 @@ class JobOrderServiceTest {
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
-    jobOrderService.createJobOrder(
+    jobOrderCreation.createMaterialOrder(
         new CreateJobOrderDto(
             responsibleOrgUnitId,
             requestingOrgUnitId,
@@ -875,7 +896,7 @@ class JobOrderServiceTest {
 
     verify(jobOrderRepository).save(argThat(jo -> "Deliver fast".equals(jo.getComment())));
 
-    jobOrderService.createJobOrder(
+    jobOrderCreation.createMaterialOrder(
         new CreateJobOrderDto(
             responsibleOrgUnitId,
             requestingOrgUnitId,
@@ -905,7 +926,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
 
-    assertThrows(NotFoundException.class, () -> jobOrderService.createJobOrder(createDto));
+    assertThrows(NotFoundException.class, () -> jobOrderCreation.createMaterialOrder(createDto));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
@@ -916,7 +937,7 @@ class JobOrderServiceTest {
         new CreateJobOrderDto(
             null, requestingOrgUnitId, "Tester", null, List.of(createMat), null, null);
 
-    assertThrows(BadRequestException.class, () -> jobOrderService.createJobOrder(createDto));
+    assertThrows(BadRequestException.class, () -> jobOrderCreation.createMaterialOrder(createDto));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 

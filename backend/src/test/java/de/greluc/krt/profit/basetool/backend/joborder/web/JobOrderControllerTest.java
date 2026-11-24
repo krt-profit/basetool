@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderCreation;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
@@ -62,6 +63,7 @@ import org.springframework.data.domain.Pageable;
 class JobOrderControllerTest {
 
   @Mock private JobOrderService jobOrderService;
+  @Mock private JobOrderCreation jobOrderCreation;
   @Mock private JobOrderQueryService jobOrderQueryService;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
@@ -107,7 +109,7 @@ class JobOrderControllerTest {
     CreateJobOrderDto request =
         new CreateJobOrderDto(null, null, "alice", null, List.of(), null, null);
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
-    when(jobOrderService.createJobOrder(request)).thenReturn(created);
+    when(jobOrderCreation.createMaterialOrder(request)).thenReturn(created);
 
     JobOrderDto result = controller.createJobOrder(request);
 
