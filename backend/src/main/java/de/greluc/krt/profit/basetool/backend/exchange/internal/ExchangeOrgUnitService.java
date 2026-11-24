@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -100,14 +101,16 @@ public class ExchangeOrgUnitService {
   }
 
   /**
-   * Returns the units the member directly belongs to and is a Logistician of, the units whose org
-   * stock the member reads by entry and writes (REQ-XCH-043, REQ-XCH-045).
+   * Returns the units whose own membership makes the member a Logistician of them, without the
+   * cascade of a Bereich or Organisationsleitung membership: the units whose org stock the member
+   * reads by entry, writes and undoes, and whose orders the demand details name (REQ-XCH-043,
+   * REQ-XCH-045, REQ-XCH-046, REQ-XCH-047).
    *
    * @param member the member the current request acts for
    * @return the unit ids, possibly empty
    */
   @Transactional(readOnly = true)
-  public @NotNull Set<UUID> directLogisticianUnits(@NotNull UUID member) {
-    return membershipQueryService.findDirectLogisticianOrgUnitIds(member);
+  public @NotNull @Unmodifiable Set<UUID> logisticianUnitsByOwnMembership(@NotNull UUID member) {
+    return membershipQueryService.findLogisticianOrgUnitIdsByOwnMembership(member);
   }
 }

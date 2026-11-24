@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -284,10 +285,32 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
+   * Returns the org-unit ids whose own membership makes the user a Logistician of that unit, by
+   * {@link OrgUnitMembership#isLogisticianOfOwnUnit()} and without the cascade of a Bereich or
+   * Organisationsleitung membership to the units below it (REQ-XCH-043). Without {@code KRT Member}
+   * no membership confers it (REQ-SEC-015), and a membership on a deactivated unit confers it
+   * neither (REQ-ORG-032).
+   *
+   * @param userId the user whose memberships to read; never {@code null}.
+   * @return the org-unit ids; never {@code null}, possibly empty.
+   */
+  @NotNull
+  @Unmodifiable
+  public Set<UUID> findLogisticianOrgUnitIdsByOwnMembership(@NotNull UUID userId) {
+    if (!seatEligibility.holdsKrtMember(userId)) {
+      return Set.of();
+    }
+    return membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId).stream()
+        .filter(OrgUnitMembership::isLogisticianOfOwnUnit)
+        .map(membership -> membership.getId().getOrgUnitId())
+        .collect(Collectors.toUnmodifiableSet());
+  }
+
+  /**
    * Returns the org-unit ids the user directly belongs to and is a Logistician of: the units of
    * {@link #findLogisticianOrgUnitIds(UUID)} that are also among {@link
    * #findDirectMembershipOrgUnitIds(UUID)}, so a Bereich or Organisationsleitung reach counts only
-   * over a unit the user is a member of (REQ-XCH-045).
+   * over a unit the user is a member of.
    *
    * @param userId the user whose memberships to read; never {@code null}.
    * @return the org-unit ids; never {@code null}, possibly empty.

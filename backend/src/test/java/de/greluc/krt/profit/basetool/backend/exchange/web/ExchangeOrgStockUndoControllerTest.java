@@ -701,6 +701,30 @@ class ExchangeOrgStockUndoControllerTest {
   }
 
   @Test
+  void aWriterWhoStaysAPlainMemberOfThePoolUnderABereichTheyAreALogisticianOfCannotUndoItsEntries()
+      throws Exception {
+    UUID bereich = orgUnit("BEREICH", null);
+    UUID pool = orgUnit("SQUADRON", bereich);
+    joins(writer, bereich, true);
+    joins(writer, pool, true);
+    joins(holder, pool, false);
+    UUID entry = stock(holder, material("SCU"), location(), 10, pool);
+    clientWrite(ops(entryOp("book-out", pool, entry, 0, quantity("4"))))
+        .andExpect(jsonPath("$.applied").value(1));
+    jdbc.update(
+        "UPDATE org_unit_membership SET is_logistician = false WHERE user_id = ? AND org_unit_id ="
+            + " ?",
+        writer,
+        pool);
+
+    undo(writer)
+        .andExpect(jsonPath("$.restored").value(0))
+        .andExpect(jsonPath("$.skipped[0].reason").value("GONE"));
+
+    assertThat(amountOf(entry)).isEqualTo(6);
+  }
+
+  @Test
   void aBatchThatTakesTooMuchOutOfOnePoolIsHeldAndAppliesOnlyAfterTheWriterConfirms()
       throws Exception {
     UUID pool = orgUnit();

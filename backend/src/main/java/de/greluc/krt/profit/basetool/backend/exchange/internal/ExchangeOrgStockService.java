@@ -100,7 +100,7 @@ public class ExchangeOrgStockService {
     List<ExchangeOrgUnitDto> units = orgUnitService.orgUnits(caller.member()).items();
     Map<UUID, ExchangeOrgUnitDto> byId =
         units.stream().collect(Collectors.toMap(ExchangeOrgUnitDto::id, Function.identity()));
-    Set<UUID> logistician = orgUnitService.directLogisticianUnits(caller.member());
+    Set<UUID> logistician = orgUnitService.logisticianUnitsByOwnMembership(caller.member());
     List<ExchangeOrgStockPoolDto> listed =
         units.stream()
             .map(unit -> ExchangeOrgStockPoolDto.of(unit, logistician.contains(unit.id())))
