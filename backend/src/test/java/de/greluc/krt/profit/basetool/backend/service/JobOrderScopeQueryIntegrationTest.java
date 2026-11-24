@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepositor
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -83,8 +84,12 @@ class JobOrderScopeQueryIntegrationTest {
   void seed() {
     transactionTemplate.executeWithoutResult(status -> {
       String tag = UUID.randomUUID().toString().substring(0, 8);
-      Squadron sqA = newSquadron("Scope-A-" + tag, "A" + tag);
-      Squadron sqB = newSquadron("Scope-B-" + tag, "B" + tag);
+      Squadron sqA =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Scope-A-" + tag, "A" + tag);
+      Squadron sqB =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Scope-B-" + tag, "B" + tag);
       SpecialCommand sk = newSpecialCommand("Scope-SK-" + tag, "S" + tag);
       squadronAId = sqA.getId();
       squadronBId = sqB.getId();
@@ -155,19 +160,17 @@ class JobOrderScopeQueryIntegrationTest {
   @Test
   void countInActiveProfitHierarchyByIdIn_countsProfitEligibleAcrossBothKinds() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron profit = new Squadron();
-    profit.setName("Profit-" + tag);
-    profit.setShorthand("P" + tag);
-    withinProfit(profit, persistedProfitArea(orgUnitRepository));
-    Squadron nonProfit = new Squadron();
-    nonProfit.setName("NonProfit-" + tag);
-    nonProfit.setShorthand("N" + tag);
+    UUID profitId =
+        OrgUnitFixtures.persistedProfitSquadron(
+                squadronRepository, orgUnitRepository, "Profit-" + tag, "P" + tag)
+            .getId();
+    UUID nonProfitId =
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "NonProfit-" + tag, "N" + tag, null)
+            .getId();
     SpecialCommand profitSk = new SpecialCommand();
     profitSk.setName("ProfitSK-" + tag);
     profitSk.setShorthand("X" + tag);
     withinProfit(profitSk, persistedProfitArea(orgUnitRepository));
-    UUID profitId = squadronRepository.save(profit).getId();
-    UUID nonProfitId = squadronRepository.save(nonProfit).getId();
     UUID profitSkId = specialCommandRepository.save(profitSk).getId();
 
     assertThat(
@@ -211,9 +214,8 @@ class JobOrderScopeQueryIntegrationTest {
     UUID[] ids = new UUID[2];
     transactionTemplate.executeWithoutResult(_ -> {
       String tag = UUID.randomUUID().toString().substring(0, 8);
-      Squadron nonProfit = newSquadron("Scope-N-" + tag, "N" + tag);
-      nonProfit.setParent(null);
-      squadronRepository.save(nonProfit);
+      Squadron nonProfit =
+          OrgUnitFixtures.persistedSquadron(squadronRepository, "Scope-N-" + tag, "N" + tag, null);
       ids[0] = nonProfit.getId();
       ids[1] = newOrder(nonProfit, nonProfit).getId();
     });
@@ -462,14 +464,6 @@ class JobOrderScopeQueryIntegrationTest {
         .stream()
         .map(JobOrder::getId)
         .collect(Collectors.toSet());
-  }
-
-  private Squadron newSquadron(String name, String shorthand) {
-    Squadron s = new Squadron();
-    s.setName(name);
-    s.setShorthand(shorthand);
-    withinProfit(s, persistedProfitArea(orgUnitRepository));
-    return squadronRepository.save(s);
   }
 
   private SpecialCommand newSpecialCommand(String name, String shorthand) {

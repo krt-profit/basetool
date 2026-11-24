@@ -923,8 +923,8 @@ the backend counts each committed flip on `basetool_exchange_registry_changes_to
   `Retry-After` until the next UTC midnight (ingest `ExchangeRelayTest`,
   `ExchangeJobOrderWriteRouteTest`, both `ExchangeRelaySeamParityTest`s, `ExchangeContractTest`).
 
-**Enforced by:** `ExchangeGate`, `JobOrderExchangeRoutes`, `ExchangeSwitch`,
-`ExchangeRegistryService#updateSwitch`, `ExchangeRegistrySnapshot`, `ExchangeJobOrderMetrics`,
+**Enforced by:** `ExchangeGate`, `ExchangeSwitchRefusal`, `JobOrderExchangeRoutes`,
+`ExchangeSwitch`, `ExchangeRegistryService#updateSwitch`, `ExchangeRegistrySnapshot`, `ExchangeJobOrderMetrics`,
 `ExchangeJobOrderCreateService` (backend) · `JobOrderClientCreateCapService`,
 `JobOrderExchangeProperties`, `JobOrderClientCreateRepository` (job orders) · `ExchangeGateFilter`,
 `AreaSwitch`, `ExchangeRoutes#isJobOrder`, `ExchangeRegistryReader`,

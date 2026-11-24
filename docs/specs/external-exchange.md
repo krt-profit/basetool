@@ -306,7 +306,9 @@ reserved: it joins the exchange as a registry client of its own at the go-live.
   `AdminExchangeClientsPageControllerMvcTest`.*
 - [x] Every switch is one `ExchangeSwitch` constant in the backend (its mirror member, its audit
   event, notice and metric action, and for an area switch its `ExchangeSettingsRepository` write and
-  its admin path `/api/v1/connected-apps/admin/settings/<segment>`); every area switch is also one
+  its admin path `/api/v1/connected-apps/admin/settings/<segment>`) and one `ExchangeSwitchRefusal`
+  the backend's `ExchangeGate` checks in the constants' order (the requests it covers, its gate
+  refusal reason, its `503` code and its family's refusal counter); every area switch is also one
   `AreaSwitch` in the gateway (its mirror member, the routes it stops, its `503` code and detail)
   and one `ExchangeAreaSwitch` on the admin page (its relay path
   `/admin/exchange-clients/settings/<segment>`, its card and its bundle keys). The mirror document

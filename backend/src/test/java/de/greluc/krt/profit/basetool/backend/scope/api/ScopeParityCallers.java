@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -268,10 +269,8 @@ public final class ScopeParityCallers {
    */
   public static Squadron persistSquadron(SquadronRepository squadrons, String tag) {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("Parity " + tag + " " + suffix);
-    squadron.setShorthand("P" + tag + suffix.substring(0, 3));
-    return squadrons.saveAndFlush(squadron);
+    return OrgUnitFixtures.persistedSquadron(
+        squadrons, "Parity " + tag + " " + suffix, "P" + tag + suffix.substring(0, 3), null);
   }
 
   /**
