@@ -1120,7 +1120,7 @@
                     <label for="handingOverUserId" th:text="#{orders.handover.handingOver}" class="form-label">Übergebender (bearbeitende Einheit)</label>
                     <select id="handingOverUserId" th:field="*{handingOverUserId}" required class="w-full" data-testid="handover-giver-select">
                         <option value="" th:text="#{orders.handover.selectHandingOver}">-- Mitglied wählen --</option>
-                        <option th:each="giver : ${handoverGivers}" th:value="${giver.id}" th:text="${giver.handle}"></option>
+                        <option th:each="giver : ${handoverGivers}" th:value="${giver.id}" th:text="${@handles.display(giver.handle)}"></option>
                     </select>
                     <small th:if="${handoverGivers == null or handoverGivers.isEmpty()}" class="form-hint" data-testid="handover-giver-none" th:text="#{orders.handover.handingOver.none}">Die bearbeitende Einheit hat keine aktiven Mitglieder.</small>
                 </div>
@@ -1177,7 +1177,7 @@
                     <label for="itemHandingOverUserId" th:text="#{orders.handover.handingOver}" class="form-label">Übergebender (bearbeitende Einheit)</label>
                     <select id="itemHandingOverUserId" th:field="*{handingOverUserId}" required class="w-full" data-testid="item-handover-giver-select">
                         <option value="" th:text="#{orders.handover.selectHandingOver}">-- Mitglied wählen --</option>
-                        <option th:each="giver : ${handoverGivers}" th:value="${giver.id}" th:text="${giver.handle}"></option>
+                        <option th:each="giver : ${handoverGivers}" th:value="${giver.id}" th:text="${@handles.display(giver.handle)}"></option>
                     </select>
                     <small th:if="${handoverGivers == null or handoverGivers.isEmpty()}" class="form-hint" data-testid="item-handover-giver-none" th:text="#{orders.handover.handingOver.none}">Die bearbeitende Einheit hat keine aktiven Mitglieder.</small>
                 </div>
