@@ -8,11 +8,13 @@ money moved, and changes their target above what was handed over and their comme
 ([writes on an existing order](#writes-on-an-existing-order)). Every route lies below
 `/exchange/v1/job-orders`.
 
-**The job-order family is not switched on yet.** Until an administrator turns it on, every path at
-or below `/exchange/v1/job-orders` answers `503 JOB_ORDER_EXCHANGE_DISABLED` with
-`Retry-After: 300`. Pause the job-order area only and keep syncing every other area
-([errors](../errors.md)). The writes have a switch of their own, `503 JOB_ORDER_WRITES_DISABLED`;
-the reads go on while only the writes are off.
+**The family goes on in two steps.** An administrator turns the job-order family on with the first
+grant of `exchange.joborders.read` in the registry, and the writes only after the first grant of
+`exchange.joborders.write`. While the family is off, every path at or below
+`/exchange/v1/job-orders` answers `503 JOB_ORDER_EXCHANGE_DISABLED` with `Retry-After: 300`. Pause
+the job-order area only and keep syncing every other area ([errors](../errors.md)). The writes have
+a switch of their own, `503 JOB_ORDER_WRITES_DISABLED`; the reads go on while only the writes are
+off.
 
 Processing, every money operation and every Bank decision stay in the Basetool. A client never
 accepts, processes, hands over, provides, settles or deletes an order and never changes its

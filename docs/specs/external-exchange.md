@@ -142,6 +142,10 @@ need no new consent (REQ-SEC-028).
   Extractor, `basetool-sc-extractor`, from 2.10.0 with `connect`, `drafts.*` and `blueprints.*`
   (owner decision 2026-09-28: the web interface and the Android app are part of the platform, every
   other program is listed). It records the approved capabilities, not the registry's runtime state.*
+- [x] An approval may hold from a Basetool release instead of a client version. *VerseKit's
+  job-order scopes are approved from Basetool 1.27.0, under both job-order criteria, and name no
+  VerseKit version; VerseKit uses them once it ships its job-order area (owner decision 2026-11-24,
+  #3655).*
 - [x] `docs/exchange/onboarding.md` states the criteria, the issue template and the fix deadline.
   *The template is `.github/ISSUE_TEMPLATE/exchange-client-application.yml`.*
 - [x] The privacy notice (the frontend's `privacy.*` keys, DE and EN) states which data flows to an
