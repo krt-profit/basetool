@@ -398,12 +398,12 @@ VerseKit-specific: the name shown is the client's display name from the registry
   time; a client's update of a web order shows that client as the last change and adds no chip.
 
 **Enforced by:** `RefineryOrderProvenanceStampingTest`, `RefineryOrderStoreServiceTest`
-(`aWebStoreIsTheLastChange`), `RefineryOrderProvenanceViewTest`, `RefineryOrderProvenanceReadTest`,
+(`aWebStoreIsTheLastChange`), `RefineryOrderProvenanceViewTest`, `ClientNamesTest`, `RefineryOrderProvenanceReadTest`,
 `RefineryOrderMapperTest`, `RefineryOrdersListPatternRenderTest`,
 `RefineryOrderDetailPatternRenderTest`, `ExchangeRefineryOrderControllerTest` (the feed's `createdBy`),
 `DataExportEndStateTest`, `PersonSearchCoverageTest` ·
 **Code:** `RefineryOrderProvenance`,
-`RefineryOrderProvenanceView`, `RefineryOrderProvenanceDto`, `refinery-orders-index.html`,
+`RefineryOrderProvenanceView`, `ClientNames`, `RefineryOrderProvenanceDto`, `refinery-orders-index.html`,
 `refinery-orders-details.html`, migration `V369`
 
 **Status:** implemented — the web side and the feed's marker (#3166, #3167), and the client

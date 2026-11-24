@@ -441,7 +441,8 @@ client id once the registry no longer holds it.
   refresh (REQ-XCH-030); the detail head's chip never changes.
 - **One query.** The read DTOs carry the names (`JobOrderDto.createdClient`, `commentClient`,
   `JobOrderMoneyTargetChangeView.client`); a transaction reads the names of every client the orders
-  of its persistence context carry in one registry query (REQ-DATA-003).
+  of its persistence context carry in one registry query through the platform's `ClientNames`, as
+  the refinery's provenance does (REQ-DATA-003).
 - **Notices.** A client's create, need-change and cancel notices name the application
   (REQ-NOTIF-008, REQ-NOTIF-017, REQ-ORDERS-042, REQ-NOTIF-028).
 - **Storage and privacy.** V450 adds both client columns; they hold registry client ids the server
@@ -459,7 +460,7 @@ Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`).
   keeps the chip.
 - [x] A page of orders names its clients in one registry query.
 
-**Enforced by:** `JobOrderCommentTest`, `JobOrderClientNamesTest`, `JobOrderMapperTest`,
+**Enforced by:** `JobOrderCommentTest`, `JobOrderClientNamesTest`, `ClientNamesTest`, `JobOrderMapperTest`,
 `JobOrderClientOriginIntegrationTest` (backend) · `OrdersListPatternRenderTest`,
 `OrdersDetailPatternRenderTest`, `JobOrderClientOriginE2eTest` (frontend) ·
 `joborder/fragments/order-origin` · V450 · **Related:** REQ-OXCH-004, REQ-REFINERY-027,
