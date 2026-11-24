@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -773,38 +774,17 @@ class OrdersDetailPatternRenderTest {
       @NotNull List<JobOrderItemDto> items,
       @NotNull List<JobOrderHandoverDto> handovers,
       boolean readOnly) {
-    return new JobOrderDto(
-        orderId,
-        7,
-        null,
-        null,
-        "Handle",
-        null,
-        1,
-        status,
-        type,
-        true,
-        materials,
-        items,
-        List.of(),
-        List.of(),
-        handovers,
-        List.of(),
-        Instant.now(),
-        1L,
-        !readOnly,
-        null,
-        false,
-        false,
-        !readOnly,
-        false,
-        false,
-        false,
-        0L,
-        0L,
-        0L,
-        null,
-        null);
+    return jobOrder()
+        .id(orderId)
+        .displayId(7)
+        .status(status)
+        .type(type)
+        .materials(materials)
+        .items(items)
+        .handovers(handovers)
+        .canEdit(!readOnly)
+        .canTransferResponsibility(!readOnly)
+        .build();
   }
 
   /**

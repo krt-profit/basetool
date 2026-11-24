@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -206,38 +207,7 @@ class JobOrderStolenChipRenderTest extends JobOrderPageMvcTestBase {
    * @return the order DTO.
    */
   private static JobOrderDto materialOrder(UUID orderId, List<JobOrderHandoverDto> handovers) {
-    return new JobOrderDto(
-        orderId,
-        1,
-        null,
-        null,
-        "Handle",
-        null,
-        1,
-        "OPEN",
-        "MATERIAL",
-        true,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        handovers,
-        List.of(),
-        Instant.now(),
-        1L,
-        null,
-        null,
-        false,
-        false,
-        null,
-        false,
-        false,
-        false,
-        0L,
-        0L,
-        0L,
-        null,
-        null);
+    return jobOrder().id(orderId).handovers(handovers).build();
   }
 
   /**

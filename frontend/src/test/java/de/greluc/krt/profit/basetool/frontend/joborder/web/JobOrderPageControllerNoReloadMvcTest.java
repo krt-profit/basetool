@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -116,38 +117,15 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
       List<JobOrderAssigneeDto> assignees,
       Boolean canEdit,
       Boolean canManageAssignees) {
-    return new JobOrderDto(
-        id,
-        7,
-        null,
-        null,
-        "Handle",
-        null,
-        1,
-        "OPEN",
-        "MATERIAL",
-        true,
-        List.of(),
-        List.of(),
-        List.of(),
-        assignees,
-        List.of(),
-        List.of(),
-        Instant.now(),
-        version,
-        canEdit,
-        canManageAssignees,
-        false,
-        false,
-        canEdit,
-        false,
-        false,
-        false,
-        0L,
-        0L,
-        0L,
-        null,
-        null);
+    return jobOrder()
+        .id(id)
+        .displayId(7)
+        .assignees(assignees)
+        .version(version)
+        .canEdit(canEdit)
+        .canManageAssignees(canManageAssignees)
+        .canTransferResponsibility(canEdit)
+        .build();
   }
 
   @Test

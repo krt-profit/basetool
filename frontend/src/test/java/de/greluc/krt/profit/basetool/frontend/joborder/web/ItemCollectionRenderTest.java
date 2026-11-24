@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -107,38 +108,16 @@ class ItemCollectionRenderTest {
     UUID locationId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(
-            new JobOrderDto(
-                orderId,
-                1,
-                null,
-                null,
-                "Reader",
-                null,
-                1,
-                "OPEN",
-                "ITEM",
-                false,
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                java.time.Instant.now(),
-                0L,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                0L,
-                0L,
-                0L,
-                null,
-                null));
+            jobOrder()
+                .id(orderId)
+                .handle("Reader")
+                .type("ITEM")
+                .countBlueprintsWithVariants(false)
+                .version(0L)
+                .canEdit(false)
+                .canManageAssignees(false)
+                .canTransferResponsibility(false)
+                .build());
     when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             List.of(
