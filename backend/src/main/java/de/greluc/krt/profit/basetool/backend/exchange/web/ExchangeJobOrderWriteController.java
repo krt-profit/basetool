@@ -26,9 +26,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOr
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCommentDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangeDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangedDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWithTargetDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
@@ -63,9 +62,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "Exchange — job orders", description = "The job orders the member relates to")
 public class ExchangeJobOrderWriteController {
-
-  /** The shape of an idempotency key, as the gateway admits it (REQ-XCH-020). */
-  private static final String IDEMPOTENCY_KEY = "[A-Za-z0-9._~-]{8,128}";
 
   /** Serves the create options and creates aUEC orders. */
   private final ExchangeJobOrderCreateService createService;
@@ -126,10 +122,10 @@ public class ExchangeJobOrderWriteController {
   @ApiResponse(responseCode = "201", description = "The created order")
   @ApiResponse(responseCode = "400", description = "The pair is not offered")
   @ApiResponse(responseCode = "409", description = "The open-order or the daily create cap")
-  public ResponseEntity<ExchangeJobOrderCreatedDto> create(
+  public ResponseEntity<ExchangeJobOrderWithTargetDto> create(
       @NotNull @Valid @RequestBody ExchangeJobOrderCreateDto body,
       @NotNull
-          @Pattern(regexp = IDEMPOTENCY_KEY)
+          @Pattern(regexp = ActingMemberHeader.EXCHANGE_IDEMPOTENCY_KEY_PATTERN)
           @RequestHeader(ActingMemberHeader.EXCHANGE_IDEMPOTENCY_KEY_HEADER)
           String idempotencyKey,
       @NotNull Authentication authentication) {
@@ -209,7 +205,7 @@ public class ExchangeJobOrderWriteController {
   @ApiResponse(
       responseCode = "409",
       description = "A stale version, invalid responsibility, a closed order or a target too low")
-  public ResponseEntity<ExchangeJobOrderTargetChangedDto> changeTarget(
+  public ResponseEntity<ExchangeJobOrderWithTargetDto> changeTarget(
       @NotNull @PathVariable UUID id,
       @NotNull @Valid @RequestBody ExchangeJobOrderTargetChangeDto body,
       @NotNull Authentication authentication) {

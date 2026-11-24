@@ -163,7 +163,7 @@ public record JobOrderExchangeRead(
   /**
    * The progress of an aUEC order, in exact whole aUEC.
    *
-   * @param target the target
+   * @param target the agreed amount the order asks for
    * @param netHandedOver the net amount handed over to the requester
    * @param remaining the target less the net handover, never negative
    * @param overpaid the net handover beyond the target, never negative

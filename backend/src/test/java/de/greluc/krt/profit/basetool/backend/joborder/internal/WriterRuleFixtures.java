@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
@@ -38,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
@@ -47,6 +49,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -57,8 +60,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Seeds the units, members and memberships the job-order writer-rule tests decide over, and signs a
- * member in the way the web and the exchange present one (ADR-0408).
+ * Seeds the units, members and memberships the job-order writer-rule tests decide over, signs a
+ * member in the way the web and the exchange present one, and builds the writer scope a unit test
+ * stubs (ADR-0408).
  */
 @RequiredArgsConstructor
 final class WriterRuleFixtures {
@@ -120,11 +124,29 @@ final class WriterRuleFixtures {
     areaCommand = units.save(areaCommand);
     return new Units(
         profit,
-        squadron("Rule profit " + tag, profit),
-        squadron("Rule staffel " + tag, null),
+        squadron("Rule profit " + tag, profit, true),
+        squadron("Rule staffel " + tag, null, true),
         area,
         areaCommand,
-        squadron("Rule outside " + tag, null));
+        squadron("Rule outside " + tag, null, true));
+  }
+
+  /**
+   * Persists a Staffel whose name and shorthand are both {@code name}.
+   *
+   * @param name the name and shorthand, unique among the org units of the database
+   * @param parent the parent unit, or {@code null} for a Staffel without a parent
+   * @param active whether the Staffel is active
+   * @return the persisted Staffel
+   */
+  @NotNull
+  Squadron squadron(@NotNull String name, @Nullable OrgUnit parent, boolean active) {
+    Squadron unit = new Squadron();
+    unit.setName(name);
+    unit.setShorthand(name);
+    unit.setParent(parent);
+    unit.setActive(active);
+    return units.save(unit);
   }
 
   /**
@@ -176,6 +198,36 @@ final class WriterRuleFixtures {
   }
 
   /**
+   * Seats the five members whose exchange writes must stay within their web writes: one flagged
+   * Logistician in {@code staffel} and {@code profitStaffel}, a Staffelleiter of {@code outside}
+   * who is a plain member of {@code staffel}, a Bereichsleiter who is a plain member of the
+   * Spezialkommando, an Organisationsleitung member flagged in the Spezialkommando, and an
+   * administrator flagged in {@code staffel}.
+   *
+   * @param seeded the units {@link #seedUnits()} persisted
+   * @return the five members in that order
+   */
+  @NotNull
+  @Unmodifiable
+  List<User> seatParityMembers(@NotNull Units seeded) {
+    User flagged = member(true, false);
+    seat(flagged, seeded.staffel(), MembershipRole.MEMBER, true);
+    seat(flagged, seeded.profitStaffel(), MembershipRole.MEMBER, true);
+    User squadronLead = member(true, false);
+    seat(squadronLead, seeded.outside(), MembershipRole.STAFFELLEITER, false);
+    seat(squadronLead, seeded.staffel(), MembershipRole.MEMBER, false);
+    User areaLead = member(true, false);
+    seat(areaLead, seeded.area(), MembershipRole.BEREICHSLEITER, false);
+    seat(areaLead, seeded.areaCommand(), MembershipRole.MEMBER, false);
+    User leitungMember = member(true, false);
+    seat(leitungMember, leitung(), MembershipRole.OL_MEMBER, false);
+    seat(leitungMember, seeded.areaCommand(), MembershipRole.MEMBER, true);
+    User admin = member(true, true);
+    seat(admin, seeded.staffel(), MembershipRole.MEMBER, true);
+    return List.of(flagged, squadronLead, areaLead, leitungMember, admin);
+  }
+
+  /**
    * Returns the Organisationsleitung, created when none exists.
    *
    * @return the Organisationsleitung
@@ -196,7 +248,7 @@ final class WriterRuleFixtures {
   /**
    * Signs the member in as the web does: the authorities the real converter mints for them, no pin.
    *
-   * @param member the member
+   * @param member the stored member to sign in
    */
   void signInAsWebMember(@NotNull User member) {
     signIn(member, converter.assembleFor(users.findById(member.getId()).orElseThrow()));
@@ -206,7 +258,7 @@ final class WriterRuleFixtures {
    * Signs the member in as the exchange's acting member: {@code KRT Member} and no contextual
    * authority.
    *
-   * @param member the member
+   * @param member the stored member to sign in
    */
   static void signInAsExchangeMember(@NotNull User member) {
     signIn(member, List.of(new SimpleGrantedAuthority(Roles.authority(Roles.KRT_MEMBER))));
@@ -215,7 +267,7 @@ final class WriterRuleFixtures {
   /**
    * Signs the member in as an administrator without a pin.
    *
-   * @param admin the member
+   * @param admin the stored member to sign in as an administrator
    */
   static void signInAsAdministrator(@NotNull User admin) {
     signIn(
@@ -231,6 +283,18 @@ final class WriterRuleFixtures {
     RequestContextHolder.resetRequestAttributes();
   }
 
+  /**
+   * Builds the contextual writer scope of an administrator without a pin, which writes for every
+   * unit on either side.
+   *
+   * @return a {@link JobOrderWriterRule#CONTEXTUAL} scope over every unit
+   */
+  @NotNull
+  static JobOrderWriters.Scope everyUnitWriterScope() {
+    return new JobOrderWriters.Scope(
+        JobOrderWriterRule.CONTEXTUAL, new ScopePredicate(true, null, Set.of()));
+  }
+
   private static void signIn(
       @NotNull User member, @NotNull Collection<? extends GrantedAuthority> authorities) {
     SecurityContextHolder.getContext()
@@ -243,13 +307,5 @@ final class WriterRuleFixtures {
                 authorities));
     RequestContextHolder.setRequestAttributes(
         new ServletRequestAttributes(new MockHttpServletRequest()));
-  }
-
-  private Squadron squadron(@NotNull String name, @Nullable OrgUnit parent) {
-    Squadron unit = new Squadron();
-    unit.setName(name);
-    unit.setShorthand(name);
-    unit.setParent(parent);
-    return units.save(unit);
   }
 }

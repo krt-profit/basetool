@@ -48,9 +48,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChang
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeHomeLocationChosenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreateOptionsDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderCreatedDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderPageDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangedDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWithTargetDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
@@ -218,9 +217,9 @@ class ExchangeWireContractTest {
           Map.entry("bank-queue", ExchangeBankQueueDto.class),
           Map.entry("page--bankRequestPage", ExchangeBankRequestPageDto.class),
           Map.entry("page--jobOrderPage", ExchangeJobOrderPageDto.class),
-          Map.entry("job-order-write--created", ExchangeJobOrderCreatedDto.class),
+          Map.entry("job-order-write--created", ExchangeJobOrderWithTargetDto.class),
           Map.entry("job-order-write--written", ExchangeJobOrderWrittenDto.class),
-          Map.entry("job-order-write--targetChanged", ExchangeJobOrderTargetChangedDto.class),
+          Map.entry("job-order-write--targetChanged", ExchangeJobOrderWithTargetDto.class),
           Map.entry("job-order-create-options", ExchangeJobOrderCreateOptionsDto.class),
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),

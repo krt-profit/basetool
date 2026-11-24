@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
@@ -43,7 +44,7 @@ import org.jetbrains.annotations.Nullable;
 public record CreateJobOrderItemRequestDto(
     @Nullable UUID responsibleOrgUnitId,
     @Nullable UUID requestingOrgUnitId,
-    @Size(max = 200) String handle,
+    @Size(max = JobOrder.CONTACT_MAX_LENGTH) String handle,
     @Size(max = 1000) String comment,
     @NotEmpty @Size(max = 50) List<@Valid CreateJobOrderItemLineDto> items,
     Long version,

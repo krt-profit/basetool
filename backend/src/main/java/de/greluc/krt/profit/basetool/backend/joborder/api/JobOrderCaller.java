@@ -17,39 +17,37 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.joborder.internal;
+package de.greluc.krt.profit.basetool.backend.joborder.api;
 
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
-import java.util.UUID;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * The authority one call of a job-order status, target or information command runs under, as its
- * caller passed it (ADR-0408).
+ * caller passes it (ADR-0408).
  *
  * @param rule the writer rule that decides which side's writer the actor is
  * @param read the read check the loaded order must pass
  * @param actor who acts
  */
-record JobOrderCaller(
+public record JobOrderCaller(
     @NotNull JobOrderWriterRule rule,
     @NotNull JobOrderReadCheck read,
     @NotNull JobOrderActor actor) {
 
   /**
    * The web's caller: the contextual authorities with the honoured pin, the contextual read and the
-   * request's member.
+   * current request's member.
    *
-   * @param member the request's member, or {@code null} when the request resolves to none
+   * @param auth the current request's authentication
    * @return the web caller
    */
   @Contract("_ -> new")
-  static @NotNull JobOrderCaller web(@Nullable UUID member) {
+  public static @NotNull JobOrderCaller web(@NotNull AuthHelperService auth) {
     return new JobOrderCaller(
-        JobOrderWriterRule.CONTEXTUAL, JobOrderReadCheck.CONTEXTUAL, new JobOrderActor.Web(member));
+        JobOrderWriterRule.CONTEXTUAL,
+        JobOrderReadCheck.CONTEXTUAL,
+        JobOrderActor.Web.current(auth));
   }
 }

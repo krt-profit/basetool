@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -41,13 +42,6 @@ import org.jetbrains.annotations.Nullable;
 public record ExchangeJobOrderCreateDto(
     @NotNull UUID requestingUnitId,
     @NotNull UUID responsibleUnitId,
-    @NotBlank @Size(max = CONTACT_MAX_LENGTH) String contact,
+    @NotBlank @Size(max = JobOrder.CONTACT_MAX_LENGTH) String contact,
     @Nullable @Size(max = JobOrder.COMMENT_MAX_LENGTH) String comment,
-    @NotNull @Min(1) @Max(TARGET_MAX) Long target) {
-
-  /** The longest contact handle, as the web's create admits it. */
-  public static final int CONTACT_MAX_LENGTH = 200;
-
-  /** The largest target in whole aUEC, the bank's amount range. */
-  public static final long TARGET_MAX = 1_000_000_000_000L;
-}
+    @NotNull @Min(1) @Max(BankAmounts.MAX_WHOLE_AUEC) Long target) {}

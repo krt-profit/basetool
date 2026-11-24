@@ -1511,7 +1511,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ExchangeJobOrderCreatedDto"
+                  "$ref" : "#/components/schemas/ExchangeJobOrderWithTargetDto"
                 }
               }
             },
@@ -1996,7 +1996,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ExchangeJobOrderTargetChangedDto"
+                  "$ref" : "#/components/schemas/ExchangeJobOrderWithTargetDto"
                 }
               }
             },
@@ -6310,26 +6310,6 @@
           }
         }
       },
-      "ExchangeJobOrderCreatedDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "status" : {
-            "type" : "string",
-            "enum" : [ "OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED", "CANCELLED" ]
-          },
-          "target" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "versions" : {
-            "$ref" : "#/components/schemas/ExchangeJobOrderVersions"
-          }
-        }
-      },
       "ExchangeJobOrderDto" : {
         "type" : "object",
         "properties" : {
@@ -6541,7 +6521,24 @@
         },
         "required" : [ "target", "targetVersion" ]
       },
-      "ExchangeJobOrderTargetChangedDto" : {
+      "ExchangeJobOrderVersions" : {
+        "type" : "object",
+        "properties" : {
+          "comment" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lifecycle" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "target" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "ExchangeJobOrderWithTargetDto" : {
         "type" : "object",
         "properties" : {
           "id" : {
@@ -6558,23 +6555,6 @@
           },
           "versions" : {
             "$ref" : "#/components/schemas/ExchangeJobOrderVersions"
-          }
-        }
-      },
-      "ExchangeJobOrderVersions" : {
-        "type" : "object",
-        "properties" : {
-          "comment" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "lifecycle" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "target" : {
-            "type" : "integer",
-            "format" : "int64"
           }
         }
       },

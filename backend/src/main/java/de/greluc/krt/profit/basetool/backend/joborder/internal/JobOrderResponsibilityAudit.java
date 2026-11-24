@@ -45,13 +45,12 @@ final class JobOrderResponsibilityAudit {
    */
   static @NotNull AuditEventType createdType(
       @NotNull JobOrderType type, @NotNull JobOrderActor actor) {
-    return switch (actor) {
-      case JobOrderActor.Client _ -> AuditEventType.JOB_ORDER_CREATED_VIA_CLIENT;
-      case JobOrderActor.Web _ ->
-          switch (type) {
-            case MATERIAL, AUEC -> AuditEventType.JOB_ORDER_CREATED;
-            case ITEM -> AuditEventType.JOB_ORDER_ITEM_CREATED;
-          };
+    if (actor.viaClient()) {
+      return AuditEventType.JOB_ORDER_CREATED_VIA_CLIENT;
+    }
+    return switch (type) {
+      case MATERIAL, AUEC -> AuditEventType.JOB_ORDER_CREATED;
+      case ITEM -> AuditEventType.JOB_ORDER_ITEM_CREATED;
     };
   }
 
@@ -66,13 +65,12 @@ final class JobOrderResponsibilityAudit {
    */
   static @NotNull AuditDetails created(
       @NotNull JobOrder order, @NotNull JobOrderActor actor, @Nullable BigDecimal target) {
-    return switch (actor) {
-      case JobOrderActor.Client _ ->
-          AuditDetails.of("requestingOrgUnit", unitReference(order.getRequestingOrgUnit()))
-              .with("responsibleOrgUnit", unitReference(order.getResponsibleOrgUnit()))
-              .with("target", target);
-      case JobOrderActor.Web _ -> created(order);
-    };
+    if (!actor.viaClient()) {
+      return created(order);
+    }
+    return AuditDetails.of("requestingOrgUnit", unitReference(order.getRequestingOrgUnit()))
+        .with("responsibleOrgUnit", unitReference(order.getResponsibleOrgUnit()))
+        .with("target", target);
   }
 
   /**

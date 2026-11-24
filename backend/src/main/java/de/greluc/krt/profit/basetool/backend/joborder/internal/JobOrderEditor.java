@@ -130,7 +130,7 @@ public class JobOrderEditor {
       JobOrderReadCheck read,
       Predicate<JobOrder> needsQueue,
       BiFunction<JobOrder, Boolean, MoneyEdit<T>> mutation) {
-    return editMoney(id, order -> authorizeMoney(order, read), needsQueue, mutation);
+    return editMoney(id, moneyChecks(read), needsQueue, mutation);
   }
 
   /**
@@ -168,6 +168,17 @@ public class JobOrderEditor {
     MoneyEdit<T> result = mutation.apply(order, queueLocked);
     recordOutcome(result.edit());
     return result.result();
+  }
+
+  /**
+   * The checks a money edit under the read check runs on the loaded order before and after the
+   * order row lock: the read check, an aUEC order and a valid responsibility.
+   *
+   * @param read the read check the loaded order must pass
+   * @return the checks, refusing a failed read with {@link AccessDeniedException}
+   */
+  Consumer<JobOrder> moneyChecks(JobOrderReadCheck read) {
+    return order -> authorizeMoney(order, read);
   }
 
   @Transactional(propagation = Propagation.MANDATORY)

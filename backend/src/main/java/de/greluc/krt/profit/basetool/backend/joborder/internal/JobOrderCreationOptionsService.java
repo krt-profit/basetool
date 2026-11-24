@@ -56,9 +56,7 @@ class JobOrderCreationOptionsService implements JobOrderCreationOptions {
       return false;
     }
     JobOrderWriters.Scope scope =
-        writers.resolve(
-            JobOrderWriterRule.CONTEXTUAL,
-            new JobOrderActor.Web(authHelper.currentUserId().orElse(null)));
+        writers.resolve(JobOrderWriterRule.CONTEXTUAL, JobOrderActor.Web.current(authHelper));
     if (scope.everyUnit()) {
       return true;
     }

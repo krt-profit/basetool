@@ -51,7 +51,6 @@ public class JobOrderCreateOptionsController {
   @Operation(summary = "Get current order creation capability and unit choices")
   public JobOrderCreateOptionsDto current() {
     return creationOptions.current(
-        JobOrderWriterRule.CONTEXTUAL,
-        new JobOrderActor.Web(authHelper.currentUserId().orElse(null)));
+        JobOrderWriterRule.CONTEXTUAL, JobOrderActor.Web.current(authHelper));
   }
 }

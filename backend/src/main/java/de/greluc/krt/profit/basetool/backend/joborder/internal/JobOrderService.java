@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
@@ -254,7 +255,7 @@ public class JobOrderService {
   }
 
   private @NotNull JobOrderActor webActor() {
-    return new JobOrderActor.Web(currentMember());
+    return JobOrderActor.Web.current(authHelperService);
   }
 
   /**
@@ -315,7 +316,7 @@ public class JobOrderService {
   @Transactional
   public JobOrderDto updateJobOrderStatus(UUID id, UpdateJobOrderStatusDto dto) {
     return jobOrderStockProjectionService.mapToDtoWithStock(
-        changeStatus(id, dto.status(), dto.version(), JobOrderCaller.web(currentMember())));
+        changeStatus(id, dto.status(), dto.version(), JobOrderCaller.web(authHelperService)));
   }
 
   /** Changes the status under the caller's writer rule, read check and actor (ADR-0408). */

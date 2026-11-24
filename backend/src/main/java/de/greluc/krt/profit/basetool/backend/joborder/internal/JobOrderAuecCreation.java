@@ -71,10 +71,7 @@ public class JobOrderAuecCreation implements JobOrderCreateCommand {
             WholeAuec.positive(dto.target()));
     return projection.mapToDtoWithStock(
         persist(
-            order,
-            JobOrderWriterRule.CONTEXTUAL,
-            new JobOrderActor.Web(authHelper.currentUserId().orElse(null)),
-            _ -> {}));
+            order, JobOrderWriterRule.CONTEXTUAL, JobOrderActor.Web.current(authHelper), _ -> {}));
   }
 
   @Override

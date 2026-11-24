@@ -24,15 +24,16 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The terse answer to a client's target change (REQ-OXCH-007), read from the stored order after the
- * write.
+ * The terse answer to a client's create (REQ-OXCH-004) or target change (REQ-OXCH-007), read from
+ * the stored order after the write: a retry under a create's key answers the order created first,
+ * with its current state and its stored target.
  *
  * @param id the order
- * @param status the order's lifecycle status, unchanged by the write
+ * @param status the order's current lifecycle status
  * @param versions the section versions the next write echoes
  * @param target the stored target in whole aUEC
  */
-public record ExchangeJobOrderTargetChangedDto(
+public record ExchangeJobOrderWithTargetDto(
     @NotNull UUID id,
     @NotNull JobOrderStatus status,
     @NotNull ExchangeJobOrderDto.Versions versions,

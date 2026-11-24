@@ -86,6 +86,23 @@ public class ExchangeJobOrderMetrics {
   }
 
   /**
+   * Counts one refused job-order write: the refusal under its reason and the write as {@link
+   * ExchangeOps#REJECTED}.
+   *
+   * @param clientId the registry client id the relay bounded
+   * @param reason the bounded reason
+   * @param refusal the exception the client's answer comes from
+   * @param <E> the exception's type
+   * @return the refusal, for the caller to throw
+   */
+  public <E extends RuntimeException> @NotNull E refusedWrite(
+      @NotNull String clientId, @NotNull JobOrderExchangeRefusal reason, @NotNull E refusal) {
+    countRefused(reason);
+    countWrite(clientId, ExchangeOps.REJECTED);
+    return refusal;
+  }
+
+  /**
    * Counts one job-order write on {@code basetool_exchange_writes_total{resource="job_order"}}.
    *
    * @param clientId the registry client id the relay bounded

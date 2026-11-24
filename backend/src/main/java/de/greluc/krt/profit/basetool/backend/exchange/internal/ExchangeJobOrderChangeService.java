@@ -20,13 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderDto;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderTargetChangedDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWithTargetDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeJobOrderWrittenDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientWriteRefusedException;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeRead;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderExchangeReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderInformationCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatusCommand;
@@ -34,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderTargetCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
@@ -64,7 +59,7 @@ public class ExchangeJobOrderChangeService {
   private final JobOrderStatusCommand statusCommand;
   private final JobOrderTargetCommand targetCommand;
   private final JobOrderInformationCommand informationCommand;
-  private final JobOrderExchangeReads reads;
+  private final ExchangeJobOrderAnswers answers;
   private final ExchangeJobOrderMetrics metrics;
 
   /** Runs a write and the read of its answer in one transaction. */
@@ -91,13 +86,8 @@ public class ExchangeJobOrderChangeService {
     return written(
         caller,
         orderId,
-        () ->
-            statusCommand.cancel(
-                orderId,
-                lifecycleVersion,
-                JobOrderWriterRule.DIRECT_LOGISTICIAN,
-                JobOrderReadCheck.OWN_RELATION,
-                actor(caller)));
+        () -> statusCommand.cancel(orderId, lifecycleVersion, caller.jobOrderCaller()),
+        answers::written);
   }
 
   /**
@@ -118,25 +108,15 @@ public class ExchangeJobOrderChangeService {
    *     JOB_ORDER_CLOSED} or {@code 409 JOB_ORDER_TARGET_TOO_LOW}
    */
   @NotNull
-  public ExchangeJobOrderTargetChangedDto changeTarget(
+  public ExchangeJobOrderWithTargetDto changeTarget(
       @NotNull ExchangeCaller caller, @NotNull UUID orderId, long target, long targetVersion) {
     return written(
         caller,
         orderId,
         () ->
             targetCommand.changeTarget(
-                orderId,
-                BigDecimal.valueOf(target),
-                targetVersion,
-                JobOrderWriterRule.DIRECT_LOGISTICIAN,
-                JobOrderReadCheck.OWN_RELATION,
-                actor(caller)),
-        read ->
-            new ExchangeJobOrderTargetChangedDto(
-                read.id(),
-                read.status(),
-                ExchangeJobOrderDto.Versions.of(read.versions()),
-                ExchangeAmounts.auecTarget(read)));
+                orderId, BigDecimal.valueOf(target), targetVersion, caller.jobOrderCaller()),
+        answers::withTarget);
   }
 
   /**
@@ -166,32 +146,8 @@ public class ExchangeJobOrderChangeService {
         orderId,
         () ->
             informationCommand.changeComment(
-                orderId,
-                comment,
-                commentVersion,
-                JobOrderWriterRule.DIRECT_LOGISTICIAN,
-                JobOrderReadCheck.OWN_RELATION,
-                actor(caller)));
-  }
-
-  /**
-   * Runs one write on an existing order with the read of its terse answer in one transaction, and
-   * counts its outcome and the reason of a refusal.
-   *
-   * @param caller the acting member and the client the outcome is counted for
-   * @param orderId the order the write edits
-   * @param write the command call
-   * @return the order's id, status and versions after the write
-   */
-  private @NotNull ExchangeJobOrderWrittenDto written(
-      @NotNull ExchangeCaller caller, @NotNull UUID orderId, @NotNull Runnable write) {
-    return written(
-        caller,
-        orderId,
-        write,
-        read ->
-            new ExchangeJobOrderWrittenDto(
-                read.id(), read.status(), ExchangeJobOrderDto.Versions.of(read.versions())));
+                orderId, comment, commentVersion, caller.jobOrderCaller()),
+        answers::written);
   }
 
   /**
@@ -201,7 +157,7 @@ public class ExchangeJobOrderChangeService {
    * @param caller the acting member and the client the outcome is counted for
    * @param orderId the order the write edits
    * @param write the command call
-   * @param answer the answer drawn from the order's exchange read after the write
+   * @param answer the answer read from the written order in the write's transaction
    * @param <T> the answer's type
    * @return the answer
    */
@@ -209,40 +165,42 @@ public class ExchangeJobOrderChangeService {
       @NotNull ExchangeCaller caller,
       @NotNull UUID orderId,
       @NotNull Runnable write,
-      @NotNull Function<JobOrderExchangeRead, T> answer) {
+      @NotNull Function<UUID, T> answer) {
     try {
       T written =
           Objects.requireNonNull(
               transaction.execute(_ -> {
                 write.run();
-                return answer.apply(read(orderId));
+                return answer.apply(orderId);
               }));
       metrics.countWrite(caller.clientId(), ExchangeOps.APPLIED);
       return written;
     } catch (NotFoundException e) {
-      throw refused(caller, JobOrderExchangeRefusal.NOT_FOUND, e);
+      throw metrics.refusedWrite(caller.clientId(), JobOrderExchangeRefusal.NOT_FOUND, e);
     } catch (AccessDeniedException e) {
-      throw refused(caller, JobOrderExchangeRefusal.NOT_PERMITTED, e);
+      throw metrics.refusedWrite(caller.clientId(), JobOrderExchangeRefusal.NOT_PERMITTED, e);
     } catch (ObjectOptimisticLockingFailureException e) {
-      throw refused(caller, JobOrderExchangeRefusal.VERSION_CONFLICT, e);
+      throw metrics.refusedWrite(caller.clientId(), JobOrderExchangeRefusal.VERSION_CONFLICT, e);
     } catch (JobOrderClientWriteRefusedException e) {
       throw switch (e.getRefusal()) {
         case RESPONSIBILITY_INVALID ->
-            refused(
-                caller,
+            metrics.refusedWrite(
+                caller.clientId(),
                 JobOrderExchangeRefusal.RESPONSIBILITY_INVALID,
                 ExchangeProblemException.jobOrderResponsibilityInvalid(e));
         case CLOSED ->
-            refused(
-                caller, JobOrderExchangeRefusal.CLOSED, ExchangeProblemException.jobOrderClosed(e));
+            metrics.refusedWrite(
+                caller.clientId(),
+                JobOrderExchangeRefusal.CLOSED,
+                ExchangeProblemException.jobOrderClosed(e));
         case MONEY_STARTED ->
-            refused(
-                caller,
+            metrics.refusedWrite(
+                caller.clientId(),
                 JobOrderExchangeRefusal.MONEY_STARTED,
                 ExchangeProblemException.jobOrderMoneyStarted(e));
         case TARGET_TOO_LOW ->
-            refused(
-                caller,
+            metrics.refusedWrite(
+                caller.clientId(),
                 JobOrderExchangeRefusal.TARGET_TOO_LOW,
                 ExchangeProblemException.jobOrderTargetTooLow(e));
       };
@@ -250,35 +208,5 @@ public class ExchangeJobOrderChangeService {
       metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
       throw e;
     }
-  }
-
-  /**
-   * Counts a refused write under its reason and hands back the refusal to throw.
-   *
-   * @param caller the acting member and the client the outcome is counted for
-   * @param reason the bounded reason
-   * @param refusal the exception the client's answer comes from
-   * @param <E> the exception's type
-   * @return the refusal
-   */
-  private <E extends RuntimeException> @NotNull E refused(
-      @NotNull ExchangeCaller caller, @NotNull JobOrderExchangeRefusal reason, @NotNull E refusal) {
-    metrics.countRefused(reason);
-    metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
-    return refusal;
-  }
-
-  /**
-   * Reads the written order's exchange read in the write's transaction.
-   *
-   * @param orderId the written order
-   * @return its member-independent read
-   */
-  private @NotNull JobOrderExchangeRead read(@NotNull UUID orderId) {
-    return Objects.requireNonNull(reads.project(List.of(orderId)).get(orderId), "written order");
-  }
-
-  private static @NotNull JobOrderActor.Client actor(@NotNull ExchangeCaller caller) {
-    return new JobOrderActor.Client(caller.member(), caller.clientId());
   }
 }
