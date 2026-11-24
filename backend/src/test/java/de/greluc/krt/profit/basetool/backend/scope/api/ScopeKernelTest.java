@@ -1558,7 +1558,6 @@ class ScopeKernelTest {
   @Test
   void resolveOrgUnitForPickerOutputNullable_multipleMemberships_nullPicker_throwsOwnerRequired() {
     UUID homeStaffelId = UUID.randomUUID();
-    Squadron homeStaffel = squadron(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
