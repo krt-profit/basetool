@@ -3086,10 +3086,10 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
 - **The capability** gates no route of its own: a request without it is answered without entries,
   never refused. Like every capability it admits the routes any capability serves. A membership that
   starts or stops making its member a Logistician of the unit (the flag or the rank changes)
-  announces the unit's pool in the feed (`V297`), so the entries appear or vanish without a new
-  snapshot. For a Bereich or the Organisationsleitung it also announces the pools below it
-  (`V317`); no member's entries change there, so those lots arrive unchanged. The capability itself is the client's: a client whose token gains it reads a new
-  snapshot, and one whose token loses it drops the entries it kept.
+  announces that unit's pool in the feed (`V297`), so the entries appear or vanish without a new
+  snapshot. A pool below a Bereich or the Organisationsleitung is not announced, since no entry
+  there changes (`V451`). The capability itself is the client's: a client whose token gains it
+  reads a new snapshot, and one whose token loses it drops the entries it kept.
 
 **Acceptance**
 
@@ -3111,11 +3111,14 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
   `ExchangeHolderRefsTest`.*
 - [x] Editing a note, adding an earmark, renaming a holder and renaming an earmarked mission each
   produce a feed entry whose lot carries the new details. *`ExchangeOrgStockDetailsControllerTest`.*
+- [x] Joining a Bereich as its Logistician, or gaining the Logistician flag in a Bereich or the
+  Organisationsleitung, announces that unit's own pool and no pool below it.
+  *`ExchangeChangeFeedTriggerIntegrationTest`.*
 
 **Code:** `ExchangeOrgStockService`, `ExchangeOrgUnitService#logisticianUnitsByOwnMembership`,
 `OrgUnitMembershipQueryService#findLogisticianOrgUnitIdsByOwnMembership`, `ExchangeHolderRefs`,
 `ExchangeGate#holds`, `StockReads#exchangeOrgEntries`, `org-stock-lot.schema.json#/$defs/entry`,
-`V297` ·
+`V297`, `V451` ·
 **Status:** implemented (#2588); the rule `OrgUnitMembership#isLogisticianOfOwnUnit` (#2584)
 
 ### REQ-XCH-044 — A member can withhold their name from connected applications
