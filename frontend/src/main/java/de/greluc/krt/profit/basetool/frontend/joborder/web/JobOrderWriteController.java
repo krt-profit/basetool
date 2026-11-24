@@ -356,7 +356,6 @@ public class JobOrderWriteController {
       return "redirect:" + postCreateTarget(created);
     } catch (Exception e) {
       SectionFallback.rethrowHandOff(e);
-      log.error("Failed to create order", e);
       log.error("Failed to create job order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
       redirectAttributes.addFlashAttribute("jobOrderForm", form);
