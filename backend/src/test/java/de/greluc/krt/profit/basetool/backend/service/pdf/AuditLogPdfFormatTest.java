@@ -19,13 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.service.pdf;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditLogPdfFormat;
-import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
-import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
+import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -33,17 +38,27 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
 import java.util.function.UnaryOperator;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
 
 /**
  * Unit tests for {@link AuditLogPdfFormat} (REQ-AUDIT-001): row and period timestamps render in the
- * supplied {@code userZone} (UTC when {@code null}), while the {@link KrtPdfSupport#addFooter}
+ * supplied {@code userZone} (UTC when {@code null}), while the {@link KrtPdfDocument#footer}
  * generation stamp stays UTC. The PDF is read back via {@code PdfTextExtractor}, with an identity
  * {@link UnaryOperator} as message resolver.
  */
 class AuditLogPdfFormatTest {
+
+  /** The production PDF layer, which opens the tagged documents. */
+  private static final KrtPdfDocuments PDF_DOCUMENTS = new TaggedKrtPdfDocuments();
+
+  /** The most rows an audit-log export may hold (REQ-AUDIT-001). */
+  private static final int ROW_CAP = 100_000;
+
+  /** The size the full row cap must stay below: compressed it is about 26 MB. */
+  private static final int MAX_CAP_BYTES = 40 * 1024 * 1024;
 
   /** The row/period timestamp pattern the renderer binds to a zone (mirrors production). */
   private static final DateTimeFormatter PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
@@ -72,6 +87,7 @@ class AuditLogPdfFormatTest {
     Instant before = Instant.now();
     byte[] pdf =
         AuditLogPdfFormat.render(
+            PDF_DOCUMENTS,
             "AUDIT LOG TITLE",
             FROM,
             TO,
@@ -109,21 +125,80 @@ class AuditLogPdfFormatTest {
   }
 
   /**
-   * The audit-log PDF, empty state included, is a PDF/A-4 file (REQ-API-026).
+   * The audit-log PDF, empty state included, conforms to PDF/A-4, PDF/UA-2 and both WTPDF levels
+   * (REQ-API-026, REQ-API-029).
    *
    * @throws Exception when veraPDF cannot validate the rendered PDF
    */
   @Test
-  void render_isPdfA4WithAndWithoutRows() throws Exception {
+  void render_conformsToEveryProfileWithAndWithoutRows() throws Exception {
     AuditLogPdfFormat.Row row =
         new AuditLogPdfFormat.Row(OCCURRED_AT, "Jörg", "Übergabe", "Konto – 1", "k=v €");
 
-    PdfA4Conformance.assertConformant(
+    PdfConformance.assertConformant(
         AuditLogPdfFormat.render(
-            "AUDIT-LOG: BANK", FROM, TO, null, List.of(row), UnaryOperator.identity()));
-    PdfA4Conformance.assertConformant(
+            PDF_DOCUMENTS,
+            "AUDIT-LOG: BANK",
+            FROM,
+            TO,
+            null,
+            List.of(row),
+            UnaryOperator.identity()));
+    PdfConformance.assertConformant(
         AuditLogPdfFormat.render(
-            "AUDIT-LOG: BANK", FROM, TO, null, List.of(), UnaryOperator.identity()));
+            PDF_DOCUMENTS, "AUDIT-LOG: BANK", FROM, TO, null, List.of(), UnaryOperator.identity()));
+  }
+
+  /**
+   * The audit log is tagged as title, meta table, events heading, events table and footer, and the
+   * events table heads its five columns (REQ-API-029).
+   *
+   * @throws IOException when the rendered PDF cannot be read
+   */
+  @Test
+  void render_tagsTitleMetaHeadingTableAndFooter() throws IOException {
+    AuditLogPdfFormat.Row row =
+        new AuditLogPdfFormat.Row(OCCURRED_AT, "actor", "event", "subject", "details");
+
+    TaggedStructure structure =
+        TaggedStructure.read(
+            AuditLogPdfFormat.render(
+                PDF_DOCUMENTS,
+                "AUDIT-LOG",
+                FROM,
+                TO,
+                null,
+                List.of(row),
+                UnaryOperator.identity()));
+
+    assertEquals(List.of("H1", "Table", "H2", "Table", "P"), structure.kidTypes());
+    TaggedStructure header = structure.kids().get(3).kids().getFirst();
+    assertEquals(List.of("TH", "TH", "TH", "TH", "TH"), header.kidTypes());
+    assertTrue(
+        header.kids().stream()
+            .allMatch(cell -> "/Column".equals(cell.attributes().get("Table.Scope"))),
+        "every column header heads its column");
+  }
+
+  /**
+   * The full audit-log cap of 100 000 rows renders, and the compressed file stays a size a member
+   * can download (REQ-AUDIT-001, REQ-API-029).
+   */
+  @Test
+  void render_theFullRowCapStaysCompact() {
+    List<AuditLogPdfFormat.Row> rows =
+        IntStream.range(0, ROW_CAP)
+            .mapToObj(index ->
+                new AuditLogPdfFormat.Row(
+                    OCCURRED_AT, "actor" + index, "event", "KB-" + index, "amount=" + index))
+            .toList();
+
+    byte[] pdf =
+        AuditLogPdfFormat.render(
+            PDF_DOCUMENTS, "AUDIT-LOG", FROM, TO, null, rows, UnaryOperator.identity());
+
+    assertEquals("%PDF-2.0", new String(pdf, 0, 8, StandardCharsets.US_ASCII));
+    assertTrue(pdf.length < MAX_CAP_BYTES, "100 000 rows render to " + pdf.length + " bytes");
   }
 
   /**
@@ -141,7 +216,13 @@ class AuditLogPdfFormatTest {
 
     byte[] pdf =
         AuditLogPdfFormat.render(
-            "AUDIT LOG TITLE", FROM, TO, null, List.of(row), UnaryOperator.identity());
+            PDF_DOCUMENTS,
+            "AUDIT LOG TITLE",
+            FROM,
+            TO,
+            null,
+            List.of(row),
+            UnaryOperator.identity());
 
     String text = extractText(pdf);
 

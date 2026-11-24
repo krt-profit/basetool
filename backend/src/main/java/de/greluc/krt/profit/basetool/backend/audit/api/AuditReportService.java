@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.audit.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -53,6 +54,7 @@ public class AuditReportService {
   private final AuditService auditService;
   private final AuditEventMapper auditEventMapper;
   private final MessageSource messageSource;
+  private final KrtPdfDocuments pdfDocuments;
 
   /**
    * Generates the audit-log PDF for one area and period and records the export in the audit log.
@@ -92,7 +94,13 @@ public class AuditReportService {
 
     byte[] pdf =
         AuditLogPdfFormat.render(
-            label("pdf.audit.title." + domain.name()), from, to, userZone, rows, this::label);
+            pdfDocuments,
+            label("pdf.audit.title." + domain.name()),
+            from,
+            to,
+            userZone,
+            rows,
+            this::label);
 
     auditService.record(
         exportEventType(domain),

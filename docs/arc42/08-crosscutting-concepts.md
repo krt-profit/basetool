@@ -238,7 +238,11 @@ working sets independent of ledger length; the response lifecycle owns cleanup
 Every file export follows the current standard of its format: downloads are RFC 6266 attachments,
 every backend PDF is PDF/A-4 on PDF 2.0 and validated by veraPDF in the build, JSON follows RFC 8259
 and the CSV export RFC 4180 ([`api-file-exports.md`](../specs/api-file-exports.md),
-[ADR-0409](../adr/0409-every-file-export-follows-its-formats-current-standard.md)).
+[ADR-0409](../adr/0409-every-file-export-follows-its-formats-current-standard.md)). Every backend
+PDF is also tagged PDF/UA-2 and Well-Tagged PDF: `KrtPdfDocuments` (`platform.api.pdf`) opens a
+document of blocks only, and `platform.internal.pdf` draws and tags each block in the PDF 2.0
+namespace with a structure tree written row by row
+([ADR-0410](../adr/0410-every-backend-pdf-is-tagged-pdf-ua-2-and-well-tagged-pdf.md)).
 
 Versioned `/api/v1` paths changed by hard cut (ADR-0234, no deprecation machinery), DTO-only boundaries (records + MapStruct +
 Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every error,

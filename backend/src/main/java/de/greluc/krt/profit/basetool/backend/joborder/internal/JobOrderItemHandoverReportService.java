@@ -24,8 +24,11 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
-import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
-import java.awt.Color;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
 import java.io.ByteArrayOutputStream;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -37,7 +40,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.openpdf.text.pdf.PdfPTable;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,12 +58,16 @@ public class JobOrderItemHandoverReportService {
   private static final DateTimeFormatter DATE_PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy");
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
 
+  /** Relative widths of the item and amount columns. */
+  private static final float[] ITEM_WIDTHS = {4f, 1.5f};
+
   private static final Comparator<ItemRow> ITEM_COMPARATOR =
       Comparator.comparing(ItemRow::itemName, String.CASE_INSENSITIVE_ORDER)
           .thenComparing(Comparator.comparingInt(ItemRow::amount).reversed());
 
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final MessageSource messageSource;
+  private final KrtPdfDocuments pdfDocuments;
 
   /**
    * Generates the delivery-note PDF for a persisted item handover.
@@ -112,40 +118,30 @@ public class JobOrderItemHandoverReportService {
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      PdfPTable metaTable = KrtPdfSupport.newMetaTable();
-      KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
-      KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
-      KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
-      KrtPdfSupport.addMetaRow(
-          metaTable,
-          "EMPFÄNGER (HANDLE)",
-          HandleAnonymisation.humaniseRequired(recipientHandle, label("general.anonymisedHandle")));
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos, "ÜBERGABEPROTOKOLL");
-      krt.document().add(metaTable);
-
-      KrtPdfSupport.addSectionHeader(krt, "ÜBERGEBENE GÜTER");
-
-      PdfPTable itemTable = new PdfPTable(2);
-      itemTable.setWidthPercentage(100);
-      itemTable.setWidths(new float[] {4f, 1.5f});
-      KrtPdfSupport.addTableHeader(itemTable, "GUT");
-      KrtPdfSupport.addTableHeader(itemTable, "MENGE");
-
-      boolean alt = false;
-      for (ItemRow row : rows) {
-        Color rowBg = KrtPdfSupport.rowBackground(alt);
-        KrtPdfSupport.addTableCell(itemTable, row.itemName(), rowBg, false);
-        KrtPdfSupport.addTableCell(itemTable, String.valueOf(row.amount()), rowBg, true);
-        alt = !alt;
+      try (KrtPdfDocument pdf = pdfDocuments.open(baos, "ÜBERGABEPROTOKOLL")) {
+        pdf.keyValueTable(
+            List.of(
+                new PdfKeyValue("AUFTRAGSNUMMER", jobOrderNumber),
+                new PdfKeyValue("DATUM DER ÜBERGABE", handoverDate),
+                new PdfKeyValue("UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)"),
+                new PdfKeyValue(
+                    "EMPFÄNGER (HANDLE)",
+                    HandleAnonymisation.humaniseRequired(
+                        recipientHandle, label("general.anonymisedHandle")))));
+        pdf.heading("ÜBERGEBENE GÜTER");
+        try (PdfDataTable table = pdf.dataTable(ITEM_WIDTHS, List.of("GUT", "MENGE"))) {
+          for (ItemRow row : rows) {
+            table.row(
+                List.of(
+                    PdfTableCell.text(row.itemName()),
+                    PdfTableCell.centered(String.valueOf(row.amount()))));
+          }
+          if (rows.isEmpty()) {
+            table.emptyRow("Keine Güter vorhanden.");
+          }
+        }
+        pdf.footer();
       }
-      if (rows.isEmpty()) {
-        KrtPdfSupport.addEmptyRow(itemTable, "Keine Güter vorhanden.", 2);
-      }
-      krt.document().add(itemTable);
-
-      KrtPdfSupport.addFooter(krt);
-
-      krt.document().close();
       return baos.toByteArray();
     } catch (Exception e) {
       throw new ReportGenerationException("PDF generation failed", e);

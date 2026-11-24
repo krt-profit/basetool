@@ -93,7 +93,7 @@ class KeycloakHealthIndicator platform health probe
 class UserSyncTask identity Keycloak user-sync trigger
 class SseSendFailureCause platform SSE failure tag shared by notification and live sync
 class RedisJsonFanout platform Redis pub/sub transport shared by notification and live sync
-class KrtPdfSupport platform shared PDF design layer
+class KrtPdfDocuments platform shared tagged PDF layer
 class AuditLogPdfFormat audit audit PDF format
 class CentralMapperConfig platform MapStruct shared config
 class DtoConstraints kernel shared validation constants

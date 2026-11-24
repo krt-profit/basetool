@@ -30,11 +30,13 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
+import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
+import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,7 +100,16 @@ class BankReportServiceTest {
     assertTrue(
         text.contains("Generiert von Profit Basetool am ") && text.contains(" UTC"),
         "footer carries the UTC generation timestamp");
-    PdfA4Conformance.assertConformant(pdf);
+    PdfConformance.assertConformant(pdf);
+    TaggedStructure structure = TaggedStructure.read(pdf);
+    assertEquals(
+        List.of("H1", "Table", "H2", "Table", "P"),
+        structure.kidTypes(),
+        "title, meta table, bookings heading, bookings table, footer");
+    assertEquals(
+        List.of("TH", "TH", "TH", "TH", "TH", "TH"),
+        structure.kids().get(3).kids().getFirst().kidTypes(),
+        "the booking table heads its six columns");
   }
 
   @Test
@@ -289,7 +300,26 @@ class BankReportServiceTest {
     assertTrue(text.contains("Kontostandverlauf"), "per-account balance chart caption present");
     assertEquals(
         auditBefore + 1, auditEventRepository.count(), "exactly one MANAGEMENT_REPORT_EXPORTED");
-    PdfA4Conformance.assertConformant(pdf);
+    PdfConformance.assertConformant(pdf);
+    TaggedStructure structure = TaggedStructure.read(pdf);
+    assertEquals(List.of("H1", "Table"), structure.kidTypes().subList(0, 2), "title, meta");
+    List<String> descriptions =
+        structure.all("Figure").stream().map(TaggedStructure::alternateDescription).toList();
+    assertFalse(descriptions.isEmpty(), "every account chart is a figure");
+    assertTrue(
+        descriptions.stream()
+            .allMatch(alt ->
+                alt.matches(
+                    "Kontostandverlauf von Konto .+ vom \\d{2}\\.\\d{2}\\.\\d{2} bis "
+                        + "\\d{2}\\.\\d{2}\\.\\d{2}: Anfangssaldo .+ aUEC, Endsaldo .+ aUEC, "
+                        + "niedrigster Stand .+ aUEC, höchster Stand .+ aUEC\\.")),
+        "each chart is described by account, window and balances: " + descriptions);
+    assertTrue(
+        descriptions.stream()
+            .anyMatch(alt ->
+                alt.startsWith("Kontostandverlauf von Konto " + account.getAccountNo() + " - ")
+                    && alt.contains("Anfangssaldo 0 aUEC, Endsaldo 750 aUEC")),
+        "the seeded account's chart names its account and closing balance: " + descriptions);
   }
 
   @Test

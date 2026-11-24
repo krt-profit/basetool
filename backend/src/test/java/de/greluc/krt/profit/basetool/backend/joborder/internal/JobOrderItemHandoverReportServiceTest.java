@@ -29,7 +29,10 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverEntry;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
+import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -39,7 +42,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openpdf.text.pdf.PdfReader;
+import org.openpdf.text.pdf.parser.PdfTextExtractor;
 import org.springframework.context.MessageSource;
 
 /**
@@ -54,6 +60,8 @@ class JobOrderItemHandoverReportServiceTest {
   @Mock private MessageSource messageSource;
   @InjectMocks private JobOrderItemHandoverReportService service;
 
+  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments();
+
   @Test
   void generatesPdfContainingOrderNumberAndItemName() throws Exception {
     UUID orderId = UUID.randomUUID();
@@ -63,11 +71,14 @@ class JobOrderItemHandoverReportServiceTest {
 
     byte[] pdf = service.generateItemHandoverReport(orderId, handoverId, ZoneOffset.UTC);
 
-    String content = new String(pdf, StandardCharsets.ISO_8859_1);
-    assertThat(content).startsWith("%PDF");
+    assertThat(new String(pdf, 0, 4, StandardCharsets.ISO_8859_1)).isEqualTo("%PDF");
+    String content = new PdfTextExtractor(new PdfReader(pdf)).getTextFromPage(1);
     assertThat(content).contains("#42");
     assertThat(content).contains("Ballista");
-    PdfA4Conformance.assertConformant(pdf);
+    PdfConformance.assertConformant(pdf);
+    TaggedStructure structure = TaggedStructure.read(pdf);
+    assertThat(structure.kidTypes()).containsExactly("H1", "Table", "H2", "Table", "P");
+    assertThat(structure.kids().get(3).kids().getFirst().kidTypes()).containsExactly("TH", "TH");
   }
 
   @Test

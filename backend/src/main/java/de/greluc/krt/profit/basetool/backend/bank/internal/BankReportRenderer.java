@@ -20,35 +20,51 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
-import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
-import java.awt.Color;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.openpdf.text.Element;
-import org.openpdf.text.Paragraph;
-import org.openpdf.text.pdf.PdfPTable;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/** Renders detached Bank snapshots with chunk-flushed tables and a bounded chart envelope. */
+/**
+ * Renders detached Bank snapshots as tagged PDFs: tables drawn chunk by chunk and a bounded chart
+ * envelope, so the working set does not grow with the ledger (REQ-BANK-014/015, REQ-API-029).
+ */
 @Component
 @RequiredArgsConstructor
 public class BankReportRenderer {
   private static final DateTimeFormatter DATE_TIME =
       DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
   private static final DateTimeFormatter DATE_ONLY = DateTimeFormatter.ofPattern("dd.MM.yy");
+
+  /** Columns of the statement with holders: date, type, holder, counterparty, amount, balance. */
+  private static final float[] STATEMENT_WIDTHS = {1.5f, 1.2f, 1.4f, 1.8f, 1.2f, 1.3f};
+
+  /** Columns of the statement without holders: date, type, counterparty, amount, balance. */
+  private static final float[] REDACTED_STATEMENT_WIDTHS = {1.6f, 1.3f, 1.9f, 1.3f, 1.4f};
+
+  /** Columns of a report's booking table: date, type, holder, counterparty, amount. */
+  private static final float[] REPORT_WIDTHS = {1.5f, 1.2f, 1.5f, 1.9f, 1.2f};
+
   private final ObjectMapper mapper;
   private final MessageSource messageSource;
+  private final KrtPdfDocuments pdfDocuments;
 
   /**
    * Renders a statement without holding a database transaction or the complete posting set.
@@ -68,28 +84,24 @@ public class BankReportRenderer {
       @Nullable ZoneId userZone,
       boolean redactHolders) {
     DateTimeFormatter stamp = DATE_TIME.withZone(userZone == null ? ZoneOffset.UTC : userZone);
-    try (var output = Files.newOutputStream(spool.file("report.pdf"))) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(output, label("pdf.bank.statement.title"));
-      try (var _ = krt.document()) {
-        PdfPTable meta = KrtPdfSupport.newMetaTable();
-        KrtPdfSupport.addMetaRow(
-            meta,
-            label("pdf.bank.statement.account"),
-            section.account().accountNo() + " - " + section.account().name());
-        period(meta, stamp, from, to);
-        KrtPdfSupport.addMetaRow(
-            meta,
-            label("pdf.bank.statement.openingBalance"),
-            BankPdfFormat.amount(section.opening()));
-        KrtPdfSupport.addMetaRow(
-            meta,
-            label("pdf.bank.statement.closingBalance"),
-            BankPdfFormat.amount(section.closing()));
-        add(krt, meta);
-        KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.statement.bookings"));
-        bookings(krt, spool, section, stamp, redactHolders, true);
-        KrtPdfSupport.addFooter(krt);
-      }
+    try (OutputStream output = Files.newOutputStream(spool.file("report.pdf"));
+        KrtPdfDocument pdf = pdfDocuments.open(output, label("pdf.bank.statement.title"))) {
+      List<PdfKeyValue> meta = new ArrayList<>();
+      meta.add(
+          new PdfKeyValue(
+              label("pdf.bank.statement.account"),
+              section.account().accountNo() + " - " + section.account().name()));
+      meta.addAll(period(stamp, from, to));
+      meta.add(
+          new PdfKeyValue(
+              label("pdf.bank.statement.openingBalance"), BankPdfFormat.amount(section.opening())));
+      meta.add(
+          new PdfKeyValue(
+              label("pdf.bank.statement.closingBalance"), BankPdfFormat.amount(section.closing())));
+      pdf.keyValueTable(meta);
+      pdf.heading(label("pdf.bank.statement.bookings"));
+      bookings(pdf, spool, section, stamp, redactHolders, true);
+      pdf.footer();
     } catch (Exception failure) {
       throw new ReportGenerationException("Bank statement PDF rendering failed", failure);
     }
@@ -113,210 +125,179 @@ public class BankReportRenderer {
     ZoneId zone = userZone == null ? ZoneOffset.UTC : userZone;
     DateTimeFormatter stamp = DATE_TIME.withZone(zone);
     DateTimeFormatter date = DATE_ONLY.withZone(zone);
-    try (var output = Files.newOutputStream(spool.file("report.pdf"))) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(output, label("pdf.bank.report.title"));
-      try (var _ = krt.document()) {
-        PdfPTable meta = KrtPdfSupport.newMetaTable();
-        period(meta, stamp, from, to);
-        add(krt, meta);
-        if (snapshot.accounts() == 0) {
-          add(
-              krt,
-              new Paragraph(
-                  label("pdf.bank.report.empty"),
-                  KrtPdfSupport.italic(10, KrtPdfSupport.COLOR_LIGHT_GRAY)));
-        }
-        boolean[] first = {true};
-        BankReportSpool.read(
-            spool.file("sections"),
-            mapper,
-            BankReportSpool.Section.class,
-            section -> {
-              if (!first[0]) {
-                krt.document().newPage();
-              }
-              first[0] = false;
-              add(krt, KrtPdfSupport.spacer(12));
-              KrtPdfSupport.addSectionHeader(
-                  krt,
-                  label("pdf.bank.statement.account")
-                      + " "
-                      + section.account().accountNo()
-                      + " - "
-                      + section.account().name());
-              PdfPTable summary = KrtPdfSupport.newMetaTable();
-              KrtPdfSupport.addMetaRow(
-                  summary,
-                  label("pdf.bank.report.opening"),
-                  BankPdfFormat.amount(section.opening()));
-              KrtPdfSupport.addMetaRow(
-                  summary,
-                  label("pdf.bank.report.inflow"),
-                  BankPdfFormat.signedAmount(section.inflow()));
-              KrtPdfSupport.addMetaRow(
-                  summary,
-                  label("pdf.bank.report.outflow"),
-                  BankPdfFormat.signedAmount(section.outflow()));
-              KrtPdfSupport.addMetaRow(
-                  summary,
-                  label("pdf.bank.report.closing"),
-                  BankPdfFormat.amount(section.closing()));
-              add(krt, summary);
-              KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.report.chart"));
-              BankBalanceEnvelope envelope = new BankBalanceEnvelope(from, to, section.opening());
-              BankReportSpool.read(
-                  spool.file(section.rowsFile()),
-                  mapper,
-                  BankReportSpool.Lines.class,
-                  chunk ->
-                      chunk.lines().forEach(line -> envelope.add(line.createdAt(), line.amount())));
-              add(
-                  krt,
-                  BankBalanceChart.render(
-                      krt.writer(), envelope, from, to, date.format(from), date.format(to)));
-              add(krt, KrtPdfSupport.spacer(12));
-              bookings(krt, spool, section, stamp, false, false);
-            });
-        if (snapshot.accounts() != 0) {
-          krt.document().newPage();
-        }
-        KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.report.holders"));
-        holders(krt, spool, snapshot.holders());
-        KrtPdfSupport.addFooter(krt);
+    try (OutputStream output = Files.newOutputStream(spool.file("report.pdf"));
+        KrtPdfDocument pdf = pdfDocuments.open(output, label("pdf.bank.report.title"))) {
+      pdf.keyValueTable(period(stamp, from, to));
+      if (snapshot.accounts() == 0) {
+        pdf.notice(label("pdf.bank.report.empty"));
       }
+      boolean[] first = {true};
+      BankReportSpool.read(
+          spool.file("sections"),
+          mapper,
+          BankReportSpool.Section.class,
+          section -> {
+            if (!first[0]) {
+              pdf.newPage();
+            }
+            first[0] = false;
+            account(pdf, spool, section, from, to, stamp, date);
+          });
+      if (snapshot.accounts() != 0) {
+        pdf.newPage();
+      }
+      pdf.heading(label("pdf.bank.report.holders"));
+      holders(pdf, spool, snapshot.holders());
+      pdf.footer();
     } catch (Exception failure) {
       throw new ReportGenerationException("Bank management PDF rendering failed", failure);
     }
   }
 
-  private void period(PdfPTable meta, DateTimeFormatter stamp, Instant from, Instant to) {
-    KrtPdfSupport.addMetaRow(
-        meta, label("pdf.bank.statement.period"), stamp.format(from) + " - " + stamp.format(to));
-    KrtPdfSupport.addMetaRow(
-        meta, label("pdf.bank.statement.generated"), stamp.format(Instant.now()));
+  /**
+   * Draws one account of the management report: heading, summary, balance chart and bookings.
+   *
+   * @param pdf the open document
+   * @param spool the snapshot storage
+   * @param section the account's snapshot section
+   * @param from window start
+   * @param to window end
+   * @param stamp the timestamp format in the caller's zone
+   * @param date the chart's date format in the caller's zone
+   */
+  private void account(
+      KrtPdfDocument pdf,
+      BankReportSpool spool,
+      BankReportSpool.Section section,
+      Instant from,
+      Instant to,
+      DateTimeFormatter stamp,
+      DateTimeFormatter date) {
+    String account = section.account().accountNo() + " - " + section.account().name();
+    pdf.sectionGap();
+    pdf.heading(label("pdf.bank.statement.account") + " " + account);
+    pdf.keyValueTable(
+        List.of(
+            new PdfKeyValue(
+                label("pdf.bank.report.opening"), BankPdfFormat.amount(section.opening())),
+            new PdfKeyValue(
+                label("pdf.bank.report.inflow"), BankPdfFormat.signedAmount(section.inflow())),
+            new PdfKeyValue(
+                label("pdf.bank.report.outflow"), BankPdfFormat.signedAmount(section.outflow())),
+            new PdfKeyValue(
+                label("pdf.bank.report.closing"), BankPdfFormat.amount(section.closing()))));
+    pdf.heading(label("pdf.bank.report.chart"));
+    BankBalanceEnvelope envelope = new BankBalanceEnvelope(from, to, section.opening());
+    BankReportSpool.read(
+        spool.file(section.rowsFile()),
+        mapper,
+        BankReportSpool.Lines.class,
+        chunk -> chunk.lines().forEach(line -> envelope.add(line.createdAt(), line.amount())));
+    String fromLabel = date.format(from);
+    String toLabel = date.format(to);
+    pdf.figure(
+        BankBalanceChart.WIDTH,
+        BankBalanceChart.HEIGHT,
+        label(
+            "pdf.bank.report.chart.alt",
+            account,
+            fromLabel,
+            toLabel,
+            BankPdfFormat.amount(section.opening()),
+            BankPdfFormat.amount(section.closing()),
+            BankPdfFormat.amount(envelope.getMinimum()),
+            BankPdfFormat.amount(envelope.getMaximum())),
+        canvas -> BankBalanceChart.draw(canvas, envelope, from, to, fromLabel, toLabel));
+    pdf.sectionGap();
+    bookings(pdf, spool, section, stamp, false, false);
+  }
+
+  private @NotNull List<PdfKeyValue> period(DateTimeFormatter stamp, Instant from, Instant to) {
+    return List.of(
+        new PdfKeyValue(
+            label("pdf.bank.statement.period"), stamp.format(from) + " - " + stamp.format(to)),
+        new PdfKeyValue(label("pdf.bank.statement.generated"), stamp.format(Instant.now())));
   }
 
   private void bookings(
-      KrtPdfSupport.KrtDocument krt,
+      KrtPdfDocument pdf,
       BankReportSpool spool,
       BankReportSpool.Section section,
       DateTimeFormatter stamp,
       boolean redactHolders,
       boolean withBalance) {
-    int columns = withBalance ? redactHolders ? 5 : 6 : 5;
-    PdfPTable table = new PdfPTable(columns);
-    table.setWidthPercentage(100);
-    table.setWidths(
-        withBalance
-            ? redactHolders
-                ? new float[] {1.6f, 1.3f, 1.9f, 1.3f, 1.4f}
-                : new float[] {1.5f, 1.2f, 1.4f, 1.8f, 1.2f, 1.3f}
-            : new float[] {1.5f, 1.2f, 1.5f, 1.9f, 1.2f});
-    for (String key : List.of("date", "type")) {
-      KrtPdfSupport.addTableHeader(table, label("pdf.bank.col." + key));
-    }
+    List<String> headers = new ArrayList<>();
+    headers.add(label("pdf.bank.col.date"));
+    headers.add(label("pdf.bank.col.type"));
     if (!redactHolders) {
-      KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.holder"));
+      headers.add(label("pdf.bank.col.holder"));
     }
-    KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.counterparty"));
-    KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.amount"));
+    headers.add(label("pdf.bank.col.counterparty"));
+    headers.add(label("pdf.bank.col.amount"));
     if (withBalance) {
-      KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.balance"));
+      headers.add(label("pdf.bank.col.balance"));
     }
-    table.setHeaderRows(1);
-    table.setComplete(false);
-    if (section.rows() == 0) {
-      KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), columns);
-      table.setComplete(true);
-      add(krt, table);
-      return;
+    float[] widths =
+        withBalance ? redactHolders ? REDACTED_STATEMENT_WIDTHS : STATEMENT_WIDTHS : REPORT_WIDTHS;
+    try (PdfDataTable table = pdf.dataTable(widths, headers)) {
+      if (section.rows() == 0) {
+        table.emptyRow(label("pdf.bank.statement.empty"));
+        return;
+      }
+      BigDecimal[] running = {section.opening()};
+      BankReportSpool.read(
+          spool.file(section.rowsFile()),
+          mapper,
+          BankReportSpool.Lines.class,
+          chunk -> {
+            for (BankReportSpool.Line line : chunk.lines()) {
+              running[0] = running[0].add(line.amount());
+              List<PdfTableCell> cells = new ArrayList<>();
+              cells.add(PdfTableCell.text(stamp.format(line.createdAt())));
+              cells.add(PdfTableCell.text(label("pdf.bank.type." + line.type().name())));
+              if (!redactHolders) {
+                cells.add(PdfTableCell.text(line.holder()));
+              }
+              cells.add(PdfTableCell.text(line.counterparty()));
+              cells.add(PdfTableCell.centered(BankPdfFormat.signedAmount(line.amount())));
+              if (withBalance) {
+                cells.add(PdfTableCell.centered(BankPdfFormat.amount(running[0])));
+              }
+              table.row(cells);
+              table.detailRow(
+                  List.of(
+                      new PdfKeyValue(
+                          label("pdf.bank.sub.justification"), orEmpty(line.justification())),
+                      new PdfKeyValue(label("pdf.bank.sub.note"), orEmpty(line.note())),
+                      new PdfKeyValue(label("pdf.bank.sub.staffNote"), orEmpty(line.staffNote()))));
+            }
+          });
     }
-    BigDecimal[] running = {section.opening()};
-    long[] rendered = {0};
-    BankReportSpool.read(
-        spool.file(section.rowsFile()),
-        mapper,
-        BankReportSpool.Lines.class,
-        chunk -> {
-          for (BankReportSpool.Line line : chunk.lines()) {
-            Color bg = KrtPdfSupport.rowBackground(rendered[0] % 2 != 0);
-            running[0] = running[0].add(line.amount());
-            KrtPdfSupport.addTableCell(table, stamp.format(line.createdAt()), bg, false);
-            KrtPdfSupport.addTableCell(
-                table, label("pdf.bank.type." + line.type().name()), bg, false);
-            if (!redactHolders) {
-              KrtPdfSupport.addTableCell(table, line.holder(), bg, false);
-            }
-            KrtPdfSupport.addTableCell(table, line.counterparty(), bg, false);
-            KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(line.amount()), bg, true);
-            if (withBalance) {
-              KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(running[0]), bg, true);
-            }
-            String reason = line.justification() == null ? "" : line.justification();
-            String note = line.note() == null ? "" : line.note();
-            String staffNote = line.staffNote() == null ? "" : line.staffNote();
-            if (!reason.isEmpty() || !note.isEmpty() || !staffNote.isEmpty()) {
-              KrtPdfSupport.addDetailSubRow(
-                  table,
-                  label("pdf.bank.sub.justification"),
-                  reason,
-                  label("pdf.bank.sub.note"),
-                  note,
-                  label("pdf.bank.sub.staffNote"),
-                  staffNote,
-                  bg,
-                  columns);
-            }
-            rendered[0]++;
-          }
-          table.setComplete(rendered[0] == section.rows());
-          add(krt, table);
-          if (rendered[0] != section.rows()) {
-            table.flushContent();
-          }
-        });
   }
 
-  private void holders(KrtPdfSupport.KrtDocument krt, BankReportSpool spool, long count) {
+  private void holders(KrtPdfDocument pdf, BankReportSpool spool, long count) {
     if (count == 0) {
-      add(krt, BankPdfFormat.distributionTable(List.of(), this::label));
+      BankPdfFormat.distributionTable(pdf, List.of(), this::label);
       return;
     }
-    PdfPTable table = new PdfPTable(2);
-    table.setWidthPercentage(100);
-    table.setWidths(new float[] {3f, 1.5f});
-    KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.holder"));
-    KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.amount"));
-    table.setHeaderRows(1);
-    table.setComplete(false);
-    long[] rendered = {0};
-    BankReportSpool.read(
-        spool.file("holders"),
-        mapper,
-        BankReportSpool.Holders.class,
-        chunk -> {
-          for (BankHolderBalance balance : chunk.balances()) {
-            Color bg = KrtPdfSupport.rowBackground(rendered[0]++ % 2 != 0);
-            KrtPdfSupport.addTableCell(table, balance.handle(), bg, false);
-            KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(balance.amount()), bg, true);
-          }
-          table.setComplete(rendered[0] == count);
-          add(krt, table);
-          if (rendered[0] != count) {
-            table.flushContent();
-          }
-        });
+    try (PdfDataTable table = BankPdfFormat.holderTable(pdf, this::label)) {
+      BankReportSpool.read(
+          spool.file("holders"),
+          mapper,
+          BankReportSpool.Holders.class,
+          chunk -> chunk.balances().forEach(balance -> BankPdfFormat.holderRow(table, balance)));
+    }
   }
 
-  private static void add(KrtPdfSupport.KrtDocument krt, Element element) {
-    try {
-      krt.document().add(element);
-    } catch (Exception failure) {
-      throw new ReportGenerationException("Bank report element rendering failed", failure);
-    }
+  private static @NotNull String orEmpty(@Nullable String text) {
+    return text == null ? "" : text;
   }
 
   private @NotNull String label(String key) {
     return messageSource.getMessage(key, null, Locale.GERMAN);
+  }
+
+  private @NotNull String label(String key, Object... arguments) {
+    return messageSource.getMessage(key, arguments, Locale.GERMAN);
   }
 }
