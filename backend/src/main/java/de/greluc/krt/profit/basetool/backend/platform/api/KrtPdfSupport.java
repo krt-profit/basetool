@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfTheme;
 import java.awt.Color;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -44,62 +45,40 @@ import org.openpdf.text.pdf.PdfPageEventHelper;
 import org.openpdf.text.pdf.PdfWriter;
 
 /**
- * Shared KRT corporate-design layer for every backend PDF: the color palette, the page background,
- * the meta and table cell helpers and the embedded Lato fonts (REQ-BANK-017). Every document it
- * opens is a PDF/A-4 file ({@link PdfArchiveProfile}, REQ-API-026).
- *
- * <p>Orange is an accent only (REQ-UI-002); surfaces and grid lines are neutral. Lato is embedded
- * with {@link BaseFont#WINANSI} so the uncompressed content stream stays text-extractable; every
- * text, spacers included, is set in Lato, since PDF/A-4 admits no unembedded font.
+ * Legacy untagged KRT layout helpers for the PDFs not yet drawn through {@link
+ * de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument}; palette and fonts come
+ * from {@link KrtPdfTheme} and every document it opens is a PDF/A-4 file ({@link
+ * PdfArchiveProfile}, REQ-API-026).
  */
 @Slf4j
 public final class KrtPdfSupport {
 
-  /** Page background fill, the app's canvas gray ({@code --color-canvas}). */
-  public static final Color COLOR_CANVAS = new Color(0x0D, 0x0F, 0x12);
+  /** Page background fill ({@link KrtPdfTheme#COLOR_CANVAS}). */
+  public static final Color COLOR_CANVAS = KrtPdfTheme.COLOR_CANVAS;
 
-  /** Box background for meta rows and odd table rows ({@code --surface-panel}). */
-  public static final Color COLOR_DARK_GRAY = new Color(0x1A, 0x1E, 0x24);
+  /** Box background for meta rows and odd table rows ({@link KrtPdfTheme#COLOR_DARK_GRAY}). */
+  public static final Color COLOR_DARK_GRAY = KrtPdfTheme.COLOR_DARK_GRAY;
 
-  /**
-   * DAS KARTELL primary orange ({@code --color-primary}), used only for titles, headings, header
-   * accent lines, the chart line, the top bar and the logo (REQ-UI-002).
-   */
-  public static final Color COLOR_ORANGE = new Color(0xE7, 0x7E, 0x23);
+  /** DAS KARTELL primary orange ({@link KrtPdfTheme#COLOR_ORANGE}). */
+  public static final Color COLOR_ORANGE = KrtPdfTheme.COLOR_ORANGE;
 
-  /** Default body / data-value text on the dark background (design token {@code --data-fg}). */
-  public static final Color COLOR_WHITE = new Color(0xFF, 0xFF, 0xFF);
+  /** Default text on the dark background ({@link KrtPdfTheme#COLOR_WHITE}). */
+  public static final Color COLOR_WHITE = KrtPdfTheme.COLOR_WHITE;
 
-  /** Muted text — footers, empty-state hints and chart axis labels (Grau 1). */
-  public static final Color COLOR_LIGHT_GRAY = new Color(0xD7, 0xDA, 0xDE);
+  /** Muted text ({@link KrtPdfTheme#COLOR_LIGHT_GRAY}). */
+  public static final Color COLOR_LIGHT_GRAY = KrtPdfTheme.COLOR_LIGHT_GRAY;
 
-  /**
-   * Muted key/meta-label gray (design token {@code --color-gray-2-text} {@code #9AA1AB}). Field
-   * labels in the meta and summary blocks are labels, not headings, so they take this neutral gray
-   * — never orange.
-   */
-  public static final Color COLOR_LABEL = new Color(0x9A, 0xA1, 0xAB);
+  /** Muted key/meta-label gray ({@link KrtPdfTheme#COLOR_LABEL}). */
+  public static final Color COLOR_LABEL = KrtPdfTheme.COLOR_LABEL;
 
-  /**
-   * Bar surface, one step darker than the {@link #COLOR_DARK_GRAY} box, used for table-head fills
-   * (design token {@code --surface-bar} {@code #14171C}) instead of an orange fill.
-   */
-  public static final Color COLOR_SURFACE_INPUT = new Color(0x14, 0x17, 0x1C);
+  /** Table-head fill ({@link KrtPdfTheme#COLOR_SURFACE_INPUT}). */
+  public static final Color COLOR_SURFACE_INPUT = KrtPdfTheme.COLOR_SURFACE_INPUT;
 
-  /**
-   * Neutral hairline border / grid color (design token Grau 3 {@code #2A3038}). Frames every data
-   * cell so the table grid is quiet, with orange reserved for the single header-underline accent.
-   */
-  public static final Color COLOR_HAIRLINE = new Color(0x2A, 0x30, 0x38);
+  /** Neutral hairline border / grid color ({@link KrtPdfTheme#COLOR_HAIRLINE}). */
+  public static final Color COLOR_HAIRLINE = KrtPdfTheme.COLOR_HAIRLINE;
 
-  /** Alternating (even) table row background, the canvas gray. */
-  public static final Color COLOR_TABLE_ROW_ALT = new Color(0x0D, 0x0F, 0x12);
-
-  /** Embedded Lato Regular — loaded once per JVM from the bundled TTF. */
-  private static final BaseFont LATO_REGULAR = loadFont("fonts/Lato-Regular.ttf");
-
-  /** Embedded Lato Bold — loaded once per JVM from the bundled TTF. */
-  private static final BaseFont LATO_BOLD = loadFont("fonts/Lato-Bold.ttf");
+  /** Alternating (even) table row background ({@link KrtPdfTheme#COLOR_TABLE_ROW_ALT}). */
+  public static final Color COLOR_TABLE_ROW_ALT = KrtPdfTheme.COLOR_TABLE_ROW_ALT;
 
   /**
    * Footer generation-timestamp format. Always UTC and zone-independent so the footer is an
@@ -149,7 +128,7 @@ public final class KrtPdfSupport {
    * @return the font
    */
   public static @NotNull Font regular(float size, @NotNull Color color) {
-    return new Font(LATO_REGULAR, size, Font.NORMAL, color);
+    return KrtPdfTheme.regular(size, color);
   }
 
   /**
@@ -160,7 +139,7 @@ public final class KrtPdfSupport {
    * @return the Lato-Regular base font
    */
   public static @NotNull BaseFont regularBaseFont() {
-    return LATO_REGULAR;
+    return KrtPdfTheme.regularBaseFont();
   }
 
   /**
@@ -171,7 +150,7 @@ public final class KrtPdfSupport {
    * @return the font
    */
   public static @NotNull Font bold(float size, @NotNull Color color) {
-    return new Font(LATO_BOLD, size, Font.NORMAL, color);
+    return KrtPdfTheme.bold(size, color);
   }
 
   /**
@@ -183,7 +162,7 @@ public final class KrtPdfSupport {
    * @return the font
    */
   public static @NotNull Font italic(float size, @NotNull Color color) {
-    return new Font(LATO_REGULAR, size, Font.ITALIC, color);
+    return KrtPdfTheme.italic(size, color);
   }
 
   /**
@@ -443,28 +422,7 @@ public final class KrtPdfSupport {
    * @return the background color
    */
   public static @NotNull Color rowBackground(boolean alt) {
-    return alt ? COLOR_TABLE_ROW_ALT : COLOR_DARK_GRAY;
-  }
-
-  /**
-   * Loads one bundled TTF as an embedded WinAnsi {@link BaseFont}. A missing font resource is a
-   * packaging defect — fail fast with an unchecked exception at class initialization.
-   *
-   * @param resource the classpath resource path
-   * @return the embedded base font
-   */
-  private static @NotNull BaseFont loadFont(@NotNull String resource) {
-    try (InputStream stream = KrtPdfSupport.class.getClassLoader().getResourceAsStream(resource)) {
-      if (stream == null) {
-        throw new IllegalStateException("Bundled font missing from classpath: " + resource);
-      }
-      return BaseFont.createFont(
-          resource, BaseFont.WINANSI, BaseFont.EMBEDDED, true, stream.readAllBytes(), null);
-    } catch (IllegalStateException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IllegalStateException("Failed to load bundled font: " + resource, e);
-    }
+    return KrtPdfTheme.rowBackground(alt);
   }
 
   /**

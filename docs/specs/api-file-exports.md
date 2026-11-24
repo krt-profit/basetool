@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-24.
-> **Owner area:** API · **Related ADRs:** ADR-0409
+> **Owner area:** API · **Related ADRs:** ADR-0409, ADR-0410
 
 # File exports follow the current standard of their format
 
@@ -17,6 +17,7 @@ The editions in force on 2026-11-24:
 |-----------------------|--------------------------------------------------------------------------------------------|
 | Download header       | RFC 6266 (`Content-Disposition`), RFC 8187 (`filename*`), RFC 9110                         |
 | PDF                   | ISO 32000-2:2020 (PDF 2.0), ISO 19005-4:2020 (PDF/A-4), RFC 8118 (`application/pdf`)       |
+| Tagged PDF            | ISO 14289-2:2024 (PDF/UA-2), Well-Tagged PDF 1.0 (WTPDF, accessibility and reuse levels)   |
 | JSON                  | RFC 8259 / STD 90, ECMA-404 2nd edition, RFC 3339 timestamps                               |
 | CSV                   | RFC 4180 with the `text/csv` registration as updated by RFC 7111                           |
 
@@ -76,6 +77,57 @@ The document title is the heading of its first page; metadata and heading cannot
 `DataExportIntegrationTest` (all through `support.PdfA4Conformance`) · **Code:**
 `platform/api/KrtPdfSupport`, `platform/api/PdfArchiveProfile`
 
+### REQ-API-029 — Every backend PDF is tagged PDF/UA-2 and Well-Tagged PDF
+
+Every PDF the backend renders is opened through `KrtPdfDocuments` (`platform.api.pdf`); its
+implementation `TaggedKrtPdfDocument` (`platform.internal.pdf`) tags every block in the PDF 2.0
+standard structure namespace (`http://iso.org/pdf2/ssn`) and marks everything else as artifact
+(ADR-0410). The `KrtPdfDocument` interface offers blocks only and never the OpenPDF `Document`,
+so no content can bypass the tagging.
+
+| Content                                                        | Structure                                                                                  |
+|----------------------------------------------------------------|--------------------------------------------------------------------------------------------|
+| The document                                                   | one `Document`, the structure tree root's only child                                       |
+| Document title                                                 | `H1`                                                                                       |
+| Section headings                                               | `H2`                                                                                       |
+| Notes, notices, the footer line                                | `P`                                                                                        |
+| Key/value meta tables                                          | `Table` > `TR` > `TH` (`Scope Row`) + `TD`                                                 |
+| Data tables                                                    | one `Table` across every page; first `TR` of `TH` (`Scope Column`), body rows of `TD`     |
+| Detail and empty-state rows of a data table                    | one `TD` with `ColSpan` = column count                                                     |
+| Charts                                                         | `Figure` with `Alt` and a `Layout` `BBox` and `Placement Block`                            |
+| Page background, accent bar, title rule, cell fills, borders   | artifact, `Type Layout`                                                                    |
+| Logo, column headers repeated after a page break               | artifact, `Type Pagination`                                                                |
+
+- A paragraph or a table row continued on the next page stays one element.
+- Content elements are written as soon as they are complete, so a table of any length keeps one
+  row in memory; the 100 000-row audit log (REQ-AUDIT-001) stays renderable.
+- The XMP packet declares PDF/UA-2 (`pdfuaid:part = 2`, `pdfuaid:rev = 2024`) and carries a
+  `pdfd:declarations` bag (namespace `http://pdfa.org/declarations/`) with
+  `http://pdfa.org/declarations/wtpdf#accessibility1.0` and `…#reuse1.0`, each with
+  `pdfd:claimBy` and `pdfd:claimDate`.
+- The catalog's `/Lang (de)`, `DisplayDocTitle` and `dc:title` of REQ-API-026 apply.
+
+**Acceptance**
+
+- [x] veraPDF validates a document built from every block — title, key/value table, heading, a
+  data table over several pages with detail and empty cells, an empty-state table, note, notice,
+  figure, footer — against PDF/A-4, PDF/UA-2, WTPDF accessibility and WTPDF reuse in one run
+  without a failed rule.
+- [x] A paragraph longer than a page and a table row taller than a page conform as well and stay
+  one element each.
+- [x] Content outside marked content fails PDF/UA-2 rule 8.2.2-1 and both WTPDF levels, so a green
+  run means the rules ran.
+- [x] The structure tree reads back as one `Document` in the PDF 2.0 namespace with headings in
+  visual order, one `TH` row with column scope per data table, row-scoped `TH` in key/value
+  tables, `ColSpan` on full-width rows and `Alt` plus `BBox` on the figure.
+- [x] Repeated column headers are pagination artifacts and absent from extracted text.
+- [x] A content element leaves the structure tree root once it ends.
+
+**Enforced by:** `TaggedKrtPdfDocumentTest`, `PdfStructureTreeTest`, `PdfConformanceProfileTest`
+(through `support.PdfConformance` and `support.TaggedStructure`) · **Code:**
+`platform/api/pdf/KrtPdfDocuments`, `platform/internal/pdf/TaggedKrtPdfDocument`,
+`platform/internal/pdf/PdfStructureTree`, `platform/internal/pdf/PdfConformanceProfile`
+
 ### REQ-API-027 — JSON exports follow RFC 8259
 
 A JSON download is UTF-8 without a byte order mark (RFC 8259 8.1) and is sent as
@@ -113,10 +165,6 @@ the bytes are UTF-8 without a byte order mark.
 
 ## Out of scope
 
-- **PDF/UA-2 (ISO 14289-2:2024).** A tagged, accessible PDF needs a structure tree in the PDF 2.0
-  namespace around every heading, paragraph, table cell and figure. OpenPDF 3.0.6 tags nothing
-  that `Document.add` lays out, so it takes a tagging layer of our own on OpenPDF's marked-content
-  API; that layer is a separate change (ADR-0409).
 - **Spreadsheet behaviour.** RFC 4180 does not define how a spreadsheet opens a file; REQ-PUR-023
   names the supported import workflow.
 - **Exchange documents** (`/exchange/v1/openapi.json`, `/exchange/v1/schemas/*`) are served inline,
