@@ -29,6 +29,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverEntry;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -39,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 
@@ -53,6 +56,8 @@ class JobOrderItemHandoverReportServiceTest {
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private MessageSource messageSource;
   @InjectMocks private JobOrderItemHandoverReportService service;
+
+  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments();
 
   @Test
   void generatesPdfContainingOrderNumberAndItemName() throws Exception {

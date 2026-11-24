@@ -767,8 +767,8 @@ of `AuditDomainSilenceAnomaly` (REQ-OBS-011); sync outages are reported by the s
 
 For each tab, an admin can export that log for a **user-selected period** (from/to) in two formats:
 
-- **PDF** — generated backend-side with OpenPDF through the shared `KrtPdfSupport` /
-  `AuditLogPdfFormat` layer, following the KRT design system (dark page background, KRT orange
+- **PDF** — generated backend-side with OpenPDF through the shared tagged PDF layer
+  (`KrtPdfDocuments`, REQ-API-029) and `AuditLogPdfFormat`, following the KRT design system (dark page background, KRT orange
   `#E77E23`, **embedded Lato**, A4, footer + logo) exactly like the bank statement/report PDFs. The
   document prints the **raw, language-neutral event code** (the on-screen viewer shows the localized
   label) so the trail stays unambiguous and the backend bundle is not duplicated. The

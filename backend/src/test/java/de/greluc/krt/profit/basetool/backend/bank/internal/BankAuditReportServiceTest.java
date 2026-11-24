@@ -31,6 +31,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -41,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
@@ -62,6 +65,8 @@ class BankAuditReportServiceTest {
   @Mock private MessageSource messageSource;
 
   @InjectMocks private BankAuditReportService bankAuditReportService;
+
+  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments();
 
   @Test
   void exportPdf_rendersEventsAndRecordsExportEvent() throws IOException {

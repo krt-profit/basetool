@@ -46,7 +46,7 @@ response. The backend builds every download through `AttachmentResponses`, the f
 
 ### REQ-API-026 — Every backend PDF is PDF/A-4 on PDF 2.0
 
-Every PDF the backend renders is opened by `KrtPdfSupport.open` and written as PDF/A-4
+Every PDF the backend renders is opened through `KrtPdfDocuments` (REQ-API-029) and written as PDF/A-4
 (ISO 19005-4:2020) on PDF 2.0 (ISO 32000-2:2020):
 
 - the header is `%PDF-2.0`, the trailer carries an `/ID`;
@@ -72,10 +72,10 @@ The document title is the heading of its first page; metadata and heading cannot
 - [x] The header, the `Info` dictionary, the XMP packet, the catalog entries and the embedded
   fonts are asserted directly.
 
-**Enforced by:** `PdfArchiveProfileTest`, `AuditLogPdfFormatTest`, `BankReportServiceTest`,
+**Enforced by:** `PdfConformanceProfileTest`, `AuditLogPdfFormatTest`, `BankReportServiceTest`,
 `JobOrderHandoverReportServiceTest`, `JobOrderItemHandoverReportServiceTest`,
 `DataExportIntegrationTest` (all through `support.PdfA4Conformance`) · **Code:**
-`platform/api/KrtPdfSupport`, `platform/api/PdfArchiveProfile`
+`platform/api/pdf/KrtPdfDocuments`, `platform/internal/pdf/PdfConformanceProfile`
 
 ### REQ-API-029 — Every backend PDF is tagged PDF/UA-2 and Well-Tagged PDF
 
@@ -100,7 +100,8 @@ so no content can bypass the tagging.
 
 - A paragraph or a table row continued on the next page stays one element.
 - Content elements are written as soon as they are complete, so a table of any length keeps one
-  row in memory; the 100 000-row audit log (REQ-AUDIT-001) stays renderable.
+  row's elements in memory, plus one object reference per tagged cell for the parent tree OpenPDF
+  writes at close; the 100 000-row audit log (REQ-AUDIT-001) stays renderable.
 - The XMP packet declares PDF/UA-2 (`pdfuaid:part = 2`, `pdfuaid:rev = 2024`) and carries a
   `pdfd:declarations` bag (namespace `http://pdfa.org/declarations/`) with
   `http://pdfa.org/declarations/wtpdf#accessibility1.0` and `…#reuse1.0`, each with

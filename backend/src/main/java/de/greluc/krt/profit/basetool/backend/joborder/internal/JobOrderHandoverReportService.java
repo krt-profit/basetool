@@ -24,8 +24,11 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
-import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
-import java.awt.Color;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
 import java.io.ByteArrayOutputStream;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -39,14 +42,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.openpdf.text.pdf.PdfPTable;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Generates handover report PDFs in KRT corporate design, for persisted handovers or as a preview
- * from raw DTO data, using the shared {@link KrtPdfSupport} layer.
+ * from raw DTO data, as tagged documents opened through {@link KrtPdfDocuments}.
  */
 @Service
 @RequiredArgsConstructor
@@ -57,8 +59,12 @@ public class JobOrderHandoverReportService {
   private static final DateTimeFormatter DATE_PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy");
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
 
+  /** Relative widths of the material, location, amount and quality columns. */
+  private static final float[] MATERIAL_WIDTHS = {3f, 2.5f, 1.5f, 1.5f};
+
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final MessageSource messageSource;
+  private final KrtPdfDocuments pdfDocuments;
 
   /**
    * Generates the report PDF for a persisted handover, rendering the handover time in {@code
@@ -150,52 +156,44 @@ public class JobOrderHandoverReportService {
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      PdfPTable metaTable = KrtPdfSupport.newMetaTable();
-      KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
-      KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
-      KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
-      KrtPdfSupport.addMetaRow(
-          metaTable,
-          "EMPFÄNGER (HANDLE)",
-          HandleAnonymisation.humaniseRequired(recipientHandle, label("general.anonymisedHandle")));
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos, "ÜBERGABEPROTOKOLL");
-      krt.document().add(metaTable);
-
-      KrtPdfSupport.addSectionHeader(krt, "ÜBERGEBENE MATERIALIEN");
-
-      PdfPTable matTable = new PdfPTable(4);
-      matTable.setWidthPercentage(100);
-      matTable.setWidths(new float[] {3f, 2.5f, 1.5f, 1.5f});
-
-      KrtPdfSupport.addTableHeader(matTable, "MATERIAL");
-      KrtPdfSupport.addTableHeader(matTable, "STANDORT");
-      KrtPdfSupport.addTableHeader(matTable, "MENGE");
-      KrtPdfSupport.addTableHeader(matTable, "QUALITÄT");
-
-      boolean alt = false;
-      for (ItemRow row : rows) {
-        Color rowBg = KrtPdfSupport.rowBackground(alt);
-        String amountStr = formatAmount(row.amount(), row.quantityType());
-        KrtPdfSupport.addTableCell(matTable, row.materialName(), rowBg, false);
-        KrtPdfSupport.addTableCell(matTable, row.locationName(), rowBg, false);
-        KrtPdfSupport.addTableCell(matTable, amountStr, rowBg, true);
-        KrtPdfSupport.addTableCell(matTable, String.valueOf(row.quality()), rowBg, true);
-        alt = !alt;
+      try (KrtPdfDocument pdf = pdfDocuments.open(baos, "ÜBERGABEPROTOKOLL")) {
+        pdf.keyValueTable(meta(jobOrderNumber, handoverDate, handoverTime, recipientHandle));
+        pdf.heading("ÜBERGEBENE MATERIALIEN");
+        try (PdfDataTable table =
+            pdf.dataTable(MATERIAL_WIDTHS, List.of("MATERIAL", "STANDORT", "MENGE", "QUALITÄT"))) {
+          for (ItemRow row : rows) {
+            table.row(
+                List.of(
+                    PdfTableCell.text(row.materialName()),
+                    PdfTableCell.text(row.locationName()),
+                    PdfTableCell.centered(formatAmount(row.amount(), row.quantityType())),
+                    PdfTableCell.centered(String.valueOf(row.quality()))));
+          }
+          if (rows.isEmpty()) {
+            table.emptyRow("Keine Materialien vorhanden.");
+          }
+        }
+        pdf.footer();
       }
-
-      if (rows.isEmpty()) {
-        KrtPdfSupport.addEmptyRow(matTable, "Keine Materialien vorhanden.", 4);
-      }
-
-      krt.document().add(matTable);
-
-      KrtPdfSupport.addFooter(krt);
-
-      krt.document().close();
       return baos.toByteArray();
     } catch (Exception e) {
       throw new ReportGenerationException("PDF generation failed", e);
     }
+  }
+
+  private @NotNull List<PdfKeyValue> meta(
+      @NotNull String jobOrderNumber,
+      @NotNull String handoverDate,
+      @NotNull String handoverTime,
+      @NotNull String recipientHandle) {
+    return List.of(
+        new PdfKeyValue("AUFTRAGSNUMMER", jobOrderNumber),
+        new PdfKeyValue("DATUM DER ÜBERGABE", handoverDate),
+        new PdfKeyValue("UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)"),
+        new PdfKeyValue(
+            "EMPFÄNGER (HANDLE)",
+            HandleAnonymisation.humaniseRequired(
+                recipientHandle, label("general.anonymisedHandle"))));
   }
 
   private @NotNull String formatAmount(double amount, @Nullable String quantityType) {

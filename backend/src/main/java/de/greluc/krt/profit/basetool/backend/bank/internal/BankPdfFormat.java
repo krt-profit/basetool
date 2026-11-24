@@ -20,8 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
-import java.awt.Color;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -31,7 +32,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 import org.jetbrains.annotations.NotNull;
-import org.openpdf.text.pdf.PdfPTable;
 
 /**
  * Bank-specific PDF formatting shared by the statement (REQ-BANK-014) and the three-month report
@@ -40,6 +40,9 @@ import org.openpdf.text.pdf.PdfPTable;
  * custody totals since ADR-0039 decoupled holders from accounts).
  */
 public final class BankPdfFormat {
+
+  /** Relative widths of the holder and amount columns of the holder-balance table. */
+  private static final float[] HOLDER_WIDTHS = {3f, 1.5f};
 
   private BankPdfFormat() {}
 
@@ -112,37 +115,55 @@ public final class BankPdfFormat {
   }
 
   /**
-   * Builds the holder-balance table (HALTER / BETRAG) of the global holder custody totals: one row
+   * Draws the holder-balance table (HALTER / BETRAG) of the global holder custody totals: one row
    * per holder with a non-zero balance, or the localized empty row.
    *
+   * @param pdf the open document
    * @param distribution the per-holder balances to render
    * @param label the message-bundle resolver of the calling service
-   * @return the ready-to-add table
    */
-  public static @NotNull PdfPTable distributionTable(
-      @NotNull List<BankHolderBalance> distribution, @NotNull UnaryOperator<String> label) {
-    PdfPTable table = new PdfPTable(2);
-    table.setWidthPercentage(100);
-    table.setWidths(new float[] {3f, 1.5f});
-    KrtPdfSupport.addTableHeader(table, label.apply("pdf.bank.col.holder"));
-    KrtPdfSupport.addTableHeader(table, label.apply("pdf.bank.col.amount"));
-
-    boolean alt = false;
-    boolean any = false;
-    for (BankHolderBalance slice : distribution) {
-      if (slice.amount().signum() == 0) {
-        continue;
+  public static void distributionTable(
+      @NotNull KrtPdfDocument pdf,
+      @NotNull List<BankHolderBalance> distribution,
+      @NotNull UnaryOperator<String> label) {
+    try (PdfDataTable table = holderTable(pdf, label)) {
+      boolean any = false;
+      for (BankHolderBalance slice : distribution) {
+        if (slice.amount().signum() != 0) {
+          any = true;
+          holderRow(table, slice);
+        }
       }
-      any = true;
-      Color bg = KrtPdfSupport.rowBackground(alt);
-      KrtPdfSupport.addTableCell(table, slice.handle(), bg, false);
-      KrtPdfSupport.addTableCell(table, amount(slice.amount()), bg, true);
-      alt = !alt;
+      if (!any) {
+        table.emptyRow(label.apply("pdf.bank.distribution.empty"));
+      }
     }
-    if (!any) {
-      KrtPdfSupport.addEmptyRow(table, label.apply("pdf.bank.distribution.empty"), 2);
-    }
-    return table;
+  }
+
+  /**
+   * Starts the holder-balance table with its HALTER / BETRAG header.
+   *
+   * @param pdf the open document
+   * @param label the message-bundle resolver of the calling service
+   * @return the open table
+   */
+  public static @NotNull PdfDataTable holderTable(
+      @NotNull KrtPdfDocument pdf, @NotNull UnaryOperator<String> label) {
+    return pdf.dataTable(
+        HOLDER_WIDTHS,
+        List.of(label.apply("pdf.bank.col.holder"), label.apply("pdf.bank.col.amount")));
+  }
+
+  /**
+   * Adds one holder and its balance to a holder-balance table.
+   *
+   * @param table the table from {@link #holderTable}
+   * @param balance the holder's custody total
+   */
+  public static void holderRow(@NotNull PdfDataTable table, @NotNull BankHolderBalance balance) {
+    table.row(
+        List.of(
+            PdfTableCell.text(balance.handle()), PdfTableCell.centered(amount(balance.amount()))));
   }
 
   /**

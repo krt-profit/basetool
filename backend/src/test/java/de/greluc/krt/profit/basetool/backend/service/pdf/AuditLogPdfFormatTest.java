@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditLogPdfFormat;
-import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
 import java.io.IOException;
 import java.time.Instant;
@@ -39,11 +41,14 @@ import org.openpdf.text.pdf.parser.PdfTextExtractor;
 
 /**
  * Unit tests for {@link AuditLogPdfFormat} (REQ-AUDIT-001): row and period timestamps render in the
- * supplied {@code userZone} (UTC when {@code null}), while the {@link KrtPdfSupport#addFooter}
+ * supplied {@code userZone} (UTC when {@code null}), while the {@link KrtPdfDocument#footer}
  * generation stamp stays UTC. The PDF is read back via {@code PdfTextExtractor}, with an identity
  * {@link UnaryOperator} as message resolver.
  */
 class AuditLogPdfFormatTest {
+
+  /** The production PDF layer, which opens the tagged documents. */
+  private static final KrtPdfDocuments PDF_DOCUMENTS = new TaggedKrtPdfDocuments();
 
   /** The row/period timestamp pattern the renderer binds to a zone (mirrors production). */
   private static final DateTimeFormatter PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
@@ -72,6 +77,7 @@ class AuditLogPdfFormatTest {
     Instant before = Instant.now();
     byte[] pdf =
         AuditLogPdfFormat.render(
+            PDF_DOCUMENTS,
             "AUDIT LOG TITLE",
             FROM,
             TO,
@@ -120,10 +126,16 @@ class AuditLogPdfFormatTest {
 
     PdfA4Conformance.assertConformant(
         AuditLogPdfFormat.render(
-            "AUDIT-LOG: BANK", FROM, TO, null, List.of(row), UnaryOperator.identity()));
+            PDF_DOCUMENTS,
+            "AUDIT-LOG: BANK",
+            FROM,
+            TO,
+            null,
+            List.of(row),
+            UnaryOperator.identity()));
     PdfA4Conformance.assertConformant(
         AuditLogPdfFormat.render(
-            "AUDIT-LOG: BANK", FROM, TO, null, List.of(), UnaryOperator.identity()));
+            PDF_DOCUMENTS, "AUDIT-LOG: BANK", FROM, TO, null, List.of(), UnaryOperator.identity()));
   }
 
   /**
@@ -141,7 +153,13 @@ class AuditLogPdfFormatTest {
 
     byte[] pdf =
         AuditLogPdfFormat.render(
-            "AUDIT LOG TITLE", FROM, TO, null, List.of(row), UnaryOperator.identity());
+            PDF_DOCUMENTS,
+            "AUDIT LOG TITLE",
+            FROM,
+            TO,
+            null,
+            List.of(row),
+            UnaryOperator.identity());
 
     String text = extractText(pdf);
 

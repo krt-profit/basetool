@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditLogPdfFormat;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -61,6 +62,7 @@ public class BankAuditReportService {
   private final BankAuditService bankAuditService;
   private final BankAuditEventMapper bankAuditEventMapper;
   private final MessageSource messageSource;
+  private final KrtPdfDocuments pdfDocuments;
 
   /**
    * Generates the bank audit-log PDF for a period and records the export as a bank audit event.
@@ -95,7 +97,7 @@ public class BankAuditReportService {
 
     byte[] pdf =
         AuditLogPdfFormat.render(
-            label("pdf.audit.title.BANK"), from, to, userZone, rows, this::label);
+            pdfDocuments, label("pdf.audit.title.BANK"), from, to, userZone, rows, this::label);
 
     bankAuditService.record(
         BankAuditEventType.AUDIT_LOG_EXPORTED,

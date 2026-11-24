@@ -57,7 +57,8 @@ API and is a PDF/A-4, PDF/UA-2 and WTPDF (accessibility and reuse) file.**
    assigns the marked-content identifiers and the parent tree; they are created under the
    structure tree root, written as soon as their content is complete and detached again. At close
    the root's `K` becomes the reference of the `Document` element, which OpenPDF's tree writer
-   leaves alone. Memory grows with the open groups and one table row, not with the document.
+   leaves alone. Memory holds the open groups and one table row; only OpenPDF's parent tree keeps
+   one object reference per tagged cell until close.
 4. **Layout.** Text is set through `ColumnText`. A table row is measured, drawn and written at
    once: a row that does not fit the page starts on the next one, a row taller than a page
    continues there inside the same cells, and the column headers are repeated as artifacts.
