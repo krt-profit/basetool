@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverEntry;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -54,7 +55,7 @@ class JobOrderItemHandoverReportServiceTest {
   @InjectMocks private JobOrderItemHandoverReportService service;
 
   @Test
-  void generatesPdfContainingOrderNumberAndItemName() {
+  void generatesPdfContainingOrderNumberAndItemName() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID handoverId = UUID.randomUUID();
     JobOrderItemHandover handover = handover(orderId, "Ballista", 3);
@@ -66,6 +67,7 @@ class JobOrderItemHandoverReportServiceTest {
     assertThat(content).startsWith("%PDF");
     assertThat(content).contains("#42");
     assertThat(content).contains("Ballista");
+    PdfA4Conformance.assertConformant(pdf);
   }
 
   @Test

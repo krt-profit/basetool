@@ -84,16 +84,13 @@ public final class AuditLogPdfFormat {
     DateTimeFormatter stamp = DATE_TIME_PATTERN.withZone(zone);
 
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos);
-
-      KrtPdfSupport.addTitle(krt, title);
-
       PdfPTable meta = KrtPdfSupport.newMetaTable();
       KrtPdfSupport.addMetaRow(
           meta, label.apply("pdf.audit.period"), stamp.format(from) + " – " + stamp.format(to));
       KrtPdfSupport.addMetaRow(
           meta, label.apply("pdf.audit.generated"), stamp.format(Instant.now()));
       KrtPdfSupport.addMetaRow(meta, label.apply("pdf.audit.count"), String.valueOf(rows.size()));
+      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos, title);
       krt.document().add(meta);
 
       KrtPdfSupport.addSectionHeader(krt, label.apply("pdf.audit.events"));

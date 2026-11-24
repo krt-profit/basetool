@@ -235,6 +235,11 @@ stream request-owned file resources. Chunked tables and viewport-bounded charts 
 working sets independent of ledger length; the response lifecycle owns cleanup
 ([REQ-BANK-014/015](../specs/bank.md), [ADR-0368](../adr/0368-bank-export-snapshots-and-rendering-have-separate-lifetimes.md)).
 
+Every file export follows the current standard of its format: downloads are RFC 6266 attachments,
+every backend PDF is PDF/A-4 on PDF 2.0 and validated by veraPDF in the build, JSON follows RFC 8259
+and the CSV export RFC 4180 ([`api-file-exports.md`](../specs/api-file-exports.md),
+[ADR-0409](../adr/0409-every-file-export-follows-its-formats-current-standard.md)).
+
 Versioned `/api/v1` paths changed by hard cut (ADR-0234, no deprecation machinery), DTO-only boundaries (records + MapStruct +
 Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every error,
 `Pageable`/`PageResponse` with whitelisted sort fields and a kernel page ceiling of 1 000 (eight

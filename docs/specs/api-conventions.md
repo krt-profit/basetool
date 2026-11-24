@@ -565,8 +565,8 @@ per controller (S11, #917). Use the shared seams; do not re-derive them inline:
 - **`@UserZone ZoneId`** — resolved by `UserZoneArgumentResolver` from the `X-User-Time-Zone`
   header, tolerating an absent/blank/invalid IANA zone as `null` (the report services fall back to
   UTC). Each site re-declares the header for the OpenAPI document via a method-level `@Parameter`.
-- **`PdfResponses.pdfAttachment(byte[], filename)`** — builds the `application/pdf` +
-  attachment `Content-Disposition` download response the PDF-export endpoints shared.
+- **`AttachmentResponses`** (`pdf`, `json`, `attachment`) — builds every file-download response:
+  the file's media type and an RFC 6266 `attachment` disposition (REQ-API-025).
 
 The two resolvers are wired in `WebMvcConfig#addArgumentResolvers`; the JWT-subject annotations are
 hidden from the generated OpenAPI document via `SpringDocUtils.addAnnotationsToIgnore` in

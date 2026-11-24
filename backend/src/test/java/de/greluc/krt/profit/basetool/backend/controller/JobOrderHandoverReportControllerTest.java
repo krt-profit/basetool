@@ -77,7 +77,7 @@ class JobOrderHandoverReportControllerTest {
     assertEquals(MediaType.APPLICATION_PDF, response.getHeaders().getContentType());
     String disposition = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
     assertNotNull(disposition);
-    assertTrue(disposition.contains("attachment"), "Content-Disposition must be attachment");
+    assertTrue(disposition.startsWith("attachment;"), "Content-Disposition must be attachment");
     assertTrue(disposition.contains(".pdf"), "Filename must end with .pdf");
     verify(jobOrderHandoverReportService).generateHandoverReport(jobOrderId, handoverId, null);
   }
@@ -119,7 +119,7 @@ class JobOrderHandoverReportControllerTest {
     assertEquals(MediaType.APPLICATION_PDF, response.getHeaders().getContentType());
     String disposition = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
     assertNotNull(disposition);
-    assertTrue(disposition.contains("attachment"), "Content-Disposition must be attachment");
+    assertTrue(disposition.startsWith("attachment;"), "Content-Disposition must be attachment");
     assertTrue(disposition.contains(".pdf"), "Filename must end with .pdf");
     verify(jobOrderHandoverReportService).generateHandoverReportPreview(dto);
   }

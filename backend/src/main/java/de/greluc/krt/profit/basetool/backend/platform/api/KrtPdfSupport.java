@@ -45,10 +45,12 @@ import org.openpdf.text.pdf.PdfWriter;
 
 /**
  * Shared KRT corporate-design layer for every backend PDF: the color palette, the page background,
- * the meta and table cell helpers and the embedded Lato fonts (REQ-BANK-017).
+ * the meta and table cell helpers and the embedded Lato fonts (REQ-BANK-017). Every document it
+ * opens is a PDF/A-4 file ({@link PdfArchiveProfile}, REQ-API-026).
  *
  * <p>Orange is an accent only (REQ-UI-002); surfaces and grid lines are neutral. Lato is embedded
- * with {@link BaseFont#WINANSI} so the uncompressed content stream stays text-extractable.
+ * with {@link BaseFont#WINANSI} so the uncompressed content stream stays text-extractable; every
+ * text, spacers included, is set in Lato, since PDF/A-4 admits no unembedded font.
  */
 @Slf4j
 public final class KrtPdfSupport {
@@ -118,19 +120,25 @@ public final class KrtPdfSupport {
   public record KrtDocument(@NotNull Document document, @NotNull PdfWriter writer) {}
 
   /**
-   * Creates and opens an A4 document in KRT corporate design: 40pt side margins, 60pt top/bottom,
-   * stream compression off and the dark background + accents + logo on every page.
+   * Creates and opens an A4 PDF/A-4 document in KRT corporate design — 40pt side margins, 60pt
+   * top/bottom, stream compression off, the dark background + accents + logo on every page — and
+   * sets its title both as document metadata and as the heading of the first page.
    *
    * @param target the stream receiving the PDF bytes
+   * @param title the (already uppercase) document title
    * @return the open document handle; the caller must {@code document().close()} when done
    */
-  public static @NotNull KrtDocument open(@NotNull OutputStream target) {
+  public static @NotNull KrtDocument open(@NotNull OutputStream target, @NotNull String title) {
     Document document = new Document(PageSize.A4, 40, 40, 60, 60);
     PdfWriter writer = PdfWriter.getInstance(document, target);
     writer.setCompressionLevel(0);
     writer.setPageEvent(new KrtPageBackground());
+    PdfArchiveProfile.beforeOpen(writer);
     document.open();
-    return new KrtDocument(document, writer);
+    PdfArchiveProfile.afterOpen(writer, title, Instant.now());
+    KrtDocument krt = new KrtDocument(document, writer);
+    addTitle(krt, title);
+    return krt;
   }
 
   /**
@@ -185,7 +193,7 @@ public final class KrtPdfSupport {
    * @param krt the open document handle
    * @param title the (already uppercase) title text
    */
-  public static void addTitle(@NotNull KrtDocument krt, @NotNull String title) {
+  private static void addTitle(@NotNull KrtDocument krt, @NotNull String title) {
     Paragraph paragraph = new Paragraph(title, bold(20, COLOR_ORANGE));
     paragraph.setAlignment(Element.ALIGN_LEFT);
     paragraph.setSpacingAfter(4f);
@@ -199,7 +207,17 @@ public final class KrtPdfSupport {
     cb.lineTo(PageSize.A4.getWidth() - 40, ypos);
     cb.stroke();
 
-    krt.document().add(new Paragraph(" ", regular(6, COLOR_WHITE)));
+    krt.document().add(spacer(6));
+  }
+
+  /**
+   * An empty line set in the embedded Lato, so no spacer falls back to an unembedded standard font.
+   *
+   * @param size the point size, which sets the line height
+   * @return the spacer paragraph
+   */
+  public static @NotNull Paragraph spacer(float size) {
+    return new Paragraph(" ", regular(size, COLOR_WHITE));
   }
 
   /**
@@ -408,7 +426,7 @@ public final class KrtPdfSupport {
    * @param krt the open document handle
    */
   public static void addFooter(@NotNull KrtDocument krt) {
-    krt.document().add(new Paragraph(" ", regular(10, COLOR_WHITE)));
+    krt.document().add(spacer(10));
     String generatedAt = FOOTER_TIMESTAMP.format(Instant.now());
     Paragraph footer =
         new Paragraph(

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditLogPdfFormat;
 import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
+import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -105,6 +106,24 @@ class AuditLogPdfFormatTest {
     assertTrue(
         berlinNow.stream().noneMatch(footer::contains),
         "footer is NOT re-zoned into the user zone (" + footer + ")");
+  }
+
+  /**
+   * The audit-log PDF, empty state included, is a PDF/A-4 file (REQ-API-026).
+   *
+   * @throws Exception when veraPDF cannot validate the rendered PDF
+   */
+  @Test
+  void render_isPdfA4WithAndWithoutRows() throws Exception {
+    AuditLogPdfFormat.Row row =
+        new AuditLogPdfFormat.Row(OCCURRED_AT, "Jörg", "Übergabe", "Konto – 1", "k=v €");
+
+    PdfA4Conformance.assertConformant(
+        AuditLogPdfFormat.render(
+            "AUDIT-LOG: BANK", FROM, TO, null, List.of(row), UnaryOperator.identity()));
+    PdfA4Conformance.assertConformant(
+        AuditLogPdfFormat.render(
+            "AUDIT-LOG: BANK", FROM, TO, null, List.of(), UnaryOperator.identity()));
   }
 
   /**

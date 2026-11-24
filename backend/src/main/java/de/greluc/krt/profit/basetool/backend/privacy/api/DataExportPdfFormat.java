@@ -76,10 +76,6 @@ public final class DataExportPdfFormat {
   public static byte @NotNull [] render(
       @NotNull DataExport export, @NotNull UnaryOperator<String> label) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(out);
-
-      KrtPdfSupport.addTitle(krt, label.apply("pdf.export.title"));
-
       PdfPTable meta = KrtPdfSupport.newMetaTable();
       KrtPdfSupport.addMetaRow(
           meta, label.apply("pdf.export.meta.subject"), export.subjectHandle());
@@ -87,6 +83,7 @@ public final class DataExportPdfFormat {
           meta, label.apply("pdf.export.meta.generatedAt"), TIMESTAMP.format(export.generatedAt()));
       KrtPdfSupport.addMetaRow(
           meta, label.apply("pdf.export.meta.totalRows"), String.valueOf(export.totalRows()));
+      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(out, label.apply("pdf.export.title"));
       krt.document().add(meta);
 
       KrtPdfSupport.addNote(krt, label.apply("pdf.export.note.summary"));

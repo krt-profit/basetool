@@ -121,7 +121,7 @@ class BankPdfFormatTest {
     UnaryOperator<String> label = UnaryOperator.identity();
     byte[] pdf;
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos);
+      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos, "VERTEILUNG");
       PdfPTable table = BankPdfFormat.distributionTable(distribution, label);
       krt.document().add(table);
       krt.document().close();

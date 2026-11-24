@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.AppHttpProperties;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.BackendDownloads;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -131,11 +132,11 @@ public class DataExportProxyController {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(mediaType);
     String disposition = backend.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
-    if (disposition != null) {
-      headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition);
-    } else {
-      headers.setContentDispositionFormData("attachment", "Datenexport." + extension);
-    }
+    headers.set(
+        HttpHeaders.CONTENT_DISPOSITION,
+        disposition != null
+            ? disposition
+            : BackendDownloads.disposition("Datenexport." + extension));
     return ResponseEntity.ok().headers(headers).body(backend.getBody());
   }
 }

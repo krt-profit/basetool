@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.privacy.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -29,9 +31,13 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ContentDisposition;
+import tools.jackson.core.StreamReadFeature;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Unit tests for {@link DataExportDocuments}: the indented JSON and the download filename. */
+/**
+ * Unit tests for {@link DataExportDocuments}: the indented RFC 8259 JSON (REQ-API-027) and the
+ * download filename.
+ */
 class DataExportDocumentsTest {
 
   private static final Instant GENERATED_AT = Instant.parse("2026-10-13T10:15:30Z");
@@ -57,6 +63,38 @@ class DataExportDocumentsTest {
     assertThat(json).contains("\n    \"backups\",\n    \"keycloakAccountRecord\"\n  ]");
     assertThat(json).doesNotContain("\r");
     assertThat(mapper.readTree(json)).isEqualTo(mapper.readTree(mapper.writeValueAsString(export)));
+  }
+
+  @Test
+  void json_isRfc8259Utf8WithoutBomUniqueNamesAndOnlyFiniteNumbers() throws Exception {
+    Map<String, Object> row = new LinkedHashMap<>();
+    row.put("ratio", Double.NaN);
+    row.put("name", "Jörg – €");
+    DataExportService.DataExport export =
+        new DataExportService.DataExport(
+            UUID.randomUUID(),
+            "Jörg",
+            GENERATED_AT,
+            false,
+            List.of(),
+            List.of(new DataExportService.ExportSection("profile", "ART_15", List.of(row), false)));
+
+    byte[] json = DataExportDocuments.json(JsonMapper.builder().build(), export);
+
+    assertThat(json[0]).as("no byte order mark (RFC 8259 8.1)").isEqualTo((byte) '{');
+    String text =
+        StandardCharsets.UTF_8
+            .newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(json))
+            .toString();
+    JsonMapper strict =
+        JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
+    assertThat(strict.readTree(json).isObject()).isTrue();
+    assertThat(text)
+        .contains("\"ratio\" : \"NaN\"")
+        .contains("\"name\" : \"Jörg – €\"")
+        .contains("\"generatedAt\" : \"2026-10-13T10:15:30Z\"");
   }
 
   @Test

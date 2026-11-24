@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -70,7 +71,7 @@ class BankReportServiceTest {
   }
 
   @Test
-  void statement_containsBalancesRunningColumnAndPerBookingHolder() throws IOException {
+  void statement_containsBalancesRunningColumnAndPerBookingHolder() throws Exception {
     Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
     deposit("500");
     withdraw("200");
@@ -97,6 +98,7 @@ class BankReportServiceTest {
     assertTrue(
         text.contains("Generiert von Profit Basetool am ") && text.contains(" UTC"),
         "footer carries the UTC generation timestamp");
+    PdfA4Conformance.assertConformant(pdf);
   }
 
   @Test
@@ -268,7 +270,7 @@ class BankReportServiceTest {
   }
 
   @Test
-  void threeMonthReport_containsAccountSummariesAndAuditEvent() throws IOException {
+  void threeMonthReport_containsAccountSummariesAndAuditEvent() throws Exception {
     deposit("750");
     long auditBefore = auditEventRepository.count();
 
@@ -287,6 +289,7 @@ class BankReportServiceTest {
     assertTrue(text.contains("Kontostandverlauf"), "per-account balance chart caption present");
     assertEquals(
         auditBefore + 1, auditEventRepository.count(), "exactly one MANAGEMENT_REPORT_EXPORTED");
+    PdfA4Conformance.assertConformant(pdf);
   }
 
   @Test

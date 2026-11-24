@@ -69,9 +69,8 @@ public class BankReportRenderer {
       boolean redactHolders) {
     DateTimeFormatter stamp = DATE_TIME.withZone(userZone == null ? ZoneOffset.UTC : userZone);
     try (var output = Files.newOutputStream(spool.file("report.pdf"))) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(output);
+      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(output, label("pdf.bank.statement.title"));
       try (var _ = krt.document()) {
-        KrtPdfSupport.addTitle(krt, label("pdf.bank.statement.title"));
         PdfPTable meta = KrtPdfSupport.newMetaTable();
         KrtPdfSupport.addMetaRow(
             meta,
@@ -115,9 +114,8 @@ public class BankReportRenderer {
     DateTimeFormatter stamp = DATE_TIME.withZone(zone);
     DateTimeFormatter date = DATE_ONLY.withZone(zone);
     try (var output = Files.newOutputStream(spool.file("report.pdf"))) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(output);
+      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(output, label("pdf.bank.report.title"));
       try (var _ = krt.document()) {
-        KrtPdfSupport.addTitle(krt, label("pdf.bank.report.title"));
         PdfPTable meta = KrtPdfSupport.newMetaTable();
         period(meta, stamp, from, to);
         add(krt, meta);
@@ -138,7 +136,7 @@ public class BankReportRenderer {
                 krt.document().newPage();
               }
               first[0] = false;
-              add(krt, new Paragraph(" "));
+              add(krt, KrtPdfSupport.spacer(12));
               KrtPdfSupport.addSectionHeader(
                   krt,
                   label("pdf.bank.statement.account")
@@ -176,7 +174,7 @@ public class BankReportRenderer {
                   krt,
                   BankBalanceChart.render(
                       krt.writer(), envelope, from, to, date.format(from), date.format(to)));
-              add(krt, new Paragraph(" "));
+              add(krt, KrtPdfSupport.spacer(12));
               bookings(krt, spool, section, stamp, false, false);
             });
         if (snapshot.accounts() != 0) {

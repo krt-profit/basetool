@@ -257,14 +257,17 @@ selected org unit: `PurchasingAccessPolicy#canReadReport` counts the managers of
 „Bericht" tab stays offered under any selection (ADR-0329, REQ-UI-026). The deals the report lists
 follow the active org unit like every deal read of the raising unit (REQ-PUR-021).
 
-The CSV uses UTF-8, semicolon-separated fields and doubled quotes inside quoted cells. Delimiters,
-quotes and CR/LF in catalogue text round-trip without replacement. It is a lossless data export:
-formula-like prefixes remain literal source text, with no added apostrophe or tab. Spreadsheet users
-import the entry column as text and disable automatic formula interpretation; double-click opening
-with automatic type detection is outside the supported import workflow.
+The CSV follows RFC 4180 (REQ-API-028): UTF-8, a header row, comma-separated fields, CRLF after
+every record and doubled quotes inside quoted cells, sent as `text/csv; charset=UTF-8;
+header=present`. Commas, quotes and CR/LF in catalogue text round-trip without replacement. It is a
+lossless data export: formula-like prefixes remain literal source text, with no added apostrophe or
+tab. Spreadsheet users import the file with the comma as separator, the entry column as text and
+automatic formula interpretation disabled; double-click opening with automatic type detection is
+outside the supported import workflow.
 
-**Enforced by:** `PurchasingReportServiceTest`, `PurchasingAccessPolicyTest`,
-`PurchasingTabAccessServiceTest` · **Code:** `purchasing/internal/PurchasingReportService`,
+**Enforced by:** `PurchasingReportServiceTest`, `PurchasingReportControllerTest`,
+`PurchasingAccessPolicyTest`, `PurchasingTabAccessServiceTest` · **Code:**
+`purchasing/internal/PurchasingReportService`,
 `purchasing/internal/PurchasingAccessPolicy#canReadReport`,
 `purchasing/web/PurchasingReportController`
 

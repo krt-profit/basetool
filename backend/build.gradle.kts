@@ -71,6 +71,7 @@ dependencies {
   testImplementation(libs.json.schema.validator) {
     exclude(group = "tools.jackson.dataformat", module = "jackson-dataformat-yaml")
   }
+  testImplementation(libs.verapdf.validation.model)
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

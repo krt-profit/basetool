@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankPdfExport;
-import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
+import de.greluc.krt.profit.basetool.backend.platform.api.AttachmentResponses;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -58,7 +58,7 @@ public class BankReportCleanupFilter extends OncePerRequestFilter {
       throw new IllegalStateException("One request cannot own multiple Bank PDF exports");
     }
     request.setAttribute(EXPORT_ATTRIBUTE, export);
-    return PdfResponses.pdfAttachment(export, filename);
+    return AttachmentResponses.pdf(export, filename);
   }
 
   /** Closes the request-owned export after conversion or any filter-chain failure. */

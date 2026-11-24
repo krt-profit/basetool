@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -77,7 +78,7 @@ class JobOrderHandoverReportServiceTest {
   }
 
   @Test
-  void generateHandoverReport_shouldReturnNonEmptyPdf_whenHandoverExists() {
+  void generateHandoverReport_shouldReturnNonEmptyPdf_whenHandoverExists() throws Exception {
     Material material = buildMaterial("Laranite", QuantityType.SCU);
     JobOrderHandoverItem item = buildItem(material, 5.0, 100, "Port Olisar");
     handover.setItems(Set.of(item));
@@ -88,6 +89,7 @@ class JobOrderHandoverReportServiceTest {
 
     assertNotNull(pdf, "PDF must not be null");
     assertTrue(pdf.length > 0, "PDF must not be empty");
+    PdfA4Conformance.assertConformant(pdf);
   }
 
   @Test
@@ -152,7 +154,7 @@ class JobOrderHandoverReportServiceTest {
   }
 
   @Test
-  void generateHandoverReportPreview_shouldReturnNonEmptyPdf() {
+  void generateHandoverReportPreview_shouldReturnNonEmptyPdf() throws Exception {
     HandoverReportPreviewRequestDto dto =
         new HandoverReportPreviewRequestDto(
             "#42",
@@ -166,6 +168,7 @@ class JobOrderHandoverReportServiceTest {
 
     assertNotNull(pdf, "Preview PDF must not be null");
     assertTrue(pdf.length > 0, "Preview PDF must not be empty");
+    PdfA4Conformance.assertConformant(pdf);
   }
 
   @Test
