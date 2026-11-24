@@ -59,6 +59,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class PurchasingReportService {
 
   private static final int MAX_MONTHS = 36;
+
+  /** RFC 4180 field separator of the CSV export. */
+  static final char CSV_FIELD_SEPARATOR = ',';
+
+  /** RFC 4180 record terminator of the CSV export. */
+  static final String CSV_RECORD_END = "\r\n";
+
   private static final Set<DealStatus> REACHED_THE_BANK =
       Set.of(
           DealStatus.SUBMITTED,
@@ -92,43 +99,45 @@ public class PurchasingReportService {
   }
 
   /**
-   * Builds the CSV file of a period: one line per deal, no names.
+   * Builds the RFC 4180 CSV file of a period: a header row, then one record per deal, no names;
+   * fields are comma-separated and every record ends with CRLF.
    *
    * @param from the first month, or {@code null}
    * @param to the last month, or {@code null}
-   * @return the CSV text, semicolon separated
+   * @return the CSV text
    */
   @NotNull
   public String csv(@Nullable YearMonth from, @Nullable YearMonth to) {
     Built built = build(period(from, to));
-    StringBuilder out = new StringBuilder(label("purchasing.report.csv.header")).append('\n');
+    StringBuilder out =
+        new StringBuilder(label("purchasing.report.csv.header")).append(CSV_RECORD_END);
     for (Figures figures : built.figures()) {
       PurchasingDeal deal = figures.deal();
       out.append(deal.getDealNo())
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(month(deal))
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(csvCell(entryName(deal)))
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(PurchasingTrancheService.amountText(deal.getAmount()))
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(PurchasingTrancheService.amountText(figures.accepted()))
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(deal.getUnitPrice())
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(deal.getTotal())
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(deal.getStatus().name())
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(figures.funded())
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(figures.returned())
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(figures.loss())
-          .append(';')
+          .append(CSV_FIELD_SEPARATOR)
           .append(
               label(figures.overdue() ? "purchasing.report.csv.yes" : "purchasing.report.csv.no"))
-          .append('\n');
+          .append(CSV_RECORD_END);
     }
     return out.toString();
   }
@@ -363,8 +372,15 @@ public class PurchasingReportService {
         : deal.getGameItem().getNameDe();
   }
 
+  /**
+   * Encodes one field per RFC 4180 2.6–2.7: a field holding the separator, a double quote, CR or LF
+   * is quoted with its inner quotes doubled; any other field stays as it is.
+   *
+   * @param value the field text
+   * @return the encoded field
+   */
   static @NotNull String csvCell(@NotNull String value) {
-    if (value.indexOf(';') >= 0
+    if (value.indexOf(CSV_FIELD_SEPARATOR) >= 0
         || value.indexOf('"') >= 0
         || value.indexOf('\r') >= 0
         || value.indexOf('\n') >= 0) {

@@ -92,7 +92,7 @@ class JobOrderHandoverReportProxyControllerTest {
     assertEquals(MediaType.APPLICATION_PDF, response.getHeaders().getContentType());
     String disposition = response.getHeaders().getFirst("Content-Disposition");
     assertNotNull(disposition);
-    assertTrue(disposition.contains("attachment"));
+    assertTrue(disposition.startsWith("attachment;"), "an RFC 6266 attachment disposition");
     assertTrue(disposition.contains(".pdf"));
   }
 
@@ -147,7 +147,7 @@ class JobOrderHandoverReportProxyControllerTest {
     assertEquals(MediaType.APPLICATION_PDF, response.getHeaders().getContentType());
     String disposition = response.getHeaders().getFirst("Content-Disposition");
     assertNotNull(disposition);
-    assertTrue(disposition.contains("attachment"));
+    assertTrue(disposition.startsWith("attachment;"), "an RFC 6266 attachment disposition");
     assertTrue(disposition.contains(".pdf"));
   }
 

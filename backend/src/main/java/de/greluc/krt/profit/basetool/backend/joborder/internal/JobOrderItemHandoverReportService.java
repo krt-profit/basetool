@@ -112,10 +112,6 @@ public class JobOrderItemHandoverReportService {
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos);
-
-      KrtPdfSupport.addTitle(krt, "ÜBERGABEPROTOKOLL");
-
       PdfPTable metaTable = KrtPdfSupport.newMetaTable();
       KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
       KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
@@ -124,6 +120,7 @@ public class JobOrderItemHandoverReportService {
           metaTable,
           "EMPFÄNGER (HANDLE)",
           HandleAnonymisation.humaniseRequired(recipientHandle, label("general.anonymisedHandle")));
+      KrtPdfSupport.KrtDocument krt = KrtPdfSupport.open(baos, "ÜBERGABEPROTOKOLL");
       krt.document().add(metaTable);
 
       KrtPdfSupport.addSectionHeader(krt, "ÜBERGEBENE GÜTER");

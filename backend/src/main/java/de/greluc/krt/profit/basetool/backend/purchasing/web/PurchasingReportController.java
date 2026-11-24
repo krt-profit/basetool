@@ -20,14 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.purchasing.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.platform.api.AttachmentResponses;
 import de.greluc.krt.profit.basetool.backend.purchasing.internal.PurchasingReportDto;
 import de.greluc.krt.profit.basetool.backend.purchasing.internal.PurchasingReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import java.nio.charset.StandardCharsets;
 import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -45,6 +44,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_KRT_MEMBER)
 public class PurchasingReportController {
+
+  /** The RFC 4180 / RFC 7111 media type of the CSV export: UTF-8 with a header row. */
+  static final MediaType CSV_WITH_HEADER =
+      MediaType.parseMediaType("text/csv; charset=UTF-8; header=present");
 
   private final PurchasingReportService reportService;
 
@@ -75,12 +78,10 @@ public class PurchasingReportController {
   public ResponseEntity<byte[]> export(
       @RequestParam(required = false) YearMonth from,
       @RequestParam(required = false) YearMonth to) {
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment().filename("purchasing-report.csv").build().toString())
-        .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
-        .body(reportService.csv(from, to).getBytes(StandardCharsets.UTF_8));
+    return AttachmentResponses.attachment(
+        reportService.csv(from, to).getBytes(StandardCharsets.UTF_8),
+        CSV_WITH_HEADER,
+        "purchasing-report.csv");
   }
 
   /**

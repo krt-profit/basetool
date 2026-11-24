@@ -248,18 +248,20 @@ class PurchasingProxyControllerTest {
 
   @Test
   void theCsvExportIsAnAttachmentOfTheBackendBytes() {
-    byte[] csv = "month;total\n2026-09;1\n".getBytes(StandardCharsets.UTF_8);
+    byte[] csv = "month,total\r\n2026-09,1\r\n".getBytes(StandardCharsets.UTF_8);
     when(purchasingClient.reportCsv("2026-08", "2026-09")).thenReturn(csv);
 
     ResponseEntity<byte[]> response = controller.exportReport("2026-08", "2026-09");
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isEqualTo(csv);
-    assertThat(response.getHeaders().getContentType())
-        .isEqualTo(new MediaType("text", "csv", StandardCharsets.UTF_8));
+    MediaType type = response.getHeaders().getContentType();
+    assertThat(type).isNotNull();
+    assertThat(type.isCompatibleWith(MediaType.parseMediaType("text/csv"))).isTrue();
+    assertThat(type.getCharset()).isEqualTo(StandardCharsets.UTF_8);
+    assertThat(type.getParameter("header")).isEqualTo("present");
     assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
-        .startsWith("attachment")
-        .contains("purchasing-report.csv");
+        .isEqualTo("attachment; filename=\"purchasing-report.csv\"");
   }
 
   @Test

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.purchasing.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.BackendDownloads;
 import de.greluc.krt.profit.basetool.frontend.purchasing.client.PurchasingBackendClient;
 import de.greluc.krt.profit.basetool.frontend.purchasing.client.PurchasingBackendClient.PartnerAction;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.AcceptDeliveryRequest;
@@ -52,8 +53,6 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -82,6 +81,10 @@ import org.springframework.web.server.ResponseStatusException;
 public class PurchasingProxyController {
 
   private static final Pattern MONTH = Pattern.compile("\\d{4}-(0[1-9]|1[0-2])");
+
+  /** The RFC 4180 / RFC 7111 media type of the CSV export: UTF-8 with a header row. */
+  static final MediaType CSV_WITH_HEADER =
+      MediaType.parseMediaType("text/csv; charset=UTF-8; header=present");
 
   /** The purchasing domain's backend calls. */
   private final PurchasingBackendClient purchasingClient;
@@ -329,12 +332,8 @@ public class PurchasingProxyController {
     requireMonth(from);
     requireMonth(to);
     byte[] body = withBackendStatus(() -> purchasingClient.reportCsv(from, to));
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment().filename("purchasing-report.csv").build().toString())
-        .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
-        .body(body == null ? new byte[0] : body);
+    return BackendDownloads.attachment(
+        body == null ? new byte[0] : body, "purchasing-report.csv", CSV_WITH_HEADER);
   }
 
   /**

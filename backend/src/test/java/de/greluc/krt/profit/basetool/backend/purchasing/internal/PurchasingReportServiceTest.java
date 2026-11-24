@@ -87,7 +87,7 @@ class PurchasingReportServiceTest {
   @BeforeEach
   void setUp() {
     messageSource = new StaticMessageSource();
-    messageSource.addMessage("purchasing.report.csv.header", Locale.GERMAN, "Deal;Monat;Eintrag");
+    messageSource.addMessage("purchasing.report.csv.header", Locale.GERMAN, "Deal,Monat,Eintrag");
     messageSource.addMessage("purchasing.report.csv.yes", Locale.GERMAN, "ja");
     messageSource.addMessage("purchasing.report.csv.no", Locale.GERMAN, "nein");
     messageSource.addMessage(
@@ -214,18 +214,19 @@ class PurchasingReportServiceTest {
 
     String csv = service.csv(FIRST, LAST);
 
-    assertThat(csv.split("\n"))
-        .containsExactly(
-            "Deal;Monat;Eintrag",
-            "1;2026-01;Quantanium;10;10;100;1000;SETTLED;1000;200;0;nein",
-            "2;2026-02;Quantanium;5;0;200;1000;FAILED;600;0;500;ja",
-            "3;2026-02;Medpen;4;4;50;200;DELIVERED;200;0;0;nein");
+    assertThat(csv)
+        .isEqualTo(
+            "Deal,Monat,Eintrag\r\n"
+                + "1,2026-01,Quantanium,10,10,100,1000,SETTLED,1000,200,0,nein\r\n"
+                + "2,2026-02,Quantanium,5,0,200,1000,FAILED,600,0,500,ja\r\n"
+                + "3,2026-02,Medpen,4,4,50,200,DELIVERED,200,0,0,nein\r\n");
     assertThat(csv).doesNotContain(PARTNER.toString());
   }
 
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(
       strings = {
+        "name,variant",
         "name;variant",
         "name\"variant",
         "name\r\nvariant",
@@ -243,7 +244,7 @@ class PurchasingReportServiceTest {
             ? encoded.substring(1, encoded.length() - 1).replace("\"\"", "\"")
             : encoded;
     assertThat(decoded).isEqualTo(value);
-    if (value.contains(";")
+    if (value.contains(",")
         || value.contains("\"")
         || value.contains("\r")
         || value.contains("\n")) {

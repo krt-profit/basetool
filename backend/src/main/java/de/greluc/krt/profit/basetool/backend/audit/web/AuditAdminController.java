@@ -27,8 +27,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditReportService;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.platform.api.AttachmentResponses;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
-import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -45,8 +45,6 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -136,8 +134,7 @@ public class AuditAdminController {
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
       @UserZone ZoneId userZone) {
     byte[] pdf = auditReportService.generateAuditLogPdf(domain, from, to, userZone);
-    return PdfResponses.pdfAttachment(
-        pdf, "audit-" + domain.name().toLowerCase(Locale.ROOT) + ".pdf");
+    return AttachmentResponses.pdf(pdf, "audit-" + domain.name().toLowerCase(Locale.ROOT) + ".pdf");
   }
 
   /**
@@ -157,11 +154,8 @@ public class AuditAdminController {
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
     List<AuditEventDto> events = auditReportService.generateAuditLogJson(domain, from, to);
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_JSON);
-    headers.setContentDispositionFormData(
-        "attachment", "audit-" + domain.name().toLowerCase(Locale.ROOT) + ".json");
-    return ResponseEntity.ok().headers(headers).body(events);
+    return AttachmentResponses.json(
+        events, "audit-" + domain.name().toLowerCase(Locale.ROOT) + ".json");
   }
 
   /**

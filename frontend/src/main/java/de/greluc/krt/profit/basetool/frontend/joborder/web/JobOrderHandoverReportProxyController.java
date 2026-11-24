@@ -23,10 +23,11 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.HandoverReportPreviewRequestDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.BackendDownloads;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.http.HttpHeaders;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -133,14 +134,13 @@ public class JobOrderHandoverReportProxyController {
   /**
    * Wraps PDF bytes as a download.
    *
-   * @param pdf the document
+   * @param pdf the document, or {@code null} when the backend sent no body
    * @param filename the download filename
    * @return the PDF with attachment headers
    */
-  private static @NotNull ResponseEntity<byte[]> attachment(byte[] pdf, @NotNull String filename) {
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", filename);
-    return ResponseEntity.ok().headers(headers).body(pdf);
+  private static @NotNull ResponseEntity<byte[]> attachment(
+      byte @Nullable [] pdf, @NotNull String filename) {
+    return BackendDownloads.attachment(
+        pdf == null ? new byte[0] : pdf, filename, MediaType.APPLICATION_PDF);
   }
 }

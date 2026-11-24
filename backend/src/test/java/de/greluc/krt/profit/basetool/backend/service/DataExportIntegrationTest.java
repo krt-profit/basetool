@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSect
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportReportService;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
+import de.greluc.krt.profit.basetool.backend.support.PdfA4Conformance;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -299,7 +300,7 @@ class DataExportIntegrationTest {
   }
 
   @Test
-  void thePdfRenders() {
+  void thePdfRendersAsPdfA4() throws Exception {
     UUID subject = user("ZzzPdfZzz");
 
     DataExportService.DataExport export = dataExportService.export(subject);
@@ -309,5 +310,6 @@ class DataExportIntegrationTest {
     assertThat(pdf).isNotEmpty();
     assertThat(new String(pdf, 0, 5, java.nio.charset.StandardCharsets.ISO_8859_1))
         .isEqualTo("%PDF-");
+    PdfA4Conformance.assertConformant(pdf);
   }
 }

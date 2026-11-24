@@ -19,12 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.privacy.api;
 
-import java.nio.charset.StandardCharsets;
+import de.greluc.krt.profit.basetool.backend.platform.api.AttachmentResponses;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.ContentDisposition;
 import tools.jackson.core.util.DefaultIndenter;
 import tools.jackson.core.util.DefaultPrettyPrinter;
 import tools.jackson.databind.ObjectMapper;
@@ -75,10 +74,7 @@ public final class DataExportDocuments {
       @NotNull DataExportService.DataExport export, @NotNull String extension) {
     String date = FILENAME_DATE.format(export.generatedAt().atZone(FILENAME_ZONE));
     String filename = "Datenexport " + safeName(export.subjectHandle()) + " " + date;
-    return ContentDisposition.attachment()
-        .filename(filename + "." + extension, StandardCharsets.UTF_8)
-        .build()
-        .toString();
+    return AttachmentResponses.contentDisposition(filename + "." + extension);
   }
 
   /**

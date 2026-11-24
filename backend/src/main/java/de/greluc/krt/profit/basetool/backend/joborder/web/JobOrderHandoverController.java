@@ -31,7 +31,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHando
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionService;
-import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
+import de.greluc.krt.profit.basetool.backend.platform.api.AttachmentResponses;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -193,7 +193,7 @@ public class JobOrderHandoverController {
         jobOrderItemHandoverReportService.generateItemHandoverReport(
             jobOrderId, handoverId, userZone);
     String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
-    return PdfResponses.pdfAttachment(pdf, filename);
+    return AttachmentResponses.pdf(pdf, filename);
   }
 
   /**
@@ -226,7 +226,7 @@ public class JobOrderHandoverController {
     byte[] pdf =
         jobOrderHandoverReportService.generateHandoverReport(jobOrderId, handoverId, userZone);
     String filename = "uebergabeprotokoll-" + jobOrderId + ".pdf";
-    return PdfResponses.pdfAttachment(pdf, filename);
+    return AttachmentResponses.pdf(pdf, filename);
   }
 
   /**
@@ -251,6 +251,6 @@ public class JobOrderHandoverController {
       @PathVariable UUID jobOrderId, @RequestBody @Valid HandoverReportPreviewRequestDto dto) {
     byte[] pdf = jobOrderHandoverReportService.generateHandoverReportPreview(dto);
     String filename = "uebergabeprotokoll-vorschau.pdf";
-    return PdfResponses.pdfAttachment(pdf, filename);
+    return AttachmentResponses.pdf(pdf, filename);
   }
 }
