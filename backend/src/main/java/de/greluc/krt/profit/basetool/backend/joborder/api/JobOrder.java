@@ -35,9 +35,12 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -47,6 +50,7 @@ import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.OptimisticLock;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /** Job Order JPA entity. */
@@ -68,6 +72,9 @@ public class JobOrder extends AbstractEntity<UUID> {
    * the Flyway migration, so the cap holds end-to-end for untrusted (incl. anonymous) input.
    */
   public static final int COMMENT_MAX_LENGTH = 1000;
+
+  /** Maximum length, in characters, of the contact {@link #handle} every create and edit admits. */
+  public static final int CONTACT_MAX_LENGTH = 200;
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -112,11 +119,27 @@ public class JobOrder extends AbstractEntity<UUID> {
   /**
    * Optional, untrusted free-text comment from the order creator, at most {@value
    * #COMMENT_MAX_LENGTH} characters. Always rendered HTML-escaped and never logged; {@code null}
-   * when left empty.
+   * when left empty. Guarded by {@link #commentVersion}, not by the order version.
    */
   @Column(name = "comment", length = COMMENT_MAX_LENGTH)
   @Nullable
+  @OptimisticLock(excluded = true)
   private String comment;
+
+  /** The independently observed revision of the {@link #comment}, for every order kind. */
+  @Column(name = "comment_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  @Builder.Default
+  private long commentVersion = 0L;
+
+  /**
+   * The registry client the {@link #comment} was last written through, or {@code null} while its
+   * last write came from the Basetool; it moves with {@link #commentVersion} (REQ-ORDERS-078).
+   */
+  @Column(name = "comment_client_id", length = 63)
+  @Nullable
+  @OptimisticLock(excluded = true)
+  private String commentClientId;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
@@ -124,17 +147,58 @@ public class JobOrder extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private JobOrderStatus status = JobOrderStatus.OPEN;
 
+  /**
+   * When the order entered a terminal status, or {@code null} while it is active (REQ-ORDERS-054);
+   * kept in step by {@link #setStatus(JobOrderStatus)} and present exactly while the status is
+   * terminal, which the database enforces.
+   */
+  @Column(name = "closed_at")
+  @Nullable
+  @Setter(AccessLevel.NONE)
+  @OptimisticLock(excluded = true)
+  private Instant closedAt;
+
   /** The independently observed revision of the order's lifecycle. */
   @Column(name = "lifecycle_version", nullable = false)
   @OptimisticLock(excluded = true)
   @Builder.Default
   private Long lifecycleVersion = 0L;
 
-  /** The independently observed contact and comment revision of an aUEC order. */
+  /** The independently observed contact revision of an aUEC order. */
   @Column(name = "money_information_version", nullable = false)
   @OptimisticLock(excluded = true)
   @Builder.Default
   private long moneyInformationVersion = 0L;
+
+  /**
+   * The registry client the order was created through, or {@code null} for an order created in the
+   * Basetool; set by {@link #recordClientCreate} and never changed (REQ-OXCH-004).
+   */
+  @Column(name = "created_by_client_id", length = 63)
+  @Nullable
+  @Setter(AccessLevel.NONE)
+  @OptimisticLock(excluded = true)
+  private String createdByClientId;
+
+  /**
+   * The member who created the order through a client, or {@code null} for a web create and once
+   * the account is gone (REQ-OXCH-004).
+   */
+  @Column(name = "created_by_member_id")
+  @Nullable
+  @Setter(AccessLevel.NONE)
+  @OptimisticLock(excluded = true)
+  private UUID createdByMemberId;
+
+  /**
+   * The client's {@code Idempotency-Key} of the create, unique per client and member, or {@code
+   * null} for a web create (REQ-OXCH-004).
+   */
+  @Column(name = "create_idempotency_key", length = 128)
+  @Nullable
+  @Setter(AccessLevel.NONE)
+  @OptimisticLock(excluded = true)
+  private String createIdempotencyKey;
 
   /**
    * Exclusive order kind: raw materials, finished items, or an independently tracked net aUEC
@@ -202,6 +266,40 @@ public class JobOrder extends AbstractEntity<UUID> {
       fetch = FetchType.LAZY)
   @Builder.Default
   private Set<JobOrderItemHandover> itemHandovers = new HashSet<>();
+
+  /**
+   * Sets the status and keeps {@link #closedAt} in step: a terminal status records the current
+   * instant unless the order is already closed, so a change between terminal statuses keeps the
+   * first closing instant, and an active status clears it.
+   *
+   * @param status the new status
+   */
+  public void setStatus(@NotNull JobOrderStatus status) {
+    if (status.isActive()) {
+      closedAt = null;
+    } else if (closedAt == null) {
+      closedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    }
+    this.status = status;
+  }
+
+  /**
+   * Records that a client created the new order for a member under the client's key; a retry under
+   * the same client, member and key finds the order instead of creating another. A comment the
+   * create carries is the client's first write of it.
+   *
+   * @param actor the creating member and the client they acted through
+   * @param idempotencyKey the client's {@code Idempotency-Key} of the create
+   */
+  public void recordClientCreate(
+      @NotNull JobOrderActor.Client actor, @NotNull String idempotencyKey) {
+    createdByClientId = actor.clientId();
+    createdByMemberId = actor.member();
+    createIdempotencyKey = idempotencyKey;
+    if (comment != null) {
+      commentClientId = actor.clientId();
+    }
+  }
 
   /**
    * Adds a material and keeps the bidirectional back-reference in sync.

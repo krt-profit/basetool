@@ -1267,6 +1267,58 @@
           "protocolMapper": "oidc-audience-mapper"
         }
       ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentJobOrdersRead}",
+        "display.on.consent.screen": "true",
+        "gui.order": "24",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.joborders.read",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentJobOrdersWrite}",
+        "display.on.consent.screen": "true",
+        "gui.order": "25",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.joborders.write",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
     }
   ],
   "clientSessionIdleTimeout": 0,
@@ -1476,6 +1528,8 @@
         "exchange.bank.queue",
         "exchange.patch.read",
         "exchange.patch.write",
+        "exchange.joborders.read",
+        "exchange.joborders.write",
         "offline_access"
       ],
       "protocol": "openid-connect",
@@ -1544,6 +1598,8 @@
         "exchange.bank.queue",
         "exchange.patch.read",
         "exchange.patch.write",
+        "exchange.joborders.read",
+        "exchange.joborders.write",
         "offline_access"
       ],
       "protocol": "openid-connect",
@@ -1698,6 +1754,23 @@
         "default-roles-basetool"
       ],
       "username": "sandbox-admin"
+    },
+    {
+      "credentials": [
+        {
+          "temporary": false,
+          "type": "password",
+          "value": "sandbox-logistician-pw-do-not-use-in-prod"
+        }
+      ],
+      "email": "sandbox-logistician@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "id": "5a4d0000-0000-4000-8000-000000000004",
+      "realmRoles": [
+        "default-roles-basetool"
+      ],
+      "username": "sandbox-logistician"
     },
     {
       "credentials": [

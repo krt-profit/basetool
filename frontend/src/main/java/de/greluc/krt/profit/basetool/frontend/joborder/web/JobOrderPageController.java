@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderKind;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
@@ -479,7 +480,7 @@ public class JobOrderPageController {
           order.responsibleOrgUnit() != null ? order.responsibleOrgUnit().id() : null);
       itemForm.setRequestingOrgUnitId(
           order.requestingOrgUnit() != null ? order.requestingOrgUnit().id() : null);
-      itemForm.setVersion(order.version());
+      itemForm.observe(JobOrderObservedVersions.of(order));
       model.addAttribute("jobOrderItemForm", itemForm);
     }
     model.addAttribute("editOrderId", id);

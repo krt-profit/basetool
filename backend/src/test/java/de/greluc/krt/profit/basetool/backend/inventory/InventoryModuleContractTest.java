@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -45,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -112,9 +111,15 @@ class InventoryModuleContractTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String tag = UUID.randomUUID().toString().substring(0, 6);
-    home = squadron("InvHome-" + tag, "I" + tag);
+    home =
+        OrgUnitFixtures.persistedProfitSquadron(
+            squadronRepository, orgUnitRepository, "InvHome-" + tag, "I" + tag);
     insider = member("inv-insider", home);
-    outsider = member("inv-outsider", squadron("InvForeign-" + tag, "J" + tag));
+    outsider =
+        member(
+            "inv-outsider",
+            OrgUnitFixtures.persistedProfitSquadron(
+                squadronRepository, orgUnitRepository, "InvForeign-" + tag, "J" + tag));
     ore = new Material();
     ore.setName("Inv Ore " + tag);
     ore.setType(MaterialType.REFINED);
@@ -224,14 +229,6 @@ class InventoryModuleContractTest {
     entityManager.flush();
     return jdbc.queryForList(
         "SELECT event_type FROM audit_event WHERE subject_id = ?", String.class, id);
-  }
-
-  private Squadron squadron(String name, String shorthand) {
-    Squadron squadron = new Squadron();
-    squadron.setName(name);
-    squadron.setShorthand(shorthand);
-    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
-    return squadronRepository.save(squadron);
   }
 
   private User member(String username, Squadron unit) {

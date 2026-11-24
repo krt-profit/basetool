@@ -63,15 +63,11 @@ public class RedisExchangeRegistryMirror implements ExchangeRegistryMirror {
    */
   @Override
   public void write(@NotNull ExchangeRegistrySnapshot snapshot, long revision) {
-    ExchangeRegistryMirrorDocument document =
-        new ExchangeRegistryMirrorDocument(
-            ExchangeRegistryMirrorDocument.SCHEMA_VERSION,
-            revision,
-            clock.instant(),
-            snapshot.enabled(),
-            snapshot.bankEnabled(),
-            snapshot.clients());
-    redisTemplate.opsForValue().set(key, jsonMapper.writeValueAsString(document));
+    redisTemplate
+        .opsForValue()
+        .set(
+            key,
+            ExchangeRegistryMirrorDocument.write(jsonMapper, snapshot, revision, clock.instant()));
   }
 
   /**
@@ -88,12 +84,7 @@ public class RedisExchangeRegistryMirror implements ExchangeRegistryMirror {
       return Optional.empty();
     }
     try {
-      ExchangeRegistryMirrorDocument document =
-          jsonMapper.readValue(raw, ExchangeRegistryMirrorDocument.class);
-      if (document.schemaVersion() != ExchangeRegistryMirrorDocument.SCHEMA_VERSION) {
-        return Optional.empty();
-      }
-      return Optional.of(document.snapshot());
+      return ExchangeRegistryMirrorDocument.read(jsonMapper, raw);
     } catch (JacksonException _) {
       log.warn("The exchange registry mirror under {} is unreadable and will be rewritten", key);
       return Optional.empty();

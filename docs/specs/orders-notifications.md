@@ -94,6 +94,15 @@ An organisational change that makes the current responsibility invalid raises
 `JOB_ORDER_CLARIFICATION_REQUIRED` for the affected writers and active assigned accounts. Repeating
 the same eligibility state creates no new prompt. Restoration or an eligible transfer clears it.
 
+**Client writes raise the web's notices.** A create, a target or comment change and a cancel through
+a connected application go through the same commands as the web and raise the same notices: the
+same types, audiences, actor exclusion, muting and prompt cleanup. The created notice, the
+need-change notice and the finished notice of a cancel carry the coded application parameter
+`viaCode = CLIENT` with `app`, the registry display name captured when the notice is published, so
+they render their variant „… über <App>" (REQ-NOTIF-028, REQ-ORDERS-078); a later rename of the
+application leaves a stored notice as it was. A completion or reopening a client's target change
+causes names no application.
+
 ### REQ-ORDERS-043 - An assignment tells the assignee
 
 `JobOrderAssigneeService#addAssignee` publishes `JOB_ORDER_ASSIGNEE_ADDED` for a newly assigned

@@ -742,7 +742,7 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
         order.handle(),
         null,
         List.of(new CreateJobOrderMaterialDto(fixture.materialId(), 650, amount)),
-        order.version());
+        new JobOrderObservedVersions(order.version(), order.commentVersion()));
   }
 
   private RequestPostProcessor asAdmin(@NotNull UUID actor) {
@@ -803,7 +803,13 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
     var order = jobOrderQueryService.getJobOrderById(fixture.orderId());
     jobOrderService.updateJobOrder(
         fixture.orderId(),
-        new CreateJobOrderDto(null, null, order.handle(), null, materials, order.version()));
+        new CreateJobOrderDto(
+            null,
+            null,
+            order.handle(),
+            null,
+            materials,
+            new JobOrderObservedVersions(order.version(), order.commentVersion())));
   }
 
   private UUID sharedWriter(Fixture fixture) {

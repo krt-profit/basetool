@@ -20,13 +20,16 @@
 package de.greluc.krt.profit.basetool.ingest.registry;
 
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeGatewayProperties;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -172,7 +175,9 @@ public class ExchangeRegistryReader {
     return new ExchangeRegistry(
         revision != null && revision.isNumber() ? revision.longValue() : 0L,
         flag(root, "enabled"),
-        flag(root, "bankEnabled"),
+        Arrays.stream(AreaSwitch.values())
+            .filter(area -> flag(root, area.getMirrorField()))
+            .collect(Collectors.toSet()),
         clients);
   }
 

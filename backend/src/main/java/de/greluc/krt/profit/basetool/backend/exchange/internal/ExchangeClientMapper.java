@@ -46,14 +46,16 @@ public interface ExchangeClientMapper {
   ExchangeSettingsDto toDto(ExchangeSettings settings);
 
   /**
-   * Maps the bank switch of the settings row, with its own version.
+   * Maps one area switch of the settings row: its state, its own change time and version.
    *
+   * @param area the switch
    * @param settings the entity
-   * @return the bank switch DTO
+   * @return the switch DTO
    */
-  default @NotNull ExchangeBankSwitchDto toBankSwitchDto(@NotNull ExchangeSettings settings) {
-    return new ExchangeBankSwitchDto(
-        settings.isBankEnabled(), settings.getBankUpdatedAt(), settings.getBankVersion());
+  default @NotNull ExchangeAreaSwitchDto toAreaSwitchDto(
+      @NotNull ExchangeSwitch area, @NotNull ExchangeSettings settings) {
+    ExchangeSwitch.State state = area.stateOf(settings);
+    return new ExchangeAreaSwitchDto(state.enabled(), state.updatedAt(), state.version());
   }
 
   /**

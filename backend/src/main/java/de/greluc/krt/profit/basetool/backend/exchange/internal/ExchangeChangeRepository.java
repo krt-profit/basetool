@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.UuidArrayLiteral;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -136,6 +137,59 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
       nativeQuery = true)
   List<ChangedKey> findChangedOrgKeys(
       @Param("units") Collection<UUID> units,
+      @Param("tx") long tx,
+      @Param("seq") long seq,
+      @Param("watermark") long watermark,
+      @Param("limit") int limit);
+
+  /**
+   * Returns the job orders announced after a feed position and below the watermark in the logs of
+   * the given units or in the member's own log, each once with its latest such entry, in the order
+   * of those entries (REQ-OXCH-003).
+   *
+   * @param units the units whose logs are read; may be empty
+   * @param userId the member whose own log is read
+   * @param tx the position's transaction id
+   * @param seq the position's sequence number
+   * @param watermark the oldest transaction id still running
+   * @param limit the most keys to return
+   * @return the announced keys with the instant of their latest entry
+   */
+  default List<AnnouncedKey> findAnnouncedJobOrders(
+      Collection<UUID> units, UUID userId, long tx, long seq, long watermark, int limit) {
+    return findAnnouncedJobOrdersByArray(
+        UuidArrayLiteral.of(units), userId, tx, seq, watermark, limit);
+  }
+
+  /**
+   * Returns the job orders announced after a feed position, the units given as one array literal.
+   *
+   * @param units the units whose logs are read, as a PostgreSQL {@code uuid[]} literal
+   * @param userId the member whose own log is read
+   * @param tx the position's transaction id
+   * @param seq the position's sequence number
+   * @param watermark the oldest transaction id still running
+   * @param limit the most keys to return
+   * @return the announced keys with the instant of their latest entry
+   */
+  @Query(
+      value =
+          """
+          SELECT latest.entity_key AS entityKey, latest.tx AS tx, latest.seq AS seq,
+                 latest.changed_at AS changedAt
+          FROM (SELECT DISTINCT ON (c.entity_key) c.entity_key, c.tx, c.seq, c.changed_at
+                FROM exchange_change c
+                WHERE c.resource = 'JOB_ORDER'
+                  AND (c.org_unit_id = ANY (CAST(:units AS UUID[])) OR c.user_id = :userId)
+                  AND (c.tx, c.seq) > (:tx, :seq) AND c.tx < :watermark
+                ORDER BY c.entity_key, c.tx DESC, c.seq DESC) latest
+          ORDER BY latest.tx, latest.seq
+          LIMIT :limit
+          """,
+      nativeQuery = true)
+  List<AnnouncedKey> findAnnouncedJobOrdersByArray(
+      @Param("units") String units,
+      @Param("userId") UUID userId,
       @Param("tx") long tx,
       @Param("seq") long seq,
       @Param("watermark") long watermark,
@@ -295,6 +349,17 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
      * @return the key
      */
     String getEntityKey();
+  }
+
+  /** A changed key with the position and the instant of its latest entry. */
+  interface AnnouncedKey extends ChangedKey {
+
+    /**
+     * When the latest entry was written.
+     *
+     * @return the time
+     */
+    Instant getChangedAt();
   }
 
   /**

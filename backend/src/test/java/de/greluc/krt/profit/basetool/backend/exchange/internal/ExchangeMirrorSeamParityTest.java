@@ -37,6 +37,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -84,10 +85,6 @@ class ExchangeMirrorSeamParityTest {
       assertThat(client.propertyNames())
           .containsExactlyElementsOf(ExchangeSeam.REGISTRY_CLIENT_FIELDS);
     }
-    assertThat(
-            Arrays.stream(ExchangeRegistryMirrorDocument.class.getRecordComponents())
-                .map(RecordComponent::getName))
-        .containsExactlyElementsOf(ExchangeSeam.REGISTRY_DOCUMENT_FIELDS);
     assertThat(
             Arrays.stream(ExchangeRegistrySnapshot.Client.class.getRecordComponents())
                 .map(RecordComponent::getName))
@@ -148,12 +145,15 @@ class ExchangeMirrorSeamParityTest {
 
     new RedisExchangeRegistryMirror(template, ExchangeSeam.REGISTRY_KEY, clock)
         .write(
-            new ExchangeRegistrySnapshot(true, true, clients),
+            new ExchangeRegistrySnapshot(EnumSet.allOf(ExchangeSwitch.class), clients),
             ExchangeSeam.REGISTRY_SAMPLE_REVISION);
 
     ArgumentCaptor<String> written = ArgumentCaptor.forClass(String.class);
     verify(values).set(eq(ExchangeSeam.REGISTRY_KEY), written.capture());
     assertThat(MAPPER.readTree(written.getValue())).isEqualTo(expected);
+    assertThat(written.getValue())
+        .as("the document byte for byte, its members in the seam's order")
+        .isEqualTo(MAPPER.writeValueAsString(expected));
   }
 
   /**

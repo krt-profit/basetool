@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -77,15 +78,6 @@ class UserMapperTest {
     role.setCode("KRT_MEMBER");
     role.setName("KRT Member");
     return role;
-  }
-
-  /** Builds a squadron fixture with the given id, name and shorthand. */
-  private static Squadron squadron(UUID id, String name, String shorthand) {
-    Squadron s = new Squadron();
-    s.setId(id);
-    s.setName(name);
-    s.setShorthand(shorthand);
-    return s;
   }
 
   @Test

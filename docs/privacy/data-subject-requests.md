@@ -105,6 +105,8 @@ In short:
 - **Unlinked**: mission participation survives as *"Gelöschter Nutzer"* with no name; the
   material-claim stamp is nulled. The aUEC order clears account links and account references in
   operations and identity history. It retains the operation IDs, correction lineage and amounts.
+  A job order created through a connected application loses its creating member; the client
+  marker stays.
 - **Kept**: the audit trail and bank booking history, including the **handle used at the time**,
   under Art. 6(1)(f). The two are not kept for the same length of time: the **bank booking history
   is permanent**, while the **audit trail is bounded at 24 months** after the recorded activity

@@ -25,11 +25,15 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend {@code JobOrderDto}: {@code MATERIAL} orders fill {@code
  * materials} and {@code handovers}; {@code ITEM} orders fill {@code items}, {@code
- * aggregatedMaterials} and {@code itemHandovers}. The other kind's lists are empty.
+ * aggregatedMaterials} and {@code itemHandovers}. The other kind's lists are empty. {@code
+ * createdClient} and {@code commentClient} name the connected application the order was created
+ * through and the one its comment was last written through, or are {@code null} for the Basetool
+ * (REQ-ORDERS-078).
  */
 @DtoMirror
 public record JobOrderDto(
@@ -60,7 +64,10 @@ public record JobOrderDto(
     Boolean canCancel,
     Boolean canReopen,
     Long lifecycleVersion,
-    Long responsibilityVersion) {
+    Long responsibilityVersion,
+    Long commentVersion,
+    @Nullable String createdClient,
+    @Nullable String commentClient) {
 
   /**
    * Whether the backend lets the caller edit this order: its {@code canEdit} row flag, which is

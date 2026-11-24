@@ -28,8 +28,8 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -207,10 +207,8 @@ class MissionUpcomingOwnOrSignedUpQueryDataTest {
 
   private OrgUnit newSquadron() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("Upcoming-" + tag);
-    squadron.setShorthand("UP" + tag);
-    return squadronRepository.save(squadron);
+    return OrgUnitFixtures.persistedSquadron(
+        squadronRepository, "Upcoming-" + tag, "UP" + tag, null);
   }
 
   private UUID saveMission(OrgUnit owner, String start, String status, boolean isInternal) {

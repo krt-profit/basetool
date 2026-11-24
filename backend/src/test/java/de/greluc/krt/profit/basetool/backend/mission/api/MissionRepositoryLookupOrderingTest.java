@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.mission.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -57,10 +57,9 @@ class MissionRepositoryLookupOrderingTest {
   @Test
   void findAllActiveReference_ordersNewestPlannedStartFirstThenNullsLast() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("Lookup-Order-" + tag);
-    squadron.setShorthand("LO" + tag);
-    OrgUnit owner = squadronRepository.save(squadron);
+    OrgUnit owner =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Lookup-Order-" + tag, "LO" + tag, null);
 
     UUID newestId = saveMission(owner, "Zulu", Instant.parse("2026-03-01T00:00:00Z"));
     UUID middleId = saveMission(owner, "Mike", Instant.parse("2026-02-01T00:00:00Z"));
@@ -84,10 +83,9 @@ class MissionRepositoryLookupOrderingTest {
   @Test
   void upcomingCandidates_forAdminSkipTerminalStatusEvenWhenItSortsEarlier() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    Squadron squadron = new Squadron();
-    squadron.setName("Next-Status-" + tag);
-    squadron.setShorthand("NS" + tag);
-    OrgUnit owner = squadronRepository.save(squadron);
+    OrgUnit owner =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Next-Status-" + tag, "NS" + tag, null);
 
     Instant lowerBound = Instant.parse("2099-01-01T00:00:00Z");
     saveMission(owner, "Completed-Earlier", Instant.parse("2099-02-01T00:00:00Z"), "COMPLETED");
@@ -117,7 +115,9 @@ class MissionRepositoryLookupOrderingTest {
   @Test
   void upcomingCandidates_publicOnly_skipsInternalAndTerminalMissions() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    OrgUnit foreign = newSquadron("Public-Foreign-" + tag, "PF" + tag);
+    OrgUnit foreign =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Public-Foreign-" + tag, "PF" + tag, null);
 
     Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
     saveMission(
@@ -151,8 +151,12 @@ class MissionRepositoryLookupOrderingTest {
   @Test
   void upcomingCandidates_scoped_returnsOwnUnitNextSkippingForeignAndTerminal() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    OrgUnit mine = newSquadron("Scoped-Mine-" + tag, "SM" + tag);
-    OrgUnit foreign = newSquadron("Scoped-Foreign-" + tag, "SF" + tag);
+    OrgUnit mine =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Scoped-Mine-" + tag, "SM" + tag, null);
+    OrgUnit foreign =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Scoped-Foreign-" + tag, "SF" + tag, null);
 
     Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
     saveMission(
@@ -196,7 +200,9 @@ class MissionRepositoryLookupOrderingTest {
   @Test
   void upcomingCandidates_scoped_includesOwnInternalMission() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    OrgUnit mine = newSquadron("Scoped-Int-" + tag, "SI" + tag);
+    OrgUnit mine =
+        OrgUnitFixtures.persistedSquadron(
+            squadronRepository, "Scoped-Int-" + tag, "SI" + tag, null);
 
     Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
     UUID internalId =
@@ -214,20 +220,6 @@ class MissionRepositoryLookupOrderingTest {
             null,
             PageRequest.of(0, 1));
     assertThat(head).extracting(Mission::getId).containsExactly(internalId);
-  }
-
-  /**
-   * Persists a fresh {@link Squadron} owner for a scope fixture.
-   *
-   * @param name the squadron display name.
-   * @param shorthand the squadron shorthand (kept short to satisfy the column constraint).
-   * @return the persisted owner.
-   */
-  private OrgUnit newSquadron(String name, String shorthand) {
-    Squadron squadron = new Squadron();
-    squadron.setName(name);
-    squadron.setShorthand(shorthand);
-    return squadronRepository.save(squadron);
   }
 
   /**

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.ingest.gate;
 import de.greluc.krt.profit.basetool.ingest.auth.ExchangeTokenGateFilter;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeCorsProperties;
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeLogContext;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeRefusals;
@@ -40,6 +41,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -56,8 +58,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * The registry gate of the exchange routes, after the token gate: the route must exist, the
- * exchange be switched on and, for the bank route family, the bank switch too (REQ-BXCH-006; while
- * it is off, a bank path answers {@code 503 BANK_EXCHANGE_DISABLED} whether a route serves it or
+ * exchange be switched on and, for a switched area, its area switches too ({@link AreaSwitch}: the
+ * bank route family, REQ-BXCH-006; the job-order route family and its {@code POST}s, REQ-OXCH-009;
+ * while one is off, every path of its area answers its {@code 503} whether a route serves it or
  * not), the client be active in the registry, a browser origin be one approved for that client,
  * neither the installation key nor the client be revoked for this member, the route's capability be
  * both in the token and granted, and the client's version meet its minimum (REQ-XCH-001, -003,
@@ -75,14 +78,11 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
   public static final String RETRY_AFTER_SECONDS = "30";
 
   /**
-   * What a client should wait before retrying a bank route after {@code 503
-   * BANK_EXCHANGE_DISABLED}; the switch is an admin's decision, so the wait is longer.
+   * What a client should wait before retrying an area an area switch stops ({@code 503
+   * BANK_EXCHANGE_DISABLED}, {@code JOB_ORDER_EXCHANGE_DISABLED}, {@code
+   * JOB_ORDER_WRITES_DISABLED}); the switch is an admin's decision, so the wait is longer.
    */
-  public static final String BANK_RETRY_AFTER_SECONDS = "300";
-
-  /** The detail of {@code 503 BANK_EXCHANGE_DISABLED}. */
-  public static final String BANK_EXCHANGE_DISABLED_DETAIL =
-      "The bank is switched off for connected applications; every other area keeps working.";
+  public static final String AREA_RETRY_AFTER_SECONDS = "300";
 
   /** The detail of {@code 503 REGISTRY_UNAVAILABLE}. */
   public static final String REGISTRY_UNAVAILABLE_DETAIL =
@@ -155,8 +155,8 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
     }
     Optional<ExchangeRoutes.Route> route =
         ExchangeRoutes.find(request.getMethod(), request.getRequestURI());
-    boolean bank = ExchangeRoutes.isBank(request.getRequestURI());
-    if (route.isEmpty() && !bank) {
+    List<AreaSwitch> areas = AreaSwitch.gating(request.getMethod(), request.getRequestURI());
+    if (route.isEmpty() && areas.isEmpty()) {
       refuseNotFound(refusals.clientLabel(jwt.getClaimAsString("azp")), response);
       return;
     }
@@ -164,10 +164,10 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
     ExchangeRequestContext context;
     try {
       if (route.isEmpty()) {
-        refuseRoutelessBankPath(jwt, response);
+        refuseRoutelessAreaPath(jwt, areas, response);
         return;
       }
-      context = admit(jwt, route.get(), bank, request, response);
+      context = admit(jwt, route.get(), areas, request, response);
     } catch (ExchangeUnavailableException _) {
       response.setHeader(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS);
       refuse(
@@ -191,7 +191,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
    *
    * @param jwt the token
    * @param route the route
-   * @param bank whether the route is a bank route, which the bank switch also gates
+   * @param areas the area switches that also gate the request, in the order they are checked
    * @param request the request
    * @param response the response a refusal is written to
    * @return the context, or {@code null} when the request was refused
@@ -201,7 +201,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
   private @Nullable ExchangeRequestContext admit(
       @NotNull Jwt jwt,
       @NotNull ExchangeRoutes.Route route,
-      boolean bank,
+      @NotNull List<AreaSwitch> areas,
       @NotNull HttpServletRequest request,
       @NotNull HttpServletResponse response)
       throws IOException {
@@ -209,7 +209,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
     String clientId = jwt.getClaimAsString("azp");
     String label = ExchangeRefusals.clientLabel(clientId, registry);
     ExchangeLogContext.client(label);
-    if (refusedBySwitch(registry, label, bank, response)) {
+    if (refusedBySwitch(registry, label, areas, response)) {
       return null;
     }
     ExchangeRegistry.Client client = clientId == null ? null : registry.clients().get(clientId);
@@ -305,12 +305,13 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Refuses a request one of the switches stops: the global switch for every route, then the bank
-   * switch for the bank route family (REQ-XCH-003, REQ-BXCH-006).
+   * Refuses a request one of the switches stops: the global switch for every route, then the area
+   * switches that gate the request in their order (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009). Every
+   * switch refusal comes before the quota and counts no write.
    *
    * @param registry the registry
    * @param label the {@code client_id} label of the request
-   * @param bank whether the request is for the bank route family
+   * @param areas the area switches that gate the request, in the order they are checked
    * @param response the response a refusal is written to
    * @return {@code true} when the request was refused
    * @throws IOException if writing the refusal fails
@@ -318,7 +319,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
   private boolean refusedBySwitch(
       @NotNull ExchangeRegistry registry,
       @NotNull String label,
-      boolean bank,
+      @NotNull List<AreaSwitch> areas,
       @NotNull HttpServletResponse response)
       throws IOException {
     if (!registry.enabled()) {
@@ -331,34 +332,33 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
           EXCHANGE_DISABLED_DETAIL);
       return true;
     }
-    if (bank && !registry.bankEnabled()) {
-      response.setHeader(HttpHeaders.RETRY_AFTER, BANK_RETRY_AFTER_SECONDS);
-      refuse(
-          label,
-          response,
-          HttpStatus.SERVICE_UNAVAILABLE,
-          ExchangeRefusals.BANK_EXCHANGE_DISABLED,
-          BANK_EXCHANGE_DISABLED_DETAIL);
-      return true;
+    for (AreaSwitch area : areas) {
+      if (!registry.isOn(area)) {
+        response.setHeader(HttpHeaders.RETRY_AFTER, AREA_RETRY_AFTER_SECONDS);
+        refuse(label, response, HttpStatus.SERVICE_UNAVAILABLE, area.getCode(), area.getDetail());
+        return true;
+      }
     }
     return false;
   }
 
   /**
-   * Answers a bank path no route serves: the switches refuse it first, so while the bank switch is
-   * off the whole family answers alike; otherwise it is {@code 404 NOT_FOUND}.
+   * Answers a path of a switched area no route serves: the switches refuse it first, so while an
+   * area switch is off its whole area answers alike; otherwise it is {@code 404 NOT_FOUND}.
    *
    * @param jwt the token
+   * @param areas the area switches that gate the path, in the order they are checked
    * @param response the response
    * @throws IOException if writing the refusal fails
    * @throws ExchangeUnavailableException if the registry cannot be read
    */
-  private void refuseRoutelessBankPath(@NotNull Jwt jwt, @NotNull HttpServletResponse response)
+  private void refuseRoutelessAreaPath(
+      @NotNull Jwt jwt, @NotNull List<AreaSwitch> areas, @NotNull HttpServletResponse response)
       throws IOException {
     ExchangeRegistry registry = registryReader.current();
     String label = ExchangeRefusals.clientLabel(jwt.getClaimAsString("azp"), registry);
     ExchangeLogContext.client(label);
-    if (!refusedBySwitch(registry, label, true, response)) {
+    if (!refusedBySwitch(registry, label, areas, response)) {
       refuseNotFound(label, response);
     }
   }

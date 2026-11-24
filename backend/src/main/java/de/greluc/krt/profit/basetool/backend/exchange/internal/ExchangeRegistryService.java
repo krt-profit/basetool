@@ -39,7 +39,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -53,10 +52,10 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Manages the exchange client registry, the global switch and the bank switch for {@code ADMIN}
- * (REQ-XCH-003, REQ-BXCH-006): each change takes the settings row lock, is mirrored by {@link
- * ExchangeRegistryMirrorSync}, audited in „Verbundene Anwendungen" and counted for {@code
- * ExchangeRegistryChanged}.
+ * Manages the exchange client registry and every {@link ExchangeSwitch} for {@code ADMIN}
+ * (REQ-XCH-003, REQ-BXCH-006, REQ-OXCH-009): each change takes the settings row lock, is mirrored
+ * by {@link ExchangeRegistryMirrorSync}, audited in „Verbundene Anwendungen" and counted on {@code
+ * basetool_exchange_registry_changes_total}.
  */
 @Slf4j
 @Service
@@ -83,7 +82,7 @@ public class ExchangeRegistryService {
 
   private final AuthHelperService authHelperService;
 
-  /** Stamps the bank switch's change time. */
+  /** Stamps an area switch's change time. */
   private final Clock clock = Clock.systemUTC();
 
   /**
@@ -140,7 +139,7 @@ public class ExchangeRegistryService {
   }
 
   /**
-   * Reads the global switch.
+   * Reads the settings row with every switch.
    *
    * @return the settings row
    */
@@ -279,73 +278,35 @@ public class ExchangeRegistryService {
   }
 
   /**
-   * Turns the global switch on or off; switching off reaches the mirror before the commit.
-   *
-   * @param enabled the new state
-   * @param version the version last seen
-   * @return the saved settings, unchanged when the switch already had that state
-   */
-  @NotNull
-  @Transactional
-  public ExchangeSettings updateSettings(boolean enabled, @NotNull Long version) {
-    return flip(
-        ExchangeSwitch.GLOBAL,
-        enabled,
-        version,
-        settings -> {
-          settings.setEnabled(enabled);
-          return mirrorSync.saveSettings(settings);
-        });
-  }
-
-  /**
-   * Turns the bank switch on or off (REQ-BXCH-006); switching off reaches the mirror before the
-   * commit. The switch has its own version counter and change time, so this never makes the global
-   * switch's version stale nor moves its {@code updatedAt}, and the other way round.
-   *
-   * @param enabled the new state
-   * @param bankVersion the bank switch's version last seen
-   * @return the saved settings, unchanged when the bank switch already had that state
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
-   *     bankVersion} is stale
-   */
-  @NotNull
-  @Transactional
-  public ExchangeSettings updateBankSwitch(boolean enabled, @NotNull Long bankVersion) {
-    return flip(
-        ExchangeSwitch.BANK,
-        enabled,
-        bankVersion,
-        settings -> mirrorSync.saveBankSwitch(settings, enabled, clock.instant()));
-  }
-
-  /**
-   * Flips one switch under the settings row lock: checks its version, writes it, mirrors the
-   * change, audits it with {@code {enabled}}, announces it and counts it after the commit.
+   * Turns one switch on or off under the settings row lock (REQ-XCH-003, REQ-BXCH-006,
+   * REQ-OXCH-009): checks its version, writes it, mirrors the change, audits it, announces it and
+   * counts it after the commit; switching off reaches the mirror before the commit. Every switch
+   * but the global one has its own version counter and change time, so flipping one never makes
+   * another's version stale nor moves its change time.
    *
    * @param target the switch
    * @param enabled the new state
    * @param version the switch's version last seen
-   * @param write writes the new state onto the locked row and returns the saved row
    * @return the saved settings, unchanged when the switch already had that state
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code version} is
+   *     stale
    */
   @NotNull
-  private ExchangeSettings flip(
-      @NotNull ExchangeSwitch target,
-      boolean enabled,
-      @NotNull Long version,
-      @NotNull UnaryOperator<ExchangeSettings> write) {
+  @Transactional
+  public ExchangeSettings updateSwitch(
+      @NotNull ExchangeSwitch target, boolean enabled, @NotNull Long version) {
     ExchangeSettings settings = mirrorSync.lockSettings();
+    ExchangeSwitch.State current = target.stateOf(settings);
     OptimisticLock.check(
-        target.versionOf(settings), version, ExchangeSettings.class, ExchangeSettings.SINGLETON_ID);
-    if (target.isOn(settings) == enabled) {
+        current.version(), version, ExchangeSettings.class, ExchangeSettings.SINGLETON_ID);
+    if (current.enabled() == enabled) {
       return settings;
     }
     ExchangeRegistrySnapshot before = mirrorSync.load();
-    final ExchangeSettings saved = write.apply(settings);
+    final ExchangeSettings saved =
+        mirrorSync.saveSwitch(target, settings, enabled, clock.instant());
     mirrorSync.mirrorChange(before, mirrorSync.load());
-    auditRecorder.record(
-        target.getAuditType(), null, null, null, AuditDetails.of("enabled", enabled));
+    auditRecorder.record(target.getAuditType(), null, null, null, target.auditDetails(enabled));
     UUID actor = authHelperService.currentUserId().orElse(null);
     eventPublisher.publishEvent(target.notice(enabled, actor));
     countAfterCommit(target.action(enabled));

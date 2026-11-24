@@ -41,12 +41,14 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderUnitReadHistory;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEditor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderGate;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyCommitmentCommands;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialProvisionCredit;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.WriteMoneyCommitmentDto;
@@ -98,6 +100,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -141,6 +144,14 @@ class TenancyGuardTest {
   private static final List<Class<?>> UNVERSIONED_EDIT_PARAMETERS =
       List.of(UUID.class, JobOrderGate.class, Function.class);
 
+  /** The exact editor mutation signature of an edit that also writes the comment. */
+  private static final List<Class<?>> COMMENT_EDIT_PARAMETERS =
+      List.of(UUID.class, JobOrderGate.class, JobOrderObservedVersions.class, Function.class);
+
+  /** The exact editor mutation signature of a status change under its caller's rule and read. */
+  private static final List<Class<?>> LIFECYCLE_EDIT_PARAMETERS =
+      List.of(UUID.class, Long.class, JobOrderReadCheck.class, Predicate.class, Function.class);
+
   /**
    * Public mutation contracts whose own bounded bodies must independently reach the scope policy.
    */
@@ -148,6 +159,8 @@ class TenancyGuardTest {
       Set.of(
           new ScopeGateway(JobOrderEditor.class, "edit", VERSIONED_EDIT_PARAMETERS),
           new ScopeGateway(JobOrderEditor.class, "editPlanned", VERSIONED_EDIT_PARAMETERS),
+          new ScopeGateway(JobOrderEditor.class, "editPlannedWithComment", COMMENT_EDIT_PARAMETERS),
+          new ScopeGateway(JobOrderEditor.class, "editLifecycle", LIFECYCLE_EDIT_PARAMETERS),
           new ScopeGateway(JobOrderEditor.class, "editUnversioned", UNVERSIONED_EDIT_PARAMETERS),
           new ScopeGateway(
               JobOrderEditor.class, "editWithoutProjection", UNVERSIONED_EDIT_PARAMETERS),
@@ -423,7 +436,7 @@ class TenancyGuardTest {
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
               new HandlerKey(JobOrderController.class, "updateJobOrderStatus"),
-              "JobOrderEditor checks the order gate on the loaded order"),
+              "JobOrderEditor checks the caller's read check and writer rule on the loaded order"),
           Map.entry(
               new HandlerKey(JobOrderController.class, "updateJobOrder"),
               "JobOrderEditor checks the order gate on the loaded order"),

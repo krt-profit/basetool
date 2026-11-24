@@ -29,14 +29,20 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import de.greluc.krt.profit.basetool.ingest.auth.ExchangeTokenGateFilter;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeLogContext;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistry;
+import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -59,8 +65,12 @@ import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
+import tools.jackson.databind.json.JsonMapper;
 
-/** Keys, tokens, DPoP proofs, registries and probe routes for the exchange gate tests. */
+/**
+ * Keys, tokens, DPoP proofs, registries, published examples, relay answers and probe routes for the
+ * exchange gate and route tests.
+ */
 public final class ExchangeTestSupport {
 
   /** The origin MockMvc requests carry. */
@@ -86,6 +96,15 @@ public final class ExchangeTestSupport {
 
   /** A write route, which needs {@code exchange.blueprints.write}. */
   public static final String BLUEPRINT_CHANGES = "/exchange/v1/me/blueprints/changes";
+
+  /** A default-configured JSON mapper; immutable, so every test class shares it. */
+  public static final JsonMapper MAPPER = JsonMapper.builder().build();
+
+  /**
+   * The published exchange examples, relative to the {@code ingest} module directory the tests run
+   * in.
+   */
+  public static final Path EXAMPLES = Path.of("../docs/exchange/examples/v1");
 
   /** Not instantiable. */
   private ExchangeTestSupport() {}
@@ -229,7 +248,7 @@ public final class ExchangeTestSupport {
     return new ExchangeRegistry(
         1L,
         enabled,
-        false,
+        Set.of(),
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client("VerseKit", active, capabilities, minVersion, null, null)));
@@ -266,7 +285,28 @@ public final class ExchangeTestSupport {
     return new ExchangeRegistry(
         1L,
         true,
-        bankEnabled,
+        bankEnabled ? Set.of(AreaSwitch.BANK) : Set.of(),
+        Map.of(
+            CLIENT,
+            new ExchangeRegistry.Client(
+                "VerseKit", true, capabilities, minVersion, requestsPerMinute, null)));
+  }
+
+  /**
+   * Builds a registry holding the test client, active and switched on, with limit overrides and
+   * every area switched on: the bank, the job orders and their writes.
+   *
+   * @param capabilities the granted capabilities
+   * @param minVersion the minimum client version, or {@code null}
+   * @param requestsPerMinute the per-minute limit override
+   * @return the registry
+   */
+  public static @NotNull ExchangeRegistry registryWithEveryArea(
+      @NotNull Set<String> capabilities, @Nullable String minVersion, int requestsPerMinute) {
+    return new ExchangeRegistry(
+        1L,
+        true,
+        EnumSet.allOf(AreaSwitch.class),
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client(
@@ -321,6 +361,27 @@ public final class ExchangeTestSupport {
       request.contentType(MediaType.APPLICATION_JSON).content(json);
     }
     return mockMvc.perform(request);
+  }
+
+  /**
+   * Reads a published exchange example as UTF-8.
+   *
+   * @param name the example's path below {@code docs/exchange/examples/v1}
+   * @return its text
+   * @throws IOException if it cannot be read
+   */
+  public static @NotNull String example(@NotNull String name) throws IOException {
+    return Files.readString(EXAMPLES.resolve(name));
+  }
+
+  /**
+   * Builds the relay result of a backend {@code 200} answer, without a problem code or detail.
+   *
+   * @param json the backend's JSON body
+   * @return the result carrying the parsed body
+   */
+  public static @NotNull ExchangeRelay.Result ok(@NotNull String json) {
+    return new ExchangeRelay.Result(200, MAPPER.readTree(json), null, null);
   }
 
   /**

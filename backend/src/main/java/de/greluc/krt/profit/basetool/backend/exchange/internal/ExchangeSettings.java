@@ -34,12 +34,13 @@ import org.hibernate.annotations.OptimisticLock;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The single row holding the global exchange switch (REQ-XCH-003) and the bank switch
- * (REQ-BXCH-006); created by the migration, never by the application.
+ * The single row holding the global exchange switch (REQ-XCH-003), the bank switch (REQ-BXCH-006)
+ * and the two job-order switches (REQ-OXCH-009); created by the migration, never by the
+ * application.
  *
- * <p>The row's {@code version} guards the global switch. The bank switch carries its own counter,
- * {@code bankVersion}, and its columns are excluded from the row's optimistic lock, so flipping one
- * switch never makes the other's echoed version stale. Every write holds the row lock first.
+ * <p>The row's {@code version} guards the global switch. Every other switch carries its own counter
+ * and change time, and their columns are excluded from the row's optimistic lock, so flipping one
+ * switch never makes another's echoed version stale. Every write holds the row lock first.
  */
 @Entity
 @Table(name = "exchange_settings")
@@ -75,4 +76,34 @@ public class ExchangeSettings extends AbstractEntity<Short> {
   @OptimisticLock(excluded = true)
   @Nullable
   private Instant bankUpdatedAt;
+
+  /** Whether the job-order route family serves requests while the exchange is on. */
+  @Column(nullable = false)
+  @OptimisticLock(excluded = true)
+  private boolean jobOrdersEnabled;
+
+  /** The job-order family switch's own optimistic-lock counter, bumped on every change of it. */
+  @Column(nullable = false)
+  @OptimisticLock(excluded = true)
+  private long jobOrdersVersion;
+
+  /** When the job-order family switch last changed, or {@code null} before its first change. */
+  @OptimisticLock(excluded = true)
+  @Nullable
+  private Instant jobOrdersUpdatedAt;
+
+  /** Whether the job-order writes are served while the job-order family is on. */
+  @Column(nullable = false)
+  @OptimisticLock(excluded = true)
+  private boolean jobOrderWritesEnabled;
+
+  /** The job-order writes switch's own optimistic-lock counter, bumped on every change of it. */
+  @Column(nullable = false)
+  @OptimisticLock(excluded = true)
+  private long jobOrderWritesVersion;
+
+  /** When the job-order writes switch last changed, or {@code null} before its first change. */
+  @OptimisticLock(excluded = true)
+  @Nullable
+  private Instant jobOrderWritesUpdatedAt;
 }

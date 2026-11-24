@@ -120,6 +120,7 @@
                         <a class="row-link" data-testid="row-link" draggable="false" th:href="@{/orders/{id}(id=${order.id})}">
                             <span class="cell-title">
                                 <span class="order-id-display" th:data-utc="${order.createdAt}" th:text="'#' + ${order.displayId}">#42</span>
+                                <th:block th:replace="~{joborder/fragments/order-origin :: clientChip(${order.createdClient}, #{orders.client.hint}, 'order-created-client')}"></th:block>
                             </span>
                             <span class="cell-sub orders-meta">
                                 <th:block th:switch="${order.type}">

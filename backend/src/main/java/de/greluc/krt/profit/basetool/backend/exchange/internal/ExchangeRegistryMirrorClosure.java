@@ -126,14 +126,14 @@ public class ExchangeRegistryMirrorClosure {
    */
   private boolean close() {
     Optional<ExchangeRegistrySnapshot> left = document.read();
-    if (left.isEmpty() || !left.get().enabled()) {
+    if (left.isEmpty() || !left.get().isOn(ExchangeSwitch.GLOBAL)) {
       return false;
     }
     Long revision = transaction.execute(_ -> settingsRepository.nextRevision());
     if (revision == null) {
       throw new IllegalStateException("No mirror revision was drawn");
     }
-    document.write(new ExchangeRegistrySnapshot(false, false, left.get().clients()), revision);
+    document.write(ExchangeRegistrySnapshot.switchedOff(left.get().clients()), revision);
     return true;
   }
 

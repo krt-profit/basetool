@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
 import de.greluc.krt.profit.basetool.ingest.idempotency.ExchangeIdempotencyFilter;
 import de.greluc.krt.profit.basetool.ingest.problem.Problems;
 import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
+import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +65,9 @@ class ExchangeRelayResponses {
   private final ExchangeAnswers answers;
   private final ExchangeSchemas schemas;
   private final LoggingProperties loggingProperties;
+
+  /** Tells the seconds until the next UTC day for a refusal that waits for it. */
+  private final ExchangeQuotas quotas;
 
   /**
    * Checks the paging parameters, relays a page request and checks the answer.
@@ -487,7 +491,8 @@ class ExchangeRelayResponses {
 
   /**
    * Builds a problem answer, with the {@code Retry-After} the gateway's gate sends for a relayed
-   * gate code that carries one.
+   * gate code that carries one, and the seconds until the next UTC day for a refusal that waits for
+   * it.
    *
    * @param status the status
    * @param code the code
@@ -506,7 +511,7 @@ class ExchangeRelayResponses {
             detail);
     ResponseEntity.BodyBuilder answer =
         ResponseEntity.status(httpStatus).contentType(MediaType.APPLICATION_PROBLEM_JSON);
-    String retryAfter = ExchangeRelay.retryAfterSeconds(code);
+    String retryAfter = ExchangeRelay.retryAfterSeconds(code, quotas::secondsUntilTomorrow);
     if (retryAfter != null) {
       answer.header(HttpHeaders.RETRY_AFTER, retryAfter);
     }

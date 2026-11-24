@@ -26,6 +26,11 @@ ADR-0287).
 The bank goes one step further: every bank access rule sits behind `BankAccessPolicy`, which
 decides for an explicit `BankActor` read from the database and never reads the security context;
 the web beans and the exchange only build the actor and ask (ADR-0352).
+Job orders take the authority as parameters instead of a policy object: every job-order command
+takes a writer rule, a read check and an actor (`JobOrderCaller`), so the web and the exchange run
+one code path with their own refusal order
+([ADR-0408](../adr/0408-job-order-commands-take-the-writer-rule-the-read-check-and-the-actor-as-parameters.md),
+[REQ-OXCH-005](../specs/orders-exchange.md#req-oxch-005--shared-rules-of-the-job-order-writes)).
 
 Beyond roles there are three mechanisms that are easy to miss:
 
@@ -179,6 +184,11 @@ a relayed exchange client, otherwise `system` — and the exchange change feed's
 a change reaches the feed with its writer whatever path made it, a bulk path included (ADR-0224,
 `REQ-XCH-013`).
 
+Job orders reach the exchange feed through a fingerprint of their carried read instead, which a
+worker recomputes from trigger-set dirty marks and a nightly window run ages out
+([ADR-0406](../adr/0406-the-job-order-feed-moves-on-a-fingerprint-of-the-carried-read.md),
+[REQ-OXCH-003](../specs/orders-exchange.md#req-oxch-003--snapshot-and-feed-of-the-job-order-set)).
+
 Every table has exactly one owning module of the target cut, recorded in a table-ownership map that
 a test holds against the migrated schema; a trigger or native statement reaches another module's
 table only through a listed crossing, and every column a trigger function names must resolve,
@@ -208,6 +218,8 @@ Transaction-bound live-sync flushes and read memos follow suspension and resumpt
 ([REQ-DATA-040](../specs/data-persistence.md#req-data-040--transaction-resources-follow-suspension-and-resumption)).
 Role permissions and descriptions use independent row-locked section counters
 ([REQ-SEC-088](../specs/security-and-access.md#req-sec-088--the-four-application-roles-are-assigned-in-the-basetool)).
+A job order's comment carries its own row-locked revision beside the one that guards its contact
+([REQ-ORDERS-066](../specs/orders-auec.md#req-orders-066--narrow-edit-scopes-protect-shared-financial-invariants)).
 
 Account consolidation and Discord registration linking share a reservation for both account IDs
 through the Keycloak calls, separate database commit and any compensation
@@ -608,8 +620,33 @@ Three rules hold for every exchange route, and each new resource or capability i
   backend answer with an undeclared property `502` and counts it `answer_contract_broken`
   (REQ-XCH-050, REQ-P4K-033, ADR-0344). A new outbound integration joins the first two.
 
+- **Job orders read through their own read set.** The acting member reads the job orders of the
+  active units they directly belong to and their own assignee entries, decided from the database on
+  every request — never the web's Profit-wide read, the cascade, a grant or the administrator's
+  scope. One set of JPQL predicates (`JobOrderScope`) serves the snapshot through
+  `JobOrderExchangeReadSet` and the writes' read check `JobOrderReadCheck.OWN_RELATION`; the read
+  serves the fingerprint's projection unchanged plus the member's own part (REQ-OXCH-001,
+  REQ-OXCH-002, ADR-0407).
+- **A client creates job orders through the web's create.** The exchange calls the one create
+  command (`JobOrderCreateCommand`) and the one create-options projection with the writer rule
+  `DIRECT_LOGISTICIAN` — a unit the member directly belongs to and is a Logistician of, requesting
+  side only — and an actor carrying the member and the client (ADR-0408), so the locks, checks,
+  notices, queue frame and audit cannot drift between the channels. Unlike the bank raise, whose
+  key lives on the bank's request, the create's `Idempotency-Key` lives on the order with the
+  creating client and member, unique per member, client and key, and the lookup runs under a
+  per-member advisory lock that the caps share; a client's create records its own audit type
+  (REQ-OXCH-004, REQ-OXCH-005, ADR-0407).
+- **A client's job-order writes stay visible in the web.** The shared commands record the client
+  from the actor they are given — the creator on the order, the client of the comment's last write
+  and of each target change — and the read DTOs name each client by its registry display name,
+  read once per transaction; the created, need-change and cancel notices name the application
+  through a template variant a coded parameter picks, captured when the notice is published
+  ([REQ-ORDERS-078](../specs/orders-core.md), REQ-NOTIF-028).
+
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
-ADR-0221, ADR-0224 … ADR-0228, ADR-0344; the third-party view is published from `docs/exchange/`.
+ADR-0221, ADR-0224 … ADR-0228, ADR-0344, and for job orders
+[`orders-exchange.md`](../specs/orders-exchange.md) (`REQ-OXCH-*`), ADR-0406 and ADR-0407; the
+third-party view is published from `docs/exchange/`.
 
 ## 8.14 Domain modules
 

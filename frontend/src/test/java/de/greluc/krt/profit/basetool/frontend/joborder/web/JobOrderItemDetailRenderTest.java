@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -191,55 +192,34 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L);
 
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            7,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(topItem, subItem),
-            List.of(
-                new AggregatedMaterialDto(
-                    acryliPlex,
-                    "GOOD",
-                    QualityTierTestData.forCode("GOOD"),
-                    7.5,
-                    7.5,
-                    0.0,
-                    3.0,
-                    List.of(),
-                    null),
-                new AggregatedMaterialDto(
-                    agricium,
-                    "NONE",
-                    QualityTierTestData.forCode("NONE"),
-                    12.0,
-                    12.0,
-                    0.0,
-                    12.0,
-                    List.of(),
-                    null)),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(orderId)
+            .displayId(7)
+            .type("ITEM")
+            .items(List.of(topItem, subItem))
+            .aggregatedMaterials(
+                List.of(
+                    new AggregatedMaterialDto(
+                        acryliPlex,
+                        "GOOD",
+                        QualityTierTestData.forCode("GOOD"),
+                        7.5,
+                        7.5,
+                        0.0,
+                        3.0,
+                        List.of(),
+                        null),
+                    new AggregatedMaterialDto(
+                        agricium,
+                        "NONE",
+                        QualityTierTestData.forCode("NONE"),
+                        12.0,
+                        12.0,
+                        0.0,
+                        12.0,
+                        List.of(),
+                        null)))
+            .build();
 
     stubDetail(orderId, userId, order);
 
@@ -326,45 +306,24 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             1L);
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            11,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(line),
-            List.of(
-                new AggregatedMaterialDto(
-                    agricium,
-                    "NONE",
-                    QualityTierTestData.forCode("NONE"),
-                    12.0,
-                    12.0,
-                    0.0,
-                    4.0,
-                    List.of(claim),
-                    6.0)),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(orderId)
+            .displayId(11)
+            .type("ITEM")
+            .items(List.of(line))
+            .aggregatedMaterials(
+                List.of(
+                    new AggregatedMaterialDto(
+                        agricium,
+                        "NONE",
+                        QualityTierTestData.forCode("NONE"),
+                        12.0,
+                        12.0,
+                        0.0,
+                        4.0,
+                        List.of(claim),
+                        6.0)))
+            .build();
     stubDetail(orderId, userId, order);
 
     String html =
@@ -419,45 +378,25 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             1L);
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            12,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "COMPLETED",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(line),
-            List.of(
-                new AggregatedMaterialDto(
-                    material("Agricium", "SCU"),
-                    "NONE",
-                    QualityTierTestData.forCode("NONE"),
-                    12.0,
-                    12.0,
-                    0.0,
-                    12.0,
-                    List.of(),
-                    null)),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(orderId)
+            .displayId(12)
+            .status("COMPLETED")
+            .type("ITEM")
+            .items(List.of(line))
+            .aggregatedMaterials(
+                List.of(
+                    new AggregatedMaterialDto(
+                        material("Agricium", "SCU"),
+                        "NONE",
+                        QualityTierTestData.forCode("NONE"),
+                        12.0,
+                        12.0,
+                        0.0,
+                        12.0,
+                        List.of(),
+                        null)))
+            .build();
     stubDetail(orderId, userId, order);
 
     String html =
@@ -511,45 +450,25 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             1L);
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            12,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "IN_PROGRESS",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(line),
-            List.of(
-                new AggregatedMaterialDto(
-                    material("Agricium", "SCU"),
-                    "NONE",
-                    QualityTierTestData.forCode("NONE"),
-                    12.0,
-                    12.0,
-                    0.0,
-                    12.0,
-                    List.of(),
-                    null)),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(orderId)
+            .displayId(12)
+            .status("IN_PROGRESS")
+            .type("ITEM")
+            .items(List.of(line))
+            .aggregatedMaterials(
+                List.of(
+                    new AggregatedMaterialDto(
+                        material("Agricium", "SCU"),
+                        "NONE",
+                        QualityTierTestData.forCode("NONE"),
+                        12.0,
+                        12.0,
+                        0.0,
+                        12.0,
+                        List.of(),
+                        null)))
+            .build();
     stubDetail(orderId, userId, order);
 
     String html =
@@ -619,45 +538,26 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L);
 
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            8,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "IN_PROGRESS",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(line),
-            List.of(
-                new AggregatedMaterialDto(
-                    material("Agricium", "SCU"),
-                    "NONE",
-                    QualityTierTestData.forCode("NONE"),
-                    12.0,
-                    12.0,
-                    0.0,
-                    12.0,
-                    List.of(),
-                    null)),
-            List.of(),
-            List.of(),
-            List.of(handover),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(orderId)
+            .displayId(8)
+            .status("IN_PROGRESS")
+            .type("ITEM")
+            .items(List.of(line))
+            .aggregatedMaterials(
+                List.of(
+                    new AggregatedMaterialDto(
+                        material("Agricium", "SCU"),
+                        "NONE",
+                        QualityTierTestData.forCode("NONE"),
+                        12.0,
+                        12.0,
+                        0.0,
+                        12.0,
+                        List.of(),
+                        null)))
+            .itemHandovers(List.of(handover))
+            .build();
 
     stubDetail(orderId, userId, order);
 
@@ -727,36 +627,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             List.of(claim),
             4.0,
             1L);
-    JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            9,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "MATERIAL",
-            true,
-            List.of(mat),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+    JobOrderDto order = jobOrder().id(orderId).displayId(9).materials(List.of(mat)).build();
     stubDetail(orderId, userId, order);
 
     String html =
@@ -793,36 +664,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             List.of(),
             null,
             1L);
-    JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            10,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "MATERIAL",
-            true,
-            List.of(mat),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+    JobOrderDto order = jobOrder().id(orderId).displayId(10).materials(List.of(mat)).build();
     stubDetail(orderId, userId, order);
 
     String html =
@@ -871,35 +713,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             null,
             1L);
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            11,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "MATERIAL",
-            true,
-            List.of(scuMat, pieceMat),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder().id(orderId).displayId(11).materials(List.of(scuMat, pieceMat)).build();
     stubDetail(orderId, userId, order);
 
     String html =
@@ -958,35 +772,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
                     1L)),
             false,
             1L);
-    return new JobOrderDto(
-        orderId,
-        21,
-        null,
-        null,
-        "Handle",
-        null,
-        1,
-        "OPEN",
-        "ITEM",
-        true,
-        List.of(),
-        List.of(line),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.now(),
-        1L,
-        null,
-        null,
-        false,
-        false,
-        null,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder().id(orderId).displayId(21).type("ITEM").items(List.of(line)).build();
   }
 
   @Test
@@ -1517,36 +1303,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             List.of(),
             null,
             1L);
-    JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            22,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "MATERIAL",
-            true,
-            List.of(mat),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+    JobOrderDto order = jobOrder().id(orderId).displayId(22).materials(List.of(mat)).build();
     stubDetail(orderId, userId, order);
 
     String html =
@@ -1587,45 +1344,24 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             1L);
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            23,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(line),
-            List.of(
-                new AggregatedMaterialDto(
-                    agricium,
-                    "NONE",
-                    QualityTierTestData.forCode("NONE"),
-                    6.0,
-                    6.0,
-                    0.0,
-                    0.0,
-                    List.of(),
-                    12.0)),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(orderId)
+            .displayId(23)
+            .type("ITEM")
+            .items(List.of(line))
+            .aggregatedMaterials(
+                List.of(
+                    new AggregatedMaterialDto(
+                        agricium,
+                        "NONE",
+                        QualityTierTestData.forCode("NONE"),
+                        6.0,
+                        6.0,
+                        0.0,
+                        0.0,
+                        List.of(),
+                        12.0)))
+            .build();
     when(reader.readOrderDetail(eq(orderId), any(), any()))
         .thenReturn(
             logisticianDetail(order, userId)
@@ -1687,35 +1423,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             1L);
     JobOrderDto order =
-        new JobOrderDto(
-            orderId,
-            8,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(retired, live),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder().id(orderId).displayId(8).type("ITEM").items(List.of(retired, live)).build();
     stubDetail(orderId, userId, order);
 
     String html =

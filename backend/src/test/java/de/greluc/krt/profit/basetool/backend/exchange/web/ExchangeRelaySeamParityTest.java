@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemExcepti
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.BankExchangeRoutes;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.JobOrderExchangeRoutes;
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
 import de.greluc.krt.profit.basetool.backend.kernel.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
@@ -151,6 +152,12 @@ class ExchangeRelaySeamParityTest {
   }
 
   @Test
+  void theJobOrderSwitchesGateTheSeamsJobOrderRouteFamily() {
+    assertThat(JobOrderExchangeRoutes.PATH)
+        .isEqualTo(ExchangeSeam.RELAY_PREFIX + ExchangeSeam.JOB_ORDERS_PATH);
+  }
+
+  @Test
   void everyCodeTheBackendRelaysIsOneTheGatewayPassesOrTranslates() throws Exception {
     assertRelayedCodes(ExchangeSeam.PASSED_THROUGH_CODES, ExchangeSeam.TRANSLATED_CODES.keySet());
     Set<String> withoutTerms = new HashSet<>(ExchangeSeam.PASSED_THROUGH_CODES);
@@ -169,7 +176,7 @@ class ExchangeRelaySeamParityTest {
     Map<String, String> expected = new TreeMap<>();
     ExchangeSeam.OPERATIONS.forEach(
         operation -> expected.put(operation.relayed(), operation.capability()));
-    assertThat(expected).as("the seam lists 33 relay operations").hasSize(33);
+    assertThat(expected).as("the seam lists 39 relay operations").hasSize(39);
     return expected;
   }
 
@@ -212,7 +219,7 @@ class ExchangeRelaySeamParityTest {
         }
       }
     }
-    assertThat(owners).as("the exchange controllers").hasSize(16);
+    assertThat(owners).as("the exchange controllers").hasSize(18);
     assertThat(served).isEqualTo(expected);
   }
 
@@ -263,7 +270,7 @@ class ExchangeRelaySeamParityTest {
   private static void assertActingMemberPaths(@NotNull Set<String> expected) {
     List<?> patterns = (List<?>) staticField(ActingMemberFilter.class, "EXCHANGE_PATHS");
     List<String> listed = patterns.stream().map(p -> ((PathPattern) p).getPatternString()).toList();
-    assertThat(listed).as("31 paths").hasSize(31).doesNotHaveDuplicates();
+    assertThat(listed).as("36 paths").hasSize(36).doesNotHaveDuplicates();
     assertThat(listed)
         .allSatisfy(path -> assertThat(path.replace("/{id}/", "/")).doesNotContain("*", "{"));
     assertThat(new TreeSet<>(listed)).isEqualTo(new TreeSet<>(expected));
@@ -295,7 +302,7 @@ class ExchangeRelaySeamParityTest {
         Arrays.stream(ExchangeCapability.values())
             .map(ExchangeCapability::getScope)
             .collect(Collectors.toCollection(TreeSet::new));
-    assertThat(scopes).hasSize(23).isEqualTo(new TreeSet<>(expected));
+    assertThat(scopes).hasSize(25).isEqualTo(new TreeSet<>(expected));
   }
 
   /**
@@ -308,6 +315,8 @@ class ExchangeRelaySeamParityTest {
         List.of(
             ExchangeProblemException::exchangeDisabled,
             ExchangeProblemException::bankExchangeDisabled,
+            ExchangeProblemException::jobOrderExchangeDisabled,
+            ExchangeProblemException::jobOrderWritesDisabled,
             ExchangeProblemException::clientNotAllowed,
             ExchangeProblemException::clientSuspended,
             ExchangeProblemException::installationRevoked,
@@ -319,7 +328,7 @@ class ExchangeRelaySeamParityTest {
       ExchangeProblemException problem = refusal.get();
       answered.put(problem.code(), problem.status().value());
     }
-    assertThat(answered).hasSize(8).isEqualTo(new TreeMap<>(expected));
+    assertThat(answered).hasSize(10).isEqualTo(new TreeMap<>(expected));
   }
 
   /**
@@ -339,7 +348,9 @@ class ExchangeRelaySeamParityTest {
             (String) staticField(PendingApprovalAccessFilter.class, "CODE_NO_ROLE"),
             (String) staticField(ActingMemberFilter.class, "CODE_ACTING_MEMBER_REFUSED"),
             ExchangeProblemException.cursorExpired().code(),
-            ExchangeProblemException.massChangeConfirmationRequired().code());
+            ExchangeProblemException.massChangeConfirmationRequired().code(),
+            ExchangeProblemException.jobOrderOpenOrderCap(new IllegalStateException("x")).code(),
+            ExchangeProblemException.jobOrderDailyCreateCap(new IllegalStateException("x")).code());
     assertThat(passedThrough).containsAll(passed);
     assertThat(
             Set.of(

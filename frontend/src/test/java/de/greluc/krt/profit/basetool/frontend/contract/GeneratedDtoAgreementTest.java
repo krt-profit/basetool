@@ -210,7 +210,7 @@ class GeneratedDtoAgreementTest {
   }
 
   /**
-   * The property names of a type: a record's components or a class's instance fields.
+   * The property names of a type: a record's wire components or a class's instance fields.
    *
    * @param type the type to read
    * @return its property names
@@ -218,7 +218,7 @@ class GeneratedDtoAgreementTest {
   private static Set<String> propertiesOf(Class<?> type) {
     Set<String> names = new TreeSet<>();
     if (type.isRecord()) {
-      for (RecordComponent component : type.getRecordComponents()) {
+      for (RecordComponent component : WireComponents.of(type)) {
         names.add(component.getName());
       }
       return names;

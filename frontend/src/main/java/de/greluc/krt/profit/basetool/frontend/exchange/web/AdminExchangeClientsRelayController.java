@@ -22,7 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.exchange.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
-import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitch;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientStatusRequest;
@@ -151,18 +152,24 @@ public class AdminExchangeClientsRelayController {
   }
 
   /**
-   * Turns the bank switch of the exchange on or off (REQ-BXCH-006).
+   * Turns one area switch of the exchange on or off (REQ-BXCH-006, REQ-OXCH-009).
    *
-   * @param request the new state and the bank switch's version the admin last saw
-   * @return the bank switch, or the relayed backend error
+   * @param area the path segment of an {@link ExchangeAreaSwitch}
+   * @param request the new state and the switch's version the admin last saw
+   * @return the switch, the relayed backend error, or {@code 404} when no area switch has that
+   *     segment
    */
-  @PutMapping(value = "/settings/bank", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> updateBankSwitch(
-      @RequestBody @NotNull ExchangeBankSwitchUpdateRequest request) {
-    return relay(
-        log,
-        "switch the bank on the exchange (ajax)",
-        () -> ResponseEntity.ok(exchangeClient.updateBankSwitch(request)));
+  @PutMapping(value = "/settings/{area}", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateAreaSwitch(
+      @PathVariable @NotNull String area,
+      @RequestBody @NotNull ExchangeAreaSwitchUpdateRequest request) {
+    return ExchangeAreaSwitch.ofSegment(area)
+        .map(target ->
+            relay(
+                log,
+                "switch the exchange area " + target.getSegment() + " (ajax)",
+                () -> ResponseEntity.ok(exchangeClient.updateAreaSwitch(target, request))))
+        .orElseGet(() -> ResponseEntity.notFound().build());
   }
 
   /**

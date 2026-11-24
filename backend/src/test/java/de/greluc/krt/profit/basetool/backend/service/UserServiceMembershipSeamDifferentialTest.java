@@ -39,8 +39,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipServic
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -410,18 +410,14 @@ class UserServiceMembershipSeamDifferentialTest {
   private Units newUnits() {
     String tag = UUID.randomUUID().toString().substring(0, 6);
     return new Units(
-        squadron("Seam-A-" + tag, "A" + tag).getId(),
-        squadron("Seam-B-" + tag, "B" + tag).getId(),
-        squadron("Seam-C-" + tag, "C" + tag).getId(),
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Seam-A-" + tag, "A" + tag, null)
+            .getId(),
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Seam-B-" + tag, "B" + tag, null)
+            .getId(),
+        OrgUnitFixtures.persistedSquadron(squadronRepository, "Seam-C-" + tag, "C" + tag, null)
+            .getId(),
         specialCommand("Seam-S1-" + tag, "S1" + tag).getId(),
         specialCommand("Seam-S2-" + tag, "S2" + tag).getId());
-  }
-
-  private Squadron squadron(String name, String shorthand) {
-    Squadron s = new Squadron();
-    s.setName(name);
-    s.setShorthand(shorthand);
-    return squadronRepository.save(s);
   }
 
   private SpecialCommand specialCommand(String name, String shorthand) {

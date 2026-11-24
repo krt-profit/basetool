@@ -1,0 +1,70 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - the job-order writes are switched off
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="job_order_writes_switch_off"}'
+        values: "0x5 1x20"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: JobOrderExchangeSwitchChanged
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              action: job_order_writes_switch_off
+            exp_annotations:
+              summary: "Job-order exchange switch changed (job_order_writes_switch_off)"
+              description: "An admin switched job orders or their writes on the third-party exchange on or off (job_order_writes_switch_off). While the job-order switch is off the gateway refuses every job-order request; while the writes switch is off it refuses every job-order write and the reads go on; the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event JOB_ORDER_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned; switching the writes off is the first step of „Faulty release on job orders“ in arc42 §6 (REQ-OBS-025)."
+      - eval_time: 20m
+        alertname: JobOrderExchangeSwitchChanged
+        exp_alerts: []
+
+  - name: fires - every direction of both job-order switches is announced
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="job_order_switch_on"}'
+        values: "0x5 1x20"
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="job_order_switch_off"}'
+        values: "0x5 1x20"
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="job_order_writes_switch_on"}'
+        values: "0x5 1x20"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: JobOrderExchangeSwitchChanged
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              action: job_order_switch_on
+            exp_annotations:
+              summary: "Job-order exchange switch changed (job_order_switch_on)"
+              description: "An admin switched job orders or their writes on the third-party exchange on or off (job_order_switch_on). While the job-order switch is off the gateway refuses every job-order request; while the writes switch is off it refuses every job-order write and the reads go on; the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event JOB_ORDER_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned; switching the writes off is the first step of „Faulty release on job orders“ in arc42 §6 (REQ-OBS-025)."
+          - exp_labels:
+              severity: warning
+              action: job_order_switch_off
+            exp_annotations:
+              summary: "Job-order exchange switch changed (job_order_switch_off)"
+              description: "An admin switched job orders or their writes on the third-party exchange on or off (job_order_switch_off). While the job-order switch is off the gateway refuses every job-order request; while the writes switch is off it refuses every job-order write and the reads go on; the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event JOB_ORDER_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned; switching the writes off is the first step of „Faulty release on job orders“ in arc42 §6 (REQ-OBS-025)."
+          - exp_labels:
+              severity: warning
+              action: job_order_writes_switch_on
+            exp_annotations:
+              summary: "Job-order exchange switch changed (job_order_writes_switch_on)"
+              description: "An admin switched job orders or their writes on the third-party exchange on or off (job_order_writes_switch_on). While the job-order switch is off the gateway refuses every job-order request; while the writes switch is off it refuses every job-order write and the reads go on; the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event JOB_ORDER_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned; switching the writes off is the first step of „Faulty release on job orders“ in arc42 §6 (REQ-OBS-025)."
+
+  - name: silent - registry changes that are not a job-order switch
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="job_order_switch_off"}'
+        values: "0x30"
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="bank_switch_off"}'
+        values: "0x5 1x25"
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="suspended"}'
+        values: "0x5 1x25"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: JobOrderExchangeSwitchChanged
+        exp_alerts: []

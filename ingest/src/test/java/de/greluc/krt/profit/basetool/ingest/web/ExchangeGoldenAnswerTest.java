@@ -111,8 +111,6 @@ class ExchangeGoldenAnswerTest {
 
   private static final Path OBSERVED = Path.of("build/exchange-golden");
 
-  private static final Path EXAMPLES = Path.of("../docs/exchange/examples/v1");
-
   private static final String TOKEN = "golden-token";
 
   private static final String GATEWAY_TOKEN = "gateway-service-token";
@@ -188,7 +186,9 @@ class ExchangeGoldenAnswerTest {
               RELAYED_OPERATIONS.add(target);
             }
             MockResponse override = OVERRIDES.get(target);
-            return override != null ? override : json(200, defaultAnswer(target));
+            return override != null
+                ? override
+                : json(200, defaultAnswer(target, readsFeed(request)));
           }
         });
     backend.start();
@@ -241,7 +241,7 @@ class ExchangeGoldenAnswerTest {
                 String.join(" ", new TreeSet<>(SCOPES)),
                 issuedAt));
     when(registryReader.current())
-        .thenReturn(ExchangeTestSupport.registryWithLimits(SCOPES, "2.0.0", 1000, true));
+        .thenReturn(ExchangeTestSupport.registryWithEveryArea(SCOPES, "2.0.0", 1000));
     when(revocationReader.isDenied(anyString())).thenReturn(false);
     when(tokenProvider.currentToken()).thenReturn(GATEWAY_TOKEN);
     when(quotas.countWrite(anyString(), anyString()))
@@ -559,6 +559,27 @@ class ExchangeGoldenAnswerTest {
         post(
             "/bank/requests/33333333-4444-4555-8666-777777777777/cancel",
             fixture("bank-request-write--cancel/valid/cancel.json")));
+    routes.put("route-get-job-orders", get("/job-orders?limit=2"));
+    routes.put("route-get-job-orders-feed", get("/job-orders?cursor=f1.1029384.0&limit=50"));
+    routes.put("route-get-job-order-create-options", get("/job-orders/create-options"));
+    routes.put(
+        "route-post-job-order",
+        post("/job-orders", fixture("job-order-write--create/valid/with-comment.json")));
+    routes.put(
+        "route-post-job-order-cancel",
+        post(
+            "/job-orders/7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/cancel",
+            fixture("job-order-write--cancel/valid/cancel.json")));
+    routes.put(
+        "route-post-job-order-target",
+        post(
+            "/job-orders/7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/target",
+            fixture("job-order-write--targetChange/valid/raise.json")));
+    routes.put(
+        "route-post-job-order-comment",
+        post(
+            "/job-orders/7b1e2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/comment",
+            fixture("job-order-write--comment/valid/comment.json")));
     routes.put("route-get-openapi", get("/openapi.json"));
     routes.put("route-get-schema", get("/schemas/page.schema.json"));
     return routes;
@@ -568,9 +589,11 @@ class ExchangeGoldenAnswerTest {
    * The backend stub's default answer per relay operation, the published fixture where one exists.
    *
    * @param target {@code METHOD path}
+   * @param feed whether the request carries a feed cursor, for a route whose snapshot and feed
+   *     answer differently
    * @return the answer's body
    */
-  private static @NotNull String defaultAnswer(@NotNull String target) {
+  private static @NotNull String defaultAnswer(@NotNull String target, boolean feed) {
     try {
       return switch (target) {
         case "GET /api/v1/exchange/me/installation", "POST /api/v1/exchange/me/installation" ->
@@ -623,6 +646,21 @@ class ExchangeGoldenAnswerTest {
             fixture("bank-request-write--written/valid/pending.json");
         case "POST /api/v1/exchange/bank/requests/{id}/cancel" ->
             fixture("bank-request-write--cancelled/valid/cancelled.json");
+        case "GET /api/v1/exchange/job-orders" ->
+            fixture(
+                feed
+                    ? "page--jobOrderPage/valid/feed.json"
+                    : "page--jobOrderPage/valid/snapshot.json");
+        case "GET /api/v1/exchange/job-orders/create-options" ->
+            fixture("job-order-create-options/valid/logistician.json");
+        case "POST /api/v1/exchange/job-orders" ->
+            fixture("job-order-write--created/valid/open.json");
+        case "POST /api/v1/exchange/job-orders/{id}/cancel" ->
+            fixture("job-order-write--written/valid/cancelled.json");
+        case "POST /api/v1/exchange/job-orders/{id}/target" ->
+            fixture("job-order-write--targetChanged/valid/raised.json");
+        case "POST /api/v1/exchange/job-orders/{id}/comment" ->
+            fixture("job-order-write--written/valid/commented.json");
         case "POST /api/v1/exchange/me/drafts/blueprints" -> PREVIEW;
         case "POST /api/v1/exchange/me/drafts/refinery-orders" -> REFINERY_DRAFT;
         default -> "{\"code\":\"NOT_FOUND\"}";
@@ -801,6 +839,17 @@ class ExchangeGoldenAnswerTest {
   }
 
   /**
+   * Tells whether a recorded request carries a feed cursor.
+   *
+   * @param request the request the stub received
+   * @return {@code true} for a {@code cursor} query parameter that starts with {@code f1.}
+   */
+  private static boolean readsFeed(@NotNull RecordedRequest request) {
+    String path = request.getPath() == null ? "" : request.getPath();
+    return path.contains("?cursor=f1.") || path.contains("&cursor=f1.");
+  }
+
+  /**
    * Builds a JSON answer of the stub.
    *
    * @param status the status
@@ -822,7 +871,7 @@ class ExchangeGoldenAnswerTest {
    * @throws IOException if it cannot be read
    */
   private static @NotNull String fixture(@NotNull String relative) throws IOException {
-    return Files.readString(EXAMPLES.resolve(relative), StandardCharsets.UTF_8);
+    return Files.readString(ExchangeTestSupport.EXAMPLES.resolve(relative), StandardCharsets.UTF_8);
   }
 
   /**

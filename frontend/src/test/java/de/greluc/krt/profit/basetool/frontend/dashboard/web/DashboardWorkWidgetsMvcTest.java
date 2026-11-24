@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.dashboard.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -111,35 +112,19 @@ class DashboardWorkWidgetsMvcTest {
   }
 
   private static JobOrderDto order(int displayId, String status, int priority) {
-    return new JobOrderDto(
-        ORDER,
-        displayId,
-        new SquadronReferenceDto(UNIT, "Alpha Staffel", "ALF"),
-        null,
-        null,
-        null,
-        priority,
-        status,
-        "MATERIAL",
-        false,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.parse("2026-10-01T10:00:00Z"),
-        1L,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .id(ORDER)
+        .displayId(displayId)
+        .responsibleOrgUnit(new SquadronReferenceDto(UNIT, "Alpha Staffel", "ALF"))
+        .handle(null)
+        .priority(priority)
+        .status(status)
+        .countBlueprintsWithVariants(false)
+        .createdAt(Instant.parse("2026-10-01T10:00:00Z"))
+        .canEdit(false)
+        .canManageAssignees(false)
+        .canTransferResponsibility(false)
+        .build();
   }
 
   private static PageResponse<JobOrderDto> orders(long total, JobOrderDto... content) {

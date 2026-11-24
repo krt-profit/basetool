@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static de.greluc.krt.profit.basetool.backend.support.StatementCounter.preparedBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -58,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.UUID;
@@ -122,8 +121,12 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
     adminId = UUID.randomUUID();
     transactionTemplate.executeWithoutResult(_ -> {
       tag = UUID.randomUUID().toString().substring(0, 8);
-      Squadron unitA = newSquadron("Alloc-A-" + tag, "AA" + tag);
-      Squadron unitB = newSquadron("Alloc-B-" + tag, "AB" + tag);
+      Squadron unitA =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Alloc-A-" + tag, "AA" + tag);
+      Squadron unitB =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Alloc-B-" + tag, "AB" + tag);
       requesterUnitId = unitB.getId();
       User assignee = newUser("alloc-assignee-" + tag, UUID.randomUUID());
       assigneeId = assignee.getId();
@@ -323,14 +326,6 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
     } catch (Exception e) {
       throw new IllegalStateException(e);
     }
-  }
-
-  private Squadron newSquadron(String name, String shorthand) {
-    Squadron s = new Squadron();
-    s.setName(name);
-    s.setShorthand(shorthand);
-    withinProfit(s, persistedProfitArea(orgUnitRepository));
-    return squadronRepository.save(s);
   }
 
   private User newUser(String username, UUID id) {

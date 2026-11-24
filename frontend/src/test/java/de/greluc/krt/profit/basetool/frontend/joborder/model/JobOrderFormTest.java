@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -41,35 +41,15 @@ class JobOrderFormTest {
    * @return the order
    */
   private static @NotNull JobOrderDto order(@Nullable List<JobOrderMaterialDto> materials) {
-    return new JobOrderDto(
-        UUID.randomUUID(),
-        7,
-        null,
-        null,
-        "Tester",
-        "Bitte bis Freitag",
-        3,
-        "OPEN",
-        "MATERIAL",
-        false,
-        materials,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.now(),
-        5L,
-        null,
-        null,
-        false,
-        false,
-        null,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .displayId(7)
+        .handle("Tester")
+        .comment("Bitte bis Freitag")
+        .priority(3)
+        .countBlueprintsWithVariants(false)
+        .materials(materials)
+        .version(5L)
+        .build();
   }
 
   /**
@@ -158,6 +138,14 @@ class JobOrderFormTest {
             JobOrderForm.JobOrderMaterialForm::getMinQuality,
             JobOrderForm.JobOrderMaterialForm::getAmount)
         .containsExactly(tuple(first, 800, 12.5), tuple(second, 0, 3.0));
+  }
+
+  /** The order version and the comment version are echoed as one pair, each in its own slot. */
+  @Test
+  void echoesTheOrderAndCommentVersionAsOnePair() {
+    JobOrderForm form = JobOrderForm.forEdit(order(List.of()));
+
+    assertThat(form.observedVersions()).isEqualTo(new JobOrderObservedVersions(5L, 0L));
   }
 
   /** An order without material lines keeps the single empty line the form starts with. */

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.ok;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -51,7 +52,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The stock and ship read routes through both gates, with the backend relay mocked (REQ-XCH-013,
@@ -61,7 +61,6 @@ import tools.jackson.databind.json.JsonMapper;
 class ExchangeStockAndShipRouteTest {
 
   private static final String TOKEN = "stock-ship-token";
-  private static final JsonMapper MAPPER = JsonMapper.builder().build();
   private static final String STOCK_PAGE =
       """
       {"items":[{"key":"m:1|l:2|q:500|s:0","material":{"bt":"%s","name":"Titanium"},
@@ -180,15 +179,5 @@ class ExchangeStockAndShipRouteTest {
   private ResultActions call(@NotNull String path) throws Exception {
     return ExchangeTestSupport.call(
         mockMvc, key, TOKEN, HttpMethod.GET, path, null, "VerseKit/2.1.0");
-  }
-
-  /**
-   * A usable relay answer.
-   *
-   * @param json the body
-   * @return the result
-   */
-  private static ExchangeRelay.Result ok(@NotNull String json) {
-    return new ExchangeRelay.Result(200, MAPPER.readTree(json), null, null);
   }
 }

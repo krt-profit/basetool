@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -280,42 +281,38 @@ class JobOrderClaimControlsMvcTest {
                 null,
                 Instant.now(),
                 1L));
-    return new JobOrderDto(
-        ORDER,
-        7,
-        new SquadronReferenceDto(UUID.randomUUID(), "Responsible SK", "SK"),
-        null,
-        "Handle",
-        null,
-        1,
-        status,
-        type,
-        true,
-        "MATERIAL".equals(type)
-            ? List.of(
-                new JobOrderMaterialDto(
-                    UUID.randomUUID(), material, null, null, 10.0, 0.0, 10.0, 0.0, claims, 5.0, 1L))
-            : List.of(),
-        List.of(),
-        "ITEM".equals(type)
-            ? List.of(
-                new AggregatedMaterialDto(
-                    material, "GOOD", null, 10.0, 10.0, 0.0, 0.0, claims, 5.0))
-            : List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.now(),
-        1L,
-        canEdit,
-        false,
-        invalid,
-        false,
-        false,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .id(ORDER)
+        .displayId(7)
+        .responsibleOrgUnit(new SquadronReferenceDto(UUID.randomUUID(), "Responsible SK", "SK"))
+        .status(status)
+        .type(type)
+        .materials(
+            "MATERIAL".equals(type)
+                ? List.of(
+                    new JobOrderMaterialDto(
+                        UUID.randomUUID(),
+                        material,
+                        null,
+                        null,
+                        10.0,
+                        0.0,
+                        10.0,
+                        0.0,
+                        claims,
+                        5.0,
+                        1L))
+                : List.of())
+        .aggregatedMaterials(
+            "ITEM".equals(type)
+                ? List.of(
+                    new AggregatedMaterialDto(
+                        material, "GOOD", null, 10.0, 10.0, 0.0, 0.0, claims, 5.0))
+                : List.of())
+        .canEdit(canEdit)
+        .canManageAssignees(false)
+        .responsibilityInvalid(invalid)
+        .canTransferResponsibility(false)
+        .build();
   }
 }

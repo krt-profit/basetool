@@ -41,6 +41,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.nimbusds.jose.jwk.ECKey;
 import de.greluc.krt.profit.basetool.ingest.auth.ExchangeTokenGateFilter;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.edge.CorrelationIdFilter;
 import de.greluc.krt.profit.basetool.ingest.edge.RequestLoggingFilter;
 import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
@@ -194,7 +195,7 @@ class ExchangeGateTest {
             new ExchangeRegistry(
                 1L,
                 true,
-                false,
+                Set.of(),
                 Map.of(
                     "someone-else",
                     new ExchangeRegistry.Client(
@@ -308,6 +309,84 @@ class ExchangeGateTest {
   }
 
   @Test
+  void theJobOrderFamilyIsRefusedOnEveryPathAndMethodWhileItsSwitchIsOff() throws Exception {
+    switchRegistry(true, AreaSwitch.BANK);
+    double before = refused("job_order_exchange_disabled");
+
+    call(HttpMethod.GET, "/exchange/v1/job-orders")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "300"))
+        .andExpect(jsonPath("$.code").value("JOB_ORDER_EXCHANGE_DISABLED"));
+    call(HttpMethod.POST, "/exchange/v1/job-orders/1/cancel")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("JOB_ORDER_EXCHANGE_DISABLED"));
+    call(HttpMethod.GET, "/exchange/v1/job-orders/no-such-route")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("JOB_ORDER_EXCHANGE_DISABLED"));
+    call(HttpMethod.GET, "/exchange/v1/job%2Dorders/feed")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("JOB_ORDER_EXCHANGE_DISABLED"));
+
+    assertThat(refused("job_order_exchange_disabled") - before).isEqualTo(4.0d);
+    assertThat(refusedBy("job_order_exchange_disabled", CLIENT)).isGreaterThanOrEqualTo(4.0d);
+    verify(quotas, never()).countWrite(anyString(), anyString());
+  }
+
+  @Test
+  void aJobOrderWriteIsRefusedWhileTheWritesSwitchIsOffBeforeItCountsAWrite() throws Exception {
+    switchRegistry(true, AreaSwitch.JOB_ORDERS);
+    double before = refused("job_order_writes_disabled");
+
+    call(HttpMethod.POST, "/exchange/v1/job-orders")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "300"))
+        .andExpect(jsonPath("$.code").value("JOB_ORDER_WRITES_DISABLED"));
+    call(HttpMethod.POST, "/exchange/v1/%6Aob-orders/1/target")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("JOB_ORDER_WRITES_DISABLED"));
+    call(HttpMethod.GET, "/exchange/v1/job-orders/no-such-route")
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+    assertThat(refused("job_order_writes_disabled") - before).isEqualTo(2.0d);
+    verify(quotas, never()).countWrite(anyString(), anyString());
+  }
+
+  @Test
+  void theGlobalSwitchWinsOverTheJobOrderSwitches() throws Exception {
+    switchRegistry(false, AreaSwitch.BANK);
+
+    call(HttpMethod.POST, "/exchange/v1/job-orders")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "30"))
+        .andExpect(jsonPath("$.code").value("EXCHANGE_DISABLED"));
+  }
+
+  @Test
+  void theJobOrderSwitchesLeaveEveryOtherRouteAndLookalikePathAlone() throws Exception {
+    switchRegistry(true, AreaSwitch.BANK);
+
+    call(HttpMethod.GET, STOCK).andExpect(status().isOk());
+    call(HttpMethod.GET, "/exchange/v1/job-orders-archive")
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    call(HttpMethod.GET, "/exchange/v1/me/store-choices/job-orders")
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+  }
+
+  @Test
+  void aJobOrderPathWithoutARouteIsNotFoundWhileBothJobOrderSwitchesAreOn() throws Exception {
+    switchRegistry(true, AreaSwitch.JOB_ORDERS, AreaSwitch.JOB_ORDER_WRITES);
+
+    call(HttpMethod.POST, "/exchange/v1/job-orders/1/no-such-write")
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+    verify(quotas, never()).countWrite(anyString(), anyString());
+  }
+
+  @Test
   void anUnreadableRegistryFailsClosed() throws Exception {
     when(registryReader.current()).thenThrow(new ExchangeUnavailableException("down", null));
     double before = refused("registry_unavailable");
@@ -337,7 +416,7 @@ class ExchangeGateTest {
 
   @Test
   void aClientOutsideTheRegistryIsNotAllowed() throws Exception {
-    when(registryReader.current()).thenReturn(new ExchangeRegistry(1L, true, false, Map.of()));
+    when(registryReader.current()).thenReturn(new ExchangeRegistry(1L, true, Set.of(), Map.of()));
     double unregistered = refusedBy("client_not_allowed", MetricNames.EXCHANGE_CLIENT_UNREGISTERED);
 
     call(HttpMethod.GET, STOCK)
@@ -668,12 +747,26 @@ class ExchangeGateTest {
    * @param bankEnabled the bank switch
    */
   private void bankRegistry(boolean enabled, boolean bankEnabled) {
+    if (bankEnabled) {
+      switchRegistry(enabled, AreaSwitch.BANK);
+    } else {
+      switchRegistry(enabled);
+    }
+  }
+
+  /**
+   * Stubs the registry with an active client holding the stock capability and the given switches.
+   *
+   * @param enabled the global switch
+   * @param on the area switches that are on
+   */
+  private void switchRegistry(boolean enabled, @NotNull AreaSwitch... on) {
     when(registryReader.current())
         .thenReturn(
             new ExchangeRegistry(
                 1L,
                 enabled,
-                bankEnabled,
+                Set.of(on),
                 Map.of(
                     CLIENT,
                     new ExchangeRegistry.Client(

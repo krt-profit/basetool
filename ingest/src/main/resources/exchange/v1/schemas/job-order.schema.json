@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ingest.profit-base.online/exchange/v1/schemas/job-order.schema.json",
+  "title": "Job order",
+  "description": "The fields every job order of the member's set carries, whatever its kind; the kind schemas add their progress. No holder, amount per person, provision, fee, movement, recipient, unit commitment, claim, Bank state, history or other member's note is ever carried. Job-order data is kept at most 7 days, in memory only, never in a backup or diagnostics and never forwarded.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "The order's id and the feed key. Clients store and echo it, never parse it."
+    },
+    "number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The order's running number, shown as #number. A display field only: no route accepts it."
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "MATERIAL",
+        "ITEM",
+        "AUEC"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "CANCELLED",
+        "REJECTED"
+      ]
+    },
+    "priority": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "The order's place in the queue; null once the order is closed."
+    },
+    "requestingUnit": {
+      "$ref": "org-unit.schema.json"
+    },
+    "responsibleUnit": {
+      "$ref": "org-unit.schema.json"
+    },
+    "supportingUnits": {
+      "type": "array",
+      "maxItems": 100,
+      "description": "The org units that actively support the order; ended support is not listed.",
+      "items": {
+        "$ref": "org-unit.schema.json"
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The last change of a field this read carries."
+    },
+    "relations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "description": "The member's own relations to the order, at least one, in this order: a unit the member directly belongs to requests it, is responsible for it or actively supports it, or the member works on it as an assignee.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "requesting",
+          "responsible",
+          "supporting",
+          "assignee"
+        ]
+      }
+    },
+    "comment": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 1000,
+      "description": "The author's comment as plain text; render it as text, never as markup or a link."
+    },
+    "responsibilityInvalid": {
+      "type": "boolean",
+      "description": "The responsible unit no longer holds a valid Profit responsibility; nothing can be written until it is fixed in the Basetool."
+    },
+    "link": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://profit-base\\.online/",
+      "maxLength": 255,
+      "description": "Opens this order in the Basetool. Open it only after checking it is https on the Basetool's host."
+    },
+    "assignees": {
+      "type": "array",
+      "maxItems": 100,
+      "description": "The members working on the order; a member who withholds their name from connected applications is left out.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "The name the Basetool shows."
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "A per-client pseudonym of the member: the same in every answer to this client, different for every other client."
+          },
+          "own": {
+            "type": "boolean",
+            "description": "Whether the entry is the acting member's own."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "The acting member's own note on their own entry; null on every other entry and when they wrote none."
+          }
+        },
+        "required": [
+          "name",
+          "ref",
+          "own",
+          "note"
+        ]
+      }
+    },
+    "versions": {
+      "type": "object",
+      "description": "The section versions a client write echoes.",
+      "properties": {
+        "lifecycle": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "The aUEC target's version; null on MATERIAL and ITEM orders."
+        },
+        "comment": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "lifecycle",
+        "target",
+        "comment"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "number",
+    "kind",
+    "status",
+    "priority",
+    "requestingUnit",
+    "responsibleUnit",
+    "supportingUnits",
+    "createdAt",
+    "updatedAt",
+    "relations",
+    "comment",
+    "responsibilityInvalid",
+    "link",
+    "assignees",
+    "versions"
+  ]
+}

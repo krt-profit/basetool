@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,6 +45,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAssigneeDto
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
@@ -116,35 +118,15 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
       List<JobOrderAssigneeDto> assignees,
       Boolean canEdit,
       Boolean canManageAssignees) {
-    return new JobOrderDto(
-        id,
-        7,
-        null,
-        null,
-        "Handle",
-        null,
-        1,
-        "OPEN",
-        "MATERIAL",
-        true,
-        List.of(),
-        List.of(),
-        List.of(),
-        assignees,
-        List.of(),
-        List.of(),
-        Instant.now(),
-        version,
-        canEdit,
-        canManageAssignees,
-        false,
-        false,
-        canEdit,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .id(id)
+        .displayId(7)
+        .assignees(assignees)
+        .version(version)
+        .canEdit(canEdit)
+        .canManageAssignees(canManageAssignees)
+        .canTransferResponsibility(canEdit)
+        .build();
   }
 
   @Test
@@ -352,7 +334,8 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   private static String editBody(UUID materialId) {
     return "{\"requestingOrgUnitId\":\""
         + UUID.randomUUID()
-        + "\",\"handle\":\"h\",\"comment\":\"c\",\"version\":1,\"materials\":[{\"materialId\":\""
+        + "\",\"handle\":\"h\",\"comment\":\"c\",\"version\":1,\"commentVersion\":2,"
+        + "\"materials\":[{\"materialId\":\""
         + materialId
         + "\",\"minQuality\":650,\"amount\":5.0}]}";
   }
@@ -372,6 +355,11 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
                 .content(editBody(UUID.randomUUID())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.version").value(4));
+
+    ArgumentCaptor<CreateJobOrderDto> captor = ArgumentCaptor.captor();
+    verify(backendApiClient)
+        .put(eq("/api/v1/orders/{id}"), captor.capture(), eq(JobOrderDto.class), eq(orderId));
+    assertThat(captor.getValue().observed()).isEqualTo(new JobOrderObservedVersions(1L, 2L));
   }
 
   @Test
@@ -706,6 +694,9 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
     assertThat(sent.requestingOrgUnitId()).as("requesting org unit is stripped").isNull();
     assertThat(sent.handle()).as("handle is stripped").isNull();
     assertThat(sent.comment()).isEqualTo("c");
+    assertThat(sent.observed())
+        .as("both versions are relayed")
+        .isEqualTo(new JobOrderObservedVersions(1L, 2L));
   }
 
   @Test

@@ -31,10 +31,14 @@ import org.jetbrains.annotations.Nullable;
  * @param target the new exact net target
  * @param recordedAt the recorded amendment time
  * @param actorName the permitted current actor label
+ * @param client the display name of the connected application the change was made through, its
+ *     client id once the registry no longer holds it, or {@code null} for a change in the Basetool
+ *     (REQ-ORDERS-078)
  */
 public record JobOrderMoneyTargetChangeView(
     UUID id,
     String previousTarget,
     String target,
     Instant recordedAt,
-    @Nullable String actorName) {}
+    @Nullable String actorName,
+    @Nullable String client) {}

@@ -117,7 +117,8 @@ class NotificationCreationServiceTest {
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
         "MATERIAL",
         null,
-        new NotificationRevision(0, 0));
+        new NotificationRevision(0, 0),
+        null);
   }
 
   @Test

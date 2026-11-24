@@ -32,7 +32,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The notices that tell the holders of a connected application's installations what an admin did to
  * it in the registry (REQ-XCH-040, -041), built from scalars so they can be delivered after the
- * commit. They name the registry's display name, never the application's own label.
+ * commit, and the fixed entity id and coded render parameter of every switch notice. They name the
+ * registry's display name, never the application's own label.
  */
 public final class ExchangeNotices {
 
@@ -41,14 +42,20 @@ public final class ExchangeNotices {
    */
   public static final String CLIENT_ENTITY_TYPE = "EXCHANGE_CLIENT";
 
-  /** Loose entity-type tag of the notices about the global switch. */
-  public static final String SWITCH_ENTITY_TYPE = "EXCHANGE_SWITCH";
-
-  /** Loose entity-type tag of the notices about the bank switch. */
-  public static final String BANK_SWITCH_ENTITY_TYPE = "EXCHANGE_BANK_SWITCH";
-
-  /** The fixed entity id of the global switch and of the bank switch. */
+  /** The fixed entity id of every switch notice; its entity type tells the switches apart. */
   public static final UUID SWITCH_ENTITY_ID = new UUID(0L, 1L);
+
+  /**
+   * The coded render parameter naming the job-order switch a notice is about (REQ-NOTIF-028), with
+   * the value {@value #FAMILY_SWITCH} or {@value #WRITES_SWITCH}.
+   */
+  public static final String SWITCH_CODE = "switchCode";
+
+  /** The {@link #SWITCH_CODE} of the job-order family switch. */
+  public static final String FAMILY_SWITCH = "family";
+
+  /** The {@link #SWITCH_CODE} of the job-order writes switch. */
+  public static final String WRITES_SWITCH = "writes";
 
   private ExchangeNotices() {}
 
@@ -149,78 +156,6 @@ public final class ExchangeNotices {
     params.put("capabilities", capabilities);
     return client(NotificationEventType.EXCHANGE_CLIENT_CAPABILITY_REMOVED, clientId, actorSub)
         .renderParams(params)
-        .build();
-  }
-
-  /**
-   * The whole exchange was switched off; the holders of every installation hear it.
-   *
-   * @param actorSub the admin, or {@code null}
-   * @return the event
-   */
-  @NotNull
-  public static NoticeEvent switchedOff(@Nullable UUID actorSub) {
-    return NoticeEvent.builder()
-        .eventType(NotificationEventType.EXCHANGE_SWITCHED_OFF)
-        .actorSub(actorSub)
-        .entityType(SWITCH_ENTITY_TYPE)
-        .entityId(SWITCH_ENTITY_ID)
-        .contextAllExchangeClients(true)
-        .resolvesNotificationTypes(Set.of(NotificationType.EXCHANGE_SWITCHED_OFF))
-        .build();
-  }
-
-  /**
-   * The exchange was switched on again; the switched-off notices go.
-   *
-   * @param actorSub the admin, or {@code null}
-   * @return the event
-   */
-  @NotNull
-  public static NoticeEvent switchedOn(@Nullable UUID actorSub) {
-    return NoticeEvent.builder()
-        .eventType(NotificationEventType.EXCHANGE_SWITCHED_ON)
-        .actorSub(actorSub)
-        .entityType(SWITCH_ENTITY_TYPE)
-        .entityId(SWITCH_ENTITY_ID)
-        .resolvesNotificationTypes(Set.of(NotificationType.EXCHANGE_SWITCHED_OFF))
-        .build();
-  }
-
-  /**
-   * The bank was switched on for connected applications (REQ-BXCH-006); the earlier bank switch
-   * notices go.
-   *
-   * @param actorSub the admin, or {@code null}
-   * @return the event
-   */
-  @NotNull
-  public static NoticeEvent bankSwitchedOn(@Nullable UUID actorSub) {
-    return bankSwitch(NotificationEventType.BANK_EXCHANGE_SWITCHED_ON, actorSub);
-  }
-
-  /**
-   * The bank was switched off for connected applications (REQ-BXCH-006); the earlier bank switch
-   * notices go.
-   *
-   * @param actorSub the admin, or {@code null}
-   * @return the event
-   */
-  @NotNull
-  public static NoticeEvent bankSwitchedOff(@Nullable UUID actorSub) {
-    return bankSwitch(NotificationEventType.BANK_EXCHANGE_SWITCHED_OFF, actorSub);
-  }
-
-  private static NoticeEvent bankSwitch(NotificationEventType type, @Nullable UUID actorSub) {
-    return NoticeEvent.builder()
-        .eventType(type)
-        .actorSub(actorSub)
-        .entityType(BANK_SWITCH_ENTITY_TYPE)
-        .entityId(SWITCH_ENTITY_ID)
-        .resolvesNotificationTypes(
-            Set.of(
-                NotificationType.BANK_EXCHANGE_SWITCHED_ON,
-                NotificationType.BANK_EXCHANGE_SWITCHED_OFF))
         .build();
   }
 }

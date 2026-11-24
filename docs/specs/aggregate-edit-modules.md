@@ -25,9 +25,14 @@ Two order edits keep their own gate and lock and stay outside it: the priority r
 lock on the priority sequence) and the assignee edits (the assignee edge's own version).
 The edit module loads the aggregate, then decides the caller's access on the loaded aggregate
 through the module's access policy (`MissionAccessPolicy.canEdit`, `JobOrderAccessPolicy.canEdit`)
-before any version check or mutation. A refused caller gets HTTP 403, a caller without an
-authentication is refused, and an unknown aggregate is HTTP 404 for every caller. The controller
-keeps a coarse role gate of its own (ADR-0236 §6): `isAuthenticated()` for the mission manage
+before any version check or mutation. A job-order status change decides it from the writer rule
+and the read check its caller passes instead of a gate (`JobOrderEditor#editLifecycle`,
+ADR-0408); a client's cancel passes the shared rules of a client write as the checks of that
+edit, in the exchange's order of refusals (REQ-OXCH-005), and a client's target and comment
+changes pass them as the checks of their money edit (`JobOrderEditor#editMoney`, REQ-OXCH-007,
+REQ-OXCH-008). A refused caller gets HTTP 403, a caller
+without an authentication is refused, and an unknown aggregate is HTTP 404 for every caller.
+The controller keeps a coarse role gate of its own (ADR-0236 §6): `isAuthenticated()` for the mission manage
 gate, member-or-above for the read and participant gates, the LOGISTICIAN role (or LOGISTICIAN,
 OFFICER, ADMIN for the unlinks) for the job-order edit gate, `isAuthenticated()` for the requester
 gate. Audit event types and payloads are unchanged (REQ-AUDIT-001); a mutation that changes
@@ -60,7 +65,8 @@ order-edit bypass.
 A job-order edit whose request carries a version requires the version of the part it edits: a
 status change the order's `lifecycleVersion`, the responsible-unit reassignment its
 `responsibilityVersion`, blueprint counting, the full material and item edits and the two
-requester edits the order's `version`. A missing version is HTTP 409 like a stale one
+requester edits the order's `version`, and the last four, which write the comment, also its
+`commentVersion` (REQ-ORDERS-066). A missing version is HTTP 409 like a stale one
 (`OptimisticLock.check`). The decision is made once, in `JobOrderEditor`, not per method. Money
 edits check the holder and target revisions they rely on, and a matching accepted replay returns
 its recorded outcome instead of failing on its old input versions (REQ-SEC-085,
@@ -74,4 +80,5 @@ even where the edit would otherwise be refused with 400 (a material order sent t
 - [ ] An update whose `version` is absent answers 409 and changes nothing.
 - [ ] A stale `version` answers 409, no audit event is recorded and no notice is published.
 
-**Enforced by:** `JobOrderEditorTest` · **Code:** `JobOrderEditor#edit`.
+**Enforced by:** `JobOrderEditorTest` · **Code:** `JobOrderEditor#edit`,
+`JobOrderEditor#editPlannedWithComment`, `JobOrderEditor#editLifecycle`.

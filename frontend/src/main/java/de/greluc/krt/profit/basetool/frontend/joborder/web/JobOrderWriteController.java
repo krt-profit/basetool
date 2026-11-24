@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import static de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderCreation.ORDERS_QUEUE_SECTION;
 import static de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderCreation.postCreateTarget;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
@@ -106,6 +105,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class JobOrderWriteController {
 
+  private static final List<String> ORDERS_QUEUE_SECTION = List.of("queue");
+
   /** Sends every job-order mutation and its follow-up reads to the backend. */
   private final JobOrderBackendClient jobOrderClient;
 
@@ -116,8 +117,8 @@ public class JobOrderWriteController {
   private final MutationResponseHelper mutationResponseHelper;
 
   /**
-   * Server-side live-sync publisher that announces a new order to the {@code orders} queue room,
-   * whose viewers may not include the creator (REQ-FE-015).
+   * Server-side live-sync publisher that announces an item-order update and a Bearbeiter change to
+   * the {@code orders} queue room and the order's room (REQ-FE-015).
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
@@ -142,8 +143,7 @@ public class JobOrderWriteController {
       if (lines.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
         redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
-        return "redirect:/orders/create"
-            + (form.getSource() != null ? "?source=" + form.getSource() : "");
+        return createFormRedirect(form.getSource());
       }
 
       CreateJobOrderItemRequestDto dto =
@@ -153,20 +153,71 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               lines,
-              form.getVersion());
+              form.observedVersions());
       JobOrderDto created = jobOrderClient.createItemOrder(dto);
-      liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
       return "redirect:" + postCreateTarget(created);
+    } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
+      log.debug("Failed to create item order (status {})", e.getStatusCode());
+      return createFailed(form, redirectAttributes);
     } catch (Exception e) {
       SectionFallback.rethrowHandOff(e);
       log.error("Failed to create item order", e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
-      redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
-      return "redirect:/orders/create"
-          + (form.getSource() != null ? "?source=" + form.getSource() : "");
+      return createFailed(form, redirectAttributes);
     }
+  }
+
+  /**
+   * Sends a failed item-order creation back to the creation form with the submitted form and the
+   * create-failed toast.
+   *
+   * @param form the submitted item-order form, flashed as {@code jobOrderItemForm}
+   * @param redirectAttributes the flash carrier
+   * @return the redirect to the creation form
+   */
+  private static @NotNull String createFailed(
+      @NotNull JobOrderItemForm form, @NotNull RedirectAttributes redirectAttributes) {
+    redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
+    return createFailed(form.getSource(), redirectAttributes);
+  }
+
+  /**
+   * Sends a failed material-order creation back to the creation form with the submitted form and
+   * the create-failed toast.
+   *
+   * @param form the submitted material-order form, flashed as {@code jobOrderForm}
+   * @param redirectAttributes the flash carrier
+   * @return the redirect to the creation form
+   */
+  private static @NotNull String createFailed(
+      @NotNull JobOrderForm form, @NotNull RedirectAttributes redirectAttributes) {
+    redirectAttributes.addFlashAttribute("jobOrderForm", form);
+    return createFailed(form.getSource(), redirectAttributes);
+  }
+
+  /**
+   * Flashes the create-failed toast and returns to the creation form.
+   *
+   * @param source the page the creation form was opened from, or {@code null}
+   * @param redirectAttributes the flash carrier
+   * @return the redirect to the creation form
+   */
+  private static @NotNull String createFailed(
+      @Nullable String source, @NotNull RedirectAttributes redirectAttributes) {
+    redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
+    return createFormRedirect(source);
+  }
+
+  /**
+   * Builds the redirect to the creation form, keeping the page it was opened from.
+   *
+   * @param source the page the creation form was opened from, or {@code null}
+   * @return the redirect to {@code /orders/create}, with {@code ?source=} when a source is set
+   */
+  private static @NotNull String createFormRedirect(@Nullable String source) {
+    return "redirect:/orders/create" + (source != null ? "?source=" + source : "");
   }
 
   /**
@@ -226,9 +277,8 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   lines,
-                  form.getVersion());
+                  form.observedVersions());
           JobOrderDto created = jobOrderClient.createItemOrder(dto);
-          liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
   }
@@ -258,12 +308,28 @@ public class JobOrderWriteController {
       persistItemEdit(id, form, lines);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
+    } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
+      log.debug("Failed to update item order {} (status {})", id, e.getStatusCode());
+      return itemUpdateFailed(id, redirectAttributes);
     } catch (Exception e) {
       SectionFallback.rethrowHandOff(e);
       log.error("Failed to update item order {}", id, e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
-      return "redirect:/orders/" + id + "/items/edit";
+      return itemUpdateFailed(id, redirectAttributes);
     }
+  }
+
+  /**
+   * Sends a failed item-order edit back to the item edit page with the update-failed toast.
+   *
+   * @param id the item-order id
+   * @param redirectAttributes the flash carrier
+   * @return the redirect to the item edit page
+   */
+  private static @NotNull String itemUpdateFailed(
+      @NotNull UUID id, @NotNull RedirectAttributes redirectAttributes) {
+    redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
+    return "redirect:/orders/" + id + "/items/edit";
   }
 
   /**
@@ -303,7 +369,7 @@ public class JobOrderWriteController {
             requester ? null : form.getHandle(),
             form.getComment(),
             lines,
-            form.getVersion());
+            form.observedVersions());
     if (requester) {
       jobOrderClient.updateItemOrderAsRequester(id, dto);
     } else {
@@ -334,19 +400,12 @@ public class JobOrderWriteController {
   public String createOrder(
       @ModelAttribute("jobOrderForm") JobOrderForm form, RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderMaterialDto> materials =
-          form.getMaterials().stream()
-              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m ->
-                  new CreateJobOrderMaterialDto(
-                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .toList();
+      List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
         redirectAttributes.addFlashAttribute("jobOrderForm", form);
-        return "redirect:/orders/create"
-            + (form.getSource() != null ? "?source=" + form.getSource() : "");
+        return createFormRedirect(form.getSource());
       }
 
       CreateJobOrderDto dto =
@@ -356,20 +415,19 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               materials,
-              form.getVersion());
+              form.observedVersions());
       JobOrderDto created = jobOrderClient.createOrder(dto);
-      liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
       return "redirect:" + postCreateTarget(created);
+    } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
+      log.debug("Failed to create job order (status {})", e.getStatusCode());
+      return createFailed(form, redirectAttributes);
     } catch (Exception e) {
       SectionFallback.rethrowHandOff(e);
-      log.error("Failed to create order", e);
       log.error("Failed to create job order", e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
-      redirectAttributes.addFlashAttribute("jobOrderForm", form);
-      return "redirect:/orders/create"
-          + (form.getSource() != null ? "?source=" + form.getSource() : "");
+      return createFailed(form, redirectAttributes);
     }
   }
 
@@ -413,9 +471,8 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   materials,
-                  form.getVersion());
+                  form.observedVersions());
           JobOrderDto created = jobOrderClient.createOrder(dto);
-          liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
   }
@@ -611,13 +668,7 @@ public class JobOrderWriteController {
       @ModelAttribute("jobOrderForm") JobOrderForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderMaterialDto> materials =
-          form.getMaterials().stream()
-              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m ->
-                  new CreateJobOrderMaterialDto(
-                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .toList();
+      List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
 
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
@@ -632,17 +683,37 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               materials,
-              form.getVersion());
+              form.observedVersions());
       jobOrderClient.updateOrder(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
+    } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
+      log.debug("Failed to update order {} (status {})", id, e.getStatusCode());
+      return updateFailed(id, form, redirectAttributes);
     } catch (Exception e) {
       SectionFallback.rethrowHandOff(e);
-      log.error("Failed to update order", e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
-      redirectAttributes.addFlashAttribute("jobOrderForm", form);
-      return "redirect:/orders/" + id;
+      log.error("Failed to update order {}", id, e);
+      return updateFailed(id, form, redirectAttributes);
     }
+  }
+
+  /**
+   * Sends a failed material-order edit back to the order detail with the submitted form and the
+   * update-failed toast.
+   *
+   * @param id the order id
+   * @param form the submitted form
+   * @param redirectAttributes the flash carrier
+   * @return the redirect to the order detail
+   */
+  private static @NotNull String updateFailed(
+      @NotNull UUID id,
+      @NotNull JobOrderForm form,
+      @NotNull RedirectAttributes redirectAttributes) {
+    redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
+    redirectAttributes.addFlashAttribute("jobOrderForm", form);
+    return "redirect:/orders/" + id;
   }
 
   /**
@@ -650,19 +721,15 @@ public class JobOrderWriteController {
    * in-place re-render; an empty material list yields 400.
    *
    * @param id the order to update
-   * @param form the edit payload (requestingOrgUnitId, handle, comment, version, materials[])
+   * @param form the edit payload (requestingOrgUnitId, handle, comment, version, commentVersion,
+   *     materials[])
    * @return the updated order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/update", consumes = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<Object> updateOrderAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
-    List<CreateJobOrderMaterialDto> materials =
-        form.getMaterials().stream()
-            .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-            .map(m ->
-                new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-            .toList();
+    List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
     if (materials.isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
@@ -677,18 +744,18 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   materials,
-                  form.getVersion());
+                  form.observedVersions());
           JobOrderDto updated = jobOrderClient.updateOrder(id, dto);
           return ResponseEntity.ok(updated);
         });
   }
 
   /**
-   * Requester-side MATERIAL edit (REQ-ORDERS-023): relays comment, materials and version to {@code
-   * PUT /api/v1/orders/{id}/requested}, which enforces the requester gate.
+   * Requester-side MATERIAL edit (REQ-ORDERS-023): relays comment, materials and both versions to
+   * {@code PUT /api/v1/orders/{id}/requested}, which enforces the requester gate.
    *
    * @param id the order to update
-   * @param form the edit payload (comment, version, materials[])
+   * @param form the edit payload (comment, version, commentVersion, materials[])
    * @param redirectAttributes flash carrier for the result toast
    * @return redirect back to the order detail
    */
@@ -699,29 +766,26 @@ public class JobOrderWriteController {
       @ModelAttribute("jobOrderForm") JobOrderForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderMaterialDto> materials =
-          form.getMaterials().stream()
-              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-              .map(m ->
-                  new CreateJobOrderMaterialDto(
-                      m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-              .toList();
+      List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
       if (materials.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
         redirectAttributes.addFlashAttribute("jobOrderForm", form);
         return "redirect:/orders/" + id;
       }
       CreateJobOrderDto dto =
-          new CreateJobOrderDto(null, null, null, form.getComment(), materials, form.getVersion());
+          new CreateJobOrderDto(
+              null, null, null, form.getComment(), materials, form.observedVersions());
       jobOrderClient.updateOrderAsRequester(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
+    } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
+      log.debug("Failed to update order {} as requester (status {})", id, e.getStatusCode());
+      return updateFailed(id, form, redirectAttributes);
     } catch (Exception e) {
       SectionFallback.rethrowHandOff(e);
       log.error("Failed to update order {} as requester", id, e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
-      redirectAttributes.addFlashAttribute("jobOrderForm", form);
-      return "redirect:/orders/" + id;
+      return updateFailed(id, form, redirectAttributes);
     }
   }
 
@@ -730,19 +794,14 @@ public class JobOrderWriteController {
    * in-place re-render; an empty material list yields 400.
    *
    * @param id the order to update
-   * @param form the edit payload (comment, version, materials[])
+   * @param form the edit payload (comment, version, commentVersion, materials[])
    * @return the updated complete order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/requested-update", consumes = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public ResponseEntity<Object> updateOrderAsRequesterAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
-    List<CreateJobOrderMaterialDto> materials =
-        form.getMaterials().stream()
-            .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
-            .map(m ->
-                new CreateJobOrderMaterialDto(m.getMaterialId(), m.getMinQuality(), m.getAmount()))
-            .toList();
+    List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
     if (materials.isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
@@ -752,7 +811,7 @@ public class JobOrderWriteController {
         () -> {
           CreateJobOrderDto dto =
               new CreateJobOrderDto(
-                  null, null, null, form.getComment(), materials, form.getVersion());
+                  null, null, null, form.getComment(), materials, form.observedVersions());
           JobOrderDto updated = jobOrderClient.updateOrderAsRequester(id, dto);
           return ResponseEntity.ok(updated);
         });

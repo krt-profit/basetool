@@ -69,6 +69,7 @@ public class NotificationCreationService {
     Set<UUID> changed = new HashSet<>(eventPreparation.removeCaptured(event));
     changed.addAll(eventPreparation.removeObsolete(prepared));
     List<Notification> notices = eventPreparation.missing(prepared);
+    eventPreparation.replaceUnread(prepared, notices);
     persist(notices);
     recordCreated(counts(notices));
     notices.forEach(notice -> changed.add(notice.getRecipientUserId()));
@@ -108,6 +109,8 @@ public class NotificationCreationService {
     }
     additional.forEach(event -> select(event, preferredAudience, selected));
     List<Notification> notices = List.copyOf(selected.values());
+    Stream.concat(preferred.stream(), additional.stream())
+        .forEach(event -> eventPreparation.replaceUnread(event, notices));
     persist(notices);
     recordAfterCommit(counts(notices));
     changed.addAll(selected.keySet());

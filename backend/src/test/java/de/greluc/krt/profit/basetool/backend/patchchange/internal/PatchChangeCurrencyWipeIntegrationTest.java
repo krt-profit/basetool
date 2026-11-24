@@ -49,10 +49,10 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -146,8 +146,10 @@ class PatchChangeCurrencyWipeIntegrationTest {
     transactions.executeWithoutResult(_ -> {
       String tag = UUID.randomUUID().toString();
       OrgUnit profit = ProfitHierarchyFixtures.persistedProfitArea(units);
-      responsible = squadron("Wipe responsible " + tag, profit);
-      requester = squadron("Wipe requester " + tag, null);
+      responsible =
+          OrgUnitFixtures.persistedSquadron(squadrons, "Wipe responsible " + tag, profit).getId();
+      requester =
+          OrgUnitFixtures.persistedSquadron(squadrons, "Wipe requester " + tag, null).getId();
       writer = member("wipe-writer-" + tag);
       reader = member("wipe-reader-" + tag);
       admin = account("wipe-admin-" + tag);
@@ -632,13 +634,5 @@ class PatchChangeCurrencyWipeIntegrationTest {
     user.setUsername(name);
     user.getRoles().add(roles.findByCode(Roles.KRT_MEMBER).orElseThrow());
     return users.saveAndFlush(user).getId();
-  }
-
-  private UUID squadron(String name, OrgUnit parent) {
-    Squadron unit = new Squadron();
-    unit.setName(name);
-    unit.setShorthand(name);
-    unit.setParent(parent);
-    return squadrons.saveAndFlush(unit).getId();
   }
 }

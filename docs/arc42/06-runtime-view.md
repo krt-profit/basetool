@@ -64,7 +64,11 @@ missing one turns the next edit into a spurious 409.
    **`/ws/sync`** WebSocket, naming the topic room (`mission:{id}`, …). Publishing needs no
    subscription; only *receiving* needs an authorised subscribe, which the relay checks again for as
    long as the socket holds the room (REQ-FE-015). Where no browser is involved, the server
-   publishes the same frame itself.
+   publishes the same frame itself. A command that more than one channel calls announces its write
+   from the backend after the commit, so the web and an exchange client reach the same rooms
+   through one path: the job-order create refreshes the `orders` room this way
+   ([REQ-ORDERS-056](../specs/orders-core.md#req-orders-056--one-shared-overview-leads-to-a-central-detail)),
+   as the exchange writes do (REQ-XCH-030).
 3. The frontend relays the frame to the room's local members and onto **`redis-shared` pub/sub**
    (`basetool:livesync:changed`), so every other frontend replica reaches its own members.
 4. Each receiving client re-reads the named sections and swaps them in place.
@@ -219,6 +223,21 @@ own undo semantics; a failing member rolls back alone. Each member whose data ch
 notification, the page refreshes the run list while it runs, and the run ends `COMPLETED` or
 `FAILED` (then `ExchangeBulkUndoFailed` alerts). Re-activating the client is a separate admin
 action (REQ-XCH-034, ADR-0227).
+
+**Faulty release on job orders.** Job-order writes have no journal and no undo, so the bulk undo
+leaves them alone; the operator stops the damage and the units repair it (REQ-OXCH-009):
+
+1. switch the job-order writes off on *Administration → Verbundene Anwendungen* — every job-order
+   write answers `503 JOB_ORDER_WRITES_DISABLED`, the reads go on;
+2. if that is not enough, switch job orders off as a whole (`503 JOB_ORDER_EXCHANGE_DISABLED`) or
+   suspend the client;
+3. list the client's job-order writes in the audit viewer with its client filter;
+4. have the units repair them in the web: reopen a client's cancel, set a target back, rewrite a
+   comment, cancel a client's create.
+
+Until the operator acts, the open-order cap and the daily create cap bound a looping create to 20
+orders a member and UTC day, cancelled ones included; `JobOrderExchangeCapHit` fires when the caps
+keep refusing.
 
 **A draft.** `drafts/blueprints` and `drafts/refinery-orders` write nothing: the backend builds the
 same preview the web's own upload builds, the gateway stages it for a one-time browser pickup and

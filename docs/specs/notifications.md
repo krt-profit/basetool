@@ -41,8 +41,8 @@ is the notification-engine view of it; the linked requirement is canonical.
 | Event (`NotificationEventType`) | Notification type(s) raised | Seed | Recipients (selectors) | Requirement |
 |---|---|---|---|---|
 | `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 + V387 | `ORG_RELATIVE_ROLE` `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-008 |
-| `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 + V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-017 |
-| `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` after a meaningful edit | REQ-NOTIF-017 |
+| `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 + V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING`; replaces the recipient's unread notice of the type and order | REQ-NOTIF-017 |
+| `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` after a meaningful edit; replaces the recipient's unread notice of the type and order | REQ-NOTIF-017 |
 | `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V360 · V360 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; the approval notice outranks the generic one | REQ-NOTIF-011/-033, [REQ-BANK-026](bank.md) |
 | `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
 | `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
@@ -125,6 +125,8 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `EXCHANGE_SWITCHED_ON` | none (no rule) | — | supersedes `EXCHANGE_SWITCHED_OFF` | REQ-XCH-041 |
 | `BANK_EXCHANGE_SWITCHED_ON` | `BANK_EXCHANGE_SWITCHED_ON` | V361 | `ROLE` `ADMIN` + `ROLE` `BANK_MANAGEMENT` (the actor excluded); supersedes the other bank switch notice | [REQ-BXCH-006](bank-exchange.md) |
 | `BANK_EXCHANGE_SWITCHED_OFF` | `BANK_EXCHANGE_SWITCHED_OFF` | V361 | `ROLE` `ADMIN` + `ROLE` `BANK_MANAGEMENT` (the actor excluded); supersedes the other bank switch notice | [REQ-BXCH-006](bank-exchange.md) |
+| `JOB_ORDER_EXCHANGE_SWITCHED_ON` | `JOB_ORDER_EXCHANGE_SWITCHED_ON` | V444 | `ROLE` `ADMIN` (the actor excluded); coded `switchCode` `family` / `writes`; supersedes the recipient's earlier notice of the same job-order switch | [REQ-OXCH-009](orders-exchange.md) |
+| `JOB_ORDER_EXCHANGE_SWITCHED_OFF` | `JOB_ORDER_EXCHANGE_SWITCHED_OFF` | V444 | `ROLE` `ADMIN` (the actor excluded); coded `switchCode` `family` / `writes`; supersedes the recipient's earlier notice of the same job-order switch | [REQ-OXCH-009](orders-exchange.md) |
 | `SUPPLY_DONATION_PLEDGED` | `SUPPLY_DONATION_PLEDGED` | V286 | `ORG_RELATIVE_ROLE` leadership and Logisticians of the receiving unit | REQ-SUP-016 |
 | `SUPPLY_DONATION_RECEIVED` | `SUPPLY_DONATION_RECEIVED` | V286 | `EVENT_RECIPIENT` (the donor); supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_DECLINED` | `SUPPLY_DONATION_DECLINED` | V286 | `EVENT_RECIPIENT` (the donor); coded `reasonCode`; supersedes the pledge notices | REQ-SUP-016 |
@@ -179,8 +181,8 @@ source aggregate (no second `@Version` bump).
 **Acceptance**
 
 - [x] Notifications are created only after the producing transaction commits.
-- [x] The producer path (`createJobOrder` / `createItemJobOrder`) gains no second `@Version`
-  write on the order.
+- [x] The producer path (`JobOrderCreation#createMaterialOrder` / `#createItemOrder`) gains no
+  second `@Version` write on the order.
 
 **Enforced by:** `NotificationCreationServiceTest`, `NotificationRuleEngineIntegrationTest`,
 `JobOrderServiceTest` · **Code:** `notification/api/events/NotificationEvent`, `notification/internal/NotificationEventListener`,
@@ -377,16 +379,24 @@ settings are retained. One creation cause can reach a writer of both sides once.
 The notice leaves the Inbox when the order closes or responsibility moves. The cleanup runs with
 the resulting order cause and preserves business history (REQ-NOTIF-018).
 
+**A create through a connected application** raises the same notice to the same audience, without
+the creating member, and names the application: it carries `viaCode = CLIENT` and `app`, the
+registry display name captured when the notice is published, and renders the variant „Neuer
+Auftrag #… für … über <App>" (REQ-NOTIF-028, REQ-ORDERS-078). A web create carries neither and keeps
+the type's own wording.
+
 **Acceptance**
 
 - [ ] The order creation notice reaches each affected current writer once, including an overlapping
   writer, and excludes the creating actor and unrelated global administrators.
 - [ ] A closure or transfer retires the outstanding creation prompt.
 - [ ] The stock seed uses both unit contexts under `UNIT_WRITER` and retains its actor exclusion.
+- [x] A client's create names the application in DE and EN; a web create does not.
 
 **Enforced by:** `ProfitHierarchyNoticeIntegrationTest`, `NotificationRuleEngineIntegrationTest`,
-`JobOrderNoticeIntegrationTest`, `JobOrderServicePriorityAndStatusTest` · **Code:**
-`joborder/internal/JobOrderService#publishJobOrderCreated`,
+`JobOrderNoticeIntegrationTest`, `JobOrderServicePriorityAndStatusTest`, `JobOrderServiceTest`,
+`JobOrderApplicationNoticeTest`, `JobOrderClientNoticeWordingTest` · **Code:**
+`joborder/internal/JobOrderLifecycleNotices#created`,
 `joborder/api/events/JobOrderCreatedEvent`, `joborder/internal/JobOrderChangeEffects`,
 `notification/internal/RecipientResolutionService`,
 `V387__seed_shared_order_notification_audiences.sql`
@@ -801,17 +811,43 @@ coordination alone receives the eligible requester-edit notice first. For a resp
 revision, the eligible material notice takes precedence. Rule evaluation and muting apply to each
 original type before the cause chooses one notice per recipient.
 
+**One unread need-change notice per order and type.** A new `JOB_ORDER_UPDATED_BY_REQUESTER` or
+`JOB_ORDER_UPDATED_BY_RESPONSIBLE` notice replaces its recipient's earlier unread notice of the
+same type about the same order, whether a member or a connected client made the change, so a loop
+of edits cannot flood the other side's Inbox. Read notices stay, the two types never replace each
+other, and every new notice still pushes the unread signal (REQ-NOTIF-010). The event names the
+coalescing types through `NotificationEvent#replacesUnreadNotificationTypes`; delivery deletes the
+receiving members' unread rows of that type and order just before it stores the new ones, for a
+single event and for a grouped cause alike. A member who receives no new notice — the editor, a
+member who muted the type, one whom the cause gave a higher-priority notice — keeps theirs.
+
+**A need change through a connected application** — a target or comment change of an aUEC order —
+raises the same notice as the web's and names the application with `viaCode = CLIENT` and `app`,
+the registry display name captured when the notice is published (REQ-NOTIF-028, REQ-ORDERS-078).
+
 **Acceptance**
 
 - [ ] Requester and meaningful responsible-side need changes reach both affected current unit
   audiences once and exclude the editor.
 - [ ] An identical responsible-side save raises no update notice.
 - [ ] Derived material changes preserve original preferences and receive one grouped delivery.
+- [x] A loop of requester or responsible-side need changes leaves each recipient one unread
+  need-change notice of the order per type.
+- [x] A read need-change notice, another order's notice and the notice of the other type stay.
+- [x] A client's need change names the application in DE and EN; a web change does not.
 
 **Enforced by:** `ProfitHierarchyNoticeIntegrationTest`, `MaterialContributionEffectsIntegrationTest`,
-`MessageBundleConsistencyTest` · **Code:** `joborder/api/events/JobOrderUpdatedByRequesterEvent`,
+`MessageBundleConsistencyTest`, `JobOrderNoticeIntegrationTest`, `JobOrderApplicationNoticeTest`,
+`JobOrderClientNoticeWordingTest` · **Code:**
+`joborder/api/events/JobOrderUpdatedByRequesterEvent`,
 `joborder/internal/JobOrderLifecycleNotices`, `joborder/internal/JobOrderChangeEffects`,
-`V387__seed_shared_order_notification_audiences.sql`
+`joborder/api/events/JobOrderNotices#needChanged`,
+`notification/api/events/NotificationEvent#replacesUnreadNotificationTypes`,
+`notification/internal/NotificationEventPreparation#replaceUnread`,
+`notification/api/NotificationRepository#deleteUnreadOfTypeAndEntityForRecipients`,
+`V387__seed_shared_order_notification_audiences.sql` · **Decision:**
+[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)
+(item 9) · **Issues:** #3617, #3638
 
 ### REQ-NOTIF-018 — Superseding: clear stale "action needed" notifications on lifecycle close
 
@@ -1236,13 +1272,29 @@ the placeholder (`{mission}: {change} durch {actor}`). A parameter named just `C
 parameter. The web inbox and bell apply the rule when they fill a template
 (`NotificationPageController#render`).
 
+**A code can pick the template.** Where the bundle holds `notifications.type.<TYPE>.<name>.<code>`
+for a `<name>Code` parameter, that variant is the notice's template, the first such parameter in
+order deciding; a notice without the code, every notice stored before the variant existed
+included, keeps the type's own template. An unfilled placeholder stays visible in the text, so a
+wording that only some notices of a type can fill lives in a variant, never in the type's own
+template. The application parameter of the job-order notices is such a code: a client's write
+carries `viaCode = CLIENT` and `app`, the application's registry display name captured when the
+notice is published, and `notifications.type.JOB_ORDER_….via.CLIENT` names it („über {app}",
+"via {app}"); a later rename of the application leaves a stored notice as it was
+(REQ-ORDERS-078).
+
 **Acceptance**
 
 - [x] A `…Code` parameter renders as the word of the member's language and as itself without one.
 - [x] A parameter named `code` is not special.
+- [x] A code the type has a variant for renders the variant; a code without one and a notice without
+  the code render the type's own template.
+- [x] The job-order created, need-change and finished notices of a client's write name the
+  application in DE and EN, and the web's keep their wording without a placeholder.
 
-**Enforced by:** `NotificationRenderCodesTest` · **Code:**
-`NotificationPageController#render` · **Issues:** #2414
+**Enforced by:** `NotificationRenderCodesTest`, `JobOrderClientNoticeWordingTest`,
+`JobOrderApplicationNoticeTest` · **Code:** `NotificationPageController#render`,
+`joborder/api/events/JobOrderNotices#addApplication` · **Issues:** #2414, #3648
 
 ### REQ-NOTIF-029 — No notice is lost to a full executor
 
@@ -1405,6 +1457,7 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `EXCHANGE_INSTALLATION_CONNECTED` | `/connected-apps?focus={installation id}` |
 | `EXCHANGE_CLIENT_SUSPENDED`, `EXCHANGE_CLIENT_ACTIVATED`, `EXCHANGE_CLIENT_UPDATE_REQUIRED`, `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `/connected-apps?focus={client id}` |
 | `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF`, `BANK_EXCHANGE_SWITCHED_ON`, `BANK_EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
+| `JOB_ORDER_EXCHANGE_SWITCHED_ON`, `JOB_ORDER_EXCHANGE_SWITCHED_OFF` | admins: `/admin/exchange-clients` |
 | `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory?storage=my` (the notice names a source row, not the recipient's) |
 | `INVENTORY_STOCK_LEVEL_LOW` | `/inventory/stock-levels` |
 | `HANGAR_SHIP_ASSIGNED`, `HANGAR_FITTED_RESET`, `HANGAR_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN` | `/hangar` |

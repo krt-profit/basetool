@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,7 +38,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -66,35 +66,7 @@ class JobOrderPageControllerReaderTest {
       new JobOrderCreatePageController(reader, qualityTiers);
 
   private static JobOrderDto order(String type) {
-    return new JobOrderDto(
-        ID,
-        7,
-        null,
-        null,
-        "Handle",
-        null,
-        1,
-        "OPEN",
-        type,
-        true,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.now(),
-        1L,
-        null,
-        null,
-        false,
-        false,
-        null,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder().id(ID).displayId(7).type(type).build();
   }
 
   private static OrgUnitMembershipOptionDto option() {

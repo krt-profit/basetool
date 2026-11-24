@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,9 +32,10 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderCreation;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
@@ -62,48 +64,28 @@ import org.springframework.data.domain.Pageable;
 class JobOrderControllerTest {
 
   @Mock private JobOrderService jobOrderService;
+  @Mock private JobOrderCreation jobOrderCreation;
   @Mock private JobOrderQueryService jobOrderQueryService;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @InjectMocks private JobOrderController controller;
 
   private static JobOrderDto jobOrderDto(UUID id) {
-    return new JobOrderDto(
-        id,
-        1,
-        null,
-        null,
-        "alice",
-        "deliver to ArcCorp",
-        1,
-        JobOrderStatus.OPEN,
-        JobOrderType.MATERIAL,
-        true,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.parse("2026-01-01T00:00:00Z"),
-        1L,
-        null,
-        null,
-        false,
-        false,
-        null,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .id(id)
+        .handle("alice")
+        .comment("deliver to ArcCorp")
+        .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+        .build();
   }
 
   @Test
   void createJobOrder_passesTheServiceResultThroughUnredacted() {
-    CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", null, List.of(), null);
+    CreateJobOrderDto request =
+        new CreateJobOrderDto(
+            null, null, "alice", null, List.of(), new JobOrderObservedVersions(null, null));
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
-    when(jobOrderService.createJobOrder(request)).thenReturn(created);
+    when(jobOrderCreation.createMaterialOrder(request)).thenReturn(created);
 
     JobOrderDto result = controller.createJobOrder(request);
 
@@ -410,7 +392,9 @@ class JobOrderControllerTest {
   @Test
   void updateJobOrder_forwardsBodyToService() {
     UUID id = UUID.randomUUID();
-    CreateJobOrderDto updateDto = new CreateJobOrderDto(null, null, "bob", null, List.of(), 1L);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto(
+            null, null, "bob", null, List.of(), new JobOrderObservedVersions(1L, 0L));
     JobOrderDto persisted = jobOrderDto(id);
     when(jobOrderService.updateJobOrder(id, updateDto)).thenReturn(persisted);
 

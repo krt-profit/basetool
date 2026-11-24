@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.profitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderDtoFixtures.jobOrder;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -51,6 +53,10 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCo
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderActor;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCaller;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreateCommand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
@@ -59,14 +65,22 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderReadCheck;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWriterRule;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncFanout;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
@@ -76,12 +90,14 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
-import java.time.Instant;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -89,6 +105,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 @ExtendWith({
   MockitoExtension.class,
@@ -98,7 +118,7 @@ class JobOrderServiceTest {
 
   @Mock private ProfitHierarchyService profitHierarchy;
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
-  @Mock private LiveSyncPublisher liveSyncPublisher;
+  @Mock private LiveSyncFanout liveSyncFanout;
 
   private final Bereich profitArea = profitArea();
 
@@ -116,6 +136,7 @@ class JobOrderServiceTest {
 
   @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
+  @Mock private JobOrderWriters writers;
 
   @Mock private SystemSettings systemSettings;
 
@@ -139,6 +160,8 @@ class JobOrderServiceTest {
 
   @Mock private JobOrderChangeEffects effects;
 
+  @Mock private JobOrderClientNames clientNames;
+
   @Mock private AuditService auditService;
 
   @Mock private QualityTierService qualityTierService;
@@ -148,6 +171,8 @@ class JobOrderServiceTest {
   private JobOrderPriorityService jobOrderPriorityService;
 
   private JobOrderService jobOrderService;
+
+  private JobOrderCreation jobOrderCreation;
 
   private JobOrderQueryService jobOrderQueryService;
 
@@ -173,13 +198,33 @@ class JobOrderServiceTest {
             org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
             auditService,
             jobOrderStockProjectionService);
+    LiveSyncPublisher liveSyncPublisher =
+        new LiveSyncPublisher(liveSyncFanout, new SimpleMeterRegistry());
+    JobOrderQueueFrame queueFrame = new JobOrderQueueFrame(liveSyncPublisher);
+    jobOrderCreation =
+        new JobOrderCreation(
+            jobOrderRepository,
+            profitHierarchy,
+            jobOrderOrgUnitResolver,
+            writers,
+            new JobOrderMaterialLines(materialRepository, qualityTierService),
+            jobOrderItemService,
+            new JobOrderItemReconciliation(jobOrderItemService),
+            org.mockito.Mockito.mock(JobOrderUnitHistory.class),
+            jobOrderPriorityService,
+            effects,
+            clientNames,
+            queueFrame,
+            auditService,
+            jobOrderStockProjectionService,
+            authHelperService);
     jobOrderService =
         new JobOrderService(
             jobOrderRepository,
             itemFulfillment,
             profitHierarchy,
             responsibilityGuard,
-            jobOrderAccessPolicy,
+            writers,
             new JobOrderMaterialLines(materialRepository, qualityTierService),
             new InventoryStockReads(
                 inventoryItemRepository,
@@ -230,11 +275,15 @@ class JobOrderServiceTest {
                     de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
                         .class)),
             liveSyncPublisher,
-            org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
+            queueFrame,
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
-            org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class));
+            org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class),
+            clientNames);
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
+    lenient().when(jobOrderAccessPolicy.canRead(any(), any())).thenReturn(true);
+    lenient()
+        .when(writers.resolve(any(), any()))
+        .thenReturn(WriterRuleFixtures.everyUnitWriterScope());
     jobOrderQueryService =
         new JobOrderQueryService(
             jobOrderRepository,
@@ -329,36 +378,7 @@ class JobOrderServiceTest {
             java.util.List.of(),
             null,
             1L);
-    baseJobOrderDto =
-        new JobOrderDto(
-            orderId,
-            1,
-            null,
-            null,
-            "Tester",
-            null,
-            1,
-            JobOrderStatus.OPEN,
-            JobOrderType.MATERIAL,
-            true,
-            List.of(jomDto),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+    baseJobOrderDto = jobOrder().id(orderId).handle("Tester").materials(List.of(jomDto)).build();
     lenient()
         .when(jobOrderItemService.prepareItemLines(any(), any()))
         .thenAnswer(inv -> preparedItemLines(inv.getArgument(0)));
@@ -395,6 +415,18 @@ class JobOrderServiceTest {
         })
         .when(jobOrderItemService)
         .applyItemLines(any(), any());
+  }
+
+  @AfterEach
+  void releaseFixtureTransaction() {
+    TransactionSynchronizationUtils.invokeAfterCompletion(
+        TransactionSynchronizationManager.getSynchronizations(),
+        TransactionSynchronization.STATUS_ROLLED_BACK);
+  }
+
+  private static void commitFixtureTransaction() {
+    TransactionSynchronizationUtils.invokeAfterCommit(
+        TransactionSynchronizationManager.getSynchronizations());
   }
 
   private JobOrderItemPlan preparedItemLines(List<CreateJobOrderItemLineDto> lines) {
@@ -445,27 +477,166 @@ class JobOrderServiceTest {
                     orderId, UUID.randomUUID(), materialId, quality, amount)));
   }
 
-  private JobOrder createAndCaptureSaved(List<CreateJobOrderMaterialDto> lines) {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+  private void permitEveryPair() {
+    when(writers.resolve(any(), any())).thenReturn(WriterRuleFixtures.everyUnitWriterScope());
+  }
+
+  private void stubCreate() {
+    stubPersistence();
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
+  }
+
+  private void stubPersistence() {
+    permitEveryPair();
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     when(jobOrderRepository.save(any(JobOrder.class)))
         .thenAnswer(i -> {
           JobOrder saved = i.getArgument(0);
           saved.setId(orderId);
           return saved;
         });
-    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
+  }
+
+  private JobOrder createAndCaptureSaved(List<CreateJobOrderMaterialDto> lines) {
+    stubCreate();
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     stubTierResolution();
 
-    jobOrderService.createJobOrder(
+    jobOrderCreation.createMaterialOrder(
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, lines, null));
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            lines,
+            new JobOrderObservedVersions(null, null)));
 
     ArgumentCaptor<JobOrder> saved = ArgumentCaptor.forClass(JobOrder.class);
     verify(jobOrderRepository).save(saved.capture());
     return saved.getValue();
+  }
+
+  @Test
+  void createJobOrder_announcesTheNewOrderToTheQueueAndTheDemandOnceAfterTheCommit() {
+    createAndCaptureSaved(List.of(new CreateJobOrderMaterialDto(materialId, 650, 10.0)));
+    verifyNoInteractions(liveSyncFanout);
+
+    commitFixtureTransaction();
+
+    verify(liveSyncFanout)
+        .publish(LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue", "demand"));
+    verify(liveSyncFanout, times(1)).publish(any(), anyList());
+  }
+
+  @Test
+  void createAuecJobOrder_announcesTheNewOrderToTheQueueOnlyOnceAfterTheCommit() {
+    stubPersistence();
+
+    jobOrderCreation.createAuecOrder(
+        new JobOrderCreateCommand.AuecOrder(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
+        JobOrderWriterRule.CONTEXTUAL,
+        new JobOrderActor.Web(null),
+        _ -> {});
+    verifyNoInteractions(liveSyncFanout);
+
+    commitFixtureTransaction();
+
+    verify(liveSyncFanout)
+        .publish(LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));
+    verify(liveSyncFanout, times(1)).publish(any(), anyList());
+  }
+
+  @Test
+  void createAuecJobOrder_attributesTheCreatedNoticeToTheActorsMemberUnderTheGivenRule() {
+    stubPersistence();
+    UUID member = UUID.randomUUID();
+    JobOrderActor actor = new JobOrderActor.Client(member, "client");
+
+    jobOrderCreation.createAuecOrder(
+        new JobOrderCreateCommand.AuecOrder(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
+        JobOrderWriterRule.DIRECT_LOGISTICIAN,
+        actor,
+        _ -> {});
+
+    verify(writers).resolve(JobOrderWriterRule.DIRECT_LOGISTICIAN, actor);
+    ArgumentCaptor<JobOrderCreatedEvent> created =
+        ArgumentCaptor.forClass(JobOrderCreatedEvent.class);
+    verify(effects).publish(created.capture());
+    assertEquals(member, created.getValue().actorSub());
+    verifyNoInteractions(authHelperService);
+  }
+
+  @Test
+  void createAuecJobOrder_namesTheClientsApplicationInTheCreatedNotice() {
+    stubPersistence();
+    JobOrderActor actor = new JobOrderActor.Client(UUID.randomUUID(), "versekit");
+    when(clientNames.appOf(actor)).thenReturn("VerseKit");
+
+    jobOrderCreation.createAuecOrder(
+        new JobOrderCreateCommand.AuecOrder(
+            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, new BigDecimal("250000")),
+        JobOrderWriterRule.DIRECT_LOGISTICIAN,
+        actor,
+        _ -> {});
+
+    ArgumentCaptor<JobOrderCreatedEvent> created =
+        ArgumentCaptor.forClass(JobOrderCreatedEvent.class);
+    verify(effects).publish(created.capture());
+    assertThat(created.getValue().renderParams())
+        .containsEntry("viaCode", "CLIENT")
+        .containsEntry("app", "VerseKit");
+  }
+
+  @Test
+  void createAuecJobOrder_refusesAPairTheGivenRuleDoesNotPermit() {
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
+    when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
+    when(writers.resolve(any(), any()))
+        .thenReturn(
+            new JobOrderWriters.Scope(
+                JobOrderWriterRule.DIRECT_LOGISTICIAN,
+                new ScopePredicate(false, null, Set.of(responsibleOrgUnitId))));
+
+    assertThrows(
+        AccessDeniedException.class,
+        () ->
+            jobOrderCreation.createAuecOrder(
+                new JobOrderCreateCommand.AuecOrder(
+                    responsibleOrgUnitId,
+                    requestingOrgUnitId,
+                    "Tester",
+                    null,
+                    new BigDecimal("250000")),
+                JobOrderWriterRule.DIRECT_LOGISTICIAN,
+                new JobOrderActor.Client(UUID.randomUUID(), "client"),
+                _ -> {}));
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
+  }
+
+  @Test
+  void createItemJobOrder_announcesTheNewOrderToTheQueueAndTheDemandOnceAfterTheCommit() {
+    stubCreate();
+
+    jobOrderCreation.createItemOrder(
+        new CreateJobOrderItemRequestDto(
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(
+                new CreateJobOrderItemLineDto(
+                    null, UUID.randomUUID(), UUID.randomUUID(), 2, List.of(), null, null)),
+            new JobOrderObservedVersions(null, null)));
+    verifyNoInteractions(liveSyncFanout);
+
+    commitFixtureTransaction();
+
+    verify(liveSyncFanout)
+        .publish(LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue", "demand"));
+    verify(liveSyncFanout, times(1)).publish(any(), anyList());
   }
 
   @Test
@@ -549,11 +720,16 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_ShouldCalculateStockAndReturnDto() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(createMat),
+            new JobOrderObservedVersions(null, null));
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -568,7 +744,7 @@ class JobOrderServiceTest {
     stubTierResolution();
     stubLinkedStock(700, 25.0);
 
-    JobOrderDto result = jobOrderService.createJobOrder(createDto);
+    JobOrderDto result = jobOrderCreation.createMaterialOrder(createDto);
 
     assertNotNull(result);
     assertEquals(orderId, result.id());
@@ -590,11 +766,16 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_ShouldHonorMinQualityFromDto() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(createMat),
+            new JobOrderObservedVersions(null, null));
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -608,7 +789,7 @@ class JobOrderServiceTest {
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
-    jobOrderService.createJobOrder(createDto);
+    jobOrderCreation.createMaterialOrder(createDto);
 
     verify(qualityTierService).resolveForRequirement(null, 650, Set.of());
     verify(jobOrderRepository)
@@ -623,11 +804,16 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_NullMinQuality_PersistsBaseTier() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, null, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(createMat),
+            new JobOrderObservedVersions(null, null));
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
@@ -641,7 +827,7 @@ class JobOrderServiceTest {
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
-    jobOrderService.createJobOrder(createDto);
+    jobOrderCreation.createMaterialOrder(createDto);
 
     verify(jobOrderRepository)
         .save(
@@ -652,7 +838,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_PersistsComment() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 10.0);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
@@ -667,36 +853,46 @@ class JobOrderServiceTest {
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
-    jobOrderService.createJobOrder(
+    jobOrderCreation.createMaterialOrder(
         new CreateJobOrderDto(
             responsibleOrgUnitId,
             requestingOrgUnitId,
             "Tester",
             "  Deliver fast  ",
             List.of(createMat),
-            null));
+            new JobOrderObservedVersions(null, null)));
 
     verify(jobOrderRepository).save(argThat(jo -> "Deliver fast".equals(jo.getComment())));
 
-    jobOrderService.createJobOrder(
+    jobOrderCreation.createMaterialOrder(
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", "   ", List.of(createMat), null));
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            "   ",
+            List.of(createMat),
+            new JobOrderObservedVersions(null, null)));
 
     verify(jobOrderRepository).save(argThat(jo -> jo.getComment() == null));
   }
 
   @Test
   void createJobOrder_MaterialNotFound_ShouldThrowException() {
-    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
+    permitEveryPair();
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+            responsibleOrgUnitId,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(createMat),
+            new JobOrderObservedVersions(null, null));
 
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.empty());
 
-    assertThrows(NotFoundException.class, () -> jobOrderService.createJobOrder(createDto));
+    assertThrows(NotFoundException.class, () -> jobOrderCreation.createMaterialOrder(createDto));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
@@ -704,9 +900,15 @@ class JobOrderServiceTest {
   void createJobOrder_MissingResponsible_Throws() {
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 5.0);
     CreateJobOrderDto createDto =
-        new CreateJobOrderDto(null, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
+        new CreateJobOrderDto(
+            null,
+            requestingOrgUnitId,
+            "Tester",
+            null,
+            List.of(createMat),
+            new JobOrderObservedVersions(null, null));
 
-    assertThrows(BadRequestException.class, () -> jobOrderService.createJobOrder(createDto));
+    assertThrows(BadRequestException.class, () -> jobOrderCreation.createMaterialOrder(createDto));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
@@ -752,6 +954,38 @@ class JobOrderServiceTest {
     assertEquals(JobOrderStatus.COMPLETED, jobOrder.getStatus());
     assertNotNull(result);
     verify(jobOrderRepository, times(2)).lockAllJobOrders();
+  }
+
+  @Test
+  void changeStatus_aClientsCancelNamesTheApplicationInTheFinishedNotice() {
+    jobOrder.setPriority(3);
+    jobOrder.setStatus(JobOrderStatus.IN_PROGRESS);
+    jobOrder.setVersion(1L);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
+    JobOrderActor actor = new JobOrderActor.Client(UUID.randomUUID(), "versekit");
+    when(clientNames.appOf(actor)).thenReturn("VerseKit");
+
+    jobOrderService.changeStatus(
+        orderId,
+        JobOrderStatus.CANCELLED,
+        jobOrder.getLifecycleVersion(),
+        new JobOrderCaller(
+            JobOrderWriterRule.DIRECT_LOGISTICIAN, JobOrderReadCheck.CONTEXTUAL, actor));
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(effects, org.mockito.Mockito.atLeastOnce()).publish(published.capture());
+    assertThat(published.getAllValues())
+        .filteredOn(NoticeEvent.class::isInstance)
+        .map(NoticeEvent.class::cast)
+        .filteredOn(notice -> notice.eventType() == NotificationEventType.JOB_ORDER_FINISHED)
+        .singleElement()
+        .satisfies(notice ->
+            assertThat(notice.renderParams())
+                .containsEntry("statusCode", "CANCELLED")
+                .containsEntry("viaCode", "CLIENT")
+                .containsEntry("app", "VerseKit"));
   }
 
   @Test
@@ -854,7 +1088,8 @@ class JobOrderServiceTest {
     jobOrder.setVersion(2L);
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, null, "Tester", null, List.of(updateMat), 1L);
+        new CreateJobOrderDto(
+            null, null, "Tester", null, List.of(updateMat), new JobOrderObservedVersions(1L, 0L));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
 
@@ -885,7 +1120,13 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(UUID.randomUUID(), bravoId, "Tester", null, List.of(updateMat), null);
+        new CreateJobOrderDto(
+            UUID.randomUUID(),
+            bravoId,
+            "Tester",
+            null,
+            List.of(updateMat),
+            new JobOrderObservedVersions(null, 0L));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(bravoId)).thenReturn(Optional.of(bravo));
@@ -939,7 +1180,13 @@ class JobOrderServiceTest {
 
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(newMaterialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, betaId, "NewTester", null, List.of(updateMat), null);
+        new CreateJobOrderDto(
+            null,
+            betaId,
+            "NewTester",
+            null,
+            List.of(updateMat),
+            new JobOrderObservedVersions(null, 0L));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(betaId)).thenReturn(Optional.of(beta));
@@ -965,7 +1212,13 @@ class JobOrderServiceTest {
     beta.setShorthand("Beta");
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, betaId, "Tester", null, List.of(updateMat), null);
+        new CreateJobOrderDto(
+            null,
+            betaId,
+            "Tester",
+            null,
+            List.of(updateMat),
+            new JobOrderObservedVersions(null, 0L));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(betaId)).thenReturn(Optional.of(beta));
@@ -984,7 +1237,13 @@ class JobOrderServiceTest {
   void updateJobOrderAsRequester_publishesEventAndAudits() {
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, null, null, "requester note", List.of(updateMat), null);
+        new CreateJobOrderDto(
+            null,
+            null,
+            null,
+            "requester note",
+            List.of(updateMat),
+            new JobOrderObservedVersions(null, 0L));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
@@ -1060,7 +1319,7 @@ class JobOrderServiceTest {
 
     de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto dto =
         new de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto(
-            null, null, "note", null, List.of(), null);
+            null, null, "note", null, List.of(), new JobOrderObservedVersions(null, 0L));
 
     assertThrows(
         BadRequestException.class,
@@ -1107,7 +1366,7 @@ class JobOrderServiceTest {
             List.of(
                 new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                     null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
-            1L);
+            new JobOrderObservedVersions(1L, 0L));
 
     jobOrderService.updateItemJobOrderAsRequester(orderId, dto);
 
@@ -1168,7 +1427,7 @@ class JobOrderServiceTest {
             List.of(
                 new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                     null, keptGameItem, UUID.randomUUID(), 1, List.of(), 1, null)),
-            1L);
+            new JobOrderObservedVersions(1L, 0L));
 
     jobOrderService.updateItemJobOrderAsRequester(orderId, dto);
 
@@ -1765,7 +2024,7 @@ class JobOrderServiceTest {
           List.of(
               new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                   null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
-          version);
+          new JobOrderObservedVersions(version, 0L));
     }
 
     private JobOrder itemOrder() {
@@ -1825,7 +2084,7 @@ class JobOrderServiceTest {
                       null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null),
                   new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                       null, UUID.randomUUID(), UUID.randomUUID(), 2, List.of(), 2, 1)),
-              1L);
+              new JobOrderObservedVersions(1L, 0L));
 
       jobOrderService.updateItemJobOrder(orderId, dto);
 
@@ -1883,7 +2142,7 @@ class JobOrderServiceTest {
                       List.of(),
                       1,
                       null)),
-              1L);
+              new JobOrderObservedVersions(1L, 0L));
 
       jobOrderService.updateItemJobOrder(orderId, dto);
 
@@ -1937,7 +2196,7 @@ class JobOrderServiceTest {
                       List.of(),
                       2,
                       null)),
-              1L);
+              new JobOrderObservedVersions(1L, 0L));
 
       assertThrows(
           de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
@@ -1968,7 +2227,7 @@ class JobOrderServiceTest {
                       List.of(),
                       1,
                       null)),
-              1L);
+              new JobOrderObservedVersions(1L, 0L));
 
       assertThrows(
           de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
@@ -1982,35 +2241,7 @@ class JobOrderServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
       when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(inv -> inv.getArgument(0));
       JobOrderDto itemBase =
-          new JobOrderDto(
-              orderId,
-              1,
-              null,
-              null,
-              "Tester",
-              null,
-              1,
-              JobOrderStatus.OPEN,
-              JobOrderType.ITEM,
-              true,
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              Instant.now(),
-              1L,
-              null,
-              null,
-              false,
-              false,
-              null,
-              false,
-              false,
-              false,
-              0L,
-              0L);
+          jobOrder().id(orderId).handle("Tester").type(JobOrderType.ITEM).build();
       when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(itemBase);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any()))
@@ -2064,35 +2295,12 @@ class JobOrderServiceTest {
           .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
           .thenAnswer(inv -> {
             JobOrder o = inv.getArgument(0);
-            return new JobOrderDto(
-                o.getId(),
-                1,
-                null,
-                null,
-                null,
-                null,
-                1,
-                JobOrderStatus.OPEN,
-                JobOrderType.ITEM,
-                o.isCountBlueprintsWithVariants(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                Instant.now(),
-                o.getVersion(),
-                null,
-                null,
-                false,
-                false,
-                null,
-                false,
-                false,
-                false,
-                0L,
-                0L);
+            return jobOrder()
+                .id(o.getId())
+                .type(JobOrderType.ITEM)
+                .countBlueprintsWithVariants(o.isCountBlueprintsWithVariants())
+                .version(o.getVersion())
+                .build();
           });
     }
 

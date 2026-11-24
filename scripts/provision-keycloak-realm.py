@@ -148,6 +148,8 @@ EXCHANGE_SCOPES: list[tuple[str, str]] = [
     ("exchange.bank.queue", "xchConsentBankQueue"),
     ("exchange.patch.read", "xchConsentPatchRead"),
     ("exchange.patch.write", "xchConsentPatchWrite"),
+    ("exchange.joborders.read", "xchConsentJobOrdersRead"),
+    ("exchange.joborders.write", "xchConsentJobOrdersWrite"),
 ]
 EXCHANGE_SCOPE_NAMES = [name for name, _ in EXCHANGE_SCOPES]
 

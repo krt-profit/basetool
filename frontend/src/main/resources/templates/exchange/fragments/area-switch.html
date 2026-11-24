@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* One area switch of the exchange beside the global switch (REQ-BXCH-006, REQ-OXCH-009): its state, the hint for that state and the button that flips it with the switch's own version. The card names the switch's relay segment and carries its confirmation and success texts. */-->
+<section th:fragment="card(area, state)"
+         class="card xc-switch-card" th:id="${area.cardId}"
+         th:with="switched=#{${area.switchedKey}},offTitle=#{${area.confirmOffTitleKey}},offBody=#{${area.confirmOffBodyKey}},onTitle=#{${area.confirmOnTitleKey}},onBody=#{${area.confirmOnBodyKey}}"
+         th:attr="data-enabled=${state.enabled},data-version=${state.version},data-xc-area=${area.segment},data-switched=${switched},data-confirm-off-title=${offTitle},data-confirm-off-body=${offBody},data-confirm-on-title=${onTitle},data-confirm-on-body=${onBody}">
+    <div class="split">
+        <div class="stack gap-2">
+            <h2 class="xc-heading" th:text="#{${area.titleKey}}">Bereich</h2>
+            <p class="cluster gap-2 xc-switch-state">
+                <span th:if="${state.enabled}" class="chip chip--success" th:text="#{admin.exchangeClients.switch.on}">Eingeschaltet</span>
+                <span th:unless="${state.enabled}" class="chip chip--danger" th:text="#{admin.exchangeClients.switch.off}">Ausgeschaltet</span>
+                <span class="xc-switch-hint" th:text="${state.enabled} ? #{${area.hintOnKey}} : #{${area.hintOffKey}}">Hinweis</span>
+            </p>
+        </div>
+        <button type="button" th:attr="data-xc-area-switch=${area.cardId},data-testid=${area.cardId}"
+                th:class="${state.enabled} ? 'btn btn-quiet-danger' : 'btn btn-success'"
+                th:text="${state.enabled} ? #{admin.exchangeClients.switch.turnOff} : #{admin.exchangeClients.switch.turnOn}">Einschalten</button>
+    </div>
+</section>
+</body>
+</html>

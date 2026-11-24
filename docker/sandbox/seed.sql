@@ -8,7 +8,10 @@ VALUES ('5a4d0000-0000-4000-8000-000000000001', 0, now(), now(), 'sandbox-member
         now(), NULL),
        ('5a4d0000-0000-4000-8000-000000000003', 0, now(), now(), 'sandbox-admin',
         'sandbox-admin@example.invalid', 'Sandbox Admin', true, true, current_date, 'ACTIVE', now(),
-        NULL)
+        NULL),
+       ('5a4d0000-0000-4000-8000-000000000004', 0, now(), now(), 'sandbox-logistician',
+        'sandbox-logistician@example.invalid', 'Sandbox Logistician', true, true, current_date,
+        'ACTIVE', now(), NULL)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id)
@@ -16,7 +19,8 @@ SELECT u.id, r.id
 FROM (VALUES ('5a4d0000-0000-4000-8000-000000000001'::uuid, 'KRT_MEMBER'),
              ('5a4d0000-0000-4000-8000-000000000002'::uuid, 'KRT_MEMBER'),
              ('5a4d0000-0000-4000-8000-000000000003'::uuid, 'KRT_MEMBER'),
-             ('5a4d0000-0000-4000-8000-000000000003'::uuid, 'ADMIN')) AS u (id, code)
+             ('5a4d0000-0000-4000-8000-000000000003'::uuid, 'ADMIN'),
+             ('5a4d0000-0000-4000-8000-000000000004'::uuid, 'KRT_MEMBER')) AS u (id, code)
 JOIN role r ON r.code = u.code
 ON CONFLICT DO NOTHING;
 
@@ -24,7 +28,7 @@ INSERT INTO terms_acceptance (id, user_id, terms_version, accepted_at)
 SELECT gen_random_uuid(), u.id, :'terms_version', now()
 FROM app_user u
 WHERE u.id IN ('5a4d0000-0000-4000-8000-000000000001', '5a4d0000-0000-4000-8000-000000000002',
-               '5a4d0000-0000-4000-8000-000000000003')
+               '5a4d0000-0000-4000-8000-000000000003', '5a4d0000-0000-4000-8000-000000000004')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO org_unit (id, version, created_at, updated_at, kind, name, shorthand, active, department)
@@ -45,6 +49,11 @@ VALUES ('5a4d0000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-0000000
        ('5a4d0000-0000-4000-8000-000000000001', '5a4d0000-0000-4000-8000-000000000101', 'SQUADRON'),
        ('5a4d0000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000001', 'SQUADRON'),
        ('5a4d0000-0000-4000-8000-000000000003', '00000000-0000-0000-0000-000000000001', 'SQUADRON')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO org_unit_membership (user_id, org_unit_id, kind, is_logistician)
+VALUES ('5a4d0000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000001', 'SQUADRON',
+        true)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO app_user (id, version, created_at, updated_at, username, email, display_name, in_keycloak,
@@ -274,6 +283,64 @@ VALUES ('5a4d0000-0000-4000-8000-000000002231', '5a4d0000-0000-4000-8000-0000000
         0)
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO job_order (id, handle, priority, created_at, updated_at, version, status,
+                       requesting_org_unit_id, responsible_org_unit_id,
+                       original_profit_org_unit_id, comment, type, lifecycle_version)
+SELECT '5a4d0000-0000-4000-8000-000000002204', 'Sandbox_Logistician', 4,
+       now() - INTERVAL '3 days', now() - INTERVAL '1 day', 0, 'IN_PROGRESS',
+       '00000000-0000-0000-0000-000000000001', p.id, p.id, 'Fuel for the sandbox convoy', 'AUEC', 1
+FROM org_unit p
+WHERE p.kind = 'BEREICH' AND p.department = 'PROFIT' AND p.active
+ON CONFLICT (id) DO NOTHING;
+
+-- Closed a day before the seed runs; every run moves the closing instant of the still-closed order
+-- again, so it lies inside the 7-day window of the job-order read after every seed (REQ-OXCH-003).
+INSERT INTO job_order (id, handle, priority, created_at, updated_at, version, status,
+                       requesting_org_unit_id, responsible_org_unit_id,
+                       original_profit_org_unit_id, comment, type, lifecycle_version, closed_at)
+SELECT '5a4d0000-0000-4000-8000-000000002205', 'Sandbox_Logistician', NULL,
+       now() - INTERVAL '4 days', now() - INTERVAL '1 day', 0, 'CANCELLED',
+       '00000000-0000-0000-0000-000000000001', p.id, p.id, 'Ordered twice by mistake', 'AUEC', 1,
+       now() - INTERVAL '1 day'
+FROM org_unit p
+WHERE p.kind = 'BEREICH' AND p.department = 'PROFIT' AND p.active
+ON CONFLICT (id) DO UPDATE SET closed_at = EXCLUDED.closed_at
+WHERE job_order.closed_at IS NOT NULL;
+
+INSERT INTO job_order_money_target (order_id, amount, version)
+VALUES ('5a4d0000-0000-4000-8000-000000002204', 250000, 0),
+       ('5a4d0000-0000-4000-8000-000000002205', 50000, 0)
+ON CONFLICT (order_id) DO NOTHING;
+
+INSERT INTO job_order_money_holder (id, order_id, user_id, revision)
+VALUES ('5a4d0000-0000-4000-8000-000000002241', '5a4d0000-0000-4000-8000-000000002204',
+        '5a4d0000-0000-4000-8000-000000000001', 2)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO job_order_money_recipient (id, order_id, user_id, active)
+VALUES ('5a4d0000-0000-4000-8000-000000002242', '5a4d0000-0000-4000-8000-000000002204',
+        '5a4d0000-0000-4000-8000-000000000004', true)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO job_order_money_operation (id, order_id, operation_id, holder_id, actor_id,
+                                       selection_kind, bank_handling, amount, recorded_at, kind,
+                                       recipient_id, new_provision, fee_rate, fee)
+VALUES ('5a4d0000-0000-4000-8000-000000002243', '5a4d0000-0000-4000-8000-000000002204',
+        '5a4d0000-0000-4000-8000-000000002245', '5a4d0000-0000-4000-8000-000000002241',
+        '5a4d0000-0000-4000-8000-000000000001', 'SELF', false, 150000, now() - INTERVAL '2 days',
+        'PROVISION', NULL, NULL, NULL, NULL),
+       ('5a4d0000-0000-4000-8000-000000002244', '5a4d0000-0000-4000-8000-000000002204',
+        '5a4d0000-0000-4000-8000-000000002246', '5a4d0000-0000-4000-8000-000000002241',
+        '5a4d0000-0000-4000-8000-000000000001', 'EXISTING', false, 100000, now() - INTERVAL '1 day',
+        'HANDOVER', '5a4d0000-0000-4000-8000-000000002242', 0, 0, 0)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO job_order_assignees (id, job_order_id, user_id, note, version, created_at, updated_at)
+VALUES ('5a4d0000-0000-4000-8000-000000002251', '5a4d0000-0000-4000-8000-000000002204',
+        '5a4d0000-0000-4000-8000-000000000001', 'Collecting the rest from the next mining run', 0,
+        now(), now())
+ON CONFLICT DO NOTHING;
+
 INSERT INTO exchange_client (id, client_id, display_name, status, contact_url, created_at, version)
 VALUES ('5a4d0000-0000-4000-8000-000000002301', 'sandbox-client', 'Sandbox Client', 'ACTIVE',
         'https://example.invalid/sandbox-client', now(), 0),
@@ -290,7 +357,8 @@ FROM (VALUES ('exchange.connect'), ('exchange.blueprints.read'), ('exchange.blue
              ('exchange.orgstock.write'), ('exchange.refinery.read'), ('exchange.refinery.write'),
              ('exchange.refinery.store'), ('exchange.drafts.blueprints'),
              ('exchange.drafts.refinery'), ('exchange.bank.read'), ('exchange.bank.request'),
-             ('exchange.bank.queue'), ('exchange.patch.read'), ('exchange.patch.write')) AS c (capability)
+             ('exchange.bank.queue'), ('exchange.patch.read'), ('exchange.patch.write'),
+             ('exchange.joborders.read'), ('exchange.joborders.write')) AS c (capability)
 UNION ALL
 SELECT '5a4d0000-0000-4000-8000-000000002302'::uuid, c.capability
 FROM (VALUES ('exchange.connect'), ('exchange.blueprints.read')) AS c (capability)
@@ -303,3 +371,13 @@ WHERE id = 1 AND NOT enabled;
 UPDATE exchange_settings
 SET bank_enabled = true, bank_updated_at = now(), bank_version = bank_version + 1
 WHERE id = 1 AND NOT bank_enabled;
+
+UPDATE exchange_settings
+SET job_orders_enabled = true, job_orders_updated_at = now(),
+    job_orders_version = job_orders_version + 1
+WHERE id = 1 AND NOT job_orders_enabled;
+
+UPDATE exchange_settings
+SET job_order_writes_enabled = true, job_order_writes_updated_at = now(),
+    job_order_writes_version = job_order_writes_version + 1
+WHERE id = 1 AND NOT job_order_writes_enabled;

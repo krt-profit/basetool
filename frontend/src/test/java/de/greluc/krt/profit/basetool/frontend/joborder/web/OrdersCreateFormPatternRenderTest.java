@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,7 +37,6 @@ import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
 import de.greluc.krt.profit.basetool.frontend.support.OrderCreationOptionsFixtures;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -298,35 +298,7 @@ class OrdersCreateFormPatternRenderTest {
   private @NotNull UUID stubEditableItemOrder() {
     UUID id = UUID.randomUUID();
     JobOrderDto order =
-        new JobOrderDto(
-            id,
-            7,
-            null,
-            null,
-            "Handle",
-            "Kurz",
-            1,
-            "OPEN",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            true,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder().id(id).displayId(7).comment("Kurz").type("ITEM").canEdit(true).build();
     doReturn(order)
         .when(backendApiClient)
         .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));

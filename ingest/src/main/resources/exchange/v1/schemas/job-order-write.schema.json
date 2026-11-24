@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ingest.profit-base.online/exchange/v1/schemas/job-order-write.schema.json",
+  "title": "Job-order writes",
+  "description": "The member's writes on aUEC orders through a client, each on an explicit action of the member. Money moves only in the Basetool; there is no undo: a wrong write is repaired in the Basetool.",
+  "$defs": {
+    "create": {
+      "title": "Create an aUEC order",
+      "description": "Both units come from the create options: one of the member's requesting units and one of the responsible units. A pair that is not among them answers 400 JOB_ORDER_UNITS_NOT_OFFERED. A create under an Idempotency-Key the client already created an order of the member with answers that order; its terms are never changed.",
+      "type": "object",
+      "properties": {
+        "requestingUnitId": {
+          "$ref": "#/$defs/unitId",
+          "description": "The unit that commissions the order: one of the requestingUnits of the create options."
+        },
+        "responsibleUnitId": {
+          "$ref": "#/$defs/unitId",
+          "description": "The Profit unit that processes the order: one of the responsibleUnits of the create options."
+        },
+        "contact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Plain text naming whom to contact about the order; the Basetool shows it as text, links are not clickable."
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000,
+          "description": "Plain text; the Basetool shows it as text, links are not clickable. Absent or null for none."
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        }
+      },
+      "required": [
+        "requestingUnitId",
+        "responsibleUnitId",
+        "contact",
+        "target"
+      ]
+    },
+    "created": {
+      "title": "Created aUEC order",
+      "description": "Only the order's id, status, versions and stored target; read the order itself from the job-order snapshot or feed. A retry under the create's key answers the same order with its current state.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The order's id and the feed key. Clients store and echo it, never parse it."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "CANCELLED",
+            "REJECTED"
+          ]
+        },
+        "versions": {
+          "$ref": "job-order.schema.json#/properties/versions"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "versions",
+        "target"
+      ]
+    },
+    "cancel": {
+      "title": "Cancel an aUEC order",
+      "description": "Cancels an open or in-progress aUEC order of a unit the member writes for, only while no money operation of the order has been accepted. A stale lifecycleVersion answers 409 VERSION_CONFLICT, so a retry after the gateway's one-hour cache does too. There is no undo and no reopen through a client: a mistaken cancel is reopened in the Basetool.",
+      "type": "object",
+      "properties": {
+        "lifecycleVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "versions.lifecycle as last read."
+        }
+      },
+      "required": [
+        "lifecycleVersion"
+      ]
+    },
+    "comment": {
+      "title": "Change an aUEC order's comment",
+      "description": "Replaces the comment of an aUEC order of a unit the member writes for, under the comment's own version; the contact is never written. A cancelled order answers 409 JOB_ORDER_CLOSED. A stale commentVersion answers 409 VERSION_CONFLICT, so a retry after the gateway's one-hour cache does too. The comment then shows the application's name until it is changed in the Basetool.",
+      "type": "object",
+      "properties": {
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000,
+          "description": "Plain text; the Basetool shows it as text, links are not clickable. It is trimmed, and null or blank clears it."
+        },
+        "commentVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "versions.comment as last read."
+        }
+      },
+      "required": [
+        "comment",
+        "commentVersion"
+      ]
+    },
+    "written": {
+      "title": "Written aUEC order",
+      "description": "Only the order's id, status and new versions after a write on an existing order; read the order itself from the job-order snapshot or feed.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The order's id and the feed key. Clients store and echo it, never parse it."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "CANCELLED",
+            "REJECTED"
+          ]
+        },
+        "versions": {
+          "$ref": "job-order.schema.json#/properties/versions"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "versions"
+      ]
+    },
+    "targetChange": {
+      "title": "Change an aUEC order's target",
+      "description": "Raises or lowers the target of an open or in-progress aUEC order of a unit the member writes for, only to an amount above the order's netHandedOver, so the change never completes or reopens the order. A target at or below it answers 409 JOB_ORDER_TARGET_TOO_LOW; completing an order happens in the Basetool. A stale targetVersion answers 409 VERSION_CONFLICT, so a retry after the gateway's one-hour cache does too.",
+      "type": "object",
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "targetVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "versions.target as last read."
+        }
+      },
+      "required": [
+        "target",
+        "targetVersion"
+      ]
+    },
+    "targetChanged": {
+      "title": "aUEC order with its changed target",
+      "description": "Only the order's id, status, new versions and stored target after a target change; read the order itself from the job-order snapshot or feed.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The order's id and the feed key. Clients store and echo it, never parse it."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "CANCELLED",
+            "REJECTED"
+          ]
+        },
+        "versions": {
+          "$ref": "job-order.schema.json#/properties/versions"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "versions",
+        "target"
+      ]
+    },
+    "unitId": {
+      "type": "string",
+      "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+      "description": "An org unit id as the create options answer it."
+    },
+    "target": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000000,
+      "description": "The requested amount in whole aUEC."
+    }
+  }
+}

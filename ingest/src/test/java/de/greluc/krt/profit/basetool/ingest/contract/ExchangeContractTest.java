@@ -100,7 +100,12 @@ class ExchangeContractTest {
           "/exchange/v1/bank/queue",
           "/exchange/v1/bank/requests",
           "/exchange/v1/bank/requests/{id}/correction",
-          "/exchange/v1/bank/requests/{id}/cancel");
+          "/exchange/v1/bank/requests/{id}/cancel",
+          "/exchange/v1/job-orders",
+          "/exchange/v1/job-orders/create-options",
+          "/exchange/v1/job-orders/{id}/cancel",
+          "/exchange/v1/job-orders/{id}/target",
+          "/exchange/v1/job-orders/{id}/comment");
 
   /**
    * Narrowings within v1 the owner accepted as corrections, each with the reason: the schema now

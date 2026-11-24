@@ -259,7 +259,10 @@ public class JobOrderStockProjectionService {
         baseDto.canCancel(),
         baseDto.canReopen(),
         baseDto.lifecycleVersion(),
-        baseDto.responsibilityVersion());
+        baseDto.responsibilityVersion(),
+        baseDto.commentVersion(),
+        baseDto.createdClient(),
+        baseDto.commentClient());
   }
 
   /**

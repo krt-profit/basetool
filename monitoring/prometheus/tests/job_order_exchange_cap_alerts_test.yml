@@ -1,0 +1,41 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - both caps together are hit more than 10 times an hour for over 30 minutes
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_job_order_refused_total{job="basetool-backend", instance="backend:11261", reason="open_order_cap"}'
+        values: "0+0.1x150"
+      - series: 'basetool_exchange_job_order_refused_total{job="basetool-backend", instance="backend:11261", reason="daily_create_cap"}'
+        values: "0+0.1x150"
+      - series: 'basetool_exchange_job_order_refused_total{job="basetool-backend", instance="backend:11261", reason="not_found"}'
+        values: "0x150"
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: JobOrderExchangeCapHit
+        exp_alerts: []
+      - eval_time: 100m
+        alertname: JobOrderExchangeCapHit
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Job-order creates keep hitting the caps on client creates"
+              description: "For 30 minutes more than 10 job-order creates an hour were refused with 409 JOB_ORDER_OPEN_ORDER_CAP or 409 JOB_ORDER_DAILY_CREATE_CAP, because members already held 20 open orders created through clients or created 20 through clients today. A client keeps creating without reading its limits, or loops on creates and cancels, which notifies the writers of both units each time. Check the job-order refusals and the job-order writes per client in the „Job orders“ row of the Exchange dashboard and contact the client's author; if one client's writes cause it, follow „Faulty release on job orders“ in arc42 §6 (REQ-OXCH-009, REQ-OBS-025)."
+
+  - name: silent - the caps are hit only rarely and other refusals do not count
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_job_order_refused_total{job="basetool-backend", instance="backend:11261", reason="open_order_cap"}'
+        values: "0+0.1x120"
+      - series: 'basetool_exchange_job_order_refused_total{job="basetool-backend", instance="backend:11261", reason="daily_create_cap"}'
+        values: "0+0.05x120"
+      - series: 'basetool_exchange_job_order_refused_total{job="basetool-backend", instance="backend:11261", reason="units_not_offered"}'
+        values: "0+5x120"
+    alert_rule_test:
+      - eval_time: 100m
+        alertname: JobOrderExchangeCapHit
+        exp_alerts: []

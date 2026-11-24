@@ -2304,6 +2304,43 @@ public final class BackendSeeder {
   }
 
   /**
+   * Records over JDBC what a client's writes leave on an order (REQ-ORDERS-078): the order as
+   * created through the client, a comment last written through it, and every target change as made
+   * through it. Local-stack only.
+   *
+   * @param jobOrderId the order
+   * @param clientId the registry client id
+   * @param comment the comment the client wrote
+   */
+  public void markJobOrderClientOrigin(String jobOrderId, String clientId, String comment) {
+    try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
+        PreparedStatement order =
+            connection.prepareStatement(
+                "UPDATE job_order SET created_by_client_id = ?, comment = ?,"
+                    + " comment_client_id = ?, comment_version = comment_version + 1"
+                    + " WHERE id = ?");
+        PreparedStatement targets =
+            connection.prepareStatement(
+                "UPDATE job_order_money_target_change SET client_id = ? WHERE order_id = ?")) {
+      UUID id = UUID.fromString(jobOrderId);
+      order.setString(1, clientId);
+      order.setString(2, comment);
+      order.setString(3, clientId);
+      order.setObject(4, id);
+      if (order.executeUpdate() != 1) {
+        throw new IllegalStateException("No job order " + jobOrderId);
+      }
+      targets.setString(1, clientId);
+      targets.setObject(2, id);
+      targets.executeUpdate();
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.markJobOrderClientOrigin failed", e);
+    }
+  }
+
+  /**
    * Makes a material sellable by seeding over JDBC a {@code terminal} and a {@code material_price}
    * row with a positive sell price. Each call uses a fresh terminal. Local-stack only.
    *

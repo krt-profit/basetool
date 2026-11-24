@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MoneyProvisionRefusedException;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.DesignateJobOrderMoneyRecipientDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAuecCreation;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderLinkedMoneyRepair;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankAccountQueries;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankAccounts;
@@ -73,6 +74,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Orders")
 public class JobOrderMoneyController {
 
+  private final JobOrderAuecCreation auecCreation;
   private final JobOrderMoneyCommands commands;
   private final JobOrderMoneyBankAccountQueries bankAccounts;
   private final JobOrderLinkedMoneyRepair repair;
@@ -92,7 +94,7 @@ public class JobOrderMoneyController {
   @PreAuthorize("isAuthenticated()")
   @Operation(operationId = "createAuecJobOrder", summary = "Create an aUEC job order")
   public JobOrderDto createMoneyOrder(@Valid @RequestBody CreateAuecJobOrderDto dto) {
-    return commands.create(dto);
+    return auecCreation.create(dto);
   }
 
   /**

@@ -22,9 +22,6 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.server.PathContainer;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 
@@ -53,16 +50,5 @@ public final class BankExchangeRoutes {
   @Contract(value = "null -> false", pure = true)
   public static boolean isBank(@Nullable String path) {
     return path != null && FAMILY.matches(PathContainer.parsePath(path));
-  }
-
-  /**
-   * Tells whether the request bound to the current thread belongs to the bank route family.
-   *
-   * @return {@code true} when a servlet request is bound and its URI is a bank path
-   */
-  public static boolean isCurrentRequestBank() {
-    RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
-    return attributes instanceof ServletRequestAttributes servlet
-        && isBank(servlet.getRequest().getRequestURI());
   }
 }

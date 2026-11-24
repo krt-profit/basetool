@@ -51,6 +51,52 @@ public final class ExchangeProblemException extends DomainProblem {
   /** The bank switch is off while the global switch is on (REQ-BXCH-006). */
   public static final String BANK_EXCHANGE_DISABLED = "BANK_EXCHANGE_DISABLED";
 
+  /** The job-order family switch is off while the global switch is on (REQ-OXCH-009). */
+  public static final String JOB_ORDER_EXCHANGE_DISABLED = "JOB_ORDER_EXCHANGE_DISABLED";
+
+  /** The job-order writes switch is off while the family switch is on (REQ-OXCH-009). */
+  public static final String JOB_ORDER_WRITES_DISABLED = "JOB_ORDER_WRITES_DISABLED";
+
+  /**
+   * A job-order create names a pair the member may not create for: an unknown unit, a requesting
+   * unit the member does not write for, or a responsible unit that is not an eligible Profit unit
+   * (REQ-OXCH-004).
+   */
+  public static final String JOB_ORDER_UNITS_NOT_OFFERED = "JOB_ORDER_UNITS_NOT_OFFERED";
+
+  /**
+   * A job-order create while the member holds the open-order cap of open orders they created
+   * through clients (REQ-OXCH-009).
+   */
+  public static final String JOB_ORDER_OPEN_ORDER_CAP = "JOB_ORDER_OPEN_ORDER_CAP";
+
+  /**
+   * A job-order create once the member created the daily create cap of orders through clients
+   * within the UTC day (REQ-OXCH-009).
+   */
+  public static final String JOB_ORDER_DAILY_CREATE_CAP = "JOB_ORDER_DAILY_CREATE_CAP";
+
+  /**
+   * A client write on an existing job order whose responsibility no longer fits the Profit
+   * hierarchy (REQ-OXCH-005, REQ-ORDERS-055).
+   */
+  public static final String JOB_ORDER_RESPONSIBILITY_INVALID = "JOB_ORDER_RESPONSIBILITY_INVALID";
+
+  /** A client write on an existing job order whose status does not admit it (REQ-OXCH-005). */
+  public static final String JOB_ORDER_CLOSED = "JOB_ORDER_CLOSED";
+
+  /**
+   * A client's cancel of a job order a money operation of which was accepted already
+   * (REQ-OXCH-006).
+   */
+  public static final String JOB_ORDER_MONEY_STARTED = "JOB_ORDER_MONEY_STARTED";
+
+  /**
+   * A client's target change of a job order to an amount at or below its net handover
+   * (REQ-OXCH-007).
+   */
+  public static final String JOB_ORDER_TARGET_TOO_LOW = "JOB_ORDER_TARGET_TOO_LOW";
+
   /** The relayed client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
@@ -124,6 +170,130 @@ public final class ExchangeProblemException extends DomainProblem {
         HttpStatus.SERVICE_UNAVAILABLE,
         BANK_EXCHANGE_DISABLED,
         "The bank is switched off on the exchange.");
+  }
+
+  /**
+   * The refusal of a job-order route while the job-order family switch is off.
+   *
+   * @return the {@code 503 JOB_ORDER_EXCHANGE_DISABLED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderExchangeDisabled() {
+    return new ExchangeProblemException(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        JOB_ORDER_EXCHANGE_DISABLED,
+        "Job orders are switched off on the exchange.");
+  }
+
+  /**
+   * The refusal of a job-order write while the job-order writes switch is off.
+   *
+   * @return the {@code 503 JOB_ORDER_WRITES_DISABLED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderWritesDisabled() {
+    return new ExchangeProblemException(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        JOB_ORDER_WRITES_DISABLED,
+        "Job-order writes are switched off on the exchange.");
+  }
+
+  /**
+   * The refusal of a job-order create whose pair the member may not create for, naming no side.
+   *
+   * @param cause the create command's refusal, kept for the log only
+   * @return the {@code 400 JOB_ORDER_UNITS_NOT_OFFERED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderUnitsNotOffered(
+      @NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.BAD_REQUEST,
+        JOB_ORDER_UNITS_NOT_OFFERED,
+        "The job-order pair is not among the create options.",
+        cause);
+  }
+
+  /**
+   * The refusal of a job-order create while the member holds the open-order cap.
+   *
+   * @param cause the create command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_OPEN_ORDER_CAP} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderOpenOrderCap(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_OPEN_ORDER_CAP,
+        "The member holds the open-order cap of client-created job orders.",
+        cause);
+  }
+
+  /**
+   * The refusal of a job-order create once the member reached the daily create cap.
+   *
+   * @param cause the create command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_DAILY_CREATE_CAP} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderDailyCreateCap(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_DAILY_CREATE_CAP,
+        "The member reached the daily create cap of client-created job orders.",
+        cause);
+  }
+
+  /**
+   * The refusal of a client write on a job order whose responsibility is invalid.
+   *
+   * @param cause the command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_RESPONSIBILITY_INVALID} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderResponsibilityInvalid(
+      @NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_RESPONSIBILITY_INVALID,
+        "The job order's responsibility is invalid.",
+        cause);
+  }
+
+  /**
+   * The refusal of a client write on a job order whose status does not admit it.
+   *
+   * @param cause the command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_CLOSED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderClosed(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_CLOSED,
+        "The job order's status does not admit the write.",
+        cause);
+  }
+
+  /**
+   * The refusal of a client's cancel once a money operation of the order was accepted.
+   *
+   * @param cause the command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_MONEY_STARTED} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderMoneyStarted(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_MONEY_STARTED,
+        "A money operation of the job order was accepted already.",
+        cause);
+  }
+
+  /**
+   * The refusal of a client's target change to an amount at or below the order's net handover.
+   *
+   * @param cause the command's refusal, kept for the log only
+   * @return the {@code 409 JOB_ORDER_TARGET_TOO_LOW} refusal
+   */
+  public static @NotNull ExchangeProblemException jobOrderTargetTooLow(@NotNull Throwable cause) {
+    return new ExchangeProblemException(
+        HttpStatus.CONFLICT,
+        JOB_ORDER_TARGET_TOO_LOW,
+        "The new target does not lie above the job order's net handover.",
+        cause);
   }
 
   /**

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -85,35 +86,22 @@ class JobOrderResponsibilityRecoveryMvcTest {
             userId, "reader", "Reader", "Reader", null, null, null, Set.of(), Set.of(), null, false,
             false, true, null, List.of(), 0L, null, null);
     JobOrderDto order =
-        new JobOrderDto(
-            id,
-            51,
-            null,
-            null,
-            "Reader",
-            "Preserved order history",
-            1,
-            status,
-            "MATERIAL",
-            true,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(new JobOrderAssigneeDto(user, "Preserved own note", 1L)),
-            List.of(),
-            List.of(),
-            Instant.parse("2026-11-01T10:00:00Z"),
-            4L,
-            false,
-            false,
-            true,
-            true,
-            true,
-            false,
-            false,
-            false,
-            0L,
-            6L);
+        jobOrder()
+            .id(id)
+            .displayId(51)
+            .handle("Reader")
+            .comment("Preserved order history")
+            .status(status)
+            .assignees(List.of(new JobOrderAssigneeDto(user, "Preserved own note", 1L)))
+            .createdAt(Instant.parse("2026-11-01T10:00:00Z"))
+            .version(4L)
+            .canEdit(false)
+            .canManageAssignees(false)
+            .responsibilityInvalid(true)
+            .originalProfitBoundaryUnknown(true)
+            .canTransferResponsibility(true)
+            .responsibilityVersion(6L)
+            .build();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
     List<OrgUnitMembershipOptionDto> options =
@@ -179,35 +167,18 @@ class JobOrderResponsibilityRecoveryMvcTest {
   void requesterEditControlsFollowExplicitBackendCapability(boolean mayEdit) throws Exception {
     UUID id = UUID.randomUUID();
     JobOrderDto order =
-        new JobOrderDto(
-            id,
-            51,
-            null,
-            null,
-            "Requester",
-            null,
-            1,
-            "OPEN",
-            "MATERIAL",
-            true,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.parse("2026-11-01T10:00:00Z"),
-            4L,
-            false,
-            false,
-            false,
-            true,
-            false,
-            mayEdit,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(id)
+            .displayId(51)
+            .handle("Requester")
+            .createdAt(Instant.parse("2026-11-01T10:00:00Z"))
+            .version(4L)
+            .canEdit(false)
+            .canManageAssignees(false)
+            .originalProfitBoundaryUnknown(true)
+            .canTransferResponsibility(false)
+            .canEditAsRequester(mayEdit)
+            .build();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
 
@@ -234,35 +205,18 @@ class JobOrderResponsibilityRecoveryMvcTest {
     UUID id = UUID.randomUUID();
     UUID target = UUID.randomUUID();
     JobOrderDto recovered =
-        new JobOrderDto(
-            id,
-            51,
-            null,
-            null,
-            "Reader",
-            null,
-            1,
-            "COMPLETED",
-            "MATERIAL",
-            true,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.parse("2026-11-01T10:00:00Z"),
-            5L,
-            false,
-            false,
-            false,
-            true,
-            true,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(id)
+            .displayId(51)
+            .handle("Reader")
+            .status("COMPLETED")
+            .createdAt(Instant.parse("2026-11-01T10:00:00Z"))
+            .version(5L)
+            .canEdit(false)
+            .canManageAssignees(false)
+            .originalProfitBoundaryUnknown(true)
+            .canTransferResponsibility(true)
+            .build();
     when(backendApiClient.patch(
             eq("/api/v1/orders/{id}/responsible-org-unit"),
             eq(new ReassignResponsibleOrgUnitRequest(target, 6L)),
@@ -291,35 +245,17 @@ class JobOrderResponsibilityRecoveryMvcTest {
     UUID id = UUID.randomUUID();
     UUID requesterId = UUID.randomUUID();
     JobOrderDto order =
-        new JobOrderDto(
-            id,
-            51,
-            null,
-            new SquadronReferenceDto(requesterId, "Requesting Bereich", "RB"),
-            "Reader",
-            null,
-            1,
-            "OPEN",
-            "MATERIAL",
-            true,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.parse("2026-11-01T10:00:00Z"),
-            4L,
-            true,
-            true,
-            false,
-            false,
-            true,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(id)
+            .displayId(51)
+            .requestingOrgUnit(new SquadronReferenceDto(requesterId, "Requesting Bereich", "RB"))
+            .handle("Reader")
+            .createdAt(Instant.parse("2026-11-01T10:00:00Z"))
+            .version(4L)
+            .canEdit(true)
+            .canManageAssignees(true)
+            .canTransferResponsibility(true)
+            .build();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
     when(backendApiClient.getCached(

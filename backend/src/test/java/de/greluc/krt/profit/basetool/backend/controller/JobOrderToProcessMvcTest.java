@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepositor
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -80,8 +81,12 @@ class JobOrderToProcessMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     transactionTemplate.executeWithoutResult(_ -> {
       String tag = UUID.randomUUID().toString().substring(0, 8);
-      Squadron sqA = newSquadron("Proc-A-" + tag, "PA" + tag);
-      Squadron sqB = newSquadron("Proc-B-" + tag, "PB" + tag);
+      Squadron sqA =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Proc-A-" + tag, "PA" + tag);
+      Squadron sqB =
+          OrgUnitFixtures.persistedProfitSquadron(
+              squadronRepository, orgUnitRepository, "Proc-B-" + tag, "PB" + tag);
       SpecialCommand sk = new SpecialCommand();
       sk.setName("Proc-SK-" + tag);
       sk.setShorthand("PS" + tag);
@@ -175,14 +180,6 @@ class JobOrderToProcessMvcTest {
             .getResponse()
             .getContentAsString();
     return JsonPath.read(body, "$.content[*].id");
-  }
-
-  private Squadron newSquadron(String name, String shorthand) {
-    Squadron s = new Squadron();
-    s.setName(name);
-    s.setShorthand(shorthand);
-    withinProfit(s, persistedProfitArea(orgUnitRepository));
-    return squadronRepository.save(s);
   }
 
   private JobOrder newOrder(OrgUnit responsible, OrgUnit requesting) {

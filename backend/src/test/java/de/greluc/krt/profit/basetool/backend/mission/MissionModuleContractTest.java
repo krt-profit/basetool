@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.mission;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -38,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;
@@ -96,9 +95,15 @@ class MissionModuleContractTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String tag = UUID.randomUUID().toString().substring(0, 6);
-    home = squadron("MisHome-" + tag, "M" + tag);
+    home =
+        OrgUnitFixtures.persistedProfitSquadron(
+            squadronRepository, orgUnitRepository, "MisHome-" + tag, "M" + tag);
     insider = member("mis-insider", home);
-    outsider = member("mis-outsider", squadron("MisForeign-" + tag, "N" + tag));
+    outsider =
+        member(
+            "mis-outsider",
+            OrgUnitFixtures.persistedProfitSquadron(
+                squadronRepository, orgUnitRepository, "MisForeign-" + tag, "N" + tag));
   }
 
   @Test
@@ -216,14 +221,6 @@ class MissionModuleContractTest {
     entityManager.flush();
     return jdbc.queryForList(
         "SELECT event_type FROM audit_event WHERE subject_id = ?", String.class, id);
-  }
-
-  private Squadron squadron(String name, String shorthand) {
-    Squadron squadron = new Squadron();
-    squadron.setName(name);
-    squadron.setShorthand(shorthand);
-    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
-    return squadronRepository.save(squadron);
   }
 
   private User member(String username, Squadron unit) {

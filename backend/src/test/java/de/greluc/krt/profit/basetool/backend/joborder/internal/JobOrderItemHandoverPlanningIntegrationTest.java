@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -130,6 +131,7 @@ class JobOrderItemHandoverPlanningIntegrationTest extends MaterialContributionTe
             sources.stream()
                 .map(source -> new JobOrderItemHandoverEntryCreateDto(source.lineId(), 2))
                 .toList());
+    Instant beforeHandover = Instant.now().truncatedTo(ChronoUnit.MICROS);
 
     mvc()
         .perform(
@@ -152,6 +154,8 @@ class JobOrderItemHandoverPlanningIntegrationTest extends MaterialContributionTe
       var remaining = stockReads.findRow(spare.rowId()).orElseThrow();
       assertThat(remaining.getAmount()).isEqualTo(1.0);
       assertThat(remaining.isEarmarkedForJobOrder(fixture.orderId())).isFalse();
+      assertThat(jobOrderRepository.findById(fixture.orderId()).orElseThrow().getClosedAt())
+          .isBetween(beforeHandover, Instant.now());
     });
     String body =
         mvc()

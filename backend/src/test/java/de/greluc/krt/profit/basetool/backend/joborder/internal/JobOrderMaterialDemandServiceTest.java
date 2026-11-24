@@ -57,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -180,11 +181,7 @@ class JobOrderMaterialDemandServiceTest {
   }
 
   private static Squadron squadron(String shorthand) {
-    Squadron squadron = new Squadron();
-    squadron.setId(UUID.randomUUID());
-    squadron.setName(shorthand + " squadron");
-    squadron.setShorthand(shorthand);
-    return squadron;
+    return OrgUnitFixtures.squadron(UUID.randomUUID(), shorthand + " squadron", shorthand);
   }
 
   /**

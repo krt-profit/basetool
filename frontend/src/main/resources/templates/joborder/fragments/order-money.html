@@ -21,7 +21,8 @@
              th:data-can-designate-recipient="${money.canDesignateRecipient}"
              th:data-can-edit-target="${money.canEditTarget}" th:data-can-edit-information="${money.canEditInformation}"
              th:data-target="${money.target}" th:data-target-version="${money.targetVersion}"
-             th:data-information-version="${money.informationVersion}" th:data-remaining="${money.remaining}"
+             th:data-information-version="${money.informationVersion}" th:data-comment-version="${order.commentVersion}"
+             th:data-remaining="${money.remaining}"
              th:data-net-handed-over="${money.netHandedOver}" th:data-status="${order.status}"
              th:data-lifecycle-version="${order.lifecycleVersion}"
              th:data-status-label="#{__${orderStatusKey}__}"
@@ -191,8 +192,10 @@
                     <div>
                         <strong th:text="#{orders.money.history.target(
                             ${@moneyFormat.exactWhole(change.previousTarget, #locale)}, ${@moneyFormat.exactWhole(change.target, #locale)})}"></strong>
-                        <div th:text="#{orders.money.history.recordedBy(
-                            ${@handles.display(change.actorName) ?: #messages.msg('orders.money.nameUnavailable')})}"></div>
+                        <div th:with="actor=${@handles.display(change.actorName) ?: #messages.msg('orders.money.nameUnavailable')}"
+                             th:text="${change.client == null} ? #{orders.money.history.recordedBy(${actor})}
+                                 : #{orders.money.history.recordedByClient(${actor}, ${change.client})}"
+                             th:data-testid="${change.client != null ? 'order-money-target-change-client' : null}"></div>
                     </div>
                     <time class="od-money-date" th:datetime="${change.recordedAt}" th:data-utc="${change.recordedAt}"></time>
                 </li>

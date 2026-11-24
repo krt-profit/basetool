@@ -25,7 +25,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -39,8 +41,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchDto;
-import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitch;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeAreaSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRunDetailDto;
@@ -56,12 +59,15 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -83,6 +89,9 @@ class AdminExchangeClientsPageControllerMvcTest {
 
   private static final UUID ID = UUID.fromString("7a0c7a0c-0000-4000-8000-00000000c11e");
   private static final UUID RUN = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000d0");
+
+  /** The backend endpoint of an area switch, named by its path segment. */
+  private static final String AREA_SWITCH = "/api/v1/connected-apps/admin/settings/{area}";
 
   private MockMvc mockMvc;
 
@@ -117,9 +126,12 @@ class AdminExchangeClientsPageControllerMvcTest {
         .thenReturn(List.of(client));
     when(backendApiClient.get("/api/v1/connected-apps/admin/settings", ExchangeSettingsDto.class))
         .thenReturn(new ExchangeSettingsDto(true, null, 5L));
-    when(backendApiClient.get(
-            "/api/v1/connected-apps/admin/settings/bank", ExchangeBankSwitchDto.class))
-        .thenReturn(new ExchangeBankSwitchDto(false, null, 2L));
+    when(backendApiClient.get(AREA_SWITCH, ExchangeAreaSwitchDto.class, "bank"))
+        .thenReturn(new ExchangeAreaSwitchDto(false, null, 2L));
+    when(backendApiClient.get(AREA_SWITCH, ExchangeAreaSwitchDto.class, "job-orders"))
+        .thenReturn(new ExchangeAreaSwitchDto(true, Instant.parse("2026-11-20T09:00:00Z"), 7L));
+    when(backendApiClient.get(AREA_SWITCH, ExchangeAreaSwitchDto.class, "job-order-writes"))
+        .thenReturn(new ExchangeAreaSwitchDto(false, null, 4L));
   }
 
   @Test
@@ -426,17 +438,18 @@ class AdminExchangeClientsPageControllerMvcTest {
         .containsPattern("id=\"xc-bank-switch\"[^>]*data-enabled=\"false\"[^>]*data-version=\"2\"")
         .containsPattern("id=\"xc-switch\"[^>]*data-version=\"5\"")
         .contains("Kartellbank im Datenaustausch")
-        .containsPattern("data-xc-bank-switch[^>]*>Einschalten<");
+        .containsPattern("data-xc-area-switch=\"xc-bank-switch\"[^>]*>Einschalten<");
   }
 
   @Test
   @WithMockUser(roles = "ADMIN")
   void theBankSwitchIsRelayedWithItsOwnVersionAndAConflictComesBackAsAConflict() throws Exception {
     when(backendApiClient.put(
-            eq("/api/v1/connected-apps/admin/settings/bank"),
-            eq(new ExchangeBankSwitchUpdateRequest(true, 2L)),
-            eq(ExchangeBankSwitchDto.class)))
-        .thenReturn(new ExchangeBankSwitchDto(true, Instant.parse("2026-11-08T12:00:00Z"), 3L))
+            eq(AREA_SWITCH),
+            eq(new ExchangeAreaSwitchUpdateRequest(true, 2L)),
+            eq(ExchangeAreaSwitchDto.class),
+            eq("bank")))
+        .thenReturn(new ExchangeAreaSwitchDto(true, Instant.parse("2026-11-08T12:00:00Z"), 3L))
         .thenThrow(new BackendServiceException("stale", null, 409));
 
     mockMvc
@@ -464,10 +477,230 @@ class AdminExchangeClientsPageControllerMvcTest {
   void theBankSwitchConfirmationsAreTranslated() throws Exception {
     stubRegistry();
 
-    assertThat(messageHolders(Locale.GERMAN))
-        .contains("data-confirm-bank-off-title=\"Kartellbank im Datenaustausch ausschalten?\"");
-    assertThat(messageHolders(Locale.ENGLISH))
-        .contains("data-confirm-bank-on-title=\"Switch the Kartellbank on in the data exchange?\"");
+    assertThat(switchCard(Locale.GERMAN, "xc-bank-switch"))
+        .contains("data-confirm-off-title=\"Kartellbank im Datenaustausch ausschalten?\"");
+    assertThat(switchCard(Locale.ENGLISH, "xc-bank-switch"))
+        .contains("data-confirm-on-title=\"Switch the Kartellbank on in the data exchange?\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theRegistryFragmentRendersBothJobOrderSwitchesWithTheirOwnVersions() throws Exception {
+    stubRegistry();
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/exchange-clients").param("fragment", "registry").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern(
+            "id=\"xc-job-order-switch\"[^>]*data-enabled=\"true\"[^>]*data-version=\"7\"")
+        .containsPattern(
+            "id=\"xc-job-order-writes-switch\"[^>]*data-enabled=\"false\"[^>]*data-version=\"4\"")
+        .contains("Aufträge im Datenaustausch")
+        .contains("Auftragsänderungen im Datenaustausch")
+        .containsPattern("data-xc-area-switch=\"xc-job-order-switch\"[^>]*>Ausschalten<")
+        .containsPattern("data-xc-area-switch=\"xc-job-order-writes-switch\"[^>]*>Einschalten<");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void aFailedLoadRendersNoJobOrderSwitch() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/connected-apps/admin/clients"), anyTypeRef()))
+        .thenThrow(new BackendServiceException("down", null, 503));
+
+    mockMvc
+        .perform(get("/admin/exchange-clients").param("fragment", "registry"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("areaSwitches", Map.of()))
+        .andExpect(content().string(not(containsString("xc-job-order-switch"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void bothJobOrderSwitchesAreRelayedWithTheirOwnVersionsAndAConflictComesBackAsAConflict()
+      throws Exception {
+    when(backendApiClient.put(
+            eq(AREA_SWITCH),
+            eq(new ExchangeAreaSwitchUpdateRequest(false, 7L)),
+            eq(ExchangeAreaSwitchDto.class),
+            eq("job-orders")))
+        .thenReturn(new ExchangeAreaSwitchDto(false, Instant.parse("2026-11-21T10:00:00Z"), 8L))
+        .thenThrow(new BackendServiceException("stale", null, 409));
+    when(backendApiClient.put(
+            eq(AREA_SWITCH),
+            eq(new ExchangeAreaSwitchUpdateRequest(true, 4L)),
+            eq(ExchangeAreaSwitchDto.class),
+            eq("job-order-writes")))
+        .thenReturn(new ExchangeAreaSwitchDto(true, Instant.parse("2026-11-21T10:05:00Z"), 5L));
+
+    mockMvc
+        .perform(
+            put("/admin/exchange-clients/settings/job-orders")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":false,\"version\":7}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enabled").value(false))
+        .andExpect(jsonPath("$.version").value(8));
+    mockMvc
+        .perform(
+            put("/admin/exchange-clients/settings/job-orders")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":false,\"version\":7}"))
+        .andExpect(status().isConflict());
+    mockMvc
+        .perform(
+            put("/admin/exchange-clients/settings/job-order-writes")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true,\"version\":4}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enabled").value(true))
+        .andExpect(jsonPath("$.version").value(5));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void onlyAnAdminFlipsAJobOrderSwitch() throws Exception {
+    for (String path :
+        new String[] {
+          "/admin/exchange-clients/settings/job-orders",
+          "/admin/exchange-clients/settings/job-order-writes"
+        }) {
+      mockMvc
+          .perform(
+              put(path)
+                  .header("X-Requested-With", "XMLHttpRequest")
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"enabled\":true,\"version\":0}"))
+          .andExpect(status().isForbidden());
+    }
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theJobOrderSwitchConfirmationsAreTranslated() throws Exception {
+    stubRegistry();
+
+    assertThat(switchCard(Locale.GERMAN, "xc-job-order-switch"))
+        .contains("data-confirm-off-title=\"Aufträge im Datenaustausch ausschalten?\"");
+    assertThat(switchCard(Locale.GERMAN, "xc-job-order-writes-switch"))
+        .contains("data-confirm-off-title=\"Auftragsänderungen im Datenaustausch ausschalten?\"");
+    assertThat(switchCard(Locale.ENGLISH, "xc-job-order-switch"))
+        .contains("data-confirm-on-title=\"Switch job orders on in the data exchange?\"");
+    assertThat(switchCard(Locale.ENGLISH, "xc-job-order-writes-switch"))
+        .contains("data-confirm-on-title=\"Switch job-order changes on in the data exchange?\"");
+  }
+
+  @ParameterizedTest
+  @EnumSource(ExchangeAreaSwitch.class)
+  @WithMockUser(roles = "ADMIN")
+  void everyAreaSwitchIsRenderedAndRelayedUnderItsOwnSegment(ExchangeAreaSwitch area)
+      throws Exception {
+    stubRegistry();
+    when(backendApiClient.put(
+            eq(AREA_SWITCH),
+            eq(new ExchangeAreaSwitchUpdateRequest(false, 9L)),
+            eq(ExchangeAreaSwitchDto.class),
+            eq(segment(area))))
+        .thenReturn(new ExchangeAreaSwitchDto(false, Instant.parse("2026-11-24T08:00:00Z"), 10L));
+
+    mockMvc
+        .perform(
+            put("/admin/exchange-clients/settings/" + segment(area))
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":false,\"version\":9}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(10));
+
+    for (Locale locale : List.of(Locale.GERMAN, Locale.ENGLISH)) {
+      assertThat(switchCard(locale, cardId(area)))
+          .as("the %s card in %s", area, locale)
+          .contains("data-xc-area=\"" + segment(area) + "\"")
+          .contains("data-xc-area-switch=\"" + cardId(area) + "\"")
+          .doesNotContain("??");
+    }
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void anUnknownAreaSwitchIsNotRelayed() throws Exception {
+    mockMvc
+        .perform(
+            put("/admin/exchange-clients/settings/garage")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true,\"version\":0}"))
+        .andExpect(status().isNotFound());
+
+    verify(backendApiClient, never())
+        .put(anyString(), any(), eq(ExchangeAreaSwitchDto.class), any(Object[].class));
+  }
+
+  /**
+   * Renders the page in one language and returns one area switch card.
+   *
+   * @param locale the request's language
+   * @param cardId the card's id
+   * @return the card's markup
+   * @throws Exception if the request fails
+   */
+  private String switchCard(Locale locale, String cardId) throws Exception {
+    stubRegistry();
+    String html =
+        mockMvc
+            .perform(get("/admin/exchange-clients").param("lang", locale.getLanguage()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    Matcher card =
+        Pattern.compile("<section[^>]*id=\"" + cardId + "\".*?</section>", Pattern.DOTALL)
+            .matcher(html);
+    assertThat(card.find()).as("the card %s", cardId).isTrue();
+    return card.group();
+  }
+
+  /**
+   * Names the path segment of an area switch.
+   *
+   * @param area the switch
+   * @return its segment
+   */
+  private static String segment(ExchangeAreaSwitch area) {
+    return switch (area) {
+      case BANK -> "bank";
+      case JOB_ORDERS -> "job-orders";
+      case JOB_ORDER_WRITES -> "job-order-writes";
+    };
+  }
+
+  /**
+   * Names the card id of an area switch.
+   *
+   * @param area the switch
+   * @return its card id
+   */
+  private static String cardId(ExchangeAreaSwitch area) {
+    return switch (area) {
+      case BANK -> "xc-bank-switch";
+      case JOB_ORDERS -> "xc-job-order-switch";
+      case JOB_ORDER_WRITES -> "xc-job-order-writes-switch";
+    };
   }
 
   @Test

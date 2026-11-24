@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -233,31 +234,104 @@ class OrdersDetailPatternRenderTest {
   @Test
   void requesterCanCancelWithTheLifecycleVersion() throws Exception {
     UUID orderId = UUID.randomUUID();
-    JobOrderDto order =
+    stubOrder(
+        orderJson(
+            """
+            {
+              "id": "%s",
+              "displayId": 7,
+              "type": "MATERIAL",
+              "status": "OPEN",
+              "version": 17,
+              "lifecycleVersion": 8,
+              "canCancel": true,
+              "canEditAsRequester": true
+            }
+            """
+                .formatted(orderId)));
+
+    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
+        .containsPattern("data-testid=\"order-cancel\"[^>]*data-version=\"8\"")
+        .doesNotContain("id=\"status-select\"")
+        .doesNotContain("data-testid=\"order-reopen\"");
+  }
+
+  /** The material edit form echoes the order version and the comment version beside it. */
+  @Test
+  void materialEditFormEchoesTheOrderAndTheCommentVersion() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    stubOrder(
+        orderJson(
+            """
+            {
+              "id": "%s",
+              "displayId": 7,
+              "type": "MATERIAL",
+              "status": "OPEN",
+              "version": 17,
+              "commentVersion": 4,
+              "canEditAsRequester": true
+            }
+            """
+                .formatted(orderId)));
+
+    assertThat(editForm(render(orderId, "ROLE_KRT_MEMBER")))
+        .containsPattern("name=\"version\"[^>]*value=\"17\"")
+        .containsPattern("name=\"commentVersion\"[^>]*value=\"4\"");
+  }
+
+  /** The refreshed money section carries the contact version and the comment version. */
+  @Test
+  void moneyFragmentEchoesTheContactAndTheCommentVersion() throws Exception {
+    UUID order = UUID.randomUUID();
+    stubOrder(
+        orderJson(
+            """
+            {
+              "id": "%s",
+              "displayId": 7,
+              "type": "AUEC",
+              "status": "IN_PROGRESS",
+              "handle": "Contact",
+              "comment": "Note",
+              "commentVersion": 5
+            }
+            """
+                .formatted(order)));
+    JobOrderMoneyView money =
         JsonMapper.builder()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .build()
             .readValue(
                 """
                 {
-                  "id": "%s",
-                  "displayId": 7,
-                  "type": "MATERIAL",
-                  "status": "OPEN",
-                  "version": 17,
-                  "lifecycleVersion": 8,
-                  "canCancel": true,
-                  "canEditAsRequester": true
+                  "target":"500000","targetVersion":2,"provided":"0","holdings":"0",
+                  "netHandedOver":"0","remaining":"500000","fees":"0","overpaid":"0",
+                  "responsibilityValid":true,"canEditInformation":true,"informationVersion":3,
+                  "history":[],"targetChanges":[],"recipients":[],"holderIdentityHistory":[],
+                  "returnableRecipientIds":[],"holders":[],"linkedAttempts":[]
                 }
-                """
-                    .formatted(orderId),
-                JobOrderDto.class);
-    stubOrder(order);
+                """,
+                JobOrderMoneyView.class);
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/money"), eq(JobOrderMoneyView.class), eq(order)))
+        .thenReturn(money);
 
-    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
-        .containsPattern("data-testid=\"order-cancel\"[^>]*data-version=\"8\"")
-        .doesNotContain("id=\"status-select\"")
-        .doesNotContain("data-testid=\"order-reopen\"");
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/{id}", order)
+                    .param("fragment", "money")
+                    .header("Accept-Language", "de")
+                    .with(authentication(token("ROLE_KRT_MEMBER"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-information-version=\"3\"", "data-comment-version=\"5\"")
+        .contains("data-handle=\"Contact\"", "data-comment=\"Note\"");
   }
 
   @Test
@@ -478,6 +552,113 @@ class OrdersDetailPatternRenderTest {
     assertThat(summary.group(1)).contains(">OWN<").doesNotContain(">PAST<");
   }
 
+  /**
+   * An order a client created carries the chip beside the status badge, and its comment the marker
+   * of the client that last wrote it, inside the header the live frames refresh (REQ-ORDERS-078).
+   */
+  @Test
+  void aClientsOrderShowsTheCreatorChipAndTheCommentMarker() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    stubOrder(
+        orderJson(
+            """
+            {
+              "id": "%s",
+              "displayId": 7,
+              "type": "MATERIAL",
+              "status": "OPEN",
+              "comment": "Bring it to Area18",
+              "createdClient": "VerseKit",
+              "commentClient": "Cargo Kit"
+            }
+            """
+                .formatted(orderId)));
+
+    String html = render(orderId, "ROLE_KRT_MEMBER");
+    String head =
+        html.substring(
+            html.indexOf("class=\"page-title\""), html.indexOf("class=\"page-actions\""));
+    String header = fragment(orderId, "header");
+
+    assertThat(head)
+        .containsPattern(
+            "<span class=\"chip chip--info\" data-testid=\"order-created-client\"[^>]*>über"
+                + " VerseKit</span>");
+    assertThat(header)
+        .containsPattern("data-testid=\"order-comment-client\"[^>]*>über Cargo Kit</span>")
+        .doesNotContain("order-created-client");
+  }
+
+  /** An order and a comment written in the web carry no origin marker (REQ-ORDERS-078). */
+  @Test
+  void aWebOrderShowsNoOriginMarker() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    stubOrder(
+        orderJson(
+            """
+            {
+              "id": "%s",
+              "displayId": 7,
+              "type": "MATERIAL",
+              "status": "OPEN",
+              "comment": "Bring it to Area18"
+            }
+            """
+                .formatted(orderId)));
+
+    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
+        .contains("Bring it to Area18")
+        .doesNotContain("order-created-client", "order-comment-client");
+  }
+
+  /**
+   * The target history names the client of a change made through one beside its member, and a web
+   * change by the member alone, in the money section the live frames refresh (REQ-ORDERS-078).
+   */
+  @Test
+  void theTargetHistoryNamesTheClientOfAChangeMadeThroughIt() throws Exception {
+    UUID order = UUID.randomUUID();
+    stubOrder(
+        orderJson(
+            """
+            {"id": "%s", "displayId": 7, "type": "AUEC", "status": "IN_PROGRESS"}
+            """
+                .formatted(order)));
+    JobOrderMoneyView money =
+        JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build()
+            .readValue(
+                """
+                {
+                  "target":"500000","targetVersion":2,"provided":"0","holdings":"0",
+                  "netHandedOver":"0","remaining":"500000","fees":"0","overpaid":"0",
+                  "responsibilityValid":true,"history":[],"recipients":[],
+                  "holderIdentityHistory":[],"returnableRecipientIds":[],"holders":[],
+                  "linkedAttempts":[],
+                  "targetChanges":[
+                    {"id":"%s","previousTarget":"250000","target":"400000",
+                     "recordedAt":"2026-11-20T10:00:00Z","actorName":"Ada","client":"VerseKit"},
+                    {"id":"%s","previousTarget":"400000","target":"500000",
+                     "recordedAt":"2026-11-21T10:00:00Z","actorName":"Bea","client":null}
+                  ]
+                }
+                """
+                    .formatted(UUID.randomUUID(), UUID.randomUUID()),
+                JobOrderMoneyView.class);
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/money"), eq(JobOrderMoneyView.class), eq(order)))
+        .thenReturn(money);
+
+    String html = fragment(order, "money");
+
+    assertThat(html)
+        .containsPattern(
+            "data-testid=\"order-money-target-change-client\"[^>]*>Erfasst von: Ada über VerseKit<")
+        .contains(">Erfasst von: Bea<");
+    assertThat(html.split("order-money-target-change-client", -1)).hasSize(2);
+  }
+
   /** Offers the responsibility transfer only through its dialog, and only with the capability. */
   @Test
   void responsibilityTransferLivesInADialogBehindTheCapability() throws Exception {
@@ -502,6 +683,19 @@ class OrdersDetailPatternRenderTest {
   }
 
   /**
+   * Reads an order DTO from the fields a test sets, leaving every other field at its default.
+   *
+   * @param json the order's JSON
+   * @return the order DTO
+   */
+  private static @NotNull JobOrderDto orderJson(@NotNull String json) {
+    return JsonMapper.builder()
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .build()
+        .readValue(json, JobOrderDto.class);
+  }
+
+  /**
    * Renders the order detail page in German for a principal with one role.
    *
    * @param orderId the order to open
@@ -515,6 +709,28 @@ class OrdersDetailPatternRenderTest {
             get("/orders/" + orderId)
                 .header("Accept-Language", "de")
                 .with(authentication(token(role))))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * Renders one live-update fragment of the order detail page in German for a member.
+   *
+   * @param orderId the order to open
+   * @param fragment the fragment the live frames request
+   * @return the rendered fragment
+   * @throws Exception if the request fails
+   */
+  private @NotNull String fragment(@NotNull UUID orderId, @NotNull String fragment)
+      throws Exception {
+    return mockMvc
+        .perform(
+            get("/orders/{id}", orderId)
+                .param("fragment", fragment)
+                .header("Accept-Language", "de")
+                .with(authentication(token("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk())
         .andReturn()
         .getResponse()
@@ -558,35 +774,17 @@ class OrdersDetailPatternRenderTest {
       @NotNull List<JobOrderItemDto> items,
       @NotNull List<JobOrderHandoverDto> handovers,
       boolean readOnly) {
-    return new JobOrderDto(
-        orderId,
-        7,
-        null,
-        null,
-        "Handle",
-        null,
-        1,
-        status,
-        type,
-        true,
-        materials,
-        items,
-        List.of(),
-        List.of(),
-        handovers,
-        List.of(),
-        Instant.now(),
-        1L,
-        !readOnly,
-        null,
-        false,
-        false,
-        !readOnly,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .id(orderId)
+        .displayId(7)
+        .status(status)
+        .type(type)
+        .materials(materials)
+        .items(items)
+        .handovers(handovers)
+        .canEdit(!readOnly)
+        .canTransferResponsibility(!readOnly)
+        .build();
   }
 
   /**

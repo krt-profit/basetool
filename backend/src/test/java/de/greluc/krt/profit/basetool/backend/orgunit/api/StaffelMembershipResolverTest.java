@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -159,13 +160,5 @@ class StaffelMembershipResolverTest {
     m.setId(new OrgUnitMembershipId(userId, squadronId));
     m.setKind(OrgUnitKind.SQUADRON);
     return m;
-  }
-
-  /** Builds a squadron fixture with the given id and name. */
-  private static Squadron squadron(UUID id, String name) {
-    Squadron s = new Squadron();
-    s.setId(id);
-    s.setName(name);
-    return s;
   }
 }

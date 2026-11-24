@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,7 +63,10 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/** Verifies creation enters the created order's common workspace through every form transport. */
+/**
+ * Verifies creation enters the created order's common workspace through every form transport and
+ * leaves the {@code orders} frame to the backend's create command (REQ-ORDERS-056).
+ */
 class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
 
   private static final UUID CREATED_ID = UUID.fromString("00000000-0000-0000-0000-000000000053");
@@ -117,6 +121,7 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
           .andExpect(status().is3xxRedirection())
           .andExpect(redirectedUrl("/orders/" + CREATED_ID));
     }
+    verifyNoInteractions(liveSyncLocalBus);
   }
 
   @ParameterizedTest
@@ -138,7 +143,7 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
           .andExpect(redirectedUrl("/orders/" + CREATED_ID))
           .andExpect(flash().attribute("successToast", "success.joborder.create"));
     }
-    verify(liveSyncLocalBus).publish("orders", List.of("queue"));
+    verifyNoInteractions(liveSyncLocalBus);
   }
 
   @ParameterizedTest
@@ -229,34 +234,18 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
   }
 
   private static JobOrderDto createdOrder(String type) {
-    return new JobOrderDto(
-        CREATED_ID,
-        53,
-        null,
-        null,
-        "Creator",
-        null,
-        null,
-        "OPEN",
-        type,
-        false,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        Instant.parse("2026-11-09T10:00:00Z"),
-        0L,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .id(CREATED_ID)
+        .displayId(53)
+        .handle("Creator")
+        .priority(null)
+        .type(type)
+        .countBlueprintsWithVariants(false)
+        .createdAt(Instant.parse("2026-11-09T10:00:00Z"))
+        .version(0L)
+        .canEdit(false)
+        .canManageAssignees(false)
+        .canTransferResponsibility(false)
+        .build();
   }
 }

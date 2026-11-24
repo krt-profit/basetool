@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -116,35 +117,15 @@ class JobOrderPageReaderTest {
       List<JobOrderItemHandoverDto> handovers,
       boolean canEdit,
       boolean canEditAsRequester) {
-    return new JobOrderDto(
-        ID,
-        7,
-        null,
-        null,
-        "Handle",
-        null,
-        1,
-        "OPEN",
-        type,
-        true,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        handovers,
-        Instant.now(),
-        1L,
-        canEdit,
-        null,
-        false,
-        false,
-        canEdit,
-        canEditAsRequester,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .id(ID)
+        .displayId(7)
+        .type(type)
+        .itemHandovers(handovers)
+        .canEdit(canEdit)
+        .canTransferResponsibility(canEdit)
+        .canEditAsRequester(canEditAsRequester)
+        .build();
   }
 
   private static JobOrderPageReader.OrderCaller logistician() {

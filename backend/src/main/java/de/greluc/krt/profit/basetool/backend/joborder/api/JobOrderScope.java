@@ -63,6 +63,38 @@ public final class JobOrderScope {
           + ACTIVE_CALLER
           + ")";
 
+  /**
+   * Exchange relation of the order alias {@code o}: a unit of {@code :relatingUnitIds} requests it
+   * (REQ-OXCH-001).
+   */
+  public static final String EXCHANGE_REQUESTING = "o.requestingOrgUnit.id IN :relatingUnitIds";
+
+  /** Exchange relation: a unit of {@code :relatingUnitIds} is responsible for the order. */
+  public static final String EXCHANGE_RESPONSIBLE = "o.responsibleOrgUnit.id IN :relatingUnitIds";
+
+  /** Exchange relation: a unit of {@code :relatingUnitIds} actively supports the order. */
+  public static final String EXCHANGE_SUPPORTING =
+      """
+      EXISTS (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o
+        AND p.active = true AND p.claimingOrgUnit.id IN :relatingUnitIds)
+      """;
+
+  /** Exchange relation: the member {@code :memberId} holds an assignee entry on the order. */
+  public static final String EXCHANGE_ASSIGNEE =
+      "EXISTS (SELECT a.id FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id = :memberId)";
+
+  /** The exchange read set of REQ-OXCH-001: any current own relation of the member. */
+  public static final String EXCHANGE_READ_SET =
+      "("
+          + EXCHANGE_REQUESTING
+          + " OR "
+          + EXCHANGE_RESPONSIBLE
+          + " OR "
+          + EXCHANGE_SUPPORTING
+          + " OR "
+          + EXCHANGE_ASSIGNEE
+          + ")";
+
   /** Complete web order readership, independent of the reduced allocation and Exchange scope. */
   public static final String READ_PREDICATE =
       """

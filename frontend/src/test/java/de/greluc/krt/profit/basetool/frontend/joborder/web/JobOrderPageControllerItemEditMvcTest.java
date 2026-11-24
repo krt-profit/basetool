@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemR
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
@@ -83,35 +85,14 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
       String type,
       List<JobOrderItemHandoverDto> itemHandovers,
       boolean canEditAsRequester) {
-    return new JobOrderDto(
-        id,
-        7,
-        null,
-        null,
-        "Handle",
-        null,
-        1,
-        "OPEN",
-        type,
-        true,
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        List.of(),
-        itemHandovers,
-        Instant.now(),
-        1L,
-        null,
-        null,
-        false,
-        false,
-        null,
-        canEditAsRequester,
-        false,
-        false,
-        0L,
-        0L);
+    return jobOrder()
+        .id(id)
+        .displayId(7)
+        .type(type)
+        .itemHandovers(itemHandovers)
+        .canEditAsRequester(canEditAsRequester)
+        .commentVersion(3L)
+        .build();
   }
 
   /** A requesting writer edits item need after delivery through the restricted update. */
@@ -140,6 +121,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             .getContentAsString();
     assertThat(html)
         .containsPattern("name=\"version\"[^>]*value=\"1\"")
+        .containsPattern("name=\"commentVersion\"[^>]*value=\"3\"")
         .containsPattern("name=\"requesterEdit\"[^>]*value=\"true\"")
         .doesNotContain("id=\"item-handle\"", "id=\"item-requestingOrgUnitId\"");
 
@@ -152,7 +134,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             List.of(
                 new CreateJobOrderItemLineDto(
                     itemId, gameItemId, blueprintId, 4, List.of(), null, null)),
-            1L);
+            new JobOrderObservedVersions(1L, 3L));
     when(backendApiClient.put(
             eq("/api/v1/orders/{id}/items/requested"), eq(expected), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
@@ -166,6 +148,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
                 .param("handle", "ignored")
                 .param("comment", "Updated need")
                 .param("version", "1")
+                .param("commentVersion", "3")
                 .param("items[0].id", itemId.toString())
                 .param("items[0].gameItemId", gameItemId.toString())
                 .param("items[0].blueprintId", blueprintId.toString())
@@ -202,35 +185,13 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
     UUID responsibleId = UUID.randomUUID();
     UUID requestingId = UUID.randomUUID();
     JobOrderDto order =
-        new JobOrderDto(
-            id,
-            7,
-            new SquadronReferenceDto(responsibleId, "ARGON", "ARG"),
-            new SquadronReferenceDto(requestingId, "CERBERUS", "CER"),
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+        jobOrder()
+            .id(id)
+            .displayId(7)
+            .responsibleOrgUnit(new SquadronReferenceDto(responsibleId, "ARGON", "ARG"))
+            .requestingOrgUnit(new SquadronReferenceDto(requestingId, "CERBERUS", "CER"))
+            .type("ITEM")
+            .build();
     when(reader.readItemEdit(id))
         .thenReturn(
             new JobOrderPageReader.ItemEditPage(
@@ -377,36 +338,7 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             List.of(),
             false,
             1L);
-    JobOrderDto order =
-        new JobOrderDto(
-            id,
-            7,
-            null,
-            null,
-            "Handle",
-            null,
-            1,
-            "OPEN",
-            "ITEM",
-            true,
-            List.of(),
-            List.of(line),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+    JobOrderDto order = jobOrder().id(id).displayId(7).type("ITEM").items(List.of(line)).build();
     when(reader.readItemEdit(id))
         .thenReturn(JobOrderPageStubs.editable(order, List.of(), List.of()));
 

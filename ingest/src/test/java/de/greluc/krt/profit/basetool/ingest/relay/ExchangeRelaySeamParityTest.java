@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeGatewayProperties;
+import de.greluc.krt.profit.basetool.ingest.contract.AreaSwitch;
 import de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes;
 import de.greluc.krt.profit.basetool.ingest.handoff.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
@@ -42,6 +43,7 @@ import java.lang.reflect.RecordComponent;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -101,7 +103,17 @@ class ExchangeRelaySeamParityTest {
     assertThat(ExchangeRoutes.BANK_PATH)
         .isEqualTo(ExchangeSeam.GATEWAY_PREFIX + ExchangeSeam.BANK_PATH);
     assertThat(ExchangeRelay.retryAfterSeconds("BANK_EXCHANGE_DISABLED"))
-        .isEqualTo(String.valueOf(ExchangeSeam.BANK_RETRY_AFTER_SECONDS));
+        .isEqualTo(String.valueOf(ExchangeSeam.AREA_SWITCH_RETRY_AFTER_SECONDS));
+  }
+
+  @Test
+  void theJobOrderSwitchesGateTheSeamsJobOrderRouteFamilyWithTheSeamsWait() {
+    assertThat(ExchangeRoutes.JOB_ORDERS_PATH)
+        .isEqualTo(ExchangeSeam.GATEWAY_PREFIX + ExchangeSeam.JOB_ORDERS_PATH);
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_EXCHANGE_DISABLED"))
+        .isEqualTo(String.valueOf(ExchangeSeam.AREA_SWITCH_RETRY_AFTER_SECONDS));
+    assertThat(ExchangeRelay.retryAfterSeconds("JOB_ORDER_WRITES_DISABLED"))
+        .isEqualTo(String.valueOf(ExchangeSeam.AREA_SWITCH_RETRY_AFTER_SECONDS));
   }
 
   @Test
@@ -157,7 +169,7 @@ class ExchangeRelaySeamParityTest {
       assertReadDiffers(renamed, "clients.versekit." + field);
       read.add(field);
     }
-    assertThat(read).hasSize(11);
+    assertThat(read).hasSize(13);
     assertThat(UNREAD_REGISTRY_FIELDS.keySet()).isSubsetOf(ExchangeSeam.REGISTRY_DOCUMENT_FIELDS);
   }
 
@@ -221,12 +233,14 @@ class ExchangeRelaySeamParityTest {
    */
   private static void assertGateStatuses(@NotNull Map<String, Integer> expected) {
     assertThat(new TreeMap<>(ExchangeRelay.GATE_STATUSES))
-        .hasSize(8)
+        .hasSize(10)
         .isEqualTo(new TreeMap<>(expected));
     Set<String> gateConstants =
         Set.of(
             ExchangeRefusals.EXCHANGE_DISABLED,
-            ExchangeRefusals.BANK_EXCHANGE_DISABLED,
+            AreaSwitch.BANK.getCode(),
+            AreaSwitch.JOB_ORDERS.getCode(),
+            AreaSwitch.JOB_ORDER_WRITES.getCode(),
             ExchangeRefusals.REGISTRY_UNAVAILABLE,
             ExchangeRefusals.CLIENT_NOT_ALLOWED,
             ExchangeRefusals.CLIENT_SUSPENDED,
@@ -259,7 +273,7 @@ class ExchangeRelaySeamParityTest {
     Map<String, String> routes = new TreeMap<>();
     ExchangeSeam.OPERATIONS.forEach(
         operation -> routes.put(operation.gateway(), operation.capability()));
-    assertThat(routes).as("one gateway route per relay operation").hasSize(33);
+    assertThat(routes).as("one gateway route per relay operation").hasSize(39);
     return routes;
   }
 
@@ -280,7 +294,7 @@ class ExchangeRelaySeamParityTest {
         scopes.add(route.capability());
       }
     }
-    assertThat(routes).hasSize(33).isEqualTo(new TreeMap<>(expected));
+    assertThat(routes).hasSize(39).isEqualTo(new TreeMap<>(expected));
     assertThat(scopes).doesNotContainAnyElementsOf(ExchangeSeam.ADDITIVE_SCOPES);
     scopes.addAll(ExchangeSeam.ADDITIVE_SCOPES);
     assertThat(scopes).isEqualTo(new TreeSet<>(ExchangeSeam.CAPABILITY_SCOPES));
@@ -295,7 +309,7 @@ class ExchangeRelaySeamParityTest {
     return new ExchangeRegistry(
         ExchangeSeam.REGISTRY_SAMPLE_REVISION,
         true,
-        true,
+        EnumSet.allOf(AreaSwitch.class),
         Map.of(
             "versekit",
             new ExchangeRegistry.Client(

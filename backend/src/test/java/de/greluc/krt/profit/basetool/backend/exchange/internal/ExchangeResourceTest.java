@@ -73,7 +73,13 @@ class ExchangeResourceTest {
   void theFeedsAreTheValuesTheChangeTableAllows() {
     assertThat(Arrays.stream(ExchangeFeedResource.values()).map(Enum::name))
         .containsExactly(
-            "BLUEPRINT", "STOCK", "SHIP", "ORG_STOCK", "BANK_REQUEST", "REFINERY_ORDER");
+            "BLUEPRINT",
+            "STOCK",
+            "SHIP",
+            "ORG_STOCK",
+            "BANK_REQUEST",
+            "REFINERY_ORDER",
+            "JOB_ORDER");
   }
 
   @Test

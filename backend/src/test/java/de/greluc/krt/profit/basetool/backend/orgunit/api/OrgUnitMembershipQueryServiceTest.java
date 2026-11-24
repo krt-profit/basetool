@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -257,14 +258,6 @@ class OrgUnitMembershipQueryServiceTest {
     m.setKind(kind);
     m.setRole(role);
     return m;
-  }
-
-  /** Builds a squadron fixture with the given id and name. */
-  private static Squadron squadron(UUID id, String name) {
-    Squadron s = new Squadron();
-    s.setId(id);
-    s.setName(name);
-    return s;
   }
 
   @Test

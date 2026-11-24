@@ -36,6 +36,17 @@ is public, case by case, and for the capabilities a client actually needs.
 - For `exchange.patch.write`: the client sends a home-location choice only after the member picked
   the location in the client, never on its own, and does not relocate synced lots or ships itself
   ([patch change](resources/patch-change.md)). The approval names this criterion.
+- For a job-order scope (`exchange.joborders.read`, `exchange.joborders.write`): job-order data of
+  every kind, the member's own orders included, is stored for at most 7 days, outside cloud-synced
+  folders, never in backups or diagnostics, and never forwarded
+  ([job orders](resources/job-orders.md#retention)). The approval names this criterion.
+- For `exchange.joborders.write`: the client creates, cancels or changes an order only on an
+  explicit action of the member, never automatically or by a rule — no order created from an
+  in-game event, no target that follows a figure — and the member chooses both units from
+  `create-options`. The client may preselect them; an overlay may offer the create on the member's
+  explicit action when it shows both units, each preselected from the current `create-options`
+  ([creating an aUEC order](resources/job-orders.md#creating-an-auec-order)). The approval names
+  this criterion.
 - Code signing of releases is recommended, not required.
 - Trying the client against the [sandbox](sandbox.md) before applying is recommended, not required.
 

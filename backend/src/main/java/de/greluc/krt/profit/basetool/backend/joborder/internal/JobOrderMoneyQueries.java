@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderClientNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderPatchLabels;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
@@ -28,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -72,6 +72,7 @@ public class JobOrderMoneyQueries {
   private final JobOrderMoneyPairedCorrectionChoices pairedCorrectionChoices;
   private final ObjectProvider<JobOrderBankPort> bankPort;
   private final JobOrderPatchLabels patchChangeLabels;
+  private final JobOrderClientNames clientNames;
 
   /**
    * Reconstructs current reported amounts from effective monetary facts.
@@ -151,21 +152,21 @@ public class JobOrderMoneyQueries {
             && (rows.stream().anyMatch(row -> actor.equals(row.userId()))
                 || designations.stream()
                     .anyMatch(designation -> actor.equals(designation.userId())));
-    BigDecimal outstanding = target.getAmount().subtract(booked.handedOver());
+    var progress = booked.progress(target.getAmount(), order.getStatus());
     return new JobOrderMoneyView(
         target.getAmount().toPlainString(),
         Objects.requireNonNull(target.getVersion()),
         booked.provided().toPlainString(),
         booked.holdings().toPlainString(),
         booked.handedOver().toPlainString(),
-        outstanding.max(BigDecimal.ZERO).toPlainString(),
+        progress.remaining().toPlainString(),
         rows,
         history,
         self,
         self && moneyAccess.responsible(order),
         validResponsibility && auth.isAdmin() && booked.facts().isEmpty() && linked.isEmpty(),
         booked.fees().toPlainString(),
-        outstanding.negate().max(BigDecimal.ZERO).toPlainString(),
+        progress.overpaid().toPlainString(),
         designations,
         self && unitWriter,
         editsOrder,
@@ -179,8 +180,7 @@ public class JobOrderMoneyQueries {
         booked.released().toPlainString(),
         booked.shortages().toPlainString(),
         booked.settled().toPlainString(),
-        !order.getStatus().isActive()
-            && (booked.holdings().signum() > 0 || outstanding.signum() < 0),
+        progress.settlementOpen(),
         validResponsibility,
         responsible,
         requester,
@@ -276,6 +276,7 @@ public class JobOrderMoneyQueries {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList());
+    clientNames.prime(changes.stream().map(JobOrderMoneyTargetChange::getClientId).toList());
     return changes.stream()
         .map(change ->
             new JobOrderMoneyTargetChangeView(
@@ -283,7 +284,8 @@ public class JobOrderMoneyQueries {
                 change.getPreviousTarget().toPlainString(),
                 change.getTarget().toPlainString(),
                 change.getRecordedAt(),
-                change.getActorId() == null ? null : names.get(change.getActorId())))
+                change.getActorId() == null ? null : names.get(change.getActorId()),
+                clientNames.nameOf(change.getClientId())))
         .toList();
   }
 

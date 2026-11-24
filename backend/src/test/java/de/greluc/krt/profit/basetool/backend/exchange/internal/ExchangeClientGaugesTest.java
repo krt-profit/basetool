@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,7 +86,7 @@ class ExchangeClientGaugesTest {
             id,
             new ExchangeRegistrySnapshot.Client(
                 id, status, List.of("exchange.connect"), null, null, null)));
-    return new ExchangeRegistrySnapshot(true, false, clients);
+    return new ExchangeRegistrySnapshot(Set.of(ExchangeSwitch.GLOBAL), clients);
   }
 
   /**
