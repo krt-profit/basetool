@@ -776,6 +776,7 @@
                 <thead>
                 <tr>
                     <th th:text="#{orders.detail.handover.time}">Zeitpunkt</th>
+                    <th th:text="#{orders.detail.handover.handingOver}">Übergebender</th>
                     <th th:text="#{orders.detail.handover.recipient}">Empfänger</th>
                     <th th:text="#{orders.detail.handover.squadron}">Staffel</th>
                     <th th:text="#{orders.detail.handover.items}">Materialien</th>
@@ -785,6 +786,7 @@
                 <tbody>
                 <tr th:each="ho : ${order.handovers}" data-testid="order-handover-row">
                     <td class="handover-time-span" th:data-utc="${ho.handoverTime}"></td>
+                    <td th:attr="data-label=#{orders.detail.handover.handingOver}" data-testid="handover-giver" th:text="${ho.handingOverHandle != null ? @handles.display(ho.handingOverHandle) : '-'}"></td>
                     <td th:attr="data-label=#{orders.detail.handover.recipient}" th:text="${@handles.display(ho.recipientHandle)}"></td>
                     <td th:attr="data-label=#{orders.detail.handover.squadron}" th:text="${ho.recipientSquadron != null ? ho.recipientSquadron : '-'}"></td>
                     <td>
@@ -832,6 +834,7 @@
                 <thead>
                 <tr>
                     <th th:text="#{orders.detail.handover.time}">Zeitpunkt</th>
+                    <th th:text="#{orders.detail.handover.handingOver}">Übergebender</th>
                     <th th:text="#{orders.detail.handover.recipient}">Empfänger</th>
                     <th th:text="#{orders.detail.handover.items}">Items</th>
                     <th class="cell-actions"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
@@ -840,6 +843,7 @@
                 <tbody>
                 <tr th:each="ho : ${order.itemHandovers}" data-testid="item-handover-row">
                     <td class="handover-time-span" th:data-utc="${ho.handoverTime}"></td>
+                    <td th:attr="data-label=#{orders.detail.handover.handingOver}" data-testid="item-handover-giver" th:text="${ho.handingOverHandle != null ? @handles.display(ho.handingOverHandle) : '-'}"></td>
                     <td th:attr="data-label=#{orders.detail.handover.recipient}" th:text="${@handles.display(ho.recipientHandle)}"></td>
                     <td>
                         <ul class="od-plain-list">
@@ -1112,6 +1116,15 @@
                     </div>
                 </div>
 
+                <div class="form-group span-all">
+                    <label for="handingOverUserId" th:text="#{orders.handover.handingOver}" class="form-label">Übergebender (bearbeitende Einheit)</label>
+                    <select id="handingOverUserId" th:field="*{handingOverUserId}" required class="w-full" data-testid="handover-giver-select">
+                        <option value="" th:text="#{orders.handover.selectHandingOver}">-- Mitglied wählen --</option>
+                        <option th:each="giver : ${handoverGivers}" th:value="${giver.id}" th:text="${giver.handle}"></option>
+                    </select>
+                    <small th:if="${handoverGivers == null or handoverGivers.isEmpty()}" class="form-hint" data-testid="handover-giver-none" th:text="#{orders.handover.handingOver.none}">Die bearbeitende Einheit hat keine aktiven Mitglieder.</small>
+                </div>
+
                 <div class="form-group">
                     <label for="recipientHandle" th:text="#{orders.handover.handle}" class="form-label">Empfänger (Handle)</label>
                     <input type="text" id="recipientHandle" th:field="*{recipientHandle}" required class="w-full">
@@ -1158,6 +1171,15 @@
                         <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" required>
                         <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" required>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="itemHandingOverUserId" th:text="#{orders.handover.handingOver}" class="form-label">Übergebender (bearbeitende Einheit)</label>
+                    <select id="itemHandingOverUserId" th:field="*{handingOverUserId}" required class="w-full" data-testid="item-handover-giver-select">
+                        <option value="" th:text="#{orders.handover.selectHandingOver}">-- Mitglied wählen --</option>
+                        <option th:each="giver : ${handoverGivers}" th:value="${giver.id}" th:text="${giver.handle}"></option>
+                    </select>
+                    <small th:if="${handoverGivers == null or handoverGivers.isEmpty()}" class="form-hint" data-testid="item-handover-giver-none" th:text="#{orders.handover.handingOver.none}">Die bearbeitende Einheit hat keine aktiven Mitglieder.</small>
                 </div>
 
                 <div class="form-group">
@@ -1322,7 +1344,8 @@
     const MSG_HANDOVER_REPORT_ERROR = /*[[#{orders.handover.report.error}]]*/ 'Fehler beim Generieren des \u00dcbergabeprotokolls.';
     const MSG_HANDOVER_REPORT_VALIDATION_DATE = /*[[#{orders.handover.report.validation.date}]]*/ 'Bitte Datum der \u00dcbergabe ausf\u00fcllen.';
     const MSG_HANDOVER_REPORT_VALIDATION_TIME = /*[[#{orders.handover.report.validation.time}]]*/ 'Bitte Uhrzeit der \u00dcbergabe ausf\u00fcllen.';
-    const MSG_HANDOVER_REPORT_VALIDATION_HANDLE = /*[[#{orders.handover.report.validation.handle}]]*/ 'Bitte Handle des Empf\u00e4ngers ausf\u00fcllen.';
+    const MSG_HANDOVER_REPORT_VALIDATION_HANDING_OVER = /*[[#{orders.handover.report.validation.handingOver}]]*/ 'Bitte den \u00dcbergebenden der bearbeitenden Einheit w\u00e4hlen.';
+    const MSG_HANDOVER_REPORT_VALIDATION_HANDLE = /*[[#{orders.handover.report.validation.handle}]]*/'Bitte Handle des Empf\u00e4ngers ausf\u00fcllen.';
     const MSG_HANDOVER_REPORT_VALIDATION_ITEMS = /*[[#{orders.handover.report.validation.items}]]*/ 'Bitte mindestens einen Material-/Lagereintrag hinzuf\u00fcgen.';
     const MSG_HANDOVER_REPORT_VALIDATION_AMOUNT = /*[[#{orders.handover.report.validation.amount}]]*/ 'Die eingegebene Menge f\u00fcr "{0}" \u00fcberschreitet den verf\u00fcgbaren Bestand ({1}).';
     const MSG_HANDOVER_MISSION_HERKUNFT = /*[[#{orders.handover.mission.herkunft}]]*/ 'Herkunft (Eins\u00e4tze)';

@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderMater
 import de.greluc.krt.profit.basetool.frontend.joborder.model.HandoverReportItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverCreateDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverGiverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverItemCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverEntryCreateDto;
@@ -63,6 +64,7 @@ class JobOrderBackendClientTest {
   private static final UUID OTHER = UUID.fromString("11111111-2222-3333-4444-555555555555");
   private static final UUID SQUADRON = UUID.fromString("6a1c0e2b-7d3f-4b8a-9c51-2e4f8a0b1c2d");
   private static final UUID MATERIAL = UUID.fromString("9b7e3f10-24c8-4d6a-8f12-3c5e7a9b0d14");
+  private static final UUID GIVER = UUID.fromString("3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b0a");
   private static final Instant TIME = Instant.parse("2026-09-01T10:15:30Z");
   private static final String EMPTY_PAGE =
       "{\"content\":[],\"page\":0,\"size\":50,\"totalElements\":0,\"totalPages\":0}";
@@ -437,13 +439,14 @@ class JobOrderBackendClientTest {
         ORDER,
         new JobOrderHandoverCreateDto(
             TIME,
+            GIVER,
             "Pilot",
             "ALP",
             List.of(new JobOrderHandoverItemCreateDto(MATERIAL, 12.5, null, "B"))));
     client.createItemHandover(
         ORDER,
         new JobOrderItemHandoverCreateDto(
-            TIME, "Pilot", List.of(new JobOrderItemHandoverEntryCreateDto(OTHER, 2))));
+            TIME, GIVER, "Pilot", List.of(new JobOrderItemHandoverEntryCreateDto(OTHER, 2))));
     client.bookProduction(
         ORDER, OTHER, new JobOrderItemProductionCreateDto(3, 2L, List.of(), List.of(), null));
     client.unlinkInventoryItem(ORDER, OTHER);
@@ -451,14 +454,18 @@ class JobOrderBackendClientTest {
     backend.expect(
         "POST",
         "/api/v1/orders/" + ORDER + "/handovers",
-        "{\"handoverTime\":\"2026-09-01T10:15:30Z\",\"recipientHandle\":\"Pilot\","
+        "{\"handoverTime\":\"2026-09-01T10:15:30Z\",\"handingOverUserId\":\""
+            + GIVER
+            + "\",\"recipientHandle\":\"Pilot\","
             + "\"recipientSquadron\":\"ALP\",\"items\":[{\"inventoryItemId\":\""
             + MATERIAL
             + "\",\"amount\":12.5,\"missionReductions\":null,\"qualityRequirement\":\"B\"}]}");
     backend.expect(
         "POST",
         "/api/v1/orders/" + ORDER + "/item-handovers",
-        "{\"handoverTime\":\"2026-09-01T10:15:30Z\",\"recipientHandle\":\"Pilot\","
+        "{\"handoverTime\":\"2026-09-01T10:15:30Z\",\"handingOverUserId\":\""
+            + GIVER
+            + "\",\"recipientHandle\":\"Pilot\","
             + "\"entries\":[{\"jobOrderItemId\":\""
             + OTHER
             + "\",\"amount\":2}]}");
@@ -471,6 +478,16 @@ class JobOrderBackendClientTest {
   }
 
   @Test
+  void handoverGivers() {
+    backend.answerJson("[{\"id\":\"" + GIVER + "\",\"handle\":\"Giver\"}]");
+
+    assertThat(client.handoverGivers(ORDER))
+        .containsExactly(new JobOrderHandoverGiverDto(GIVER, "Giver"));
+
+    backend.expect("GET", "/api/v1/orders/" + ORDER + "/handover-givers");
+  }
+
+  @Test
   void handoverReports() {
     byte[] pdf = {0x25, 0x50, 0x44, 0x46};
     backend.answerBytes("application/pdf", pdf);
@@ -480,6 +497,7 @@ class JobOrderBackendClientTest {
         new HandoverReportPreviewRequestDto(
             "42",
             LocalDateTime.parse("2026-09-01T10:15:30"),
+            "Giver",
             "Pilot",
             List.of(new HandoverReportItemDto("Laranite", "Port Olisar", 12.5, 500, "SCU")));
 
@@ -497,6 +515,7 @@ class JobOrderBackendClientTest {
         "POST",
         "/api/v1/orders/" + ORDER + "/handovers/report/preview",
         "{\"jobOrderNumber\":\"42\",\"handoverTime\":\"2026-09-01T10:15:30\","
+            + "\"handingOverHandle\":\"Giver\","
             + "\"recipientHandle\":\"Pilot\",\"items\":[{\"materialName\":\"Laranite\","
             + "\"locationName\":\"Port Olisar\",\"amount\":12.5,\"quality\":500,"
             + "\"quantityType\":\"SCU\"}]}");

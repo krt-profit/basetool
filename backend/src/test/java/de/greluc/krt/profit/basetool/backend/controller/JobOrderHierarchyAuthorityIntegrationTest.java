@@ -1058,7 +1058,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     JobOrderItem line = itemWithBookedWork(JobOrderStatus.CANCELLED);
     String endpoint = "/api/v1/orders/" + line.getJobOrder().getId();
     String body =
-        "{\"handoverTime\":\"2026-11-10T20:00:00Z\",\"recipientHandle\":\"Recipient\","
+        "{\"handoverTime\":\"2026-11-10T20:00:00Z\",\"handingOverUserId\":\""
+            + caller
+            + "\",\"recipientHandle\":\"Recipient\","
             + "\"entries\":[{\"jobOrderItemId\":\""
             + line.getId()
             + "\",\"amount\":1}]}";

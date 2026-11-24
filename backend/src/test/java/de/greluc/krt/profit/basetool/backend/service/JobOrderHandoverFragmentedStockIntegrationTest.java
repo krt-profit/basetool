@@ -269,7 +269,7 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
     }
 
     JobOrderHandoverCreateDto dto =
-        new JobOrderHandoverCreateDto(Instant.now(), "swing-by", "KARTELL", items);
+        new JobOrderHandoverCreateDto(Instant.now(), f.actorId(), "swing-by", "KARTELL", items);
 
     jobOrderHandoverService.createHandover(f.jobOrderId(), dto);
 

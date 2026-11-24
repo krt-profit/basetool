@@ -466,6 +466,53 @@ Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`).
 `joborder/fragments/order-origin` · V450 · **Related:** REQ-OXCH-004, REQ-REFINERY-027,
 REQ-BANK-067, REQ-XCH-030 · **Issues:** #3617, #3648
 
+### REQ-ORDERS-079 — A handover names the member of the processing unit who handed it over
+
+A MATERIAL or ITEM handover records, besides the recipient, the member of the processing unit who
+handed the goods over in the game. It is a different fact from the member who recorded the handover
+in the web (`executing_user_id`), which a handover keeps as before.
+
+- **A required choice.** Both handover dialogs carry a select "Übergebender (bearbeitende
+  Einheit)" listing the active direct members of the order's responsible org unit, ordered by
+  handle, and preselect the caller when they are one of them. A handover cannot be saved without
+  one; the PDF preview of a material handover requires it as well. When the unit has no such member,
+  the dialog says so.
+- **Checked on write.** `POST …/handovers` and `POST …/item-handovers` take `handingOverUserId`
+  (required). The backend accepts only an active account (approved, present and enabled in
+  Keycloak) that is a direct member of the order's responsible org unit at that moment, otherwise
+  400 `error.job_order.handover.handing_over_not_member`. The list comes from
+  `GET /api/v1/orders/{id}/handover-givers`, gated like recording a handover.
+- **Stored as identity and snapshot.** V452 adds `handing_over_user_id` (FK `app_user`,
+  `ON DELETE SET NULL`) and the handle snapshot `handing_over_handle` to `job_order_handover` and
+  `job_order_item_handover`; a `CHECK` keeps a handle beside every named user. Handovers recorded
+  before the field existed name nobody and show a dash.
+- **Shown everywhere a handover is.** Both handover tables of the detail page gain a column
+  "Übergebender", and both protocol PDFs a row "ÜBERGEBENDER (HANDLE)" above the recipient; an
+  erased handle renders as `general.anonymisedHandle`.
+- **Audit.** `JOB_ORDER_HANDOVER_CREATED` and `JOB_ORDER_ITEM_HANDOVER_CREATED` carry the named
+  member as `target_user_id` (REQ-AUDIT-001); no name enters the details.
+- **Privacy.** The handle snapshot is a registered Personensuche column (REQ-SEC-060), anonymised by
+  `handing_over_user_id` on a granted erasure (REQ-SEC-062) and replaced by the sentinel by the name
+  retention (REQ-DATA-047). An account merge leaves the user id with the act.
+
+**Acceptance**
+
+- [x] Both dialogs list the active direct members of the processing unit and preselect the caller
+  who is one of them; saving without a choice is impossible.
+- [x] A handover naming a non-member, an inactive account or an unknown user is refused with 400
+  before any stock or line changes.
+- [x] The tables and both PDFs show the member; an older handover shows a dash.
+- [x] Erasure, name retention and the Personensuche cover the new snapshot.
+
+**Enforced by:** `JobOrderHandoverGiversTest`, `JobOrderHandoverServiceTest`,
+`JobOrderItemHandoverServiceTest`, `JobOrderHandoverReportServiceTest`,
+`JobOrderItemHandoverReportServiceTest`, `HandleErasureCoverageTest`,
+`HandleAnonymisationCoverageTest`, `GdprParticipantCoverageTest`, `UserReassignmentOrderTest`
+(backend) · `OrdersDetailPatternRenderTest`, `JobOrderPageControllerReaderTest`,
+`JobOrderPageControllerHandoverMvcTest`, `JobOrderBackendClientTest`, `JobOrderHandoverE2eTest`
+(frontend) · V452 ·
+**Related:** REQ-ORDERS-035, REQ-SEC-060, REQ-SEC-062, REQ-DATA-047
+
 ## Out of scope
 
 Automatic in-game payments, reading/verifying full player wallets, mixed-kind orders, money

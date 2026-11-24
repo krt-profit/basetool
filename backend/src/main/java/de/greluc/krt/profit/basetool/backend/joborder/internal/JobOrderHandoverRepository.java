@@ -65,8 +65,26 @@ public interface JobOrderHandoverRepository extends JpaRepository<JobOrderHandov
   int anonymiseRecipientHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
 
   /**
-   * Replaces the recipient of every handover of the given orders, for the name retention
-   * (REQ-DATA-047).
+   * Replaces the handing-over handle snapshot of the given member with the erasure sentinel
+   * (REQ-SEC-062), matched by {@code handing_over_user_id}.
+   *
+   * @param userId the member whose snapshots are erased
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          UPDATE job_order_handover SET handing_over_handle = :sentinel
+          WHERE handing_over_user_id = :userId AND handing_over_handle <> :sentinel
+          """,
+      nativeQuery = true)
+  int anonymiseHandingOverHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
+
+  /**
+   * Replaces the recipient and the handing-over handle of every handover of the given orders, for
+   * the name retention (REQ-DATA-047); a handover that names no handing-over member keeps none.
    *
    * @param orderIds the locked orders
    * @param sentinel {@code HandleAnonymisation#SENTINEL}
@@ -76,10 +94,11 @@ public interface JobOrderHandoverRepository extends JpaRepository<JobOrderHandov
   @Query(
       value =
           """
-          UPDATE job_order_handover SET recipient_handle = :sentinel
-          WHERE job_order_id IN (:orderIds) AND recipient_handle <> :sentinel
+          UPDATE job_order_handover SET recipient_handle = :sentinel,
+            handing_over_handle = CASE WHEN handing_over_handle IS NULL THEN NULL ELSE :sentinel END
+          WHERE job_order_id IN (:orderIds)
+            AND (recipient_handle <> :sentinel OR handing_over_handle <> :sentinel)
           """,
       nativeQuery = true)
-  int clearRecipientHandles(
-      @Param("orderIds") List<UUID> orderIds, @Param("sentinel") String sentinel);
+  int clearNames(@Param("orderIds") List<UUID> orderIds, @Param("sentinel") String sentinel);
 }

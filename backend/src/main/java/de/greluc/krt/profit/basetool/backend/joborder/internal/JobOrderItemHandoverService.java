@@ -81,6 +81,7 @@ public class JobOrderItemHandoverService {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final OrgUnitRepository orgUnitRepository;
   private final AuditRecorder auditRecorder;
+  private final JobOrderHandoverGivers givers;
 
   /**
    * Snapshot of one consumed game-item row, captured while managed so the {@code
@@ -110,7 +111,8 @@ public class JobOrderItemHandoverService {
    * @param dto the delivered item-line quantities
    * @return the persisted handover
    * @throws NotFoundException when the order does not exist
-   * @throws BadRequestException when the order is not an item order, an entry references a foreign
+   * @throws BadRequestException when the order is not an item order, the handing-over member is no
+   *     active direct member of the processing unit (REQ-ORDERS-079), an entry references a foreign
    *     line, or an entry exceeds the manufactured-but-undelivered quantity
    */
   @Transactional
@@ -126,6 +128,7 @@ public class JobOrderItemHandoverService {
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException(JobOrderStockErrors.ITEM_ORDER_REQUIRED);
     }
+    final JobOrderHandoverGivers.Giver giver = givers.require(jobOrder, dto.handingOverUserId());
 
     final ItemHandoverPlanner.Booked booked =
         handoverPlanner.prepare(jobOrder, dto.entries(), scopes);
@@ -133,6 +136,8 @@ public class JobOrderItemHandoverService {
     JobOrderItemHandover handover = new JobOrderItemHandover();
     handover.setJobOrder(jobOrder);
     handover.setHandoverTime(dto.handoverTime());
+    handover.setHandingOverUser(giver.user());
+    handover.setHandingOverHandle(giver.handle());
     handover.setRecipientHandle(dto.recipientHandle());
     stampAuditTrail(handover);
 
@@ -185,7 +190,7 @@ public class JobOrderItemHandoverService {
         AuditEventType.JOB_ORDER_ITEM_HANDOVER_CREATED,
         jobOrderId,
         JobOrderAuditLabel.of(jobOrder.getDisplayId()),
-        null,
+        giver.user().getId(),
         AuditDetails.of("handover", saved.getId())
             .with("entries", booked.entries().size())
             .with("autoCompleted", allDelivered));

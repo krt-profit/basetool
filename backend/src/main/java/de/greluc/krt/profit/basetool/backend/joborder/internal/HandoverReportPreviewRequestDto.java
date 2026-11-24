@@ -30,10 +30,17 @@ import java.util.List;
  * Request DTO for a handover report PDF preview before the handover is persisted.
  *
  * <p>{@code handoverTime} is the user's local time as typed and is rendered unchanged.
+ *
+ * @param jobOrderNumber the order number as shown, e.g. {@code #42}
+ * @param handoverTime the handover time as typed, in the user's local time
+ * @param handingOverHandle the handle of the chosen handing-over member (REQ-ORDERS-079)
+ * @param recipientHandle the recipient's handle
+ * @param items the materials to list
  */
 public record HandoverReportPreviewRequestDto(
     @NotBlank String jobOrderNumber,
     @NotNull LocalDateTime handoverTime,
+    @NotBlank String handingOverHandle,
     @NotBlank String recipientHandle,
     @NotNull List<@Valid HandoverReportItemDto> items) {
   /** Represents a single material item in the handover report preview. */

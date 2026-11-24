@@ -33,10 +33,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.openpdf.text.pdf.PdfPTable;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
@@ -55,6 +57,9 @@ public class JobOrderItemHandoverReportService {
 
   private static final DateTimeFormatter DATE_PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy");
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
+
+  /** Shown for a handover that names no handing-over member. */
+  private static final String NOT_RECORDED = "-";
 
   private static final Comparator<ItemRow> ITEM_COMPARATOR =
       Comparator.comparing(ItemRow::itemName, String.CASE_INSENSITIVE_ORDER)
@@ -102,13 +107,19 @@ public class JobOrderItemHandoverReportService {
             .toList();
 
     return buildPdf(
-        jobOrderNumber, handoverDate, handoverTime, handover.getRecipientHandle(), rows);
+        jobOrderNumber,
+        handoverDate,
+        handoverTime,
+        handover.getHandingOverHandle(),
+        handover.getRecipientHandle(),
+        rows);
   }
 
   private byte @NotNull [] buildPdf(
       @NotNull String jobOrderNumber,
       @NotNull String handoverDate,
       @NotNull String handoverTime,
+      @Nullable String handingOverHandle,
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -116,6 +127,12 @@ public class JobOrderItemHandoverReportService {
       KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
       KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
       KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
+      KrtPdfSupport.addMetaRow(
+          metaTable,
+          label("pdf.handover.handingOver"),
+          Objects.requireNonNullElse(
+              HandleAnonymisation.humanise(handingOverHandle, label("general.anonymisedHandle")),
+              NOT_RECORDED));
       KrtPdfSupport.addMetaRow(
           metaTable,
           "EMPFÄNGER (HANDLE)",

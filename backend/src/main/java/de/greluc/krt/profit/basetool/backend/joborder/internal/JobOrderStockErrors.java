@@ -59,5 +59,8 @@ public final class JobOrderStockErrors {
   static final String INSUFFICIENT_MANUFACTURED_ITEMS =
       "error.job_order.handover.insufficient_manufactured_items";
 
+  /** The named handing-over member is no active direct member of the processing unit. */
+  static final String HANDING_OVER_NOT_MEMBER = "error.job_order.handover.handing_over_not_member";
+
   private JobOrderStockErrors() {}
 }

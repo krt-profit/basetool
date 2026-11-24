@@ -145,6 +145,7 @@ class JobOrderMaterialEditCreditIntegrationTest extends MaterialContributionTest
     var request =
         new JobOrderHandoverCreateDto(
             Instant.now(),
+            handingOverMember(fixture),
             "Handover recipient",
             null,
             List.of(new JobOrderHandoverItemCreateDto(stock.rowId(), amount, null, null)));

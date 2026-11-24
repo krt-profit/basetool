@@ -114,7 +114,9 @@ class HandleAnonymisationServiceTest {
     when(bankBookingRequestRepository.anonymiseHandles(any(), any())).thenReturn(each);
     when(bankHolderRepository.anonymiseHandle(any(), any())).thenReturn(each);
     when(jobOrderRepository.anonymiseHandle(any(), any())).thenReturn(each);
+    when(jobOrderHandoverRepository.anonymiseHandingOverHandle(any(), any())).thenReturn(each);
     when(jobOrderHandoverRepository.anonymiseRecipientHandle(any(), any())).thenReturn(each);
+    when(jobOrderItemHandoverRepository.anonymiseHandingOverHandle(any(), any())).thenReturn(each);
     when(jobOrderItemHandoverRepository.anonymiseRecipientHandle(any(), any())).thenReturn(each);
   }
 
@@ -129,11 +131,13 @@ class HandleAnonymisationServiceTest {
     verify(bankTransactionRepository).anonymiseCounterpartyHandle(USER, SENTINEL);
     verify(bankBookingRequestRepository).anonymiseHandles(USER, SENTINEL);
     verify(bankHolderRepository).anonymiseHandle(USER, SENTINEL);
+    verify(jobOrderHandoverRepository).anonymiseHandingOverHandle(USER, SENTINEL);
+    verify(jobOrderItemHandoverRepository).anonymiseHandingOverHandle(USER, SENTINEL);
     verify(auditEventRepository).anonymiseSubjectLabel(HANDLE, SENTINEL);
     verify(jobOrderRepository).anonymiseHandle(HANDLE, SENTINEL);
     verify(jobOrderHandoverRepository).anonymiseRecipientHandle(HANDLE, SENTINEL);
     verify(jobOrderItemHandoverRepository).anonymiseRecipientHandle(HANDLE, SENTINEL);
-    assertThat(result.total()).isEqualTo(18);
+    assertThat(result.total()).isEqualTo(22);
   }
 
   @Test
@@ -228,10 +232,12 @@ class HandleAnonymisationServiceTest {
     verify(jobOrderItemHandoverRepository, never()).anonymiseRecipientHandle(any(), any());
     verify(jobOrderRepository, never()).anonymiseHandle(any(), any());
     verify(auditEventRepository, never()).anonymiseSubjectLabel(any(), any());
-    assertThat(result.materialHandovers()).isZero();
-    assertThat(result.itemHandovers()).isZero();
+    verify(jobOrderHandoverRepository).anonymiseHandingOverHandle(USER, SENTINEL);
+    verify(jobOrderItemHandoverRepository).anonymiseHandingOverHandle(USER, SENTINEL);
+    assertThat(result.materialHandovers()).isOne();
+    assertThat(result.itemHandovers()).isOne();
     assertThat(result.jobOrders()).isZero();
-    assertThat(result.total()).isEqualTo(5);
+    assertThat(result.total()).isEqualTo(7);
   }
 
   @Test

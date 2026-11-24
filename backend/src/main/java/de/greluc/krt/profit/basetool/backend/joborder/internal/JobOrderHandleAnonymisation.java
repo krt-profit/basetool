@@ -34,7 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The job-order module's part of the handle anonymisation: the order contact and the recipients of
- * the material and item handovers, all typed by hand and therefore matched by text.
+ * the material and item handovers, all typed by hand and therefore matched by text, and the
+ * handing-over members of both handover kinds, matched by their user id.
  */
 @Component
 @RequiredArgsConstructor
@@ -58,7 +59,9 @@ public class JobOrderHandleAnonymisation implements HandleAnonymisationParticipa
     return List.of(
         "job_order.handle",
         "job_order_handover.recipient_handle",
+        "job_order_handover.handing_over_handle",
         "job_order_item_handover.recipient_handle",
+        "job_order_item_handover.handing_over_handle",
         "job_order_money_holder.accountless_name",
         "job_order_money_holder_change.previous_name",
         "job_order_money_holder_change.name",
@@ -69,7 +72,8 @@ public class JobOrderHandleAnonymisation implements HandleAnonymisationParticipa
   }
 
   /**
-   * Redacts order contacts, handover recipients and monetary names by identity or whole spelling.
+   * Redacts order contacts, handover recipients and monetary names by identity or whole spelling,
+   * and handing-over members by identity.
    *
    * @param userId the member whose snapshots are erased
    * @param spellings every name the member is stored under
@@ -82,8 +86,8 @@ public class JobOrderHandleAnonymisation implements HandleAnonymisationParticipa
     moneyPrivacy.anonymise(userId, spellings, rewritten::put);
     String sentinel = HandleAnonymisation.SENTINEL;
     int jobOrders = 0;
-    int materialHandovers = 0;
-    int itemHandovers = 0;
+    int materialHandovers = jobOrderHandoverRepository.anonymiseHandingOverHandle(userId, sentinel);
+    int itemHandovers = jobOrderItemHandoverRepository.anonymiseHandingOverHandle(userId, sentinel);
     for (String name : spellings) {
       jobOrders += jobOrderRepository.anonymiseHandle(name, sentinel);
       materialHandovers += jobOrderHandoverRepository.anonymiseRecipientHandle(name, sentinel);

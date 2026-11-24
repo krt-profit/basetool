@@ -27,6 +27,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
@@ -60,6 +61,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 })
 class JobOrderHandoverServiceTest {
 
+  private static final UUID GIVER_ID = UUID.randomUUID();
+  private static final String GIVER_HANDLE = "Chewie";
+
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
 
   @Mock private JobOrderRepository jobOrderRepository;
@@ -74,8 +78,10 @@ class JobOrderHandoverServiceTest {
   private de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository orgUnitRepository;
 
   @Mock private AuditService auditService;
+  @Mock private JobOrderHandoverGivers givers;
   private JobOrderHandoverService service;
 
+  private User giver;
   private UUID orderId;
   private UUID inventoryId;
   private UUID materialId;
@@ -119,7 +125,8 @@ class JobOrderHandoverServiceTest {
             userService,
             null,
             orgUnitRepository,
-            auditService);
+            auditService,
+            givers);
     orderId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();
     materialId = UUID.randomUUID();
@@ -143,6 +150,81 @@ class JobOrderHandoverServiceTest {
     inventoryItem.setAmount(10.0);
     InventoryAllocations.addJobOrder(
         inventoryItem, order.getId(), inventoryItem.getAmount(), false);
+
+    giver = new User();
+    giver.setId(GIVER_ID);
+    giver.setUsername("chewie");
+    giver.setDisplayName(GIVER_HANDLE);
+    lenient()
+        .when(givers.require(order, GIVER_ID))
+        .thenReturn(new JobOrderHandoverGivers.Giver(giver, GIVER_HANDLE));
+  }
+
+  /**
+   * The handover names the member who handed it over with their handle snapshot, and the audit
+   * event targets that member (REQ-ORDERS-079).
+   */
+  @Test
+  void createHandover_stampsTheHandingOverMember_andAuditsThemAsTarget() {
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(
+            Instant.now(),
+            GIVER_ID,
+            "HanSolo",
+            null,
+            List.of(new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null)));
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
+    lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
+        .thenReturn(mock(JobOrderHandoverDto.class));
+
+    service.createHandover(orderId, createDto);
+
+    ArgumentCaptor<JobOrderHandover> saved = ArgumentCaptor.forClass(JobOrderHandover.class);
+    verify(jobOrderHandoverRepository).save(saved.capture());
+    assertSame(giver, saved.getValue().getHandingOverUser());
+    assertEquals(GIVER_HANDLE, saved.getValue().getHandingOverHandle());
+    assertEquals("HanSolo", saved.getValue().getRecipientHandle());
+    verify(auditService)
+        .record(
+            eq(AuditEventType.JOB_ORDER_HANDOVER_CREATED), eq(orderId), any(), eq(GIVER_ID), any());
+  }
+
+  /**
+   * A handing-over member outside the processing unit fails the handover before any stock row, line
+   * credit or record is touched (REQ-ORDERS-079).
+   */
+  @Test
+  void createHandover_rejectsAGiverOutsideTheProcessingUnit_beforeAnyStockOrBookingChange() {
+    UUID outsider = UUID.randomUUID();
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(
+            Instant.now(),
+            outsider,
+            "HanSolo",
+            null,
+            List.of(new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null)));
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(givers.require(order, outsider))
+        .thenThrow(new BadRequestException(JobOrderStockErrors.HANDING_OVER_NOT_MEMBER));
+
+    BadRequestException ex =
+        assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
+
+    assertEquals(JobOrderStockErrors.HANDING_OVER_NOT_MEMBER, ex.getMessage());
+    assertEquals(10.0, inventoryItem.getAmount());
+    assertEquals(0.0, jobOrderMaterial.getCreditedAmount(), 1e-9);
+    verifyNoInteractions(
+        inventoryItemRepository,
+        offerRatchet,
+        responsibilityGuard,
+        jobOrderHandoverRepository,
+        jobOrderService,
+        auditService);
   }
 
   @Test
@@ -151,7 +233,8 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
+        new JobOrderHandoverCreateDto(
+            Instant.now(), GIVER_ID, "HanSolo", "Rogue", List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
     assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
@@ -171,6 +254,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(
             Instant.now(),
+            GIVER_ID,
             "HanSolo",
             "Rogue",
             List.of(new JobOrderHandoverItemCreateDto(inventoryId, 12.0, null, null)));
@@ -205,7 +289,8 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
+        new JobOrderHandoverCreateDto(
+            Instant.now(), GIVER_ID, "HanSolo", "Rogue", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -241,7 +326,8 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
+        new JobOrderHandoverCreateDto(
+            Instant.now(), GIVER_ID, "HanSolo", "Rogue", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -275,7 +361,8 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverItemCreateDto(
             inventoryId, 4.0, List.of(new AllocationReductionDto(missionA.getId(), 4.0)), null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
+        new JobOrderHandoverCreateDto(
+            Instant.now(), GIVER_ID, "HanSolo", "Rogue", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -317,7 +404,8 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 50.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
+        new JobOrderHandoverCreateDto(
+            Instant.now(), GIVER_ID, "HanSolo", "Rogue", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -339,7 +427,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -380,7 +468,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 11.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -400,7 +488,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "swing-by", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -443,7 +531,8 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto2 =
         new JobOrderHandoverItemCreateDto(inventoryId2, 8.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto1, itemDto2));
+        new JobOrderHandoverCreateDto(
+            Instant.now(), GIVER_ID, "swing-by", null, List.of(itemDto1, itemDto2));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -506,7 +595,8 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto2 =
         new JobOrderHandoverItemCreateDto(inventoryId2, 3.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto1, itemDto2));
+        new JobOrderHandoverCreateDto(
+            Instant.now(), GIVER_ID, "swing-by", null, List.of(itemDto1, itemDto2));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -534,7 +624,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -556,7 +646,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 3.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -587,7 +677,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -605,7 +695,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 15.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
@@ -626,7 +716,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "swing-by", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -655,7 +745,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "swing-by", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -683,7 +773,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 2.5, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
@@ -714,7 +804,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverItemCreateDto(inventoryId, 3.0, null, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(
-            Instant.now(), "CrossSquadronHandler", "BRV", List.of(itemDto));
+            Instant.now(), GIVER_ID, "CrossSquadronHandler", "BRV", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -763,7 +853,8 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto2 =
         new JobOrderHandoverItemCreateDto(inventoryId2, 8.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto1, itemDto2));
+        new JobOrderHandoverCreateDto(
+            Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto1, itemDto2));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -803,7 +894,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -844,7 +935,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
@@ -882,7 +973,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null, null);
     JobOrderHandoverCreateDto createDto =
-        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+        new JobOrderHandoverCreateDto(Instant.now(), GIVER_ID, "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendCli
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderMoneyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverGiverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
@@ -47,6 +48,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -80,6 +82,8 @@ public class JobOrderPageReader {
   static final int DEFAULT_AGE_RED_DAYS = 90;
 
   private static final String TYPE_ITEM = "ITEM";
+
+  private static final String STATUS_CANCELLED = "CANCELLED";
 
   private final JobOrderBackendClient jobOrderClient;
   private final JobOrderMoneyBackendClient moneyClient;
@@ -205,6 +209,8 @@ public class JobOrderPageReader {
    * @param claimingOptions the squadrons whose claims the caller may manage on this order
    * @param support the Staffel participation and authorized enrollment choices
    * @param money the aUEC projection and current action grants
+   * @param handoverGivers the members a material or item handover may name as handing it over, read
+   *     for a caller who may record one (REQ-ORDERS-079)
    */
   public record OrderDetailPage(
       @NotNull JobOrderDto order,
@@ -222,7 +228,8 @@ public class JobOrderPageReader {
       @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions,
       @NotNull List<OrgUnitMembershipOptionDto> claimingOptions,
       @NotNull Part<JobOrderSupportDto> support,
-      @NotNull Part<JobOrderMoneyView> money) {
+      @NotNull Part<JobOrderMoneyView> money,
+      @NotNull Part<List<JobOrderHandoverGiverDto>> handoverGivers) {
 
     /** Supplies the status badge class for the order detail and its fragments. */
     @NotNull
@@ -379,7 +386,22 @@ public class JobOrderPageReader {
                     || "actions".equalsIgnoreCase(fragment))
             ? SectionFallback.load(
                 log, "job-order-money", () -> Part.of(moneyClient.view(id)), Part.absent())
+            : Part.absent(),
+        !moneyOrder
+                && canAssign
+                && !order.responsibilityInvalid()
+                && !STATUS_CANCELLED.equals(order.status())
+                && (fragment == null || "dialogs".equalsIgnoreCase(fragment))
+            ? handoverGivers(id)
             : Part.absent());
+  }
+
+  private Part<List<JobOrderHandoverGiverDto>> handoverGivers(@NotNull UUID id) {
+    return SectionFallback.load(
+        log,
+        "job-order-handover-givers",
+        () -> Part.of(Objects.requireNonNullElse(jobOrderClient.handoverGivers(id), List.of())),
+        Part.absent());
   }
 
   private Part<JobOrderSupportDto> support(@NotNull UUID id) {

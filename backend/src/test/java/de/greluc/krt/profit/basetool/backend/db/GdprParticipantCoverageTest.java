@@ -255,6 +255,13 @@ class GdprParticipantCoverageTest {
               "job_order_item_handover.executing_user_id",
               "See job_order_handover.executing_user_id."),
           Map.entry(
+              "job_order_handover.handing_over_user_id",
+              "Names the member of the processing unit who handed a job-order handover over, an"
+                  + " act on the organisation's order; not selected by any section."),
+          Map.entry(
+              "job_order_item_handover.handing_over_user_id",
+              "See job_order_handover.handing_over_user_id."),
+          Map.entry(
               "mission_ownership.owner_id",
               "The concurrency companion of mission.owner_id, which missionsOwned exports."),
           Map.entry(

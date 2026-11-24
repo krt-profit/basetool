@@ -128,7 +128,7 @@ class JobOrderHandoverReportProxyControllerTest {
     UUID jobOrderId = UUID.randomUUID();
     byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
     HandoverReportPreviewRequestDto payload =
-        new HandoverReportPreviewRequestDto("#42", null, "Pilot", null);
+        new HandoverReportPreviewRequestDto("#42", null, "Giver", "Pilot", null);
 
     doReturn(requestBodyUriSpec).when(webClient).post();
     doReturn(requestBodySpec)
@@ -156,7 +156,7 @@ class JobOrderHandoverReportProxyControllerTest {
   void previewHandoverReport_shouldThrowResponseStatusException_whenBackendReturns400() {
     UUID jobOrderId = UUID.randomUUID();
     HandoverReportPreviewRequestDto payload =
-        new HandoverReportPreviewRequestDto(null, null, null, null);
+        new HandoverReportPreviewRequestDto(null, null, null, null, null);
 
     doReturn(requestBodyUriSpec).when(webClient).post();
     doReturn(requestBodySpec)

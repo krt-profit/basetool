@@ -57,6 +57,9 @@ public class JobOrderHandoverReportService {
   private static final DateTimeFormatter DATE_PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy");
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
 
+  /** Shown for a handover that names no handing-over member. */
+  private static final String NOT_RECORDED = "-";
+
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final MessageSource messageSource;
 
@@ -107,7 +110,13 @@ public class JobOrderHandoverReportService {
             .sorted(ITEM_COMPARATOR)
             .toList();
 
-    return buildPdf(jobOrderNumber, handoverDate, handoverTime, recipientHandle, rows);
+    return buildPdf(
+        jobOrderNumber,
+        handoverDate,
+        handoverTime,
+        handover.getHandingOverHandle(),
+        recipientHandle,
+        rows);
   }
 
   /**
@@ -135,7 +144,13 @@ public class JobOrderHandoverReportService {
             .sorted(ITEM_COMPARATOR)
             .toList();
 
-    return buildPdf(dto.jobOrderNumber(), handoverDate, handoverTime, dto.recipientHandle(), rows);
+    return buildPdf(
+        dto.jobOrderNumber(),
+        handoverDate,
+        handoverTime,
+        dto.handingOverHandle(),
+        dto.recipientHandle(),
+        rows);
   }
 
   private static final Comparator<ItemRow> ITEM_COMPARATOR =
@@ -147,6 +162,7 @@ public class JobOrderHandoverReportService {
       @NotNull String jobOrderNumber,
       @NotNull String handoverDate,
       @NotNull String handoverTime,
+      @Nullable String handingOverHandle,
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -154,6 +170,12 @@ public class JobOrderHandoverReportService {
       KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
       KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
       KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
+      KrtPdfSupport.addMetaRow(
+          metaTable,
+          label("pdf.handover.handingOver"),
+          Objects.requireNonNullElse(
+              HandleAnonymisation.humanise(handingOverHandle, label("general.anonymisedHandle")),
+              NOT_RECORDED));
       KrtPdfSupport.addMetaRow(
           metaTable,
           "EMPFÄNGER (HANDLE)",
@@ -214,8 +236,8 @@ public class JobOrderHandoverReportService {
       @Nullable String quantityType) {}
 
   /**
-   * Resolves a German PDF label from the backend message bundle, used for the shared erased-handle
-   * placeholder (REQ-SEC-062).
+   * Resolves a German PDF label from the backend message bundle, such as the handing-over row and
+   * the shared erased-handle placeholder (REQ-SEC-062).
    *
    * @param key the message key
    * @return the resolved label

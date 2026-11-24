@@ -447,6 +447,7 @@ POST /api/v1/orders/{id}/assignees/{userId} | JobOrderAssigneeController#addAssi
 DELETE /api/v1/orders/{id}/assignees/{userId}/note | JobOrderAssigneeController#deleteAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/assignees/{userId}/note | JobOrderAssigneeController#setAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 PATCH /api/v1/orders/{id}/blueprint-variant-counting | JobOrderController#updateBlueprintVariantCounting | pre=isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/handover-givers | JobOrderHandoverController#handoverGivers | pre=isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id) | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/handovers | JobOrderHandoverController#createHandover | pre=isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/item-blueprint-owners | JobOrderMaterialController#getItemBlueprintOwners | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrderBlueprintOwners(#id) | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/item-handovers | JobOrderHandoverController#createItemHandover | pre=isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id) | url=anyRequest -> authenticated

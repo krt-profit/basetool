@@ -25,8 +25,10 @@ DELETION_REQUEST|deletion_request|decision_note|null|Vor ZzzMentionZzz nach
 HANGAR|ship|name|null|Vor ZzzMentionZzz nach
 INVENTORY|inventory_item|note|INVENTORY|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_assignees|note|JOB_ORDER|Vor ZzzMentionZzz nach
+JOB_ORDER|job_order_handover|handing_over_handle|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_handover|recipient_handle|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_handover|recipient_squadron|JOB_ORDER|Vor ZzzMentionZzz nach
+JOB_ORDER|job_order_item_handover|handing_over_handle|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_item_handover|recipient_handle|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_linked_money_attempt|counterparty_name|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_linked_money_attempt|selected_accountless_name|JOB_ORDER|Vor ZzzMentionZzz nach

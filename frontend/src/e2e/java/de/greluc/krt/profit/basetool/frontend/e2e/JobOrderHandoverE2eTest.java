@@ -153,13 +153,18 @@ class JobOrderHandoverE2eTest {
         page.locator("#handover-modal .date-part").fill(LocalDate.now().toString());
         page.locator("#handover-modal .time-part").fill("12:00");
         page.locator("#recipientHandle").fill("E2E Recipient");
+        Locator giver = page.getByTestId("handover-giver-select");
+        assertThat(giver).not().hasValue("");
+        String giverHandle =
+            ((String) giver.evaluate("select => select.selectedOptions[0].text")).trim();
 
         page.evaluate("window.__krtNoReload = true;");
         page.getByTestId("order-handover-submit").click();
-        assertThat(
-                page.getByTestId("order-handover-row")
-                    .filter(new Locator.FilterOptions().setHasText("E2E Recipient")))
-            .isVisible();
+        Locator row =
+            page.getByTestId("order-handover-row")
+                .filter(new Locator.FilterOptions().setHasText("E2E Recipient"));
+        assertThat(row).isVisible();
+        assertThat(row.getByTestId("handover-giver")).hasText(giverHandle);
         assertEquals(
             Boolean.TRUE,
             page.evaluate("window.__krtNoReload === true"),
