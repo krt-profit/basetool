@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -66,7 +67,7 @@ class BankAuditReportServiceTest {
 
   @InjectMocks private BankAuditReportService bankAuditReportService;
 
-  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments();
+  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments(BackendMessages.bundle());
 
   @Test
   void exportPdf_rendersEventsAndRecordsExportEvent() throws IOException {

@@ -102,8 +102,8 @@ public interface KrtPdfDocument extends AutoCloseable {
   void newPage();
 
   /**
-   * Adds the centered footer {@code "Generiert von Profit Basetool am <date> <time> UTC"}, tagged
-   * {@code P}; the timestamp is always UTC.
+   * Adds the centered footer line {@code pdf.footer.generated} of the message bundle, naming Profit
+   * Basetool and the generation timestamp, tagged {@code P}; the timestamp is always UTC.
    */
   void footer();
 

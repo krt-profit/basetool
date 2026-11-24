@@ -25,8 +25,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
 import java.io.OutputStream;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.Consumer;
 import org.jetbrains.annotations.NotNull;
@@ -127,13 +125,6 @@ public final class TaggedKrtPdfDocument implements KrtPdfDocument {
 
   private static final PdfName BLOCK = new PdfName("Block");
 
-  /**
-   * Footer generation-timestamp format. Always UTC, so the footer is an unambiguous stamp whatever
-   * zone the rest of the document is rendered in.
-   */
-  private static final DateTimeFormatter FOOTER_TIMESTAMP =
-      DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(ZoneOffset.UTC);
-
   private final Document document;
 
   private final PdfContentByte canvas;
@@ -144,14 +135,19 @@ public final class TaggedKrtPdfDocument implements KrtPdfDocument {
 
   private final PdfTextBlock text;
 
+  /** The localized line {@link #footer()} draws. */
+  private final String footerLine;
+
   private @Nullable TaggedPdfDataTable openTable;
 
-  private TaggedKrtPdfDocument(@NotNull Document document, @NotNull PdfWriter writer) {
+  private TaggedKrtPdfDocument(
+      @NotNull Document document, @NotNull PdfWriter writer, @NotNull String footerLine) {
     this.document = document;
     this.canvas = writer.getDirectContent();
     this.flow = new PdfPageFlow(document);
     this.tree = new PdfStructureTree(writer);
     this.text = new PdfTextBlock(tree, flow, canvas);
+    this.footerLine = footerLine;
   }
 
   /**
@@ -161,10 +157,16 @@ public final class TaggedKrtPdfDocument implements KrtPdfDocument {
    *
    * @param target the stream receiving the PDF bytes
    * @param title the (already uppercase) document title
+   * @param generatedAt the generation instant, written as the metadata's creation date
+   * @param footerLine the localized footer line naming {@code generatedAt}, drawn by {@link
+   *     #footer()}
    * @return the open document; the caller must close it
    */
   public static @NotNull TaggedKrtPdfDocument open(
-      @NotNull OutputStream target, @NotNull String title) {
+      @NotNull OutputStream target,
+      @NotNull String title,
+      @NotNull Instant generatedAt,
+      @NotNull String footerLine) {
     Document document =
         new Document(
             PdfPageFlow.PAGE,
@@ -179,8 +181,8 @@ public final class TaggedKrtPdfDocument implements KrtPdfDocument {
     writer.setPageEvent(new KrtPageDecoration());
     PdfConformanceProfile.beforeOpen(writer);
     document.open();
-    PdfConformanceProfile.afterOpen(writer, title, Instant.now());
-    TaggedKrtPdfDocument pdf = new TaggedKrtPdfDocument(document, writer);
+    PdfConformanceProfile.afterOpen(writer, title, generatedAt);
+    TaggedKrtPdfDocument pdf = new TaggedKrtPdfDocument(document, writer, footerLine);
     pdf.title(title);
     return pdf;
   }
@@ -280,9 +282,7 @@ public final class TaggedKrtPdfDocument implements KrtPdfDocument {
   @Override
   public void footer() {
     requireNoOpenTable();
-    text.draw(
-        "Generiert von Profit Basetool am " + FOOTER_TIMESTAMP.format(Instant.now()) + " UTC",
-        FOOTER);
+    text.draw(footerLine, FOOTER);
   }
 
   @Override
