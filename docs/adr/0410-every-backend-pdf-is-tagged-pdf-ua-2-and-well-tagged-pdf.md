@@ -67,11 +67,16 @@ API and is a PDF/A-4, PDF/UA-2 and WTPDF (accessibility and reuse) file.**
    `pdfuaid:rev = 2024` and a `pdfd:declarations` bag with both WTPDF declarations, each with
    `claimBy` and `claimDate`. The namespace is `http://pdfa.org/declarations/` and the URIs use the
    corrected form without a slash before `#`, as veraPDF reads them.
-6. **veraPDF validates every document kind** against PDF/A-4, PDF/UA-2 and both WTPDF levels in
+6. **Full compression.** Content streams are Flate-compressed and the structure elements go into
+   object streams. Measured on the 100 000-row audit log at the production heap of 1.17 GB:
+   26 MB and a peak of about 0.5 GB, against 100 MB and 1.14 GB for the untagged, uncompressed
+   layout before and 223 MB and 1.2 GB for the tagged one uncompressed. Tests read text through
+   the PDF text extractor, never raw bytes.
+7. **veraPDF validates every document kind** against PDF/A-4, PDF/UA-2 and both WTPDF levels in
    one run (`support.PdfConformance`); a negative test proves untagged content fails, and
    structure assertions (`support.TaggedStructure`) pin heading order, header scopes and figure
    descriptions.
-7. **What a validator cannot judge** — meaningful alternate text, reading order, header
+8. **What a validator cannot judge** — meaningful alternate text, reading order, header
    relationships, nothing real marked as artifact, languages, contrast — is a human checklist per
    document kind in the spec.
 
@@ -94,8 +99,8 @@ API and is a PDF/A-4, PDF/UA-2 and WTPDF (accessibility and reuse) file.**
 
 - The PDFs look as before; screen readers get headings, table headers and figure descriptions,
   and text extraction skips artifacts, so a repeated table header is read once.
-- The logo is embedded once per file instead of once per page; the structure tree adds a few
-  kilobytes.
+- The logo is embedded once per file instead of once per page; with full compression a PDF is
+  a fraction of its former size, and the full audit-log cap fits the production heap with room.
 - A new PDF is built from `KrtPdfDocument` blocks; a new block type needs its structure mapping
   and a conformance test, and every renderer takes `KrtPdfDocuments` as a dependency.
 - The layer relies on two OpenPDF behaviours: a `PdfStructureElement` may be created with the

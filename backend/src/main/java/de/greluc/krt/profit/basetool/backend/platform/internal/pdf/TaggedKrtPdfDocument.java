@@ -155,9 +155,9 @@ public final class TaggedKrtPdfDocument implements KrtPdfDocument {
   }
 
   /**
-   * Creates and opens a tagged KRT document on A4 — stream compression off, the dark background,
-   * accent bar and logo on every page — and sets its title both as document metadata and as the
-   * {@code H1} of the first page.
+   * Creates and opens a tagged, fully compressed KRT document on A4 — the dark background, accent
+   * bar and logo on every page — and sets its title both as document metadata and as the {@code H1}
+   * of the first page.
    *
    * @param target the stream receiving the PDF bytes
    * @param title the (already uppercase) document title
@@ -173,8 +173,8 @@ public final class TaggedKrtPdfDocument implements KrtPdfDocument {
             PdfPageFlow.TOP_BOTTOM_MARGIN,
             PdfPageFlow.TOP_BOTTOM_MARGIN);
     PdfWriter writer = PdfWriter.getInstance(document, target);
-    // Content assertions in the tests read the raw content streams.
-    writer.setCompressionLevel(0);
+    // Flate streams in object streams keep a 100 000-row table near 26 MB (REQ-API-029).
+    writer.setFullCompression();
     writer.setTagged();
     writer.setPageEvent(new KrtPageDecoration());
     PdfConformanceProfile.beforeOpen(writer);
