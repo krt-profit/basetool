@@ -100,7 +100,7 @@ class OrgStockPlanner {
       @NotNull ExchangeCaller caller, @NotNull ExchangeOrgStockChangeSet changeSet) {
     List<ExchangeOrgStockChangeSet.Op> ops = changeSet.ops();
     ops.forEach(OrgStockPlanner::requireFields);
-    Set<UUID> pools = orgUnitService.logisticianUnits(caller.member());
+    Set<UUID> pools = orgUnitService.directLogisticianUnits(caller.member());
     Map<Integer, ExchangeLotCatalogue.Entry> catalogue = resolveBookIns(ops);
     Map<UUID, Map<String, UUID>> rosters = new HashMap<>();
     List<Planned<PoolWrite>> plan = new ArrayList<>(ops.size());

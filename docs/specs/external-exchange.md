@@ -3239,6 +3239,10 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
   *`ExchangeOrgStockWriteControllerTest`.*
 - [x] An op on a pool where the writer is not a Logistician, on a personal row or on a row of
   another pool is refused `NOT_PERMITTED` and changes nothing. *`ExchangeOrgStockWriteControllerTest`.*
+- [x] A Logistician of a Bereich or of the Organisationsleitung who is no direct member of a unit
+  below it is refused that unit's ops (`NOT_PERMITTED`), roster and targets (`403`), as one query
+  of the direct Logistician units decides for the reads, the roster, the targets and the ops.
+  *`ExchangeOrgStockWriteControllerTest`.*
 - [x] A `book-in` naming a member who withholds their name, or who is not a member of the unit, is
   refused `HOLDER_UNKNOWN`, and so is a `move-holder` to such a member; a `move-holder` into a unit
   the writer is not a Logistician of is `NOT_PERMITTED`. *`ExchangeOrgStockWriteControllerTest`.*
