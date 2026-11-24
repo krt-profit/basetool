@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderDtoFixtures.jobOrder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,13 +46,11 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWr
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -224,38 +223,17 @@ class JobOrderServicePriorityAndStatusTest {
         .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
         .thenAnswer(inv -> {
           JobOrder o = inv.getArgument(0);
-          return new JobOrderDto(
-              o.getId(),
-              o.getDisplayId(),
-              null,
-              null,
-              o.getHandle(),
-              o.getComment(),
-              o.getPriority(),
-              o.getStatus(),
-              JobOrderType.MATERIAL,
-              o.isCountBlueprintsWithVariants(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              null,
-              o.getVersion(),
-              null,
-              null,
-              false,
-              false,
-              null,
-              false,
-              false,
-              false,
-              0L,
-              0L,
-              0L,
-              null,
-              null);
+          return jobOrder()
+              .id(o.getId())
+              .displayId(o.getDisplayId())
+              .handle(o.getHandle())
+              .comment(o.getComment())
+              .priority(o.getPriority())
+              .status(o.getStatus())
+              .countBlueprintsWithVariants(o.isCountBlueprintsWithVariants())
+              .createdAt(null)
+              .version(o.getVersion())
+              .build();
         });
   }
 

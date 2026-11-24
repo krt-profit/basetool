@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.profitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderDtoFixtures.jobOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -91,7 +92,6 @@ import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -357,39 +357,7 @@ class JobOrderServiceTest {
             java.util.List.of(),
             null,
             1L);
-    baseJobOrderDto =
-        new JobOrderDto(
-            orderId,
-            1,
-            null,
-            null,
-            "Tester",
-            null,
-            1,
-            JobOrderStatus.OPEN,
-            JobOrderType.MATERIAL,
-            true,
-            List.of(jomDto),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.now(),
-            1L,
-            null,
-            null,
-            false,
-            false,
-            null,
-            false,
-            false,
-            false,
-            0L,
-            0L,
-            0L,
-            null,
-            null);
+    baseJobOrderDto = jobOrder().id(orderId).handle("Tester").materials(List.of(jomDto)).build();
     lenient()
         .when(jobOrderItemService.prepareItemLines(any(), any()))
         .thenAnswer(inv -> preparedItemLines(inv.getArgument(0)));
@@ -2232,38 +2200,7 @@ class JobOrderServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
       when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(inv -> inv.getArgument(0));
       JobOrderDto itemBase =
-          new JobOrderDto(
-              orderId,
-              1,
-              null,
-              null,
-              "Tester",
-              null,
-              1,
-              JobOrderStatus.OPEN,
-              JobOrderType.ITEM,
-              true,
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of(),
-              Instant.now(),
-              1L,
-              null,
-              null,
-              false,
-              false,
-              null,
-              false,
-              false,
-              false,
-              0L,
-              0L,
-              0L,
-              null,
-              null);
+          jobOrder().id(orderId).handle("Tester").type(JobOrderType.ITEM).build();
       when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(itemBase);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any()))
@@ -2317,38 +2254,12 @@ class JobOrderServiceTest {
           .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
           .thenAnswer(inv -> {
             JobOrder o = inv.getArgument(0);
-            return new JobOrderDto(
-                o.getId(),
-                1,
-                null,
-                null,
-                null,
-                null,
-                1,
-                JobOrderStatus.OPEN,
-                JobOrderType.ITEM,
-                o.isCountBlueprintsWithVariants(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                Instant.now(),
-                o.getVersion(),
-                null,
-                null,
-                false,
-                false,
-                null,
-                false,
-                false,
-                false,
-                0L,
-                0L,
-                0L,
-                null,
-                null);
+            return jobOrder()
+                .id(o.getId())
+                .type(JobOrderType.ITEM)
+                .countBlueprintsWithVariants(o.isCountBlueprintsWithVariants())
+                .version(o.getVersion())
+                .build();
           });
     }
 
