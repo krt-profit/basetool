@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.MAPPER;
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.example;
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.ok;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -47,8 +50,6 @@ import de.greluc.krt.profit.basetool.ingest.store.ExchangeIdempotency;
 import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
 import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -70,7 +71,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Web tests for the exchange drafts: checked, relayed to the backend's preview, staged for the
@@ -80,8 +80,6 @@ import tools.jackson.databind.json.JsonMapper;
 class ExchangeDraftRouteTest {
 
   private static final String TOKEN = "draft-token";
-  private static final JsonMapper MAPPER = JsonMapper.builder().build();
-  private static final Path EXAMPLES = Path.of("../docs/exchange/examples/v1");
   private static final String PREVIEW =
       "{\"total\":1,\"matched\":1,\"matchedByAlias\":0,\"suggested\":0,\"unmatched\":0,"
           + "\"alreadyOwned\":0,\"entries\":[]}";
@@ -443,17 +441,6 @@ class ExchangeDraftRouteTest {
   }
 
   /**
-   * Reads a published example.
-   *
-   * @param name its path below the examples folder
-   * @return its text
-   * @throws Exception if it cannot be read
-   */
-  private static @NotNull String example(@NotNull String name) throws Exception {
-    return Files.readString(EXAMPLES.resolve(name));
-  }
-
-  /**
    * Builds an envelope that carries only a format version.
    *
    * @param formatVersion the version
@@ -461,15 +448,5 @@ class ExchangeDraftRouteTest {
    */
   private static @NotNull JsonNode envelope(@NotNull String formatVersion) {
     return MAPPER.createObjectNode().put("formatVersion", formatVersion);
-  }
-
-  /**
-   * A usable relay answer.
-   *
-   * @param json the body
-   * @return the result
-   */
-  private static ExchangeRelay.Result ok(@NotNull String json) {
-    return new ExchangeRelay.Result(200, MAPPER.readTree(json), null, null);
   }
 }

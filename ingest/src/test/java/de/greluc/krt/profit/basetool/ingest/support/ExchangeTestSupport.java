@@ -32,7 +32,11 @@ import de.greluc.krt.profit.basetool.ingest.auth.ExchangeTokenGateFilter;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
 import de.greluc.krt.profit.basetool.ingest.observability.ExchangeLogContext;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistry;
+import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
@@ -59,8 +63,12 @@ import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
+import tools.jackson.databind.json.JsonMapper;
 
-/** Keys, tokens, DPoP proofs, registries and probe routes for the exchange gate tests. */
+/**
+ * Keys, tokens, DPoP proofs, registries, published examples, relay answers and probe routes for the
+ * exchange gate and route tests.
+ */
 public final class ExchangeTestSupport {
 
   /** The origin MockMvc requests carry. */
@@ -86,6 +94,15 @@ public final class ExchangeTestSupport {
 
   /** A write route, which needs {@code exchange.blueprints.write}. */
   public static final String BLUEPRINT_CHANGES = "/exchange/v1/me/blueprints/changes";
+
+  /** A default-configured JSON mapper; immutable, so every test class shares it. */
+  public static final JsonMapper MAPPER = JsonMapper.builder().build();
+
+  /**
+   * The published exchange examples, relative to the {@code ingest} module directory the tests run
+   * in.
+   */
+  public static final Path EXAMPLES = Path.of("../docs/exchange/examples/v1");
 
   /** Not instantiable. */
   private ExchangeTestSupport() {}
@@ -348,6 +365,27 @@ public final class ExchangeTestSupport {
       request.contentType(MediaType.APPLICATION_JSON).content(json);
     }
     return mockMvc.perform(request);
+  }
+
+  /**
+   * Reads a published exchange example as UTF-8.
+   *
+   * @param name the example's path below {@code docs/exchange/examples/v1}
+   * @return its text
+   * @throws IOException if it cannot be read
+   */
+  public static @NotNull String example(@NotNull String name) throws IOException {
+    return Files.readString(EXAMPLES.resolve(name));
+  }
+
+  /**
+   * Builds the relay result of a backend {@code 200} answer, without a problem code or detail.
+   *
+   * @param json the backend's JSON body
+   * @return the result carrying the parsed body
+   */
+  public static @NotNull ExchangeRelay.Result ok(@NotNull String json) {
+    return new ExchangeRelay.Result(200, MAPPER.readTree(json), null, null);
   }
 
   /**

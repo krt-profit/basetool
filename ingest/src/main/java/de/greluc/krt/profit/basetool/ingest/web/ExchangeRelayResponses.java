@@ -511,10 +511,7 @@ class ExchangeRelayResponses {
             detail);
     ResponseEntity.BodyBuilder answer =
         ResponseEntity.status(httpStatus).contentType(MediaType.APPLICATION_PROBLEM_JSON);
-    String retryAfter =
-        ExchangeRelay.waitsForNextUtcDay(code)
-            ? String.valueOf(quotas.secondsUntilTomorrow())
-            : ExchangeRelay.retryAfterSeconds(code);
+    String retryAfter = ExchangeRelay.retryAfterSeconds(code, quotas::secondsUntilTomorrow);
     if (retryAfter != null) {
       answer.header(HttpHeaders.RETRY_AFTER, retryAfter);
     }

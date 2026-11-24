@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.ok;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,7 +54,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The blueprint read route through both gates, with the backend relay mocked (REQ-XCH-013,
@@ -65,7 +65,6 @@ class ExchangeBlueprintRouteTest {
   private static final String TOKEN = "blueprint-token";
   private static final String PATH = "/exchange/v1/me/blueprints";
   private static final String BACKEND = "/api/v1/exchange/me/blueprints";
-  private static final JsonMapper MAPPER = JsonMapper.builder().build();
   private static final String PAGE =
       """
       {"items":[{"key":"arrowhead","ref":{"bt":"arrowhead","name":"Arrowhead"},"isDefault":false}],
@@ -193,15 +192,5 @@ class ExchangeBlueprintRouteTest {
   private ResultActions call(@NotNull String path) throws Exception {
     return ExchangeTestSupport.call(
         mockMvc, key, TOKEN, HttpMethod.GET, path, null, "VerseKit/2.1.0");
-  }
-
-  /**
-   * A usable relay answer.
-   *
-   * @param json the body
-   * @return the result
-   */
-  private static ExchangeRelay.Result ok(@NotNull String json) {
-    return new ExchangeRelay.Result(200, MAPPER.readTree(json), null, null);
   }
 }

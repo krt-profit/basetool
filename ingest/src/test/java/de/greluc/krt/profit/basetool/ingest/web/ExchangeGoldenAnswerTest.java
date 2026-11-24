@@ -111,8 +111,6 @@ class ExchangeGoldenAnswerTest {
 
   private static final Path OBSERVED = Path.of("build/exchange-golden");
 
-  private static final Path EXAMPLES = Path.of("../docs/exchange/examples/v1");
-
   private static final String TOKEN = "golden-token";
 
   private static final String GATEWAY_TOKEN = "gateway-service-token";
@@ -873,7 +871,7 @@ class ExchangeGoldenAnswerTest {
    * @throws IOException if it cannot be read
    */
   private static @NotNull String fixture(@NotNull String relative) throws IOException {
-    return Files.readString(EXAMPLES.resolve(relative), StandardCharsets.UTF_8);
+    return Files.readString(ExchangeTestSupport.EXAMPLES.resolve(relative), StandardCharsets.UTF_8);
   }
 
   /**

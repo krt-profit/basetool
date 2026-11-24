@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.example;
+import static de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport.ok;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -40,8 +42,6 @@ import de.greluc.krt.profit.basetool.ingest.store.ExchangeBudget;
 import de.greluc.krt.profit.basetool.ingest.store.ExchangeIdempotency;
 import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
 import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -59,7 +59,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The patch change through both gates, with the backend relay mocked (REQ-PATCH-050…052): the read
@@ -71,8 +70,6 @@ class ExchangePatchChangeRouteTest {
 
   private static final String TOKEN = "patch-change-token";
   private static final String READ_ONLY = "patch-change-read-only-token";
-  private static final JsonMapper MAPPER = JsonMapper.builder().build();
-  private static final Path EXAMPLES = Path.of("../docs/exchange/examples/v1");
   private static final String READ_ROUTE = "/exchange/v1/me/patch-change";
   private static final String CHOICE_ROUTE = READ_ROUTE + "/home-location";
   private static final String READ_BACKEND = "/api/v1/exchange/me/patch-change";
@@ -273,17 +270,6 @@ class ExchangePatchChangeRouteTest {
   }
 
   /**
-   * Reads a published example.
-   *
-   * @param name the example below {@code docs/exchange/examples/v1}
-   * @return its text
-   * @throws Exception if it cannot be read
-   */
-  private static @NotNull String example(@NotNull String name) throws Exception {
-    return Files.readString(EXAMPLES.resolve(name));
-  }
-
-  /**
    * Renames the examples' home location Lorville and its system Stanton to the longest name the
    * catalogue stores.
    *
@@ -293,15 +279,5 @@ class ExchangePatchChangeRouteTest {
   private static @NotNull String longestNames(@NotNull String json) {
     return json.replace("\"Lorville\"", "\"" + LONGEST_NAME + "\"")
         .replace("\"Stanton\"", "\"" + LONGEST_NAME + "\"");
-  }
-
-  /**
-   * A usable relay answer.
-   *
-   * @param json the body
-   * @return the result
-   */
-  private static ExchangeRelay.Result ok(@NotNull String json) {
-    return new ExchangeRelay.Result(200, MAPPER.readTree(json), null, null);
   }
 }
