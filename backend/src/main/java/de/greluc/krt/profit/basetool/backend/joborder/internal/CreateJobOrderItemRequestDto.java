@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -38,8 +40,8 @@ import org.jetbrains.annotations.Nullable;
  * @param handle optional contact handle (≤ 200 chars)
  * @param comment optional free-text note (≤ 1000 chars), HTML-escaped on display
  * @param items the ordered finished-item lines (1..50)
- * @param version optimistic-lock version (unused on create)
- * @param commentVersion the observed comment version; required on update, unused on create
+ * @param observed the observed order and comment versions, read from the flat {@code version} and
+ *     {@code commentVersion} fields; both required on update, unused on create
  */
 public record CreateJobOrderItemRequestDto(
     @Nullable UUID responsibleOrgUnitId,
@@ -47,5 +49,4 @@ public record CreateJobOrderItemRequestDto(
     @Size(max = JobOrder.CONTACT_MAX_LENGTH) String handle,
     @Size(max = 1000) String comment,
     @NotEmpty @Size(max = 50) List<@Valid CreateJobOrderItemLineDto> items,
-    Long version,
-    @Nullable Long commentVersion) {}
+    @JsonUnwrapped @NotNull JobOrderObservedVersions observed) {}

@@ -362,8 +362,7 @@ public class JobOrderService {
     return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.EDIT,
-        updateDto.version(),
-        updateDto.commentVersion(),
+        updateDto.observed(),
         plannedOrder ->
             materialReplacementPlan(
                 plannedOrder,
@@ -489,8 +488,7 @@ public class JobOrderService {
     return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.EDIT,
-        updateDto.version(),
-        updateDto.commentVersion(),
+        updateDto.observed(),
         jobOrder -> itemReplacementPlan(jobOrder, updateDto, false));
   }
 
@@ -579,8 +577,7 @@ public class JobOrderService {
     return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.REQUESTER,
-        updateDto.version(),
-        updateDto.commentVersion(),
+        updateDto.observed(),
         plannedOrder ->
             materialReplacementPlan(
                 plannedOrder,
@@ -625,8 +622,7 @@ public class JobOrderService {
     return jobOrderEditor.editPlannedWithComment(
         id,
         JobOrderGate.REQUESTER,
-        updateDto.version(),
-        updateDto.commentVersion(),
+        updateDto.observed(),
         jobOrder -> itemReplacementPlan(jobOrder, updateDto, true));
   }
 

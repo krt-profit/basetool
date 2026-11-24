@@ -189,8 +189,7 @@ class JobOrderCommentVersionIntegrationTest extends MaterialContributionTestSupp
             current.handle(),
             comment,
             List.of(new CreateJobOrderMaterialDto(fixture.materialId(), GOOD_FLOOR, requested)),
-            current.version(),
-            commentVersion);
+            new JobOrderObservedVersions(current.version(), commentVersion));
     return send("/api/v1/orders/{id}", fixture.orderId(), edit);
   }
 
@@ -216,8 +215,7 @@ class JobOrderCommentVersionIntegrationTest extends MaterialContributionTestSupp
                     List.of(),
                     null,
                     null)),
-            current.version(),
-            commentVersion);
+            new JobOrderObservedVersions(current.version(), commentVersion));
     return send("/api/v1/orders/{id}/items", fixture.orderId(), edit);
   }
 

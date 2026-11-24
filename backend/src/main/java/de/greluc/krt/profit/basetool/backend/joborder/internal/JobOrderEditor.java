@@ -382,8 +382,7 @@ public class JobOrderEditor {
    *
    * @param id the order to edit
    * @param gate the current authority required by the edit
-   * @param expectedVersion the observed order version
-   * @param expectedCommentVersion the observed comment version
+   * @param observed the observed order version and comment version
    * @param planner immutable resource selection and mutation over the authorized order
    * @return the current projected order
    * @throws AccessDeniedException when current authority fails before or after resource locking
@@ -395,12 +394,11 @@ public class JobOrderEditor {
   public JobOrderDto editPlannedWithComment(
       @NotNull UUID id,
       @NotNull JobOrderGate gate,
-      @Nullable Long expectedVersion,
-      @Nullable Long expectedCommentVersion,
+      @NotNull JobOrderObservedVersions observed,
       @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
     Consumer<JobOrder> versions =
-        versioned(gate, expectedVersion)
-            .andThen(order -> JobOrderComment.check(order, expectedCommentVersion));
+        versioned(gate, observed.version())
+            .andThen(order -> JobOrderComment.check(order, observed.commentVersion()));
     return jobOrderStockProjectionService.mapToDtoWithStock(
         run(id, gated(gate, versions), planner));
   }

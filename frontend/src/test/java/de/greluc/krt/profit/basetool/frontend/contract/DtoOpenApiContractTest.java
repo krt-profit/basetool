@@ -181,8 +181,9 @@ class DtoOpenApiContractTest {
   }
 
   /**
-   * Asserts every component of {@code record} appears as a property of {@code schemaProperties},
-   * collecting all misses into a single message rather than failing on the first.
+   * Asserts every wire component of {@code record} appears as a property of {@code
+   * schemaProperties}, collecting all misses into a single message rather than failing on the
+   * first.
    *
    * @param record the frontend DTO record under test
    * @param schemaProperties the {@code properties} node of the matching OpenAPI schema
@@ -190,8 +191,8 @@ class DtoOpenApiContractTest {
   private static void assertRecordMatchesSchema(Class<?> record, JsonNode schemaProperties) {
     Set<String> allowed = KNOWN_PREEXISTING_DRIFT.getOrDefault(record.getSimpleName(), Set.of());
     Set<String> missing = new TreeSet<>();
-    for (RecordComponent component : record.getRecordComponents()) {
-      String jsonName = jsonName(record, component);
+    for (RecordComponent component : WireComponents.of(record)) {
+      String jsonName = jsonName(component.getDeclaringRecord(), component);
       if (!schemaProperties.has(jsonName) && !allowed.contains(jsonName)) {
         missing.add(jsonName);
       }

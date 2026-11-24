@@ -154,8 +154,7 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               lines,
-              form.getVersion(),
-              form.getCommentVersion());
+              form.observedVersions());
       JobOrderDto created = jobOrderClient.createItemOrder(dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -227,8 +226,7 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   lines,
-                  form.getVersion(),
-                  form.getCommentVersion());
+                  form.observedVersions());
           JobOrderDto created = jobOrderClient.createItemOrder(dto);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
@@ -304,8 +302,7 @@ public class JobOrderWriteController {
             requester ? null : form.getHandle(),
             form.getComment(),
             lines,
-            form.getVersion(),
-            form.getCommentVersion());
+            form.observedVersions());
     if (requester) {
       jobOrderClient.updateItemOrderAsRequester(id, dto);
     } else {
@@ -358,8 +355,7 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               materials,
-              form.getVersion(),
-              form.getCommentVersion());
+              form.observedVersions());
       JobOrderDto created = jobOrderClient.createOrder(dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -415,8 +411,7 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   materials,
-                  form.getVersion(),
-                  form.getCommentVersion());
+                  form.observedVersions());
           JobOrderDto created = jobOrderClient.createOrder(dto);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
@@ -634,8 +629,7 @@ public class JobOrderWriteController {
               form.getHandle(),
               form.getComment(),
               materials,
-              form.getVersion(),
-              form.getCommentVersion());
+              form.observedVersions());
       jobOrderClient.updateOrder(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
@@ -681,8 +675,7 @@ public class JobOrderWriteController {
                   form.getHandle(),
                   form.getComment(),
                   materials,
-                  form.getVersion(),
-                  form.getCommentVersion());
+                  form.observedVersions());
           JobOrderDto updated = jobOrderClient.updateOrder(id, dto);
           return ResponseEntity.ok(updated);
         });
@@ -718,13 +711,7 @@ public class JobOrderWriteController {
       }
       CreateJobOrderDto dto =
           new CreateJobOrderDto(
-              null,
-              null,
-              null,
-              form.getComment(),
-              materials,
-              form.getVersion(),
-              form.getCommentVersion());
+              null, null, null, form.getComment(), materials, form.observedVersions());
       jobOrderClient.updateOrderAsRequester(id, dto);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
@@ -764,13 +751,7 @@ public class JobOrderWriteController {
         () -> {
           CreateJobOrderDto dto =
               new CreateJobOrderDto(
-                  null,
-                  null,
-                  null,
-                  form.getComment(),
-                  materials,
-                  form.getVersion(),
-                  form.getCommentVersion());
+                  null, null, null, form.getComment(), materials, form.observedVersions());
           JobOrderDto updated = jobOrderClient.updateOrderAsRequester(id, dto);
           return ResponseEntity.ok(updated);
         });

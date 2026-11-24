@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPol
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEditor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderGate;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyCommitmentCommands;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderObservedVersions;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialProvisionCredit;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.WriteMoneyCommitmentDto;
@@ -145,7 +146,7 @@ class TenancyGuardTest {
 
   /** The exact editor mutation signature of an edit that also writes the comment. */
   private static final List<Class<?>> COMMENT_EDIT_PARAMETERS =
-      List.of(UUID.class, JobOrderGate.class, Long.class, Long.class, Function.class);
+      List.of(UUID.class, JobOrderGate.class, JobOrderObservedVersions.class, Function.class);
 
   /** The exact editor mutation signature of a status change under its caller's rule and read. */
   private static final List<Class<?>> LIFECYCLE_EDIT_PARAMETERS =
