@@ -55,7 +55,8 @@ class MessageBundleConsistencyTest {
   private static final Path DEFAULT = Path.of("src/main/resources/messages.properties");
 
   /** Default Bean Validation bundle under the module's main resources. */
-  private static final Path VALIDATION = Path.of("src/main/resources/ValidationMessages.properties");
+  private static final Path VALIDATION =
+      Path.of("src/main/resources/ValidationMessages.properties");
 
   /** English Bean Validation bundle under the module's main resources. */
   private static final Path VALIDATION_EN =
