@@ -142,6 +142,10 @@ need no new consent (REQ-SEC-028).
   Extractor, `basetool-sc-extractor`, from 2.10.0 with `connect`, `drafts.*` and `blueprints.*`
   (owner decision 2026-09-28: the web interface and the Android app are part of the platform, every
   other program is listed). It records the approved capabilities, not the registry's runtime state.*
+- [x] An approval may hold from a Basetool release instead of a client version. *VerseKit's
+  job-order scopes are approved from Basetool 1.27.0, under both job-order criteria, and name no
+  VerseKit version; VerseKit uses them once it ships its job-order area (owner decision 2026-11-24,
+  #3655).*
 - [x] `docs/exchange/onboarding.md` states the criteria, the issue template and the fix deadline.
   *The template is `.github/ISSUE_TEMPLATE/exchange-client-application.yml`.*
 - [x] The privacy notice (the frontend's `privacy.*` keys, DE and EN) states which data flows to an
@@ -3086,10 +3090,10 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
 - **The capability** gates no route of its own: a request without it is answered without entries,
   never refused. Like every capability it admits the routes any capability serves. A membership that
   starts or stops making its member a Logistician of the unit (the flag or the rank changes)
-  announces the unit's pool in the feed (`V297`), so the entries appear or vanish without a new
-  snapshot. For a Bereich or the Organisationsleitung it also announces the pools below it
-  (`V317`); no member's entries change there, so those lots arrive unchanged. The capability itself is the client's: a client whose token gains it reads a new
-  snapshot, and one whose token loses it drops the entries it kept.
+  announces that unit's pool in the feed (`V297`), so the entries appear or vanish without a new
+  snapshot. A pool below a Bereich or the Organisationsleitung is not announced, since no entry
+  there changes (`V451`). The capability itself is the client's: a client whose token gains it
+  reads a new snapshot, and one whose token loses it drops the entries it kept.
 
 **Acceptance**
 
@@ -3111,11 +3115,14 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
   `ExchangeHolderRefsTest`.*
 - [x] Editing a note, adding an earmark, renaming a holder and renaming an earmarked mission each
   produce a feed entry whose lot carries the new details. *`ExchangeOrgStockDetailsControllerTest`.*
+- [x] Joining a Bereich as its Logistician, or gaining the Logistician flag in a Bereich or the
+  Organisationsleitung, announces that unit's own pool and no pool below it.
+  *`ExchangeChangeFeedTriggerIntegrationTest`.*
 
 **Code:** `ExchangeOrgStockService`, `ExchangeOrgUnitService#logisticianUnitsByOwnMembership`,
 `OrgUnitMembershipQueryService#findLogisticianOrgUnitIdsByOwnMembership`, `ExchangeHolderRefs`,
 `ExchangeGate#holds`, `StockReads#exchangeOrgEntries`, `org-stock-lot.schema.json#/$defs/entry`,
-`V297` ·
+`V297`, `V451` ·
 **Status:** implemented (#2588); the rule `OrgUnitMembership#isLogisticianOfOwnUnit` (#2584)
 
 ### REQ-XCH-044 — A member can withhold their name from connected applications

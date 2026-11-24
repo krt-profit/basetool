@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.squadron;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -144,13 +145,9 @@ class ScopeKernelTest {
     lenient().when(authHelper.isAuthenticated()).thenReturn(true);
     lenient().when(authHelper.holdsKrtMember()).thenReturn(true);
 
-    squadronA = new Squadron();
-    squadronA.setId(SQUADRON_A_ID);
-    squadronA.setShorthand("ALF");
+    squadronA = squadron(SQUADRON_A_ID, null, "ALF");
 
-    squadronB = new Squadron();
-    squadronB.setId(SQUADRON_B_ID);
-    squadronB.setShorthand("BRV");
+    squadronB = squadron(SQUADRON_B_ID, null, "BRV");
 
     memberUserInA = new User();
     memberUserInA.setId(MEMBER_USER_ID);
@@ -1560,9 +1557,7 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForPickerOutputNullable_multipleMemberships_nullPicker_throwsOwnerRequired() {
-    Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
-    homeStaffel.setId(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
@@ -1603,9 +1598,8 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForPickerOutputNullable_multiMembership_nullPicker_withPin_stampsPinned() {
-    Squadron staffelA = new Squadron();
     UUID staffelAId = UUID.randomUUID();
-    staffelA.setId(staffelAId);
+    Squadron staffelA = squadron(staffelAId);
     UUID staffelBId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
@@ -1626,9 +1620,8 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForPickerOutputNullable_validStaffelPick_returnsPickedSquadron() {
-    Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
-    homeStaffel.setId(homeStaffelId);
+    Squadron homeStaffel = squadron(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
@@ -1643,9 +1636,8 @@ class ScopeKernelTest {
   @Test
   void
       resolveOrgUnitForPickerOutputNullable_validMultiMembershipStaffelPick_returnsPickedSquadron() {
-    Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
-    homeStaffel.setId(homeStaffelId);
+    Squadron homeStaffel = squadron(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
 
@@ -1664,9 +1656,8 @@ class ScopeKernelTest {
   @Test
   void
       resolveOrgUnitForPickerOutputNullable_singleStaffelOnlyMembership_nullPicker_returnsStaffel() {
-    Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
-    homeStaffel.setId(homeStaffelId);
+    Squadron homeStaffel = squadron(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
@@ -1746,9 +1737,8 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForUnitOwnedAggregate_membershiplessAdmin_withPin_stampsThePin() {
-    Squadron pinned = new Squadron();
     UUID pinnedId = UUID.randomUUID();
-    pinned.setId(pinnedId);
+    Squadron pinned = squadron(pinnedId);
     User admin = new User();
     admin.setId(UUID.randomUUID());
     pinnedAdminWithoutMemberships(admin, pinnedId);
@@ -1768,9 +1758,8 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForUnitOwnedAggregate_singleMembership_pinOnACascadeUnit_stampsThePin() {
-    Squadron pinned = new Squadron();
     UUID pinnedId = UUID.randomUUID();
-    pinned.setId(pinnedId);
+    Squadron pinned = squadron(pinnedId);
     User leader = new User();
     leader.setId(UUID.randomUUID());
     leaderPinnedOnACascadeUnit(leader, UUID.randomUUID(), pinnedId);
@@ -1781,9 +1770,8 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForPickerOutputNullable_pinOnACascadeUnit_stampsTheOwnMembership() {
-    Squadron home = new Squadron();
     UUID homeId = UUID.randomUUID();
-    home.setId(homeId);
+    Squadron home = squadron(homeId);
     User leader = new User();
     leader.setId(UUID.randomUUID());
     leaderPinnedOnACascadeUnit(leader, homeId, UUID.randomUUID());
@@ -1794,9 +1782,8 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForPickerOutputNullable_twoMemberships_pinOnOne_stampsThePin() {
-    Squadron pinned = new Squadron();
     UUID pinnedId = UUID.randomUUID();
-    pinned.setId(pinnedId);
+    Squadron pinned = squadron(pinnedId);
     User member = new User();
     member.setId(UUID.randomUUID());
     callerIs(member);
@@ -1876,9 +1863,8 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForPickerOutputNullable_singleMembership_nullPicker_autoStamps() {
-    Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
-    homeStaffel.setId(homeStaffelId);
+    Squadron homeStaffel = squadron(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
@@ -1914,9 +1900,8 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForImport_singleMembership_stampsIt() {
-    Squadron home = new Squadron();
     UUID homeId = UUID.randomUUID();
-    home.setId(homeId);
+    Squadron home = squadron(homeId);
     User user = new User();
     user.setId(UUID.randomUUID());
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
@@ -1957,9 +1942,8 @@ class ScopeKernelTest {
 
   @Test
   void resolveOrgUnitForImport_severalMembershipsWithOwnPin_stampsThePin() {
-    Squadron pinned = new Squadron();
     UUID pinnedId = UUID.randomUUID();
-    pinned.setId(pinnedId);
+    Squadron pinned = squadron(pinnedId);
     User user = new User();
     user.setId(UUID.randomUUID());
     callerIs(user);
@@ -2785,9 +2769,7 @@ class ScopeKernelTest {
     void leaderCreatesOnBehalfOfDescendant_passesViaCanEditOrgUnit() {
       User leader = new User();
       leader.setId(UUID.randomUUID());
-      Squadron descendant = new Squadron();
-      descendant.setId(DESCENDANT_STAFFEL_ID);
-      descendant.setShorthand("DSC");
+      Squadron descendant = squadron(DESCENDANT_STAFFEL_ID, null, "DSC");
 
       when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
           .thenReturn(List.of(bereichLeadMembership(leader.getId())));
@@ -2881,9 +2863,7 @@ class ScopeKernelTest {
       User receiver = new User();
       receiver.setId(UUID.randomUUID());
       UUID receiverHomeStaffelId = UUID.randomUUID();
-      Squadron descendant = new Squadron();
-      descendant.setId(DESCENDANT_STAFFEL_ID);
-      descendant.setShorthand("DSC");
+      Squadron descendant = squadron(DESCENDANT_STAFFEL_ID, null, "DSC");
 
       when(orgUnitMembershipRepository.findAllByIdUserId(receiver.getId()))
           .thenReturn(List.of(staffelMembership(receiver.getId(), receiverHomeStaffelId)));

@@ -19,8 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.OrgUnitFixtures.persistedProfitSquadron;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -105,12 +104,13 @@ class JobOrderHandoverCompletionIntegrationTest {
 
   private Fixture prepareFixture() {
     return transactionTemplate.execute(status -> {
-      Squadron processor = new Squadron();
       String unitTag = UUID.randomUUID().toString().substring(0, 8);
-      processor.setName("Handover Processor " + unitTag);
-      processor.setShorthand("H" + unitTag);
-      withinProfit(processor, persistedProfitArea(orgUnitRepository));
-      processor = squadronRepository.save(processor);
+      Squadron processor =
+          persistedProfitSquadron(
+              squadronRepository,
+              orgUnitRepository,
+              "Handover Processor " + unitTag,
+              "H" + unitTag);
 
       User user = new User();
       user.setId(UUID.randomUUID());
