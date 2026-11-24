@@ -23,10 +23,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
+import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfTheme;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
+import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
 import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
 import java.io.ByteArrayOutputStream;
@@ -53,6 +55,9 @@ import org.verapdf.pdfa.flavours.PDFAFlavour;
  * figure with alternate description and bounding box, and decoration only as artifact.
  */
 class TaggedKrtPdfDocumentTest {
+
+  private static final KrtPdfDocuments DOCUMENTS =
+      new TaggedKrtPdfDocuments(BackendMessages.bundle());
 
   private static final int BOOKING_ROWS = 80;
 
@@ -298,7 +303,7 @@ class TaggedKrtPdfDocumentTest {
   @Test
   void noBlockStartsWhileATableIsOpen() throws IOException {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream();
-        KrtPdfDocument krt = new TaggedKrtPdfDocuments().open(out, "OFFEN")) {
+        KrtPdfDocument krt = DOCUMENTS.open(out, "OFFEN")) {
       PdfDataTable table = krt.dataTable(new float[] {1f}, List.of("SPALTE"));
 
       assertThatThrownBy(() -> krt.heading("ZU FRÜH")).isInstanceOf(IllegalStateException.class);
@@ -311,7 +316,7 @@ class TaggedKrtPdfDocumentTest {
   @Test
   void aRowMustFillEveryColumn() throws IOException {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream();
-        KrtPdfDocument krt = new TaggedKrtPdfDocuments().open(out, "SPALTEN");
+        KrtPdfDocument krt = DOCUMENTS.open(out, "SPALTEN");
         PdfDataTable table = krt.dataTable(new float[] {1f, 1f}, List.of("A", "B"))) {
       assertThatThrownBy(() -> table.row(List.of(PdfTableCell.text("nur eine"))))
           .isInstanceOf(IllegalArgumentException.class);
@@ -330,7 +335,7 @@ class TaggedKrtPdfDocumentTest {
 
   private static byte[] render(Consumer<KrtPdfDocument> content) throws IOException {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-      try (KrtPdfDocument krt = new TaggedKrtPdfDocuments().open(out, "KONTOAUSZUG ÄÖÜ – €")) {
+      try (KrtPdfDocument krt = DOCUMENTS.open(out, "KONTOAUSZUG ÄÖÜ – €")) {
         content.accept(krt);
       }
       return out.toByteArray();

@@ -62,8 +62,15 @@ Every PDF the backend renders is opened through `KrtPdfDocuments` (REQ-API-029) 
 
 The document title is the heading of its first page; metadata and heading cannot drift apart.
 
+Every text a backend PDF shows — title, labels, headings, column headers, notices and the footer
+line — is resolved in German from the backend message bundle, never written in Java. The footer
+line `pdf.footer.generated` names the generation instant in UTC, the same instant the XMP creation
+date carries.
+
 **Acceptance**
 
+- [x] The handover reports render their title, header labels, headings, column headers,
+  empty-state notices and the footer line from the bundle.
 - [x] veraPDF validates every document kind against PDF/A-4 without a failed rule: the audit log
   (with and without rows), the account statement, the three-month report, the material handover
   report and its preview, the item handover delivery note and the data-export PDF.
@@ -75,7 +82,8 @@ The document title is the heading of its first page; metadata and heading cannot
 **Enforced by:** `PdfConformanceProfileTest`, `AuditLogPdfFormatTest`, `BankReportServiceTest`,
 `JobOrderHandoverReportServiceTest`, `JobOrderItemHandoverReportServiceTest`,
 `DataExportIntegrationTest` (all through `support.PdfConformance`) · **Code:**
-`platform/api/pdf/KrtPdfDocuments`, `platform/internal/pdf/PdfConformanceProfile`
+`platform/api/pdf/KrtPdfDocuments`, `platform/internal/pdf/TaggedKrtPdfDocuments`,
+`platform/internal/pdf/PdfConformanceProfile`, `joborder/internal/HandoverReportLabels`
 
 ### REQ-API-029 — Every backend PDF is tagged PDF/UA-2 and Well-Tagged PDF
 

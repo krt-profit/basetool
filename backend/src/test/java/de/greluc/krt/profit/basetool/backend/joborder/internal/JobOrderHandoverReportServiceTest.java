@@ -29,8 +29,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
 import de.greluc.krt.profit.basetool.backend.support.PdfText;
 import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
@@ -46,9 +46,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openpdf.text.pdf.PdfReader;
 import org.springframework.context.MessageSource;
@@ -58,14 +56,11 @@ class JobOrderHandoverReportServiceTest {
 
   private static final String HANDING_OVER_LABEL = "ÜBERGEBENDER (HANDLE)";
   private static final String RECIPIENT_LABEL = "EMPFÄNGER (HANDLE)";
-  private static final String ANONYMISED_LABEL = "Anonymisiert";
 
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
-  @Mock private MessageSource messageSource;
 
-  @InjectMocks private JobOrderHandoverReportService service;
-
-  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments();
+  private MessageSource messages;
+  private JobOrderHandoverReportService service;
 
   private UUID jobOrderId;
   private UUID handoverId;
@@ -74,6 +69,13 @@ class JobOrderHandoverReportServiceTest {
 
   @BeforeEach
   void setUp() {
+    messages = BackendMessages.bundle();
+    service =
+        new JobOrderHandoverReportService(
+            jobOrderHandoverRepository,
+            new HandoverReportLabels(messages),
+            new TaggedKrtPdfDocuments(messages));
+
     jobOrderId = UUID.randomUUID();
     handoverId = UUID.randomUUID();
 
@@ -482,7 +484,6 @@ class JobOrderHandoverReportServiceTest {
   void generateHandoverReport_showsTheHandingOverMember() throws IOException {
     handover.setHandingOverHandle("Chewie");
     handover.setItems(Set.of());
-    stubLabels();
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
     String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
@@ -494,7 +495,6 @@ class JobOrderHandoverReportServiceTest {
   @Test
   void generateHandoverReport_showsADash_whenNoHandingOverMemberIsRecorded() throws IOException {
     handover.setItems(Set.of());
-    stubLabels();
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
     String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
@@ -508,19 +508,18 @@ class JobOrderHandoverReportServiceTest {
       throws IOException {
     handover.setHandingOverHandle(HandleAnonymisation.SENTINEL);
     handover.setItems(Set.of());
-    stubLabels();
     when(jobOrderHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
 
     String text = PdfText.of(service.generateHandoverReport(jobOrderId, handoverId, null));
 
-    assertEquals(ANONYMISED_LABEL, handingOverRow(text));
+    assertEquals(
+        messages.getMessage("general.anonymisedHandle", null, Locale.GERMAN), handingOverRow(text));
     assertFalse(text.contains(HandleAnonymisation.SENTINEL), "The sentinel must not be printed");
   }
 
   /** The preview names the handing-over member chosen in the form. */
   @Test
   void generateHandoverReportPreview_showsTheChosenHandingOverMember() throws IOException {
-    stubLabels();
     HandoverReportPreviewRequestDto dto =
         new HandoverReportPreviewRequestDto(
             "#3", LocalDateTime.parse("2025-06-15T14:45:00"), "Chewie", "Pilot", List.of());
@@ -528,13 +527,6 @@ class JobOrderHandoverReportServiceTest {
     String text = PdfText.of(service.generateHandoverReportPreview(dto));
 
     assertEquals("Chewie", handingOverRow(text));
-  }
-
-  private void stubLabels() {
-    when(messageSource.getMessage("pdf.handover.handingOver", null, Locale.GERMAN))
-        .thenReturn(HANDING_OVER_LABEL);
-    when(messageSource.getMessage("general.anonymisedHandle", null, Locale.GERMAN))
-        .thenReturn(ANONYMISED_LABEL);
   }
 
   private static String handingOverRow(String text) {

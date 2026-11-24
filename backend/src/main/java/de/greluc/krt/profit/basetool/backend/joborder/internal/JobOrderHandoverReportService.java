@@ -21,13 +21,11 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
-import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
-import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
 import java.io.ByteArrayOutputStream;
 import java.time.ZoneId;
@@ -35,14 +33,12 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,14 +55,11 @@ public class JobOrderHandoverReportService {
   private static final DateTimeFormatter DATE_PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy");
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
 
-  /** Shown for a handover that names no handing-over member. */
-  private static final String NOT_RECORDED = "-";
-
   /** Relative widths of the material, location, amount and quality columns. */
   private static final float[] MATERIAL_WIDTHS = {3f, 2.5f, 1.5f, 1.5f};
 
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
-  private final MessageSource messageSource;
+  private final HandoverReportLabels labels;
   private final KrtPdfDocuments pdfDocuments;
 
   /**
@@ -172,12 +165,19 @@ public class JobOrderHandoverReportService {
       @NotNull String recipientHandle,
       @NotNull List<ItemRow> rows) {
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      try (KrtPdfDocument pdf = pdfDocuments.open(baos, "ÜBERGABEPROTOKOLL")) {
+      try (KrtPdfDocument pdf = pdfDocuments.open(baos, labels.title())) {
         pdf.keyValueTable(
-            meta(jobOrderNumber, handoverDate, handoverTime, handingOverHandle, recipientHandle));
-        pdf.heading("ÜBERGEBENE MATERIALIEN");
+            labels.header(
+                jobOrderNumber, handoverDate, handoverTime, handingOverHandle, recipientHandle));
+        pdf.heading(labels.resolve("pdf.handover.materials"));
         try (PdfDataTable table =
-            pdf.dataTable(MATERIAL_WIDTHS, List.of("MATERIAL", "STANDORT", "MENGE", "QUALITÄT"))) {
+            pdf.dataTable(
+                MATERIAL_WIDTHS,
+                List.of(
+                    labels.resolve("pdf.handover.materials.col.material"),
+                    labels.resolve("pdf.handover.materials.col.location"),
+                    labels.resolve("pdf.handover.col.amount"),
+                    labels.resolve("pdf.handover.materials.col.quality")))) {
           for (ItemRow row : rows) {
             table.row(
                 List.of(
@@ -187,7 +187,7 @@ public class JobOrderHandoverReportService {
                     PdfTableCell.centered(String.valueOf(row.quality()))));
           }
           if (rows.isEmpty()) {
-            table.emptyRow("Keine Materialien vorhanden.");
+            table.emptyRow(labels.resolve("pdf.handover.materials.empty"));
           }
         }
         pdf.footer();
@@ -196,27 +196,6 @@ public class JobOrderHandoverReportService {
     } catch (Exception e) {
       throw new ReportGenerationException("PDF generation failed", e);
     }
-  }
-
-  private @NotNull List<PdfKeyValue> meta(
-      @NotNull String jobOrderNumber,
-      @NotNull String handoverDate,
-      @NotNull String handoverTime,
-      @Nullable String handingOverHandle,
-      @NotNull String recipientHandle) {
-    return List.of(
-        new PdfKeyValue("AUFTRAGSNUMMER", jobOrderNumber),
-        new PdfKeyValue("DATUM DER ÜBERGABE", handoverDate),
-        new PdfKeyValue("UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)"),
-        new PdfKeyValue(
-            label("pdf.handover.handingOver"),
-            Objects.requireNonNullElse(
-                HandleAnonymisation.humanise(handingOverHandle, label("general.anonymisedHandle")),
-                NOT_RECORDED)),
-        new PdfKeyValue(
-            "EMPFÄNGER (HANDLE)",
-            HandleAnonymisation.humaniseRequired(
-                recipientHandle, label("general.anonymisedHandle"))));
   }
 
   private @NotNull String formatAmount(double amount, @Nullable String quantityType) {
@@ -233,15 +212,4 @@ public class JobOrderHandoverReportService {
       double amount,
       int quality,
       @Nullable String quantityType) {}
-
-  /**
-   * Resolves a German PDF label from the backend message bundle, such as the handing-over row and
-   * the shared erased-handle placeholder (REQ-SEC-062).
-   *
-   * @param key the message key
-   * @return the resolved label
-   */
-  private @NotNull String label(@NotNull String key) {
-    return messageSource.getMessage(key, null, Locale.GERMAN);
-  }
 }

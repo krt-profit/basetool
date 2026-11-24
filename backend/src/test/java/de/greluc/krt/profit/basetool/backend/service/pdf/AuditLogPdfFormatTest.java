@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditLogPdfFormat;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
 import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
 import java.io.IOException;
@@ -52,7 +53,8 @@ import org.openpdf.text.pdf.parser.PdfTextExtractor;
 class AuditLogPdfFormatTest {
 
   /** The production PDF layer, which opens the tagged documents. */
-  private static final KrtPdfDocuments PDF_DOCUMENTS = new TaggedKrtPdfDocuments();
+  private static final KrtPdfDocuments PDF_DOCUMENTS =
+      new TaggedKrtPdfDocuments(BackendMessages.bundle());
 
   /** The most rows an audit-log export may hold (REQ-AUDIT-001). */
   private static final int ROW_CAP = 100_000;

@@ -30,8 +30,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverEntry;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.platform.internal.pdf.TaggedKrtPdfDocuments;
+import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
 import de.greluc.krt.profit.basetool.backend.support.PdfText;
 import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
@@ -42,11 +42,10 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
@@ -61,13 +60,21 @@ import org.springframework.context.MessageSource;
 class JobOrderItemHandoverReportServiceTest {
 
   private static final String HANDING_OVER_LABEL = "ÜBERGEBENDER (HANDLE)";
-  private static final String ANONYMISED_LABEL = "Anonymisiert";
 
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
-  @Mock private MessageSource messageSource;
-  @InjectMocks private JobOrderItemHandoverReportService service;
 
-  @Spy private KrtPdfDocuments pdfDocuments = new TaggedKrtPdfDocuments();
+  private MessageSource messages;
+  private JobOrderItemHandoverReportService service;
+
+  @BeforeEach
+  void setUp() {
+    messages = BackendMessages.bundle();
+    service =
+        new JobOrderItemHandoverReportService(
+            jobOrderItemHandoverRepository,
+            new HandoverReportLabels(messages),
+            new TaggedKrtPdfDocuments(messages));
+  }
 
   @Test
   void generatesPdfContainingOrderNumberAndItemName() throws Exception {
@@ -86,6 +93,47 @@ class JobOrderItemHandoverReportServiceTest {
     TaggedStructure structure = TaggedStructure.read(pdf);
     assertThat(structure.kidTypes()).containsExactly("H1", "Table", "H2", "Table", "P");
     assertThat(structure.kids().get(3).kids().getFirst().kidTypes()).containsExactly("TH", "TH");
+  }
+
+  @Test
+  void rendersTheGermanLabelsFromTheMessageBundle() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID handoverId = UUID.randomUUID();
+    JobOrderItemHandover handover = handover(orderId, "Ballista", 3);
+    when(jobOrderItemHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    byte[] pdf = service.generateItemHandoverReport(orderId, handoverId, ZoneOffset.UTC);
+
+    assertThat(new PdfTextExtractor(new PdfReader(pdf)).getTextFromPage(1))
+        .containsSubsequence(
+            "ÜBERGABEPROTOKOLL",
+            "AUFTRAGSNUMMER",
+            "DATUM DER ÜBERGABE",
+            "UHRZEIT DER ÜBERGABE",
+            "10:00 (Lokalzeit)",
+            HANDING_OVER_LABEL,
+            "EMPFÄNGER (HANDLE)",
+            "ÜBERGEBENE GÜTER",
+            "GUT",
+            "MENGE",
+            "Ballista")
+        .containsPattern(
+            "Generiert von Profit Basetool am \\d{2}\\.\\d{2}\\.\\d{4} \\d{2}:\\d{2} UTC");
+  }
+
+  @Test
+  void showsTheEmptyNoticeWhenNoItemWasHandedOver() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID handoverId = UUID.randomUUID();
+    JobOrderItemHandover handover = handover(orderId, "Ballista", 1);
+    handover.getEntries().clear();
+    when(jobOrderItemHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
+
+    byte[] pdf = service.generateItemHandoverReport(orderId, handoverId, ZoneOffset.UTC);
+
+    assertThat(new PdfTextExtractor(new PdfReader(pdf)).getTextFromPage(1))
+        .contains("Keine Güter vorhanden.")
+        .doesNotContain("Ballista");
   }
 
   @Test
@@ -115,7 +163,8 @@ class JobOrderItemHandoverReportServiceTest {
   /** An erased handing-over handle prints the anonymised label, never the sentinel. */
   @Test
   void showsTheAnonymisedLabelForAnErasedHandingOverHandle() throws Exception {
-    assertThat(handingOverRow(HandleAnonymisation.SENTINEL)).isEqualTo(ANONYMISED_LABEL);
+    assertThat(handingOverRow(HandleAnonymisation.SENTINEL))
+        .isEqualTo(messages.getMessage("general.anonymisedHandle", null, Locale.GERMAN));
   }
 
   /**
@@ -132,10 +181,6 @@ class JobOrderItemHandoverReportServiceTest {
     JobOrderItemHandover handover = handover(orderId, "Ballista", 3);
     handover.setHandingOverHandle(handingOverHandle);
     when(jobOrderItemHandoverRepository.findById(handoverId)).thenReturn(Optional.of(handover));
-    when(messageSource.getMessage("pdf.handover.handingOver", null, Locale.GERMAN))
-        .thenReturn(HANDING_OVER_LABEL);
-    when(messageSource.getMessage("general.anonymisedHandle", null, Locale.GERMAN))
-        .thenReturn(ANONYMISED_LABEL);
 
     String text =
         PdfText.of(service.generateItemHandoverReport(orderId, handoverId, ZoneOffset.UTC));

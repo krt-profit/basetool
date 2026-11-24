@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfKeyValue;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfTableCell;
+import de.greluc.krt.profit.basetool.backend.support.BackendMessages;
 import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -59,7 +60,8 @@ class PdfConformanceProfileTest {
   @BeforeAll
   static void render() throws IOException {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-      try (KrtPdfDocument krt = new TaggedKrtPdfDocuments().open(out, "KONTOAUSZUG ÄÖÜ – €")) {
+      try (KrtPdfDocument krt =
+          new TaggedKrtPdfDocuments(BackendMessages.bundle()).open(out, "KONTOAUSZUG ÄÖÜ – €")) {
         krt.keyValueTable(List.of(new PdfKeyValue("ZEITRAUM", "01.01.2026 – 31.01.2026")));
         krt.heading("BUCHUNGEN");
         try (PdfDataTable table = krt.dataTable(new float[] {1f, 1f}, List.of("DATUM", "BETRAG"))) {
