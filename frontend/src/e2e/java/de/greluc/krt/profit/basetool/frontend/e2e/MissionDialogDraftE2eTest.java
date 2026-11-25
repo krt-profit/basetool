@@ -149,6 +149,42 @@ class MissionDialogDraftE2eTest {
     }
   }
 
+  /** Brings a half-filled unit back, and adding it removes the draft. */
+  @Test
+  void aReloadOffersTheUnitAndAddingItRemovesTheDraft() {
+    assumeTrue(STACK.managesStack(), "Requires the isolated test stack");
+    String missionId = seedMission();
+    String unit = "E2E Draft Unit " + UUID.randomUUID().toString().substring(0, 6);
+    try (BrowserContext context = newContext()) {
+      Page page = context.newPage();
+      page.onDialog(dialog -> dialog.accept());
+      try {
+        E2eSupport.navigate(page, STACK.baseUrl() + "/missions/" + missionId + "?tab=crew");
+        page.waitForLoadState();
+        page.locator("#add-unit-btn").click();
+        page.locator("#add-unit-form [name='name']").fill(unit);
+        awaitDraft(page, "mission-unit-add", unit);
+
+        page.reload();
+        page.waitForLoadState();
+        page.getByTestId("draft-dialog-offer").getByTestId("draft-dialog-restore").click();
+        assertThat(page.locator("#add-unit-modal")).isVisible();
+        assertThat(page.locator("#add-unit-form [name='name']")).hasValue(unit);
+
+        page.waitForResponse(
+            r ->
+                r.url().contains("/missions/" + missionId + "/units/ajax")
+                    && "POST".equals(r.request().method())
+                    && r.status() < 300,
+            () -> page.locator("#add-unit-form button[type='submit']").click());
+        page.waitForFunction("() => " + DRAFTS + " === 0");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "mission-unit-draft");
+        throw failure;
+      }
+    }
+  }
+
   /**
    * Seeds a mission of the test member's unit.
    *
