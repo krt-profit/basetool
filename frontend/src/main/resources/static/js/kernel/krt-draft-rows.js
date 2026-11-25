@@ -25,6 +25,7 @@
  * @property {() => Element[]} rows lists the rows in order
  * @property {() => void} add appends an empty row
  * @property {(row: Element) => void} remove removes a row, or leaves the last one in place
+ * @property {number} [minimum] the fewest rows the form has; one when omitted, zero for optional rows
  * @property {(form: HTMLFormElement) => void} [reveal] shows the form on a page of several
  */
 
@@ -32,12 +33,13 @@
  * Reads the row count a draft recorded.
  *
  * @param {unknown} extra the draft part the adapter stored
- * @returns {number} the row count, at least one
+ * @param {number} minimum the fewest rows the form has
+ * @returns {number} the row count, at least the minimum
  */
-function storedRowCount(extra) {
+function storedRowCount(extra, minimum) {
     const rows =
         extra && typeof extra === 'object' ? /** @type {{rows?: unknown}} */ (extra).rows : null;
-    return typeof rows === 'number' && rows >= 1 ? Math.floor(rows) : 1;
+    return typeof rows === 'number' && rows >= minimum ? Math.floor(rows) : minimum;
 }
 
 /**
@@ -54,7 +56,7 @@ export function rowCountAdapter(form) {
             return { rows: form.rows().length };
         },
         restore(_form, extra) {
-            const wanted = storedRowCount(extra);
+            const wanted = storedRowCount(extra, form.minimum ?? 1);
             while (form.rows().length < wanted) {
                 form.add();
             }

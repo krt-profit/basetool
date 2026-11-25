@@ -3184,10 +3184,11 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 - **Opt-in.** A form carries `data-krt-draft="<form-key>"`, `data-krt-draft-version="<n>"` and the
   restore offer `kernel/fragments/draft-offer :: draftOffer`. Drafted are the refinery-order create
   (`refinery-order-create`), the three forms of the job-order create (`job-order-material-create`,
-  `job-order-item-create`, `job-order-auec-create`) and the mission create (`mission-create`), each
-  only when its page creates, never on the edit page that reuses the template. Edit forms need the
-  entity's `version` in the draft and a warning when it changed, so they are not drafted yet; the
-  bank request dialogs (#3747) need an offer outside the dialog.
+  `job-order-item-create`, `job-order-auec-create`), the mission create (`mission-create`) and the
+  stock booking of the personal and the global stock (`inventory-input-own`,
+  `inventory-input-global`), each only when its page creates, never on the edit page that reuses
+  the template. Edit forms need the entity's `version` in the draft and a warning when it changed,
+  so they are not drafted yet; the bank request dialogs (#3747) need an offer outside the dialog.
 - **Storage and key.** `sessionStorage` only: a draft survives a reload and the maintenance-page
   round trip in the same tab and is gone when the tab closes, so nothing stays behind on a shared
   device. The key is `krt-draft:` plus the member scope, the active org-unit context, the form key
@@ -3204,17 +3205,19 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 - **Rows.** A form with script-built rows registers a `KrtDraftAdapter` (`registerDraftAdapter`)
   whose part is stored with the draft and restored before the values. Rows that differ only in
   number use `rowCountAdapter` (`krt-draft-rows.js`): the refinery goods rows and the job-order
-  material rows. The job-order item lines load their blueprints and derived materials after the
-  item is picked and link a sub-assembly to its parent line, so the generic part skips them
-  (`data-krt-draft-skip`) and their adapter (`joborder/order-item-drafts.js`) keeps each line's
-  item and label, blueprint, amount, quality per derived material and the position of its parent,
-  and rebuilds the lines through the page's line builder with fresh client line ids. The mission
-  create's adapter (`mission/mission-create-draft.js`) keeps the planning rows of each section
-  (objectives, steps, units, frequencies; skipped by the generic part, as is the template picker,
-  which would open the apply dialog) and the applied template with its revision; a revision that
-  changed meanwhile is refused on save as stale (`MISSION_TEMPLATE_STALE`), as for a fresh form.
-  Its `finish` hook restores that link after the values, because the restored owner's `change`
-  clears it.
+  material rows; optional rows pass `minimum: 0`, as the stock booking's job-order and mission
+  allocation rows do. The stock booking's adapter also keeps the catalog mode (material or item)
+  and selects it first, because the other mode's fields are disabled. The job-order item lines
+  load their blueprints and derived materials after the item is picked and link a sub-assembly to
+  its parent line, so the generic part skips them (`data-krt-draft-skip`) and their adapter
+  (`joborder/order-item-drafts.js`) keeps each line's item and label, blueprint, amount, quality
+  per derived material and the position of its parent, and rebuilds the lines through the page's
+  line builder with fresh client line ids. The mission create's adapter
+  (`mission/mission-create-draft.js`) keeps the planning rows of each section (objectives, steps,
+  units, frequencies; skipped by the generic part, as is the template picker, which would open the
+  apply dialog) and the applied template with its revision; a revision that changed meanwhile is
+  refused on save as stale (`MISSION_TEMPLATE_STALE`), as for a fresh form. Its `finish` hook
+  restores that link after the values, because the restored owner's `change` clears it.
 - **Several forms on a page.** The page offers its drafts once `DOMContentLoaded` fires, after its
   module scripts registered their adapters. The first offer of a page asks its adapter to
   `reveal` the form: the job-order create switches to the order kind of the offered draft.
@@ -3237,6 +3240,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   switches the page into item mode and restores its line with the derived material's quality.
 - [x] A reload of a half-filled mission create restores its fields, schedule and planning rows; the
   save then removes the draft.
+- [x] A reload of a half-filled stock booking restores its fields and allocation rows; the booking
+  then removes the draft.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3246,9 +3251,11 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `scripts/mission-create-draft.test.mjs` (`:frontend:testMissionCreateDraftJs`),
 `DraftScopeAdviceTest`, `RefineryOrderCreateE2eTest#reloadOffersTheUnsavedInputBackAndTheSaveRemovesIt`,
 `JobOrderCreateDraftE2eTest`, `MissionCreateE2eTest#reloadOffersTheMissionDraftBackWithItsPlanningRows`,
+`InventoryOperationsE2eTest#einbuchenDraftComesBackAfterAReloadAndTheBookingClearsIt`,
 `MessageBundleConsistencyTest` · **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`,
 `krt-draft-snapshot.js`, `krt-draft-rows.js`, `krt-searchable-select.js` (`selection`),
 `kernel/fragments/draft-offer.html`, `kernel/fragments/sidebar.html` (`data-krt-draft-scope`),
 `kernel/layout/DraftScopeAdvice`, `refinery/refinery-orders-create.js`, `joborder/orders-create.js`,
 `joborder/order-item-drafts.js`, `mission/mission-create.js`, `mission/mission-create-draft.js`,
-`mission/mission-create-rows.js` (`values`) · **ADR:** ADR-0411 · **Related:** REQ-FE-024, REQ-FE-040
+`mission/mission-create-rows.js` (`values`), `inventory/inventory-input.js`,
+`inventory/inventory-input.html` · **ADR:** ADR-0411 · **Related:** REQ-FE-024, REQ-FE-040

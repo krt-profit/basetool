@@ -14,7 +14,9 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${backKey}, eyebrowHref=@{${backHref}},
         titleText=#{inventory.input.title})}"></th:block>
 
-    <form id="inventory-input-form" class="form-layout card" th:action="@{/inventory/input}" method="post" th:object="${inventoryForm}">
+    <form id="inventory-input-form" class="form-layout card" th:action="@{/inventory/input}" method="post" th:object="${inventoryForm}"
+          th:attr="data-krt-draft=${inventoryForm.isGlobal} ? 'inventory-input-global' : 'inventory-input-own'" data-krt-draft-version="1">
+        <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
         <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
         <div th:if="${#fields.hasErrors('*')}" class="alert alert-danger" role="alert">
             <ul class="form-errors">

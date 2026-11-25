@@ -26,6 +26,8 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { renderOwnerPicker } from '/js/kernel/krt-owner-picker.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { refreshProvisionPicker, provisionReady } from '/js/inventory/inventory-provision.js';
+import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
+import { rowCountAdapter } from '/js/kernel/krt-draft-rows.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const matSelect = /** @type {HTMLSelectElement | null} */ (
@@ -897,6 +899,72 @@ function initInventoryInput() {
 }
 
 initInventoryInput();
+
+/**
+ * Builds the row-count adapter of one allocation dimension, whose rows are optional.
+ *
+ * @param {string} dimension `jobOrder` or `mission`
+ * @returns {KrtDraftAdapter} the dimension's adapter
+ */
+function allocDraftRows(dimension) {
+    return rowCountAdapter({
+        rows: () =>
+            Array.from(
+                document.querySelectorAll(`#${allocConfig(dimension).rows} [data-alloc-row]`),
+            ),
+        add: () => addAllocRow(dimension),
+        remove(row) {
+            const button = row.querySelector('[data-trigger="inv-input-remove-alloc"]');
+            if (button) removeAllocRow(button);
+        },
+        minimum: 0,
+    });
+}
+
+/**
+ * Switches the booking form to a catalog mode, enabling that mode's fields.
+ *
+ * @param {string} mode `material` or `item`
+ */
+function selectCatalogMode(mode) {
+    const radio = document.querySelector(`input[name="inventoryCatalogMode"][value="${mode}"]`);
+    if (radio instanceof HTMLInputElement) {
+        radio.checked = true;
+        applyCatalogMode();
+    }
+}
+
+/**
+ * Registers the draft adapter of the booking form (REQ-FE-041): it keeps the catalog mode, which
+ * enables the fields the values go into, and the number of job-order and mission allocation rows,
+ * whose values the generic draft keeps by their indexed names.
+ */
+function registerInventoryInputDraft() {
+    const orderRows = allocDraftRows('jobOrder');
+    const missionRows = allocDraftRows('mission');
+    /** @type {KrtDraftAdapter} */
+    const adapter = {
+        serialize(form) {
+            return {
+                mode: currentCatalogMode(),
+                jobOrder: orderRows.serialize(form),
+                mission: missionRows.serialize(form),
+            };
+        },
+        restore(form, extra) {
+            const parts = /** @type {{mode?: unknown, jobOrder?: unknown, mission?: unknown}} */ (
+                extra && typeof extra === 'object' ? extra : {}
+            );
+            selectCatalogMode(parts.mode === 'item' ? 'item' : 'material');
+            orderRows.restore(form, parts.jobOrder);
+            missionRows.restore(form, parts.mission);
+        },
+    };
+    registerDraftAdapter('inventory-input-own', adapter);
+    registerDraftAdapter('inventory-input-global', adapter);
+}
+
+registerInventoryInputDraft();
 
 /**
  * Refreshes optional provision choices without changing the entered allocation amounts.
