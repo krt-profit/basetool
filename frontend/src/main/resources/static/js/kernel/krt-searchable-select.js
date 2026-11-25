@@ -758,7 +758,25 @@ function krtSearchableSelect(select, config) {
         input.setCustomValidity('');
     }
 
-    const controller = { setValue };
+    /**
+     * Names the committed selection with its label and option metadata, so it can be restored
+     * through {@link setValue} without a lookup.
+     *
+     * @returns {KrtComboboxSelection} the committed selection; an empty value when none is made
+     */
+    function selection() {
+        /** @type {Record<string, string>} */
+        const data = {};
+        const map = committedItem && committedItem.data ? committedItem.data : {};
+        Object.keys(map).forEach((key) => {
+            if (map[key] != null) {
+                data[key] = String(map[key]);
+            }
+        });
+        return { value: committedValue, label: committedLabel, data };
+    }
+
+    const controller = { setValue, selection };
     hidden.krtCombobox = controller;
     wrapper.krtCombobox = controller;
 }

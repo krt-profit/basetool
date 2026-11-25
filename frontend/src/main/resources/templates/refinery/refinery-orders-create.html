@@ -55,7 +55,9 @@
     <div class="rod-layout"
          th:with="sales=${refineryOrderForm.oreSales ?: 0},
                   costs=${(refineryOrderForm.expenses ?: 0) + (refineryOrderForm.otherExpenses ?: 0)}">
-        <form data-testid="refinery-form" class="form-layout card rod-form" th:action="@{/refinery-orders/create}" method="post" th:object="${refineryOrderForm}">
+        <form data-testid="refinery-form" class="form-layout card rod-form" th:action="@{/refinery-orders/create}" method="post" th:object="${refineryOrderForm}"
+              data-krt-draft="refinery-order-create" data-krt-draft-version="1">
+            <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
             <input type="hidden" th:field="*{source}" />
 
             <fieldset class="form-section">
@@ -101,7 +103,7 @@
                             <input type="hidden" id="startedAt" th:field="*{startedAt}">
                             <div class="datetime-split-inputs">
                                 <input type="date" id="startedAtDate" class="date-part" th:aria-label="#{a11y.datetime.date}">
-                                <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                                <input type="time" id="startedAtTime" class="time-part" th:aria-label="#{a11y.datetime.time}">
                             </div>
                             <button type="button" class="btn btn-ghost btn-xs" data-trigger="rfc-set-started-now" th:text="#{refineryorder.form.now}">Jetzt</button>
                         </div>

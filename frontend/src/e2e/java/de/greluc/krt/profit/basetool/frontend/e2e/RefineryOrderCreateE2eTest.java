@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -29,6 +31,10 @@ import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -131,6 +137,114 @@ class RefineryOrderCreateE2eTest {
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "refinery-create");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Reloads a half-filled create form with two goods rows, restores the offered draft and saves it
+   * (REQ-FE-041): the rows and every value come back exactly, the stored draft holds no hidden
+   * field or token, and the save removes it.
+   */
+  @Test
+  void reloadOffersTheUnsavedInputBackAndTheSaveRemovesIt() {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      page.onDialog(dialog -> dialog.accept());
+      try {
+        E2eSupport.navigate(page, baseUrl + "/refinery-orders/create");
+        page.waitForLoadState();
+        assertThat(page.getByTestId("draft-offer")).isHidden();
+
+        Locator ownerCombo = page.locator(".krt-combobox:has(#ownerId) .krt-combobox__input");
+        if (ownerCombo.count() > 0) {
+          E2eSupport.selectComboboxFirstOption(ownerCombo);
+        }
+        page.locator("#locationId").selectOption(new SelectOption().setLabel("E2E Refinery Hub"));
+        page.locator("#refiningMethodId")
+            .selectOption(new SelectOption().setLabel("E2E Refining Method"));
+        E2eSupport.selectComboboxByValue(
+            page.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input"),
+            materialId,
+            "E2E Refinery Material");
+        page.locator("#inputQuantity_0").fill("100");
+        page.locator("#outputQuantity_0").fill("80");
+        page.getByTestId("refinery-add-material").click();
+        E2eSupport.selectComboboxByValue(
+            page.locator(".krt-combobox:has(#inputMaterialId_1) .krt-combobox__input"),
+            materialId,
+            "E2E Refinery Material");
+        page.locator("#inputQuantity_1").fill("50");
+        page.locator("#outputQuantity_1").fill("40");
+        page.locator("#otherExpenses").fill("1234");
+        page.locator("#durationHours").click();
+
+        List<String> fields =
+            new ArrayList<>(
+                List.of(
+                    "#locationId",
+                    "#refiningMethodId",
+                    "#inputMaterialId_0",
+                    "#inputQuantity_0",
+                    "#outputQuantity_0",
+                    "#inputMaterialId_1",
+                    "#inputQuantity_1",
+                    "#outputQuantity_1",
+                    "#otherExpenses"));
+        if (ownerCombo.count() > 0) {
+          fields.add("#ownerId");
+        }
+        Map<String, String> typed = new LinkedHashMap<>();
+        fields.forEach(field -> typed.put(field, page.locator(field).inputValue()));
+        String secondLabel =
+            page.locator(".krt-combobox:has(#inputMaterialId_1) .krt-combobox__input").inputValue();
+
+        Object canonicalCosts =
+            page.evaluate("() => document.getElementById('otherExpenses').value");
+        page.waitForFunction(
+            "(costs) => Object.keys(sessionStorage).some((k) => k.startsWith('krt-draft:')"
+                + " && sessionStorage.getItem(k).includes('\"rows\":2')"
+                + " && sessionStorage.getItem(k).includes(JSON.stringify(costs)))",
+            canonicalCosts);
+        String stored =
+            (String)
+                page.evaluate(
+                    "() => Object.keys(sessionStorage).filter((k) => k.startsWith('krt-draft:'))"
+                        + ".map((k) => sessionStorage.getItem(k)).join('')");
+        String csrf = page.locator("meta[name='_csrf']").getAttribute("content");
+        assertFalse(stored.contains("\"source\""), stored);
+        assertFalse(stored.contains("_csrf"), stored);
+        assertFalse(csrf != null && stored.contains(csrf), stored);
+
+        page.reload();
+        page.waitForLoadState();
+        assertThat(page.getByTestId("draft-offer")).isVisible();
+        assertThat(page.locator(".material-entry")).hasCount(1);
+        page.getByTestId("draft-restore").click();
+
+        assertThat(page.getByTestId("draft-offer")).isHidden();
+        assertThat(page.locator(".material-entry")).hasCount(2);
+        typed.forEach((field, value) -> assertThat(page.locator(field)).hasValue(value));
+        assertThat(page.locator(".krt-combobox:has(#inputMaterialId_1) .krt-combobox__input"))
+            .hasValue(secondLabel);
+
+        E2eSupport.awaitFormPost(page, () -> page.getByTestId("refinery-submit").click());
+        page.waitForURL(url -> !url.contains("/refinery-orders/create"));
+        page.waitForLoadState();
+        Object left =
+            page.evaluate(
+                "() => Object.keys(sessionStorage).filter((k) =>"
+                    + " k.startsWith('krt-draft:')).length");
+        assertEquals(0, ((Number) left).intValue());
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "refinery-create-draft");
         throw failure;
       }
     }
