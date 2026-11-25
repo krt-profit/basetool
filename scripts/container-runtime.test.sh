@@ -639,7 +639,7 @@ expect_no_call "an unchanged pin does not stop anything" podman 'RT_PIN_FILE="${
 
 say ""
 say "== one restart window: every re-defined unit goes down in ONE stop, then the stack starts in order =="
-stack5='RT_STACK_SERVICES="db-backend keycloak backend ingest frontend"'
+stack5='RT_STACK_SERVICES="db-backend keycloak backend frontend ingest"'
 expect_call "all re-defined units are named in one stop call" podman \
   "RT_CHANGED_SERVICES='keycloak backend frontend'; ${stack5} rt_apply_stack" \
   'systemctl --user stop keycloak.service backend.service frontend.service'
@@ -649,7 +649,13 @@ expect_no_call "...and no unit is restarted" podman \
   "RT_CHANGED_SERVICES='keycloak backend frontend'; ${stack5} rt_apply_stack" 'restart'
 expect_out "the stop comes first, then every stack unit is started in stack order" podman \
   "RT_CHANGED_SERVICES='backend'; ${stack5} rt_apply_stack; grep -oE '(stop|start) [a-z-]+' \"\${LOG}\" | tr '\n' ' '" \
-  'stop backend start db-backend start keycloak start backend start ingest start frontend '
+  'stop backend start db-backend start keycloak start backend start frontend start ingest '
+expect_out "the window is timed from its stop to the end of the start pass" podman \
+  "date() { local n; n=\$((\$(cat \"\${WORK}/clock\" 2>/dev/null || echo 100) + 42)); echo \"\${n}\" >\"\${WORK}/clock\"; echo \"\${n}\"; }; rm -f \"\${WORK}/clock\"; RT_CHANGED_SERVICES='backend'; ${stack5} rt_apply_stack; echo \"window=[\${RT_WINDOW_SECONDS}]\"" \
+  'window=[42]'
+expect_out "...and an apply that stops nothing opens no window to time" podman \
+  "RT_WINDOW_SECONDS=7; RT_CHANGED_SERVICES=''; ${stack5} rt_apply_stack; echo \"window=[\${RT_WINDOW_SECONDS}]\"" \
+  'window=[]'
 expect_out "a failed stop fails the apply (the unit would keep its old definition)" podman \
   "export STUB_FAIL='stop_backend.service'; RT_CHANGED_SERVICES='backend'; ${stack5} rt_apply_stack; echo \"rc=\$?;\"" 'rc=1;'
 expect_call "...but the start pass still runs, so nothing the stop took down stays down" podman \
@@ -663,17 +669,19 @@ expect_out "...and cleared by the next wait" podman \
 
 say ""
 say "== the edge serves the maintenance page: a re-defined edge restarts alone, before the window opens =="
-stackE='RT_STACK_SERVICES="edge db-backend keycloak backend ingest frontend"'
+stackE='RT_STACK_SERVICES="edge db-backend keycloak backend frontend ingest"'
 expect_call "a re-defined edge is restarted on its own" podman \
   "RT_CHANGED_SERVICES='edge backend'; ${stackE} rt_apply_stack" 'systemctl --user restart edge.service'
 expect_out "...before the window's stop, and the stack then starts in order with the edge already up" podman \
   "RT_CHANGED_SERVICES='backend edge'; ${stackE} rt_apply_stack; grep -oE '(restart|stop|start) [a-z-]+' \"\${LOG}\" | tr '\n' ' '" \
-  'restart edge stop backend start edge start db-backend start keycloak start backend start ingest start frontend '
+  'restart edge stop backend start edge start db-backend start keycloak start backend start frontend start ingest '
 expect_out "...and the window's stop never names it" podman \
   "RT_CHANGED_SERVICES='edge keycloak backend'; ${stackE} rt_apply_stack; grep ' stop ' \"\${LOG}\" | sed 's/.* stop \(.*\)$/stopped=[\1]/'" \
   'stopped=[keycloak.service backend.service]'
 expect_no_call "an edge alone opens no window at all" podman \
   "RT_CHANGED_SERVICES='edge'; ${stackE} rt_apply_stack" ' stop '
+expect_out "...so there is no window to time" podman \
+  "RT_CHANGED_SERVICES='edge'; ${stackE} rt_apply_stack; echo \"window=[\${RT_WINDOW_SECONDS}]\"" 'window=[]'
 expect_out "an edge that does not come back fails the apply, and is named" podman \
   "export STUB_FAIL='restart_edge.service'; RT_CHANGED_SERVICES='edge backend'; ${stackE} rt_apply_stack; echo \"rc=\$?; failed=[\${RT_FAILED_SERVICES}]\"" \
   'rc=1; failed=[edge]'
@@ -690,7 +698,9 @@ expect_call "the sick units go down in one stop" podman \
   "${stack5} rt_heal_stack backend frontend" 'systemctl --user stop backend.service frontend.service'
 expect_out "...first, then every stack unit is started in stack order" podman \
   "${stack5} rt_heal_stack backend frontend; grep -oE '(stop|start) [a-z-]+' \"\${LOG}\" | tr '\n' ' '" \
-  'stop backend start db-backend start keycloak start backend start ingest start frontend '
+  'stop backend start db-backend start keycloak start backend start frontend start ingest '
+expect_out "...and the heal's window is timed like a release's" podman \
+  "${stack5} rt_heal_stack backend; [[ \"\${RT_WINDOW_SECONDS}\" =~ ^[0-9]+\$ ]] && echo timed" 'timed'
 expect_no_call "...and nothing is restarted" podman \
   "${stack5} rt_heal_stack keycloak" 'restart'
 expect_out "a sick keycloak is the one unit stopped -- systemd, not the heal, takes what requires it" podman \
@@ -764,7 +774,10 @@ say ""
 say "== the stack is the installed units, in the known order =="
 # shellcheck disable=SC2016
 expect_out "the known order starts the edge first, so the maintenance page is up before the slow units" podman \
-  'echo "[${RT_STACK_ORDER}]"' '[edge db-backend db-keycloak redis redis-session redis-shared keycloak backend ingest frontend acme]'
+  'echo "[${RT_STACK_ORDER}]"' '[edge db-backend db-keycloak redis redis-session redis-shared keycloak backend frontend ingest acme]'
+# shellcheck disable=SC2016
+expect_out "...and the frontend before ingest, which it does not require, so members do not wait for ingest's start" podman \
+  'o=" ${RT_STACK_ORDER} "; before_frontend="${o%% frontend *}"; before_ingest="${o%% ingest *}"; ((${#before_frontend} < ${#before_ingest})) && echo frontend-first' 'frontend-first'
 STACKDIR="${WORK}/stack-units"
 mkdir -p "$STACKDIR"
 for u in db-backend keycloak backend legacy prometheus; do printf '[Container]\n' >"${STACKDIR}/${u}.container"; done

@@ -757,14 +757,18 @@ Within about five minutes the timer fires `deploy.sh`, which:
    never in that stop, so the maintenance page answers for the whole window (REQ-OPS-061,
    ADR-0397). The stack
    units are the **installed** ones (`config applied — stack units, from the installed units: […]`):
-   `edge db-backend db-keycloak redis redis-session redis-shared keycloak backend ingest frontend
-   acme` as far as the host has them (`redis` is the single instance a rollback to a release before
+   `edge db-backend db-keycloak redis redis-session redis-shared keycloak backend frontend ingest
+   acme` as far as the host has them — the frontend before ingest, which it does not require, so
+   members do not wait for ingest's start (`redis` is the single instance a rollback to a release before
    ADR-0388 brings back), and an installed unit one of them `Requires=` right before
    the first unit that requires it; every other installed unit is a monitoring unit. Keycloak
    comes up on the new JAR before backend starts, and one health gate covers everything (ADR-0213,
    since 2026-09-25 — until then the JAR was swapped only after this gate, and its keycloak restart
    took the app down a second time; see [Keycloak provider JAR](#keycloak-provider-jar));
-6. on success writes the marker, clears the failure records, reconciles the monitoring units —
+6. on success logs `restart window closed after <n>s` (from the window's stop until every stack unit
+   started) and writes it to `deploy-restart-window.prom`
+   (`basetool_deploy_last_restart_window_seconds`, *Ops automation* dashboard; a heal does the same),
+   writes the marker, clears the failure records, reconciles the monitoring units —
    a `restart` of each monitoring unit the release re-defined, its `env.d` file included, and a
    `start` of the others — and the edge (config drift or renewed certificates → `nginx reloaded in
    place` through `docker/edge/reload.sh`; a configuration nginx refuses keeps the running edge and
@@ -1048,11 +1052,11 @@ ${UPOD} exec -it db-backend sh                       # a shell in a running cont
 >
 > ```bash
 > ${UCTL} stop keycloak.service backend.service       # also stops ingest and frontend: Requires=
-> ${UCTL} start keycloak.service backend.service ingest.service frontend.service
+> ${UCTL} start keycloak.service backend.service frontend.service ingest.service
 > ```
 
-The application stack, in dependency order, is `db-backend db-keycloak redis-session redis-shared keycloak backend ingest
-frontend edge`, plus `acme`. The monitoring units are `prometheus loki tempo grafana alertmanager
+The application stack, in start order, is `edge db-backend db-keycloak redis-session redis-shared keycloak backend
+frontend ingest`, plus `acme`. The monitoring units are `prometheus loki tempo grafana alertmanager
 blackbox-exporter postgres-exporter-backend postgres-exporter-keycloak redis-session-exporter redis-shared-exporter`; `alloy` and
 `prometheus-node-exporter` are system services (`systemctl restart alloy.service`).
 
@@ -1941,7 +1945,7 @@ edge refuses the new certificate and Grafana answers `503`.
 ### Maintenance page
 
 `include/maintenance.conf` turns an upstream 502/503/504 into a `503` with `Retry-After: 60` — the
-branded `maintenance.html` (auto-refreshes every 30 s) or, for an `Accept: application/json` caller,
+branded `maintenance.html` (auto-refreshes every 10 s) or, for an `Accept: application/json` caller,
 RFC 7807 `maintenance.json`. The static files are `docker/maintenance/static/`, mounted into the
 edge. It covers every vhost, including `/auth`: during a restart there is nothing to log in to.
 

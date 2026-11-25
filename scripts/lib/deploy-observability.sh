@@ -242,3 +242,16 @@ write_stack_health_metric() {
     echo "basetool_deploy_last_health_restart_failed_timestamp ${prev_failed}"
   } | write_textfile "$(basename "${f}")" || true
 }
+
+record_restart_window() {
+  [[ "${RT_WINDOW_SECONDS}" =~ ^[0-9]+$ ]] || return 0
+  log "restart window closed after ${RT_WINDOW_SECONDS}s"
+  {
+    echo "# HELP basetool_deploy_last_restart_window_seconds Seconds from the one stop of the last release, re-apply or heal window that closed healthy until every stack unit was started and healthy again."
+    echo "# TYPE basetool_deploy_last_restart_window_seconds gauge"
+    echo "basetool_deploy_last_restart_window_seconds ${RT_WINDOW_SECONDS}"
+    echo "# HELP basetool_deploy_last_restart_window_timestamp Unix time that window closed."
+    echo "# TYPE basetool_deploy_last_restart_window_timestamp gauge"
+    echo "basetool_deploy_last_restart_window_timestamp $(date +%s)"
+  } | write_textfile "$(basename "${RESTART_WINDOW_METRIC_FILE}")" || true
+}

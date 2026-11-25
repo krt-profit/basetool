@@ -440,6 +440,30 @@ assert_no_apply() {
   fi
 }
 
+assert_before() {
+  local first="$1" second="$2" desc="$3" a b
+  a="$(grep -nF -- "${first}" "${T_DOCKER_LOG}" | tail -n 1 | cut -d: -f1 || true)"
+  b="$(grep -nF -- "${second}" "${T_DOCKER_LOG}" | head -n 1 | cut -d: -f1 || true)"
+  if [[ -n "${a}" && -n "${b}" ]] && ((a < b)); then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} (last '${first}' at line ${a:-none}, first '${second}' at line ${b:-none})"
+  fi
+}
+
+assert_restart_window_metric() {
+  local want="$1" desc="$2" got=no f="${T_STATE_DIR}/textfile/deploy-restart-window.prom"
+  if grep -qE '^basetool_deploy_last_restart_window_seconds [0-9]+$' "${f}" 2>/dev/null \
+    && grep -qE '^basetool_deploy_last_restart_window_timestamp [1-9][0-9]*$' "${f}" 2>/dev/null; then
+    got=yes
+  fi
+  if [[ "${got}" == "${want}" ]]; then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} (restart-window metric written: ${got}, expected ${want})"
+  fi
+}
+
 assert_no_monitoring_recreate() {
   local desc="$1"
   if ! grep -qE 'restart (prometheus|blackbox-exporter|alloy)\.service' "${T_DOCKER_LOG}"; then
@@ -580,6 +604,7 @@ scenario_converged_noop() {
   assert_no_docker "podman pull" "nothing is pulled"
   assert_no_apply "nothing is restarted"
   assert_no_docker "cosign verify" "no signature verification on the steady-state no-op"
+  assert_restart_window_metric no "the no-op opens no restart window, so none is exported"
   rm -rf "${tmp}"
 }
 
@@ -2744,6 +2769,8 @@ scenario_spi_and_apps_move_in_one_restart_window() {
   assert_starts backend 1 "one window: backend is started once"
   assert_starts ingest 1 "one window: ingest is started once, not again after backend's restart"
   assert_starts frontend 1 "one window: frontend is started once, not again after backend's restart"
+  assert_before "systemctl --user start frontend.service" "systemctl --user start ingest.service" \
+    "one window: frontend starts before ingest, so members do not wait for ingest's start"
   assert_count '^systemctl --user stop ' 1 "one window: the re-defined units go down in ONE stop"
   assert_count '^systemctl --user restart (keycloak|backend|ingest|frontend)\.service' 0 \
     "one window: no stack unit is restarted (a restart travels along Requires= and re-runs dependents)"
@@ -2752,6 +2779,8 @@ scenario_spi_and_apps_move_in_one_restart_window() {
   assert_contains "provider JAR: yes" "one window: ...and the JAR"
   assert_contains "keycloak-spi provider JAR applied with the release" "one window: the JAR is reported applied with the release"
   assert_contains "deploy successful" "one window: success is reported"
+  assert_contains "restart window closed after " "one window: the log names how long the window was"
+  assert_restart_window_metric yes "one window: the window's length is exported"
   assert_marker "${MARKER}" "one window: the marker advances to the new images AND the new JAR"
   rm -rf "${tmp}"
 }
@@ -2837,7 +2866,7 @@ scenario_spi_gate_failure_rolls_back_images_and_jar() {
   run_deploy -- "${fake[@]}" "FAKE_STUCK_UNITS=keycloak" "FAKE_STUCK_WITH_JAR=NEW jar" || rc=$?
   assert_exit 1 "$rc" "rollback: the run fails"
   assert_excludes "deploy successful" "rollback: success is never reported"
-  assert_contains "did not come up, in start order: [keycloak backend ingest frontend]" \
+  assert_contains "did not come up, in start order: [keycloak backend frontend ingest]" \
     "rollback: the log names what did not come up, keycloak first"
   assert_contains "KEYCLOAK did not come up, and the provider JAR is the only part of this release that changed keycloak" \
     "rollback: the log says the JAR is the likely cause"
@@ -2978,6 +3007,7 @@ scenario_heal_unhealthy_backend_restarts_it_and_its_dependents_once() {
   assert_contains "health drift resolved" "heal backend: resolution is reported"
   assert_health_stamp basetool_deploy_last_stack_healthy_timestamp yes "heal backend: the healthy heartbeat is stamped"
   assert_health_stamp basetool_deploy_last_health_restart_failed_timestamp no "heal backend: no restart failure is stamped"
+  assert_restart_window_metric yes "heal backend: the heal window's length is exported"
   assert_no_docker "podman pull" "heal backend: nothing is pulled"
   assert_no_docker "cosign verify" "heal backend: nothing is re-verified"
   rm -rf "${tmp}"
@@ -3032,8 +3062,9 @@ scenario_heal_that_fails_is_recorded_after_the_wait() {
     "FAKE_STUCK_UNITS=backend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
   assert_exit 1 "$rc" "heal fails: the run fails"
   assert_contains "did NOT restore health (attempt #1)" "heal fails: the failure is reported"
-  assert_contains "health drift: did not come up, in start order: [backend ingest frontend]" \
+  assert_contains "health drift: did not come up, in start order: [backend frontend ingest]" \
     "heal fails: the log names what did not come up, in start order"
+  assert_restart_window_metric no "heal fails: a window that did not close healthy is not exported"
   assert_excludes "health drift resolved" "heal fails: resolution is not claimed"
   assert_excludes "rolling back" "heal fails: no release rollback"
   assert_health_stamp basetool_deploy_last_health_restart_failed_timestamp yes \
@@ -3952,17 +3983,6 @@ scenario_first_deploy_after_the_layout_migration_has_no_old_release_to_roll_back
 scenario_before_the_layout_migration_a_failed_release_restores_the_old_tree
 scenario_first_deploy_after_the_layout_migration_has_no_old_release_to_roll_back_to
 
-assert_before() {
-  local first="$1" second="$2" desc="$3" a b
-  a="$(grep -nF -- "${first}" "${T_DOCKER_LOG}" | tail -n 1 | cut -d: -f1 || true)"
-  b="$(grep -nF -- "${second}" "${T_DOCKER_LOG}" | head -n 1 | cut -d: -f1 || true)"
-  if [[ -n "${a}" && -n "${b}" ]] && ((a < b)); then
-    record 1 "${desc}"
-  else
-    record 0 "${desc} (last '${first}' at line ${a:-none}, first '${second}' at line ${b:-none})"
-  fi
-}
-
 assert_unit_installed() {
   if [[ -f "${T_UNIT_DIR}/$1.container" ]]; then
     record 1 "$2"
@@ -4037,7 +4057,7 @@ scenario_rename_retires_the_old_unit_inside_the_restart_window() {
   assert_unit_gone redis-exporter "rename: a retired unit that is not loaded is removed without a stop"
   assert_no_docker "stop redis-exporter.service" "rename: ...which is not attempted"
   assert_unit_installed redis-session "rename: the new unit is installed"
-  assert_contains "stack units, from the installed units: [edge db-backend db-keycloak redis-session keycloak backend ingest frontend acme]" \
+  assert_contains "stack units, from the installed units: [edge db-backend db-keycloak redis-session keycloak backend frontend ingest acme]" \
     "rename: the stack is the installed units, the new one before the first unit that requires it"
   assert_before "systemctl --user start redis-session.service" "systemctl --user start ingest.service" \
     "rename: the new unit starts before what requires it"
@@ -4101,7 +4121,7 @@ scenario_rollback_after_a_rename_starts_the_restored_units() {
   run_deploy -- "${RENAME_RUN[@]}" "FAKE_START_FAIL_UNITS=redis-session" || rc=$?
   assert_exit 1 "$rc" "rollback: the failed release exits non-zero"
   assert_contains "the first unit that did not come up is redis-session" "rollback: the gate names the new unit"
-  assert_contains "rollback: stack units, from the installed units: [edge db-backend db-keycloak redis keycloak backend ingest frontend acme]" \
+  assert_contains "rollback: stack units, from the installed units: [edge db-backend db-keycloak redis keycloak backend frontend ingest acme]" \
     "rollback: the stack is derived from the restored units"
   assert_contains "rolled back to previous digest pin successfully" "rollback: the rollback reaches health (no 'Unit not found')"
   assert_excludes "rollback ALSO failed" "rollback: ...and does not report failure"

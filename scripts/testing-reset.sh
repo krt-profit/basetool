@@ -44,7 +44,7 @@ STOPPED=false
 restart_writers() {
   if [[ "${STOPPED}" == "true" ]]; then
     log "starting ${WRITER_SERVICES[*]} again"
-    rt_service_start backend ingest frontend || log "WARN: a writer did not start; check the units"
+    rt_service_start backend frontend ingest || log "WARN: a writer did not start; check the units"
     STOPPED=false
   fi
 }

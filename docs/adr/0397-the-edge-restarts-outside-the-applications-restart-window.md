@@ -104,3 +104,32 @@ The edge is never stopped inside the applications' restart window, and its own r
 - **Render into a staging directory and test that.** It would keep a refused configuration off the
   live directory, but `nginx.conf` includes the rendered vhosts from one fixed path, so testing a
   staged copy needs a second `nginx.conf`; the live render is only read on a reload or a restart.
+
+## Amendment 1 (2026-11-25) — the frontend starts before ingest, and the window is measured
+
+**Context.** The window of v1.26.7 on production (2026-11-22, read from the service user's journal)
+took 170 s: the stop 54 s, then keycloak 22 s, backend 31 s, ingest 32 s and frontend 31 s, each
+`systemctl start` waited for in `RT_STACK_ORDER`. Members see the maintenance page until the
+frontend answers. `frontend` requires `backend`, `keycloak` and `redis-session`, not `ingest`, yet it
+started only after ingest's 32 s.
+
+**Decision.**
+
+- `RT_STACK_ORDER` is `edge db-backend db-keycloak redis redis-session redis-shared keycloak backend
+  frontend ingest acme`. Ingest is down exactly as long as before, only later; the member-facing
+  window loses ingest's start.
+- `rt_apply_stack` times the window from its one stop until every stack unit started
+  (`RT_WINDOW_SECONDS`). A release, re-apply or heal whose window closed healthy logs it and writes
+  `basetool_deploy_last_restart_window_seconds` and `…_timestamp`, shown on the *Ops automation*
+  dashboard, so the effect of this and later changes is read rather than guessed.
+- The maintenance page reloads every 10 s instead of 30 s (REQ-OPS-061).
+
+**Consequences.** The member-facing window of a release shrinks by ingest's start, about 30 s of the
+170 s measured. The desktop extractor's gateway comes back last, after the same downtime as before.
+The stop's 54 s are left as they are here: the frontend and
+the backend each wait out the 20 s graceful-shutdown phase for requests still open, and keycloak
+restarts in every release whose provider-JAR digest moved; both are separate decisions.
+
+**Alternatives considered.** Starting frontend and ingest in one `systemctl start` would let systemd
+run them in parallel, but the gate names what did not come up per unit in start order; one call
+would need a second pass to attribute a failure, for no member-facing gain over the order.

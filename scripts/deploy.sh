@@ -274,6 +274,7 @@ MIXED_RELEASE_FILE="${STATE_DIR}/mixed-release.since"
 TEXTFILE_DIR="${BASETOOL_MONITORING_TEXTFILE_DIR:-/var/lib/basetool/textfile}"
 DEPLOY_METRIC_FILE="${TEXTFILE_DIR}/deploy.prom"
 STACK_HEALTH_METRIC_FILE="${TEXTFILE_DIR}/deploy-health.prom"
+RESTART_WINDOW_METRIC_FILE="${TEXTFILE_DIR}/deploy-restart-window.prom"
 START_EPOCH="$(date +%s)"
 
 TOKEN_EXPIRY_FILE="${BASETOOL_GHCR_TOKEN_EXPIRY_FILE:-${TOKEN_FILE}.expiry}"
@@ -733,6 +734,7 @@ if [[ "${HEALTH_DRIFT}" == "true" ]]; then
     rm -f "${HEALTH_RESTART_FILE}"
     log "health drift resolved — service(s) [${UNHEALTHY_SVCS}] healthy again after targeted restart, and every unit that requires them is up"
     write_stack_health_metric healthy
+    record_restart_window
     exit 0
   fi
   log "health drift: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
@@ -960,6 +962,7 @@ if rt_apply_stack; then
   if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
     log "keycloak-spi provider JAR applied with the release — keycloak and the application stack are healthy on it"
   fi
+  record_restart_window
 
   echo "${EXPECTED_MARKER}" >"${LAST_DEPLOYED_FILE}"
   if [[ "${REAPPLY}" == "true" ]]; then
