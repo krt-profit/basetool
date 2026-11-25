@@ -926,9 +926,14 @@ single authenticated socket cannot grow the per-topic presence map without limit
 full-map snapshot rebuild-and-broadcast blow-up that looping `focus` frames with unique section keys
 would otherwise drive.
 
-An incoming refresh must **never yank a section out from under an active edit**: while a modal is open
-(or focus sits inside the target section's container) the refresh is deferred behind a DS-styled
-"Aktualisierungen verfügbar" pill (no native dialog) that applies the held-back sections on click.
+An incoming refresh must **never yank a section out from under an active edit**: while a modal is open,
+focus sits inside the target section's container, or that container holds a form with unsaved edits
+(REQ-FE-024), the refresh is deferred behind a DS-styled "Aktualisierungen verfügbar" pill (no native
+dialog) that applies, on click, the held-back sections nothing holds any more. A click never discards
+an unsaved form; a section such a form holds back re-renders by itself once the form is saved or
+reset, and focus inside that form, such as on its save or discard button, no longer holds it back.
+The pill sits above a page's sticky form action bar (`.form-actions--sticky`), so it never covers a
+form's save button.
 Bursts are coalesced (a debounce window jittered like the reconnect backoff — `COALESCE_MS +
 random()*COALESCE_MS` — so peers that all received the same `changed` frame within microseconds do
 not fire their fragment refetches in one synchronized spike, #1125), and a dropped-then-reconnected
@@ -1626,6 +1631,12 @@ up to ~200 viewers spreads its fragment re-fetch herd instead of spiking. Peer-d
 always preserve the **peer's own** query state (filters, paging, view toggles — the page-URL getter
 is late-bound per viewer); only the acting client's own refresh may deliberately reset paging.
 
+**A resync never overwrites unsaved input.** A deploy closes every socket, so after each release
+every open page resyncs all its sections at once, often while its member is away from the tab. A
+section whose container holds an edited, unsaved form counts as busy like a focused one (REQ-FE-010,
+REQ-FE-024): it waits behind the pill and re-renders once that form is saved or reset, while every
+section without edits refreshes at once.
+
 **Cross-replica correctness rides Redis pub/sub** (`basetool:livesync:changed`): the relay delivers
 locally first, then publishes `{v, topic, sections, origin}`; instances skip their own origin on
 consume. A Redis outage therefore degrades to single-instance behaviour — never worse — and
@@ -1706,8 +1717,12 @@ because an ordinary navigation also ends a socket after seconds and no threshold
   lapses, without a subscribe and without a probe; a room whose re-check allows, or reaches no
   verdict, stays joined, and no room is re-checked more than once per interval.
 - [ ] A presence frame sent while its `subscribe` is still being authorized shows no dot.
+- [x] A reconnect never overwrites an edited, unsaved form in a live-synced section, even with the
+  focus elsewhere; the held-back section refreshes once the form is saved or reset, and sections
+  without edits refresh on the resync as before.
 
-**Enforced by:** `LiveSyncWebSocketHandlerTest` (topic parsing, cross-room isolation, per-topic
+**Enforced by:** `krt-live-sync.test.mjs` (a section an unsaved form holds back, the pill that leaves
+it, the refresh when the mark is cleared) · `LiveSyncWebSocketHandlerTest` (topic parsing, cross-room isolation, per-topic
 whitelists, publish-without-subscription, per-session rate limit, topic cap, close cleanup, plus the
 F2/#1243 abuse bounds: per-user socket cap accept/refuse/decrement/per-user, per-topic publish
 throttle across publishers, idle-bucket reaping, the keepalive sweep and the socket-lifetime timer,
@@ -2422,6 +2437,13 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
   listener that submits for the same edit then clears it. Listening in the bubble phase re-armed the
   guard after the submit and warned on the next link, which is how the auto-applied terms filter
   warned on its own pager.
+- **Each edited form carries its own mark.** Beside the page-wide guard, an edit in a tracked form
+  sets `data-krt-unsaved` on that form (`krt-unsaved-marks.js`). Only a successful save clears it —
+  `krtFetch` on a 2xx for the form it submitted, or the form a submit control belongs to — or a
+  reset of the form, or `resetUnsavedChanges()`, which clears every mark. A submit alone keeps it,
+  so a save that fails or never reaches the server keeps the form marked. A fragment swap that
+  replaces the form takes the mark with it. Each clear raises `krt:unsaved-cleared` on the
+  document. Live sync holds back a section whose container holds a marked form (REQ-FE-010).
 
 **Acceptance**
 
@@ -2429,9 +2451,13 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
   leaves the page without a warning.
 - [x] Typing a hangar search, which filters in place, leaves the next link unguarded.
 - [x] An unsaved edit in a data form still opens the dialog when a link is clicked.
+- [x] An edit marks only its own form; a GET or `no-track` form is never marked.
+- [x] A successful save or a reset clears the form's mark; a failed or unreachable save keeps it.
 
-**Enforced by:** `UnsavedChangesGuardE2eTest` · **Code:** `unsaved-changes.js`,
-`kernel/fragments/unsaved-modal.html`, `admin-terms.js`, `identity/admin/terms.html` · **Related:** REQ-FE-005,
+**Enforced by:** `UnsavedChangesGuardE2eTest` · `unsaved-changes.test.mjs` (marking, reset,
+submit) · `krt-fetch-read.test.mjs` (the mark a save clears or keeps) · **Code:**
+`unsaved-changes.js`, `krt-unsaved-marks.js`, `krt-fetch.js`, `kernel/fragments/unsaved-modal.html`,
+`admin-terms.js`, `identity/admin/terms.html` · **Related:** REQ-FE-005, REQ-FE-010, REQ-FE-015,
 REQ-FE-021
 
 ### REQ-FE-025 — The route table and its gates are pinned, and every handler carries a gate

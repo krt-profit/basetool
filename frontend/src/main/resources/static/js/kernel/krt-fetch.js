@@ -6,6 +6,7 @@ import {
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtMaintenance } from '/js/kernel/krt-maintenance.js';
 import { pressSettled } from '/js/kernel/krt-press.js';
+import { clearUnsaved } from '/js/kernel/krt-unsaved-marks.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
 const fragmentPolicy =
@@ -767,14 +768,18 @@ async function parseBody(response, responseType) {
  *  - accept               Accept header value (default application/json)
  *  - responseType         'blob' delivers a 2xx body to onSuccess as a Blob
  *
+ * A 2xx clears the unsaved mark of the saved form: `form`, else the form a submit control belongs
+ * to (REQ-FE-024).
+ *
  * Returns { ok, status, body } (plus `redirected` on a 2xx).
  *
  * @param {KrtSendOpts} opts the shared write options
  * @param {() => RequestInit} buildInit builds the request init afresh for each attempt
  * @param {string} url the target URL
+ * @param {HTMLFormElement | null} [form] the form whose fields the request carries
  * @returns {Promise<KrtWriteResult>} the outcome
  */
-async function send(opts, buildInit, url) {
+async function send(opts, buildInit, url, form = null) {
     const submitter = /** @type {HTMLButtonElement | null} */ (opts.submitter || null);
     if (submitter) {
         submitter.disabled = true;
@@ -859,6 +864,7 @@ async function send(opts, buildInit, url) {
                 );
             }
         }
+        clearUnsaved(form || submittedForm(submitter));
         if (!refreshFailed && opts.toast !== false) {
             const label = opts.sectionLabel ? `${opts.sectionLabel}: ` : '';
             successToast(label + text(opts.successMessage, defaults().saved, 'krtFetchI18n.saved'));
@@ -875,6 +881,16 @@ async function send(opts, buildInit, url) {
             submitter.disabled = false;
         }
     }
+}
+
+/**
+ * Names the form a submit control submits.
+ *
+ * @param {HTMLButtonElement | null} submitter the control that started the request
+ * @returns {HTMLFormElement | null} its form when it is a submit control, else null
+ */
+function submittedForm(submitter) {
+    return submitter && submitter.type === 'submit' ? submitter.form : null;
 }
 
 /**
@@ -975,7 +991,7 @@ async function submitForm(opts) {
             return { method, headers, body };
         }
 
-        return send(opts, buildInit, /** @type {string} */ (url));
+        return send(opts, buildInit, /** @type {string} */ (url), form || null);
     }
 
     return runSerialized(opts.serialize, exec);

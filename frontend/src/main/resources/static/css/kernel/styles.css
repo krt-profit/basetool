@@ -5808,7 +5808,10 @@
     .krt-livesync-pill {
         position: fixed;
         right: calc(var(--space-4) + env(safe-area-inset-right));
-        bottom: calc(var(--krt-footer-height, 0px) + var(--krt-tabbar-height) + var(--space-4));
+        bottom: calc(
+            var(--krt-footer-height, 0px) + var(--krt-tabbar-height) + var(--space-4) +
+                var(--krt-livesync-pill-lift, 0px)
+        );
         z-index: var(--z-status-pill);
         display: inline-flex;
         align-items: center;

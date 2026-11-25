@@ -829,16 +829,38 @@ val testLiveSyncJs =
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-live-sync.js"),
     )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-unsaved-marks.js"),
+    )
+  }
+
+val testUnsavedChangesJs =
+  registerNodeScriptTest(
+    "testUnsavedChangesJs",
+    "Regression tests for the per-form unsaved mark of the unsaved-changes guard (REQ-FE-024).",
+    "scripts/unsaved-changes.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/unsaved-changes.js"),
+    )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-unsaved-marks.js"),
+    )
   }
 
 val testKrtFetchReadJs =
   registerNodeScriptTest(
     "testKrtFetchReadJs",
-    "Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031).",
+    "Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031), and the unsaved mark a save clears (REQ-FE-024).",
     "scripts/krt-fetch-read.test.mjs",
     "npmSetup",
   ) {
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-unsaved-marks.js"),
+    )
   }
 
 val testMaintenanceJs =
@@ -1383,5 +1405,6 @@ tasks.named("check").configure {
     typecheckJs,
     testGenApiTypes,
     testLiveSyncJs,
+    testUnsavedChangesJs,
   )
 }

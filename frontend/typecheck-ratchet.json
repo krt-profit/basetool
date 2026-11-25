@@ -195,6 +195,7 @@
       "kernel/krt-shortcuts.js",
       "kernel/krt-tab-scroll-cue.js",
       "kernel/krt-table-sort.js",
+      "kernel/krt-unsaved-marks.js",
       "kernel/krt-user-search.js",
       "kernel/nav-appearance.js",
       "kernel/nav-edit.js",

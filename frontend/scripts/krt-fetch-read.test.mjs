@@ -18,9 +18,9 @@
  */
 
 /**
- * Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031), and the problem
- * wording helper page-local handlers read: the transport is run in a vm context with a scripted
- * fetch and a recording location.
+ * Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031), the problem wording
+ * helper page-local handlers read and the unsaved mark a successful save clears (REQ-FE-024): the
+ * transport is run in a vm context with a scripted fetch and a recording location.
  */
 
 import assert from 'node:assert/strict';
@@ -74,6 +74,7 @@ function harness(script = [], page = {}) {
     const navigations = [];
     const storage = new Map();
     const errors = [];
+    const documentEvents = [];
     const context = {
         console: { warn() {}, log() {}, error() {} },
         Response,
@@ -90,13 +91,20 @@ function harness(script = [], page = {}) {
                 Object.assign(this, options);
             }
         },
-        CustomEvent: class {},
+        CustomEvent: class {
+            constructor(type, init) {
+                this.type = type;
+                this.detail = init && init.detail;
+            }
+        },
         addEventListener() {},
         document: {
             querySelector: () => null,
             querySelectorAll: () => [],
             addEventListener() {},
-            dispatchEvent() {},
+            dispatchEvent(event) {
+                documentEvents.push(event);
+            },
             createElement: () => ({ setAttribute() {} }),
             head: { appendChild() {} },
             body: { dataset: page.gatePage ? { sessionGatePage: 'true' } : {} },
@@ -140,7 +148,33 @@ function harness(script = [], page = {}) {
         calls,
         navigations,
         errors,
+        documentEvents,
     };
+}
+
+/**
+ * A form carrying the unsaved mark (REQ-FE-024), with just the attribute API the mark uses.
+ *
+ * @returns {{hasAttribute(name: string): boolean, setAttribute(name: string): void,
+ *     removeAttribute(name: string): void}} the fake form
+ */
+function editedForm() {
+    const attributes = new Set(['data-krt-unsaved']);
+    return {
+        hasAttribute: (name) => attributes.has(name),
+        setAttribute: (name) => attributes.add(name),
+        removeAttribute: (name) => attributes.delete(name),
+    };
+}
+
+/**
+ * Lists the types of the events the transport dispatched on the document.
+ *
+ * @param {{documentEvents: Array<{type: string}>}} h the harness
+ * @returns {string[]} the event types in dispatch order
+ */
+function documentEventTypes(h) {
+    return h.documentEvents.map((event) => event.type);
 }
 
 await test('get marks the read as background traffic and sends the caller headers', async () => {
@@ -413,6 +447,54 @@ await test('rejected error callbacks are reported and do not suppress default ha
     assert.equal(result.ok, false);
     assert.equal(h.errors.length, 1);
     assert.equal(h.calls.length, 1);
+});
+
+await test('a saved form loses its unsaved mark and announces it', async () => {
+    const h = harness([reply(200, '{}', JSON_TYPE)]);
+    const form = editedForm();
+    const result = await h.krtFetch.submitForm({
+        form,
+        url: '/save',
+        method: 'POST',
+        formData: {},
+    });
+    assert.equal(result.ok, true);
+    assert.equal(form.hasAttribute('data-krt-unsaved'), false);
+    assert.deepEqual(documentEventTypes(h), ['krt:unsaved-cleared']);
+});
+
+await test('a write a submit control started clears the mark of that control’s form', async () => {
+    const h = harness([reply(200, '{}', JSON_TYPE)]);
+    const form = editedForm();
+    await h.krtFetch.write({ url: '/save', submitter: { type: 'submit', form, disabled: false } });
+    assert.equal(form.hasAttribute('data-krt-unsaved'), false);
+});
+
+await test('a write from any other control keeps its form’s mark', async () => {
+    const h = harness([reply(200, '{}', JSON_TYPE)]);
+    const form = editedForm();
+    await h.krtFetch.write({ url: '/row', submitter: { type: 'button', form, disabled: false } });
+    assert.equal(form.hasAttribute('data-krt-unsaved'), true);
+    assert.deepEqual(documentEventTypes(h), []);
+});
+
+await test('a failed or unreachable save keeps the form marked', async () => {
+    for (const answer of [
+        reply(409, '{}', JSON_TYPE),
+        () => Promise.reject(new TypeError('Failed to fetch')),
+    ]) {
+        const h = harness([answer]);
+        const form = editedForm();
+        const result = await h.krtFetch.submitForm({
+            form,
+            url: '/save',
+            method: 'POST',
+            formData: {},
+        });
+        assert.equal(result.ok, false);
+        assert.equal(form.hasAttribute('data-krt-unsaved'), true);
+        assert.deepEqual(documentEventTypes(h), []);
+    }
 });
 
 if (failures > 0) {
