@@ -128,7 +128,8 @@ itself changes only through the Ansible role, which never delivers):
    off, and `DeployFailed` fires (since 2026-09-25; until then it ended the run in silence).
    A moved **provider JAR** rides the same apply (`REQ-OPS-007`, ADR-0213): extracted before
    anything changes, swapped in as the last step before the gate, and keycloak recreated together
-   with the app images. The apply takes every re-defined unit down in **one** `systemctl stop` —
+   with the app images — only when the JAR differs byte for byte from the live one; the bundle's
+   digest moves in every release, the JAR only with the module's inputs. The apply takes every re-defined unit down in **one** `systemctl stop` —
    `Requires=` takes what depends on them along — and then starts the stack in dependency order, so
    a release is one restart window in which each unit restarts once, and one gate covers images,
    units and JAR. The edge is the exception: it starts first, and a re-defined edge is restarted on

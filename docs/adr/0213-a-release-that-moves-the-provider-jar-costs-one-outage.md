@@ -89,3 +89,28 @@ A Keycloak **image** change stays operator-gated by REQ-OPS-006; this decision d
 - **Start instead of restart for units a chain restart already covers** — rejected: it needs the
   `Requires=` graph in the deployer to know which units the chain covers, and it still races a
   dependent that systemd is starting on its own while `systemctl` returns.
+
+## Amendment 1 (2026-11-25) — only a JAR that differs restarts keycloak
+
+**Context.** `deploy.sh` took a moved `basetool-keycloak-spi` digest for a moved JAR. The bundle is
+rebuilt by every release run (REQ-OPS-021), so its digest moves in every release: every release from
+2026-10-25 to 2026-11-22 logged `provider JAR: yes` and stopped keycloak, which cost about 29 s of each
+window (stop 7 s, start 22 s on 2026-11-22). Yet `keycloak-spi/src` and its build changed in one of
+the releases v1.23.0 … v1.26.7 only, and the live JARs of v1.26.6 and v1.26.7 share one SHA-256: the
+JAR itself is reproducible. `--reapply` already compared the staged JAR with the live one.
+
+**Decision.** Every run compares the staged JAR with the live one byte for byte before the swap. An
+identical JAR is dropped: no swap, keycloak is not re-defined and not restarted,
+`keycloak-spi-previous.jar` stays on the last JAR that differed, and the marker records the new
+digest. A JAR that differs is swapped and gated exactly as above.
+
+**Consequences.** A release without a `keycloak-spi` change leaves keycloak running, and the window
+loses keycloak's stop and start. `keycloak-spi-previous.jar` holds the JAR that was live before the
+live one, which may be older than the release before the deployed one; a rollback still finds the
+right JAR, because a release that did not swap has nothing to put back. Deleting the marker no
+longer rotates the JAR anchor onto the deployed release.
+
+**Alternatives considered.** Reusing the previous `keycloak-spi` digest in `release-images.yml` when
+the module's inputs did not change, like the three app images, would keep the digest stable too, but
+it extends the reuse logic to a bundle that is rebuilt in seconds, and it would still trust a digest
+where the host can check the bytes it installs.

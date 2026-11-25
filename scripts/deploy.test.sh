@@ -2828,6 +2828,35 @@ scenario_spi_only_is_the_whole_apply() {
   rm -rf "${tmp}"
 }
 
+scenario_spi_same_jar_under_a_new_digest_restarts_nothing() {
+  echo "Scenario: a release whose provider-JAR bundle moved but whose JAR is byte-identical to the live one swaps nothing and restarts nothing"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  spi_host "${tmp}" "${DIG_BACKEND}" "${DIG_FRONTEND}" "${DIG_INGEST}"
+  echo "N-1 jar" >"${T_STATE_DIR}/keycloak-spi-previous.jar"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_KCSPI_JAR=OLD jar" || rc=$?
+  assert_exit 0 "$rc" "same jar: the deploy succeeds"
+  assert_contains "keycloak-spi changed" "same jar: the moved bundle digest is noticed"
+  assert_contains "provider JAR is byte-identical to the live one" "same jar: ...and the staged JAR found identical"
+  assert_contains "provider JAR: no" "same jar: the release parts do not count the JAR as a change"
+  assert_count '^systemctl --user stop ' 0 "same jar: nothing is stopped"
+  assert_starts keycloak 0 "same jar: keycloak is not restarted"
+  assert_starts backend 0 "same jar: ...nor backend, which requires it"
+  assert_starts frontend 0 "same jar: ...nor frontend"
+  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "same jar: the live JAR is untouched"
+  assert_file_says "${T_STATE_DIR}/keycloak-spi-previous.jar" "N-1 jar" \
+    "same jar: keycloak-spi-previous.jar is not rotated onto an identical JAR"
+  if [[ ! -e "${T_STATE_DIR}/keycloak-spi-stage.jar" ]]; then
+    record 1 "same jar: the staged JAR is removed"
+  else
+    record 0 "same jar: the staged JAR is removed"
+  fi
+  assert_contains "deploy successful" "same jar: success is reported"
+  assert_marker "${MARKER}" "same jar: the marker records the new bundle digest, so the next tick is a no-op"
+  rm -rf "${tmp}"
+}
+
 scenario_spi_gate_failure_rolls_back_images_and_jar() {
   echo "Scenario: keycloak failing on the new JAR rolls back the app images AND the JAR, in one rollback"
   local tmp rc=0
@@ -3507,13 +3536,13 @@ scenario_reapply_flag_is_refused_without_a_deployed_release() {
 }
 
 scenario_deleting_the_marker_still_rotates_the_anchors() {
-  echo "Scenario: deleting last-deployed.digests still turns N into a new release and rotates all three anchors onto it (documented; use --reapply)"
+  echo "Scenario: deleting last-deployed.digests still turns N into a new release and rotates the pin and config anchors onto it; the JAR anchor stays, N's JAR being the live one (documented; use --reapply)"
   local tmp rc=0
   tmp="$(mktmp)"
   reapply_host "${tmp}"
   rm -f "${T_STATE_DIR}/last-deployed.digests"
   mapfile -t fake < <(spi_env)
-  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" || rc=$?
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" "FAKE_KCSPI_JAR=OLD jar" || rc=$?
   assert_exit 0 "$rc" "marker deleted: the run succeeds"
   assert_excludes "re-applying" "marker deleted: it is not a re-apply"
   if grep -q "@${DIG_BACKEND}\$" "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null; then
@@ -3523,8 +3552,9 @@ scenario_deleting_the_marker_still_rotates_the_anchors() {
   fi
   assert_file_says "${T_STATE_DIR}/config-previous/docker/edge/nginx.conf" "N edge" \
     "marker deleted: config-previous/ now holds N"
-  assert_file_says "${T_STATE_DIR}/keycloak-spi-previous.jar" "OLD jar" \
-    "marker deleted: keycloak-spi-previous.jar now holds N's JAR"
+  assert_file_says "${T_STATE_DIR}/keycloak-spi-previous.jar" "N-1 jar" \
+    "marker deleted: keycloak-spi-previous.jar stays on N-1, because N's JAR is byte-identical to the live one"
+  assert_starts keycloak 0 "marker deleted: keycloak is not restarted for its own JAR"
   rm -rf "${tmp}"
 }
 
@@ -3611,6 +3641,7 @@ scenario_failed_release_keeps_the_long_backoff
 scenario_spi_and_apps_move_in_one_restart_window
 scenario_apps_only_restart_each_unit_once
 scenario_spi_only_is_the_whole_apply
+scenario_spi_same_jar_under_a_new_digest_restarts_nothing
 scenario_spi_gate_failure_rolls_back_images_and_jar
 scenario_spi_app_failure_rolls_back_both_and_says_it_cannot_tell
 scenario_spi_only_failure_blames_the_jar

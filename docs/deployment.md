@@ -463,10 +463,11 @@ only a change of target moves them (REQ-OPS-003):
 |---|---|---|
 | `previous-digest-pin.yml` | any run whose target differs from `last-deployed.digests` — copied from `current-digest-pin.yml` before the new pin is written | a re-apply: a drift re-apply (target = marker) or `deploy.sh --reapply` |
 | `config-previous/` (the previous units inside it) | such a run whose config digest moved — a snapshot of the live tree before the mirror, unless `config-apply.incomplete` says the live tree is a mix | a re-apply, even one that re-delivers the config (the unit files are gone, or `--reapply`) |
-| `keycloak-spi-previous.jar` | such a run whose provider-JAR digest moved | a re-apply (`--reapply` puts the deployed JAR back over a live one that differs, and snapshots nothing) |
+| `keycloak-spi-previous.jar` | such a run whose provider-JAR digest moved **and** whose JAR differs byte for byte from the live one | a re-apply (`--reapply` puts the deployed JAR back over a live one that differs, and snapshots nothing), and a release whose JAR is identical to the live one (its bundle is rebuilt every release, so only the digest moved) |
 
 Deleting `last-deployed.digests` makes the next run a **release** of the deployed digests: it rotates
-all three anchors onto the release that is already deployed. Use `deploy.sh --reapply` instead
+the pin and config anchors onto the release that is already deployed; `keycloak-spi-previous.jar`
+stays, because the deployed JAR is the live one. Use `deploy.sh --reapply` instead
 ([Manual deploy, rollback and checks](#manual-deploy-rollback-and-checks)).
 
 `~basetool/.config/containers/systemd/` must stay **empty**: Quadlet searches it before the delivery
@@ -738,8 +739,9 @@ Within about five minutes the timer fires `deploy.sh`, which:
    `EnvironmentFile=` only when it is created;
 5. writes the digest-pin record and the per-service pin drop-ins — after the config, so a release
    the stateful-infra gate holds back leaves no pin behind — pulls the three app images, swaps a
-   moved provider JAR into `keycloak/providers/` (the previous one kept as
-   `keycloak-spi-previous.jar`), logs `release parts: …`, and applies the release in **one restart
+   moved provider JAR into `keycloak/providers/` when it differs byte for byte from the live one (the
+   previous one kept as `keycloak-spi-previous.jar`; an identical JAR under a new bundle digest is
+   dropped and keycloak is not restarted for it), logs `release parts: …`, and applies the release in **one restart
    window**: first each unit the release **retires** is stopped — while systemd still holds the
    definition it was started from, which takes what `Requires=` it down too — and its unit file
    removed once it is down (one already inactive or not loaded just loses its file; one that cannot
@@ -1603,7 +1605,11 @@ window as the app images the release moves:
 1. before anything on the host changes, it extracts the JAR to `/var/lib/basetool/deploy/keycloak-spi-stage.jar`
    — a failure there is a recorded pre-gate failure (`FATAL … step 'extract the keycloak-spi provider
    JAR'`, backoff, `DeployFailed`) with nothing to undo;
-2. as the last step before the apply, it copies the live JAR to
+2. as the last step before the apply, it compares the staged JAR with the live one. When they are
+   byte-identical — the bundle is rebuilt in every release, so its digest moves even when the JAR
+   does not — it drops the staged JAR, logs `the release's provider JAR is byte-identical to the
+   live one (only its bundle digest moved) — not swapped, keycloak is not restarted for it`, and
+   the release goes on without keycloak (`provider JAR: no`). Otherwise it copies the live JAR to
    `/var/lib/basetool/deploy/keycloak-spi-previous.jar` and installs the new one into
    `/opt/basetool/keycloak/providers/`;
 3. the release apply stops keycloak together with every other re-defined unit — and, through
@@ -1617,7 +1623,7 @@ A JAR-only release is the same apply with only keycloak re-defined. The deploy l
 that moves the JAR and the images reads:
 
 ```text
-keycloak-spi changed → staging ghcr.io/…/basetool-keycloak-spi@sha256:… (applied with this release, one restart)
+keycloak-spi changed → staging ghcr.io/…/basetool-keycloak-spi@sha256:… (applied with this release, one restart, if its JAR differs from the live one)
 …
 provider JAR swapped in — keycloak restarts on it with this release
 release parts: app images [backend frontend ingest] · unit definitions [none] · config bundle: no · provider JAR: yes
