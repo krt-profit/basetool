@@ -27,7 +27,11 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { flattenModule, UI_STUBS } from './flatten-module.mjs';
 
-const SOURCE = flattenModule('kernel/krt-live-sync.js', UI_STUBS);
+const SOURCE = flattenModule('kernel/krt-live-sync.js', {
+    ...UI_STUBS,
+    '/js/kernel/krt-maintenance.js':
+        'const krtMaintenance = { entered: 0, enter() { this.entered += 1; }, observe() { return false; }, isActive() { return false; }, isMaintenanceResponse() { return false; } };',
+});
 
 let failures = 0;
 
@@ -104,6 +108,7 @@ function harness(randomValue = 0.5, page = {}) {
     vm.runInContext(SOURCE, context);
     return {
         sync: context.krtLiveSync,
+        maintenance: vm.runInContext('krtMaintenance', context),
         sockets,
         live: () => timers.filter((t) => t.live),
         fire(timer) {
@@ -148,6 +153,29 @@ test('a fallback-first room carries the flag on every subscribe frame it sends',
     const second = h.sockets[1];
     second.open();
     assert.deepEqual(second.sent, [{ type: 'subscribe', topic: 'bank:1', fallbackFirst: true }]);
+});
+
+test('a close for a restart (1012) raises the maintenance banner and still reconnects', () => {
+    const h = harness();
+    h.sync.subscribe('bank:1', {});
+    const first = h.sockets[0];
+    first.open();
+
+    first.close(1012);
+
+    assert.equal(h.maintenance.entered, 1);
+    assert.equal(h.live().length, 1, 'the reconnect stays scheduled');
+});
+
+test('an ordinary drop (1006) leaves the maintenance banner alone', () => {
+    const h = harness();
+    h.sync.subscribe('bank:1', {});
+    const first = h.sockets[0];
+    first.open();
+
+    first.close(1006);
+
+    assert.equal(h.maintenance.entered, 0);
 });
 
 test('a room without the option sends the plain subscribe frame', () => {

@@ -5833,6 +5833,44 @@
         background: color-mix(in srgb, var(--color-primary) 12%, transparent);
     }
 
+    .krt-maintenance-banner {
+        --krt-maintenance-tint: var(--color-warning);
+
+        position: fixed;
+        top: calc(var(--krt-header-height, 0px) + var(--space-3));
+        left: 50%;
+        z-index: var(--z-status-pill);
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        width: min(var(--measure), calc(100vw - 2 * var(--space-4)));
+        margin: 0;
+        transform: translateX(-50%);
+        border-color: color-mix(in srgb, var(--krt-maintenance-tint) 45%, transparent);
+        border-radius: var(--radius-tile);
+        background:
+            linear-gradient(
+                color-mix(in srgb, var(--krt-maintenance-tint) 15%, transparent),
+                color-mix(in srgb, var(--krt-maintenance-tint) 15%, transparent)
+            ),
+            var(--surface-panel);
+        color: var(--color-gray-1);
+        box-shadow: 0 2px 12px color-mix(in srgb, var(--color-bg-black) 45%, transparent);
+    }
+
+    .krt-maintenance-banner[data-state='back'] {
+        --krt-maintenance-tint: var(--color-success);
+    }
+
+    .krt-maintenance-banner > .krt-icon {
+        flex: none;
+        color: var(--krt-maintenance-tint);
+    }
+
+    .krt-maintenance-banner__text {
+        flex: 1;
+    }
+
     #missions-results[aria-busy='true'] {
         opacity: 0.55;
         transition: opacity 120ms ease-in-out;

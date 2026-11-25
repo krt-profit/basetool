@@ -4,6 +4,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { krtMaintenance } from '/js/kernel/krt-maintenance.js';
 import { pressSettled } from '/js/kernel/krt-press.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
@@ -401,11 +402,17 @@ async function get(url, opts) {
             credentials: 'same-origin',
             signal,
         });
+    } catch (transportError) {
+        if (!isAbort(transportError)) {
+            krtMaintenance.enter();
+        }
+        throw transportError;
     } finally {
         if (controller && options.key && readAborters.get(options.key) === controller) {
             readAborters.delete(options.key);
         }
     }
+    krtMaintenance.observe(response);
     if (maybeReauthenticate(response) || maybeSessionGate(response)) {
         return null;
     }
@@ -414,6 +421,21 @@ async function get(url, opts) {
         return null;
     }
     return response;
+}
+
+/**
+ * Whether a rejection is an abort the caller asked for rather than a transport failure.
+ *
+ * @param {unknown} error the rejection
+ * @returns {boolean} true for an `AbortError`
+ */
+function isAbort(error) {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        error.name === 'AbortError'
+    );
 }
 
 /**
@@ -477,12 +499,7 @@ async function getJson(url, opts) {
                     problem = await response.json();
                 } catch (unparsable) {
                     signal?.throwIfAborted();
-                    if (
-                        unparsable &&
-                        typeof unparsable === 'object' &&
-                        'name' in unparsable &&
-                        unparsable.name === 'AbortError'
-                    ) {
+                    if (isAbort(unparsable)) {
                         throw unparsable;
                     }
                 }
@@ -774,6 +791,7 @@ async function send(opts, buildInit, url) {
             }
         } catch (networkError) {
             devWarn('krtFetch network error', networkError);
+            krtMaintenance.enter();
             /** @type {unknown} */
             let handled = false;
             if (typeof opts.onNetworkError === 'function') {
@@ -792,6 +810,7 @@ async function send(opts, buildInit, url) {
         }
 
         const body = await parseBody(response, opts.responseType);
+        krtMaintenance.observe(response, body);
 
         if (maybeReauthenticate(response)) {
             return { ok: false, status: response.status, body };

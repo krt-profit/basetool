@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtMaintenance } from '/js/kernel/krt-maintenance.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 
 /**
@@ -45,11 +46,15 @@ function initToasts() {
 }
 
 /**
- * Shows a transient error toast.
+ * Shows a transient error toast, except while the tool is held to be unreachable: the maintenance
+ * banner explains every failure then (REQ-FE-040).
  *
  * @param {string} message the text under the error title
  */
 export function showFrontendErrorToast(message) {
+    if (krtMaintenance.isActive()) {
+        return;
+    }
     const toast = document.createElement('div');
     toast.className = 'notification-toast error-toast';
     toast.setAttribute('data-duration', '7000');

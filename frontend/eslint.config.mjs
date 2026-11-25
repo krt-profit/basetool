@@ -26,6 +26,7 @@ const IMPORT_EXPRESSION_MESSAGE =
 const TRANSPORT_FILES = [
     'src/main/resources/static/js/kernel/krt-fetch.js',
     'src/main/resources/static/js/kernel/krt-client-error.js',
+    'src/main/resources/static/js/kernel/krt-maintenance.js',
 ];
 
 const RAW_FETCH_MESSAGE =

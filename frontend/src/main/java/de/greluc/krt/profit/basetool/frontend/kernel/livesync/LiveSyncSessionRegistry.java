@@ -112,6 +112,9 @@ final class LiveSyncSessionRegistry {
    */
   private final Map<String, Integer> socketsByUser = new ConcurrentHashMap<>();
 
+  /** Whether the replica shuts down: its sockets were closed with 1012 and a new one is refused. */
+  private volatile boolean restarting;
+
   /**
    * Creates the registry and binds the socket-lifetime timer.
    *
@@ -132,14 +135,19 @@ final class LiveSyncSessionRegistry {
    * LiveSyncWebSocketHandler#MAX_SOCKETS_PER_USER}, wraps it in its backpressure decorator and
    * seeds an empty subscription set.
    *
-   * <p>Refuses and closes a socket a session gate holds ({@link
-   * LiveSyncWebSocketHandler#ATTR_SESSION_GATE}, REQ-SEC-028), without a resolvable principal, or
-   * over the per-user cap.
+   * <p>Refuses and closes a socket while the replica shuts down ({@link
+   * CloseStatus#SERVICE_RESTARTED}), one a session gate holds ({@link
+   * LiveSyncWebSocketHandler#ATTR_SESSION_GATE}, REQ-SEC-028), one without a resolvable principal,
+   * or one over the per-user cap.
    *
    * @param session the freshly opened session
    * @throws IOException when closing a refused socket fails
    */
   void open(@NotNull WebSocketSession session) throws IOException {
+    if (restarting) {
+      session.close(CloseStatus.SERVICE_RESTARTED);
+      return;
+    }
     String consentUrl =
         (String) session.getAttributes().get(LiveSyncWebSocketHandler.ATTR_SESSION_GATE);
     if (consentUrl != null) {
@@ -171,6 +179,49 @@ final class LiveSyncSessionRegistry {
     WebSocketSession decorated = wrap(session);
     session.getAttributes().put(ATTR_DECORATED, decorated);
     liveSessions.add(decorated);
+    if (restarting) {
+      closeForRestart(decorated);
+    }
+  }
+
+  /**
+   * Closes every open socket with {@link CloseStatus#SERVICE_RESTARTED} and refuses new ones, so
+   * each client knows the replica restarts (REQ-FE-040); the close path books the sockets out.
+   *
+   * @return the number of sockets closed
+   */
+  int closeAllForRestart() {
+    restarting = true;
+    List<WebSocketSession> open = sockets();
+    open.forEach(LiveSyncSessionRegistry::closeForRestart);
+    return open.size();
+  }
+
+  /** Admits sockets again after {@link #closeAllForRestart()}. */
+  void acceptAgain() {
+    restarting = false;
+  }
+
+  /**
+   * Reports whether the registry admits sockets, which it does until {@link #closeAllForRestart()}.
+   *
+   * @return {@code true} while sockets are admitted
+   */
+  boolean admitting() {
+    return !restarting;
+  }
+
+  /**
+   * Closes one socket with {@link CloseStatus#SERVICE_RESTARTED}, tolerating one already gone.
+   *
+   * @param session the socket's decorator
+   */
+  private static void closeForRestart(@NotNull WebSocketSession session) {
+    try {
+      session.close(CloseStatus.SERVICE_RESTARTED);
+    } catch (IOException | RuntimeException e) {
+      log.debug("Live-sync socket could not be closed for the restart; it is already gone", e);
+    }
   }
 
   /**
