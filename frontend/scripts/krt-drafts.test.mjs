@@ -1213,6 +1213,16 @@ test('a discard on the page drops a dialog draft and leaves the dialog closed', 
     assert.equal(dialog.opener.clicked, undefined);
 });
 
+test('a page without a main element shows a dialog offer at the top of its page wrapper', () => {
+    const dom = page();
+    const dialog = inDialog(dom);
+    dialog.main.tagName = 'DIV';
+    dialog.main.classList.push('page-wrapper');
+    const key = harness().context.openerKey(dialog.opener);
+    harness({ [keyFor(SCOPE)]: storedDraft({ opener: key }) }, dom);
+    assert.equal(dialog.main.children[0], dialog.notice);
+});
+
 if (failures > 0) {
     console.error(`${failures} failed`);
     process.exit(1);

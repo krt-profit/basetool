@@ -85,7 +85,8 @@ class MissionDialogDraftE2eTest {
       try {
         E2eSupport.navigate(page, missionUrl);
         page.waitForLoadState();
-        page.locator("button[data-modal-id='finance-modal']").click();
+        page.locator("button[data-trigger='open-modal-display'][data-modal-id='finance-modal']")
+            .click();
         page.locator("#finance-modal button[data-type-value='EXPENSE']").click();
         page.locator("#add-finance-form [name='amount']").fill("250");
         page.locator("#add-finance-form [name='note']").fill("Draft fuel cost");
