@@ -894,6 +894,27 @@ val testMissionCreateDraftJs =
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/mission/mission-create-draft.js"),
     )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/mission/mission-draft-rows.js"),
+    )
+  }
+
+val testMissionTemplateDraftJs =
+  registerNodeScriptTest(
+    "testMissionTemplateDraftJs",
+    "Regression tests for the shown parts and planning rows of a mission template draft (REQ-FE-041).",
+    "scripts/mission-template-draft.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/mission/mission-template-draft.js",
+      ),
+    )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/mission/mission-draft-rows.js"),
+    )
   }
 
 val testKrtFetchReadJs =
@@ -1455,5 +1476,6 @@ tasks.named("check").configure {
     testDraftsJs,
     testOrderItemDraftsJs,
     testMissionCreateDraftJs,
+    testMissionTemplateDraftJs,
   )
 }

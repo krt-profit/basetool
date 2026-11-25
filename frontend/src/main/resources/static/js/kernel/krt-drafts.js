@@ -59,6 +59,12 @@ let signingOut = false;
 /** Whether a restore offer of the page has already been shown. */
 let revealed = false;
 
+/** The opaque per-member key once the page's drafts are wired; empty before. */
+let pageScope = '';
+
+/** The restore offers whose buttons are wired, so an offer shown again is not wired twice. */
+const wiredOffers = new WeakSet();
+
 /**
  * Registers the part of a form's draft that the page's own script keeps, such as the number of
  * its script-built rows. The adapter restores that part before the control values are written.
@@ -234,12 +240,18 @@ function offer(state, draft) {
         return;
     }
     const adapter = adapters.get(state.form.dataset.krtDraft || '');
-    if (!revealed && adapter && adapter.reveal) {
-        adapter.reveal(state.form);
-    }
-    revealed = true;
     state.offered = draft;
+    if (!revealed) {
+        revealed = true;
+        if (adapter && adapter.reveal) {
+            adapter.reveal(state.form);
+        }
+    }
     element.hidden = false;
+    if (wiredOffers.has(element)) {
+        return;
+    }
+    wiredOffers.add(element);
     element.addEventListener('click', (event) => {
         const button =
             event.target instanceof Element
@@ -299,6 +311,37 @@ function stateOf(form, scope) {
 }
 
 /**
+ * Turns the draft of a form that both creates and edits on under its form key, or off while it
+ * edits (REQ-FE-041). The form carries the key when the page loads. Turning the draft off withdraws
+ * a standing offer and keeps the stored draft; turning it on again offers that draft back while the
+ * form is pristine.
+ *
+ * @param {HTMLFormElement} form the form
+ * @param {string | null} formKey the form key while the form creates; null while it edits
+ */
+export function setDraftKey(form, formKey) {
+    if ((form.dataset.krtDraft ?? null) === formKey) {
+        return;
+    }
+    if (formKey !== null) {
+        form.dataset.krtDraft = formKey;
+        if (pageScope) {
+            bindForm(form, pageScope);
+        }
+        return;
+    }
+    const state = pageScope ? states.get(keyOf(form, pageScope)) : undefined;
+    if (state) {
+        if (state.timer !== null) {
+            clearTimeout(state.timer);
+            state.timer = null;
+        }
+        closeOffer(state);
+    }
+    delete form.dataset.krtDraft;
+}
+
+/**
  * Tells whether a submitted form signs the member out.
  *
  * @param {HTMLFormElement} form the submitted form
@@ -319,6 +362,7 @@ function initKrtDrafts() {
     if (!scope) {
         return;
     }
+    pageScope = scope;
     removeDrafts(scope);
     document.querySelectorAll(DRAFT_FORM_SELECTOR).forEach((form) => {
         if (form instanceof HTMLFormElement) {

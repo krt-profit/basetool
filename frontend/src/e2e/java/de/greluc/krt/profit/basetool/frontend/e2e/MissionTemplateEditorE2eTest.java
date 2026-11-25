@@ -159,6 +159,96 @@ class MissionTemplateEditorE2eTest {
     }
   }
 
+  /** Brings a half-built new template back after a reload, with its parts and rows (REQ-FE-041). */
+  @Test
+  void reloadOffersTheTemplateDraftBackWithItsPartsAndRows() {
+    assumeTrue(STACK.managesStack(), "Requires the isolated test stack");
+    new BackendSeeder().ensureIridiumMembership(USERNAME, PASSWORD);
+    String name = "E2E template draft " + UUID.randomUUID();
+    try (Playwright playwright = Playwright.create();
+        Browser browser = E2eSupport.launchBrowser(playwright, STACK.managesStack())) {
+      var auth = E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
+      var options =
+          new Browser.NewContextOptions().setIgnoreHTTPSErrors(true).setStorageStatePath(auth);
+      try (BrowserContext context = browser.newContext(options)) {
+        Page page = context.newPage();
+        page.onDialog(dialog -> dialog.accept());
+        Locator editor = page.locator("#mission-template-editor");
+        Locator offer = editor.getByTestId("draft-offer");
+        Locator objectiveTitles =
+            editor.locator("[data-template-rows='objectives'] [name='title']");
+        Locator unit = editor.locator("[data-template-rows='units'] [data-planning-row]");
+        try {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/mission-templates");
+          page.getByTestId("mission-template-create").click();
+          assertThat(offer).isHidden();
+          editor.locator("#mission-template-name").fill(name);
+          editor.locator("[data-template-part-add='description']").click();
+          editor.locator("textarea[name='description']").fill("Drafted briefing");
+          editor.locator("[data-template-part-add='schedule']").click();
+          editor.locator("input[name='plannedStartTime']").fill("20:00");
+          editor.locator("[data-template-part-add='objectives']").click();
+          objectiveTitles.first().fill("Rally");
+          editor.locator("[data-template-add='objectives']").click();
+          objectiveTitles.last().fill("Scout ahead");
+          editor.locator("[data-template-part-add='units']").click();
+          unit.locator("[name='name']").fill("Scout");
+          unit.locator("[name='note']").fill("Check landing zone");
+          unit.locator("[name='highValueUnit']").check();
+          page.waitForFunction(
+              "() => Object.keys(sessionStorage).some((k) => k.startsWith('krt-draft:')"
+                  + " && k.includes('mission-template-create')"
+                  + " && sessionStorage.getItem(k).includes('Scout ahead')"
+                  + " && sessionStorage.getItem(k).includes('\"highValueUnit\":true'))");
+
+          page.reload();
+          page.waitForLoadState();
+          assertThat(editor).isVisible();
+          assertThat(offer).isVisible();
+          assertThat(editor.locator("#mission-template-name")).hasValue("");
+          assertThat(editor.locator("[data-template-part='objectives']")).isHidden();
+          editor.getByTestId("draft-restore").click();
+
+          assertThat(offer).isHidden();
+          assertThat(editor.locator("#mission-template-name")).hasValue(name);
+          assertThat(editor.locator("[data-template-part='description']")).isVisible();
+          assertThat(editor.locator("textarea[name='description']")).hasValue("Drafted briefing");
+          assertThat(editor.locator("input[name='plannedStartTime']")).hasValue("20:00");
+          assertThat(editor.locator("[data-template-part='meetingPoint']")).isHidden();
+          assertThat(editor.locator("[data-template-part-add='objectives']")).isHidden();
+          assertThat(objectiveTitles).hasCount(2);
+          assertThat(objectiveTitles.first()).hasValue("Rally");
+          assertThat(objectiveTitles.last()).hasValue("Scout ahead");
+          assertThat(editor.locator("[data-template-count='objectives']")).hasText("2");
+          assertThat(unit.locator("[name='name']")).hasValue("Scout");
+          assertThat(unit.locator("[name='note']")).hasValue("Check landing zone");
+          assertThat(unit.locator("[name='highValueUnit']")).isChecked();
+
+          editor.getByTestId("mission-template-save").click();
+          assertThat(editor).isHidden();
+          Object left =
+              page.evaluate(
+                  "() => Object.keys(sessionStorage).filter((k) =>"
+                      + " k.startsWith('krt-draft:')).length");
+          assertEquals(0, ((Number) left).intValue());
+
+          page.getByRole(AriaRole.ROW)
+              .filter(new Locator.FilterOptions().setHasText(name))
+              .locator("[data-template-edit]")
+              .click();
+          assertThat(objectiveTitles.first()).hasValue("Rally");
+          assertThat(offer).isHidden();
+          editor.locator("[data-template-delete]").click();
+          page.locator(".krt-confirm-ok").click();
+          assertThat(page.locator("#mission-template-list").getByText(name)).hasCount(0);
+        } catch (RuntimeException | AssertionError failure) {
+          E2eSupport.dump(page, "mission-template-draft");
+          throw failure;
+        }
+      }
+    }
+  }
+
   /** Applies, reapplies and detaches a revision while keeping the planner's open draft. */
   @Test
   void applyingATemplateKeepsTheOpenCreateDraft() {

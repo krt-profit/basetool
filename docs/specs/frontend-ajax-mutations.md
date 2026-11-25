@@ -3189,6 +3189,11 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   `inventory-input-global`), each only when its page creates, never on the edit page that reuses
   the template. Edit forms need the entity's `version` in the draft and a warning when it changed,
   so they are not drafted yet; the bank request dialogs (#3747) need an offer outside the dialog.
+- **A form that creates and edits.** The mission template editor (`mission-template-create`) is
+  one form for a new and an existing template. It carries its key when the page loads, and
+  `setDraftKey` turns its draft off while it edits and on again when it opens blank or from a
+  mission. Turning it off withdraws a standing offer and keeps the stored draft, which the next
+  blank editor offers again.
 - **Storage and key.** `sessionStorage` only: a draft survives a reload and the maintenance-page
   round trip in the same tab and is gone when the tab closes, so nothing stays behind on a shared
   device. The key is `krt-draft:` plus the member scope, the active org-unit context, the form key
@@ -3217,10 +3222,15 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   units, frequencies; skipped by the generic part, as is the template picker, which would open the
   apply dialog) and the applied template with its revision; a revision that changed meanwhile is
   refused on save as stale (`MISSION_TEMPLATE_STALE`), as for a fresh form. Its `finish` hook
-  restores that link after the values, because the restored owner's `change` clears it.
+  restores that link after the values, because the restored owner's `change` clears it. Both
+  mission adapters read every row through `values()` of `mission/mission-planning-rows.js`. The
+  template editor's rows repeat their field names, so the generic part skips them and its adapter
+  (`mission/mission-template-editor.js`, `mission/mission-template-draft.js`) keeps the shown parts
+  and the rows of each section, then shows those parts and rebuilds the rows.
 - **Several forms on a page.** The page offers its drafts once `DOMContentLoaded` fires, after its
   module scripts registered their adapters. The first offer of a page asks its adapter to
-  `reveal` the form: the job-order create switches to the order kind of the offered draft.
+  `reveal` the form: the job-order create switches to the order kind of the offered draft, and the
+  mission templates page opens its blank editor, hidden until then.
 - **Offer and restore.** A pristine form with a stored draft of its schema version shows the
   offer (`.alert.alert-info`, no native dialog): *Wiederherstellen* / *Verwerfen*. Restore rebuilds
   the rows, writes the values and raises `input` and `change` on each, which arms the
@@ -3242,6 +3252,9 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   save then removes the draft.
 - [x] A reload of a half-filled stock booking restores its fields and allocation rows; the booking
   then removes the draft.
+- [x] A reload of a half-built new mission template opens the editor with the offer and restores
+  its parts and rows; the save then removes the draft, and an existing template opened for editing
+  shows no offer and writes no draft.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3249,13 +3262,17 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 **Enforced by:** `scripts/krt-drafts.test.mjs` (`:frontend:testDraftsJs`),
 `scripts/order-item-drafts.test.mjs` (`:frontend:testOrderItemDraftsJs`),
 `scripts/mission-create-draft.test.mjs` (`:frontend:testMissionCreateDraftJs`),
+`scripts/mission-template-draft.test.mjs` (`:frontend:testMissionTemplateDraftJs`),
 `DraftScopeAdviceTest`, `RefineryOrderCreateE2eTest#reloadOffersTheUnsavedInputBackAndTheSaveRemovesIt`,
 `JobOrderCreateDraftE2eTest`, `MissionCreateE2eTest#reloadOffersTheMissionDraftBackWithItsPlanningRows`,
 `InventoryOperationsE2eTest#einbuchenDraftComesBackAfterAReloadAndTheBookingClearsIt`,
+`MissionTemplateEditorE2eTest#reloadOffersTheTemplateDraftBackWithItsPartsAndRows`,
 `MessageBundleConsistencyTest` · **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`,
 `krt-draft-snapshot.js`, `krt-draft-rows.js`, `krt-searchable-select.js` (`selection`),
 `kernel/fragments/draft-offer.html`, `kernel/fragments/sidebar.html` (`data-krt-draft-scope`),
 `kernel/layout/DraftScopeAdvice`, `refinery/refinery-orders-create.js`, `joborder/orders-create.js`,
 `joborder/order-item-drafts.js`, `mission/mission-create.js`, `mission/mission-create-draft.js`,
-`mission/mission-create-rows.js` (`values`), `inventory/inventory-input.js`,
-`inventory/inventory-input.html` · **ADR:** ADR-0411 · **Related:** REQ-FE-024, REQ-FE-040
+`mission/mission-planning-rows.js` (`values`), `mission/mission-draft-rows.js`,
+`mission/mission-templates.js`, `mission/mission-template-editor.js`,
+`mission/mission-template-draft.js`, `mission/fragments/mission-template-editor.html`,
+`inventory/inventory-input.js`, `inventory/inventory-input.html` · **ADR:** ADR-0411 · **Related:** REQ-FE-024, REQ-FE-040
