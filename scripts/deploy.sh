@@ -810,7 +810,7 @@ if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
   if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
     log "--reapply: re-staging the deployed provider JAR ${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST} (swapped in only if the live one differs)"
   else
-    log "keycloak-spi changed → staging ${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST} (applied with this release, one restart)"
+    log "keycloak-spi changed → staging ${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST} (applied with this release, one restart, if its JAR differs from the live one)"
   fi
   DEPLOY_STEP="extract the keycloak-spi provider JAR"
   stage_keycloak_spi_jar "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}"
@@ -922,11 +922,15 @@ RT_PIN_FILE="${PIN_FILE_CURRENT}" rt_pull \
   "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
   "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
-if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" && "${REAPPLY}" == "true" && -f "${KEYCLOAK_SPI_JAR}" ]] \
+if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" && -f "${KEYCLOAK_SPI_JAR}" ]] \
   && [[ "$(sha256sum <"${KEYCLOAK_SPI_STAGE_JAR}")" == "$(sha256sum <"${KEYCLOAK_SPI_JAR}")" ]]; then
   rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
   KEYCLOAK_SPI_CHANGED=false
-  log "--reapply: the live provider JAR is the deployed release's — not swapped, keycloak is not restarted for it"
+  if [[ "${REAPPLY}" == "true" ]]; then
+    log "--reapply: the live provider JAR is the deployed release's — not swapped, keycloak is not restarted for it"
+  else
+    log "the release's provider JAR is byte-identical to the live one (only its bundle digest moved) — not swapped, keycloak is not restarted for it, and ${KEYCLOAK_SPI_PREVIOUS_JAR} is left alone"
+  fi
 fi
 if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
   DEPLOY_STEP="swap in the keycloak-spi provider JAR"

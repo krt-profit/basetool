@@ -175,7 +175,9 @@ snapshotting that tree over `config-previous/`.
 **The rollback anchors move only with the target.** `previous-digest-pin.yml`, `config-previous/`
 (the previous units with it) and `keycloak-spi-previous.jar` name the release *before* the deployed
 one, and nothing else on the host remembers it. Only a run whose target differs from the last
-deployed one rotates them. A drift re-apply of the deployed release (REQ-OPS-013) rewrites the pin,
+deployed one rotates them, and `keycloak-spi-previous.jar` only when the release's JAR differs from
+the live one (REQ-OPS-007): it holds the last JAR that was live before the live one. A drift
+re-apply of the deployed release (REQ-OPS-013) rewrites the pin,
 and on a host whose unit files are gone the config too, but it saves no pin, takes no snapshot and
 writes no `config-apply.incomplete`. A re-apply that fails — at its health gate or before it — rolls
 nothing back, because its target *is* the deployed release: it leaves the release and the anchors
@@ -518,9 +520,15 @@ the owner's decision of 2026-09-25). When the promoted `keycloak-spi` digest mov
 1. **extracts** the JAR into the state directory (`keycloak-spi-stage.jar`) before anything on the
    host changes — a failure there is a pre-gate failure under REQ-OPS-003: a `FATAL … step 'extract
    the keycloak-spi provider JAR'` line, the backoff record and `DeployFailed`, with nothing to undo;
-2. after the config delivery, the pin and the pull, as the **last step before the apply**, snapshots
-   the live `keycloak/providers/keycloak-spi.jar` (`keycloak-spi-previous.jar`), installs the new one
-   and marks keycloak as re-defined;
+2. after the config delivery, the pin and the pull, as the **last step before the apply**, compares
+   the staged JAR with the live `keycloak/providers/keycloak-spi.jar` byte for byte. **Only a JAR that
+   differs moves keycloak:** `deploy.sh` snapshots the live one (`keycloak-spi-previous.jar`),
+   installs the new one and marks keycloak as re-defined. A byte-identical JAR is dropped — nothing
+   is swapped, keycloak is not re-defined and not restarted, `keycloak-spi-previous.jar` stays, and
+   the log says `the release's provider JAR is byte-identical to the live one (only its bundle digest
+   moved)`. The bundle is rebuilt by every release run (REQ-OPS-021), so its digest moves in every
+   release while the JAR inside it changes only with the module's inputs; the marker records the new
+   digest either way, so the next tick is a no-op;
 3. applies the release **once**: one `systemctl --user stop` takes down every re-defined unit but
    the edge — keycloak, the re-pinned app services, the units the config replaced — and, through
    `Requires=`, what requires them; then every stack unit is **started** in dependency order and
@@ -562,6 +570,11 @@ provider-JAR change for that tick (the manual-staging fallback in the runbook st
 - [ ] A release that moves the JAR and the app images starts keycloak, backend, ingest and frontend
   **once each**; no stack unit is `restart`ed, and the re-defined units go down in one `stop`.
 - [ ] A release that re-pins app services without moving the JAR does not stop or restart keycloak.
+- [x] A release whose `keycloak-spi` digest moved but whose JAR is byte-identical to the live one
+  swaps nothing, leaves `keycloak-spi-previous.jar` alone, stops and starts nothing for it, and
+  records the new digest in the marker (`scenario_spi_same_jar_under_a_new_digest_restarts_nothing`).
+- [ ] On production, a release without a `keycloak-spi` source change logs the identical JAR and
+  leaves keycloak out of the window's stop.
 - [ ] A provider-JAR-only promotion auto-applies as that same apply (one window); a combined
   Keycloak-image + JAR promotion is gated until `--force`.
 - [ ] A failed health gate restores the previous digest pin, config tree, units **and** JAR together,
@@ -1537,7 +1550,10 @@ independently of the gates. Trivy is **not** re-run: the scan is per digest, and
 scanned by the main run under the same SARIF categories. The `basetool-config` and
 `basetool-keycloak-spi` bundles are rebuilt on both runs — they are seconds-scale `FROM scratch`
 images off the critical path, and leaving them alone keeps the reuse logic confined to the three
-app images.
+app images. A rebuilt `basetool-keycloak-spi` bundle therefore has a new digest in every release,
+while the JAR inside it is byte-identical as long as its inputs are (the live JARs of v1.26.6 and
+v1.26.7 on production share one SHA-256); the host compares the JAR, not the digest, before it
+restarts keycloak (REQ-OPS-007).
 
 **A `main` push rebuilds only the images whose inputs it changed, and re-tags the others from the
 previous `main` build** (CI-07, 2026-09-23, per module since the same day —
