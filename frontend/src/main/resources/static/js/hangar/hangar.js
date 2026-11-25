@@ -21,7 +21,8 @@
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
-import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { releaseUnsavedChanges, resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { setDraftKey } from '/js/kernel/krt-drafts.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { bindShipTypePicker } from '/js/hangar/ship-type-picker.js';
@@ -35,6 +36,9 @@ import {
 } from '/js/hangar/ship-unit-change.js';
 import { bindOriginField, bulkChangeOrigin } from '/js/hangar/ship-origin.js';
 import { initHangarImport } from '/js/hangar/hangar-import.js';
+
+/** The draft key of the ship dialog while it adds a ship (REQ-FE-041). */
+const SHIP_DRAFT_KEY = 'hangar-ship';
 
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
@@ -226,7 +230,14 @@ document.addEventListener('DOMContentLoaded', () => {
         krtModal.open(modal);
     }
 
+    /** Closes the ship dialog without saving; a new ship's input stays as its draft. */
     function closeModal() {
+        releaseUnsavedChanges(form);
+        krtModal.close(modal);
+    }
+
+    /** Closes the ship dialog after a save, which clears its unsaved input and its draft. */
+    function closeSavedModal() {
         resetUnsavedChanges();
         krtModal.close(modal);
     }
@@ -277,6 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {HTMLElement} btn the add button
      */
     function openAddModal(btn) {
+        setDraftKey(form, SHIP_DRAFT_KEY);
         modalTitle.textContent = form.getAttribute('data-title-add');
         assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
         shipField('ship-name').value = '';
@@ -298,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {HTMLElement} btn the edit button
      */
     function openEditModal(btn) {
+        setDraftKey(form, null);
         modalTitle.textContent = form.getAttribute('data-title-edit');
         assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
         shipField('ship-name').value = btn.getAttribute('data-name') ?? '';
@@ -541,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     conflict: hangarConflict,
                     onSuccess() {
                         if (deleteModal) krtModal.close(deleteModal);
-                        closeModal();
+                        closeSavedModal();
                         afterHangarWrite();
                     },
                 })
@@ -715,7 +728,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 errorMessage: isUpdate ? hangarI18n.updateError : hangarI18n.addError,
                 conflict: hangarConflict,
                 onSuccess() {
-                    closeModal();
+                    closeSavedModal();
                     afterHangarWrite();
                 },
             })

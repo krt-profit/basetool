@@ -174,7 +174,7 @@
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='member-ship-modal', titleKey='hangar.ship.modal_title', variant='krt-modal--wide', titleId='member-ship-modal-title', closeTrigger='', closeClass='close-member-ship-modal', body=~{::member-ship-modal-body})}">
         <th:block th:ref="member-ship-modal-body">
-            <form id="member-ship-form" data-testid="member-hangar-form" method="post" th:object="${shipForm}"
+            <form id="member-ship-form" data-testid="member-hangar-form" data-krt-draft="member-hangar-ship" data-krt-draft-version="1" method="post" th:object="${shipForm}"
                   th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}"
                   th:action="@{/admin/members/{id}/hangar/add(id=${memberId})}">
                 <input type="hidden" id="member-ship-version" name="version">
