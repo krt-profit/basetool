@@ -900,24 +900,27 @@ expect_out "a truncated digest is not a pin" podman \
 SCRIPT_BIN="${WORK}/script-bin"
 mkdir -p "${SCRIPT_BIN}"
 cp "${BIN}/podman" "${SCRIPT_BIN}/podman"
-printf '#!%s\necho running\n' "$(command -v bash)" >"${SCRIPT_BIN}/systemctl"
+printf '#!%s\nprintf "systemctl %%s\\n" "$*" >>"%s"\necho running\n' "$(command -v bash)" "${LOG}" >"${SCRIPT_BIN}/systemctl"
 chmod +x "${SCRIPT_BIN}/systemctl"
 SCRIPT_COMPOSE="${WORK}/compose"
 mkdir -p "${SCRIPT_COMPOSE}/quadlet/systemd" "${WORK}/state"
 mkdir -p "${WORK}/config"
 : >"${WORK}/config/basetool.env"
-: >"${WORK}/backup.env"
+printf 'RESTIC_REPOSITORY=local:%s/repo\nRESTIC_PASSWORD=throwaway\n' "${WORK}" >"${WORK}/backup.env"
+SCRIPT_LOCK="${WORK}/deploy.lock"
 
 run_job() {
   local job="$1" unit="$2"
+  shift 2
   : >"$LOG"
   rm -f "${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
   [[ -n "$unit" ]] && printf '%s\n' "$unit" >"${SCRIPT_COMPOSE}/quadlet/systemd/db-backend.container"
   # shellcheck disable=SC2031
   PATH="${SCRIPT_BIN}:${PATH}" RT_BACKEND=podman RT_UNIT_DIR="${WORK}/nowhere" RT_STARTUP_WAIT=0 \
     BASETOOL_COMPOSE_DIR="${SCRIPT_COMPOSE}" BASETOOL_CONFIG_DIR="${WORK}/config" BASETOOL_BACKUP_ENV="${WORK}/backup.env" BASETOOL_STATE_DIR="${WORK}/state" \
-    BASETOOL_BACKUP_DIR="${WORK}/backupdir" TEXTFILE_DIR="${WORK}/textfile" \
-    bash "${HERE}/${job}.sh" 2>&1
+    BASETOOL_BACKUP_DIR="${WORK}/backupdir" TEXTFILE_DIR="${WORK}/textfile" BASETOOL_CACHE_DIR="${WORK}/cache" \
+    BASETOOL_LOCKFILE="${SCRIPT_LOCK}" BASETOOL_BACKUP_LOCK_WAIT=1 \
+    bash "${HERE}/${job}.sh" "$@" 2>&1
 }
 PIN="Image=docker.io/postgres:18-alpine@sha256:$(printf 'a%.0s' $(seq 1 64))"
 for job in backup restore-drill; do
@@ -937,6 +940,53 @@ for job in backup restore-drill; do
   else bad "${job}.sh with a pinned unit did not get past the image check: '${got}'"; fi
 done
 if [[ ! -e "${WORK}/textfile/backup.prom" ]]; then ok "a refused backup writes no success metric, so BackupStaleOrMissing keeps counting"; else bad "a refused backup wrote backup.prom"; fi
+
+say ""
+say "== the nightly backup dumps online; only --quiesce stops the writers (REQ-OPS-009) =="
+for tool in restic rclone; do
+  printf '#!%s\nexit 0\n' "$(command -v bash)" >"${SCRIPT_BIN}/${tool}"
+  chmod +x "${SCRIPT_BIN}/${tool}"
+done
+first_call() { grep -nF -- "$1" "$LOG" | head -n 1 | cut -d: -f1; }
+WRITERS="frontend backend ingest"
+
+got="$(run_job backup "$PIN" --skip-upload)"
+rc=$?
+if [[ $rc -eq 0 && "$got" == *"dumping online"* ]]; then ok "a run without flags dumps online"; else bad "an online run: rc=${rc} out='${got}'"; fi
+stopped=""
+for svc in ${WRITERS}; do
+  grep -qF "systemctl --user stop ${svc}.service" "$LOG" && stopped="${stopped} ${svc}"
+done
+if [[ -z "${stopped}" ]]; then ok "...and stops no writer"; else bad "an online run stopped:${stopped}"; fi
+at_backend="$(first_call 'podman exec db-backend')"
+at_keycloak="$(first_call 'podman exec db-keycloak')"
+if [[ -n "${at_backend}" && -n "${at_keycloak}" && "${at_backend}" -lt "${at_keycloak}" ]]; then
+  ok "...and dumps krt_basetool before keycloak"
+else bad "dump order: db-backend at '${at_backend}', db-keycloak at '${at_keycloak}'"; fi
+
+got="$( (flock 9 && run_job backup "$PIN" --skip-upload) 9>"${SCRIPT_LOCK}")"
+rc=$?
+if [[ $rc -ne 0 && "$got" == *"could not acquire deploy lock"* ]] && ! grep -qF 'podman exec db-' "$LOG"; then
+  ok "an online dump still waits for the deploy lock and dumps nothing while a deploy holds it"
+else bad "a held deploy lock: rc=${rc} out='${got}'"; fi
+
+got="$(run_job backup "$PIN" --quiesce --skip-upload)"
+rc=$?
+at_dump="$(first_call 'podman exec db-backend')"
+at_last_dump="$(first_call 'podman exec db-keycloak')"
+order_ok=true
+for svc in ${WRITERS}; do
+  at_stop="$(first_call "systemctl --user stop ${svc}.service")"
+  at_start="$(first_call "systemctl --user start ${svc}.service")"
+  if [[ -z "${at_stop}" || -z "${at_start}" || -z "${at_dump}" || -z "${at_last_dump}" ]] \
+    || ((at_stop >= at_dump || at_start <= at_last_dump)); then
+    order_ok=false
+    bad "--quiesce: ${svc} stopped at '${at_stop}', started at '${at_start}', dumps at '${at_dump}'..'${at_last_dump}'"
+  fi
+done
+if [[ $rc -eq 0 && "${order_ok}" == "true" ]]; then
+  ok "--quiesce stops every writer before the dumps and starts it after them"
+elif [[ $rc -ne 0 ]]; then bad "--quiesce run: rc=${rc} out='${got}'"; fi
 
 say ""
 say "== the weekly TSDB snapshot is asked from inside prometheus (OPS-SEC-02) =="

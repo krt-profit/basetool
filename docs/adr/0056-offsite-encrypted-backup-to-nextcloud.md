@@ -1,6 +1,6 @@
 # ADR-0056 — Off-site encrypted backups to Nextcloud via restic over rclone WebDAV
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-11-25 (the nightly dump runs online, see amendment 1)
 - **Date:** 2026-06-30
 - **Deciders:** @greluc
 - **Related:** spec `REQ-OPS-008..012` ([`backup-recovery.md`](../specs/backup-recovery.md)) · runbook [`docs/backup.md`](../backup.md) · builds on `REQ-OPS-001` (pull-only host) and `REQ-OPS-005` (no secrets in the config bundle)
@@ -83,3 +83,43 @@ remote, scheduled by systemd:
   encrypted off-site.
 - **Continuous WAL archiving / PITR** — rejected as overkill for this data size and RPO; daily
   logical dumps suffice (see spec *Out of scope*).
+
+## Amendment 1 — the nightly dump runs online — 2026-11-25
+
+**Context.** The decision above accepted "a brief nightly write-downtime (dump duration only)". On
+production the dump is that short, but the stop and restart around it are not. Measured in
+`backup.log` and the service user's journal on 2026-11-22 to 2026-11-25, every night alike:
+
+| Step (UTC, 2026-11-25) | Duration |
+| --- | --- |
+| stop `frontend`, `ingest`, `backend` one after the other, each with its graceful drain | 45 s |
+| both `pg_dump`s, the edge volumes, the ACLs and the host config | 9 s |
+| start `backend`, `frontend`, `ingest` one after the other, each until healthy | 95 s |
+
+The frontend answered with the maintenance page from 04:15:12 to 04:17:10, ingest from 04:15:33 to
+04:17:41. About 400 connections reached the host in that span each night.
+
+The quiesce bought less than its name says. Keycloak and its database keep running throughout, so
+the two dumps were never of one instant either. Each `pg_dump` already reads one MVCC snapshot,
+the committed state at one instant, which is the state the backend must survive after any crash.
+Schema changes come only from Flyway when a release starts the backend, and the deploy `flock` keeps
+a release out of the dump whether the writers run or not. The backend takes no table lock that
+conflicts with `pg_dump`: there is no `TRUNCATE`, `LOCK TABLE` or `REFRESH MATERIALIZED VIEW` at run
+time, only advisory locks.
+
+**Decision (the owner's, in chat).** `backup.sh` dumps **online by default**. It keeps the deploy
+`flock` across the dumps and dumps `krt_basetool` before `keycloak`, so a Keycloak account newer than
+the backend dump gets its backend row on its next login, and no backend row can be left without its
+Keycloak account. `--quiesce` replaces `--no-quiesce` as the opt-in that stops the writers for the
+dumps. The Grafana stop for its SQLite copy stays: it takes only the monitoring UI down, for about
+30 s. REQ-OPS-009 is rewritten to match.
+
+**Consequences.** No member-facing downtime is left in the nightly run, and with it goes the
+nightly restart that could leave a writer unhealthy until the deploy bot healed it. A restore
+carries a skew of a few seconds between the two databases, which the identity reconciliation
+absorbs. A snapshot from before this amendment restores the same way.
+
+**Rejected:** keeping the quiesce and shortening it by starting `frontend` and `ingest` in parallel
+(about 30 s less, still over a minute of maintenance page every night, for a guarantee Keycloak's
+running database never gave); dumping Keycloak first (a backend row whose Keycloak account is missing
+turns into a second, pending account on the member's next sign-up).

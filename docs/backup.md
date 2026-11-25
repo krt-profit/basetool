@@ -1,6 +1,6 @@
 # Backup & disaster recovery — operator runbook
 
-> **Doc type:** Runbook — the *how-to*. Last reviewed: 2026-11-21. The binding requirements (the
+> **Doc type:** Runbook — the *how-to*. Last reviewed: 2026-11-25. The binding requirements (the
 > *what-must-hold*) live in [`docs/specs/backup-recovery.md`](specs/backup-recovery.md)
 > (`REQ-OPS-008..012`); the decision record is
 > [ADR-0056](adr/0056-offsite-encrypted-backup-to-nextcloud.md).
@@ -25,8 +25,8 @@ pull-only host posture (`REQ-OPS-001`).
   (`restic forget --group-by host,tags`) — every run backs up from its own timestamped staging
   path, so restic's default grouping by path would keep every snapshot; `restic check` after every
   upload.
-- **Downtime:** only the database dump (seconds), inside the 04:00–05:00 window — the slow upload
-  runs after the stack is back up. See *How consistency works* below.
+- **Downtime:** none. The databases are dumped while the stack serves; only Grafana stops for
+  about 30 s for its SQLite copy. See *How consistency works* below.
 
 ## What is and isn't backed up
 
@@ -71,19 +71,18 @@ success over a snapshot missing the certificates, the ACL and the keystore.
 
 ## How consistency works (`REQ-OPS-009`)
 
-`pg_dump` is already a transactionally consistent snapshot, so strictly no downtime is required.
-For a *globally* quiescent instant, the job:
+Each `pg_dump` reads one transactionally consistent MVCC snapshot of its database, so the job dumps
+**online**, with every service running ([ADR-0056](adr/0056-offsite-encrypted-backup-to-nextcloud.md)
+amendment 1). It:
 
-1. acquires the **same `flock`** `deploy.sh` uses (`/run/lock/basetool-deploy.lock`) so a deploy tick
-   cannot recreate containers mid-backup;
-2. stops the writers (`frontend`, `backend`, `ingest` — `systemctl --user stop <svc>.service` as
-   the service user) — the edge keeps serving the maintenance page;
-3. dumps both databases and captures the edge volumes, the two Redis ACLs and the host config to local
-   staging (**seconds**);
-4. **restarts the writers**. A writer that is slow to report healthy (`Notify=healthy`) is logged
-   as a `WARN` and the run continues, so the dumps still reach the repository;
-5. captures the monitoring plane, then **releases the lock** — production is fully live again;
-6. only *then* opens the repository (`restic cat config`, one file, no lock), clears stale locks
+1. acquires the **same `flock`** `deploy.sh` uses (`/run/lock/basetool-deploy.lock`), so no release
+   recreates containers or runs a Flyway migration mid-dump;
+2. dumps `krt_basetool`, **then** `keycloak` — in that order, so a Keycloak account created between
+   the two dumps gets its backend row on its next login — and captures the edge volumes, the two
+   Redis ACLs and the host config to local staging (about 10 s);
+3. captures the monitoring plane (Grafana stops for about 30 s for a consistent SQLite copy), then
+   **releases the lock**;
+4. only *then* opens the repository (`restic cat config`, one file, no lock), clears stale locks
    (`restic unlock` — a lock a crashed or refused run left behind; a live run's lock is never
    stale), and runs the slow `restic` encrypt + upload + `forget --prune` + `check`. It writes
    `basetool_backup_last_success_timestamp`, `basetool_backup_duration_seconds`,
@@ -94,9 +93,14 @@ The repository is initialised **only** when restic reports that it does not exis
 Any other failure to open it — a `403` from the store, a wrong password, a lock — is `FATAL` with
 restic's own error in the log, never an `init` over an existing repository.
 
-A `trap` guarantees the writers are restarted even if a dump step fails, so production is never
-left down, and the plaintext staging directory is removed on every exit. Pass `--no-quiesce` for a
-zero-downtime online dump (accepting only a benign theoretical cross-database edge case).
+The plaintext staging directory is removed on every exit.
+
+The two dumps are seconds apart, not of one instant: Keycloak keeps running in every mode. Pass
+`--quiesce` to stop the writers (`frontend`, `backend`, `ingest`) for the dumps, so the backend
+database stands still while Keycloak's is dumped. That costs about two minutes of maintenance page
+(the stop with its graceful drains, the dumps, the restart until healthy); a writer slow to report
+healthy is logged as a `WARN` and the run continues, and a `trap` restarts the writers on every
+failure path.
 
 ---
 

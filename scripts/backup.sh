@@ -37,14 +37,14 @@ MON_DATA="${BASETOOL_MONITORING_DATA_DIR:-/var/lib/basetool/monitoring}"
 MON_CONFIG="${BASETOOL_MONITORING_CONFIG_DIR:-${CONFIG_DIR}/monitoring}"
 START_EPOCH="$(date +%s)"
 
-QUIESCE=true
+QUIESCE=false
 SKIP_UPLOAD=false
 DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --no-quiesce)
-      QUIESCE=false
+    --quiesce)
+      QUIESCE=true
       shift
       ;;
     --skip-upload)
@@ -57,16 +57,19 @@ while [[ $# -gt 0 ]]; do
       ;;
     -h | --help)
       cat <<'USAGE'
-Usage: backup.sh [--no-quiesce] [--skip-upload] [--dry-run]
+Usage: backup.sh [--quiesce] [--skip-upload] [--dry-run]
 
 Captures a consistent full-restore backup set and pushes it client-side
-encrypted to Nextcloud via restic. See docs/backup.md for the operator
-runbook.
+encrypted to Nextcloud via restic. Each database is dumped from one
+pg_dump snapshot while the stack keeps serving; the deploy lock keeps a
+release and its migrations out of the dump. See docs/backup.md for the
+operator runbook.
 
 Options:
-  --no-quiesce   Do NOT stop the writer services; rely on pg_dump's own MVCC
-                 snapshot consistency. Zero downtime, slightly weaker cross-DB
-                 guarantee (benign for this app).
+  --quiesce      Stop the writer services (frontend, backend, ingest) for the
+                 dump and restart them before the upload, so the backend
+                 database does not move while Keycloak's is dumped. Costs
+                 about two minutes of maintenance page.
   --skip-upload  Capture the dumps to staging but do not run restic (debugging).
   --dry-run      Resolve config and print the plan + `restic snapshots`; stop,
                  dump and upload nothing.
@@ -139,7 +142,7 @@ cd "${COMPOSE_DIR}"
 
 if [[ "${DRY_RUN}" == "true" ]]; then
   log "DRY RUN — would back up: krt_basetool + keycloak dumps, the edge-certs/edge-acme-state/edge-acme-webroot volumes, basetool.env, ${KEYSTORE_PATH}, ${INTERNAL_TLS_DIR} (if present), ${REDIS_SESSION_ACL_PATH}, ${REDIS_SHARED_ACL_PATH}, realm-export.json, keycloak/providers"
-  log "DRY RUN — quiesce=${QUIESCE} (stop: ${WRITER_SERVICES[*]}); repo=${RESTIC_REPOSITORY}; retention ${KEEP_DAILY}/${KEEP_WEEKLY}/${KEEP_MONTHLY}"
+  log "DRY RUN — quiesce=${QUIESCE} (--quiesce stops: ${WRITER_SERVICES[*]}); repo=${RESTIC_REPOSITORY}; retention ${KEEP_DAILY}/${KEEP_WEEKLY}/${KEEP_MONTHLY}"
   log "existing snapshots:"
   restic snapshots --compact 2>&1 | sed 's/^/  /' || log "  (repo not reachable / not initialized yet)"
   exit 0
@@ -176,9 +179,12 @@ if [[ "${QUIESCE}" == "true" ]]; then
   rt_service_stop "${WRITER_SERVICES[@]}"
   QUIESCED=true
 else
-  log "running ONLINE (no quiesce): relying on pg_dump MVCC snapshot consistency"
+  log "dumping online: each pg_dump reads one MVCC snapshot, and the deploy lock keeps migrations out"
 fi
 
+# krt_basetool is dumped before keycloak: a Keycloak user newer than the backend dump gets its
+# backend row on its next login, while a backend row without its Keycloak user would come back as a
+# second, pending account once the member signs up again (ADR-0142).
 log "dumping backend database (krt_basetool)"
 # shellcheck disable=SC2016
 rt_exec db-backend sh -c \

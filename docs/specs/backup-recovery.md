@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-24.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-25.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0056](../adr/0056-offsite-encrypted-backup-to-nextcloud.md)
 
 # Backup & disaster recovery
@@ -66,28 +66,41 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
 
 **Enforced by:** `scripts/backup.sh` · `scripts/lib/restic-repo.sh` · `scripts/basetool-backup.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 
-### REQ-OPS-009 — Consistency via a minimal, bounded nightly quiesce
+### REQ-OPS-009 — Consistency from one snapshot per database, with the stack serving
 
-The backup must be **consistent**. `pg_dump` is already a transactionally consistent per-database
-snapshot, but to obtain one globally quiescent instant the job briefly **stops the writer
-services** (`frontend`, `backend`, `ingest`) for the **dump only**, then restarts them **before**
-the slow upload — so the user-facing window is the dump duration (seconds), never the upload.
-The quiesce must (a) happen inside the **04:00–05:00** window, (b) be as short as possible, (c)
-**guarantee the stack is restarted** even if a dump step fails, and (d) **coordinate with the
-deployer** so a deploy tick cannot recreate containers mid-backup. The edge stays up throughout and
-serves the existing maintenance page. An operator may opt into a zero-downtime online dump
-(`--no-quiesce`), accepting only the benign theoretical cross-database edge case.
+The backup must be **consistent**, and the nightly run takes **no downtime** for it. Each
+`pg_dump` reads one transactionally consistent MVCC snapshot of its database: the committed state
+at one instant, which is the state the application already has to survive after a crash at that
+instant. The job therefore dumps **online**, with every service running ([ADR-0056](../adr/0056-offsite-encrypted-backup-to-nextcloud.md)
+amendment 1). It holds the same `flock` as `deploy.sh` across the dumps, so no release and no Flyway
+migration changes a schema mid-dump, and it dumps `krt_basetool` **before** `keycloak`.
+
+The two dumps are seconds apart and not of one instant. The only link between the databases is the
+user's Keycloak id: a Keycloak account created between the two dumps exists in the restored realm
+without its backend row, which the next login creates. The reverse order would leave a backend row
+whose Keycloak account is missing, and a second, pending account on the member's next sign-up
+(ADR-0142); that is why the order is fixed. Roles live in the backend database (ADR-0355), and the
+Keycloak sessions are not in the dump (REQ-OPS-010), so nothing else crosses.
+
+An operator may still pass **`--quiesce`**: the writer services (`frontend`, `backend`, `ingest`)
+are stopped for the dumps and restarted before the upload, so the backend database stands still
+while Keycloak's is dumped. That costs about two minutes of maintenance page (stop, dumps and the
+restart until healthy), and a `trap` restarts the writers on every failure path.
 
 **Acceptance**
 
-- [ ] The dump runs with `frontend`/`backend`/`ingest` stopped; they are restarted before the
-  restic upload begins.
-- [ ] A `trap` restarts the writers on any failure path — a failed dump never leaves production down.
-- [ ] `backup.sh` acquires the same `flock` (`/run/lock/basetool-deploy.lock`) as `deploy.sh` and
-  releases it as soon as the writers are back up.
-- [ ] The scheduled start is at 04:15, inside the 04:00–05:00 window.
+- [ ] A run without flags stops no service and dumps `krt_basetool` before `keycloak`
+  (`scripts/container-runtime.test.sh`).
+- [ ] `backup.sh` acquires the same `flock` (`/run/lock/basetool-deploy.lock`) as `deploy.sh` before
+  the first dump and dumps nothing while a deploy holds it (`scripts/container-runtime.test.sh`); it
+  releases the lock before the upload.
+- [ ] With `--quiesce`, `frontend`/`backend`/`ingest` are stopped before the first dump and started
+  after the last, before the restic upload begins (`scripts/container-runtime.test.sh`); a `trap`
+  restarts them on any failure path.
+- [ ] The scheduled start is 04:15 host time (UTC on production).
 
-**Enforced by:** `scripts/backup.sh` (quiesce + trap + flock) · **Runbook:** [`docs/backup.md`](../backup.md)
+**Enforced by:** `scripts/backup.sh` (flock, dump order, opt-in quiesce + trap) ·
+`scripts/container-runtime.test.sh` · **Runbook:** [`docs/backup.md`](../backup.md)
 
 ### REQ-OPS-010 — Defined backup surface and explicit exclusions
 
