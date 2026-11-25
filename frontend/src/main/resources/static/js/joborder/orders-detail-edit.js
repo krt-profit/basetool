@@ -70,6 +70,7 @@ function initHandoverForms() {
                 method: 'POST',
                 url: `/orders/${orderId}/handovers`,
                 payload,
+                submitter: /** @type {SubmitEvent} */ (e).submitter,
                 toast: false,
                 errorMessage: MSG_HANDOVER_FAILED,
                 onSuccess(order) {
@@ -118,6 +119,7 @@ function initHandoverForms() {
                 method: 'POST',
                 url: `/orders/${orderId}/item-handovers`,
                 payload,
+                submitter: /** @type {SubmitEvent} */ (e).submitter,
                 toast: false,
                 errorMessage: MSG_HANDOVER_FAILED,
                 onSuccess(order) {
