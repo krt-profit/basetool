@@ -2443,7 +2443,8 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
   reset of the form, or `resetUnsavedChanges()`, which clears every mark. A submit alone keeps it,
   so a save that fails or never reaches the server keeps the form marked. A fragment swap that
   replaces the form takes the mark with it. Each clear raises `krt:unsaved-cleared` on the
-  document. Live sync holds back a section whose container holds a marked form (REQ-FE-010).
+  document. Live sync holds back a section whose container holds a marked form (REQ-FE-010), and a
+  drafted form keeps its draft while it carries the mark (REQ-FE-041).
 
 **Acceptance**
 
@@ -3172,3 +3173,55 @@ member knowing that, rather than reading "save failed" and reloading the page aw
 `static/js/kernel/krt-maintenance.js`, `krt-fetch.js` (`get`, `send`), `toast.js`, `krt-modal.js`
 (the hand-back), `krt-live-sync.js`, `kernel/livesync/LiveSyncRestartNotice`,
 `LiveSyncSessionRegistry#closeAllForRestart`, `docker/edge/include/maintenance.conf` (the header).
+
+### REQ-FE-041 — A create form keeps unsaved input as a tab-scoped draft and offers it back
+
+Nothing kept a member's unsaved input once the page went away: a reload in the restart window, the
+re-authentication after an update, a phone browser discarding the background tab, an accidental
+reload. The unsaved-changes guard (REQ-FE-024) only warns before a link. A form that opts in now
+keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it back (ADR-0411).
+
+- **Opt-in.** A form carries `data-krt-draft="<form-key>"`, `data-krt-draft-version="<n>"` and the
+  restore offer `kernel/fragments/draft-offer :: draftOffer`. The refinery-order create
+  (`refinery-order-create`) is the first; the other create forms follow one by one. Edit forms need
+  the entity's `version` in the draft and a warning when it changed, so they are not drafted yet.
+- **Storage and key.** `sessionStorage` only: a draft survives a reload and the maintenance-page
+  round trip in the same tab and is gone when the tab closes, so nothing stays behind on a shared
+  device. The key is `krt-draft:` plus the member scope, the active org-unit context, the form key
+  and the page path. The member scope is `draftScope`, the first 32 hex characters of a SHA-256 of
+  the identity provider's subject (`DraftScopeAdvice`), never a name or an e-mail address; it stays
+  the same across sessions, so a draft survives a re-authentication. A page drops every draft of
+  another member scope when it loads.
+- **What is stored.** The values of the form's visible, enabled, editable controls with a name or
+  an id, while the form holds unsaved edits (the mark of REQ-FE-024), 400 ms after the last edit or
+  row change and at once when the page is hidden. Never stored: hidden fields, passwords, file
+  inputs, the CSRF token, any `version` field, read-only and disabled controls, and controls inside
+  `data-krt-draft-skip`. A searchable combobox keeps its value, label and option metadata
+  (`selection()`), so it is restored without a lookup.
+- **Rows.** A form with script-built rows registers a `KrtDraftAdapter` (`registerDraftAdapter`)
+  whose part is stored with the draft and restored before the values: the refinery create keeps its
+  number of goods rows and rebuilds them through `addMaterialRow`.
+- **Offer and restore.** A pristine form with a stored draft of its schema version shows the
+  offer (`.alert.alert-info`, no native dialog): *Wiederherstellen* / *Verwerfen*. Restore rebuilds
+  the rows, writes the values and raises `input` and `change` on each, which arms the
+  unsaved-changes guard and updates the derived displays. A draft of another version is dropped.
+  An edit or a submit before the member chooses withdraws the offer and drops the stored draft;
+  no draft is written while the offer stands.
+- **Clear.** The draft goes with its form's unsaved mark (`krt:unsaved-cleared`: a successful save,
+  a reset, `resetUnsavedChanges()`), with *Verwerfen*, with a fragment swap that replaces the form,
+  and on a logout, which removes every draft of the tab and stops further writes.
+
+**Acceptance**
+
+- [x] A reload of a half-filled refinery-order create offers the input back, rows included, and
+  restores it exactly; the save then removes the draft.
+- [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
+- [x] A successful save, a discard and a logout remove the draft.
+- [x] Another member signing in in the same tab is never offered the draft.
+
+**Enforced by:** `scripts/krt-drafts.test.mjs` (`:frontend:testDraftsJs`), `DraftScopeAdviceTest`,
+`RefineryOrderCreateE2eTest#reloadOffersTheUnsavedInputBackAndTheSaveRemovesIt`,
+`MessageBundleConsistencyTest` · **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`,
+`krt-draft-snapshot.js`, `krt-searchable-select.js` (`selection`), `kernel/fragments/draft-offer.html`,
+`kernel/fragments/sidebar.html` (`data-krt-draft-scope`), `kernel/layout/DraftScopeAdvice`,
+`refinery/refinery-orders-create.js` · **ADR:** ADR-0411 · **Related:** REQ-FE-024, REQ-FE-040

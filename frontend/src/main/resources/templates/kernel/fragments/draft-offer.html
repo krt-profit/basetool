@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="draftOffer">
+    <div class="alert alert-info krt-draft-offer" role="status" data-krt-draft-offer hidden data-testid="draft-offer">
+        <p class="krt-draft-offer__text" th:text="#{draft.offer.message}">In diesem Tab liegen ungespeicherte Eingaben zu diesem Formular. Möchtest du sie wiederherstellen?</p>
+        <div class="krt-draft-offer__actions">
+            <button type="button" class="btn btn-ghost" data-krt-draft-action="discard" data-testid="draft-discard" th:text="#{draft.offer.discard}">Verwerfen</button>
+            <button type="button" class="btn" data-krt-draft-action="restore" data-testid="draft-restore" th:text="#{draft.offer.restore}">Wiederherstellen</button>
+        </div>
+    </div>
+</th:block>
+</body>
+</html>

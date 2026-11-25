@@ -885,6 +885,41 @@ interface KrtComboboxController {
      * outside the loaded items; `data` is option metadata mirrored onto the hidden input.
      */
     setValue(value: string, label?: string, data?: object): void;
+    /** The committed selection with its label and option metadata; an empty value when none. */
+    selection(): KrtComboboxSelection;
+}
+
+/** A combobox selection that restores through `setValue` without a lookup. */
+interface KrtComboboxSelection {
+    value: string;
+    label: string;
+    /** Option metadata mirrored onto the hidden input while selected (REQ-FE-016). */
+    data: Record<string, string>;
+}
+
+/** A stored control value of a form draft: a text value, a checked state or selected values. */
+type KrtDraftValue = string | boolean | string[];
+
+/** The control values of a form, keyed by control name (else id) (REQ-FE-041). */
+interface KrtDraftSnapshot {
+    fields: Record<string, KrtDraftValue>;
+    combos: Record<string, KrtComboboxSelection>;
+}
+
+/** A stored form draft: its schema version, its control values and the form adapter's part. */
+interface KrtDraft {
+    version: string;
+    snapshot: KrtDraftSnapshot;
+    extra: unknown;
+}
+
+/**
+ * The part of a form draft a page's own script keeps, such as the number of script-built rows: it
+ * is serialized with the draft and restored before the control values.
+ */
+interface KrtDraftAdapter {
+    serialize(form: HTMLFormElement): unknown;
+    restore(form: HTMLFormElement, extra: unknown): void;
 }
 
 interface HTMLElement {
