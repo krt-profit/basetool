@@ -20,6 +20,8 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
+import { readMissionCreateDraft } from '/js/mission/mission-create-draft.js';
 import { createMissionDraftRows } from '/js/mission/mission-create-rows.js';
 import { createMissionScheduleDraft } from '/js/mission/mission-create-schedule.js';
 import { createTemplateApplyDialog } from '/js/mission/mission-create-template-apply.js';
@@ -491,6 +493,30 @@ function initMissionCreate() {
         } finally {
             submitting = false;
         }
+    });
+
+    registerDraftAdapter('mission-create', {
+        serialize() {
+            return {
+                templateId: templateId.value,
+                templateVersion: templateVersion.value,
+                rows: Object.fromEntries(
+                    sections.map((section) => [section, rows[section].values()]),
+                ),
+            };
+        },
+        restore(_form, extra) {
+            const draft = readMissionCreateDraft(extra, sections);
+            sections.forEach((section) => rows[section].fill(draft.rows[section]));
+            frequencies.sync();
+        },
+        finish(_form, extra) {
+            const draft = readMissionCreateDraft(extra, sections);
+            templateId.value = draft.templateId;
+            templateVersion.value = draft.templateVersion;
+            stale.hidden = true;
+            void loadChoices();
+        },
     });
     void loadChoices();
 }

@@ -199,7 +199,8 @@ function forget(state) {
 
 /**
  * Restores the offered draft: the adapter rebuilds the script-built parts, then the control values
- * are written and announced, which arms the unsaved-changes guard.
+ * are written and announced, which arms the unsaved-changes guard, and the adapter finishes what
+ * those announcements would undo.
  *
  * @param {DraftState} state the form's draft state
  */
@@ -214,6 +215,9 @@ function restoreOffered(state) {
         adapter.restore(state.form, draft.extra);
     }
     restoreForm(state.form, draft.snapshot);
+    if (adapter && adapter.finish) {
+        adapter.finish(state.form, draft.extra);
+    }
     focusFirstField(state.form);
 }
 

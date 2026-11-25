@@ -116,4 +116,72 @@ class MissionCreateE2eTest {
       }
     }
   }
+
+  /**
+   * Reloads a half-filled mission create form with an objective and a step, restores the offered
+   * draft and saves it (REQ-FE-041): the fields and the planning rows come back, and the save
+   * removes the draft.
+   */
+  @Test
+  void reloadOffersTheMissionDraftBackWithItsPlanningRows() {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    String startDate = java.time.LocalDate.now().plusDays(7).toString();
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      page.onDialog(dialog -> dialog.accept());
+      try {
+        E2eSupport.navigate(page, baseUrl + "/missions/new");
+        page.waitForLoadState();
+        assertThat(page.getByTestId("draft-offer")).isHidden();
+
+        page.getByTestId("mission-name-input").fill("E2E Draft Mission");
+        page.getByTestId("mission-start-date").fill(startDate);
+        page.getByTestId("mission-start-time").fill("19:30");
+        page.locator("#mission-description").fill("Drafted briefing");
+        page.locator("#mission-create-objective-add").click();
+        page.locator("#mission-create-objective-list .ae-title").last().fill("Hold the relay");
+        page.locator("#mission-create-step-add").click();
+        page.locator("#mission-create-step-list .ae-title").last().fill("Muster at Port Olisar");
+        page.getByTestId("mission-name-input").click();
+        page.waitForFunction(
+            "() => Object.keys(sessionStorage).some((k) => k.startsWith('krt-draft:')"
+                + " && k.includes('mission-create')"
+                + " && sessionStorage.getItem(k).includes('Hold the relay')"
+                + " && sessionStorage.getItem(k).includes('Muster at Port Olisar'))");
+
+        page.reload();
+        page.waitForLoadState();
+        assertThat(page.getByTestId("draft-offer")).isVisible();
+        assertThat(page.locator("#mission-create-objective-list .ae-row")).hasCount(0);
+        page.getByTestId("draft-restore").click();
+
+        assertThat(page.getByTestId("draft-offer")).isHidden();
+        assertThat(page.getByTestId("mission-name-input")).hasValue("E2E Draft Mission");
+        assertThat(page.getByTestId("mission-start-date")).hasValue(startDate);
+        assertThat(page.getByTestId("mission-start-time")).hasValue("19:30");
+        assertThat(page.locator("#mission-description")).hasValue("Drafted briefing");
+        assertThat(page.locator("#mission-create-objective-list .ae-title"))
+            .hasValue("Hold the relay");
+        assertThat(page.locator("#mission-create-step-list .ae-title"))
+            .hasValue("Muster at Port Olisar");
+
+        assertEquals(201, E2eSupport.submitMissionDraft(page));
+        page.waitForURL(url -> url.contains("?tab=verw"));
+        page.waitForLoadState();
+        Object left =
+            page.evaluate(
+                "() => Object.keys(sessionStorage).filter((k) =>"
+                    + " k.startsWith('krt-draft:')).length");
+        assertEquals(0, ((Number) left).intValue());
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "mission-create-draft");
+        throw failure;
+      }
+    }
+  }
 }

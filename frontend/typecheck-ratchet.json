@@ -239,6 +239,7 @@
       "mission/mission-detail.js",
       "mission/mission-hooks.js",
       "mission/mission-presence.js",
+      "mission/mission-create-draft.js",
       "mission/mission-create-rows.js",
       "mission/mission-create-schedule.js",
       "mission/mission-create-template-apply.js",

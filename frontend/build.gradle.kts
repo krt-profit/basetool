@@ -883,6 +883,19 @@ val testOrderItemDraftsJs =
     )
   }
 
+val testMissionCreateDraftJs =
+  registerNodeScriptTest(
+    "testMissionCreateDraftJs",
+    "Regression tests for the template link and planning rows of a mission create draft (REQ-FE-041).",
+    "scripts/mission-create-draft.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/mission/mission-create-draft.js"),
+    )
+  }
+
 val testKrtFetchReadJs =
   registerNodeScriptTest(
     "testKrtFetchReadJs",
@@ -1441,5 +1454,6 @@ tasks.named("check").configure {
     testUnsavedChangesJs,
     testDraftsJs,
     testOrderItemDraftsJs,
+    testMissionCreateDraftJs,
   )
 }

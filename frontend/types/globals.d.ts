@@ -922,6 +922,11 @@ interface KrtDraftAdapter {
     restore(form: HTMLFormElement, extra: unknown): void;
     /** Shows the form when the page offers its draft first, on a page that shows one of several. */
     reveal?(form: HTMLFormElement): void;
+    /**
+     * Completes a restore after the control values were written and announced, for state those
+     * announcements reset, such as a link a changed select clears.
+     */
+    finish?(form: HTMLFormElement, extra: unknown): void;
 }
 
 interface HTMLElement {

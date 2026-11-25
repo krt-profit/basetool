@@ -747,6 +747,21 @@ test('a row-count adapter stops when a row cannot be removed and passes reveal o
     assert.deepEqual(revealed, ['form']);
 });
 
+test('an adapter finishes the restore after the values are written and announced', () => {
+    const h = harness({ [keyFor(SCOPE)]: storedDraft() });
+    const steps = [];
+    h.context.registerDraftAdapter(FORM_KEY, {
+        serialize: () => null,
+        restore: () => steps.push(`restore:${h.controls.note.value}`),
+        finish: (form, extra) =>
+            steps.push(
+                `finish:${h.controls.note.value}:${h.controls.note.fired.join('+')}:${extra.rows}`,
+            ),
+    });
+    h.click(h.restore);
+    assert.deepEqual(steps, ['restore:', 'finish:from the draft:input+change:2']);
+});
+
 if (failures > 0) {
     console.error(`${failures} failed`);
     process.exit(1);
