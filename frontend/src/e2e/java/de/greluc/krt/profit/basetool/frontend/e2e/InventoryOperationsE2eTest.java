@@ -313,6 +313,79 @@ class InventoryOperationsE2eTest {
   }
 
   /**
+   * <em>Einbuchen, draft (REQ-FE-041).</em> Reloads a half-filled booking with two mission
+   * allocations, restores the offered draft and books it: the fields and both allocation rows come
+   * back exactly, and the booking removes the draft.
+   */
+  @Test
+  void einbuchenDraftComesBackAfterAReloadAndTheBookingClearsIt() {
+    runFlow(
+        "inventory-einbuchen-draft",
+        page -> {
+          page.onDialog(dialog -> dialog.accept());
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
+          page.waitForLoadState();
+          assertThat(page.getByTestId("draft-offer")).isHidden();
+
+          E2eSupport.selectComboboxFirstOption(
+              page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"));
+          E2eSupport.selectComboboxFirstOption(
+              page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"));
+          page.locator("#quality").fill(String.valueOf(SEED_QUALITY));
+          page.locator("#amount").fill("20");
+          page.locator("[data-trigger='inv-input-add-mission']").click();
+          page.locator("[data-trigger='inv-input-add-mission']").click();
+          Locator rows = page.locator("#missionAllocRows [data-alloc-row]");
+          rows.nth(0).locator("[data-alloc-target]").selectOption(new SelectOption().setIndex(1));
+          rows.nth(0).locator("[data-alloc-amount]").fill("5");
+          rows.nth(1).locator("[data-alloc-target]").selectOption(new SelectOption().setIndex(2));
+          rows.nth(1).locator("[data-alloc-amount]").fill("7");
+          page.locator("#quality").click();
+
+          java.util.Map<String, String> typed = new java.util.LinkedHashMap<>();
+          for (String field :
+              java.util.List.of(
+                  "#materialId",
+                  "#locationId",
+                  "#quality",
+                  "#amount",
+                  "[name='missionAllocations[0].targetId']",
+                  "[name='missionAllocations[0].amount']",
+                  "[name='missionAllocations[1].targetId']",
+                  "[name='missionAllocations[1].amount']")) {
+            typed.put(field, page.locator(field).inputValue());
+          }
+          page.waitForFunction(
+              "() => Object.keys(sessionStorage).some((k) => k.includes('inventory-input-own')"
+                  + " && sessionStorage.getItem(k).includes('missionAllocations[1].amount'))");
+
+          page.reload();
+          page.waitForLoadState();
+          assertThat(page.getByTestId("draft-offer")).isVisible();
+          assertThat(rows).hasCount(0);
+          page.getByTestId("draft-restore").click();
+
+          assertThat(page.getByTestId("draft-offer")).isHidden();
+          assertThat(rows).hasCount(2);
+          typed.forEach((field, value) -> assertThat(page.locator(field)).hasValue(value));
+
+          page.evaluate(
+              "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                  + " 'none'; } }");
+          page.waitForResponse(
+              r -> r.url().contains("/inventory/input") && "POST".equals(r.request().method()),
+              () -> page.locator("form[action$='/inventory/input'] button[type='submit']").click());
+          page.waitForURL(url -> !url.contains("/inventory/input"));
+          page.waitForLoadState();
+          Object left =
+              page.evaluate(
+                  "() => Object.keys(sessionStorage).filter((k) =>"
+                      + " k.startsWith('krt-draft:')).length");
+          assertEquals(0, ((Number) left).intValue());
+        });
+  }
+
+  /**
    * <em>Einbuchen, merge opt-in (REQ-INV-026).</em> The „Zusammenführen" row appears for an SCU
    * material only while a row with the same owner, material, place, quality and unit exists, and
    * hiding it unticks the box.

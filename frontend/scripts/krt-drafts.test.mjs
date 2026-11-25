@@ -747,6 +747,18 @@ test('a row-count adapter stops when a row cannot be removed and passes reveal o
     assert.deepEqual(revealed, ['form']);
 });
 
+test('a row-count adapter with a minimum of zero restores an empty list', () => {
+    const h = harness();
+    const list = rowList(2, 0);
+    const adapter = h.context.rowCountAdapter({ ...list.api, minimum: 0 });
+    adapter.restore(null, { rows: 0 });
+    assert.equal(list.rows.length, 0);
+    adapter.restore(null, { rows: 'none' });
+    assert.equal(list.rows.length, 0);
+    adapter.restore(null, { rows: 3 });
+    assert.equal(list.rows.length, 3);
+});
+
 test('an adapter finishes the restore after the values are written and announced', () => {
     const h = harness({ [keyFor(SCOPE)]: storedDraft() });
     const steps = [];
