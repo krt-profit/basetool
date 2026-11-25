@@ -3379,6 +3379,12 @@ therefore alerts on:
   tick wrote; none could see ticks that stopped happening. `DeployHeartbeatStale` (warning) fires
   when `basetool_deploy_last_stack_healthy_timestamp` — stamped by every tick that finds the stack at
   target and healthy — is over an hour old, or absent.
+- **How long members wait** (REQ-OPS-007). A release, re-apply or heal whose restart window closed
+  healthy writes `basetool_deploy_last_restart_window_seconds` — from the window's one stop until
+  every stack unit started — and `basetool_deploy_last_restart_window_timestamp` to
+  `deploy-restart-window.prom`; the *Ops automation* dashboard shows the last value and its history.
+  It carries no alert: a window that does not close fails the health gate and raises
+  `DeployRolledBack` or `DeployHealthRestartFailing` already.
 - **The scripts that apply a release** (since 2026-10-11). The promotion of v1.14.0 was applied by a
   `deploy.sh` older than the release, and nothing said so. `deploy.sh` now compares the host's scripts
   with the `host-scripts.sha256` of the release (deployed, or incoming on a staging tick) and writes

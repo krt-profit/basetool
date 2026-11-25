@@ -322,7 +322,8 @@ the old instance on its data directory beside the new one. A retired `.network` 
 removed at the install, as before: it reaches nothing until the reload. **The stack is the units the
 host has**: the services the gated apply stops, starts and waits for are the installed `.container`
 units of the known stack order (`RT_STACK_ORDER`: `edge db-backend db-keycloak redis redis-session
-redis-shared keycloak backend ingest frontend acme`, the edge first by REQ-OPS-061; `redis` is the single instance a rollback to
+redis-shared keycloak backend frontend ingest acme`, the edge first by REQ-OPS-061 and the frontend
+before ingest by REQ-OPS-007; `redis` is the single instance a rollback to
 a release before ADR-0388 brings back, and both Redis instances start before the backend that uses
 `redis-shared` without `Requires=`), with any installed unit a stack unit `Requires=` placed before the first unit
 that requires it; every other installed unit is a monitoring unit. The list is derived again after a
@@ -525,8 +526,9 @@ the owner's decision of 2026-09-25). When the promoted `keycloak-spi` digest mov
    the edge — keycloak, the re-pinned app services, the units the config replaced — and, through
    `Requires=`, what requires them; then every stack unit is **started** in dependency order and
    waited for (`Notify=healthy`). Keycloak's start re-runs the provider build on the new JAR before
-   backend starts. **The edge starts first and the window never stops it** (`edge db-backend
-   db-keycloak redis-session redis-shared keycloak backend ingest frontend acme`; a re-defined edge is
+   backend starts. **The frontend starts before ingest**, which it does not require, so members do
+   not wait for ingest's start. **The edge starts first and the window never stops it** (`edge db-backend
+   db-keycloak redis-session redis-shared keycloak backend frontend ingest acme`; a re-defined edge is
    restarted on its own before the stop, REQ-OPS-061): it serves the maintenance page while the
    window is open, and the applications fetch the issuer's discovery document through the public
    name, which the host alias routes through haproxy to the edge, so an edge that is down fails every
@@ -541,9 +543,15 @@ the release changed (`release parts: app images […] · unit definitions […] 
 config bundle: … · provider JAR: …`) and, on a failed gate, the units that did not come up in start order; when keycloak
 is the first of them and the JAR is the only change to keycloak, it says the JAR is the likely cause
 (the cause, when the JAR is the release's only change). Exact blame between a JAR and an app image is
-not possible in one gate, and the log says so rather than guessing. **Expected outage:** one keycloak
-start, then one backend start, then the slower of frontend and ingest — about two minutes on
-production — for the whole release, JAR or not. A provider-JAR-only change **auto-applies** and is
+not possible in one gate, and the log says so rather than guessing. **Expected outage:** the stop,
+then one keycloak start when keycloak is re-defined, one backend start and one frontend start — the
+stretch members see the maintenance page — for the whole release, JAR or not; ingest starts after
+the frontend. On production a window with keycloak took 170 s with ingest before the frontend
+(stop 54 s, keycloak 22 s, backend 31 s, ingest 32 s, frontend 31 s). **The window is measured:**
+`rt_apply_stack` times it from its one stop until every stack unit started, and a release, re-apply
+or heal whose window closed healthy logs `restart window closed after <n>s` and writes
+`basetool_deploy_last_restart_window_seconds` and `basetool_deploy_last_restart_window_timestamp`
+(`deploy-restart-window.prom`), shown on the *Ops automation* dashboard. A provider-JAR-only change **auto-applies** and is
 exactly this apply with only keycloak re-defined; a combined Keycloak-**image** + provider-JAR change
 stays operator-gated by the postgres/Keycloak carve-out of REQ-OPS-006 (the image change blocks the
 tick until `--force`). A missing/unresolvable `basetool-keycloak-spi` artifact degrades to no
@@ -562,6 +570,13 @@ provider-JAR change for that tick (the manual-staging fallback in the runbook st
 - [ ] A release that moves the JAR and the app images starts keycloak, backend, ingest and frontend
   **once each**; no stack unit is `restart`ed, and the re-defined units go down in one `stop`.
 - [ ] A release that re-pins app services without moving the JAR does not stop or restart keycloak.
+- [x] The window starts the frontend before ingest (`RT_STACK_ORDER`, `container-runtime.test.sh`,
+  `scenario_spi_and_apps_move_in_one_restart_window`).
+- [x] A release, re-apply or heal whose window closed healthy logs its length and exports it as
+  `basetool_deploy_last_restart_window_seconds`; a no-op and a window that did not close healthy
+  export nothing.
+- [ ] On production, the first release with the new order shows a window shorter by about
+  ingest's start on the *Ops automation* dashboard.
 - [ ] A provider-JAR-only promotion auto-applies as that same apply (one window); a combined
   Keycloak-image + JAR promotion is gated until `--force`.
 - [ ] A failed health gate restores the previous digest pin, config tree, units **and** JAR together,
@@ -570,7 +585,7 @@ provider-JAR change for that tick (the manual-staging fallback in the runbook st
 - [ ] A JAR that cannot be extracted is a recorded pre-gate failure (`FATAL`, backoff,
   `DeployFailed`) and changes nothing on the host.
 
-**Enforced by:** `.github/workflows/release-images.yml` (`keycloak-spi-jar`, `build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`stage_keycloak_spi_jar`, `swap_in_keycloak_spi_jar`, `restore_previous_keycloak_spi_jar`, `explain_gate_failure`, the 5-field marker, the rollback block) · `scripts/lib/container-runtime.sh` (`rt_apply_stack`, `rt_await_stack`) · `scripts/deploy.test.sh` (`scenario_spi_*`, `scenario_apps_only_restart_each_unit_once`) · `scripts/container-runtime.test.sh` · **Runbook:** `docs/deployment.md` → *Keycloak provider JAR* · **Decisions:** ADR-0055, ADR-0213
+**Enforced by:** `.github/workflows/release-images.yml` (`keycloak-spi-jar`, `build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`stage_keycloak_spi_jar`, `swap_in_keycloak_spi_jar`, `restore_previous_keycloak_spi_jar`, `explain_gate_failure`, the 5-field marker, the rollback block) · `scripts/lib/container-runtime.sh` (`rt_apply_stack`, `rt_await_stack`, `RT_STACK_ORDER`, `RT_WINDOW_SECONDS`) · `scripts/lib/deploy-observability.sh` (`record_restart_window`) · `monitoring/grafana/dashboards/11-ops-automation.json` · `scripts/deploy.test.sh` (`scenario_spi_*`, `scenario_apps_only_restart_each_unit_once`) · `scripts/container-runtime.test.sh` · **Runbook:** `docs/deployment.md` → *Keycloak provider JAR* · **Decisions:** ADR-0055, ADR-0213, ADR-0397
 
 ### REQ-OPS-013 — Idempotence fast-exit only over a verified running stack
 
@@ -3920,6 +3935,11 @@ the edge maps an unreachable upstream (502, 503, 504) to the maintenance page, H
 by `Accept` (`docker/edge/include/maintenance.conf`). A request goes unanswered only while the edge
 itself restarts, or the host or haproxy does.
 
+- **The HTML page reloads every 10 s** (`meta refresh` in `docker/maintenance/static/maintenance.html`,
+  and its text says so), so a member is back at most 10 s after the frontend answers. It is a static
+  file the edge serves itself. The `Retry-After: 60` header and the problem+json body's
+  `retryAfterSeconds` stay at 60 s for API clients such as the desktop extractor.
+
 - **The edge is never stopped inside a restart window.** It is the first unit of `RT_STACK_ORDER`,
   so every start in order brings the maintenance page up before the databases, keycloak and the
   applications. A release or re-apply that re-defines the edge (its unit, its image pin, its
@@ -3957,6 +3977,7 @@ itself restarts, or the host or haproxy does.
 - [x] A re-defined edge whose restart fails fails the apply with `[edge]` named and nothing stopped.
 - [x] A sick edge is healed with one restart of the edge and no stop.
 - [x] `RT_STACK_ORDER` starts with `edge`.
+- [x] The maintenance page reloads every 10 s and says so in both languages.
 - [x] A changed edge configuration or certificate reloads nginx in place without a restart; a
   refused one keeps the running edge, logs nginx's refusal and sets the gauge to `1` until a reload
   succeeds; any other reload failure and a stopped edge fall back to a recreate.
@@ -3969,6 +3990,7 @@ itself restarts, or the host or haproxy does.
 **Enforced by:** `scripts/lib/container-runtime.sh` (`RT_EDGE_SERVICE`, `RT_STACK_ORDER`,
 `rt_apply_stack`, `rt_window_services`) · `scripts/deploy.sh` · `scripts/lib/deploy-observability.sh`
 (`reconcile_edge`, `load_edge_state`) · `docker/edge/nginx.conf` · `docker/edge/reload.sh` ·
+`docker/maintenance/static/maintenance.html` ·
 `scripts/check-edge-nginx.sh` · `monitoring/prometheus/alerts/ops-automation.yml`
 (`EdgeConfigNotLoaded`) · `monitoring/prometheus/tests/edge_config_not_loaded_test.yml` ·
 `scripts/container-runtime.test.sh` · `scripts/deploy.test.sh`
