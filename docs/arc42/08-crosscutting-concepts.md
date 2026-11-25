@@ -346,7 +346,9 @@ Two binding rules shape every UI change:
 - **Only data forms arm the unsaved-changes guard** (2026-10-02). `unsaved-changes.js` warns before
   a link leaves a page with an edited form; a form marked `no-track` or with `method="get"` is a
   query and never arms it, and a submit triggered by the same edit clears it (REQ-FE-024,
-  `UnsavedChangesGuardE2eTest`).
+  `UnsavedChangesGuardE2eTest`). Each edited form also carries its own `data-krt-unsaved` mark until
+  a successful save or a reset clears it; live sync holds back a section that holds a marked form,
+  so a reconnect after a deploy never overwrites unsaved input (REQ-FE-010, REQ-FE-015).
 - **Every backend call the frontend makes names an operation the backend has** (2026-10-03). A test
   parses the frontend sources, folds every call site's URI into a template and matches verb and
   path against the committed `openapi.json`; the live-sync probe templates must be existing `GET`s.

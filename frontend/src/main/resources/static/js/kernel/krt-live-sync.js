@@ -1,4 +1,5 @@
 import { krtSessionGate } from '/js/kernel/krt-fetch.js';
+import { holdsUnsaved, UNSAVED_CLEARED_EVENT } from '/js/kernel/krt-unsaved-marks.js';
 
 const DEFAULT_COALESCE_MS = 400;
 
@@ -357,6 +358,9 @@ function createReceiver(cfg) {
         if (container && document.activeElement && container.contains(document.activeElement)) {
             return true;
         }
+        if (container && holdsUnsaved(container)) {
+            return true;
+        }
         if (typeof extraBusyTest === 'function') {
             return !!extraBusyTest(sectionKey, container);
         }
@@ -379,6 +383,21 @@ function createReceiver(cfg) {
         }
     }
 
+    /** Re-renders the deferred sections that are no longer busy and drops the pill once none is left. */
+    function flushReadyDeferred() {
+        /** @type {string[]} */
+        const ready = [];
+        Object.keys(deferred).forEach((k) => {
+            if (sectionBusy(k)) {
+                return;
+            }
+            delete deferred[k];
+            ready.push(k);
+        });
+        refresh(ready);
+        hidePillIfEmpty();
+    }
+
     function showPill() {
         if (document.getElementById(pillId)) {
             return;
@@ -392,19 +411,7 @@ function createReceiver(cfg) {
         pill.type = 'button';
         pill.className = pillClassName;
         pill.textContent = label;
-        pill.addEventListener('click', () => {
-            /** @type {string[]} */
-            const ready = [];
-            Object.keys(deferred).forEach((k) => {
-                if (sectionBusy(k)) {
-                    return;
-                }
-                delete deferred[k];
-                ready.push(k);
-            });
-            refresh(ready);
-            hidePillIfEmpty();
-        });
+        pill.addEventListener('click', flushReadyDeferred);
         document.body.appendChild(pill);
     }
 
@@ -493,6 +500,7 @@ function createReceiver(cfg) {
             apply(null);
         });
     }
+    document.addEventListener(UNSAVED_CLEARED_EVENT, flushReadyDeferred);
 
     /** @type {{unsubscribe(): void} | null} */
     let subscription = null;

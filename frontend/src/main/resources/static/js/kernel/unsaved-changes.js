@@ -1,12 +1,15 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { clearAllUnsaved, clearUnsaved, markUnsaved } from '/js/kernel/krt-unsaved-marks.js';
 
 let isDirty = false;
 
 /**
- * Clears the unsaved-changes guard, for a save that did not submit a form.
+ * Clears the unsaved-changes guard and every form's unsaved mark, for a save that did not submit a
+ * form.
  */
 export function resetUnsavedChanges() {
     isDirty = false;
+    clearAllUnsaved();
 }
 
 /**
@@ -47,23 +50,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Arms the guard for an edit, ahead of the control's own listeners so a submit they trigger
-     * for the same edit clears it again.
+     * Arms the guard and marks the edited form, ahead of the control's own listeners so a submit
+     * they trigger for the same edit clears the guard again.
      *
      * @param {Event} e the input or change event
      */
     function markDirty(e) {
         const target = /** @type {Element} */ (e.target);
-        if (target instanceof Element && tracksEdits(target.closest('form'))) {
+        const form = target instanceof Element ? target.closest('form') : null;
+        if (form && tracksEdits(form)) {
             isDirty = true;
+            markUnsaved(form);
         }
     }
 
     document.addEventListener('input', markDirty, true);
     document.addEventListener('change', markDirty, true);
 
+    // A submit keeps the form's mark: only a successful save (krtFetch) or a reset clears it.
     document.addEventListener('submit', () => {
         isDirty = false;
+    });
+
+    document.addEventListener('reset', (event) => {
+        if (event.target instanceof HTMLFormElement) {
+            clearUnsaved(event.target);
+        }
     });
 
     document.addEventListener('click', (event) => {
