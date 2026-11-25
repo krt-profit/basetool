@@ -181,6 +181,7 @@ class RefineryOrderCreateE2eTest {
             page.locator(".krt-combobox:has(#inputMaterialId_1) .krt-combobox__input"),
             materialId,
             "E2E Refinery Material");
+        page.locator("#quality_1").fill("500");
         page.locator("#inputQuantity_1").fill("50");
         page.locator("#outputQuantity_1").fill("40");
         page.locator("#otherExpenses").fill("1234");
@@ -195,6 +196,7 @@ class RefineryOrderCreateE2eTest {
                     "#inputQuantity_0",
                     "#outputQuantity_0",
                     "#inputMaterialId_1",
+                    "#quality_1",
                     "#inputQuantity_1",
                     "#outputQuantity_1",
                     "#otherExpenses"));
