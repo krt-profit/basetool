@@ -1918,12 +1918,13 @@ nothing, so the alert stays silent on a host without one.
   `AuditDomain` is covered by default and exempting one is a deliberate edit rather than an
   omission. The rule, its exclusions and the `up` guard are pinned by promtool unit tests in
   `monitoring/prometheus/tests/audit_domain_silence_alerts_*_test.yml`. **All three silence rules
-  carry `keep_firing_for: 15m`** (since 2026-09-11): `for:` delays a fire and never a resolve, so the
-  nightly backup quiesce — `scripts/backup.sh` stops `frontend backend ingest` at 04:15 host-local
-  for the `pg_dump`, REQ-OPS-009 — emptied the `and on() (up == 1)` conjunction for about a minute,
-  resolved all three on the spot and re-fired them a full `for:` later. That produced a RESOLVED and
-  a FIRING notification **every night** for as long as the underlying silence lasted, and no
-  Alertmanager `repeat_interval` suppresses it because neither mail is a repeat. The hold was chosen
+  carry `keep_firing_for: 15m`** (since 2026-09-11): `for:` delays a fire and never a resolve, so a
+  restart window — a release apply or health heal of `deploy.sh`, or a `backup.sh --quiesce` run
+  (REQ-OPS-009) — empties the `and on() (up == 1)` conjunction for one to three minutes, resolves all
+  three on the spot and re-fires them a full `for:` later. Without the hold that is a RESOLVED and a
+  FIRING notification for **every window** for as long as the underlying silence lasts (every night
+  while the nightly backup still stopped the writers), and no Alertmanager `repeat_interval`
+  suppresses it because neither mail is a repeat. The hold was chosen
   over relaxing the guard to `max_over_time(up[15m]) == 1`, which would also let the alert newly fire
   *during* a real outage — the one case the guard exists to prevent; a sustained outage still
   resolves the alert once the hold expires. Both the hold and its limit are pinned in
@@ -3396,8 +3397,8 @@ therefore alerts on:
   `DeployFailed`.
 - **The stateful services themselves** (since 2026-09-22). An exporter that cannot reach its target
   stays up and scraped, so `TargetDown` never saw a down database. `PostgresDown` (`pg_up == 0`) and
-  `RedisDown` (`redis_up == 0`), both critical after 2 minutes, close that; the nightly quiesce stops
-  only the writers and needs no carve-out. `ContainerUnhealthy` (warning, 10 minutes) names any
+  `RedisDown` (`redis_up == 0`), both critical after 2 minutes, close that; the nightly backup stops
+  neither, and its opt-in `--quiesce` stops only the writers, so neither needs a carve-out. `ContainerUnhealthy` (warning, 10 minutes) names any
   container failing its own health check — the podman exporter's `podman_container_health == 1`
   joined to `podman_container_info` for the name — which deploy.sh's targeted restart covers for the
   three application modules only.

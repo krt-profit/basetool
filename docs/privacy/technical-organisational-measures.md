@@ -109,7 +109,8 @@ measures below are accordingly proportionate rather than exhaustive.
 - **Automated, scheduled, encrypted, off-site backups**, daily, with a post-upload integrity check
   and a **weekly restore drill** — a backup nobody has restored is a hypothesis, not a backup
   (REQ-OPS-008, [`backup-recovery.md`](../specs/backup-recovery.md)).
-- **Backups are consistent**, taken around a minimal bounded quiesce (REQ-OPS-009).
+- **Backups are consistent**, each database dumped from one transactionally consistent snapshot
+  while the deploy lock keeps schema changes out (REQ-OPS-009).
 - **Health-gated deploys with automatic rollback** on a failed health check (REQ-OPS-003).
 - **Resilience4j** (timeout, retry, circuit breaker, bulkhead) around every backend call from the
   frontend, so a partial outage degrades rather than cascades.

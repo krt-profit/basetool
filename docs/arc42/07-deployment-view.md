@@ -274,8 +274,8 @@ Three things now hold the jobs back, each on the signal it can actually see:
 
 The last exists because the others are not enough. `user@<uid>.service` reports ready as soon as
 the manager runs; measured on the 2026-09-22 boot that was 16:26:03, while the manager's own startup
-finished at 16:27:33. The ordering makes detection possible; it would still have let the backup's
-quiesce stop the backend while it was starting.
+finished at 16:27:33. The ordering makes detection possible; it would still have let the backup dump
+from, or with `--quiesce` stop, a backend that was still starting.
 
 > [!success] Fixed 2026-09-25 (#2069): the waits did not cover the 2026-09-25 reboot
 > Rebooted for a kernel at 15:56 UTC, production started all four services at 15:57:30 (their timers'
