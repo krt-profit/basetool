@@ -63,9 +63,28 @@ class FakeElement {
         this.children = [];
         this.fired = [];
         this.listeners = {};
-        this.dataset = {};
         this.hidden = false;
         this.connected = true;
+    }
+
+    /** The `data-*` attributes under their camel-case names, read and written through. */
+    get dataset() {
+        const attribute = (key) =>
+            `data-${String(key).replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+        return new Proxy(
+            {},
+            {
+                get: (_, key) => this.getAttribute(attribute(key)) ?? undefined,
+                set: (_, key, value) => {
+                    this.setAttribute(attribute(key), value);
+                    return true;
+                },
+                deleteProperty: (_, key) => {
+                    this.removeAttribute(attribute(key));
+                    return true;
+                },
+            },
+        );
     }
 
     get id() {
@@ -278,8 +297,7 @@ function page() {
         'data-krt-draft-scope': SCOPE,
         'data-active-org-unit-context': ORG_UNIT,
     });
-    const form = new FakeForm({ 'data-krt-draft': FORM_KEY });
-    form.dataset = { krtDraft: FORM_KEY, krtDraftVersion: '1' };
+    const form = new FakeForm({ 'data-krt-draft': FORM_KEY, 'data-krt-draft-version': '1' });
     const offer = new FakeElement('div', { 'data-krt-draft-offer': '' });
     offer.hidden = true;
     const restore = new FakeElement('button', { 'data-krt-draft-action': 'restore' });
@@ -648,8 +666,7 @@ test('a malformed entry is removed and a refused write keeps no draft', () => {
  * @returns {{form: object, offer: object}} the second form and its offer
  */
 function addSecondForm(dom, formKey) {
-    const form = new FakeForm({ 'data-krt-draft': formKey });
-    form.dataset = { krtDraft: formKey, krtDraftVersion: '1' };
+    const form = new FakeForm({ 'data-krt-draft': formKey, 'data-krt-draft-version': '1' });
     const offer = new FakeElement('div', { 'data-krt-draft-offer': '' });
     offer.hidden = true;
     form.append(offer, new FakeInput('text', { name: 'handle' }));
@@ -694,6 +711,59 @@ test('only the first offer of a page reveals its form', () => {
     assert.deepEqual(revealed, [FORM_KEY]);
     assert.equal(h.offer.hidden, false);
     assert.equal(second.offer.hidden, false);
+});
+
+test('a form switched to editing withdraws its offer and keeps its draft until it creates again', () => {
+    const h = harness({ [keyFor(SCOPE)]: storedDraft() });
+    assert.equal(h.offer.hidden, false);
+    h.context.setDraftKey(h.form, null);
+    assert.equal(h.offer.hidden, true);
+    assert.equal(h.form.hasAttribute('data-krt-draft'), false);
+
+    h.form.setAttribute('data-krt-unsaved', '');
+    h.controls.note.value = 'editing';
+    h.edit(h.controls.note);
+    h.flushTimers();
+    h.fire('krt:unsaved-cleared', { detail: { form: h.form } });
+    assert.equal(h.stored().snapshot.fields.note, 'from the draft');
+
+    h.form.removeAttribute('data-krt-unsaved');
+    h.context.setDraftKey(h.form, FORM_KEY);
+    assert.equal(h.offer.hidden, false);
+    assert.equal(h.offer.listeners.click.length, 1);
+    h.click(h.restore);
+    assert.equal(h.controls.note.value, 'from the draft');
+});
+
+test('a pending snapshot is dropped when the form switches to editing', () => {
+    const h = harness();
+    h.form.setAttribute('data-krt-unsaved', '');
+    h.controls.note.value = 'typed';
+    h.edit(h.controls.note);
+    h.context.setDraftKey(h.form, null);
+    h.windowFire('pagehide');
+    h.flushTimers();
+    assert.equal(h.stored(), null);
+});
+
+test('switching a form before the page wires its drafts only sets its key', () => {
+    const h = harness({ [keyFor(SCOPE)]: storedDraft() }, page(), 'interactive');
+    const revealed = [];
+    h.context.registerDraftAdapter(FORM_KEY, {
+        serialize: () => null,
+        restore() {},
+        reveal: (form) => {
+            revealed.push(form);
+            h.context.setDraftKey(form, FORM_KEY);
+        },
+    });
+    h.context.setDraftKey(h.form, null);
+    h.context.setDraftKey(h.form, FORM_KEY);
+    assert.equal(h.offer.hidden, true);
+    h.fire('DOMContentLoaded', {});
+    assert.equal(h.offer.hidden, false);
+    assert.deepEqual(revealed, [h.form]);
+    assert.equal(h.offer.listeners.click.length, 1);
 });
 
 /**

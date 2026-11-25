@@ -133,10 +133,35 @@ export function createMissionPlanningRows(list, template, { liveRegion, hiddenSh
         (adjacent?.querySelector('input') || list.parentElement?.querySelector('button'))?.focus();
     }
 
+    /**
+     * Reads every row of the section, empty ones included, under the keys `fill` writes.
+     *
+     * @returns {PlanningRow[]} the field values per row, in order
+     */
+    function values() {
+        return Array.from(list.children, (row) => {
+            /** @type {PlanningRow} */
+            const fields = {};
+            row.querySelectorAll('[data-plan-field], [name]').forEach((field) => {
+                if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement))
+                    return;
+                const key = field.dataset.planField ?? field.name;
+                if (field instanceof HTMLInputElement && field.type === 'checkbox') {
+                    fields[key] = field.checked;
+                    return;
+                }
+                const text = field.value.trim();
+                fields[key] =
+                    field.hasAttribute('data-number-input') && text ? Number(text) : text || null;
+            });
+            return fields;
+        });
+    }
+
     list.addEventListener('input', (event) => {
         const field = event.target;
         if (field instanceof HTMLInputElement && field.matches(nameField)) syncName(field);
     });
 
-    return { list, add, fill, remove };
+    return { list, add, fill, remove, values };
 }

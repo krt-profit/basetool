@@ -8,7 +8,8 @@
     <header class="card-head mission-template-editor-head">
         <h2 id="mission-template-editor-title" th:text="#{missionTemplate.create}">Neue Vorlage</h2>
     </header>
-    <form method="post" id="mission-template-form">
+    <form method="post" id="mission-template-form" data-krt-draft="mission-template-create" data-krt-draft-version="1">
+        <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
         <div class="mission-template-metadata">
             <label for="mission-template-name">
                 <span th:text="#{general.name}">Name</span>
@@ -118,7 +119,7 @@
                         <span th:text="#{mission.objective.title.placeholder}">Zieltext</span>
                         <span th:text="#{mission.objective.kind.label}">Klassifizierung</span>
                     </div>
-                    <ol class="mission-template-rows" data-template-rows="objectives" role="list"></ol>
+                    <ol class="mission-template-rows" data-template-rows="objectives" role="list" data-krt-draft-skip></ol>
                 </section>
                 <section class="mission-template-section" data-template-part="frequencies" hidden
                          aria-labelledby="mission-template-frequencies-title">
@@ -135,7 +136,7 @@
                             <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='frequencies')}"></th:block>
                         </div>
                     </header>
-                    <ol class="mission-template-rows" data-template-rows="frequencies" role="list"></ol>
+                    <ol class="mission-template-rows" data-template-rows="frequencies" role="list" data-krt-draft-skip></ol>
                 </section>
             </div>
             <div class="mission-template-column">
@@ -158,7 +159,7 @@
                         <span th:text="#{mission.step.title.placeholder}">Schritt-Titel</span>
                         <span th:text="#{missionTemplate.step.hint}">Zeit oder Ort</span>
                     </div>
-                    <ol class="mission-template-rows" data-template-rows="steps" role="list"></ol>
+                    <ol class="mission-template-rows" data-template-rows="steps" role="list" data-krt-draft-skip></ol>
                 </section>
 
                 <section class="mission-template-section" data-template-part="units" hidden
@@ -176,7 +177,7 @@
                             <th:block th:replace="~{mission/fragments/mission-template-editor :: partRemove(part='units')}"></th:block>
                         </div>
                     </header>
-                    <ol class="mission-template-rows" data-template-rows="units" role="list"></ol>
+                    <ol class="mission-template-rows" data-template-rows="units" role="list" data-krt-draft-skip></ol>
                 </section>
             </div>
         </div>

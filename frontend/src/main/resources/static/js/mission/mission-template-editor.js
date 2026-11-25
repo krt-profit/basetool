@@ -17,10 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { setDraftKey } from '/js/kernel/krt-drafts.js';
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { bindFrequencyRows } from '/js/mission/mission-frequency-rows.js';
 import { createMissionPlanningRows } from '/js/mission/mission-planning-rows.js';
+import {
+    readMissionTemplateDraft,
+    TEMPLATE_DRAFT_KEY,
+} from '/js/mission/mission-template-draft.js';
 import { hasPart, TEMPLATE_PARTS, timeOfDay } from '/js/mission/mission-template-parts.js';
 
 /** @typedef {ApiDto<'MissionTemplateDto'>} MissionTemplate */
@@ -279,6 +284,7 @@ export function createMissionTemplateEditor(panel) {
 
         owner.value = template?.owningOrgUnitId || ownerId;
         const editing = Boolean(template && 'id' in template && template.id);
+        setDraftKey(form, editing ? null : TEMPLATE_DRAFT_KEY);
         owner.disabled = editing;
         name.value = template?.name || '';
         heading.textContent = editing
@@ -395,5 +401,29 @@ export function createMissionTemplateEditor(panel) {
     });
     name.addEventListener('input', () => showError(''));
 
-    return { form, owner, open, close, readPlan, showError };
+    /**
+     * The part of a create draft the generic snapshot cannot keep (REQ-FE-041): the shown parts and
+     * the planning rows, whose repeated field names the snapshot skips.
+     *
+     * @type {KrtDraftAdapter}
+     */
+    const draftAdapter = {
+        serialize() {
+            return {
+                parts: TEMPLATE_PARTS.filter((part) => shown(part)),
+                rows: Object.fromEntries(
+                    SECTIONS.map((section) => [section, rows[section].values()]),
+                ),
+            };
+        },
+        restore(_form, extra) {
+            const draft = readMissionTemplateDraft(extra, TEMPLATE_PARTS, SECTIONS);
+            for (const section of SECTIONS) rows[section].fill(draft.rows[section]);
+            frequencies.sync();
+            for (const part of TEMPLATE_PARTS) card(part).hidden = !draft.parts.includes(part);
+            syncChrome();
+        },
+    };
+
+    return { form, owner, open, close, readPlan, showError, draftAdapter };
 }

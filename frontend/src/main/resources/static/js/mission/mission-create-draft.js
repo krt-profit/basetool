@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** @typedef {Record<string, string | number | boolean | null>} MissionDraftRow */
+import { readPlanningRows } from '/js/mission/mission-draft-rows.js';
 
 /**
  * The part of a mission create draft the page keeps itself (REQ-FE-041): the applied template with
@@ -27,7 +27,7 @@
  * @typedef {object} MissionCreateDraft
  * @property {string} templateId the applied template; empty without one
  * @property {string} templateVersion the applied template revision; empty without one
- * @property {Record<string, MissionDraftRow[]>} rows the planning rows per section
+ * @property {ReturnType<typeof readPlanningRows>} rows the planning rows per section
  */
 
 /**
@@ -43,30 +43,6 @@ function textOf(stored, name) {
 }
 
 /**
- * Keeps the plain field values of a stored planning row.
- *
- * @param {unknown} stored the stored row
- * @returns {MissionDraftRow} its string, number, boolean and null fields
- */
-function rowOf(stored) {
-    /** @type {MissionDraftRow} */
-    const row = {};
-    if (stored && typeof stored === 'object') {
-        Object.entries(stored).forEach(([field, value]) => {
-            if (
-                value === null ||
-                typeof value === 'string' ||
-                typeof value === 'number' ||
-                typeof value === 'boolean'
-            ) {
-                row[field] = value;
-            }
-        });
-    }
-    return row;
-}
-
-/**
  * Reads the part a stored mission create draft holds; anything else yields no template and empty
  * sections.
  *
@@ -78,18 +54,9 @@ export function readMissionCreateDraft(extra, sections) {
     const stored = /** @type {Record<string, unknown>} */ (
         extra && typeof extra === 'object' ? extra : {}
     );
-    const storedRows = /** @type {Record<string, unknown>} */ (
-        stored.rows && typeof stored.rows === 'object' ? stored.rows : {}
-    );
-    /** @type {Record<string, MissionDraftRow[]>} */
-    const rows = {};
-    sections.forEach((section) => {
-        const list = storedRows[section];
-        rows[section] = Array.isArray(list) ? list.map(rowOf) : [];
-    });
     return {
         templateId: textOf(stored, 'templateId'),
         templateVersion: textOf(stored, 'templateVersion'),
-        rows,
+        rows: readPlanningRows(stored.rows, sections),
     };
 }

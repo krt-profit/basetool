@@ -17,10 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { hasUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { TEMPLATE_DRAFT_KEY } from '/js/mission/mission-template-draft.js';
 import { createMissionTemplateEditor } from '/js/mission/mission-template-editor.js';
 
 /** @typedef {ApiDto<'MissionTemplateDto'>} MissionTemplate */
@@ -159,6 +161,13 @@ function setup(workspace, panel, scope, createButton, list, listError) {
         (opener?.isConnected ? opener : createButton).focus();
     }
 
+    /** Opens a blank editor whose close returns the focus to the blank-editor action. */
+    function openBlank() {
+        opener = createButton;
+        current = null;
+        editor.open(scope.value, null);
+    }
+
     /** @returns {Promise<boolean>} whether an open draft can be replaced */
     async function canReplaceEditor() {
         if (panel.hidden || !hasUnsavedChanges()) return true;
@@ -192,6 +201,13 @@ function setup(workspace, panel, scope, createButton, list, listError) {
             duplicate,
         );
     }
+
+    registerDraftAdapter(TEMPLATE_DRAFT_KEY, {
+        ...editor.draftAdapter,
+        reveal() {
+            if (panel.hidden) openBlank();
+        },
+    });
 
     if (messages.templateDraft) {
         const draft = /** @type {MissionDraft} */ (JSON.parse(messages.templateDraft));
@@ -229,9 +245,7 @@ function setup(workspace, panel, scope, createButton, list, listError) {
         try {
             if (!(await canReplaceEditor())) return;
             if (!panel.hidden) editor.close();
-            opener = createButton;
-            current = null;
-            editor.open(scope.value, null);
+            openBlank();
         } finally {
             setPending(false);
         }
