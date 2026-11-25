@@ -178,13 +178,20 @@ re-authentication signal through instead of answering `500`. Tests:
 submit button for the whole in-flight round-trip and re-enables it when the request settles (success
 / error / network), so a double-click cannot fire a second duplicate write — a silent duplicate
 finance-ledger row, a self-409 stale-version PUT, or a 404-toasting second DELETE over a succeeding
-navigation. The button is captured on the capture-phase document `submit` listener and MUST be
-consumed + disabled **synchronously** at the top of `write()` / `submitForm()`, during the same
-submit-event dispatch — **before** `runSerialized` defers the send **and before** the capture
-listener's clearing microtask runs. Consuming it later inside the deferred `send()` always loses the
-FIFO microtask race to the clear and leaves the button enabled (the dead-guard regression #970
-shipped and #1133 restored). A raw-`fetch` call site that does not go through `write`/`submitForm`
-MUST pass an explicit `submitter` (e.g. the operation-detail delete form).
+navigation. The button is captured on the capture-phase document `submit` listener and kept until
+the task of the submit ends: a submit the browser dispatches from a click runs a microtask checkpoint
+after each listener, so a microtask would forget the button before the form's own submit listener
+runs. A later submit's button is never cleared by an earlier one's task end. The button MUST be
+consumed + disabled **synchronously** at the top of `write()` / `submitForm()`, in the task of the
+submit — **before** `runSerialized` defers the send. Consuming it later inside the deferred
+`send()` leaves the button enabled (the dead-guard regression #970 shipped and #1133 restored). A
+write a submit listener starts only after an `await` (a confirm dialog, a read) runs in a later task
+and MUST pass an explicit `submitter`, as must a raw-`fetch` call site that does not go through
+`write`/`submitForm` (e.g. the operation-detail delete form). The same button names the form whose
+unsaved mark a 2xx clears (REQ-FE-024). A submit that sends several writes names the button of each:
+the profile's save-all passes each section's own save button, and a write that saves no form passes
+`submitter: false` and never takes the button, as the dashboard's layout write ahead of a new
+widget's options write does.
 
 **Acceptance**
 
@@ -195,6 +202,10 @@ MUST pass an explicit `submitter` (e.g. the operation-detail delete form).
   native-submit fallback, and does not full-page reload on success.
 - [ ] A double-click on a submit button driving a `krtFetch.write` / `submitForm` fires exactly one
   request; the button is disabled synchronously on first submit and re-enabled when it settles.
+- [x] A write the form's own submit listener starts in the task of the submit knows its button
+  after the microtask checkpoint between listeners: the button is disabled during the write and a
+  2xx clears the form's unsaved mark; once the task ended, a later write never takes it
+  (`krt-fetch-read.test.mjs`).
 
 **Lint-enforced since 2026-09-22 (FE-SEC-03).** Twenty-three `fetch` writes in fifteen files had
 drifted back past the review guard — each with its own CSRF read and, mostly, no retry-on-403, no
@@ -219,7 +230,7 @@ a followed redirect.
 > `XMLHttpRequest` everywhere. That also closes the gap of an init built in another function.
 
 **Enforced by:** `:frontend:lintJs` (`no-restricted-globals`, `no-restricted-properties`),
-`:frontend:testEslintBans`, per-area double-submit e2e (incl.
+`:frontend:testEslintBans`, `scripts/krt-fetch-read.test.mjs` (`:frontend:testKrtFetchReadJs`), per-area double-submit e2e (incl.
 `AdminMaterialCreateInPlaceE2eTest`) · **Code:** `krt-fetch.js` (`write`, `submitForm`, `send`,
 `resolveSubmitter`), `eslint.config.mjs` · **Issues:** #572, #916, #1133
 

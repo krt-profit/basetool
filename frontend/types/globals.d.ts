@@ -157,8 +157,12 @@ interface KrtSendOpts {
     refreshFailedMessage?: string;
     /** Localized strings for the optimistic-lock conflict dialog. */
     conflict?: KrtConflictStrings;
-    /** The submit button disabled for the in-flight request (double-submit guard). */
-    submitter?: KrtElementRef;
+    /**
+     * The submit button disabled for the in-flight request (double-submit guard), whose form a 2xx
+     * marks saved; omitted, the button of the submit in progress. `false` for a write that saves no
+     * form, which then never takes that button.
+     */
+    submitter?: KrtElementRef | false;
     /**
      * Accept header value; defaults to `application/json`. A non-JSON 2xx body reaches `onSuccess`
      * as text.

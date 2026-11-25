@@ -75,6 +75,10 @@ function harness(script = [], page = {}) {
     const storage = new Map();
     const errors = [];
     const documentEvents = [];
+    /** @type {Array<{type: string, listener: (event: object) => void}>} */
+    const documentListeners = [];
+    /** @type {Array<() => void>} */
+    const timers = [];
     const context = {
         console: { warn() {}, log() {}, error() {} },
         Response,
@@ -98,10 +102,16 @@ function harness(script = [], page = {}) {
             }
         },
         addEventListener() {},
+        setTimeout(callback) {
+            timers.push(callback);
+            return timers.length;
+        },
         document: {
             querySelector: () => null,
             querySelectorAll: () => [],
-            addEventListener() {},
+            addEventListener(type, listener) {
+                documentListeners.push({ type, listener });
+            },
             dispatchEvent(event) {
                 documentEvents.push(event);
             },
@@ -149,6 +159,17 @@ function harness(script = [], page = {}) {
         navigations,
         errors,
         documentEvents,
+        timers,
+        /**
+         * Dispatches a submit to the document listeners, as the browser's capture phase does.
+         *
+         * @param {object} event the submit event
+         */
+        submit(event) {
+            documentListeners
+                .filter((entry) => entry.type === 'submit')
+                .forEach((entry) => entry.listener(event));
+        },
     };
 }
 
@@ -476,6 +497,54 @@ await test('a write from any other control keeps its form’s mark', async () =>
     await h.krtFetch.write({ url: '/row', submitter: { type: 'button', form, disabled: false } });
     assert.equal(form.hasAttribute('data-krt-unsaved'), true);
     assert.deepEqual(documentEventTypes(h), []);
+});
+
+await test('a write from the form’s own submit listener knows its submitter after the microtask checkpoint', async () => {
+    const h = harness([reply(200, '{}', JSON_TYPE)]);
+    const form = editedForm();
+    const button = { type: 'submit', form, disabled: false };
+    h.submit({ target: form, submitter: button });
+    await Promise.resolve();
+    await Promise.resolve();
+    const pending = h.krtFetch.write({ url: '/save' });
+    assert.equal(button.disabled, true);
+    await pending;
+    assert.equal(button.disabled, false);
+    assert.equal(form.hasAttribute('data-krt-unsaved'), false);
+});
+
+await test('a submit’s submitter is gone once its task ends, so a later write never takes it', async () => {
+    const h = harness([reply(200, '{}', JSON_TYPE)]);
+    const form = editedForm();
+    h.submit({ target: form, submitter: { type: 'submit', form, disabled: false } });
+    h.timers.forEach((run) => run());
+    await h.krtFetch.write({ url: '/later' });
+    assert.equal(form.hasAttribute('data-krt-unsaved'), true);
+});
+
+await test('a write that saves no form never takes the button of the submit in progress', async () => {
+    const h = harness([reply(200, '{}', JSON_TYPE), reply(200, '{}', JSON_TYPE)]);
+    const form = editedForm();
+    const button = { type: 'submit', form, disabled: false };
+    h.submit({ target: form, submitter: button });
+    const layout = h.krtFetch.write({ url: '/layout', submitter: false });
+    assert.equal(button.disabled, false);
+    await layout;
+    assert.equal(form.hasAttribute('data-krt-unsaved'), true);
+    await h.krtFetch.write({ url: '/save' });
+    assert.equal(form.hasAttribute('data-krt-unsaved'), false);
+});
+
+await test('the end of an earlier submit’s task leaves a newer submit’s submitter in place', async () => {
+    const h = harness([reply(200, '{}', JSON_TYPE)]);
+    const first = editedForm();
+    const second = editedForm();
+    h.submit({ target: first, submitter: { type: 'submit', form: first, disabled: false } });
+    h.submit({ target: second, submitter: { type: 'submit', form: second, disabled: false } });
+    h.timers[0]();
+    await h.krtFetch.write({ url: '/save' });
+    assert.equal(second.hasAttribute('data-krt-unsaved'), false);
+    assert.equal(first.hasAttribute('data-krt-unsaved'), true);
 });
 
 await test('a failed or unreachable save keeps the form marked', async () => {
