@@ -623,11 +623,139 @@ test('a cleared unsaved mark removes the draft', () => {
     assert.equal(h.stored(), null);
 });
 
-test('a swap that replaces the drafted form removes its draft', () => {
-    const h = harness({ [keyFor(SCOPE)]: storedDraft() });
-    h.form.connected = false;
+/**
+ * Takes a node out of the fake tree, as a fragment swap does with the form it replaces.
+ *
+ * @param {FakeElement} node the replaced node
+ */
+function detach(node) {
+    node.parent.children.splice(node.parent.children.indexOf(node), 1);
+    node.parent = null;
+    node.connected = false;
+}
+
+/**
+ * Adds the form a fragment swap puts under the drafted form's key: its restore offer with the
+ * stale notice, a note field and a lock version.
+ *
+ * @param {object} dom the page from {@link page}
+ * @param {string} version the lock version the new form was rendered with
+ */
+function successorForm(dom, version) {
+    const form = new FakeForm({ 'data-krt-draft': FORM_KEY, 'data-krt-draft-version': '1' });
+    const offer = new FakeElement('div', { 'data-krt-draft-offer': '' });
+    offer.hidden = true;
+    const stale = new FakeElement('p', { 'data-krt-draft-stale': '' });
+    stale.hidden = true;
+    offer.append(stale);
+    const note = new FakeTextArea({ name: 'note' });
+    const base = new FakeInput(
+        'hidden',
+        { name: 'gameDataVersion', 'data-krt-draft-base': '' },
+        { value: version },
+    );
+    form.append(offer, note, base);
+    dom.body.append(form);
+    return { form, offer, stale, note, base };
+}
+
+/**
+ * Gives the drafted form of a page a lock version and its offer the stale notice, as an edit form
+ * carries them.
+ *
+ * @param {object} dom the page from {@link page}
+ * @param {string} version the lock version the form was rendered with
+ */
+function asEditForm(dom, version) {
+    const base = new FakeInput(
+        'hidden',
+        { name: 'gameDataVersion', 'data-krt-draft-base': '' },
+        { value: version },
+    );
+    const stale = new FakeElement('p', { 'data-krt-draft-stale': '' });
+    stale.hidden = true;
+    dom.offer.append(stale);
+    dom.form.append(base);
+    return { base, stale };
+}
+
+test('a swap that replaces a drafted form holding edits removes its draft', () => {
+    const h = harness();
+    h.form.setAttribute('data-krt-unsaved', '');
+    h.controls.note.value = 'typed';
+    h.edit(h.controls.note);
+    h.flushTimers();
+    assert.ok(h.stored());
+    detach(h.form);
+    successorForm(h, '1');
     h.fire('krt:swapped', { detail: {} });
     assert.equal(h.stored(), null);
+});
+
+test('a swap that removes the drafted form removes its draft', () => {
+    const h = harness({ [keyFor(SCOPE)]: storedDraft() });
+    detach(h.form);
+    h.fire('krt:swapped', { detail: {} });
+    assert.equal(h.stored(), null);
+});
+
+test('a swap that replaces a form whose offer stands offers the draft again', () => {
+    const h = harness({ [keyFor(SCOPE)]: storedDraft({ base: { gameDataVersion: '3' } }) });
+    detach(h.form);
+    const next = successorForm(h, '4');
+    h.fire('krt:swapped', { detail: {} });
+    assert.equal(next.offer.hidden, false);
+    assert.equal(next.stale.hidden, false);
+    assert.equal(h.stored().snapshot.fields.note, 'from the draft');
+});
+
+test('an edit form records the lock versions its edits were made against', () => {
+    const h = harness();
+    asEditForm(h, '3');
+    h.form.setAttribute('data-krt-unsaved', '');
+    h.controls.note.value = 'typed';
+    h.edit(h.controls.note);
+    h.flushTimers();
+    assert.deepEqual({ ...h.stored().base }, { gameDataVersion: '3' });
+    assert.ok(!('gameDataVersion' in h.stored().snapshot.fields));
+});
+
+test('an offer says so when the entry changed since the draft was made', () => {
+    const fresh = page();
+    const current = asEditForm(fresh, '3');
+    harness({ [keyFor(SCOPE)]: storedDraft({ base: { gameDataVersion: '3' } }) }, fresh);
+    assert.equal(fresh.offer.hidden, false);
+    assert.equal(current.stale.hidden, true);
+
+    const changed = page();
+    const meanwhile = asEditForm(changed, '4');
+    harness({ [keyFor(SCOPE)]: storedDraft({ base: { gameDataVersion: '3' } }) }, changed);
+    assert.equal(changed.offer.hidden, false);
+    assert.equal(meanwhile.stale.hidden, false);
+});
+
+test('a restore writes back the lock versions the edits were made against', () => {
+    const dom = page();
+    const edit = asEditForm(dom, '4');
+    const h = harness({ [keyFor(SCOPE)]: storedDraft({ base: { gameDataVersion: '3' } }) }, dom);
+    h.click(h.restore);
+    assert.equal(h.controls.note.value, 'from the draft');
+    assert.equal(edit.base.value, '3');
+});
+
+test('drafts of two entities edited in one tab stay apart', () => {
+    const h = harness();
+    const first = h.run(`draftKey('s', 'o', 'refinery-order-edit', '/refinery-orders/a-1')`);
+    const second = h.run(`draftKey('s', 'o', 'refinery-order-edit', '/refinery-orders/b-2')`);
+    assert.notEqual(first, second);
+});
+
+test('a create form matches a draft without versions', () => {
+    const h = harness({ [keyFor(SCOPE)]: storedDraft() });
+    assert.equal(h.run('sameBase(undefined, {})'), true);
+    assert.equal(h.run("sameBase({ v: '1' }, {})"), false);
+    assert.equal(h.run("sameBase('junk', { v: '1' })"), false);
+    assert.equal(h.offer.hidden, false);
 });
 
 test('a logout removes every draft and writes none afterwards', () => {

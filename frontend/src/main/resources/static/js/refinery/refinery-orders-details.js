@@ -29,7 +29,13 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { krtFocusNewRow } from '/js/kernel/krt-row-focus.js';
+import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
 import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
+import {
+    matchGoodRows,
+    readRefineryEditDraft,
+    REFINERY_EDIT_DRAFT_KEY,
+} from '/js/refinery/refinery-order-edit-draft.js';
 
 /**
  * A form control of a material or store row, whose `id`, `name` and `value` the renumbering
@@ -436,8 +442,36 @@ function updateOutputMaterial(selectElement) {
  * writes every part (REQ-FE-006, REQ-REFINERY-029).
  */
 function resetRefineryChangeFlags() {
+    writeRefineryChangeFlags({});
+}
+
+/**
+ * Reads which order-form parts are marked changed.
+ *
+ * @returns {Record<string, boolean>} whether each part is marked, by part name
+ */
+function readRefineryChangeFlags() {
+    /** @type {Record<string, boolean>} */
+    const changed = {};
     document.querySelectorAll('#refineryOrderMainForm [data-rod-changed]').forEach((flag) => {
-        /** @type {HTMLInputElement} */ (flag).value = 'false';
+        changed[flag.getAttribute('data-rod-changed') || ''] =
+            /** @type {HTMLInputElement} */ (flag).value === 'true';
+    });
+    return changed;
+}
+
+/**
+ * Marks exactly the given order-form parts as changed and every other part as unchanged.
+ *
+ * @param {Record<string, boolean>} changed whether each part is changed, by part name
+ */
+function writeRefineryChangeFlags(changed) {
+    document.querySelectorAll('#refineryOrderMainForm [data-rod-changed]').forEach((flag) => {
+        /** @type {HTMLInputElement} */ (flag).value = changed[
+            flag.getAttribute('data-rod-changed') || ''
+        ]
+            ? 'true'
+            : 'false';
     });
 }
 
@@ -632,7 +666,65 @@ function addMaterialRow() {
 function removeMaterialRow(button) {
     const entry = /** @type {Element} */ (button.closest('.material-entry'));
     entry.remove();
+    renumberMaterialRows();
+}
 
+/**
+ * Lists the material rows of the order form in order.
+ *
+ * @returns {HTMLElement[]} the rows
+ */
+function materialRows() {
+    return Array.from(document.querySelectorAll('#materials-container .material-entry'));
+}
+
+/**
+ * Reads the good a material row edits.
+ *
+ * @param {Element} row the material row
+ * @returns {string} the good id; empty for a row the member added
+ */
+function goodIdOf(row) {
+    const field = row.querySelector('[data-testid="refinery-good-id"]');
+    return field instanceof HTMLInputElement ? field.value : '';
+}
+
+/**
+ * Rebuilds the material rows in the order a draft recorded (REQ-FE-041): a row whose good the draft
+ * kept stays, a row the draft added is appended empty, and a row the draft removed goes.
+ *
+ * @param {string[]} goods the good id per recorded row; empty for an added row
+ */
+function rebuildMaterialRows(goods) {
+    const container = document.getElementById('materials-container');
+    if (!container || goods.length === 0) return;
+    const rendered = materialRows();
+    const rows = matchGoodRows(rendered.map(goodIdOf), goods).map((index) =>
+        index === null ? addMaterialRow() : rendered[index],
+    );
+    rendered.forEach((row) => {
+        if (!rows.includes(row)) row.remove();
+    });
+    rows.forEach((row) => {
+        if (row) container.appendChild(row);
+    });
+    renumberMaterialRows();
+}
+
+registerDraftAdapter(REFINERY_EDIT_DRAFT_KEY, {
+    serialize() {
+        return { goods: materialRows().map(goodIdOf), changed: readRefineryChangeFlags() };
+    },
+    restore(_form, extra) {
+        rebuildMaterialRows(readRefineryEditDraft(extra).goods);
+    },
+    finish(_form, extra) {
+        writeRefineryChangeFlags(readRefineryEditDraft(extra).changed);
+    },
+});
+
+/** Renumbers the ids, names and labels of the material rows after their order changed. */
+function renumberMaterialRows() {
     const container = document.getElementById('materials-container');
     if (!container) return;
     const entries = container.querySelectorAll('.material-entry');

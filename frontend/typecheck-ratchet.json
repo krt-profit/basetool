@@ -301,6 +301,7 @@
       "purchasing/purchasing-report.js"
     ],
     "refinery": [
+      "refinery/refinery-order-edit-draft.js",
       "refinery/refinery-orders-create.js",
       "refinery/refinery-orders-details.js",
       "refinery/refinery-orders-index.js",

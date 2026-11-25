@@ -23,6 +23,9 @@ const SKIPPED_TYPES = new Set(['hidden', 'password', 'file', 'submit', 'button',
 /** The marker that keeps a control, or every control inside an element, out of a draft. */
 const SKIP_SELECTOR = '[data-krt-draft-skip]';
 
+/** The marker of a control holding a lock version that an edit form's draft is made against. */
+const BASE_SELECTOR = '[data-krt-draft-base]';
+
 /**
  * Names the key a control is stored under: its name, else its id.
  *
@@ -205,5 +208,66 @@ export function restoreForm(form, snapshot) {
     restored.forEach((control) => {
         control.dispatchEvent(new Event('input', { bubbles: true }));
         control.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
+
+/**
+ * Reads the lock versions an edit form's draft is made against: the values of the controls marked
+ * `data-krt-draft-base`, keyed like the snapshot (REQ-FE-041).
+ *
+ * @param {HTMLFormElement} form the form
+ * @returns {Record<string, string>} the versions; empty for a form without any
+ */
+export function readBase(form) {
+    /** @type {Record<string, string>} */
+    const base = {};
+    form.querySelectorAll(BASE_SELECTOR).forEach((control) => {
+        const key = controlKey(control);
+        if (key && control instanceof HTMLInputElement) {
+            base[key] = control.value;
+        }
+    });
+    return base;
+}
+
+/**
+ * Reads the versions a stored draft recorded.
+ *
+ * @param {unknown} stored the stored versions
+ * @returns {Record<string, unknown>} the versions; empty for anything that is not an object
+ */
+function recordedBase(stored) {
+    return stored && typeof stored === 'object'
+        ? /** @type {Record<string, unknown>} */ (stored)
+        : {};
+}
+
+/**
+ * Tells whether a stored draft was made against the versions the form was rendered with.
+ *
+ * @param {unknown} stored the versions the draft recorded
+ * @param {Record<string, string>} current the versions the form holds now
+ * @returns {boolean} true when every version matches, as for a draft and a form without any
+ */
+export function sameBase(stored, current) {
+    const recorded = recordedBase(stored);
+    const keys = new Set([...Object.keys(recorded), ...Object.keys(current)]);
+    return Array.from(keys).every((key) => recorded[key] === current[key]);
+}
+
+/**
+ * Writes the versions a restored draft was made against back into the form, so its save is checked
+ * against them and a change saved meanwhile is refused instead of overwritten.
+ *
+ * @param {HTMLFormElement} form the form
+ * @param {unknown} stored the versions the draft recorded
+ */
+export function restoreBase(form, stored) {
+    const recorded = recordedBase(stored);
+    form.querySelectorAll(BASE_SELECTOR).forEach((control) => {
+        const value = recorded[controlKey(control)];
+        if (control instanceof HTMLInputElement && typeof value === 'string') {
+            control.value = value;
+        }
     });
 }

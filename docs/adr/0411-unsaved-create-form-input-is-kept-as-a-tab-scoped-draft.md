@@ -2,6 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-25
+- **Amended:** 2026-11-25 — edit forms keep a draft against the lock versions it was made against
+  (issue #3750)
 - **Deciders:** @greluc
 - **Related:** spec REQ-FE-041 · REQ-FE-024 · REQ-FE-040 · ADR-0397 · issue #3734 ·
   `static/js/kernel/krt-drafts.js` · `kernel/layout/DraftScopeAdvice`
@@ -55,3 +57,27 @@ re-authentication case loses the draft.
   before.
 - Each further form opts in with a small change of its own; forms with script-built rows register
   an adapter for them.
+
+## Amendment 1 (2026-11-25) — edit forms keep a draft against its lock versions
+
+Decision 5 left edit forms out: a restored draft submitted with the version the page was reloaded
+with would overwrite a change a peer saved in between. Edit forms now opt in under one rule.
+
+1. **The draft records its base.** An edit form marks its lock-version fields
+   `data-krt-draft-base`. The draft stores their values as its base, apart from the snapshot, so
+   decision 4 still holds: no version is ever a restored field value.
+2. **The offer compares the base.** A form rendered with other versions still offers the draft, and
+   the offer says that the entry was changed meanwhile and that a save refuses overlapping edits
+   instead of overwriting them.
+3. **Restore writes the base back.** The restored form submits the versions its edits were made
+   against, so the optimistic lock decides: an untouched part saves, a part a peer changed ends in
+   the form's existing 409 handling. A draft never raises its own versions to the current ones.
+4. **The key's path names the entity.** Edit pages carry the entity id in their path, so two
+   entities edited in one tab never share a draft; a form whose path does not name its entity is
+   not drafted until it does.
+5. **A swap while the offer stands keeps the draft.** A live update that re-renders a form with a
+   standing offer offers the draft again on the new form, with a fresh comparison, instead of
+   dropping it; a swap of a form holding edits still drops it with decision 3.
+
+The refinery-order detail form is the first edit form drafted; the further forms of issue #3750
+follow one by one.

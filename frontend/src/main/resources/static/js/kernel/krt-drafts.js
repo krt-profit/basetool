@@ -24,7 +24,13 @@ import {
     removeDrafts,
     writeDraft,
 } from '/js/kernel/krt-draft-store.js';
-import { restoreForm, snapshotForm } from '/js/kernel/krt-draft-snapshot.js';
+import {
+    readBase,
+    restoreBase,
+    restoreForm,
+    sameBase,
+    snapshotForm,
+} from '/js/kernel/krt-draft-snapshot.js';
 import { holdsUnsaved, UNSAVED_CLEARED_EVENT } from '/js/kernel/krt-unsaved-marks.js';
 
 /** The pause after the last edit before a draft is written, in milliseconds. */
@@ -159,6 +165,7 @@ function capture(state) {
         version: form.dataset.krtDraftVersion || '',
         snapshot: snapshotForm(form),
         extra: adapter ? adapter.serialize(form) : null,
+        base: readBase(form),
     });
 }
 
@@ -205,8 +212,8 @@ function forget(state) {
 
 /**
  * Restores the offered draft: the adapter rebuilds the script-built parts, then the control values
- * are written and announced, which arms the unsaved-changes guard, and the adapter finishes what
- * those announcements would undo.
+ * are written and announced, which arms the unsaved-changes guard, the lock versions the edits were
+ * made against are written back, and the adapter finishes what those announcements would undo.
  *
  * @param {DraftState} state the form's draft state
  */
@@ -221,6 +228,7 @@ function restoreOffered(state) {
         adapter.restore(state.form, draft.extra);
     }
     restoreForm(state.form, draft.snapshot);
+    restoreBase(state.form, draft.base);
     if (adapter && adapter.finish) {
         adapter.finish(state.form, draft.extra);
     }
@@ -228,8 +236,9 @@ function restoreOffered(state) {
 }
 
 /**
- * Shows a form's restore offer for its stored draft and wires its two buttons. The first offer of
- * the page asks the form's adapter to reveal the form, for a page that shows one of several forms.
+ * Shows a form's restore offer for its stored draft and wires its two buttons. The offer says when
+ * the entry was changed since the draft's edits were made. The first offer of the page asks the
+ * form's adapter to reveal the form, for a page that shows one of several forms.
  *
  * @param {DraftState} state the form's draft state
  * @param {KrtDraft} draft the stored draft
@@ -238,6 +247,10 @@ function offer(state, draft) {
     const element = state.form.querySelector('[data-krt-draft-offer]');
     if (!(element instanceof HTMLElement)) {
         return;
+    }
+    const stale = element.querySelector('[data-krt-draft-stale]');
+    if (stale instanceof HTMLElement) {
+        stale.hidden = sameBase(draft.base, readBase(state.form));
     }
     const adapter = adapters.get(state.form.dataset.krtDraft || '');
     state.offered = draft;
@@ -355,7 +368,8 @@ function isLogout(form) {
 /**
  * Wires the drafts of the page (REQ-FE-041): drops other members' drafts, offers each pristine
  * drafted form its stored draft, keeps a draft while a form holds unsaved edits and removes it on
- * a save, a reset, a discard, a swap that replaces the form and a logout.
+ * a save, a reset, a discard, a swap that replaces the form and a logout. A swap that replaces a
+ * form whose offer still stands offers the draft again on the new form.
  */
 function initKrtDrafts() {
     const scope = pageAttribute('data-krt-draft-scope');
@@ -406,15 +420,27 @@ function initKrtDrafts() {
     });
 
     document.addEventListener('krt:swapped', () => {
+        /** @type {HTMLFormElement[]} */
+        const present = [];
+        document.querySelectorAll(DRAFT_FORM_SELECTOR).forEach((form) => {
+            if (form instanceof HTMLFormElement) {
+                present.push(form);
+            }
+        });
         states.forEach((state) => {
-            if (!state.form.isConnected) {
+            if (state.form.isConnected) {
+                return;
+            }
+            const successor = present.find((form) => keyOf(form, scope) === state.key);
+            if (state.offered && successor) {
+                state.offered = null;
+                bindForm(successor, scope);
+            } else {
                 forget(state);
             }
         });
-        document.querySelectorAll(DRAFT_FORM_SELECTOR).forEach((form) => {
-            if (form instanceof HTMLFormElement) {
-                rows.observe(stateOf(form, scope).form, { childList: true, subtree: true });
-            }
+        present.forEach((form) => {
+            rows.observe(stateOf(form, scope).form, { childList: true, subtree: true });
         });
     });
 
