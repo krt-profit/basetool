@@ -20,14 +20,31 @@
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
+import { readDraftFlags } from '/js/kernel/krt-draft-flags.js';
 import { missionHooks } from '/js/mission/mission-hooks.js';
 
+/** The form key of the mission form while it edits a mission the member may edit (REQ-FE-041). */
+const MISSION_EDIT_DRAFT_KEY = 'mission-edit';
+
+/**
+ * The tab control of the mission detail page, as the edit form's draft needs it.
+ *
+ * @typedef {object} MissionTabs
+ * @property {() => void} showEditTab switches to the edit pane without a history entry
+ */
+
+/**
+ * Wires the tabs and the edit mode of the mission detail page.
+ *
+ * @returns {MissionTabs | null} the tab control; null on a page without tabs
+ */
 function initMissionDetailTabs() {
     const tabs = /** @type {HTMLElement[]} */ (
         Array.from(document.querySelectorAll('.tab-nav .tab[data-tab]'))
     );
     if (!tabs.length) {
-        return;
+        return null;
     }
     const EDIT_KEY = 'verw';
     const viewKeys = tabs.map((t) => t.getAttribute('data-tab'));
@@ -192,11 +209,22 @@ function initMissionDetailTabs() {
     });
 
     apply(resolveInitial(true));
+    return {
+        showEditTab() {
+            void show(EDIT_KEY, false);
+        },
+    };
 }
 
-initMissionDetailTabs();
+const missionTabs = initMissionDetailTabs();
 
-function initMissionDetailTabs2() {
+/**
+ * Saves the edit form in place, one header section per dirty flag, and keeps its unsaved edits as
+ * a draft (REQ-FE-014, REQ-FE-041).
+ *
+ * @param {MissionTabs | null} tabs the tab control that shows the edit pane
+ */
+function initMissionDetailTabs2(tabs) {
     const missionForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('mission-form')
     );
@@ -302,29 +330,49 @@ function initMissionDetailTabs2() {
             initialSnapshot[sec] = sectionSnapshot(fd0, SECTION_FIELDS[sec]);
         });
     })();
-    function markDirtySections() {
+    /**
+     * Tells which header sections differ from the values they were rendered with.
+     *
+     * @returns {Record<string, boolean>} whether each section changed, by section name
+     */
+    function dirtySections() {
         const fd = new FormData(form);
-        /**
-         * @param {string} id the hidden dirty-flag input id
-         * @param {boolean} dirty whether the section changed
-         */
-        function setFlag(id, dirty) {
-            const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
-            if (el) el.value = dirty ? 'true' : 'false';
-        }
-        setFlag(
-            'mission-dirty-core',
-            sectionSnapshot(fd, SECTION_FIELDS.core) !== initialSnapshot.core,
-        );
-        setFlag(
-            'mission-dirty-schedule',
-            sectionSnapshot(fd, SECTION_FIELDS.schedule) !== initialSnapshot.schedule,
-        );
-        setFlag(
-            'mission-dirty-flags',
-            sectionSnapshot(fd, SECTION_FIELDS.flags) !== initialSnapshot.flags,
-        );
+        /** @type {Record<string, boolean>} */
+        const dirty = {};
+        Object.keys(SECTION_FIELDS).forEach((sec) => {
+            dirty[sec] = sectionSnapshot(fd, SECTION_FIELDS[sec]) !== initialSnapshot[sec];
+        });
+        return dirty;
     }
+    function markDirtySections() {
+        const dirty = dirtySections();
+        Object.keys(dirty).forEach((sec) => {
+            const el = /** @type {HTMLInputElement | null} */ (
+                document.getElementById(`mission-dirty-${sec}`)
+            );
+            if (el) el.value = dirty[sec] ? 'true' : 'false';
+        });
+    }
+
+    registerDraftAdapter(MISSION_EDIT_DRAFT_KEY, {
+        serialize() {
+            return { dirty: dirtySections() };
+        },
+        restore() {},
+        reveal() {
+            if (tabs) tabs.showEditTab();
+        },
+        finish(_form, extra) {
+            const stored = /** @type {{dirty?: unknown} | null} */ (
+                extra && typeof extra === 'object' ? extra : null
+            );
+            const dirty = readDraftFlags(stored ? stored.dirty : null);
+            const fd = new FormData(form);
+            Object.keys(SECTION_FIELDS).forEach((sec) => {
+                if (!dirty[sec]) initialSnapshot[sec] = sectionSnapshot(fd, SECTION_FIELDS[sec]);
+            });
+        },
+    });
 
     async function submitInPlace() {
         markDirtySections();
@@ -362,7 +410,7 @@ function initMissionDetailTabs2() {
     });
 }
 
-initMissionDetailTabs2();
+initMissionDetailTabs2(missionTabs);
 
 function initMissionDetailTabs3() {
     if (!window.missionCanEdit) {

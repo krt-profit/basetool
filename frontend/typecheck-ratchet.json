@@ -160,6 +160,7 @@
       "kernel/krt-client-error.js",
       "kernel/krt-combobox-sources.js",
       "kernel/krt-current-option.js",
+      "kernel/krt-draft-flags.js",
       "kernel/krt-draft-rows.js",
       "kernel/krt-draft-snapshot.js",
       "kernel/krt-draft-store.js",

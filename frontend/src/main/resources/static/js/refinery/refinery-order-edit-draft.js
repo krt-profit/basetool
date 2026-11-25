@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { readDraftFlags } from '/js/kernel/krt-draft-flags.js';
+
 /** The form key of the refinery-order detail form while the member may edit it (REQ-FE-041). */
 export const REFINERY_EDIT_DRAFT_KEY = 'refinery-order-edit';
 
@@ -44,14 +46,7 @@ export function readRefineryEditDraft(extra) {
     const goods = Array.isArray(stored.goods)
         ? stored.goods.map((id) => (typeof id === 'string' ? id : ''))
         : [];
-    /** @type {Record<string, boolean>} */
-    const changed = {};
-    if (stored.changed && typeof stored.changed === 'object') {
-        Object.entries(stored.changed).forEach(([part, value]) => {
-            changed[part] = value === true;
-        });
-    }
-    return { goods, changed };
+    return { goods, changed: readDraftFlags(stored.changed) };
 }
 
 /**
