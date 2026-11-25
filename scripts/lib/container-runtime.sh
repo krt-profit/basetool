@@ -28,10 +28,14 @@ RT_CHANGED_SERVICES="${RT_CHANGED_SERVICES:-}"
 
 RT_FAILED_SERVICES=""
 
+# Seconds from the restart window's stop until the last stack unit started; empty when no window opened.
+RT_WINDOW_SECONDS="${RT_WINDOW_SECONDS:-}"
+
 # The edge serves the maintenance page: it starts first and is never stopped inside a restart window.
 RT_EDGE_SERVICE="${RT_EDGE_SERVICE:-edge}"
 
-RT_STACK_ORDER="${RT_STACK_ORDER:-edge db-backend db-keycloak redis redis-session redis-shared keycloak backend ingest frontend acme}"
+# frontend precedes ingest: it does not require ingest, so members do not wait for ingest's start.
+RT_STACK_ORDER="${RT_STACK_ORDER:-edge db-backend db-keycloak redis redis-session redis-shared keycloak backend frontend ingest acme}"
 
 RT_RETIRED_SERVICES="${RT_RETIRED_SERVICES:-}"
 
@@ -307,6 +311,7 @@ rt_window_services() {
 # it is open; an edge that does not come back fails the apply before anything else is stopped.
 rt_apply_stack() {
   RT_FAILED_SERVICES=""
+  RT_WINDOW_SECONDS=""
   rt_retire_services || return 1
   ${RT_SYSTEMCTL} daemon-reload || return 1
   local svc rc=0
@@ -328,10 +333,15 @@ rt_apply_stack() {
       return 1
     fi
   done
+  local window_start=""
   if ((${#redefined[@]} > 0)); then
+    window_start="$(date +%s)"
     ${RT_SYSTEMCTL} stop "${redefined[@]}" || rc=1
   fi
   rt_await_stack "$@" || rc=1
+  if [[ -n "${window_start}" ]]; then
+    RT_WINDOW_SECONDS=$(($(date +%s) - window_start))
+  fi
   return "${rc}"
 }
 
