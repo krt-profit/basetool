@@ -906,11 +906,15 @@ interface KrtDraftSnapshot {
     combos: Record<string, KrtComboboxSelection>;
 }
 
-/** A stored form draft: its schema version, its control values and the form adapter's part. */
+/**
+ * A stored form draft: its schema version, its control values, the form adapter's part and, for an
+ * edit form, the lock versions the edits were made against.
+ */
 interface KrtDraft {
     version: string;
     snapshot: KrtDraftSnapshot;
     extra: unknown;
+    base?: Record<string, string>;
 }
 
 /**

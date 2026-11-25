@@ -3174,7 +3174,7 @@ member knowing that, rather than reading "save failed" and reloading the page aw
 (the hand-back), `krt-live-sync.js`, `kernel/livesync/LiveSyncRestartNotice`,
 `LiveSyncSessionRegistry#closeAllForRestart`, `docker/edge/include/maintenance.conf` (the header).
 
-### REQ-FE-041 — A create form keeps unsaved input as a tab-scoped draft and offers it back
+### REQ-FE-041 — A form keeps unsaved input as a tab-scoped draft and offers it back
 
 Nothing kept a member's unsaved input once the page went away: a reload in the restart window, the
 re-authentication after an update, a phone browser discarding the background tab, an accidental
@@ -3187,8 +3187,21 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   `job-order-item-create`, `job-order-auec-create`), the mission create (`mission-create`) and the
   stock booking of the personal and the global stock (`inventory-input-own`,
   `inventory-input-global`), each only when its page creates, never on the edit page that reuses
-  the template. Edit forms need the entity's `version` in the draft and a warning when it changed,
-  so they are not drafted yet; the bank request dialogs (#3747) need an offer outside the dialog.
+  the template, and the refinery-order detail form (`refinery-order-edit`) while the member may
+  edit it, as the first edit form (see *Edit forms*). The further edit forms of #3750 follow one by
+  one; the bank request dialogs (#3747) need an offer outside the dialog.
+- **Edit forms.** An edit form marks its lock-version fields `data-krt-draft-base`. Its draft
+  records their values as its base, apart from the snapshot, so no version is ever a restored field
+  value. The key's page path names the entity, so two entities edited in one tab never share a
+  draft. A form rendered with other versions still offers the draft, and the offer says that the
+  entry was changed meanwhile and that a save refuses overlapping edits (`draft.offer.stale`).
+  Restore writes the base back, so the save is checked against the versions the edits were made
+  against: an untouched part saves, and a part a peer changed is refused by the optimistic lock
+  (HTTP 409, the form's existing conflict handling) instead of being overwritten. The
+  refinery-order detail's adapter (`refinery/refinery-order-edit-draft.js`) keeps the good id of
+  each material row and the parts the member changed (REQ-REFINERY-029): restore matches the rows
+  to the rendered goods by id, appends the rows the member added and drops the ones they removed,
+  and `finish` marks exactly the changed parts, so the save writes no other part.
 - **A form that creates and edits.** The mission template editor (`mission-template-create`) is
   one form for a new and an existing template. It carries its key when the page loads, and
   `setDraftKey` turns its draft off while it edits and on again when it opens blank or from a
@@ -3240,7 +3253,9 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   no draft is written while the offer stands.
 - **Clear.** The draft goes with its form's unsaved mark (`krt:unsaved-cleared`: a successful save,
   a reset, `resetUnsavedChanges()`), with *Verwerfen*, with a fragment swap that replaces the form,
-  and on a logout, which removes every draft of the tab and stops further writes.
+  and on a logout, which removes every draft of the tab and stops further writes. A swap that
+  replaces a form whose offer still stands, such as a peer's live update, offers the draft again on
+  the new form with a fresh version comparison.
 
 **Acceptance**
 
@@ -3255,6 +3270,11 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 - [x] A reload of a half-built new mission template opens the editor with the offer and restores
   its parts and rows; the save then removes the draft, and an existing template opened for editing
   shows no offer and writes no draft.
+- [x] A reload of a half-edited refinery order offers the edits back when nobody else changed it;
+  the save then removes the draft.
+- [x] When a peer saved meanwhile, the offer says so, and saving the restored edits ends in the
+  existing conflict handling (HTTP 409), never in a silent overwrite.
+- [x] Drafts of two entities edited in one tab stay apart.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3263,11 +3283,12 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `scripts/order-item-drafts.test.mjs` (`:frontend:testOrderItemDraftsJs`),
 `scripts/mission-create-draft.test.mjs` (`:frontend:testMissionCreateDraftJs`),
 `scripts/mission-template-draft.test.mjs` (`:frontend:testMissionTemplateDraftJs`),
+`scripts/refinery-order-edit-draft.test.mjs` (`:frontend:testRefineryEditDraftJs`),
 `DraftScopeAdviceTest`, `RefineryOrderCreateE2eTest#reloadOffersTheUnsavedInputBackAndTheSaveRemovesIt`,
 `JobOrderCreateDraftE2eTest`, `MissionCreateE2eTest#reloadOffersTheMissionDraftBackWithItsPlanningRows`,
 `InventoryOperationsE2eTest#einbuchenDraftComesBackAfterAReloadAndTheBookingClearsIt`,
 `MissionTemplateEditorE2eTest#reloadOffersTheTemplateDraftBackWithItsPartsAndRows`,
-`MessageBundleConsistencyTest` · **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`,
+`RefineryOrderEditDraftE2eTest`, `MessageBundleConsistencyTest` · **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`,
 `krt-draft-snapshot.js`, `krt-draft-rows.js`, `krt-searchable-select.js` (`selection`),
 `kernel/fragments/draft-offer.html`, `kernel/fragments/sidebar.html` (`data-krt-draft-scope`),
 `kernel/layout/DraftScopeAdvice`, `refinery/refinery-orders-create.js`, `joborder/orders-create.js`,
@@ -3275,4 +3296,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `mission/mission-planning-rows.js` (`values`), `mission/mission-draft-rows.js`,
 `mission/mission-templates.js`, `mission/mission-template-editor.js`,
 `mission/mission-template-draft.js`, `mission/fragments/mission-template-editor.html`,
-`inventory/inventory-input.js`, `inventory/inventory-input.html` · **ADR:** ADR-0411 · **Related:** REQ-FE-024, REQ-FE-040
+`inventory/inventory-input.js`, `inventory/inventory-input.html`,
+`refinery/refinery-orders-details.js`, `refinery/refinery-order-edit-draft.js`,
+`refinery/refinery-orders-details.html` · **ADR:** ADR-0411 · **Related:** REQ-FE-024, REQ-FE-040,
+REQ-REFINERY-029

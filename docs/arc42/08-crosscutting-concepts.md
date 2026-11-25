@@ -350,7 +350,9 @@ Two binding rules shape every UI change:
   a successful save or a reset clears it; live sync holds back a section that holds a marked form,
   so a reconnect after a deploy never overwrites unsaved input (REQ-FE-010, REQ-FE-015). A form that
   opts in keeps that input as a draft in the tab's `sessionStorage`, under an opaque per-member key,
-  and offers it back after a reload or a re-authentication (REQ-FE-041, ADR-0411).
+  and offers it back after a reload or a re-authentication (REQ-FE-041, ADR-0411). An edit form's
+  draft keeps the lock versions its edits were made against, so a restored save is refused rather
+  than overwriting a change a peer saved meanwhile.
 - **Every backend call the frontend makes names an operation the backend has** (2026-10-03). A test
   parses the frontend sources, folds every call site's URI into a template and matches verb and
   path against the committed `openapi.json`; the live-sync probe templates must be existing `GET`s.

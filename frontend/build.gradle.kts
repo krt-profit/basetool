@@ -917,6 +917,21 @@ val testMissionTemplateDraftJs =
     )
   }
 
+val testRefineryEditDraftJs =
+  registerNodeScriptTest(
+    "testRefineryEditDraftJs",
+    "Regression tests for the good rows and changed parts of a refinery-order edit draft (REQ-FE-041).",
+    "scripts/refinery-order-edit-draft.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/refinery/refinery-order-edit-draft.js",
+      ),
+    )
+  }
+
 val testKrtFetchReadJs =
   registerNodeScriptTest(
     "testKrtFetchReadJs",
@@ -1477,5 +1492,6 @@ tasks.named("check").configure {
     testOrderItemDraftsJs,
     testMissionCreateDraftJs,
     testMissionTemplateDraftJs,
+    testRefineryEditDraftJs,
   )
 }

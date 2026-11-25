@@ -43,9 +43,11 @@
                   sales=${refineryOrderForm.oreSales ?: 0},
                   costs=${(refineryOrderForm.expenses ?: 0) + (refineryOrderForm.otherExpenses ?: 0)}"
          th:attr="data-rod-state=${stateName},data-rod-state-class=${orderState != null ? orderState.badgeClass : null},data-rod-state-label=${orderState != null ? #messages.msg(orderState.labelKey) : null}">
-        <form id="refineryOrderMainForm" class="form-layout card rod-form" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}">
-            <input type="hidden" th:field="*{gameDataVersion}" />
-            <input type="hidden" th:field="*{financesVersion}" />
+        <form id="refineryOrderMainForm" class="form-layout card rod-form" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}"
+              th:attr="data-krt-draft=${canEdit} ? 'refinery-order-edit' : null,data-krt-draft-version=${canEdit} ? '1' : null">
+            <th:block th:if="${canEdit}"><th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" /></th:block>
+            <input type="hidden" th:field="*{gameDataVersion}" data-krt-draft-base />
+            <input type="hidden" th:field="*{financesVersion}" data-krt-draft-base />
             <input type="hidden" th:field="*{gameDataChanged}" data-rod-changed="gameData" />
             <input type="hidden" th:field="*{financesChanged}" data-rod-changed="finances" />
             <input type="hidden" th:field="*{missionChanged}" data-rod-changed="mission" />
@@ -93,7 +95,7 @@
                             <input type="hidden" id="startedAt" th:field="*{startedAt}">
                             <div class="datetime-split-inputs">
                                 <input type="date" id="startedAtDate" class="date-part" th:aria-label="#{a11y.datetime.date}" th:readonly="${!canEdit}">
-                                <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:readonly="${!canEdit}">
+                                <input type="time" id="startedAtTime" class="time-part" th:aria-label="#{a11y.datetime.time}" th:readonly="${!canEdit}">
                             </div>
                             <button th:if="${canEdit}" type="button" class="btn btn-ghost btn-xs" data-trigger="rod-set-started-now" th:text="#{refineryorder.form.now}">Jetzt</button>
                         </div>
