@@ -1104,15 +1104,15 @@
 <th:block th:if="${canFulfill and order.type == 'MATERIAL'}">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='handover-modal', titleKey='orders.detail.handover.record', variant='krt-modal--wide', body=~{::handover-modal-body})}">
     <th:block th:ref="handover-modal-body">
-        <form data-testid="order-handover-form" id="handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
+        <form data-testid="order-handover-form" id="handover-form" data-krt-draft="job-order-handover" data-krt-draft-version="1" th:data-order-id="${order.id}" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
             <div class="krt-modal-body">
             <div class="form-grid">
                 <div class="form-group datetime-split-group span-all" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                     <label for="handoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                     <input type="hidden" id="handoverTime" th:field="*{handoverTime}">
                     <div class="datetime-split-inputs">
-                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" required>
-                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" required>
+                        <input type="date" id="handoverTimeDate" class="date-part" th:aria-label="#{a11y.datetime.date}" required>
+                        <input type="time" id="handoverTimeTimeOfDay" class="time-part" th:aria-label="#{a11y.datetime.time}" required>
                     </div>
                 </div>
 
@@ -1161,15 +1161,15 @@
 <th:block th:if="${canFulfill and order.type == 'ITEM' and hasOutstandingItemLines}">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='item-handover-modal', titleKey='orders.detail.handover.record', variant='krt-modal--wide', body=~{::item-handover-modal-body})}">
     <th:block th:ref="item-handover-modal-body">
-        <form data-testid="item-handover-form" id="item-handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
+        <form data-testid="item-handover-form" id="item-handover-form" data-krt-draft="job-order-item-handover" data-krt-draft-version="1" th:data-order-id="${order.id}" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
             <div class="krt-modal-body">
             <div class="form-grid">
                 <div class="form-group datetime-split-group" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                     <label for="itemHandoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                     <input type="hidden" id="itemHandoverTime" th:field="*{handoverTime}">
                     <div class="datetime-split-inputs">
-                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" required>
-                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" required>
+                        <input type="date" id="itemHandoverTimeDate" class="date-part" th:aria-label="#{a11y.datetime.date}" required>
+                        <input type="time" id="itemHandoverTimeTimeOfDay" class="time-part" th:aria-label="#{a11y.datetime.time}" required>
                     </div>
                 </div>
 
@@ -1191,7 +1191,7 @@
             <h3 class="od-modal-section" th:text="#{orders.detail.itemHandover.lines}">Übergebene Items</h3>
             <p class="form-hint od-modal-hint" th:text="#{orders.detail.itemHandover.hint}">Trage je Item die übergebene Stückzahl ein (maximal die ausstehende Menge).</p>
 
-            <div id="item-handover-lines"><th:block th:fragment="itemHandoverLines">
+            <div id="item-handover-lines" data-krt-draft-skip><th:block th:fragment="itemHandoverLines">
             <th:block th:each="item, stat : ${order.items}"
                       th:with="outstanding=${(item.manufacturedAmount != null ? item.manufacturedAmount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}">
                 <div th:if="${outstanding > 0}" class="item-handover-line od-line od-line--item">

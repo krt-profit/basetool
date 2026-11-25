@@ -97,8 +97,7 @@ class MissionDialogDraftE2eTest {
         assertThat(page.locator("#finance-modal")).isVisible();
         assertThat(page.locator("#add-finance-form [name='note']")).hasValue("Draft fuel cost");
         assertEquals(
-            "EXPENSE",
-            page.evaluate("() => document.getElementById('add-finance-type').value"));
+            "EXPENSE", page.evaluate("() => document.getElementById('add-finance-type').value"));
         assertEquals(
             "250",
             page.evaluate(

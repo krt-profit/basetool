@@ -37,7 +37,7 @@ import {
     openerOf,
     showDialogOffer,
     trackDialogOpeners,
-    whenOpen,
+    whenReady,
 } from '/js/kernel/krt-draft-dialog.js';
 import {
     holdsDraftEdits,
@@ -361,7 +361,7 @@ function offerDialog(state, draft, dialog) {
             if (current) {
                 current.click();
             }
-            whenOpen(dialog, () => restoreOffered(state));
+            whenReady(dialog, () => restoreOffered(state));
         },
         discard: () => forget(state),
     });

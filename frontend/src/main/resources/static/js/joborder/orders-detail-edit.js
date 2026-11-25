@@ -41,6 +41,7 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { krtFocusNewRow } from '/js/kernel/krt-row-focus.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
+import { initHandoverDrafts } from '/js/joborder/orders-handover-drafts.js';
 
 /** @type {WeakSet<Element>} */
 const boundOrderControls = new WeakSet();
@@ -560,5 +561,6 @@ function initOrderWriteControls() {
     initOrdersDetailEdit();
     initOrdersDetailEdit2();
 }
+initHandoverDrafts();
 document.addEventListener('DOMContentLoaded', initOrderWriteControls);
 document.addEventListener('krt:swapped', initOrderWriteControls);

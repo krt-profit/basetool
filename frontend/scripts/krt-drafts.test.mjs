@@ -1165,6 +1165,23 @@ test('a dialog draft is offered on the page, and restore reopens the dialog thro
     assert.ok(!dialog.main.children.includes(dialog.notice));
 });
 
+test('restore writes a dialog draft only once the opened dialog is done loading', () => {
+    const dom = page();
+    const dialog = inDialog(dom);
+    dialog.opener.click = () => {
+        dialog.dialog.classList.push('is-open');
+        dialog.dialog.setAttribute('aria-busy', 'true');
+    };
+    const key = harness().context.openerKey(dialog.opener);
+    const h = harness({ [keyFor(SCOPE)]: storedDraft({ opener: key }) }, dom);
+    clickOffer(dialog, dialog.restore);
+    h.changed(dialog.dialog);
+    assert.equal(h.controls.note.value, '');
+    dialog.dialog.removeAttribute('aria-busy');
+    h.changed(dialog.dialog);
+    assert.equal(h.controls.note.value, 'from the draft');
+});
+
 test('a dialog draft whose opener the page no longer has is dropped', () => {
     const dom = page();
     inDialog(dom, null);

@@ -3200,7 +3200,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   recorded donation (`supply-record`), the purchasing deal (`purchasing-deal`), the purchasing
   partner (`purchasing-partner`, only while it adds a new partner) and the mission's added
   participant, unit and finance entry (`mission-participant-add`, `mission-unit-add`,
-  `mission-finance-add`); the further create dialogs of #3747 follow one by one.
+  `mission-finance-add`) and the job order's material and item handover (`job-order-handover`,
+  `job-order-item-handover`); the further create dialogs of #3747 follow one by one.
 - **Dialog forms.** A form in a dialog (`.krt-modal-overlay`) opts in the same way and needs no
   offer of its own. Its draft also records the opener whose click last opened the dialog (a
   button, a `data-modal-id` or a `data-trigger` control), as a hash of the opener's id and `data-*`
@@ -3212,7 +3213,9 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   so the leave warning and live sync stay as they are. A reload closes the dialog, so the page
   shows the offer at the top of its content (`kernel/fragments/draft-offer :: draftDialogOffer`)
   and names the dialog; restore clicks the same opener, so the page opens and primes the dialog as
-  it always does, and writes the draft once the dialog is open. A draft whose opener the page no
+  it always does, and writes the draft once the dialog is open and done loading: a dialog that
+  loads what it shows after it opened carries `aria-busy="true"` until it has, as the material
+  handover does while it loads the order's inventory entries. A draft whose opener the page no
   longer has is dropped. Closing a dialog keeps its draft; a page that empties its dialog when it
   reopens it, as the supply dialogs do, drops the draft with that reset. A dialog that both creates
   and edits turns its draft off while it edits (`setDraftKey`). Controls that switch others on,
@@ -3223,9 +3226,13 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   (`mission/mission-detail-actions.js`); its finance dialog keeps the income or expense choice of
   its segmented control, and its participant dialog keeps the typed name with the picked member,
   writing both without the events that would start a new member search
-  (`mission/mission-detail-participants.js`, the search field skipped by the generic part). A
-  choice the dialog loads only after it opened, such as the pledge's stock source, is not
-  restored.
+  (`mission/mission-detail-participants.js`, the search field skipped by the generic part). The
+  job order's material handover rebuilds its rows (`rowCountAdapter`, minimum 0) before their
+  entries and amounts are written; each row's quality tier and mission split are derived afresh
+  from the restored entry and amount. The item handover's lines are named by their position in the
+  order's items, so the generic part skips them and the adapter keeps each amount by its job-order
+  item (`joborder/orders-handover-drafts.js`). A choice the dialog loads only after it opened,
+  without marking itself busy, such as the pledge's stock source, is not restored.
 - **Edit forms.** An edit form marks its lock-version fields `data-krt-draft-base`. Its draft
   records their values as its base, apart from the snapshot, so no version is ever a restored field
   value. The key's page path names the entity, so two entities edited in one tab never share a
@@ -3337,6 +3344,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 - [x] The purchasing partner dialog does the same and keeps no draft while it edits a partner.
 - [x] The mission's finance dialog comes back with its expense choice, its participant dialog with
   the typed name, and adding the participant removes the draft.
+- [x] The job order's material handover comes back with its rows once its inventory entries are
+  loaded, the item handover with its amounts, and each save removes the draft.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3352,7 +3361,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `MissionTemplateEditorE2eTest#reloadOffersTheTemplateDraftBackWithItsPartsAndRows`,
 `RefineryOrderEditDraftE2eTest`, `MissionEditDraftE2eTest`, `MemberEditDraftE2eTest`,
 `ProfileDraftE2eTest`, `BankDialogDraftE2eTest`, `SupplyDialogDraftE2eTest`,
-`PurchasingDialogDraftE2eTest`, `MissionDialogDraftE2eTest`, `MessageBundleConsistencyTest` ·
+`PurchasingDialogDraftE2eTest`, `MissionDialogDraftE2eTest`, `JobOrderHandoverDraftE2eTest`,
+`MessageBundleConsistencyTest` ·
 **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`, `krt-draft-snapshot.js`,
 `krt-draft-rows.js`, `krt-draft-flags.js`, `krt-draft-dialog.js`, `krt-draft-lead.js`,
 `krt-unsaved-marks.js` (draft mark), `krt-searchable-select.js` (`selection`),
@@ -3371,6 +3381,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `supply/supply-needs.js`, `supply/needs.html`, `supply/incoming-donations.html`,
 `supply/fragments/pledge-modal.html`, `supply/fragments/lager-pledge-modal.html`,
 `purchasing/purchasing-partners.js`, `purchasing/partners.html`, `purchasing/deals.html`,
-`mission/mission-detail-participants.js`, `mission/mission-detail-actions.js` ·
+`mission/mission-detail-participants.js`, `mission/mission-detail-actions.js`,
+`joborder/orders-handover-drafts.js`, `joborder/orders-detail.js` (`openHandoverModal`),
+`joborder/orders-detail.html` ·
 **ADR:** ADR-0411 · **Related:** REQ-FE-014, REQ-FE-024,
 REQ-FE-040, REQ-REFINERY-029

@@ -32,6 +32,15 @@ const KERNEL_PREFIX = 'data-krt-';
 /** The state changes of a dialog that tell it opened. */
 const OPEN_OBSERVATION = { attributes: true, attributeFilter: ['class', 'open'] };
 
+/** The attribute a dialog carries as `true` while it loads what it shows. */
+const BUSY_ATTRIBUTE = 'aria-busy';
+
+/** The state changes of a dialog that tell it opened or finished loading. */
+const READY_OBSERVATION = {
+    attributes: true,
+    attributeFilter: [...OPEN_OBSERVATION.attributeFilter, BUSY_ATTRIBUTE],
+};
+
 /** The template of the page-level offer of a dialog draft (`kernel/fragments/draft-offer.html`). */
 const NOTICE_TEMPLATE_ID = 'krt-draft-dialog-offer';
 
@@ -144,24 +153,35 @@ export function trackDialogOpeners(dialogs) {
 }
 
 /**
- * Runs a step once a dialog is open: at once when it already is, else when it opens, as a dialog
- * whose opener first loads what it shows does later.
+ * Tells whether a dialog is open and done loading: a dialog that loads what it shows after it
+ * opened carries `aria-busy="true"` until it has.
+ *
+ * @param {HTMLElement} dialog the dialog
+ * @returns {boolean} true while it is open and not busy
+ */
+function isReady(dialog) {
+    return isOpen(dialog) && dialog.getAttribute(BUSY_ATTRIBUTE) !== 'true';
+}
+
+/**
+ * Runs a step once a dialog is open and done loading: at once when it already is, else when it
+ * is, as a dialog whose opener first loads what it shows, or that loads it once open, is later.
  *
  * @param {HTMLElement} dialog the dialog
  * @param {() => void} step the step to run
  */
-export function whenOpen(dialog, step) {
-    if (isOpen(dialog)) {
+export function whenReady(dialog, step) {
+    if (isReady(dialog)) {
         step();
         return;
     }
     const observer = new MutationObserver(() => {
-        if (isOpen(dialog)) {
+        if (isReady(dialog)) {
             observer.disconnect();
             step();
         }
     });
-    observer.observe(dialog, OPEN_OBSERVATION);
+    observer.observe(dialog, READY_OBSERVATION);
 }
 
 /**
