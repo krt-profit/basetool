@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.notification.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -94,7 +95,7 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry(),
+            new NotificationRelays(new SimpleMeterRegistry()),
             SecurityConfig.roleHierarchy(),
             new SessionGates(List.of()));
 
@@ -123,7 +124,7 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry(),
+            new NotificationRelays(new SimpleMeterRegistry()),
             SecurityConfig.roleHierarchy(),
             new SessionGates(List.of()));
 
@@ -153,7 +154,7 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry(),
+            new NotificationRelays(new SimpleMeterRegistry()),
             SecurityConfig.roleHierarchy(),
             new SessionGates(List.of()));
 
@@ -185,7 +186,7 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry(),
+            new NotificationRelays(new SimpleMeterRegistry()),
             SecurityConfig.roleHierarchy(),
             new SessionGates(List.of()));
 
@@ -244,10 +245,9 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            registry,
+            new NotificationRelays(registry),
             SecurityConfig.roleHierarchy(),
             new SessionGates(List.of()));
-    controller.registerRelayGauge();
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -291,7 +291,7 @@ class NotificationPageControllerStreamTest {
             messageSource,
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry(),
+            new NotificationRelays(new SimpleMeterRegistry()),
             SecurityConfig.roleHierarchy(),
             new SessionGates(List.of())) {
           @Override
@@ -406,13 +406,57 @@ class NotificationPageControllerStreamTest {
     verify(mockEmitter).complete();
   }
 
+  @Test
+  void stream_whileTheInstanceShutsDown_completesAtOnce_withoutSubscribingTheBackend() {
+    SseEmitter mockEmitter = mock(SseEmitter.class);
+    AtomicBoolean subscribed = new AtomicBoolean();
+    NotificationRelays relays = new NotificationRelays(new SimpleMeterRegistry());
+    relays.stop();
+
+    streamWith(
+        mockEmitter,
+        Flux.<ServerSentEvent<String>>never().doOnSubscribe(_ -> subscribed.set(true)),
+        new SessionGates(List.of()),
+        relays);
+
+    verify(mockEmitter).complete();
+    assertFalse(subscribed.get(), "a stream opened during the shutdown must not reach the backend");
+  }
+
+  @Test
+  void stream_closedByTheShutdown_cancelsTheBackendSubscription_andCompletesTheBrowserStream() {
+    SseEmitter mockEmitter = mock(SseEmitter.class);
+    AtomicBoolean cancelled = new AtomicBoolean();
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    NotificationRelays relays = new NotificationRelays(registry);
+    streamWith(
+        mockEmitter,
+        Flux.<ServerSentEvent<String>>never().doOnCancel(() -> cancelled.set(true)),
+        new SessionGates(List.of()),
+        relays);
+
+    relays.stop();
+
+    assertTrue(cancelled.get(), "the shutdown must cancel the backend subscription");
+    verify(mockEmitter).complete();
+    assertEquals(0.0, registry.get(MetricNames.NOTIFICATION_RELAY_CONNECTIONS).gauge().value());
+  }
+
   private static void streamWith(SseEmitter emitter, Flux<ServerSentEvent<String>> upstream) {
     streamWith(emitter, upstream, new SessionGates(List.of()));
   }
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
   private static void streamWith(
       SseEmitter emitter, Flux<ServerSentEvent<String>> upstream, SessionGates gates) {
+    streamWith(emitter, upstream, gates, new NotificationRelays(new SimpleMeterRegistry()));
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static void streamWith(
+      SseEmitter emitter,
+      Flux<ServerSentEvent<String>> upstream,
+      SessionGates gates,
+      NotificationRelays relays) {
     WebClient sseWebClient = mock(WebClient.class);
     OAuth2AuthorizedClientManager authorizedClientManager =
         mock(OAuth2AuthorizedClientManager.class);
@@ -422,7 +466,7 @@ class NotificationPageControllerStreamTest {
             mock(MessageSource.class),
             new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
-            new SimpleMeterRegistry(),
+            relays,
             SecurityConfig.roleHierarchy(),
             gates) {
           @Override

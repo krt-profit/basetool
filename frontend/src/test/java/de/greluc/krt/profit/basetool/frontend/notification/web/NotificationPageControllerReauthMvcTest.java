@@ -58,7 +58,7 @@ class NotificationPageControllerReauthMvcTest {
                 mock(MessageSource.class),
                 mock(BackendSideChannels.class),
                 mock(OAuth2AuthorizedClientManager.class),
-                new SimpleMeterRegistry(),
+                new NotificationRelays(new SimpleMeterRegistry()),
                 SecurityConfig.roleHierarchy(),
                 new SessionGates(List.of())));
     ReauthPageMvc.signInMember();

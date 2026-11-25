@@ -46,6 +46,8 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.web.server.WebServer;
+import org.springframework.boot.web.server.context.WebServerGracefulShutdownLifecycle;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -419,6 +421,67 @@ class NotificationStreamServiceTest {
             .getFormattedMessage()
             .contains(String.valueOf(NotificationStreamService.MAX_EMITTERS_PER_SUB)),
         "the line must name the cap that was hit: " + evictionLine.getFormattedMessage());
+  }
+
+  @Test
+  void stop_completesEveryOpenStream_emptiesTheRegistry_andLogsTheCount() {
+    DistinctEmitterStreamService service = new DistinctEmitterStreamService();
+    UUID twice = UUID.randomUUID();
+    service.subscribe(twice);
+    service.subscribe(twice);
+    service.subscribe(UUID.randomUUID());
+
+    List<ILoggingEvent> events = withStreamLogAppender(service::stop);
+
+    service.created.forEach(emitter -> verify(emitter).complete());
+    assertEquals(
+        0.0, service.registry.get(NotificationMetricNames.SSE_CONNECTIONS).gauge().value());
+    assertFalse(service.isRunning());
+    assertTrue(
+        events.stream()
+            .anyMatch(e ->
+                e.getLevel() == Level.INFO
+                    && e.getFormattedMessage().contains("Closed 3 notification SSE stream(s)")),
+        "the shutdown must say how many streams it closed");
+  }
+
+  @Test
+  void subscribe_afterStop_returnsACompletedEmitter_thatIsNeitherRegisteredNorGreeted()
+      throws IOException {
+    DistinctEmitterStreamService service = new DistinctEmitterStreamService();
+    service.stop();
+
+    SseEmitter emitter = service.subscribe(UUID.randomUUID());
+
+    verify(emitter).complete();
+    verify(emitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+    assertEquals(
+        0.0, service.registry.get(NotificationMetricNames.SSE_CONNECTIONS).gauge().value());
+  }
+
+  @Test
+  void start_afterStop_acceptsSubscriptionsAgain() {
+    DistinctEmitterStreamService service = new DistinctEmitterStreamService();
+    service.stop();
+
+    service.start();
+    service.subscribe(UUID.randomUUID());
+
+    assertTrue(service.isRunning());
+    assertEquals(
+        1.0, service.registry.get(NotificationMetricNames.SSE_CONNECTIONS).gauge().value());
+  }
+
+  @Test
+  void stopsBeforeTheWebServersGracefulShutdown_soNoStreamHoldsItsPhase() {
+    NotificationStreamService service = new NotificationStreamService(new SimpleMeterRegistry());
+    WebServerGracefulShutdownLifecycle gracefulShutdown =
+        new WebServerGracefulShutdownLifecycle(mock(WebServer.class));
+
+    assertThat(service.getPhase())
+        .as("a higher phase stops first")
+        .isGreaterThan(gracefulShutdown.getPhase());
+    assertTrue(service.isAutoStartup());
   }
 
   /**

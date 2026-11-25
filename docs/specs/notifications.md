@@ -640,6 +640,20 @@ notification-creation transaction commits — so the client's unread-count refet
 (not a pre-commit stale count) and the blocking SSE fan-out never pins the creation transaction's
 Hikari connection (#1152).
 
+**An instance that shuts down closes its streams first.** Tomcat's graceful shutdown waits for every
+request in progress, and an open stream is one for up to its 30-minute timeout — a backend stream
+whose frontend has already gone included, because the container notices a dead client only at the
+next write and the heartbeat scheduler stops before the wait begins. Open streams therefore held the
+frontend's and the backend's stop for the whole 20 s shutdown phase in every restart window (both
+logged `Graceful shutdown aborted with one or more requests still active` on production). The
+backend registry (`NotificationStreamService`) and the frontend's open relays (`NotificationRelays`,
+which also feeds `basetool_notification_relay_connections`) are `SmartLifecycle` beans in the default
+phase, which stops before the web server's graceful shutdown: each completes every open stream (the
+relay cancels its backend subscription first), refuses a new one with an already completed stream,
+and logs `Closed <n> notification SSE stream(s)` / `relay(s) ahead of the graceful shutdown`. The
+browser reconnects after its usual 3–6 s, by which time the instance accepts no more connections, so
+it meets the maintenance page and backs off; short requests keep the whole phase to finish.
+
 **Acceptance**
 
 - [x] A created notification pushes a `notification` SSE event to the recipient's live streams.
@@ -666,9 +680,15 @@ Hikari connection (#1152).
   login redirect, and logs no `ERROR`.
 - [x] A connect refused before `open` probes the session; a `401` stops the stream for the page, and
   consecutive refusals back off.
+- [x] At shutdown the backend registry and the frontend relays complete every open stream before the
+  web server's graceful shutdown phase, refuse new ones, and stop in a phase above that shutdown's
+  (`NotificationStreamServiceTest`, `NotificationRelaysTest`, `NotificationPageControllerStreamTest`).
+- [ ] On production, the next restart window's frontend and backend stops log no
+  `Graceful shutdown aborted with one or more requests still active` and take a few seconds, not
+  20 s or more.
 
 **Enforced by:** `NotificationStreamServiceTest` (named `connected`/`heartbeat`/`notification`
-events + clean timeout completion), `DisconnectedClientHandlingTest`,
+events + clean timeout completion, the shutdown), `NotificationRelaysTest`, `DisconnectedClientHandlingTest`,
 `AnonymousSurfaceSweepMvcTest#anonymousEventSourceGets401`,
 `NotificationStreamReconnectContractTest`, full build (bean wiring), frontend lint gate · **Code:**
 `notification/api/NotificationStreamService`, `notification/api/NotificationFanout` / `RedisNotificationFanout` /

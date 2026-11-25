@@ -20,13 +20,13 @@
 package de.greluc.krt.profit.basetool.frontend.notification.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.notification.web.NotificationRelays.completeQuietly;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
@@ -37,9 +37,6 @@ import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationCou
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationPageSliceDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationViewDto;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotNull;
@@ -55,7 +52,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -131,27 +127,15 @@ public class NotificationPageController {
   private final MessageSource messageSource;
   private final BackendSideChannels backendSideChannels;
   private final OAuth2AuthorizedClientManager authorizedClientManager;
-  private final MeterRegistry meterRegistry;
+
+  /** The relays open on this instance, closed ahead of the web server's graceful shutdown. */
+  private final NotificationRelays notificationRelays;
 
   /** Applies the role inheritance before a notification's target is chosen for the viewer. */
   private final RoleHierarchy roleHierarchy;
 
   /** The session gates whose backend refusal hands the stream off to the gate's page. */
   private final SessionGates sessionGates;
-
-  /** Live browser-to-backend SSE relays open on this instance (relay-connections gauge source). */
-  private final AtomicInteger relayConnections = new AtomicInteger();
-
-  /** Binds the {@code basetool_notification_relay_connections} gauge to the live relay count. */
-  @PostConstruct
-  void registerRelayGauge() {
-    Gauge.builder(
-            MetricNames.NOTIFICATION_RELAY_CONNECTIONS,
-            relayConnections,
-            AtomicInteger::doubleValue)
-        .description("Open browser-to-backend notification SSE relays on this instance.")
-        .register(meterRegistry);
-  }
 
   /**
    * Creates the {@link SseEmitter} backing a new browser relay; overridable in tests.
@@ -227,6 +211,7 @@ public class NotificationPageController {
    * <p>The bearer token is obtained once, at open, through the single-flight authorized-client
    * manager, so an expired one is refreshed first (REQ-SEC-012), and sent as a plain {@code
    * Authorization} header. Without a usable token, or on a backend error, the stream fails soft.
+   * While the instance shuts down the stream is completed at once (see {@link NotificationRelays}).
    *
    * @param request the current servlet request, handed to the manager to load and store the
    *     session's authorized client
@@ -270,18 +255,26 @@ public class NotificationPageController {
       return emitter;
     }
     Disposable.Swap subscription = Disposables.swap();
-    emitter.onCompletion(subscription::dispose);
+    if (!notificationRelays.admit(emitter, subscription)) {
+      emitter.complete();
+      return emitter;
+    }
+    Runnable end =
+        () -> {
+          notificationRelays.release(emitter);
+          subscription.dispose();
+        };
+    emitter.onCompletion(end);
     emitter.onTimeout(() -> {
-      subscription.dispose();
+      end.run();
       completeQuietly(emitter);
     });
-    emitter.onError(_ -> subscription.dispose());
+    emitter.onError(_ -> end.run());
     String contextPath = request.getContextPath();
-    relayConnections.incrementAndGet();
     subscription.update(
         backendSideChannels
             .notificationStream(bearerToken)
-            .doFinally(_ -> relayConnections.decrementAndGet())
+            .doFinally(_ -> notificationRelays.release(emitter))
             .subscribe(
                 event -> forward(emitter, event, subscription),
                 error -> handleStreamError(emitter, error, contextPath),
@@ -695,22 +688,6 @@ public class NotificationPageController {
           "Notification stream send failed ({}); completing cleanly", e.getClass().getSimpleName());
       subscription.dispose();
       completeQuietly(emitter);
-    }
-  }
-
-  /**
-   * Completes the emitter from a non-container thread, tolerating a request the container has
-   * already ended.
-   *
-   * @param emitter the browser-facing emitter to complete
-   */
-  private static void completeQuietly(SseEmitter emitter) {
-    try {
-      emitter.complete();
-    } catch (IllegalStateException e) {
-      log.debug(
-          "Notification stream already ended by the container ({}); nothing to complete",
-          e.getClass().getSimpleName());
     }
   }
 }
