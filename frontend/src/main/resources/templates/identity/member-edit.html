@@ -32,8 +32,10 @@
     </div>
 
     <form id="member-edit-form" data-member-edit="true" class="form-layout card"
-          th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
-        <input type="hidden" name="version" th:field="*{version}">
+          th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}"
+          data-krt-draft="member-edit" data-krt-draft-version="1">
+        <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
+        <input type="hidden" name="version" th:field="*{version}" data-krt-draft-base>
         <input type="hidden" name="source" th:field="*{source}">
         <input type="hidden" name="staffelDetailLoaded" th:field="*{staffelDetailLoaded}">
 

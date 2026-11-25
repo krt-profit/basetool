@@ -17,18 +17,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+
+/** The form key of the member edit form (REQ-FE-041). */
+const MEMBER_EDIT_DRAFT_KEY = 'member-edit';
 
 /**
  * Wires the Stammdaten / Mitgliedschaften / Datenauskunft tabs: arrow-key navigation and the
  * `tab` query-parameter deeplink. The edit form stays visible for every tab whose panel it
  * contains.
+ *
+ * @returns {{ showForm(): void } | null} shows the first tab while the form is hidden; null on a
+ *     page without the tabs
  */
 function bindTabs() {
     const nav = document.querySelector('.member-edit-tabs[role="tablist"]');
     const formElement = document.getElementById('member-edit-form');
     if (!nav || !formElement) {
-        return;
+        return null;
     }
     const form = formElement;
     /** @type {HTMLElement[]} */
@@ -112,9 +119,19 @@ function bindTabs() {
         show(next.getAttribute('data-tab') || '');
     });
     apply(requested());
+    return {
+        showForm() {
+            if (form.hidden) show(keys[0]);
+        },
+    };
 }
 
-/** Shows and clears the optional second Staffel slot and keeps both selects distinct. */
+/**
+ * Shows and clears the optional second Staffel slot and keeps both selects distinct.
+ *
+ * @returns {{ sync(): void } | null} shows the second slot exactly while it holds a Staffel; null
+ *     on a page without the slots
+ */
 function bindStaffelSlots() {
     const sel1 = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('staffel1-select')
@@ -126,7 +143,7 @@ function bindStaffelSlots() {
     const addBtn = document.getElementById('staffel-add-2');
     const removeBtn = document.getElementById('staffel-remove-2');
     if (!sel1 || !sel2 || !slot2 || !addBtn || !removeBtn) {
-        return;
+        return null;
     }
     const first = sel1;
     const second = sel2;
@@ -177,6 +194,12 @@ function bindStaffelSlots() {
     first.addEventListener('change', syncDuplicateOptions);
     second.addEventListener('change', syncDuplicateOptions);
     syncDuplicateOptions();
+    return {
+        sync() {
+            showSlot2(second.value !== '');
+            syncDuplicateOptions();
+        },
+    };
 }
 
 /** Keeps the "n / max" counter under every textarea with `data-char-counter` current. */
@@ -286,7 +309,20 @@ function bindSubmit() {
     });
 }
 
-bindTabs();
-bindStaffelSlots();
+const memberTabs = bindTabs();
+const staffelSlots = bindStaffelSlots();
 bindCharCounters();
 document.addEventListener('DOMContentLoaded', bindSubmit);
+
+registerDraftAdapter(MEMBER_EDIT_DRAFT_KEY, {
+    serialize() {
+        return null;
+    },
+    restore() {},
+    reveal() {
+        if (memberTabs) memberTabs.showForm();
+    },
+    finish() {
+        if (staffelSlots) staffelSlots.sync();
+    },
+});
