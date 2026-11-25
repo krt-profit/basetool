@@ -3196,8 +3196,10 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   `profile-name-withholding`, `profile-home-location`), and the create dialogs (see *Dialog
   forms*): the bank movement (`bank-movement`), the org-unit bank request
   (`org-unit-bank-request`), the supply need (`supply-need`, only while it raises a new need), the
-  supply pledge (`supply-pledge`), the pledge from the Lager (`supply-lager-pledge`) and the
-  recorded donation (`supply-record`); the further create dialogs of #3747 follow one by one.
+  supply pledge (`supply-pledge`), the pledge from the Lager (`supply-lager-pledge`), the
+  recorded donation (`supply-record`), the purchasing deal (`purchasing-deal`) and the purchasing
+  partner (`purchasing-partner`, only while it adds a new partner); the further create dialogs of
+  #3747 follow one by one.
 - **Dialog forms.** A form in a dialog (`.krt-modal-overlay`) opts in the same way and needs no
   offer of its own. Its draft also records the opener whose click last opened the dialog (a
   `data-modal-id` or `data-trigger` control), as a hash of the opener's `data-*` attributes, which
@@ -3326,6 +3328,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   opens the dialog through its opener and fills it, the booking removes the draft, closing the
   dialog keeps it and a discard drops it; the leave warning stays off for an untracked dialog.
 - [x] The supply need and pledge dialogs do the same; the need's edit mode keeps no draft.
+- [x] The purchasing partner dialog does the same and keeps no draft while it edits a partner.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3341,7 +3344,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `MissionTemplateEditorE2eTest#reloadOffersTheTemplateDraftBackWithItsPartsAndRows`,
 `RefineryOrderEditDraftE2eTest`, `MissionEditDraftE2eTest`, `MemberEditDraftE2eTest`,
 `ProfileDraftE2eTest`, `BankDialogDraftE2eTest`, `SupplyDialogDraftE2eTest`,
-`MessageBundleConsistencyTest` ·
+`PurchasingDialogDraftE2eTest`, `MessageBundleConsistencyTest` ·
 **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`, `krt-draft-snapshot.js`,
 `krt-draft-rows.js`, `krt-draft-flags.js`, `krt-draft-dialog.js`, `krt-draft-lead.js`,
 `krt-unsaved-marks.js` (draft mark), `krt-searchable-select.js` (`selection`),
@@ -3358,6 +3361,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `identity/profile.js`, `identity/profile.html`, `bank/bank-drafts.js`, `bank/bank.js`,
 `bank/fragments/bank-movement-modal.html`, `bank/fragments/org-unit-bank-views.html`,
 `supply/supply-needs.js`, `supply/needs.html`, `supply/incoming-donations.html`,
-`supply/fragments/pledge-modal.html`, `supply/fragments/lager-pledge-modal.html` ·
+`supply/fragments/pledge-modal.html`, `supply/fragments/lager-pledge-modal.html`,
+`purchasing/purchasing-partners.js`, `purchasing/partners.html`, `purchasing/deals.html` ·
 **ADR:** ADR-0411 · **Related:** REQ-FE-014, REQ-FE-024,
 REQ-FE-040, REQ-REFINERY-029

@@ -110,7 +110,7 @@
     <th:block th:if="${purchasingState.delegate()}">
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-deal-modal', titleKey='purchasing.deal.new', titleId='purchasing-deal-title', variant='krt-modal--wide', body=~{::purchasing-deal-modal-body})}">
         <th:block th:ref="purchasing-deal-modal-body">
-            <form id="purchasing-deal-form" class="no-track" novalidate>
+            <form id="purchasing-deal-form" class="no-track" novalidate data-krt-draft="purchasing-deal" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                     <div class="form-group">
                         <label for="purchasing-deal-need" th:text="#{purchasing.deal.need}">Bedarf</label>
