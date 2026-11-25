@@ -20,8 +20,8 @@
 /** A dialog `krtModal` opens. */
 const DIALOG_SELECTOR = '.krt-modal-overlay';
 
-/** A control that can open a dialog: a `krtModal` trigger or a page action. */
-const OPENER_SELECTOR = '[data-modal-id], [data-trigger]';
+/** A control that can open a dialog: a button, a `krtModal` trigger or a page action. */
+const OPENER_SELECTOR = 'button, [data-modal-id], [data-trigger]';
 
 /** The prefix of the attributes an opener carries its action and its dialog's context in. */
 const DATA_PREFIX = 'data-';
@@ -74,17 +74,19 @@ export function hashText(text) {
 }
 
 /**
- * Names an opener by its `data-*` attributes: the dialog or page action it triggers and the
- * context it primes the dialog with, such as the account or the need it acts on.
+ * Names an opener by its id and its `data-*` attributes: the dialog or page action it triggers
+ * and the context it primes the dialog with, such as the account or the need it acts on.
  *
- * @param {Element} opener a control carrying `data-modal-id` or `data-trigger`
+ * @param {Element} opener a control that opened a dialog
  * @returns {string} the opener key
  */
 export function openerKey(opener) {
     const named = Array.from(opener.attributes)
         .filter(
             (attribute) =>
-                attribute.name.startsWith(DATA_PREFIX) && !attribute.name.startsWith(KERNEL_PREFIX),
+                attribute.name === 'id' ||
+                (attribute.name.startsWith(DATA_PREFIX) &&
+                    !attribute.name.startsWith(KERNEL_PREFIX)),
         )
         .map((attribute) => `${attribute.name}=${attribute.value}`)
         .sort();

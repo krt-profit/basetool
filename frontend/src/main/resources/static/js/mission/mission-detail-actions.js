@@ -24,6 +24,8 @@ import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { leadingControlsAdapter } from '/js/kernel/krt-draft-lead.js';
+import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
 import { missionHooks } from '/js/mission/mission-hooks.js';
 
 /**
@@ -446,6 +448,23 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('add-finance-form')
     );
     if (addForm) {
+        const typeInput = /** @type {HTMLInputElement | null} */ (
+            addForm.querySelector('#add-finance-type')
+        );
+        registerDraftAdapter('mission-finance-add', {
+            serialize() {
+                return { type: typeInput ? typeInput.value : '' };
+            },
+            restore(_form, extra) {
+                const type =
+                    extra && typeof extra === 'object'
+                        ? /** @type {{type?: unknown}} */ (extra).type
+                        : null;
+                if (type === 'INCOME' || type === 'EXPENSE') {
+                    missionHooks.segSet('add-finance-type', type);
+                }
+            },
+        });
         addForm.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             const fd = new FormData(addForm);
@@ -600,6 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setupShipFilter('add-unit-shiptype', 'add-unit-ship');
+    registerDraftAdapter('mission-unit-add', leadingControlsAdapter(['#add-unit-shiptype']));
     setupShipFilter('edit-unit-shiptype', 'edit-unit-ship');
 });
 

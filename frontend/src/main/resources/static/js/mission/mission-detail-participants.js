@@ -18,6 +18,7 @@
  */
 
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { missionHooks } from '/js/mission/mission-hooks.js';
@@ -341,6 +342,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsDiv = document.getElementById('participant-search-results');
 
     if (searchInput && resultsDiv && userIdInput) {
+        registerDraftAdapter('mission-participant-add', {
+            serialize() {
+                return { name: searchInput.value, userId: userIdInput.value };
+            },
+            restore(_form, extra) {
+                const stored = /** @type {{name?: unknown, userId?: unknown}} */ (
+                    extra && typeof extra === 'object' ? extra : {}
+                );
+                searchInput.value = typeof stored.name === 'string' ? stored.name : '';
+                userIdInput.value = typeof stored.userId === 'string' ? stored.userId : '';
+                const orgUnitsGroup = document.getElementById('participant-org-units-group');
+                if (orgUnitsGroup && userIdInput.value) {
+                    orgUnitsGroup.style.display = 'none';
+                }
+            },
+        });
+
         /** @type {number | undefined} */
         let debounceTimer;
 
