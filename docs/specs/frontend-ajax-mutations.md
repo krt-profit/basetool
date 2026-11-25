@@ -3204,9 +3204,10 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   `job-order-item-handover`); the further create dialogs of #3747 follow one by one.
 - **Dialog forms.** A form in a dialog (`.krt-modal-overlay`) opts in the same way and needs no
   offer of its own. Its draft also records the opener whose click last opened the dialog (a
-  button, a `data-modal-id` or a `data-trigger` control), as a hash of the opener's id and `data-*`
-  attributes, which name its action and the context it primes the dialog with, such as the need
-  it acts on; the context itself is never stored. The opener is the last such control clicked before the dialog
+  button, a `data-modal-id` or a `data-trigger` control), as a hash of the opener's id, which a page script
+  marking the bound control does not change, or, without an id, of its `data-*` attributes, which
+  name its action and the context it primes the dialog with, such as the need it acts on; the
+  context itself is never stored. The opener is the last such control clicked before the dialog
   opened, so a dialog that opens only after the page loaded its content is matched too. A form the
   guard does not track (`no-track`, as the bank and supply forms are) gets the draft mark
   `data-krt-draft-edited` on a trusted edit instead of the unsaved mark; only the drafts read it,

@@ -86,19 +86,22 @@ export function hashText(text) {
 }
 
 /**
- * Names an opener by its id and its `data-*` attributes: the dialog or page action it triggers
- * and the context it primes the dialog with, such as the account or the need it acts on.
+ * Names an opener: by its id, which is unique on the page and unaffected by the markers a page
+ * script adds once it binds the control; without an id, by its `data-*` attributes, which name the
+ * dialog or page action it triggers and the context it primes the dialog with, such as the account
+ * or the need it acts on.
  *
  * @param {Element} opener a control that opened a dialog
  * @returns {string} the opener key
  */
 export function openerKey(opener) {
+    if (opener.id) {
+        return hashText(`id=${opener.id}`);
+    }
     const named = Array.from(opener.attributes)
         .filter(
             (attribute) =>
-                attribute.name === 'id' ||
-                (attribute.name.startsWith(DATA_PREFIX) &&
-                    !attribute.name.startsWith(KERNEL_PREFIX)),
+                attribute.name.startsWith(DATA_PREFIX) && !attribute.name.startsWith(KERNEL_PREFIX),
         )
         .map((attribute) => `${attribute.name}=${attribute.value}`)
         .sort();

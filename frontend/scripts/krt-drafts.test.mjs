@@ -1213,6 +1213,15 @@ test('a discard on the page drops a dialog draft and leaves the dialog closed', 
     assert.equal(dialog.opener.clicked, undefined);
 });
 
+test('an opener with an id keeps its key when a page script marks it after binding it', () => {
+    const context = harness().context;
+    const opener = new FakeButton({ id: 'add-unit-btn' });
+    const before = context.openerKey(opener);
+    opener.setAttribute('data-au-bound', '1');
+    assert.equal(context.openerKey(opener), before);
+    assert.notEqual(context.openerKey(new FakeButton({ id: 'add-participant-btn' })), before);
+});
+
 test('a page without a main element shows a dialog offer at the top of its page wrapper', () => {
     const dom = page();
     const dialog = inDialog(dom);
