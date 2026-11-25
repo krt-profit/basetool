@@ -90,7 +90,7 @@
 
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-pi-modal', titleKey='personalInventory.modal.create.title', variant='krt-modal--wide', titleId='krt-pi-modal-title', open=${showItemModal != null}, closeTrigger='pi-close-modal', body=~{::krt-pi-modal-body})}">
     <th:block th:ref="krt-pi-modal-body">
-        <form id="krt-pi-form"
+        <form id="krt-pi-form" data-krt-draft="personal-inventory-entry" data-krt-draft-version="1"
               th:action="${modalAction != null ? modalAction : '/admin/personal-inventory'}"
               method="post"
               th:object="${personalInventoryForm}">
@@ -116,7 +116,7 @@
             </div>
             <div class="form-group krt-pi-typeahead">
                 <label for="krt-pi-location-search" th:text="#{personalInventory.field.location}">Ort</label>
-                <input id="krt-pi-location-search" type="text" autocomplete="off"
+                <input id="krt-pi-location-search" type="text" autocomplete="off" data-krt-draft-skip
                        th:value="${personalInventoryForm.locationName}"
                        th:placeholder="#{personalInventory.field.location.placeholder}">
                 <div id="krt-pi-location-results" class="krt-pi-typeahead-results" hidden></div>

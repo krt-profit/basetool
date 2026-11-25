@@ -3202,8 +3202,9 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   participant, unit and finance entry (`mission-participant-add`, `mission-unit-add`,
   `mission-finance-add`), the job order's material and item handover (`job-order-handover`,
   `job-order-item-handover`) and the add-ship dialog of the own and the member hangar
-  (`hangar-ship`, `member-hangar-ship`, only while it adds a ship); the further create dialogs of
-  #3747 follow one by one.
+  (`hangar-ship`, `member-hangar-ship`, only while it adds a ship) and the add-entry dialog of the
+  personal inventory, own and admin (`personal-inventory-entry`, only while it adds an entry); the
+  further create dialogs of #3747 follow one by one.
 - **Dialog forms.** A form in a dialog (`.krt-modal-overlay`) opts in the same way and needs no
   offer of its own. Its draft also records the opener whose click last opened the dialog (a
   button, a `data-modal-id` or a `data-trigger` control), as a hash of the opener's id, which a page script
@@ -3238,7 +3239,10 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   entries and amounts are written; each row's quality tier and mission split are derived afresh
   from the restored entry and amount. The item handover's lines are named by their position in the
   order's items, so the generic part skips them and the adapter keeps each amount by its job-order
-  item (`joborder/orders-handover-drafts.js`). A choice the dialog loads only after it opened,
+  item (`joborder/orders-handover-drafts.js`). The personal inventory's adapter
+  (`personalinventory/personal-inventory.js`) keeps the typed location with the picked one and
+  writes both without the input event that would start a new search; the type-ahead is skipped by
+  the generic part. A choice the dialog loads only after it opened,
   without marking itself busy, such as the pledge's stock source, is not restored.
 - **Edit forms.** An edit form marks its lock-version fields `data-krt-draft-base`. Its draft
   records their values as its base, apart from the snapshot, so no version is ever a restored field
@@ -3355,6 +3359,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   loaded, the item handover with its amounts, and each save removes the draft.
 - [x] The hangar's add-ship dialog closed with its close button keeps its draft, comes back after a
   reload, and the save removes the draft; editing a ship keeps no draft.
+- [x] The personal inventory's add-entry dialog comes back with its picked location, and the save
+  removes the draft.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3372,7 +3378,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `RefineryOrderEditDraftE2eTest`, `MissionEditDraftE2eTest`, `MemberEditDraftE2eTest`,
 `ProfileDraftE2eTest`, `BankDialogDraftE2eTest`, `SupplyDialogDraftE2eTest`,
 `PurchasingDialogDraftE2eTest`, `MissionDialogDraftE2eTest`, `JobOrderHandoverDraftE2eTest`,
-`HangarDialogDraftE2eTest`, `MessageBundleConsistencyTest` ·
+`HangarDialogDraftE2eTest`, `PersonalInventoryDialogDraftE2eTest`, `MessageBundleConsistencyTest` ·
 **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`, `krt-draft-snapshot.js`,
 `krt-draft-rows.js`, `krt-draft-flags.js`, `krt-draft-dialog.js`, `krt-draft-lead.js`,
 `krt-unsaved-marks.js` (draft mark), `krt-searchable-select.js` (`selection`),
@@ -3394,6 +3400,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `mission/mission-detail-participants.js`, `mission/mission-detail-actions.js`,
 `joborder/orders-handover-drafts.js`, `joborder/orders-detail.js` (`openHandoverModal`),
 `joborder/orders-detail.html`, `kernel/unsaved-changes.js` (`releaseUnsavedChanges`),
-`hangar/hangar.js`, `hangar/member-hangar.js`, `hangar/hangar.html`, `hangar/member-hangar.html` ·
+`hangar/hangar.js`, `hangar/member-hangar.js`, `hangar/hangar.html`, `hangar/member-hangar.html`,
+`personalinventory/personal-inventory.js`, `personalinventory/personal-inventory.html`,
+`personalinventory/admin/personal-inventory.html` ·
 **ADR:** ADR-0411 · **Related:** REQ-FE-014, REQ-FE-024,
 REQ-FE-040, REQ-REFINERY-029
