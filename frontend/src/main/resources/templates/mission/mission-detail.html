@@ -594,7 +594,8 @@
             </div>
             <div class="pane-grid-2" th:classappend="${isNew} ? 'pane-grid--single' : 'pane-grid--edit'">
                     <form id="mission-form" class="form-layout card" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}"
-                          th:attr="data-mission-edit=${isNew} ? null : 'true'">
+                          th:attr="data-mission-edit=${isNew} ? null : 'true', data-krt-draft=${isNew} ? 'mission-create' : null, data-krt-draft-version=${isNew} ? '1' : null">
+                        <th:block th:if="${isNew}"><th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" /></th:block>
                         <input type="hidden" id="mission-version" name="version" th:field="*{version}">
                         <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
                         <input type="hidden" id="mission-schedule-version" name="scheduleVersion" th:field="*{scheduleVersion}">
@@ -607,7 +608,7 @@
                             <legend class="form-section__head"><span th:text="#{mission.create.template.label}">Einsatzvorlage</span> <span class="opt" th:text="|· #{form.optional}|">· optional</span></legend>
                             <div class="form-group">
                                 <label for="mission-create-template-select" th:text="#{mission.create.template.choice}">Vorlage auswählen</label>
-                                <select id="mission-create-template-select" disabled
+                                <select id="mission-create-template-select" disabled data-krt-draft-skip
                                         aria-describedby="mission-create-template-owner-hint"
                                         th:attr="data-read-error=#{mission.create.template.readError},
                                                  data-save-error=#{error.mission.create},
@@ -697,8 +698,8 @@
                                     <label th:text="#{mission.meeting_time}">Treffen Teamspeak</label>
                                     <input type="hidden" name="meetingTime" id="meetingTime" th:value="*{meetingTime}">
                                     <div class="datetime-split-inputs">
-                                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
-                                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                                        <input type="date" id="meetingTimeDate" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                                        <input type="time" id="meetingTimeTimeOfDay" class="time-part" th:aria-label="#{a11y.datetime.time}">
                                     </div>
                                     <div th:if="${#fields.hasErrors('meetingTime')}" th:errors="*{meetingTime}" class="field-error"></div>
                                 </div>
@@ -707,8 +708,8 @@
                                     <label th:text="#{mission.planned_start}">Planned Start</label>
                                     <input type="hidden" name="plannedStartTime" id="plannedStartTime" th:value="*{plannedStartTime}">
                                     <div class="datetime-split-inputs">
-                                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" data-testid="mission-start-date" required>
-                                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" data-testid="mission-start-time" required>
+                                        <input type="date" id="plannedStartTimeDate" class="date-part" th:aria-label="#{a11y.datetime.date}" data-testid="mission-start-date" required>
+                                        <input type="time" id="plannedStartTimeTimeOfDay" class="time-part" th:aria-label="#{a11y.datetime.time}" data-testid="mission-start-time" required>
                                     </div>
                                     <div th:if="${#fields.hasErrors('plannedStartTime')}" th:errors="*{plannedStartTime}" class="field-error"></div>
                                 </div>
@@ -717,8 +718,8 @@
                                     <label th:text="#{mission.planned_end}">Planned End</label>
                                     <input type="hidden" name="plannedEndTime" id="plannedEndTime" th:value="*{plannedEndTime}">
                                     <div class="datetime-split-inputs">
-                                        <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
-                                        <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                                        <input type="date" id="plannedEndTimeDate" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                                        <input type="time" id="plannedEndTimeTimeOfDay" class="time-part" th:aria-label="#{a11y.datetime.time}">
                                     </div>
                                     <div th:if="${#fields.hasErrors('plannedEndTime')}" th:errors="*{plannedEndTime}" class="field-error"></div>
                                 </div>
@@ -773,7 +774,7 @@
                         <fieldset class="form-section" th:if="${isNew}">
                             <legend class="form-section__head"><span th:text="|4 · #{mission.objective.section}|">4 · Ziele</span> <span class="opt" th:text="|· #{form.optional}|">· optional</span></legend>
                             <div class="stack gap-3">
-                                <div class="ae-list" id="mission-create-objective-list"></div>
+                                <div class="ae-list" id="mission-create-objective-list" data-krt-draft-skip></div>
                                 <button type="button" class="btn btn-ghost editor-add" id="mission-create-objective-add"
                                         data-trigger="create-objective-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
                                 <p class="form-hint m-0" th:text="#{mission.objective.editor.hint}">Titel + Klassifizierung frei editierbar.</p>
@@ -801,7 +802,7 @@
                         <fieldset class="form-section" th:if="${isNew}">
                             <legend class="form-section__head"><span th:text="|5 · #{mission.step.section}|">5 · Ablauf</span> <span class="opt" th:text="|· #{form.optional}|">· optional</span></legend>
                             <div class="stack gap-3">
-                                <div class="ae-list" id="mission-create-step-list"></div>
+                                <div class="ae-list" id="mission-create-step-list" data-krt-draft-skip></div>
                                 <button type="button" class="btn btn-ghost editor-add" id="mission-create-step-add"
                                         data-trigger="create-step-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
                                 <p class="form-hint m-0" th:text="#{mission.step.editor.hint}">Titel + optionale Zeit/Ort frei editierbar.</p>
@@ -826,7 +827,7 @@
                         <fieldset class="form-section" th:if="${isNew}">
                             <legend class="form-section__head" th:text="#{missionTemplate.units}">Einheitenplanung</legend>
                             <div class="stack gap-3">
-                                <div class="ae-list" id="mission-create-unit-list"></div>
+                                <div class="ae-list" id="mission-create-unit-list" data-krt-draft-skip></div>
                                 <button type="button" class="btn btn-ghost editor-add" id="mission-create-unit-add"
                                         data-trigger="create-unit-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.unit.add}">Einheit hinzufügen</span></button>
                             </div>
@@ -870,7 +871,7 @@
                         <fieldset class="form-section" th:if="${isNew}">
                             <legend class="form-section__head"><span th:text="#{mission.create.frequency.section}">Frequenzen</span> <span class="opt" th:text="|· #{form.optional}|">· optional</span></legend>
                             <div class="stack gap-3">
-                                <div class="ae-list" id="mission-create-frequency-list"></div>
+                                <div class="ae-list" id="mission-create-frequency-list" data-krt-draft-skip></div>
                                 <button type="button" class="btn btn-ghost editor-add" id="mission-create-frequency-add"
                                         data-trigger="create-frequency-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.frequency.custom.add}">Frequenz hinzufügen</span></button>
                             </div>

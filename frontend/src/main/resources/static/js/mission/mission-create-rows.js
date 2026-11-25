@@ -33,26 +33,35 @@ import { createMissionPlanningRows } from '/js/mission/mission-planning-rows.js'
 export function createMissionDraftRows(list, template, carrier, options) {
     const planning = createMissionPlanningRows(list, template, options);
 
-    /** Serializes the current draft for the mission create endpoint. */
-    function serialize() {
-        const rows = Array.from(list.children, (row) => {
+    /**
+     * Reads every row of the section, empty ones included.
+     *
+     * @returns {PlanningRow[]} the field values per row, in order
+     */
+    function values() {
+        return Array.from(list.children, (row) => {
             /** @type {PlanningRow} */
-            const values = {};
+            const fields = {};
             row.querySelectorAll('[data-plan-field]').forEach((element) => {
                 const field = /** @type {HTMLInputElement | HTMLSelectElement} */ (element);
                 const name = field.dataset.planField || '';
                 if (field instanceof HTMLInputElement && field.type === 'checkbox') {
-                    values[name] = field.checked;
+                    fields[name] = field.checked;
                 } else {
                     const text = field.value.trim();
-                    values[name] =
+                    fields[name] =
                         field.hasAttribute('data-number-input') && text
                             ? Number(text)
                             : text || null;
                 }
             });
-            return values;
-        }).filter((row) => row.title || Object.hasOwn(row, 'name'));
+            return fields;
+        });
+    }
+
+    /** Serializes the current draft for the mission create endpoint. */
+    function serialize() {
+        const rows = values().filter((row) => row.title || Object.hasOwn(row, 'name'));
         carrier.value = rows.length ? JSON.stringify(rows) : '';
     }
 
@@ -65,5 +74,5 @@ export function createMissionDraftRows(list, template, carrier, options) {
         }
     }
 
-    return { ...planning, serialize };
+    return { ...planning, values, serialize };
 }
