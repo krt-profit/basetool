@@ -30,6 +30,7 @@ import { flattenModule, UI_STUBS } from './flatten-module.mjs';
 const SOURCE = [
     flattenModule('kernel/krt-drafts.js', UI_STUBS),
     flattenModule('kernel/krt-draft-rows.js'),
+    flattenModule('kernel/krt-draft-lead.js'),
 ].join('\n');
 
 const PATH = '/refinery-orders/create';
@@ -57,7 +58,7 @@ function test(name, fn) {
 class FakeElement {
     constructor(tagName, attributes = {}, classes = []) {
         this.tagName = tagName.toUpperCase();
-        this.attributes = new Map(Object.entries(attributes));
+        this.attrs = new Map(Object.entries(attributes));
         this.classList = classes;
         this.parent = null;
         this.children = [];
@@ -87,12 +88,33 @@ class FakeElement {
         );
     }
 
+    /** The attributes as the DOM lists them, each with its name and value. */
+    get attributes() {
+        return Array.from(this.attrs, ([name, value]) => ({ name, value }));
+    }
+
     get id() {
         return this.getAttribute('id') || '';
     }
 
     get isConnected() {
         return this.connected;
+    }
+
+    prepend(child) {
+        child.parent = this;
+        this.children.unshift(child);
+    }
+
+    remove() {
+        if (this.parent) {
+            this.parent.children.splice(this.parent.children.indexOf(this), 1);
+            this.parent = null;
+        }
+    }
+
+    click() {
+        this.clicked = (this.clicked || 0) + 1;
     }
 
     append(...children) {
@@ -108,19 +130,19 @@ class FakeElement {
     }
 
     getAttribute(name) {
-        return this.attributes.has(name) ? this.attributes.get(name) : null;
+        return this.attrs.has(name) ? this.attrs.get(name) : null;
     }
 
     setAttribute(name, value) {
-        this.attributes.set(name, String(value));
+        this.attrs.set(name, String(value));
     }
 
     hasAttribute(name) {
-        return this.attributes.has(name);
+        return this.attrs.has(name);
     }
 
     removeAttribute(name) {
-        this.attributes.delete(name);
+        this.attrs.delete(name);
     }
 
     matches(selector) {
@@ -156,6 +178,11 @@ class FakeElement {
         if (selector === '.krt-combobox > input[type="hidden"]') {
             return all.filter(
                 (el) => el.type === 'hidden' && el.parent && el.parent.matches('.krt-combobox'),
+            );
+        }
+        if (selector === '.krt-modal-head h2') {
+            return all.filter(
+                (el) => el.tagName === 'H2' && el.parent && el.parent.matches('.krt-modal-head'),
             );
         }
         if (selector === FIRST_FIELD) {
@@ -230,6 +257,22 @@ class FakeTextArea extends FakeElement {
         this.value = props.value ?? '';
         this.disabled = false;
         this.readOnly = false;
+    }
+}
+
+/** A `<button>` that can be disabled. */
+class FakeButton extends FakeElement {
+    constructor(attributes = {}) {
+        super('button', attributes);
+        this.disabled = false;
+    }
+}
+
+/** A `<template>` whose content clones a prepared element. */
+class FakeTemplate extends FakeElement {
+    constructor(attributes, clone) {
+        super('template', attributes);
+        this.content = { firstElementChild: { cloneNode: clone } };
     }
 }
 
@@ -360,6 +403,7 @@ function harness(storageEntries = {}, dom = page(), readyState = 'complete') {
         visibilityState: 'visible',
         querySelector: (selector) => dom.body.querySelector(selector),
         querySelectorAll: (selector) => dom.body.querySelectorAll(selector),
+        getElementById: (id) => dom.body.descendants().find((el) => el.id === id) || null,
         addEventListener(type, fn) {
             (docListeners[type] ||= []).push(fn);
         },
@@ -381,6 +425,8 @@ function harness(storageEntries = {}, dom = page(), readyState = 'complete') {
         HTMLInputElement: FakeInput,
         HTMLSelectElement: FakeSelect,
         HTMLTextAreaElement: FakeTextArea,
+        HTMLButtonElement: FakeButton,
+        HTMLTemplateElement: FakeTemplate,
         MutationObserver: class {
             observe() {}
         },
@@ -970,6 +1016,139 @@ test('an adapter finishes the restore after the values are written and announced
     });
     h.click(h.restore);
     assert.deepEqual(steps, ['restore:', 'finish:from the draft:input+change:2']);
+});
+
+test('a leading-controls adapter keeps its controls and sets the enabled ones first, in order', () => {
+    const h = harness();
+    const form = new FakeForm();
+    const type = new FakeSelect({ 'data-type': '' }, ['DEPOSIT', 'TRANSFER']);
+    type.value = 'TRANSFER';
+    const split = new FakeInput('checkbox', { 'data-split': '' }, { checked: true });
+    const locked = new FakeSelect({ 'data-locked': '' }, ['a', 'b'], { disabled: true });
+    locked.value = 'a';
+    form.append(type, split, locked);
+    const adapter = h.context.leadingControlsAdapter([
+        '[data-type]',
+        '[data-split]',
+        '[data-locked]',
+    ]);
+    assert.deepEqual([...adapter.serialize(form)], ['TRANSFER', true, 'a']);
+
+    type.value = 'DEPOSIT';
+    split.checked = false;
+    locked.value = 'b';
+    adapter.restore(form, ['TRANSFER', true, 'a']);
+    assert.equal(type.value, 'TRANSFER');
+    assert.equal(split.checked, true);
+    assert.equal(locked.value, 'b');
+    assert.deepEqual(type.fired, ['change']);
+    assert.deepEqual(split.fired, ['change']);
+    assert.deepEqual(locked.fired, []);
+    adapter.restore(form, 'junk');
+    assert.deepEqual(type.fired, ['change']);
+});
+
+/**
+ * Moves the drafted form of a page into a dialog, adds an opener of the dialog with the given
+ * context, and the page-level offer template with the elements a test clicks.
+ *
+ * @param {object} dom the page from {@link page}
+ * @param {object} [context] the opener's `data-field-*` attributes; no opener when null
+ */
+function inDialog(dom, context = {}) {
+    detach(dom.form);
+    dom.form.connected = true;
+    const dialog = new FakeElement('dialog', { id: 'bank-movement-modal' }, ['krt-modal-overlay']);
+    const heading = new FakeElement('h2');
+    heading.textContent = 'Kontobewegung';
+    const head = new FakeElement('div', {}, ['krt-modal-head']).append(heading);
+    dialog.append(head, dom.form);
+    const opener =
+        context === null
+            ? null
+            : new FakeButton({ 'data-modal-id': 'bank-movement-modal', ...context });
+    const notice = new FakeElement('div');
+    const name = new FakeElement('strong', { 'data-krt-draft-dialog-name': '' });
+    const restore = new FakeElement('button', { 'data-krt-draft-action': 'restore' });
+    const discard = new FakeElement('button', { 'data-krt-draft-action': 'discard' });
+    notice.append(name, restore, discard);
+    const template = new FakeTemplate({ id: 'krt-draft-dialog-offer' }, () => notice);
+    const main = new FakeElement('main');
+    dom.body.append(main, dialog, template);
+    if (opener) {
+        main.append(opener);
+    }
+    return { dialog, opener, notice, name, restore, discard, main };
+}
+
+test('an edit in an untracked dialog form marks it, and its draft names the opener', () => {
+    const dom = page();
+    const dialog = inDialog(dom, { 'data-field-accountid': 'acc-1' });
+    const h = harness({}, dom);
+    h.fire('click', { target: dialog.opener });
+    h.controls.note.value = 'typed';
+    h.edit(h.controls.note);
+    assert.ok(h.form.hasAttribute('data-krt-draft-edited'));
+    assert.ok(!h.form.hasAttribute('data-krt-unsaved'));
+    h.flushTimers();
+    assert.equal(h.stored().opener, h.context.openerKey(dialog.opener));
+    assert.notEqual(h.stored().opener, h.run("hashText('bank-movement-modal')"));
+});
+
+/**
+ * Clicks a button of a page-level dialog offer.
+ *
+ * @param {object} dialog the parts from {@link inDialog}
+ * @param {FakeElement} button the offer's button
+ */
+function clickOffer(dialog, button) {
+    (dialog.notice.listeners.click || []).forEach((fn) => fn({ target: button }));
+}
+
+test('a dialog draft is offered on the page, and restore reopens the dialog through its opener', () => {
+    const dom = page();
+    const dialog = inDialog(dom);
+    const key = harness().context.openerKey(dialog.opener);
+    const h = harness({ [keyFor(SCOPE)]: storedDraft({ opener: key }) }, dom);
+    assert.equal(dialog.main.children[0], dialog.notice);
+    assert.equal(dialog.name.textContent, 'Kontobewegung');
+    assert.equal(h.offer.hidden, true);
+    clickOffer(dialog, dialog.restore);
+    assert.equal(dialog.opener.clicked, 1);
+    assert.equal(h.controls.note.value, 'from the draft');
+    assert.ok(h.form.hasAttribute('data-krt-draft-edited'));
+    assert.ok(!dialog.main.children.includes(dialog.notice));
+});
+
+test('a dialog draft whose opener the page no longer has is dropped', () => {
+    const dom = page();
+    inDialog(dom, null);
+    const h = harness({ [keyFor(SCOPE)]: storedDraft({ opener: 'deadbeef' }) }, dom);
+    assert.equal(h.stored(), null);
+});
+
+test('a saved dialog form loses its mark and its draft', () => {
+    const dom = page();
+    inDialog(dom);
+    const h = harness({}, dom);
+    h.controls.note.value = 'typed';
+    h.edit(h.controls.note);
+    h.flushTimers();
+    assert.ok(h.stored());
+    h.context.clearUnsaved(h.form);
+    assert.ok(!h.form.hasAttribute('data-krt-draft-edited'));
+    assert.equal(h.stored(), null);
+});
+
+test('a discard on the page drops a dialog draft and leaves the dialog closed', () => {
+    const dom = page();
+    const dialog = inDialog(dom);
+    const key = harness().context.openerKey(dialog.opener);
+    const h = harness({ [keyFor(SCOPE)]: storedDraft({ opener: key }) }, dom);
+    clickOffer(dialog, dialog.discard);
+    assert.equal(h.stored(), null);
+    assert.ok(!dialog.main.children.includes(dialog.notice));
+    assert.equal(dialog.opener.clicked, undefined);
 });
 
 if (failures > 0) {

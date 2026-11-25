@@ -120,6 +120,7 @@
 
 <th:block th:fragment="org-unit-request-modal-body">
     <form class="bank-ajax-form no-track" th:attr="data-refresh=${refreshKey}"
+          data-krt-draft="org-unit-bank-request" data-krt-draft-version="1"
           data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
           data-endpoint="/api/proxy/org-units/bank/requests" data-method="POST">
         <div class="krt-modal-body">

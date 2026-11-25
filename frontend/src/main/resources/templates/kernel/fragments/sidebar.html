@@ -202,6 +202,7 @@
     <th:block th:replace="~{kernel/fragments/footer :: footer}" />
     <th:block th:replace="~{kernel/fragments/icons :: sprite}" />
     <script type="module" th:src="@{/js/kernel/unsaved-changes.js}" th:attr="nonce=${cspNonce}"></script>
+    <th:block sec:authorize="isAuthenticated()"><th:block th:replace="~{kernel/fragments/draft-offer :: draftDialogOffer}" /></th:block>
     <script type="module" th:src="@{/js/kernel/krt-drafts.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
 </th:block>
 </body>

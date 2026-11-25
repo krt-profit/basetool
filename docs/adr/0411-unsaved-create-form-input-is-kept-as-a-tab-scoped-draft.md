@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-11-25
 - **Amended:** 2026-11-25 — edit forms keep a draft against the lock versions it was made against
-  (issue #3750)
+  (issue #3750); create dialogs keep a draft under their own mark and are offered on the page
+  (issue #3747)
 - **Deciders:** @greluc
 - **Related:** spec REQ-FE-041 · REQ-FE-024 · REQ-FE-040 · ADR-0397 · issue #3734 ·
   `static/js/kernel/krt-drafts.js` · `kernel/layout/DraftScopeAdvice`
@@ -81,3 +82,22 @@ with would overwrite a change a peer saved in between. Edit forms now opt in und
 
 Issue #3750 drafts the refinery-order detail form, the mission edit form, the member edit form and
 the six profile sections under this rule.
+
+## Amendment 2 (2026-11-25) — create dialogs keep a draft under their own mark
+
+Create dialogs did not fit decision 3: a reload closes the dialog, so an offer inside it is never
+seen, and most of them are `no-track`, so they never carry the unsaved mark a draft waits for. The
+bank forms are `no-track` because the leave warning once had a single page-wide mark that only a
+full submit cleared, so every in-place dialog save and every cancelled dialog left a false warning;
+a cancelled dialog still does. @greluc chose to keep that and to give dialogs a mark of their own.
+
+1. **A draft mark for untracked dialogs.** A trusted edit in an untracked drafted dialog form sets
+   `data-krt-draft-edited`; only the drafts read it. The leave warning and live sync stay as they
+   are, and a clear of the unsaved mark (a successful save, `resetUnsavedChanges()`) removes it too.
+2. **Closing keeps the draft.** Closing a dialog is not a discard: its input stays in the dialog as
+   before, and a reload offers it.
+3. **The offer is on the page, restore goes through the opener.** The page shows the offer at the
+   top of its content and names the dialog. Restore clicks the control that opened the dialog, so
+   the page primes the dialog's context as it always does, and then writes the draft. The draft
+   records that opener only as a hash of its `data-modal-id` and `data-field-*` context, so no
+   hidden value is stored; a draft whose opener the page no longer has is dropped.

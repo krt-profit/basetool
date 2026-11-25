@@ -2444,7 +2444,9 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
   so a save that fails or never reaches the server keeps the form marked. A fragment swap that
   replaces the form takes the mark with it. Each clear raises `krt:unsaved-cleared` on the
   document. Live sync holds back a section whose container holds a marked form (REQ-FE-010), and a
-  drafted form keeps its draft while it carries the mark (REQ-FE-041).
+  drafted form keeps its draft while it carries the mark (REQ-FE-041). An untracked dialog form
+  that keeps drafts carries the draft mark `data-krt-draft-edited` instead, which only the drafts
+  read; a clear removes either mark.
 
 **Acceptance**
 
@@ -3191,8 +3193,21 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   refinery-order detail form (`refinery-order-edit`), the mission form on the mission's edit pane
   (`mission-edit`), the member edit form (`member-edit`) and the six section forms of the profile
   (`profile-description`, `profile-rsi-handle`, `profile-payout`, `profile-blueprint-sharing`,
-  `profile-name-withholding`, `profile-home-location`). The bank request dialogs (#3747) need an
-  offer outside the dialog.
+  `profile-name-withholding`, `profile-home-location`), and the create dialogs (see *Dialog
+  forms*): the bank movement (`bank-movement`) and the org-unit bank request
+  (`org-unit-bank-request`); the further create dialogs of #3747 follow one by one.
+- **Dialog forms.** A form in a dialog (`.krt-modal-overlay`) opts in the same way and needs no
+  offer of its own. Its draft also records the opener that last opened the dialog, as a hash of
+  the opener's `data-modal-id` and `data-field-*` context, so the context itself is never stored.
+  A form the guard does not track (`no-track`, as the bank forms are) gets the draft mark
+  `data-krt-draft-edited` on a trusted edit instead of the unsaved mark; only the drafts read it,
+  so the leave warning and live sync stay as they are. A reload closes the dialog, so the page
+  shows the offer at the top of its content (`kernel/fragments/draft-offer :: draftDialogOffer`)
+  and names the dialog; restore clicks the same opener, so the page opens and primes the dialog as
+  it always does, and then writes the draft. A draft whose opener the page no longer has is
+  dropped. Closing a dialog keeps its draft. Controls that switch others on, such as the bank
+  dialogs' type, account and split toggle, are set first by `leadingControlsAdapter`
+  (`krt-draft-lead.js`, registered in `bank/bank-drafts.js`), so the values go into enabled fields.
 - **Edit forms.** An edit form marks its lock-version fields `data-krt-draft-base`. Its draft
   records their values as its base, apart from the snapshot, so no version is ever a restored field
   value. The key's page path names the entity, so two entities edited in one tab never share a
@@ -3266,8 +3281,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   completes what those announcements reset. A draft of another version is dropped.
   An edit or a submit before the member chooses withdraws the offer and drops the stored draft;
   no draft is written while the offer stands.
-- **Clear.** The draft goes with its form's unsaved mark (`krt:unsaved-cleared`: a successful save,
-  a reset, `resetUnsavedChanges()`), with *Verwerfen*, with a fragment swap that replaces the form,
+- **Clear.** The draft goes with its form's unsaved or draft mark (`krt:unsaved-cleared`: a
+  successful save, a reset, `resetUnsavedChanges()`), with *Verwerfen*, with a fragment swap that replaces the form,
   and on a logout, which removes every draft of the tab and stops further writes. A swap that
   replaces a form whose offer still stands, such as a peer's live update, offers the draft again on
   the new form with a fresh version comparison.
@@ -3297,6 +3312,9 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   restored save is refused with HTTP 409.
 - [x] A reload of the profile offers each edited section back and no other; after a save of the
   shared user row meanwhile, the restored description save is refused with HTTP 409.
+- [x] A reload of a page with a half-filled create dialog offers the input on the page; restore
+  opens the dialog through its opener and fills it, the booking removes the draft, closing the
+  dialog keeps it and a discard drops it; the leave warning stays off for an untracked dialog.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3311,9 +3329,10 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `InventoryOperationsE2eTest#einbuchenDraftComesBackAfterAReloadAndTheBookingClearsIt`,
 `MissionTemplateEditorE2eTest#reloadOffersTheTemplateDraftBackWithItsPartsAndRows`,
 `RefineryOrderEditDraftE2eTest`, `MissionEditDraftE2eTest`, `MemberEditDraftE2eTest`,
-`ProfileDraftE2eTest`, `MessageBundleConsistencyTest` ·
+`ProfileDraftE2eTest`, `BankDialogDraftE2eTest`, `MessageBundleConsistencyTest` ·
 **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`, `krt-draft-snapshot.js`,
-`krt-draft-rows.js`, `krt-draft-flags.js`, `krt-searchable-select.js` (`selection`),
+`krt-draft-rows.js`, `krt-draft-flags.js`, `krt-draft-dialog.js`, `krt-draft-lead.js`,
+`krt-unsaved-marks.js` (draft mark), `krt-searchable-select.js` (`selection`),
 `kernel/fragments/draft-offer.html`, `kernel/fragments/sidebar.html` (`data-krt-draft-scope`),
 `kernel/layout/DraftScopeAdvice`, `refinery/refinery-orders-create.js`, `joborder/orders-create.js`,
 `joborder/order-item-drafts.js`, `mission/mission-create.js`, `mission/mission-create-draft.js`,
@@ -3324,6 +3343,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `refinery/refinery-orders-details.js`, `refinery/refinery-order-edit-draft.js`,
 `refinery/refinery-orders-details.html`, `mission/mission-detail-tabs.js`,
 `mission/mission-detail.html`, `identity/member-edit.js`, `identity/member-edit.html`,
-`identity/profile.js`, `identity/profile.html` ·
+`identity/profile.js`, `identity/profile.html`, `bank/bank-drafts.js`, `bank/bank.js`,
+`bank/fragments/bank-movement-modal.html`, `bank/fragments/org-unit-bank-views.html` ·
 **ADR:** ADR-0411 · **Related:** REQ-FE-014, REQ-FE-024,
 REQ-FE-040, REQ-REFINERY-029

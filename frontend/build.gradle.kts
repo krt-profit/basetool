@@ -863,6 +863,8 @@ val testDraftsJs =
         "krt-draft-store.js",
         "krt-draft-snapshot.js",
         "krt-draft-rows.js",
+        "krt-draft-dialog.js",
+        "krt-draft-lead.js",
         "krt-unsaved-marks.js",
       )
       .forEach {
