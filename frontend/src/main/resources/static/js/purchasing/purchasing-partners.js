@@ -21,6 +21,7 @@
 
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { setDraftKey } from '/js/kernel/krt-drafts.js';
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import {
     bindFilterForm,
@@ -32,6 +33,9 @@ import {
     submitterOf,
     textOrNull,
 } from '/js/purchasing/purchasing-common.js';
+
+/** The form key of the partner dialog while it adds a new partner (REQ-FE-041). */
+const PARTNER_DRAFT_KEY = 'purchasing-partner';
 
 document.addEventListener('DOMContentLoaded', () => {
     const afterWrite = bindResults({
@@ -59,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     krtEvents.on('click', 'purchasing-open-partner', () => {
         form.reset();
+        setDraftKey(form, PARTNER_DRAFT_KEY);
         field('purchasing-partner-id').value = '';
         field('purchasing-partner-version').value = '';
         const kindRow = document.getElementById('purchasing-partner-kind-row');
@@ -68,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     krtEvents.on('click', 'purchasing-edit-partner', (button) => {
         form.reset();
+        setDraftKey(form, null);
         field('purchasing-partner-id').value = button.getAttribute('data-partner-id') || '';
         field('purchasing-partner-version').value = button.getAttribute('data-version') || '';
         field('purchasing-partner-name').value = button.getAttribute('data-name') || '';

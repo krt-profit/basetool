@@ -59,7 +59,11 @@ class FakeElement {
     constructor(tagName, attributes = {}, classes = []) {
         this.tagName = tagName.toUpperCase();
         this.attrs = new Map(Object.entries(attributes));
-        this.classList = classes;
+        this.classList = Object.assign([...classes], {
+            contains(name) {
+                return this.includes(name);
+            },
+        });
         this.parent = null;
         this.children = [];
         this.fired = [];
@@ -385,6 +389,7 @@ function harness(storageEntries = {}, dom = page(), readyState = 'complete') {
     const timers = [];
     const docListeners = {};
     const winListeners = {};
+    const observers = [];
     class FakeEvent {
         constructor(type, init = {}) {
             this.type = type;
@@ -428,7 +433,19 @@ function harness(storageEntries = {}, dom = page(), readyState = 'complete') {
         HTMLButtonElement: FakeButton,
         HTMLTemplateElement: FakeTemplate,
         MutationObserver: class {
-            observe() {}
+            constructor(callback) {
+                this.callback = callback;
+                this.targets = [];
+                observers.push(this);
+            }
+
+            observe(target) {
+                this.targets.push(target);
+            }
+
+            disconnect() {
+                this.targets = [];
+            }
         },
         setTimeout(fn) {
             const timer = { fn, live: true };
@@ -484,6 +501,11 @@ function harness(storageEntries = {}, dom = page(), readyState = 'complete') {
         stored() {
             const raw = storage.getItem(this.key);
             return raw === null ? null : JSON.parse(raw);
+        },
+        changed(target) {
+            observers
+                .filter((observer) => observer.targets.includes(target))
+                .forEach((observer) => observer.callback([{ target }]));
         },
     };
 }
@@ -1076,6 +1098,10 @@ function inDialog(dom, context = {}) {
     const main = new FakeElement('main');
     dom.body.append(main, dialog, template);
     if (opener) {
+        opener.click = () => {
+            opener.clicked = (opener.clicked || 0) + 1;
+            dialog.classList.push('is-open');
+        };
         main.append(opener);
     }
     return { dialog, opener, notice, name, restore, discard, main };
@@ -1085,14 +1111,33 @@ test('an edit in an untracked dialog form marks it, and its draft names the open
     const dom = page();
     const dialog = inDialog(dom, { 'data-field-accountid': 'acc-1' });
     const h = harness({}, dom);
+    h.flushTimers();
     h.fire('click', { target: dialog.opener });
+    dialog.dialog.classList.push('is-open');
+    h.changed(dialog.dialog);
     h.controls.note.value = 'typed';
     h.edit(h.controls.note);
     assert.ok(h.form.hasAttribute('data-krt-draft-edited'));
     assert.ok(!h.form.hasAttribute('data-krt-unsaved'));
     h.flushTimers();
     assert.equal(h.stored().opener, h.context.openerKey(dialog.opener));
-    assert.notEqual(h.stored().opener, h.run("hashText('bank-movement-modal')"));
+});
+
+test('an opener whose dialog opens later, after the page loaded its content, is still named', () => {
+    const dom = page();
+    const dialog = inDialog(dom, { 'data-need-id': 'need-7' });
+    const other = new FakeButton({ 'data-trigger': 'other' });
+    dialog.main.append(other);
+    const h = harness({}, dom);
+    h.fire('click', { target: dialog.opener });
+    h.flushTimers();
+    dialog.dialog.classList.push('is-open');
+    h.changed(dialog.dialog);
+    h.controls.note.value = 'typed';
+    h.edit(h.controls.note);
+    h.flushTimers();
+    assert.equal(h.stored().opener, h.context.openerKey(dialog.opener));
+    assert.notEqual(h.context.openerKey(dialog.opener), h.context.openerKey(other));
 });
 
 /**

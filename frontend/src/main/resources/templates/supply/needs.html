@@ -143,7 +143,7 @@
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='supply-need-modal', titleKey='supply.need.modal.title', titleId='supply-need-title', variant='krt-modal--wide', body=~{::supply-need-modal-body})}">
         <th:block th:ref="supply-need-modal-body">
-            <form id="supply-need-form" class="no-track" novalidate>
+            <form id="supply-need-form" class="no-track" novalidate data-krt-draft="supply-need" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                     <input type="hidden" id="supply-need-id">
                     <input type="hidden" id="supply-need-version">

@@ -165,7 +165,7 @@
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='supply-record-modal', titleKey='supply.record.title', titleId='supply-record-title', variant='krt-modal--wide', body=~{::supply-record-modal-body})}">
         <th:block th:ref="supply-record-modal-body">
-            <form id="supply-record-form" class="no-track" novalidate>
+            <form id="supply-record-form" class="no-track" novalidate data-krt-draft="supply-record" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                     <div class="form-group">
                         <label for="supply-record-need" th:text="#{supply.record.need}">F&uuml;r den Bedarf (optional)</label>

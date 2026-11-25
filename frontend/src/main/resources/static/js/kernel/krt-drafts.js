@@ -37,6 +37,7 @@ import {
     openerOf,
     showDialogOffer,
     trackDialogOpeners,
+    whenOpen,
 } from '/js/kernel/krt-draft-dialog.js';
 import {
     holdsDraftEdits,
@@ -334,9 +335,9 @@ function offer(state, draft) {
 
 /**
  * Shows the page-level offer of a dialog form's draft, since a reload closed the dialog; restore
- * reopens the dialog through the same opener, which primes it, before the draft is written. A
- * draft whose opener the page no longer has is dropped, as the dialog cannot be reopened in its
- * context.
+ * clicks the same opener, which primes the dialog, and writes the draft once the dialog is open,
+ * which an opener that first loads what it shows does later. A draft whose opener the page no
+ * longer has is dropped, as the dialog cannot be reopened in its context.
  *
  * @param {DraftState} state the form's draft state
  * @param {KrtDraft} draft the stored draft
@@ -360,7 +361,7 @@ function offerDialog(state, draft, dialog) {
             if (current) {
                 current.click();
             }
-            restoreOffered(state);
+            whenOpen(dialog, () => restoreOffered(state));
         },
         discard: () => forget(state),
     });
@@ -470,7 +471,15 @@ function initKrtDrafts() {
     }
     pageScope = scope;
     removeDrafts(scope);
-    trackDialogOpeners();
+    /** @type {HTMLElement[]} */
+    const dialogs = [];
+    document.querySelectorAll(DRAFT_FORM_SELECTOR).forEach((form) => {
+        const dialog = form instanceof HTMLFormElement ? dialogOf(form) : null;
+        if (dialog && !dialogs.includes(dialog)) {
+            dialogs.push(dialog);
+        }
+    });
+    trackDialogOpeners(dialogs);
     document.querySelectorAll(DRAFT_FORM_SELECTOR).forEach((form) => {
         if (form instanceof HTMLFormElement) {
             bindForm(form, scope);

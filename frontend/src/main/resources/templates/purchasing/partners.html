@@ -104,7 +104,7 @@
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-partner-modal', titleKey='purchasing.partner.modal.title', titleId='purchasing-partner-title', variant='krt-modal--wide', body=~{::purchasing-partner-modal-body})}">
         <th:block th:ref="purchasing-partner-modal-body">
-            <form id="purchasing-partner-form" class="no-track" novalidate>
+            <form id="purchasing-partner-form" class="no-track" novalidate data-krt-draft="purchasing-partner" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                     <input type="hidden" id="purchasing-partner-id">
                     <input type="hidden" id="purchasing-partner-version">
