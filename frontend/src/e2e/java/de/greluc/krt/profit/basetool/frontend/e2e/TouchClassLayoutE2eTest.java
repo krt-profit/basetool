@@ -376,7 +376,10 @@ class TouchClassLayoutE2eTest {
                 + String.join(System.lineSeparator(), findings));
   }
 
-  /** Each starmap list stays busy until its current result renders or its read fails. */
+  /**
+   * Each starmap list stays busy until its current result renders or its read fails; a read the
+   * network refuses raises the maintenance notice in place of an error toast (REQ-FE-040).
+   */
   @Test
   void starmapListsAnnounceIndependentPendingReads() {
     List<Route> objectReads = new ArrayList<>();
@@ -408,7 +411,8 @@ class TouchClassLayoutE2eTest {
 
       placeRead.get().abort();
       assertThat(page.locator("#starmap-links")).hasAttribute("aria-busy", "false");
-      assertThat(page.locator(".notification-toast.error-toast")).isVisible();
+      assertThat(page.locator("#krt-maintenance-banner")).hasAttribute("data-state", "down");
+      assertThat(page.locator(".notification-toast.error-toast")).hasCount(0);
     }
   }
 
