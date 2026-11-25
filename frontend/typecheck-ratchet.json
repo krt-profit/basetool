@@ -171,6 +171,7 @@
       "kernel/krt-list-count.js",
       "kernel/krt-live-sync.js",
       "kernel/krt-localised-name.js",
+      "kernel/krt-maintenance.js",
       "kernel/krt-modal.js",
       "kernel/krt-owner-picker.js",
       "kernel/krt-number-format.js",

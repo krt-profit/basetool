@@ -3088,3 +3088,61 @@ The generated output is build state, with declared inputs/outputs and configurat
 
 **Enforced by:** `MessageBundleConsistencyTest`, locale message coverage tests,
 `generateDefaultMessages`; ADR-0369.
+
+### REQ-FE-040 — A member is told when the tool is being updated, and the input stays
+
+A release restarts the applications in one restart window (REQ-OPS-007), and the edge answers every
+request in it with the maintenance page or its problem body (REQ-OPS-061). Every write goes through
+`krtFetch`, so a save in the window already leaves the form on the page; what was missing is the
+member knowing that, rather than reading "save failed" and reloading the page away.
+
+- **The client recognises the window.** `krt-maintenance.js` takes a `502`, a `504`, and a `503`
+  that carries the edge's `X-Basetool-Maintenance: 1` header or the
+  `…/problems/maintenance` problem type as a maintenance answer. `krtFetch` hands every answer of a
+  write and of a read to it, and a transport failure of either (not an abort) enters the mode as
+  well. A `503` of the application itself, such as a backend refusal relayed by the frontend, is no
+  maintenance answer.
+- **One banner says so.** The mode shows one banner (`.alert.krt-maintenance-banner`,
+  `role="status"`, `aria-live="polite"`) on the topmost layer, above an open dialog, centred below
+  the header, where it covers no form's sticky action bar and no live-sync pill: the tool cannot
+  be reached right now, usually because of an update; the input stays on the page; do not reload
+  (`frontend.maintenance.*`, DE and EN). The edge's English `detail` is never shown. While the mode
+  is on, error toasts stay silent: the banner is the explanation of every failure then. The page's
+  own `onError` / `onNetworkError` hooks still run, so an optimistic control is still put back.
+- **The tool says when it answers again.** While the mode is on, a probe asks `HEAD /favicon.ico`
+  every 5 s plus up to 2.5 s of jitter, with `credentials: 'omit'` and `cache: 'no-store'`: a public
+  static file the frontend serves itself, so the probe neither creates nor refreshes a session
+  (ADR-0088) and opens no new public path. The first regular answer — of the probe or of any
+  `krtFetch` request — switches the banner to "saving works again" and hides it after 8 s. The
+  member can close the banner; the next failure shows it again.
+- **Nothing is resent.** A write that met the window is not repeated automatically: a `502` or `504`
+  can hit a request the server already processed. The member saves again once the banner says so.
+- **The page knows early.** The frontend closes every `/ws/sync` socket with `1012 Service Restart`
+  before the web server's graceful shutdown (`LiveSyncRestartNotice`, a `SmartLifecycle` in the
+  default phase) and refuses a new socket with the same code until it stops; `krt-live-sync.js`
+  enters the mode on that code and reconnects as usual. An open page therefore shows the banner as
+  the window opens, before the member presses save.
+
+**Acceptance**
+
+- [x] A maintenance answer (`502`, `504`, `503` with the header or the problem) and a transport
+  failure enter the mode; a plain `503`, a `500` and an abort do not (`krt-maintenance.test.mjs`).
+- [x] The banner shows the localized text on the topmost layer, error toasts stay silent while it
+  is on, and a dialog that closes hands it back to the body.
+- [x] The probe asks the favicon without a cookie, keeps waiting on a maintenance answer or a
+  failure, and the first regular answer switches the banner to "back" and hides it after 8 s.
+- [x] `krtFetch` hands each answer of a write and a read to the check and enters the mode on a
+  transport failure; no write is resent.
+- [x] The frontend closes every live-sync socket with `1012` ahead of the graceful shutdown and
+  refuses new ones; the client enters the mode on `1012` and still reconnects
+  (`LiveSyncWebSocketHandlerTest`, `LiveSyncRestartNoticeTest`, `LiveSyncCloseCodeWireParityTest`,
+  `krt-live-sync.test.mjs`).
+- [ ] On production, the next release shows the banner on open pages as the window opens and the
+  "back" notice once the frontend answers.
+
+**Enforced by:** `scripts/krt-maintenance.test.mjs` (`:frontend:testMaintenanceJs`),
+`scripts/krt-live-sync.test.mjs`, `LiveSyncWebSocketHandlerTest`, `LiveSyncRestartNoticeTest`,
+`LiveSyncCloseCodeWireParityTest`, `MessageBundleConsistencyTest` · **Code:**
+`static/js/kernel/krt-maintenance.js`, `krt-fetch.js` (`get`, `send`), `toast.js`, `krt-modal.js`
+(the hand-back), `krt-live-sync.js`, `kernel/livesync/LiveSyncRestartNotice`,
+`LiveSyncSessionRegistry#closeAllForRestart`, `docker/edge/include/maintenance.conf` (the header).

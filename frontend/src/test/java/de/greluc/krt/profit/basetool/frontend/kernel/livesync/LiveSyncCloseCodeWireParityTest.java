@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.socket.CloseStatus;
 
 /**
  * Verifies that the WebSocket close codes declared in {@link LiveSyncWebSocketHandler} match the
@@ -42,6 +43,10 @@ class LiveSyncCloseCodeWireParityTest {
   private static final Pattern CLIENT_SOCKET_CAP_CODE =
       Pattern.compile("SOCKET_CAP_CLOSE_CODE\\s*=\\s*(\\d{4})");
 
+  /** The client's declaration of the restart close code, e.g. {@code = 1012;}. */
+  private static final Pattern CLIENT_SERVICE_RESTART_CODE =
+      Pattern.compile("SERVICE_RESTART_CLOSE_CODE\\s*=\\s*(\\d{4})");
+
   @Test
   void clientConsentGateCloseCode_matchesTheServerValue() throws IOException {
     assertThat(declaredCode(CLIENT_TERMS_GATE_CODE, "TERMS_GATE_CLOSE_CODE"))
@@ -54,6 +59,13 @@ class LiveSyncCloseCodeWireParityTest {
     assertThat(declaredCode(CLIENT_SOCKET_CAP_CODE, "SOCKET_CAP_CLOSE_CODE"))
         .as("krt-live-sync.js vs LiveSyncWebSocketHandler.SOCKET_CAP_EXCEEDED")
         .isEqualTo(String.valueOf(LiveSyncWebSocketHandler.SOCKET_CAP_EXCEEDED.getCode()));
+  }
+
+  @Test
+  void clientServiceRestartCloseCode_matchesTheCodeTheRestartNoticeSends() throws IOException {
+    assertThat(declaredCode(CLIENT_SERVICE_RESTART_CODE, "SERVICE_RESTART_CLOSE_CODE"))
+        .as("krt-live-sync.js vs CloseStatus.SERVICE_RESTARTED")
+        .isEqualTo(String.valueOf(CloseStatus.SERVICE_RESTARTED.getCode()));
   }
 
   /**

@@ -5,6 +5,20 @@ const returnFocus = new WeakMap();
 const FIELDS =
     'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])';
 
+/** The overlays appended to a dialog's layer that outlive it: the toasts and the maintenance banner. */
+const LAYERED = ':scope > .notification-toast, :scope > .krt-maintenance-banner';
+
+/**
+ * Hands the layered overlays of a closing dialog back to the body, so they stay visible.
+ *
+ * @param {HTMLElement} dialog the closing dialog
+ */
+function handBackLayered(dialog) {
+    dialog.querySelectorAll(LAYERED).forEach((overlay) => {
+        document.body.appendChild(overlay);
+    });
+}
+
 /**
  * Resolves an overlay reference: the element itself or its id.
  *
@@ -129,9 +143,7 @@ function close(ref) {
     if (overlay instanceof HTMLDialogElement && overlay.open) {
         overlay.close();
     }
-    overlay.querySelectorAll(':scope > .notification-toast').forEach((toast) => {
-        document.body.appendChild(toast);
-    });
+    handBackLayered(overlay);
     const back = returnFocus.get(overlay);
     returnFocus.delete(overlay);
     if (back instanceof HTMLElement && back.isConnected && !overlay.contains(back)) {
@@ -241,9 +253,7 @@ function sync(dialog) {
         } catch (_notModal) {}
     } else if (!shown && dialog.open) {
         dialog.close();
-        dialog.querySelectorAll(':scope > .notification-toast').forEach((toast) => {
-            document.body.appendChild(toast);
-        });
+        handBackLayered(dialog);
     }
 }
 

@@ -3955,6 +3955,9 @@ itself restarts, or the host or haproxy does.
   and its text says so), so a member is back at most 10 s after the frontend answers. It is a static
   file the edge serves itself. The `Retry-After: 60` header and the problem+json body's
   `retryAfterSeconds` stay at 60 s for API clients such as the desktop extractor.
+- **Every maintenance answer carries `X-Basetool-Maintenance: 1`**, HTML and problem+json alike, so
+  an open page tells it from an application error without reading the body and shows its
+  maintenance banner (REQ-FE-040).
 
 - **The edge is never stopped inside a restart window.** It is the first unit of `RT_STACK_ORDER`,
   so every start in order brings the maintenance page up before the databases, keycloak and the

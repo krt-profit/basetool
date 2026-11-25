@@ -141,6 +141,15 @@ await test('the transport may call fetch but still not XMLHttpRequest', async ()
     );
 });
 
+await test('the maintenance probe may call fetch but still not XMLHttpRequest', async () => {
+    assert.deepEqual(await rulesFor("fetch('/favicon.ico');", 'kernel/krt-maintenance.js'), []);
+    assert.ok(
+        (await rulesFor('new XMLHttpRequest();', 'kernel/krt-maintenance.js')).includes(
+            'no-restricted-globals',
+        ),
+    );
+});
+
 await test('the shared read path and ES2025 syntax pass', async () => {
     const code = [
         "window.krtFetch.getJson('/a').then((list) => list);",

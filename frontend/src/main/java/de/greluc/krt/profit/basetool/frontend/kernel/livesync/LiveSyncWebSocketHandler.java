@@ -277,9 +277,33 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
+   * Closes every {@code /ws/sync} socket of this replica with {@code 1012 Service Restart} and
+   * refuses new ones, for a restart (REQ-FE-040).
+   *
+   * @return the number of sockets closed
+   */
+  int closeAllForRestart() {
+    return sessions.closeAllForRestart();
+  }
+
+  /** Admits sockets again after {@link #closeAllForRestart()}. */
+  void acceptSocketsAgain() {
+    sessions.acceptAgain();
+  }
+
+  /**
+   * Reports whether the handler admits sockets.
+   *
+   * @return {@code true} until {@link #closeAllForRestart()}
+   */
+  boolean admitsSockets() {
+    return sessions.admitting();
+  }
+
+  /**
    * Registers a new {@code /ws/sync} socket through {@link LiveSyncSessionRegistry#open}, which
-   * refuses a socket without accepted Terms of Use (REQ-SEC-028), without a resolvable principal,
-   * or over {@link #MAX_SOCKETS_PER_USER}.
+   * refuses a socket while the replica restarts, without accepted Terms of Use (REQ-SEC-028),
+   * without a resolvable principal, or over {@link #MAX_SOCKETS_PER_USER}.
    *
    * @param session the freshly opened session
    */

@@ -1049,6 +1049,11 @@ interface Window {
      * when a caller passes no string of its own.
      */
     krtFetchI18n?: KrtI18nDict;
+    /**
+     * The maintenance banner's wording from `fragments/head.html`, read by `krt-maintenance.js`
+     * (REQ-FE-040).
+     */
+    krtMaintenanceI18n?: KrtI18nDict;
 
     /**
      * Whether a bank booking needs a justification, keyed by account id; filled as the remote
