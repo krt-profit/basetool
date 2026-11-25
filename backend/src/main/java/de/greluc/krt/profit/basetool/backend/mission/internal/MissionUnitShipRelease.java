@@ -19,13 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.admin.api.events.HangarNotices;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeaveCause;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeavesMissionsObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
+import de.greluc.krt.profit.basetool.backend.mission.api.events.MissionNotices;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import java.time.Instant;
 import java.util.List;
@@ -38,14 +39,14 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Releases a deleted ship from every mission unit that carries it, recording one {@code
- * MISSION_UNIT_UPDATED} event per unit so the mission trail shows the change (REQ-AUDIT-001), and
- * tells the mission leadership when the ship leaves a mission that is not finished
- * (REQ-HANGAR-006).
+ * Releases a ship that leaves its missions from every mission unit that carries it, recording one
+ * {@code MISSION_UNIT_UPDATED} event per unit so the mission trail shows the change
+ * (REQ-AUDIT-001), and tells the mission leadership, with the cause, when the ship leaves a mission
+ * that is not finished (REQ-HANGAR-006).
  */
 @Component
 @RequiredArgsConstructor
-public class MissionUnitShipRelease implements ShipDeletionObserver {
+public class MissionUnitShipRelease implements ShipLeavesMissionsObserver {
 
   private final MissionUnitRepository missionUnitRepository;
   private final AuditRecorder auditRecorder;
@@ -54,7 +55,7 @@ public class MissionUnitShipRelease implements ShipDeletionObserver {
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public int beforeShipDelete(@NotNull UUID shipId) {
+  public int shipLeaves(@NotNull UUID shipId, @NotNull ShipLeaveCause cause) {
     List<MissionUnit> units = missionUnitRepository.findByShipId(shipId);
     if (units.isEmpty()) {
       return 0;
@@ -64,7 +65,7 @@ public class MissionUnitShipRelease implements ShipDeletionObserver {
       UnitShipRelease release = UnitShipRelease.of(unit, shipId);
       unit.setShip(null);
       missionUnitRepository.save(unit);
-      report(release, actor);
+      report(release, cause, actor);
     }
     return units.size();
   }
@@ -84,27 +85,30 @@ public class MissionUnitShipRelease implements ShipDeletionObserver {
     missionUnitRepository.releaseShipsOfOwner(ownerId, Instant.now());
     ActorRef actor = userService.currentActor();
     for (UnitShipRelease release : releases) {
-      report(release.withoutResponsible(ownerId), actor);
+      report(release.withoutResponsible(ownerId), ShipLeaveCause.DELETED, actor);
     }
     return releases.size();
   }
 
   /**
-   * Records the unit's change on the mission trail and announces the gap unless the mission is
-   * finished.
+   * Records the unit's change on the mission trail and announces the gap with its cause unless the
+   * mission is finished.
    *
    * @param release the unit that lost its ship
-   * @param actor who deletes the ship
+   * @param cause why the ship left the unit
+   * @param actor who caused it
    */
-  private void report(@NotNull UnitShipRelease release, @NotNull ActorRef actor) {
+  private void report(
+      @NotNull UnitShipRelease release, @NotNull ShipLeaveCause cause, @NotNull ActorRef actor) {
     if (!release.missionFinished()) {
       eventPublisher.publishEvent(
-          HangarNotices.shipDeleted(
+          MissionNotices.shipLeftMission(
               release.missionId(),
               release.responsibleUserId(),
               release.shipTypeName(),
               release.missionName(),
               release.unitName(),
+              cause,
               actor));
     }
     auditRecorder.record(

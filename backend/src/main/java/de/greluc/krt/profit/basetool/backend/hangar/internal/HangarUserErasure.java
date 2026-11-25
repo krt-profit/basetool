@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeavesMissionsObserver;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
 import java.util.List;
@@ -40,7 +40,7 @@ public class HangarUserErasure implements UserErasureParticipant {
   static final int POSITION = 30;
 
   private final ShipRepository shipRepository;
-  private final ShipDeletionObserver shipDeletionObserver;
+  private final ShipLeavesMissionsObserver shipLeavesMissionsObserver;
   private final HangarUnitLiveSync unitLiveSync;
 
   @Override
@@ -65,7 +65,7 @@ public class HangarUserErasure implements UserErasureParticipant {
   @Override
   public @NotNull Map<Erased, Integer> erase(@NotNull UUID userId, @NotNull UUID fallbackAdminId) {
     List<UUID> units = shipRepository.findOrgUnitIdsByOwnerId(userId);
-    shipDeletionObserver.beforeOwnerShipsDelete(userId);
+    shipLeavesMissionsObserver.beforeOwnerShipsDelete(userId);
     int deleted = shipRepository.deleteByOwnerId(userId);
     if (deleted > 0) {
       unitLiveSync.unitsChanged(units);

@@ -110,7 +110,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `ORG_MEMBER_DEPARTED` | `ORG_MEMBER_DEPARTED` | V279 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` on `RESPONSIBLE` (each unit of the member, the parent Bereich of a vacated seat); coded `reasonCode`, `vacancyCode` | REQ-ORG-030 |
 | `HANGAR_SHIP_ASSIGNED_TO_UNIT` | `HANGAR_SHIP_ASSIGNED` | V280 | `EVENT_RECIPIENT` (the ship's owner); supersedes the owner's earlier notice for the unit | REQ-HANGAR-005 |
 | `HANGAR_SHIP_UNASSIGNED_FROM_UNIT` | none (no rule) | — | supersedes the owner's `HANGAR_SHIP_ASSIGNED` for the unit | REQ-HANGAR-005 |
-| `HANGAR_SHIP_DELETED_FROM_MISSION` | `HANGAR_SHIP_REMOVED_FROM_UNIT` | V280 | `MISSION_LEADERSHIP`, `EVENT_RECIPIENT` (the unit's responsible member) | REQ-HANGAR-006 |
+| `HANGAR_SHIP_LEFT_MISSION` | `HANGAR_SHIP_REMOVED_FROM_UNIT` | V280 + V455 | `MISSION_LEADERSHIP`, `EVENT_RECIPIENT` (the unit's responsible member); coded `causeCode`; one notice per released unit | REQ-HANGAR-006 |
 | `HANGAR_FITTED_RESET_FOR_OWNER` | `HANGAR_FITTED_RESET` | V280 | `EVENT_RECIPIENT` (the owner); one per owner per reset | REQ-HANGAR-007 |
 | `HANGAR_CHANGED_BY_ADMIN` | `HANGAR_CHANGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (the member); coded `changeCode` | REQ-HANGAR-008 |
 | `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | V291 | `EVENT_RECIPIENT` (the member); one per bulk action that moved several ships, with the `count` | REQ-HANGAR-008, REQ-HANGAR-012 |

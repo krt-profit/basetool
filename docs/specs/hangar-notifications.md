@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-25.
 > **Owner area:** HANGAR · **Related ADRs:** [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)
 
 # Hangar and blueprint notifications
@@ -6,7 +6,7 @@
 ## Context & goal
 
 Issue #2414 tells a member when somebody else touched their ships or blueprints, and tells a mission's
-leadership when a deleted ship drops out of a plan. Each notice is published after the commit, never
+leadership when an assigned ship drops out of a plan. Each notice is published after the commit, never
 for the actor, carries only ship type names, mission and unit names, counts and the acting member's
 display name (never a ship's own free-text name), and has a seeded, admin-editable rule. Each can be
 muted (REQ-NOTIF-027).
@@ -23,22 +23,34 @@ the mission, the unit and the planned start. Taking the ship off the unit, or sw
 supersede, REQ-NOTIF-025); keeping the same ship announces nothing. The notice belongs to the unit
 (`MISSION_UNIT`), so it links to the owner's hangar.
 
-### REQ-HANGAR-006 — A deleted ship tells the mission about its gap
+### REQ-HANGAR-006 — A ship leaving a mission tells the mission about its gap, with its cause
 
-Deleting a ship (`HangarService#deleteShip`, `#deleteAllShipsForUser`) runs the mission module's
-`MissionUnitShipRelease`, which publishes `HANGAR_SHIP_DELETED_FROM_MISSION` for every unit the ship was
-assigned to, unless the unit's mission is `COMPLETED` or `CANCELLED`. The default
-rule notifies the mission leadership (`MISSION_LEADERSHIP`) and the unit's responsible member
-(`EVENT_RECIPIENT`), names the ship **type** (never the ship's own name), the mission and the unit, and
-excludes the actor.
+When a ship leaves the mission units that carry it, the hangar calls
+`ShipLeavesMissionsObserver#shipLeaves` with a coded cause (`ShipLeaveCause`) inside the transaction
+that causes it, while the ship's row still exists. The mission module's `MissionUnitShipRelease`
+releases every unit that carries the ship and publishes one `HANGAR_SHIP_LEFT_MISSION` per released
+unit, unless the unit's mission is `COMPLETED` or `CANCELLED`, where the reference goes without a
+notice. The default rule notifies the mission leadership (`MISSION_LEADERSHIP`) and the unit's
+responsible member (`EVENT_RECIPIENT`), names the ship **type** (never the ship's own name), the
+mission and the unit, and excludes the actor.
 
-The account deletion (REQ-DATA-008) does the same for every ship of the departing member:
-`HangarUserErasure` calls `ShipDeletionObserver#beforeOwnerShipsDelete` before its bulk delete, and
-`MissionUnitShipRelease` reads the affected units as a projection and releases them with one
-set-based update, so no ship or unit enters the deletion's persistence context. The notice is the
-same, because its text names no actor; the actor is the deleting admin, or the system actor when no
-member is signed in (the scheduled execution of a deletion request), and the departing member is
-never its `EVENT_RECIPIENT`.
+The notice carries the cause as `causeCode`. Every cause renders as the one notification type
+`HANGAR_SHIP_REMOVED_FROM_UNIT`, so a member who muted it stays muted, and the cause picks the text:
+the variant `notifications.type.HANGAR_SHIP_REMOVED_FROM_UNIT.cause.<code>` where the bundles hold
+one, the type's own text otherwise (REQ-NOTIF-028). A notice stored without a cause reads as
+`DELETED`.
+
+| Cause | When the ship leaves | Text |
+|-------|----------------------|------|
+| `DELETED` | The ship is deleted: `HangarService#deleteShip`, `#deleteAllShipsForUser` and the patch wipe (REQ-PATCH-015), every path through `HangarShipRemoval`, and the account deletion below | The type's own text: the ship „wurde gelöscht und fällt aus der Planung" |
+
+The account deletion (REQ-DATA-008) does the same for every ship of the departing member, with the
+cause `DELETED`: `HangarUserErasure` calls `ShipLeavesMissionsObserver#beforeOwnerShipsDelete`
+before its bulk delete, and `MissionUnitShipRelease` reads the affected units as a projection and
+releases them with one set-based update, so no ship or unit enters the deletion's persistence
+context. The notice is the same, because its text names no actor; the actor is the deleting admin,
+or the system actor when no member is signed in (the scheduled execution of a deletion request), and
+the departing member is never its `EVENT_RECIPIENT`.
 
 ### REQ-HANGAR-007 — A bulk reset of the fitted marks tells each owner
 
@@ -71,6 +83,11 @@ own data hears nothing.
 - [x] A ship of a finished mission, a ship in no unit and an admin's own data announce nothing.
 - [x] Deleting a member's account announces the gaps its ships leave in unfinished missions, never to
   that member.
+- [x] A ship leaving its units sends one notice per released unit carrying its cause; the cause
+  `DELETED` and a notice stored without a cause read as a deleted ship.
+- [x] A member who muted `HANGAR_SHIP_REMOVED_FROM_UNIT` hears nothing of any cause.
+- [x] Every rule of the gap notice's event, the seeded one and an admin's own, matches
+  `HANGAR_SHIP_LEFT_MISSION`.
 - [x] One notice per member per reset or purge, with that member's count.
 - [x] An admin's unit change of one or several ships tells the member once per action.
 - [x] The default rules exist, are enabled, and use the intended selector kinds.
@@ -79,11 +96,15 @@ own data hears nothing.
 `HangarServiceTest`, `HangarUserErasureTest`, `UserDeletionShipReleaseIntegrationTest`,
 `HangarShipAdminOrgUnitChangeIntegrationTest`,
 `PersonalBlueprintServiceTest`, `SeededNotificationRulesIntegrationTest`,
+`V455ShipLeftMissionRuleMigrationTest`, `ShipLeftMissionNoticeWordingTest`,
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `mission/api/events/MissionNotices`,
 `admin/api/events/HangarNotices`, `mission/internal/MissionNotificationPublisher`,
 `mission/internal/MissionStructureService`, `mission/internal/MissionUnitShipRelease`,
+`hangar/api/ShipLeavesMissionsObserver`, `hangar/api/ShipLeaveCause`,
+`hangar/internal/HangarShipRemoval`,
 `hangar/internal/HangarService`, `hangar/internal/HangarUserErasure`, `blueprint/internal/PersonalBlueprintService`,
 `hangar/api/ShipRepository#countFittedByOwnerScoped`,
 `blueprint/api/PersonalBlueprintRepository#countRemovableByOwner`,
 `V280__seed_hangar_and_blueprint_notification_rules.sql`,
-`V291__seed_admin_ship_org_unit_notification_rule.sql` · **Issues:** #2414, #2601, #3260
+`V291__seed_admin_ship_org_unit_notification_rule.sql`,
+`V455__rename_ship_left_mission_rule.sql` · **Issues:** #2414, #2601, #3260, #3703
