@@ -23,6 +23,12 @@
  */
 const UNSAVED_ATTR = 'data-krt-unsaved';
 
+/**
+ * The attribute that marks a dialog form the guard does not track (`no-track`) as edited, for its
+ * draft alone (REQ-FE-041): live sync and the leave warning never read it.
+ */
+const DRAFT_EDIT_ATTR = 'data-krt-draft-edited';
+
 /** The document event a cleared mark raises, so a deferred live-sync refresh can run (REQ-FE-015). */
 export const UNSAVED_CLEARED_EVENT = 'krt:unsaved-cleared';
 
@@ -36,21 +42,42 @@ export function markUnsaved(form) {
 }
 
 /**
- * Clears a form's mark and raises `krt:unsaved-cleared`; a form without the mark is left alone.
+ * Marks an untracked dialog form as holding edits its draft keeps.
+ *
+ * @param {HTMLFormElement} form the edited dialog form
+ */
+export function markDraftEdited(form) {
+    form.setAttribute(DRAFT_EDIT_ATTR, '');
+}
+
+/**
+ * Tells whether an untracked dialog form holds edits its draft keeps.
+ *
+ * @param {HTMLFormElement} form the dialog form
+ * @returns {boolean} true while the form carries the draft mark
+ */
+export function holdsDraftEdits(form) {
+    return form.hasAttribute(DRAFT_EDIT_ATTR);
+}
+
+/**
+ * Clears a form's marks and raises `krt:unsaved-cleared`; a form without either mark is left
+ * alone.
  *
  * @param {HTMLFormElement | null | undefined} form the saved or discarded form
  */
 export function clearUnsaved(form) {
-    if (!form || !form.hasAttribute(UNSAVED_ATTR)) {
+    if (!form || !(form.hasAttribute(UNSAVED_ATTR) || form.hasAttribute(DRAFT_EDIT_ATTR))) {
         return;
     }
     form.removeAttribute(UNSAVED_ATTR);
+    form.removeAttribute(DRAFT_EDIT_ATTR);
     document.dispatchEvent(new CustomEvent(UNSAVED_CLEARED_EVENT, { detail: { form } }));
 }
 
-/** Clears the mark of every form on the page, for a save that did not name its form. */
+/** Clears the marks of every form on the page, for a save that did not name its form. */
 export function clearAllUnsaved() {
-    document.querySelectorAll(`form[${UNSAVED_ATTR}]`).forEach((form) => {
+    document.querySelectorAll(`form[${UNSAVED_ATTR}], form[${DRAFT_EDIT_ATTR}]`).forEach((form) => {
         clearUnsaved(/** @type {HTMLFormElement} */ (form));
     });
 }

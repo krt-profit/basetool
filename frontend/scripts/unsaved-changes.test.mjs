@@ -109,8 +109,10 @@ function harness(forms) {
                 return true;
             },
             getElementById: () => null,
-            querySelectorAll: (selector) =>
-                selector === `form[${MARK}]` ? forms.filter((form) => form.hasAttribute(MARK)) : [],
+            querySelectorAll: (selector) => {
+                const marks = Array.from(selector.matchAll(/form\[([\w-]+)\]/g), (m) => m[1]);
+                return forms.filter((form) => marks.some((mark) => form.hasAttribute(mark)));
+            },
         },
         addEventListener() {},
     });
@@ -179,6 +181,15 @@ test('resetting the guard clears the mark of every form', () => {
     assert.equal(second.hasAttribute(MARK), false);
     assert.equal(h.isDirty(), false);
     assert.deepEqual(h.dispatched, ['krt:unsaved-cleared', 'krt:unsaved-cleared']);
+});
+
+test('resetting the guard also clears the draft mark of an untracked dialog form', () => {
+    const dialogForm = new FakeForm({ noTrack: true });
+    dialogForm.setAttribute('data-krt-draft-edited', '');
+    const h = harness([dialogForm]);
+    h.reset();
+    assert.equal(dialogForm.hasAttribute('data-krt-draft-edited'), false);
+    assert.deepEqual(h.dispatched, ['krt:unsaved-cleared']);
 });
 
 if (failures > 0) {

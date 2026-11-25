@@ -31,7 +31,19 @@ import {
     sameBase,
     snapshotForm,
 } from '/js/kernel/krt-draft-snapshot.js';
-import { holdsUnsaved, UNSAVED_CLEARED_EVENT } from '/js/kernel/krt-unsaved-marks.js';
+import {
+    dialogOf,
+    findOpener,
+    openerOf,
+    showDialogOffer,
+    trackDialogOpeners,
+} from '/js/kernel/krt-draft-dialog.js';
+import {
+    holdsDraftEdits,
+    holdsUnsaved,
+    markDraftEdited,
+    UNSAVED_CLEARED_EVENT,
+} from '/js/kernel/krt-unsaved-marks.js';
 
 /** The pause after the last edit before a draft is written, in milliseconds. */
 const SNAPSHOT_DELAY_MS = 400;
@@ -51,6 +63,7 @@ const FIRST_FIELD_SELECTOR =
  * @property {string} key the storage key
  * @property {ReturnType<typeof setTimeout> | null} timer the pending snapshot
  * @property {KrtDraft | null} offered the stored draft the restore offer stands for
+ * @property {HTMLElement | null} notice the page-level offer of a dialog form's draft
  */
 
 /** @type {Map<string, KrtDraftAdapter>} */
@@ -147,25 +160,43 @@ function closeOffer(state) {
     if (offer instanceof HTMLElement) {
         offer.hidden = true;
     }
+    if (state.notice) {
+        state.notice.remove();
+        state.notice = null;
+    }
 }
 
 /**
- * Writes the form's current values as its draft while it holds unsaved edits.
+ * Tells whether a drafted form holds edits its draft keeps: the unsaved mark of a tracked form or
+ * the draft mark of an untracked dialog form.
+ *
+ * @param {HTMLFormElement} form the drafted form
+ * @returns {boolean} true while the form carries either mark
+ */
+function holdsEdits(form) {
+    return holdsUnsaved(form) || holdsDraftEdits(form);
+}
+
+/**
+ * Writes the form's current values as its draft while it holds unsaved edits; a dialog form's
+ * draft also names the opener that reopens the dialog.
  *
  * @param {DraftState} state the form's draft state
  */
 function capture(state) {
     state.timer = null;
     const form = state.form;
-    if (signingOut || !form.isConnected || !holdsUnsaved(form)) {
+    if (signingOut || !form.isConnected || !holdsEdits(form)) {
         return;
     }
     const adapter = adapters.get(form.dataset.krtDraft || '');
+    const dialog = dialogOf(form);
     writeDraft(state.key, {
         version: form.dataset.krtDraftVersion || '',
         snapshot: snapshotForm(form),
         extra: adapter ? adapter.serialize(form) : null,
         base: readBase(form),
+        opener: dialog ? openerOf(dialog) : undefined,
     });
 }
 
@@ -229,10 +260,37 @@ function restoreOffered(state) {
     }
     restoreForm(state.form, draft.snapshot);
     restoreBase(state.form, draft.base);
+    if (dialogOf(state.form) && !holdsUnsaved(state.form)) {
+        markDraftEdited(state.form);
+    }
     if (adapter && adapter.finish) {
         adapter.finish(state.form, draft.extra);
     }
     focusFirstField(state.form);
+}
+
+/**
+ * Wires the two buttons of a restore offer.
+ *
+ * @param {HTMLElement} element the offer
+ * @param {DraftState} state the form's draft state
+ * @param {{restore: () => void, discard: () => void}} actions what the buttons do
+ */
+function wireOfferActions(element, state, actions) {
+    element.addEventListener('click', (event) => {
+        const button =
+            event.target instanceof Element
+                ? event.target.closest('[data-krt-draft-action]')
+                : null;
+        if (!button || !state.offered) {
+            return;
+        }
+        if (button.getAttribute('data-krt-draft-action') === 'restore') {
+            actions.restore();
+        } else {
+            actions.discard();
+        }
+    });
 }
 
 /**
@@ -265,26 +323,52 @@ function offer(state, draft) {
         return;
     }
     wiredOffers.add(element);
-    element.addEventListener('click', (event) => {
-        const button =
-            event.target instanceof Element
-                ? event.target.closest('[data-krt-draft-action]')
-                : null;
-        if (!button || !state.offered) {
-            return;
-        }
-        if (button.getAttribute('data-krt-draft-action') === 'restore') {
-            restoreOffered(state);
-        } else {
+    wireOfferActions(element, state, {
+        restore: () => restoreOffered(state),
+        discard() {
             forget(state);
             focusFirstField(state.form);
-        }
+        },
     });
 }
 
 /**
- * Registers a drafted form and offers its stored draft back while the form is pristine; a draft of
- * another schema version is dropped.
+ * Shows the page-level offer of a dialog form's draft, since a reload closed the dialog; restore
+ * reopens the dialog through the same opener, which primes it, before the draft is written. A
+ * draft whose opener the page no longer has is dropped, as the dialog cannot be reopened in its
+ * context.
+ *
+ * @param {DraftState} state the form's draft state
+ * @param {KrtDraft} draft the stored draft
+ * @param {HTMLElement} dialog the dialog the form sits in
+ */
+function offerDialog(state, draft, dialog) {
+    const opener = draft.opener || '';
+    if (!findOpener(dialog, opener)) {
+        removeDraft(state.key);
+        return;
+    }
+    const notice = showDialogOffer(dialog, !sameBase(draft.base, readBase(state.form)));
+    if (!notice) {
+        return;
+    }
+    state.offered = draft;
+    state.notice = notice;
+    wireOfferActions(notice, state, {
+        restore() {
+            const current = findOpener(dialog, opener);
+            if (current) {
+                current.click();
+            }
+            restoreOffered(state);
+        },
+        discard: () => forget(state),
+    });
+}
+
+/**
+ * Registers a drafted form and offers its stored draft back while the form is pristine, on the
+ * page for a form in a dialog; a draft of another schema version is dropped.
  *
  * @param {HTMLFormElement} form the drafted form
  * @param {string} scope the opaque per-member key
@@ -297,7 +381,15 @@ function bindForm(form, scope) {
     }
     if (draft.version !== (form.dataset.krtDraftVersion || '')) {
         removeDraft(state.key);
-    } else if (!holdsUnsaved(form)) {
+        return;
+    }
+    if (holdsEdits(form)) {
+        return;
+    }
+    const dialog = dialogOf(form);
+    if (dialog) {
+        offerDialog(state, draft, dialog);
+    } else {
         offer(state, draft);
     }
 }
@@ -318,7 +410,7 @@ function stateOf(form, scope) {
         return known;
     }
     /** @type {DraftState} */
-    const state = { form, key, timer: null, offered: null };
+    const state = { form, key, timer: null, offered: null, notice: null };
     states.set(key, state);
     return state;
 }
@@ -378,6 +470,7 @@ function initKrtDrafts() {
     }
     pageScope = scope;
     removeDrafts(scope);
+    trackDialogOpeners();
     document.querySelectorAll(DRAFT_FORM_SELECTOR).forEach((form) => {
         if (form instanceof HTMLFormElement) {
             bindForm(form, scope);
@@ -389,6 +482,9 @@ function initKrtDrafts() {
         const form = draftedFormOf(event.target);
         if (!form) {
             return;
+        }
+        if (event.isTrusted && dialogOf(form) && !holdsUnsaved(form)) {
+            markDraftEdited(form);
         }
         const state = stateOf(form, scope);
         if (state.offered && event.isTrusted) {

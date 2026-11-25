@@ -907,14 +907,16 @@ interface KrtDraftSnapshot {
 }
 
 /**
- * A stored form draft: its schema version, its control values, the form adapter's part and, for an
- * edit form, the lock versions the edits were made against.
+ * A stored form draft: its schema version, its control values, the form adapter's part, for an
+ * edit form the lock versions the edits were made against, and for a dialog form the key of the
+ * opener that reopens the dialog.
  */
 interface KrtDraft {
     version: string;
     snapshot: KrtDraftSnapshot;
     extra: unknown;
     base?: Record<string, string>;
+    opener?: string;
 }
 
 /**

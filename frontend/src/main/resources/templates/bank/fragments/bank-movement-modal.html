@@ -4,7 +4,7 @@
 <th:block th:fragment="movementModal(modalId, refreshTarget, accountId, accountSelectable, justificationRequired, canDeposit, canWithdraw, canTransfer)">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId=${modalId}, titleKey='bank.modal.movement.title', variant='krt-modal--wide', body=~{bank/fragments/bank-movement-modal :: bank-movement-modal-body})}">
     <th:block th:ref="bank-movement-modal-body">
-        <form class="bank-ajax-form no-track" data-method="POST"
+        <form class="bank-ajax-form no-track" data-method="POST" data-krt-draft="bank-movement" data-krt-draft-version="1"
               data-livesync="bank:@account/account,bookings,chart bank:@destination/account,bookings,chart bank/grid orgunit-bank/orgUnitBank"
               th:with="initEndpoint=${canDeposit} ? '/api/proxy/bank/deposits' : (${canWithdraw} ? '/api/proxy/bank/withdrawals' : '/api/proxy/bank/transfers'),initAccountField=${canDeposit or canWithdraw} ? 'accountId' : 'sourceAccountId'"
               th:attr="data-refresh=${refreshTarget},data-account-id=${accountId},data-justification-required=${justificationRequired},data-endpoint=${initEndpoint},data-account-id-field=${initAccountField}">
