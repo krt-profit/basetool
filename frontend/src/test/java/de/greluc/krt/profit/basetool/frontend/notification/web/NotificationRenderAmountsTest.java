@@ -52,7 +52,7 @@ class NotificationRenderAmountsTest {
         messages,
         new BackendSideChannels(mock(WebClient.class), null),
         mock(OAuth2AuthorizedClientManager.class),
-        new SimpleMeterRegistry(),
+        new NotificationRelays(new SimpleMeterRegistry()),
         SecurityConfig.roleHierarchy(),
         new SessionGates(List.of()));
   }
@@ -81,7 +81,7 @@ class NotificationRenderAmountsTest {
             messages,
             new BackendSideChannels(mock(WebClient.class), null),
             mock(OAuth2AuthorizedClientManager.class),
-            new SimpleMeterRegistry(),
+            new NotificationRelays(new SimpleMeterRegistry()),
             SecurityConfig.roleHierarchy(),
             new SessionGates(List.of()));
     Map<String, String> params = new LinkedHashMap<>();

@@ -72,7 +72,7 @@ class NotificationPageControllerTest {
         messageSource,
         new BackendSideChannels(mock(WebClient.class), null),
         mock(OAuth2AuthorizedClientManager.class),
-        new SimpleMeterRegistry(),
+        new NotificationRelays(new SimpleMeterRegistry()),
         SecurityConfig.roleHierarchy(),
         new SessionGates(List.of()));
   }

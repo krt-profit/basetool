@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -45,10 +46,14 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  *
  * <p>Push is best-effort: a failed send drops the emitter. A periodic named {@code heartbeat} event
  * keeps idle connections alive and lets clients detect a half-open stream.
+ *
+ * <p>As a {@link SmartLifecycle} in the default phase it stops before the web server's graceful
+ * shutdown: it completes every open stream and refuses new ones, so no stream holds that shutdown
+ * for its whole phase.
  */
 @Service
 @Slf4j
-public class NotificationStreamService {
+public class NotificationStreamService implements SmartLifecycle {
 
   /** How long a single SSE connection is held open before the client must reconnect. */
   private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
@@ -73,6 +78,9 @@ public class NotificationStreamService {
 
   private final MeterRegistry meterRegistry;
 
+  /** Whether the instance is shutting down: its streams were completed and a new one is refused. */
+  private volatile boolean closed;
+
   /**
    * Binds the unlabelled {@code basetool_sse_connections} gauge to the number of open SSE
    * subscriptions on this instance (REQ-OBS-011).
@@ -84,17 +92,19 @@ public class NotificationStreamService {
     Gauge.builder(
             NotificationMetricNames.SSE_CONNECTIONS,
             emittersBySub,
-            map -> map.values().stream().mapToInt(Queue::size).sum())
+            NotificationStreamService::countOpen)
         .description("Live SSE subscriber connections summed across all recipients.")
         .register(meterRegistry);
   }
 
   /**
    * Registers a new SSE subscription for a recipient and returns its emitter. The emitter
-   * de-registers itself on completion, timeout or error.
+   * de-registers itself on completion, timeout or error. While the instance shuts down the emitter
+   * comes back completed and unregistered, so the client reconnects to the instance that answers
+   * next.
    *
    * @param recipientUserId the subscribing caller's {@code sub}
-   * @return the registered emitter
+   * @return the registered emitter, or a completed one while the instance shuts down
    */
   @NotNull
   public SseEmitter subscribe(@NotNull UUID recipientUserId) {
@@ -121,6 +131,10 @@ public class NotificationStreamService {
           recipientUserId,
           MAX_EMITTERS_PER_SUB);
       retireReplaced(old);
+    }
+    if (closed) {
+      reconnect(List.of(recipientUserId));
+      return emitter;
     }
     emitter.onCompletion(() -> remove(recipientUserId, emitter));
     emitter.onTimeout(() -> {
@@ -198,6 +212,45 @@ public class NotificationStreamService {
             remove(recipientUserId, emitter);
           }
         }));
+  }
+
+  /** Accepts subscriptions again; the registry accepts them from construction on. */
+  @Override
+  public void start() {
+    closed = false;
+  }
+
+  /**
+   * Refuses new subscriptions and completes every open stream, before the web server's graceful
+   * shutdown waits for in-flight requests: an open stream would otherwise hold it for its whole
+   * phase, a stream whose client is already gone included.
+   */
+  @Override
+  public void stop() {
+    closed = true;
+    int open = countOpen(emittersBySub);
+    reconnect(List.copyOf(emittersBySub.keySet()));
+    log.info("Closed {} notification SSE stream(s) ahead of the graceful shutdown", open);
+  }
+
+  /**
+   * Reports whether the registry accepts subscriptions, which it does until {@link #stop()}.
+   *
+   * @return {@code true} until the instance shuts down
+   */
+  @Override
+  public boolean isRunning() {
+    return !closed;
+  }
+
+  /**
+   * Counts the open streams across all recipients.
+   *
+   * @param emitters the registry's emitter queues by recipient
+   * @return the number of registered emitters
+   */
+  private static int countOpen(@NotNull Map<UUID, Queue<SseEmitter>> emitters) {
+    return emitters.values().stream().mapToInt(Queue::size).sum();
   }
 
   /**
