@@ -20,7 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeaveCause;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeavesMissionsObserver;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -29,15 +30,16 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The ordinary deletion path of ships: whatever references a ship lets go of it first through
- * {@link ShipDeletionObserver}, so a mission unit is released with its notice, then the ships go
- * and the unit hangar overviews refresh after the commit. The caller records its own audit event.
+ * The ordinary deletion path of ships: each ship first leaves its missions through {@link
+ * ShipLeavesMissionsObserver} with the cause {@link ShipLeaveCause#DELETED}, so a mission unit is
+ * released with its notice, then the ships go and the unit hangar overviews refresh after the
+ * commit. The caller records its own audit event.
  */
 @Component
 @RequiredArgsConstructor
 class HangarShipRemoval {
 
-  private final ShipDeletionObserver shipDeletionObserver;
+  private final ShipLeavesMissionsObserver shipLeavesMissionsObserver;
   private final EntityManager entityManager;
   private final ShipRepository shipRepository;
   private final HangarUnitLiveSync unitLiveSync;
@@ -51,7 +53,7 @@ class HangarShipRemoval {
   int remove(@NotNull List<Ship> ships) {
     int detached = 0;
     for (Ship ship : ships) {
-      detached += shipDeletionObserver.beforeShipDelete(ship.getId());
+      detached += shipLeavesMissionsObserver.shipLeaves(ship.getId(), ShipLeaveCause.DELETED);
     }
     entityManager.flush();
     shipRepository.deleteAll(ships);

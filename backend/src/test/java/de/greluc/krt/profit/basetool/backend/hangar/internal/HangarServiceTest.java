@@ -41,7 +41,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeaveCause;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeavesMissionsObserver;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
@@ -84,7 +85,7 @@ class HangarServiceTest {
   @Mock private ShipRepository shipRepository;
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private LocationRepository locationRepository;
-  @Mock private ShipDeletionObserver shipDeletionObserver;
+  @Mock private ShipLeavesMissionsObserver shipLeavesMissionsObserver;
   @Mock private EntityManager entityManager;
   @Mock private de.greluc.krt.profit.basetool.backend.identity.api.UserRepository userRepository;
   @Mock private RequestScopeResolver requestScopeResolver;
@@ -108,7 +109,7 @@ class HangarServiceTest {
             shipTypeRepository,
             locationRepository,
             new HangarShipRemoval(
-                shipDeletionObserver, entityManager, shipRepository, unitLiveSync),
+                shipLeavesMissionsObserver, entityManager, shipRepository, unitLiveSync),
             shipTypeMapper,
             requestScopeResolver,
             accessGateService,
@@ -196,13 +197,13 @@ class HangarServiceTest {
     ship2.setId(shipId2);
 
     when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship1, ship2));
-    when(shipDeletionObserver.beforeShipDelete(shipId1)).thenReturn(1);
-    when(shipDeletionObserver.beforeShipDelete(shipId2)).thenReturn(0);
+    when(shipLeavesMissionsObserver.shipLeaves(shipId1, ShipLeaveCause.DELETED)).thenReturn(1);
+    when(shipLeavesMissionsObserver.shipLeaves(shipId2, ShipLeaveCause.DELETED)).thenReturn(0);
 
     hangarService.deleteAllShipsForUser(userId);
 
-    verify(shipDeletionObserver).beforeShipDelete(shipId1);
-    verify(shipDeletionObserver).beforeShipDelete(shipId2);
+    verify(shipLeavesMissionsObserver).shipLeaves(shipId1, ShipLeaveCause.DELETED);
+    verify(shipLeavesMissionsObserver).shipLeaves(shipId2, ShipLeaveCause.DELETED);
     verify(entityManager, times(1)).flush();
     verify(shipRepository, times(1)).deleteAll(List.of(ship1, ship2));
     verify(auditService)
@@ -221,7 +222,7 @@ class HangarServiceTest {
 
     hangarService.deleteAllShipsForUser(userId);
 
-    verify(shipDeletionObserver, never()).beforeShipDelete(any());
+    verify(shipLeavesMissionsObserver, never()).shipLeaves(any(), any());
     verify(shipRepository, never()).deleteAll(anyList());
     verify(entityManager, never()).flush();
     verifyNoInteractions(auditService);
@@ -344,13 +345,13 @@ class HangarServiceTest {
     de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron unit = squadron(UUID.randomUUID());
     ship.setOwningOrgUnit(unit);
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
-    when(shipDeletionObserver.beforeShipDelete(shipId)).thenReturn(1);
+    when(shipLeavesMissionsObserver.shipLeaves(shipId, ShipLeaveCause.DELETED)).thenReturn(1);
 
     hangarService.deleteShip(userId, shipId);
 
     verify(unitLiveSync).shipsChanged(List.of(unit));
 
-    verify(shipDeletionObserver).beforeShipDelete(shipId);
+    verify(shipLeavesMissionsObserver).shipLeaves(shipId, ShipLeaveCause.DELETED);
     verify(auditService)
         .record(
             eq(AuditEventType.HANGAR_SHIP_DELETED),

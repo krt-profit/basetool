@@ -396,8 +396,8 @@ When the in-game ships are selected, the trigger deletes every member's ship who
 `IN_GAME` and not locked (REQ-HANGAR-017) and that was created before the live time (undated
 counts as before). A pledged ship, a ship of unknown origin and a ship whose origin an import or a
 pledge id locked stay. Each ship goes through the ordinary deletion path (`HangarShipRemoval`), so
-`ShipDeletionObserver` releases a mission unit that carried it with its notice; the exchange ship
-feed records the removal under the `patch` source.
+`ShipLeavesMissionsObserver` releases a mission unit that carried it with its notice (cause
+`DELETED`); the exchange ship feed records the removal under the `patch` source.
 
 **Acceptance**
 

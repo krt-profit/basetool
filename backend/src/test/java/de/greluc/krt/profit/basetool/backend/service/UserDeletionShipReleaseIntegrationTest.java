@@ -142,12 +142,15 @@ class UserDeletionShipReleaseIntegrationTest {
 
     List<NoticeEvent> notices =
         events.stream(NoticeEvent.class)
-            .filter(e -> e.eventType() == NotificationEventType.HANGAR_SHIP_DELETED_FROM_MISSION)
+            .filter(e -> e.eventType() == NotificationEventType.HANGAR_SHIP_LEFT_MISSION)
             .toList();
     assertThat(notices)
         .as("one notice per unit of the unfinished mission, none for the completed one")
         .hasSize(2)
-        .allSatisfy(notice -> assertThat(notice.contextMissionId()).isEqualTo(open.getId()));
+        .allSatisfy(notice -> {
+          assertThat(notice.contextMissionId()).isEqualTo(open.getId());
+          assertThat(notice.renderParams()).containsEntry("causeCode", "DELETED");
+        });
     assertThat(notices)
         .extracting(notice -> notice.renderParams().get("unit"))
         .containsExactlyInAnyOrder("Alpha", "Bravo");

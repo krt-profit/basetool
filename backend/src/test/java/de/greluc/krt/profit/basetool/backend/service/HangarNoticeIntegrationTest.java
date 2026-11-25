@@ -22,11 +22,13 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.events.HangarNotices;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeaveCause;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.events.MissionNotices;
 import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
@@ -44,8 +46,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The hangar and blueprint notices end to end against Postgres (REQ-HANGAR-005…008): the seeded
  * rules reach the ship's owner, the unit's responsible member and a member whose data an admin
- * changed, never the actor, and unassigning a ship clears the owner's notice. Runs in a rolled-back
- * transaction.
+ * changed, never the actor or a member who muted the type, and unassigning a ship clears the
+ * owner's notice. Runs in a rolled-back transaction.
  */
 @SpringBootTest
 @Transactional
@@ -57,6 +59,7 @@ class HangarNoticeIntegrationTest {
   private static final ActorRef ACTING = new ActorRef(ACTOR, "Ada");
 
   @Autowired private NotificationCreationService creationService;
+  @Autowired private NotificationMuteService muteService;
   @Autowired private NotificationRepository notificationRepository;
   @Autowired private UserRepository userRepository;
 
@@ -119,14 +122,33 @@ class HangarNoticeIntegrationTest {
     assertThat(inbox(OWNER)).isEmpty();
   }
 
+  private void shipLeft() {
+    creationService.createFromEvent(
+        MissionNotices.shipLeftMission(
+            missionId,
+            RESPONSIBLE,
+            "Cutlass Black",
+            "Op Aurora",
+            "Alpha",
+            ShipLeaveCause.DELETED,
+            ACTING));
+  }
+
   @Test
   void aDeletedShipTellsTheUnitsResponsibleMemberButNotTheActor() {
-    creationService.createFromEvent(
-        HangarNotices.shipDeleted(
-            missionId, RESPONSIBLE, "Cutlass Black", "Op Aurora", "Alpha", ACTING));
+    shipLeft();
 
     assertThat(inbox(RESPONSIBLE)).containsExactly(NotificationType.HANGAR_SHIP_REMOVED_FROM_UNIT);
     assertThat(inbox(ACTOR)).isEmpty();
+  }
+
+  @Test
+  void aMemberWhoMutedTheGapNoticeStillHearsNothing() {
+    muteService.setMuted(RESPONSIBLE, NotificationType.HANGAR_SHIP_REMOVED_FROM_UNIT, true);
+
+    shipLeft();
+
+    assertThat(inbox(RESPONSIBLE)).isEmpty();
   }
 
   @Test

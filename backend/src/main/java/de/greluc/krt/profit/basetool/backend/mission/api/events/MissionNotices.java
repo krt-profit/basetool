@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.api.events;
 
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeaveCause;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
@@ -454,6 +455,39 @@ public final class MissionNotices {
         .entityId(unitId)
         .supersedeRecipients(Set.of(ownerId))
         .resolvesNotificationTypesForRecipients(SHIP_ASSIGNED)
+        .build();
+  }
+
+  /**
+   * A ship left a unit of a mission that is not finished (REQ-HANGAR-006); the coded {@code
+   * causeCode} picks the notice's text.
+   *
+   * @param missionId the mission, the {@code MISSION_LEADERSHIP} selector input
+   * @param responsibleId the unit's responsible member, or {@code null}
+   * @param shipType the ship's type name (never the ship's own name)
+   * @param missionName the mission's name
+   * @param unitName the unit's name
+   * @param cause why the ship left the unit
+   * @param actor who caused it
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent shipLeftMission(
+      @NotNull UUID missionId,
+      @Nullable UUID responsibleId,
+      @Nullable String shipType,
+      @Nullable String missionName,
+      @Nullable String unitName,
+      @NotNull ShipLeaveCause cause,
+      @NotNull ActorRef actor) {
+    return base(NotificationEventType.HANGAR_SHIP_LEFT_MISSION, missionId, actor)
+        .contextRecipientUserId(responsibleId)
+        .renderParams(
+            params(
+                "shipType", text(shipType),
+                "mission", text(missionName),
+                "unit", text(unitName),
+                "causeCode", cause.name()))
         .build();
   }
 }
