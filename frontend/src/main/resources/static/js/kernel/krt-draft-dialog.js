@@ -32,6 +32,9 @@ const KERNEL_PREFIX = 'data-krt-';
 /** The state changes of a dialog that tell it opened. */
 const OPEN_OBSERVATION = { attributes: true, attributeFilter: ['class', 'open'] };
 
+/** The root of a page's content: its `<main>`, or the `.page-wrapper` of a page without one. */
+const PAGE_CONTENT_SELECTOR = 'main, .page-wrapper';
+
 /** The template of the page-level offer of a dialog draft (`kernel/fragments/draft-offer.html`). */
 const NOTICE_TEMPLATE_ID = 'krt-draft-dialog-offer';
 
@@ -217,7 +220,7 @@ function dialogName(dialog) {
  */
 export function showDialogOffer(dialog, stale) {
     const template = document.getElementById(NOTICE_TEMPLATE_ID);
-    const host = document.querySelector('main');
+    const host = document.querySelector(PAGE_CONTENT_SELECTOR);
     if (!(template instanceof HTMLTemplateElement) || !host) {
         return null;
     }
