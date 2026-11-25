@@ -18,16 +18,19 @@
  */
 
 /**
- * Regression tests for the tab-scoped form drafts (REQ-FE-041): the store, the form snapshot and
- * the page wiring run in a vm context over a small fake DOM, a fake session storage, manual timers
- * and recorded document listeners.
+ * Regression tests for the tab-scoped form drafts (REQ-FE-041): the store, the form snapshot, the
+ * row-count adapter and the page wiring run in a vm context over a small fake DOM, a fake session
+ * storage, manual timers and recorded document listeners.
  */
 
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { flattenModule, UI_STUBS } from './flatten-module.mjs';
 
-const SOURCE = flattenModule('kernel/krt-drafts.js', UI_STUBS);
+const SOURCE = [
+    flattenModule('kernel/krt-drafts.js', UI_STUBS),
+    flattenModule('kernel/krt-draft-rows.js'),
+].join('\n');
 
 const PATH = '/refinery-orders/create';
 const SCOPE = 'scope-a';
@@ -314,9 +317,9 @@ function page() {
 
 /**
  * Loads the draft scripts over a page and a storage, with manual timers and recorded document and
- * window listeners.
+ * window listeners; a page still loading runs them only once `DOMContentLoaded` is fired.
  */
-function harness(storageEntries = {}, dom = page()) {
+function harness(storageEntries = {}, dom = page(), readyState = 'complete') {
     const storage = fakeStorage(storageEntries);
     const timers = [];
     const docListeners = {};
@@ -335,7 +338,7 @@ function harness(storageEntries = {}, dom = page()) {
         }
     }
     const document = {
-        readyState: 'complete',
+        readyState,
         visibilityState: 'visible',
         querySelector: (selector) => dom.body.querySelector(selector),
         querySelectorAll: (selector) => dom.body.querySelectorAll(selector),
@@ -635,6 +638,113 @@ test('a malformed entry is removed and a refused write keeps no draft', () => {
         `writeDraft(${JSON.stringify(h.key)}, { version: '1', snapshot: { fields: {}, combos: {} }, extra: null })`,
     );
     assert.equal(written, false);
+});
+
+/**
+ * Adds a second drafted form with its own offer to a page.
+ *
+ * @param {object} dom the page from {@link page}
+ * @param {string} formKey the second form's key
+ * @returns {{form: object, offer: object}} the second form and its offer
+ */
+function addSecondForm(dom, formKey) {
+    const form = new FakeForm({ 'data-krt-draft': formKey });
+    form.dataset = { krtDraft: formKey, krtDraftVersion: '1' };
+    const offer = new FakeElement('div', { 'data-krt-draft-offer': '' });
+    offer.hidden = true;
+    form.append(offer, new FakeInput('text', { name: 'handle' }));
+    dom.body.append(form);
+    return { form, offer };
+}
+
+test('a loading page offers its drafts on DOMContentLoaded, after the page registered adapters', () => {
+    const h = harness({ [keyFor(SCOPE)]: storedDraft() }, page(), 'interactive');
+    assert.equal(h.offer.hidden, true);
+    const revealed = [];
+    h.context.registerDraftAdapter(FORM_KEY, {
+        serialize: () => null,
+        restore() {},
+        reveal: (form) => revealed.push(form),
+    });
+    h.fire('DOMContentLoaded', {});
+    assert.equal(h.offer.hidden, false);
+    assert.deepEqual(revealed, [h.form]);
+});
+
+test('only the first offer of a page reveals its form', () => {
+    const dom = page();
+    const second = addSecondForm(dom, 'second-form');
+    const h = harness(
+        {
+            [keyFor(SCOPE)]: storedDraft(),
+            [keyFor(SCOPE, ORG_UNIT, 'second-form')]: storedDraft(),
+        },
+        dom,
+        'interactive',
+    );
+    const revealed = [];
+    [FORM_KEY, 'second-form'].forEach((formKey) => {
+        h.context.registerDraftAdapter(formKey, {
+            serialize: () => null,
+            restore() {},
+            reveal: () => revealed.push(formKey),
+        });
+    });
+    h.fire('DOMContentLoaded', {});
+    assert.deepEqual(revealed, [FORM_KEY]);
+    assert.equal(h.offer.hidden, false);
+    assert.equal(second.offer.hidden, false);
+});
+
+/**
+ * Builds rows a row-count adapter works on: a list that `add` grows and `remove` shrinks while
+ * more than `floor` rows remain.
+ *
+ * @param {number} count the rows at the start
+ * @param {number} floor the rows `remove` never goes below
+ */
+function rowList(count, floor = 1) {
+    const rows = Array.from({ length: count }, (_, i) => ({ i }));
+    return {
+        rows,
+        api: {
+            rows: () => rows.slice(),
+            add: () => rows.push({ i: rows.length }),
+            remove(row) {
+                if (rows.length > floor) {
+                    rows.splice(rows.indexOf(row), 1);
+                }
+            },
+        },
+    };
+}
+
+test('a row-count adapter stores the rows and adds or removes rows to match on restore', () => {
+    const h = harness();
+    const list = rowList(3);
+    const adapter = h.context.rowCountAdapter(list.api);
+    assert.deepEqual({ ...adapter.serialize() }, { rows: 3 });
+    adapter.restore(null, { rows: 5 });
+    assert.equal(list.rows.length, 5);
+    adapter.restore(null, { rows: 2 });
+    assert.equal(list.rows.length, 2);
+    adapter.restore(null, { rows: 'many' });
+    assert.equal(list.rows.length, 1);
+    assert.equal(adapter.reveal, undefined);
+});
+
+test('a row-count adapter stops when a row cannot be removed and passes reveal on', () => {
+    const h = harness();
+    const list = rowList(4, 3);
+    const revealed = [];
+    const adapter = h.context.rowCountAdapter({
+        ...list.api,
+        reveal: (form) => revealed.push(form),
+    });
+    adapter.restore(null, { rows: 1 });
+    assert.equal(list.rows.length, 3);
+    adapter.reveal('form');
+    assert.deepEqual(revealed, ['form']);
 });
 
 if (failures > 0) {

@@ -31,6 +31,13 @@ import { localisedName } from '/js/kernel/krt-localised-name.js';
 import { formatParts, separatorsFor } from '/js/kernel/krt-number-format.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { krtFocusNewRow } from '/js/kernel/krt-row-focus.js';
+import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
+import { rowCountAdapter } from '/js/kernel/krt-draft-rows.js';
+import {
+    itemLineDrafts,
+    readItemLineDrafts,
+    restoreItemLines,
+} from '/js/joborder/order-item-drafts.js';
 
 /** @typedef {ApiDto<'MaterialDto'> & {id: string}} OrderMaterial */
 /** @typedef {ApiDto<'BlueprintReferenceDto'> & {id: string}} OrderBlueprint */
@@ -1031,3 +1038,61 @@ function initCreationUnitPairs() {
 }
 initCreationUnitPairs();
 initAuecSummary();
+
+/**
+ * Switches the create page to one of its order kinds.
+ *
+ * @param {string} mode `material`, `item` or `auec`
+ */
+function selectOrderMode(mode) {
+    const radio = document.querySelector(`input[name="orderModeToggle"][value="${mode}"]`);
+    if (radio instanceof HTMLInputElement) {
+        radio.checked = true;
+        toggleOrderMode();
+    }
+}
+
+registerDraftAdapter(
+    'job-order-material-create',
+    rowCountAdapter({
+        rows: () => Array.from(document.querySelectorAll('#materials-container .material-row')),
+        add: addMaterialRow,
+        remove(row) {
+            const removeButton = row.querySelector('[data-trigger="orders-remove-material"]');
+            if (removeButton) {
+                removeMaterialRow(removeButton);
+            }
+        },
+        reveal() {
+            selectOrderMode('material');
+        },
+    }),
+);
+
+registerDraftAdapter('job-order-item-create', {
+    serialize() {
+        return { lines: itemLinesContainer ? itemLineDrafts(itemLinesContainer) : [] };
+    },
+    restore(_form, extra) {
+        if (!itemLinesContainer) {
+            return;
+        }
+        itemLinesContainer.replaceChildren();
+        itemLineIndex = 0;
+        restoreItemLines(readItemLineDrafts(extra), addItemLine);
+        updateItemSummary();
+    },
+    reveal() {
+        selectOrderMode('item');
+    },
+});
+
+registerDraftAdapter('job-order-auec-create', {
+    serialize() {
+        return null;
+    },
+    restore() {},
+    reveal() {
+        selectOrderMode('auec');
+    },
+});

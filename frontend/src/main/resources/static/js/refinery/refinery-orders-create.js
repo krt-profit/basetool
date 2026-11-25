@@ -29,6 +29,7 @@ import { krtFocusNewRow } from '/js/kernel/krt-row-focus.js';
 import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
 import { registerDraftAdapter } from '/js/kernel/krt-drafts.js';
+import { rowCountAdapter } from '/js/kernel/krt-draft-rows.js';
 
 krtRefineryYield.init(MATERIAL_YIELD_BONUSES, {
     help: MATERIAL_YIELD_BONUS_HELP,
@@ -271,47 +272,19 @@ function removeMaterialRow(button) {
     });
 }
 
-/**
- * Lists the goods rows of the create form.
- *
- * @returns {Element[]} the rows in order
- */
-function materialRows() {
-    return Array.from(document.querySelectorAll('#materials-container .material-entry'));
-}
-
-/**
- * Reads the number of goods rows a draft recorded.
- *
- * @param {unknown} extra the draft part this page stored
- * @returns {number} the row count, at least one
- */
-function draftRowCount(extra) {
-    const rows =
-        extra && typeof extra === 'object' ? /** @type {{rows?: unknown}} */ (extra).rows : null;
-    return typeof rows === 'number' && rows >= 1 ? Math.floor(rows) : 1;
-}
-
-registerDraftAdapter('refinery-order-create', {
-    serialize() {
-        return { rows: materialRows().length };
-    },
-    restore(_form, extra) {
-        const wanted = draftRowCount(extra);
-        while (materialRows().length < wanted) {
-            addMaterialRow();
-        }
-        let rows = materialRows();
-        while (rows.length > wanted) {
-            const removeButton = rows[rows.length - 1].querySelector('.remove-btn');
-            if (!removeButton) {
-                break;
+registerDraftAdapter(
+    'refinery-order-create',
+    rowCountAdapter({
+        rows: () => Array.from(document.querySelectorAll('#materials-container .material-entry')),
+        add: addMaterialRow,
+        remove(row) {
+            const removeButton = row.querySelector('.remove-btn');
+            if (removeButton) {
+                removeMaterialRow(removeButton);
             }
-            removeMaterialRow(removeButton);
-            rows = materialRows();
-        }
-    },
-});
+        },
+    }),
+);
 
 function updateMethodRatings() {
     const methodSelect = /** @type {HTMLSelectElement | null} */ (

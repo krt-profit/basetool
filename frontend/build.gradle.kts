@@ -853,15 +853,34 @@ val testUnsavedChangesJs =
 val testDraftsJs =
   registerNodeScriptTest(
     "testDraftsJs",
-    "Regression tests for the tab-scoped form drafts: store, snapshot and page wiring (REQ-FE-041).",
+    "Regression tests for the tab-scoped form drafts: store, snapshot, row-count adapter and page wiring (REQ-FE-041).",
     "scripts/krt-drafts.test.mjs",
     "npmSetup",
   ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
-    listOf("krt-drafts.js", "krt-draft-store.js", "krt-draft-snapshot.js", "krt-unsaved-marks.js")
+    listOf(
+        "krt-drafts.js",
+        "krt-draft-store.js",
+        "krt-draft-snapshot.js",
+        "krt-draft-rows.js",
+        "krt-unsaved-marks.js",
+      )
       .forEach {
         inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/$it"))
       }
+  }
+
+val testOrderItemDraftsJs =
+  registerNodeScriptTest(
+    "testOrderItemDraftsJs",
+    "Regression tests for the item lines of a job-order create draft (REQ-FE-041).",
+    "scripts/order-item-drafts.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/joborder/order-item-drafts.js"),
+    )
   }
 
 val testKrtFetchReadJs =
@@ -1421,5 +1440,6 @@ tasks.named("check").configure {
     testLiveSyncJs,
     testUnsavedChangesJs,
     testDraftsJs,
+    testOrderItemDraftsJs,
   )
 }

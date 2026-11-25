@@ -56,6 +56,9 @@ const states = new Map();
 /** Whether the member is signing out, after which the page writes no draft any more. */
 let signingOut = false;
 
+/** Whether a restore offer of the page has already been shown. */
+let revealed = false;
+
 /**
  * Registers the part of a form's draft that the page's own script keeps, such as the number of
  * its script-built rows. The adapter restores that part before the control values are written.
@@ -215,7 +218,8 @@ function restoreOffered(state) {
 }
 
 /**
- * Shows a form's restore offer for its stored draft and wires its two buttons.
+ * Shows a form's restore offer for its stored draft and wires its two buttons. The first offer of
+ * the page asks the form's adapter to reveal the form, for a page that shows one of several forms.
  *
  * @param {DraftState} state the form's draft state
  * @param {KrtDraft} draft the stored draft
@@ -225,6 +229,11 @@ function offer(state, draft) {
     if (!(element instanceof HTMLElement)) {
         return;
     }
+    const adapter = adapters.get(state.form.dataset.krtDraft || '');
+    if (!revealed && adapter && adapter.reveal) {
+        adapter.reveal(state.form);
+    }
+    revealed = true;
     state.offered = draft;
     element.hidden = false;
     element.addEventListener('click', (event) => {
@@ -389,8 +398,10 @@ function initKrtDrafts() {
     });
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initKrtDrafts);
-} else {
+// The page's module scripts all run before DOMContentLoaded, so their adapters are registered when
+// the offers are made.
+if (document.readyState === 'complete') {
     initKrtDrafts();
+} else {
+    document.addEventListener('DOMContentLoaded', initKrtDrafts);
 }

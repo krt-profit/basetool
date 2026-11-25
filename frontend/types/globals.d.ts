@@ -920,6 +920,8 @@ interface KrtDraft {
 interface KrtDraftAdapter {
     serialize(form: HTMLFormElement): unknown;
     restore(form: HTMLFormElement, extra: unknown): void;
+    /** Shows the form when the page offers its draft first, on a page that shows one of several. */
+    reveal?(form: HTMLFormElement): void;
 }
 
 interface HTMLElement {

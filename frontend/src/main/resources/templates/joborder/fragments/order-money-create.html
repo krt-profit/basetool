@@ -3,7 +3,9 @@
 <body>
 <div id="mode-auec" th:fragment="form(auecMode)" th:hidden="${!auecMode}">
     <form class="orders-create__form" th:action="@{/orders/auec}" method="post"
-          th:data-error="#{orders.money.create.error}">
+          th:data-error="#{orders.money.create.error}"
+          th:attr="data-krt-draft=${drafted} ? 'job-order-auec-create' : null,data-krt-draft-version=${drafted} ? '1' : null">
+        <th:block th:if="${drafted}"><th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" /></th:block>
         <fieldset class="form-section">
             <legend class="form-section__head" th:text="|1 · #{orders.create.section.order}|"></legend>
             <div class="form-grid">
