@@ -1,4 +1,5 @@
 import { krtSessionGate } from '/js/kernel/krt-fetch.js';
+import { krtMaintenance } from '/js/kernel/krt-maintenance.js';
 import { holdsUnsaved, UNSAVED_CLEARED_EVENT } from '/js/kernel/krt-unsaved-marks.js';
 
 const DEFAULT_COALESCE_MS = 400;
@@ -36,6 +37,7 @@ const syncSocket = (function () {
     const RECONNECT_MAX_MS = 30000;
     const SOCKET_CAP_CLOSE_CODE = 4029;
     const TERMS_GATE_CLOSE_CODE = 4003;
+    const SERVICE_RESTART_CLOSE_CODE = 1012;
     const DENY_REASON_INDETERMINATE = 'indeterminate';
     const RESUBSCRIBE_BASE_MS = 1000;
     const RESUBSCRIBE_MAX_MS = 30000;
@@ -210,6 +212,9 @@ const syncSocket = (function () {
         }
         if (ev && ev.code === SOCKET_CAP_CLOSE_CODE) {
             reconnectDelay = RECONNECT_MAX_MS;
+        }
+        if (ev && ev.code === SERVICE_RESTART_CLOSE_CODE) {
+            krtMaintenance.enter();
         }
         Object.keys(topics).forEach((t) => {
             clearResubscribe(topics[t]);

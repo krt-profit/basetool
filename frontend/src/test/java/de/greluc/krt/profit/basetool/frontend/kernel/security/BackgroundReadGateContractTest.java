@@ -57,8 +57,15 @@ class BackgroundReadGateContractTest {
   /** The client-error beacon, which must work when {@code krtFetch} did not load. */
   private static final String CLIENT_ERROR_MODULE = "/static/js/kernel/krt-client-error.js";
 
-  /** The only scripts allowed to call {@code fetch} themselves. */
-  private static final Set<String> TRANSPORT_FILES = Set.of("krt-fetch.js", "krt-client-error.js");
+  /** The maintenance probe, which asks a public static file without a cookie (REQ-FE-040). */
+  private static final String MAINTENANCE_MODULE = "/static/js/kernel/krt-maintenance.js";
+
+  /**
+   * The only scripts allowed to call {@code fetch} themselves: the transport, the client-error
+   * beacon and the cookie-less maintenance probe.
+   */
+  private static final Set<String> TRANSPORT_FILES =
+      Set.of("krt-fetch.js", "krt-client-error.js", "krt-maintenance.js");
 
   /** Fewer scanned scripts than this means the walk lost its root. */
   private static final int MIN_SCRIPTS = 100;
@@ -198,6 +205,20 @@ class BackgroundReadGateContractTest {
     assertThat(readResource(CLIENT_ERROR_MODULE))
         .as("the beacon is the one script that may not depend on krtFetch")
         .doesNotContain("krtFetch");
+  }
+
+  /**
+   * The maintenance probe may call {@code fetch} itself only because it carries no session: it asks
+   * the public favicon without a cookie, so neither gate nor a re-authentication applies to it.
+   *
+   * @throws IOException if the module cannot be read from the classpath
+   */
+  @Test
+  void theMaintenanceProbe_asksAPublicFileWithoutACookie() throws IOException {
+    assertThat(readResource(MAINTENANCE_MODULE))
+        .contains("const PROBE_URL = '/favicon.ico';")
+        .contains("credentials: 'omit'")
+        .contains("method: 'HEAD'");
   }
 
   /**

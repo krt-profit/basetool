@@ -36,6 +36,8 @@ export const UI_STUBS = {
         'const krtModal = { open() {}, close() {}, isOpen() { return false; }, topmost() { return null; }, layerRoot() { return null; } };',
     '/js/kernel/toast.js':
         'function showFrontendErrorToast() {}\nfunction showFrontendSuccessToast() {}\nfunction showKrtConfirm() { return Promise.resolve(true); }',
+    '/js/kernel/krt-maintenance.js':
+        'const krtMaintenance = { enter() {}, observe() { return false; }, isActive() { return false; }, isMaintenanceResponse() { return false; } };',
 };
 
 const ROOT = fileURLToPath(new URL('../src/main/resources/static/', import.meta.url));

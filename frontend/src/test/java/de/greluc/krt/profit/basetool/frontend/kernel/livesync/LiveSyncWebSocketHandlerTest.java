@@ -1863,6 +1863,34 @@ class LiveSyncWebSocketHandlerTest {
             + "}");
   }
 
+  @Test
+  void closeAllForRestart_closesEveryOpenSocketWith1012_andRefusesANewOne() throws Exception {
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+
+    int closed = handler.closeAllForRestart();
+
+    assertThat(closed).isEqualTo(2);
+    assertThat(alice.closeStatus).isEqualTo(CloseStatus.SERVICE_RESTARTED);
+    assertThat(bob.closeStatus).isEqualTo(CloseStatus.SERVICE_RESTARTED);
+    assertThat(handler.admitsSockets()).isFalse();
+    FakeSession late = openMultiplexedSession(oidcUser("user-3", "Carol"));
+    assertThat(late.closeStatus)
+        .as("a socket opened during the shutdown learns of the restart too")
+        .isEqualTo(CloseStatus.SERVICE_RESTARTED);
+  }
+
+  @Test
+  void acceptSocketsAgain_afterTheRestartClose_admitsSocketsAgain() throws Exception {
+    handler.closeAllForRestart();
+
+    handler.acceptSocketsAgain();
+    FakeSession session = openMultiplexedSession(oidcUser("user-1", "Alice"));
+
+    assertThat(handler.admitsSockets()).isTrue();
+    assertThat(session.closeStatus).isNull();
+  }
+
   private void subscribe(FakeSession session, String topic) throws Exception {
     handler.handleTextMessage(
         session, new TextMessage("{\"type\":\"subscribe\",\"topic\":\"" + topic + "\"}"));

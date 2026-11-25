@@ -139,6 +139,18 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
         liveSyncSubscribeAuthExecutor());
   }
 
+  /**
+   * Closes the {@code /ws/sync} sockets with 1012 before the web server's graceful shutdown
+   * (REQ-FE-040).
+   *
+   * @return the lifecycle bean bound to the handler bean
+   */
+  @NotNull
+  @Bean
+  public LiveSyncRestartNotice liveSyncRestartNotice() {
+    return new LiveSyncRestartNotice(liveSyncWebSocketHandler());
+  }
+
   /** {@inheritDoc} */
   @Override
   public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {

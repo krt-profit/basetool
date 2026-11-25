@@ -863,6 +863,21 @@ val testKrtFetchReadJs =
     )
   }
 
+val testMaintenanceJs =
+  registerNodeScriptTest(
+    "testMaintenanceJs",
+    "Regression tests for the maintenance banner and its probe, the transport's calls into it and the error toast it silences (REQ-FE-040).",
+    "scripts/krt-maintenance.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-maintenance.js"),
+    )
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/toast.js"))
+  }
+
 val testKrtFetchSwapPressJs =
   registerNodeScriptTest(
     "testKrtFetchSwapPressJs",
@@ -1351,6 +1366,7 @@ tasks.named("check").configure {
   dependsOn("checkExchangeDocs")
   dependsOn(
     testKrtFetchReadJs,
+    testMaintenanceJs,
     testKrtFetchSwapPressJs,
     testPageSectionsJs,
     testTrustedTypesJs,
