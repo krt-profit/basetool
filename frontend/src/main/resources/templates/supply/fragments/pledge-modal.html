@@ -4,7 +4,7 @@
 <th:block th:fragment="pledgeModal">
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='supply-pledge-modal', titleKey='supply.pledge.title', titleId='supply-pledge-title', variant='krt-modal--wide', body=~{::supply-pledge-modal-body})}">
         <th:block th:ref="supply-pledge-modal-body">
-            <form id="supply-pledge-form" class="no-track" novalidate>
+            <form id="supply-pledge-form" class="no-track" novalidate data-krt-draft="supply-pledge" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                     <input type="hidden" id="supply-pledge-need-id">
                     <p class="supply-pledge-need" id="supply-pledge-need-label" hidden></p>

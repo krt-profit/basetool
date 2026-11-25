@@ -98,6 +98,7 @@ a cancelled dialog still does. @greluc chose to keep that and to give dialogs a 
    before, and a reload offers it.
 3. **The offer is on the page, restore goes through the opener.** The page shows the offer at the
    top of its content and names the dialog. Restore clicks the control that opened the dialog, so
-   the page primes the dialog's context as it always does, and then writes the draft. The draft
-   records that opener only as a hash of its `data-modal-id` and `data-field-*` context, so no
-   hidden value is stored; a draft whose opener the page no longer has is dropped.
+   the page primes the dialog's context as it always does, and writes the draft once the dialog is
+   open, for a page that loads the dialog's content first. The draft records that opener only as a
+   hash of its `data-*` attributes, which name its action and context, so no hidden value is
+   stored; a draft whose opener the page no longer has is dropped.

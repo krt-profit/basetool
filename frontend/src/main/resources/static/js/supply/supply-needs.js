@@ -21,6 +21,7 @@
 
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { registerDraftAdapter, setDraftKey } from '/js/kernel/krt-drafts.js';
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import {
     bindFilterForm,
@@ -35,6 +36,9 @@ import {
     sendWrite,
     textOrNull,
 } from '/js/supply/supply-common.js';
+
+/** The form key of the need dialog while it raises a new need (REQ-FE-041). */
+const NEED_DRAFT_KEY = 'supply-need';
 
 document.addEventListener('DOMContentLoaded', () => {
     const afterWrite = bindResults({
@@ -71,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function openCreate() {
         resetForm(/** @type {HTMLFormElement} */ (form));
+        setDraftKey(/** @type {HTMLFormElement} */ (form), NEED_DRAFT_KEY);
         field('supply-need-id').value = '';
         field('supply-need-version').value = '';
         [
@@ -95,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function openEdit(button) {
         resetForm(/** @type {HTMLFormElement} */ (form));
+        setDraftKey(/** @type {HTMLFormElement} */ (form), null);
         field('supply-need-id').value = button.getAttribute('data-need-id') || '';
         field('supply-need-version').value = button.getAttribute('data-version') || '';
         field('supply-need-amount').value = button.getAttribute('data-amount') || '';
@@ -154,6 +160,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const unitSelect = select('supply-need-unit');
     unitSelect.addEventListener('change', () => showJobOrdersOf(unitSelect.value, '', ''));
+
+    registerDraftAdapter(NEED_DRAFT_KEY, {
+        serialize() {
+            return { jobOrder: jobOrder.value };
+        },
+        restore() {},
+        finish(_form, extra) {
+            const stored =
+                extra && typeof extra === 'object'
+                    ? /** @type {{jobOrder?: unknown}} */ (extra).jobOrder
+                    : null;
+            if (
+                typeof stored === 'string' &&
+                Array.from(jobOrder.options).some((o) => o.value === stored && !o.disabled)
+            ) {
+                jobOrder.value = stored;
+            }
+        },
+    });
 
     krtEvents.on('click', 'supply-open-need', openCreate);
     krtEvents.on('click', 'supply-edit-need', openEdit);

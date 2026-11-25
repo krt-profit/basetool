@@ -3194,20 +3194,30 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   (`mission-edit`), the member edit form (`member-edit`) and the six section forms of the profile
   (`profile-description`, `profile-rsi-handle`, `profile-payout`, `profile-blueprint-sharing`,
   `profile-name-withholding`, `profile-home-location`), and the create dialogs (see *Dialog
-  forms*): the bank movement (`bank-movement`) and the org-unit bank request
-  (`org-unit-bank-request`); the further create dialogs of #3747 follow one by one.
+  forms*): the bank movement (`bank-movement`), the org-unit bank request
+  (`org-unit-bank-request`), the supply need (`supply-need`, only while it raises a new need), the
+  supply pledge (`supply-pledge`), the pledge from the Lager (`supply-lager-pledge`) and the
+  recorded donation (`supply-record`); the further create dialogs of #3747 follow one by one.
 - **Dialog forms.** A form in a dialog (`.krt-modal-overlay`) opts in the same way and needs no
-  offer of its own. Its draft also records the opener that last opened the dialog, as a hash of
-  the opener's `data-modal-id` and `data-field-*` context, so the context itself is never stored.
-  A form the guard does not track (`no-track`, as the bank forms are) gets the draft mark
+  offer of its own. Its draft also records the opener whose click last opened the dialog (a
+  `data-modal-id` or `data-trigger` control), as a hash of the opener's `data-*` attributes, which
+  name its action and the context it primes the dialog with, such as the need it acts on; the
+  context itself is never stored. The opener is the last such control clicked before the dialog
+  opened, so a dialog that opens only after the page loaded its content is matched too. A form the
+  guard does not track (`no-track`, as the bank and supply forms are) gets the draft mark
   `data-krt-draft-edited` on a trusted edit instead of the unsaved mark; only the drafts read it,
   so the leave warning and live sync stay as they are. A reload closes the dialog, so the page
   shows the offer at the top of its content (`kernel/fragments/draft-offer :: draftDialogOffer`)
   and names the dialog; restore clicks the same opener, so the page opens and primes the dialog as
-  it always does, and then writes the draft. A draft whose opener the page no longer has is
-  dropped. Closing a dialog keeps its draft. Controls that switch others on, such as the bank
-  dialogs' type, account and split toggle, are set first by `leadingControlsAdapter`
-  (`krt-draft-lead.js`, registered in `bank/bank-drafts.js`), so the values go into enabled fields.
+  it always does, and writes the draft once the dialog is open. A draft whose opener the page no
+  longer has is dropped. Closing a dialog keeps its draft; a page that empties its dialog when it
+  reopens it, as the supply dialogs do, drops the draft with that reset. A dialog that both creates
+  and edits turns its draft off while it edits (`setDraftKey`). Controls that switch others on,
+  such as the bank dialogs' type, account and split toggle, are set first by
+  `leadingControlsAdapter` (`krt-draft-lead.js`, registered in `bank/bank-drafts.js`), so the
+  values go into enabled fields; the supply need's adapter (`supply/supply-needs.js`) sets its job
+  order again after the restored unit reset it. A choice the dialog loads only after it opened,
+  such as the pledge's stock source, is not restored.
 - **Edit forms.** An edit form marks its lock-version fields `data-krt-draft-base`. Its draft
   records their values as its base, apart from the snapshot, so no version is ever a restored field
   value. The key's page path names the entity, so two entities edited in one tab never share a
@@ -3315,6 +3325,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 - [x] A reload of a page with a half-filled create dialog offers the input on the page; restore
   opens the dialog through its opener and fills it, the booking removes the draft, closing the
   dialog keeps it and a discard drops it; the leave warning stays off for an untracked dialog.
+- [x] The supply need and pledge dialogs do the same; the need's edit mode keeps no draft.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3329,7 +3340,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `InventoryOperationsE2eTest#einbuchenDraftComesBackAfterAReloadAndTheBookingClearsIt`,
 `MissionTemplateEditorE2eTest#reloadOffersTheTemplateDraftBackWithItsPartsAndRows`,
 `RefineryOrderEditDraftE2eTest`, `MissionEditDraftE2eTest`, `MemberEditDraftE2eTest`,
-`ProfileDraftE2eTest`, `BankDialogDraftE2eTest`, `MessageBundleConsistencyTest` ·
+`ProfileDraftE2eTest`, `BankDialogDraftE2eTest`, `SupplyDialogDraftE2eTest`,
+`MessageBundleConsistencyTest` ·
 **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`, `krt-draft-snapshot.js`,
 `krt-draft-rows.js`, `krt-draft-flags.js`, `krt-draft-dialog.js`, `krt-draft-lead.js`,
 `krt-unsaved-marks.js` (draft mark), `krt-searchable-select.js` (`selection`),
@@ -3344,6 +3356,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `refinery/refinery-orders-details.html`, `mission/mission-detail-tabs.js`,
 `mission/mission-detail.html`, `identity/member-edit.js`, `identity/member-edit.html`,
 `identity/profile.js`, `identity/profile.html`, `bank/bank-drafts.js`, `bank/bank.js`,
-`bank/fragments/bank-movement-modal.html`, `bank/fragments/org-unit-bank-views.html` ·
+`bank/fragments/bank-movement-modal.html`, `bank/fragments/org-unit-bank-views.html`,
+`supply/supply-needs.js`, `supply/needs.html`, `supply/incoming-donations.html`,
+`supply/fragments/pledge-modal.html`, `supply/fragments/lager-pledge-modal.html` ·
 **ADR:** ADR-0411 · **Related:** REQ-FE-014, REQ-FE-024,
 REQ-FE-040, REQ-REFINERY-029

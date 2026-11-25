@@ -20,8 +20,17 @@
 /** A dialog `krtModal` opens. */
 const DIALOG_SELECTOR = '.krt-modal-overlay';
 
-/** The prefix of the attributes an opener primes its dialog's fields from. */
-const CONTEXT_PREFIX = 'data-field-';
+/** A control that can open a dialog: a `krtModal` trigger or a page action. */
+const OPENER_SELECTOR = '[data-modal-id], [data-trigger]';
+
+/** The prefix of the attributes an opener carries its action and its dialog's context in. */
+const DATA_PREFIX = 'data-';
+
+/** The prefix of the kernel's own attributes, which say nothing about an opener's context. */
+const KERNEL_PREFIX = 'data-krt-';
+
+/** The state changes of a dialog that tell it opened. */
+const OPEN_OBSERVATION = { attributes: true, attributeFilter: ['class', 'open'] };
 
 /** The template of the page-level offer of a dialog draft (`kernel/fragments/draft-offer.html`). */
 const NOTICE_TEMPLATE_ID = 'krt-draft-dialog-offer';
@@ -65,71 +74,119 @@ export function hashText(text) {
 }
 
 /**
- * Names an opener by the dialog it opens and the `data-field-*` context it primes the dialog with.
+ * Names an opener by its `data-*` attributes: the dialog or page action it triggers and the
+ * context it primes the dialog with, such as the account or the need it acts on.
  *
- * @param {Element} opener a control carrying `data-modal-id`
- * @returns {string} the opener key; a control without context is keyed by its dialog id alone
+ * @param {Element} opener a control carrying `data-modal-id` or `data-trigger`
+ * @returns {string} the opener key
  */
 export function openerKey(opener) {
-    const context = Array.from(opener.attributes)
-        .filter((attribute) => attribute.name.startsWith(CONTEXT_PREFIX))
+    const named = Array.from(opener.attributes)
+        .filter(
+            (attribute) =>
+                attribute.name.startsWith(DATA_PREFIX) && !attribute.name.startsWith(KERNEL_PREFIX),
+        )
         .map((attribute) => `${attribute.name}=${attribute.value}`)
         .sort();
-    return hashText([opener.getAttribute('data-modal-id') || '', ...context].join('\n'));
+    return hashText(named.join('\n'));
 }
 
 /**
- * Tells whether a control opens a dialog from outside it; the dialog's own close control names
- * the dialog too.
+ * Tells whether a dialog is open, by the state `krtModal` gives it.
  *
- * @param {Element} control a control carrying `data-modal-id`
  * @param {HTMLElement} dialog the dialog
- * @returns {boolean} true for an opener of the dialog
+ * @returns {boolean} true while it is open
  */
-function opensFromOutside(control, dialog) {
-    return control.getAttribute('data-modal-id') === dialog.id && !dialog.contains(control);
+function isOpen(dialog) {
+    return dialog.classList.contains('is-open') || dialog.hasAttribute('open');
 }
 
-/** Records the control that opens a dialog, so a draft of the dialog can reopen it the same way. */
-export function trackDialogOpeners() {
+/**
+ * The opener the member clicked last and no dialog has claimed yet; it waits for a dialog that
+ * opens only after the page loaded what it shows.
+ */
+let lastControl = /** @type {Element | null} */ (null);
+
+/**
+ * Records the control whose click opens each of the given dialogs, so a draft of a dialog can
+ * reopen it the same way.
+ *
+ * @param {HTMLElement[]} dialogs the dialogs that hold drafted forms
+ */
+export function trackDialogOpeners(dialogs) {
     document.addEventListener(
         'click',
         (event) => {
-            const control =
-                event.target instanceof Element ? event.target.closest('[data-modal-id]') : null;
-            const dialog = control
-                ? document.getElementById(control.getAttribute('data-modal-id') || '')
-                : null;
-            if (control && dialog && opensFromOutside(control, dialog)) {
-                lastOpeners.set(dialog.id, openerKey(control));
-            }
+            lastControl =
+                event.target instanceof Element ? event.target.closest(OPENER_SELECTOR) : null;
         },
         true,
     );
+    const observer = new MutationObserver((records) => {
+        records.forEach((record) => {
+            const dialog = record.target;
+            if (
+                dialog instanceof HTMLElement &&
+                isOpen(dialog) &&
+                lastControl &&
+                !dialog.contains(lastControl)
+            ) {
+                lastOpeners.set(dialog.id, openerKey(lastControl));
+                lastControl = null;
+            }
+        });
+    });
+    dialogs.forEach((dialog) => {
+        observer.observe(dialog, OPEN_OBSERVATION);
+    });
+}
+
+/**
+ * Runs a step once a dialog is open: at once when it already is, else when it opens, as a dialog
+ * whose opener first loads what it shows does later.
+ *
+ * @param {HTMLElement} dialog the dialog
+ * @param {() => void} step the step to run
+ */
+export function whenOpen(dialog, step) {
+    if (isOpen(dialog)) {
+        step();
+        return;
+    }
+    const observer = new MutationObserver(() => {
+        if (isOpen(dialog)) {
+            observer.disconnect();
+            step();
+        }
+    });
+    observer.observe(dialog, OPEN_OBSERVATION);
 }
 
 /**
  * Names the opener a draft of the dialog reopens it with.
  *
  * @param {HTMLElement} dialog the dialog
- * @returns {string} the key of the control that last opened it; the dialog id's key when none did
+ * @returns {string} the key of the control that last opened it; empty when none was clicked
  */
 export function openerOf(dialog) {
-    return lastOpeners.get(dialog.id) ?? hashText(dialog.id);
+    return lastOpeners.get(dialog.id) ?? '';
 }
 
 /**
- * Finds an enabled control on the page that opens the dialog with the context a draft recorded.
+ * Finds an enabled control outside the dialog that carries the opener key a draft recorded.
  *
  * @param {HTMLElement} dialog the dialog
  * @param {string} key the opener key the draft recorded
  * @returns {HTMLElement | null} the opener; null when the page has none
  */
 export function findOpener(dialog, key) {
-    const match = Array.from(document.querySelectorAll('[data-modal-id]')).find(
+    if (!key) {
+        return null;
+    }
+    const match = Array.from(document.querySelectorAll(OPENER_SELECTOR)).find(
         (control) =>
             control instanceof HTMLElement &&
-            opensFromOutside(control, dialog) &&
+            !dialog.contains(control) &&
             !(control instanceof HTMLButtonElement && control.disabled) &&
             openerKey(control) === key,
     );
