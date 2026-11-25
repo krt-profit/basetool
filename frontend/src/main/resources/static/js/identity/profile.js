@@ -18,6 +18,7 @@
  */
 
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { clearUnsaved } from '/js/kernel/krt-unsaved-marks.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
@@ -265,7 +266,8 @@ function initProfile() {
     /**
      * Saves every dirty section in page order through its own endpoint, one after the other so
      * each write carries the version the previous one returned. Stops at the first failure; the
-     * sections saved before it keep their new baseline and the rest stay dirty.
+     * sections saved before it keep their new baseline and lose their unsaved mark and draft, and
+     * the rest stay dirty.
      *
      * @returns {Promise<void>} settles when the run ended
      */
@@ -326,6 +328,7 @@ function initProfile() {
                     }
                 }
                 snapshot(entry.form);
+                clearUnsaved(entry.form);
             }
         } finally {
             saving = false;

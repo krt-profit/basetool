@@ -41,6 +41,9 @@ const fetchedFragments = new Map([
     ['/js/joborder/orders-contribution-history.js', ['joborder/fragments/contribution-history']],
 ]);
 
+// A module that only reads a capability's controller where the page itself renders one.
+const capabilityNeutral = new Set(['/js/kernel/krt-draft-snapshot.js']);
+
 function filesBelow(directory) {
     return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
         const full = path.join(directory, entry.name);
@@ -64,7 +67,7 @@ function contentsOf(view, readSource = sourceOf) {
         if (seen.has(item) || item === 'kernel/fragments/layout') continue;
         seen.add(item);
         const source = readSource(item);
-        parts.push(source);
+        if (!capabilityNeutral.has(item)) parts.push(source);
         if (item.startsWith('/js/')) {
             pending.push(...(fetchedFragments.get(item) ?? []));
             pending.push(
@@ -114,6 +117,11 @@ const testContents = contentsOf('joborder/example', (item) => {
 assert.ok(capabilities.pagePickers.test(testContents));
 assert.ok(capabilities.pageFocus.test(testContents));
 assert.ok(!capabilities.pageNumbers.test(testContents));
+assert.ok(
+    !capabilities.pagePickers.test(
+        contentsOf('/js/kernel/krt-draft-snapshot.js', () => 'hidden.krtCombobox'),
+    ),
+);
 
 let checked = 0;
 for (const filename of filesBelow(templates).filter((file) => file.endsWith('.html'))) {

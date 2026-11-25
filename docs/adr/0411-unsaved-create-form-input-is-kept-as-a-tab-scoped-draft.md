@@ -79,5 +79,5 @@ with would overwrite a change a peer saved in between. Edit forms now opt in und
    standing offer offers the draft again on the new form, with a fresh comparison, instead of
    dropping it; a swap of a form holding edits still drops it with decision 3.
 
-The refinery-order detail form is the first edit form drafted; the further forms of issue #3750
-follow one by one.
+Issue #3750 drafts the refinery-order detail form, the mission edit form, the member edit form and
+the six profile sections under this rule.

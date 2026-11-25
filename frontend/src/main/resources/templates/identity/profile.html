@@ -65,8 +65,9 @@
                 <div class="form-layout card profile-settings" id="profile-settings" data-testid="profile-settings">
 
                     <form id="profile-description-form" th:action="@{/profile/description}" method="post" th:object="${profileDescriptionForm}"
-                          th:data-section-name="#{profile.section.identity}">
-                        <input type="hidden" name="version" th:field="*{version}">
+                          th:data-section-name="#{profile.section.identity}" data-krt-draft="profile-description" data-krt-draft-version="1">
+                        <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
+                        <input type="hidden" name="version" th:field="*{version}" data-krt-draft-base>
                         <fieldset class="form-section" id="profile-section-identity">
                             <legend class="form-section__head" th:text="'1 · ' + #{profile.section.identity}">1 · Profil</legend>
                             <div class="form-group">
@@ -91,8 +92,9 @@
                     </form>
 
                     <form id="profile-rsi-handle-form" th:action="@{/profile/rsi-handle}" method="post" th:object="${profileRsiHandleForm}"
-                          th:data-section-name="#{profile.rsiHandle.label}">
-                        <input type="hidden" name="version" th:field="*{version}">
+                          th:data-section-name="#{profile.rsiHandle.label}" data-krt-draft="profile-rsi-handle" data-krt-draft-version="1">
+                        <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
+                        <input type="hidden" name="version" th:field="*{version}" data-krt-draft-base>
                         <fieldset class="form-section" id="profile-section-rsi">
                             <legend class="form-section__head">
                                 <span th:text="'2 · ' + #{profile.rsiHandle.label}">2 · RSI-Handle</span>
@@ -115,8 +117,9 @@
                     </form>
 
                     <form id="profile-payout-form" th:action="@{/profile/payout-preference}" method="post" th:object="${profilePayoutPreferenceForm}"
-                          th:data-section-name="#{profile.section.payout}">
-                        <input type="hidden" name="version" th:field="*{version}">
+                          th:data-section-name="#{profile.section.payout}" data-krt-draft="profile-payout" data-krt-draft-version="1">
+                        <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
+                        <input type="hidden" name="version" th:field="*{version}" data-krt-draft-base>
                         <fieldset class="form-section" id="profile-section-payout">
                             <legend class="form-section__head" th:text="'3 · ' + #{profile.payout.preference}">3 · Standard-Auszahlungsart</legend>
                             <div class="form-group">
@@ -133,8 +136,9 @@
                     </form>
 
                     <form id="profile-blueprint-sharing-form" th:action="@{/profile/blueprint-sharing}" method="post" th:object="${profileBlueprintSharingForm}"
-                          th:data-section-name="#{profile.section.blueprints}">
-                        <input type="hidden" name="version" th:field="*{version}">
+                          th:data-section-name="#{profile.section.blueprints}" data-krt-draft="profile-blueprint-sharing" data-krt-draft-version="1">
+                        <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
+                        <input type="hidden" name="version" th:field="*{version}" data-krt-draft-base>
                         <fieldset class="form-section" id="profile-section-blueprints">
                             <legend class="form-section__head" th:text="'4 · ' + #{profile.blueprintSharing.label}">4 · Blaupausen-Verfügbarkeit</legend>
                             <div class="check-row">
@@ -151,8 +155,9 @@
                     </form>
 
                     <form id="profile-name-withholding-form" th:action="@{/profile/name-withholding}" method="post" th:object="${profileNameWithholdingForm}"
-                          th:data-section-name="#{profile.nameWithholding.label}">
-                        <input type="hidden" name="version" th:field="*{version}">
+                          th:data-section-name="#{profile.nameWithholding.label}" data-krt-draft="profile-name-withholding" data-krt-draft-version="1">
+                        <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
+                        <input type="hidden" name="version" th:field="*{version}" data-krt-draft-base>
                         <fieldset class="form-section" id="profile-section-name-withholding">
                             <legend class="form-section__head" th:text="'5 · ' + #{profile.nameWithholding.label}">5 · Verbundene Anwendungen</legend>
                             <div class="check-row">
@@ -178,8 +183,9 @@
                         </fieldset>
 
                         <form id="profile-home-location-form" th:action="@{/profile/home-location}" method="post" th:object="${profileHomeLocationForm}"
-                              th:if="${homeLocationAvailable}" th:data-section-name="#{profile.homeLocation.label}">
-                            <input type="hidden" name="version" th:field="*{version}">
+                              th:if="${homeLocationAvailable}" th:data-section-name="#{profile.homeLocation.label}" data-krt-draft="profile-home-location" data-krt-draft-version="1">
+                            <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
+                            <input type="hidden" name="version" th:field="*{version}" data-krt-draft-base>
                             <fieldset class="form-section">
                                 <legend class="form-section__head">
                                     <span th:text="'6 · ' + #{profile.homeLocation.label}">6 · Meine Home Location</span>
