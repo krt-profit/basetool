@@ -3187,9 +3187,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   `job-order-item-create`, `job-order-auec-create`), the mission create (`mission-create`) and the
   stock booking of the personal and the global stock (`inventory-input-own`,
   `inventory-input-global`), each only when its page creates, never on the edit page that reuses
-  the template. Edit forms need the
-  entity's `version` in the draft and a warning when it changed, so they are not drafted yet; the
-  bank request dialogs (#3747) need an offer outside the dialog.
+  the template. Edit forms need the entity's `version` in the draft and a warning when it changed,
+  so they are not drafted yet; the bank request dialogs (#3747) need an offer outside the dialog.
 - **Storage and key.** `sessionStorage` only: a draft survives a reload and the maintenance-page
   round trip in the same tab and is gone when the tab closes, so nothing stays behind on a shared
   device. The key is `krt-draft:` plus the member scope, the active org-unit context, the form key
@@ -3208,17 +3207,17 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   number use `rowCountAdapter` (`krt-draft-rows.js`): the refinery goods rows and the job-order
   material rows; optional rows pass `minimum: 0`, as the stock booking's job-order and mission
   allocation rows do. The stock booking's adapter also keeps the catalog mode (material or item)
-  and selects it first, because the other mode's fields are disabled. The job-order item lines load their blueprints and derived materials after the
-  item is picked and link a sub-assembly to its parent line, so the generic part skips them
-  (`data-krt-draft-skip`) and their adapter (`joborder/order-item-drafts.js`) keeps each line's
-  item and label, blueprint, amount, quality per derived material and the position of its parent,
-  and rebuilds the lines through the page's line builder with fresh client line ids. The mission
-  create's adapter (`mission/mission-create-draft.js`) keeps the planning rows of each section
-  (objectives, steps, units, frequencies; skipped by the generic part, as is the template picker,
-  which would open the apply dialog) and the applied template with its revision; a revision that
-  changed meanwhile is refused on save as stale (`MISSION_TEMPLATE_STALE`), as for a fresh form.
-  Its `finish` hook restores that link after the values, because the restored owner's `change`
-  clears it.
+  and selects it first, because the other mode's fields are disabled. The job-order item lines
+  load their blueprints and derived materials after the item is picked and link a sub-assembly to
+  its parent line, so the generic part skips them (`data-krt-draft-skip`) and their adapter
+  (`joborder/order-item-drafts.js`) keeps each line's item and label, blueprint, amount, quality
+  per derived material and the position of its parent, and rebuilds the lines through the page's
+  line builder with fresh client line ids. The mission create's adapter
+  (`mission/mission-create-draft.js`) keeps the planning rows of each section (objectives, steps,
+  units, frequencies; skipped by the generic part, as is the template picker, which would open the
+  apply dialog) and the applied template with its revision; a revision that changed meanwhile is
+  refused on save as stale (`MISSION_TEMPLATE_STALE`), as for a fresh form. Its `finish` hook
+  restores that link after the values, because the restored owner's `change` clears it.
 - **Several forms on a page.** The page offers its drafts once `DOMContentLoaded` fires, after its
   module scripts registered their adapters. The first offer of a page asks its adapter to
   `reveal` the form: the job-order create switches to the order kind of the offered draft.
