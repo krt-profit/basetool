@@ -594,12 +594,12 @@
             </div>
             <div class="pane-grid-2" th:classappend="${isNew} ? 'pane-grid--single' : 'pane-grid--edit'">
                     <form id="mission-form" class="form-layout card" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}"
-                          th:attr="data-mission-edit=${isNew} ? null : 'true', data-krt-draft=${isNew} ? 'mission-create' : null, data-krt-draft-version=${isNew} ? '1' : null">
-                        <th:block th:if="${isNew}"><th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" /></th:block>
-                        <input type="hidden" id="mission-version" name="version" th:field="*{version}">
-                        <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
-                        <input type="hidden" id="mission-schedule-version" name="scheduleVersion" th:field="*{scheduleVersion}">
-                        <input type="hidden" id="mission-flags-version" name="flagsVersion" th:field="*{flagsVersion}">
+                          th:attr="data-mission-edit=${isNew} ? null : 'true', data-krt-draft=${isNew} ? 'mission-create' : (${mission.canEdit} ? 'mission-edit' : null), data-krt-draft-version=${isNew or mission.canEdit} ? '1' : null">
+                        <th:block th:if="${isNew or mission.canEdit}"><th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" /></th:block>
+                        <input type="hidden" id="mission-version" name="version" th:field="*{version}" th:attr="data-krt-draft-base=${isNew} ? null : 'true'">
+                        <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}" th:attr="data-krt-draft-base=${isNew} ? null : 'true'">
+                        <input type="hidden" id="mission-schedule-version" name="scheduleVersion" th:field="*{scheduleVersion}" th:attr="data-krt-draft-base=${isNew} ? null : 'true'">
+                        <input type="hidden" id="mission-flags-version" name="flagsVersion" th:field="*{flagsVersion}" th:attr="data-krt-draft-base=${isNew} ? null : 'true'">
                         <input type="hidden" id="mission-dirty-core" name="dirtyCore" value="true">
                         <input type="hidden" id="mission-dirty-schedule" name="dirtySchedule" value="true">
                         <input type="hidden" id="mission-dirty-flags" name="dirtyFlags" value="true">
@@ -730,8 +730,8 @@
                                     <input type="hidden" name="actualStartTime" id="actualStartTime" th:value="*{actualStartTime}">
                                     <div class="datetime-with-now">
                                         <div class="datetime-split-inputs">
-                                            <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
-                                            <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                                            <input type="date" id="actualStartTimeDate" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                                            <input type="time" id="actualStartTimeTimeOfDay" class="time-part" th:aria-label="#{a11y.datetime.time}">
                                         </div>
                                         <button type="button" class="btn btn-ghost" data-trigger="mission-set-now" data-input-id="actualStartTime"
                                                 th:if="${mission.canEdit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg> <span th:text="#{general.now}">Jetzt</span></button>
@@ -744,8 +744,8 @@
                                     <input type="hidden" name="actualEndTime" id="actualEndTime" th:value="*{actualEndTime}">
                                     <div class="datetime-with-now">
                                         <div class="datetime-split-inputs">
-                                            <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
-                                            <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
+                                            <input type="date" id="actualEndTimeDate" class="date-part" th:aria-label="#{a11y.datetime.date}">
+                                            <input type="time" id="actualEndTimeTimeOfDay" class="time-part" th:aria-label="#{a11y.datetime.time}">
                                         </div>
                                         <button type="button" class="btn btn-ghost" data-trigger="mission-set-now" data-input-id="actualEndTime"
                                                 th:if="${mission.canEdit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg> <span th:text="#{general.now}">Jetzt</span></button>

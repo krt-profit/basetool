@@ -930,6 +930,9 @@ val testRefineryEditDraftJs =
         "src/main/resources/static/js/refinery/refinery-order-edit-draft.js",
       ),
     )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-draft-flags.js"),
+    )
   }
 
 val testKrtFetchReadJs =
