@@ -931,7 +931,9 @@ focus sits inside the target section's container, or that container holds a form
 (REQ-FE-024), the refresh is deferred behind a DS-styled "Aktualisierungen verfügbar" pill (no native
 dialog) that applies, on click, the held-back sections nothing holds any more. A click never discards
 an unsaved form; a section such a form holds back re-renders by itself once the form is saved or
-reset.
+reset, and focus inside that form, such as on its save or discard button, no longer holds it back.
+The pill sits above a page's sticky form action bar (`.form-actions--sticky`), so it never covers a
+form's save button.
 Bursts are coalesced (a debounce window jittered like the reconnect backoff — `COALESCE_MS +
 random()*COALESCE_MS` — so peers that all received the same `changed` frame within microseconds do
 not fire their fragment refetches in one synchronized spike, #1125), and a dropped-then-reconnected

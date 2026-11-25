@@ -115,6 +115,7 @@ function harness(randomValue = 0.5, page = {}) {
     vm.runInContext(SOURCE, context);
     return {
         sync: context.krtLiveSync,
+        document: context.document,
         marks: { mark: context.markUnsaved, clear: context.clearUnsaved },
         maintenance: vm.runInContext('krtMaintenance', context),
         sockets,
@@ -285,27 +286,30 @@ test('a retry does nothing once the topic was unsubscribed', () => {
 /**
  * A form that keeps its attributes, so the unsaved mark can be set and cleared on it.
  *
+ * @param {object[]} [controls] the nodes inside the form
  * @returns {{hasAttribute(name: string): boolean, setAttribute(name: string): void,
- *     removeAttribute(name: string): void}} the fake form
+ *     removeAttribute(name: string): void, contains(node: object): boolean}} the fake form
  */
-function fakeForm() {
+function fakeForm(controls = []) {
     const attributes = new Set();
     return {
         hasAttribute: (name) => attributes.has(name),
         setAttribute: (name) => attributes.add(name),
         removeAttribute: (name) => attributes.delete(name),
+        contains: (node) => controls.includes(node),
     };
 }
 
 /**
  * A container that answers the unsaved-form query from the forms it holds.
  *
- * @param {object[]} forms the fake forms inside the container
+ * @param {object[]} [forms] the fake forms inside the container
+ * @param {object[]} [others] further nodes inside the container, outside every form
  * @returns {object} the fake container
  */
-function fakeContainer(forms = []) {
+function fakeContainer(forms = [], others = []) {
     return {
-        contains: () => false,
+        contains: (node) => others.includes(node) || forms.some((form) => form.contains(node)),
         matches: () => false,
         querySelector: (sel) =>
             sel === 'form[data-krt-unsaved]'
@@ -315,18 +319,23 @@ function fakeContainer(forms = []) {
 }
 
 /**
- * A page with an order section holding a form and a signal section, a toggleable open modal, a
- * capturing pill and document listeners that `dispatchEvent` reaches.
+ * A page with an order section and a signal section, a toggleable open modal, a capturing pill, the
+ * page's sticky form action bars and document listeners that `dispatchEvent` reaches. The order
+ * section holds a form with a save button and, outside the form, a filter field.
  *
- * @returns {{page: object, modal: {open: boolean}, pills: object[], orderForm: object}} the fake
- *     page and its state
+ * @returns {{page: object, modal: {open: boolean}, pills: object[], orderForm: object,
+ *     saveButton: object, filterField: object, stickyBars: Array<{offsetHeight: number}>}} the
+ *     fake page and its state
  */
 function sectionPage() {
     const modal = { open: false };
     const pills = [];
-    const orderForm = fakeForm();
+    const stickyBars = [];
+    const saveButton = {};
+    const filterField = {};
+    const orderForm = fakeForm([saveButton]);
     const containers = {
-        '#order': fakeContainer([orderForm]),
+        '#order': fakeContainer([orderForm], [filterField]),
         '#deleted': fakeContainer(),
     };
     const listeners = {};
@@ -338,11 +347,22 @@ function sectionPage() {
             (listeners[event.type] || []).forEach((fn) => fn(event));
             return true;
         },
-        querySelectorAll: (sel) => (sel === '.krt-modal-overlay' && modal.open ? [{}] : []),
+        querySelectorAll: (sel) => {
+            if (sel === '.form-actions--sticky') {
+                return stickyBars;
+            }
+            return sel === '.krt-modal-overlay' && modal.open ? [{}] : [];
+        },
         querySelector: (sel) => containers[sel] || null,
         getElementById: () => null,
         createElement: () => {
-            const pill = { listeners: {}, remove() {} };
+            const style = {
+                props: {},
+                setProperty(name, value) {
+                    style.props[name] = value;
+                },
+            };
+            const pill = { listeners: {}, style, remove() {} };
             pill.addEventListener = (type, fn) => {
                 pill.listeners[type] = fn;
             };
@@ -351,7 +371,7 @@ function sectionPage() {
         body: { appendChild: (el) => pills.push(el) },
         activeElement: null,
     };
-    return { page, modal, pills, orderForm };
+    return { page, modal, pills, orderForm, saveButton, filterField, stickyBars };
 }
 
 /** Builds a receiver on `refinery-order:1` over {@link sectionPage} that records its refreshes. */
@@ -424,6 +444,42 @@ test('saving or discarding the form runs the deferred refresh', () => {
     assert.deepEqual(r.refreshed, []);
     r.h.marks.clear(r.fake.orderForm);
     assert.deepEqual(r.refreshed, [['order']]);
+});
+
+test('the focus on the cleared form’s own button does not hold its section back', () => {
+    const r = signalReceiver();
+    r.h.marks.mark(r.fake.orderForm);
+    r.ws.message({ type: 'changed', topic: 'refinery-order:1', sections: ['order'] });
+    r.flush();
+    r.h.document.activeElement = r.fake.saveButton;
+    r.h.marks.clear(r.fake.orderForm);
+    assert.deepEqual(r.refreshed, [['order']]);
+});
+
+test('the focus elsewhere in the section still holds it back once the form is cleared', () => {
+    const r = signalReceiver();
+    r.h.marks.mark(r.fake.orderForm);
+    r.ws.message({ type: 'changed', topic: 'refinery-order:1', sections: ['order'] });
+    r.flush();
+    r.h.document.activeElement = r.fake.filterField;
+    r.h.marks.clear(r.fake.orderForm);
+    assert.deepEqual(r.refreshed, []);
+    assert.equal(r.fake.pills.length, 1);
+});
+
+test('the pill rises above the tallest sticky form action bar', () => {
+    const r = signalReceiver();
+    r.fake.stickyBars.push({ offsetHeight: 0 }, { offsetHeight: 69 });
+    r.h.marks.mark(r.fake.orderForm);
+    r.ws.message({ type: 'subscribed', topic: 'refinery-order:1' });
+    assert.deepEqual({ ...r.fake.pills[0].style.props }, { '--krt-livesync-pill-lift': '69px' });
+});
+
+test('a pill on a page without a sticky action bar keeps its place', () => {
+    const r = signalReceiver();
+    r.h.marks.mark(r.fake.orderForm);
+    r.ws.message({ type: 'subscribed', topic: 'refinery-order:1' });
+    assert.deepEqual({ ...r.fake.pills[0].style.props }, {});
 });
 
 test('clearing an unmarked form refreshes nothing', () => {

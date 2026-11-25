@@ -32,6 +32,25 @@ function anyModalOpen() {
     });
 }
 
+/**
+ * Lifts the pill above the page's sticky form action bar, which sits on the same bottom edge, so
+ * the pill never covers a form's save button.
+ *
+ * @param {HTMLElement} pill the pill about to be shown
+ */
+function liftAboveStickyActions(pill) {
+    const bars = /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('.form-actions--sticky')
+    );
+    let lift = 0;
+    bars.forEach((bar) => {
+        lift = Math.max(lift, bar.offsetHeight);
+    });
+    if (lift > 0) {
+        pill.style.setProperty('--krt-livesync-pill-lift', `${lift}px`);
+    }
+}
+
 const syncSocket = (function () {
     const RECONNECT_BASE_MS = 1000;
     const RECONNECT_MAX_MS = 30000;
@@ -345,10 +364,15 @@ function createReceiver(cfg) {
     let timer = null;
 
     /**
+     * Tells whether a section must not be re-rendered now: a modal is open, the focus is inside it,
+     * it holds an unsaved form, or the page's own busy test says so. Focus inside the form whose
+     * edits were just saved or discarded does not count, because that form is done.
+     *
      * @param {string} sectionKey the section to test
+     * @param {Element | null} [settledForm] the form whose unsaved mark was just cleared
      * @returns {boolean} whether the section must not be re-rendered now
      */
-    function sectionBusy(sectionKey) {
+    function sectionBusy(sectionKey, settledForm = null) {
         if (signalSections.indexOf(sectionKey) >= 0) {
             return false;
         }
@@ -360,7 +384,9 @@ function createReceiver(cfg) {
         }
         const sel = sectionContainers[sectionKey];
         const container = sel && document.querySelector(sel);
-        if (container && document.activeElement && container.contains(document.activeElement)) {
+        const active = document.activeElement;
+        const focusSettled = !!settledForm && !!active && settledForm.contains(active);
+        if (container && active && !focusSettled && container.contains(active)) {
             return true;
         }
         if (container && holdsUnsaved(container)) {
@@ -388,12 +414,16 @@ function createReceiver(cfg) {
         }
     }
 
-    /** Re-renders the deferred sections that are no longer busy and drops the pill once none is left. */
-    function flushReadyDeferred() {
+    /**
+     * Re-renders the deferred sections that are no longer busy and drops the pill once none is left.
+     *
+     * @param {Element | null} [settledForm] the form whose unsaved mark was just cleared
+     */
+    function flushReadyDeferred(settledForm = null) {
         /** @type {string[]} */
         const ready = [];
         Object.keys(deferred).forEach((k) => {
-            if (sectionBusy(k)) {
+            if (sectionBusy(k, settledForm)) {
                 return;
             }
             delete deferred[k];
@@ -416,7 +446,10 @@ function createReceiver(cfg) {
         pill.type = 'button';
         pill.className = pillClassName;
         pill.textContent = label;
-        pill.addEventListener('click', flushReadyDeferred);
+        pill.addEventListener('click', () => {
+            flushReadyDeferred();
+        });
+        liftAboveStickyActions(pill);
         document.body.appendChild(pill);
     }
 
@@ -505,7 +538,10 @@ function createReceiver(cfg) {
             apply(null);
         });
     }
-    document.addEventListener(UNSAVED_CLEARED_EVENT, flushReadyDeferred);
+    document.addEventListener(UNSAVED_CLEARED_EVENT, (event) => {
+        const detail = /** @type {CustomEvent<{form?: HTMLFormElement} | null>} */ (event).detail;
+        flushReadyDeferred(detail && detail.form ? detail.form : null);
+    });
 
     /** @type {{unsubscribe(): void} | null} */
     let subscription = null;
