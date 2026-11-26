@@ -110,6 +110,20 @@ class FakeElement {
         this.children.unshift(child);
     }
 
+    after(node) {
+        const siblings = this.parent.children;
+        siblings.splice(siblings.indexOf(this) + 1, 0, node);
+        node.parent = this.parent;
+    }
+
+    get nextElementSibling() {
+        if (!this.parent) {
+            return null;
+        }
+        const siblings = this.parent.children;
+        return siblings[siblings.indexOf(this) + 1] || null;
+    }
+
     remove() {
         if (this.parent) {
             this.parent.children.splice(this.parent.children.indexOf(this), 1);
@@ -1248,6 +1262,26 @@ test('a page without a main element shows a dialog offer at the top of its page 
     const key = harness().context.openerKey(dialog.opener);
     harness({ [keyFor(SCOPE)]: storedDraft({ opener: key }) }, dom);
     assert.equal(dialog.main.children[0], dialog.notice);
+});
+
+test('a dialog offer sits below the page head and its tabs, where the page shows its notices', () => {
+    const dom = page();
+    const dialog = inDialog(dom);
+    const head = new FakeElement('div', {}, ['page-head']);
+    const tabs = new FakeElement('nav', {}, ['tab-nav']);
+    dialog.main.prepend(tabs);
+    dialog.main.prepend(head);
+    const key = harness().context.openerKey(dialog.opener);
+    harness({ [keyFor(SCOPE)]: storedDraft({ opener: key }) }, dom);
+    assert.deepEqual(dialog.main.children.slice(0, 3), [head, tabs, dialog.notice]);
+
+    const plain = page();
+    const untabbed = inDialog(plain);
+    const plainHead = new FakeElement('div', {}, ['page-head']);
+    untabbed.main.prepend(plainHead);
+    const plainKey = harness().context.openerKey(untabbed.opener);
+    harness({ [keyFor(SCOPE)]: storedDraft({ opener: plainKey }) }, plain);
+    assert.deepEqual(untabbed.main.children.slice(0, 2), [plainHead, untabbed.notice]);
 });
 
 if (failures > 0) {

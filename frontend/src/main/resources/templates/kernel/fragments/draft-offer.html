@@ -7,7 +7,7 @@
         <p class="krt-draft-offer__text" data-krt-draft-stale hidden data-testid="draft-offer-stale" th:text="#{draft.offer.stale}">Der Eintrag wurde inzwischen geändert. Überschneidet sich das mit deinen Änderungen, lehnt das Speichern sie ab, statt etwas zu überschreiben.</p>
         <div class="krt-draft-offer__actions">
             <button type="button" class="btn btn-ghost" data-krt-draft-action="discard" data-testid="draft-discard" th:text="#{draft.offer.discard}">Verwerfen</button>
-            <button type="button" class="btn" data-krt-draft-action="restore" data-testid="draft-restore" th:text="#{draft.offer.restore}">Wiederherstellen</button>
+            <button type="button" class="btn btn-outline" data-krt-draft-action="restore" data-testid="draft-restore"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-reset"/></svg> <span th:text="#{draft.offer.restore}">Wiederherstellen</span></button>
         </div>
     </div>
 </th:block>
@@ -17,7 +17,7 @@
         <p class="krt-draft-offer__text" data-krt-draft-stale hidden th:text="#{draft.offer.stale}">Der Eintrag wurde inzwischen geändert.</p>
         <div class="krt-draft-offer__actions">
             <button type="button" class="btn btn-ghost" data-krt-draft-action="discard" data-testid="draft-dialog-discard" th:text="#{draft.offer.discard}">Verwerfen</button>
-            <button type="button" class="btn" data-krt-draft-action="restore" data-testid="draft-dialog-restore" th:text="#{draft.offer.restore}">Wiederherstellen</button>
+            <button type="button" class="btn btn-outline" data-krt-draft-action="restore" data-testid="draft-dialog-restore"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-reset"/></svg> <span th:text="#{draft.offer.restore}">Wiederherstellen</span></button>
         </div>
     </div>
 </template>

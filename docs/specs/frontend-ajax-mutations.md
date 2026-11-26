@@ -3229,7 +3229,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   guard does not track (`no-track`, as the bank and supply forms are) gets the draft mark
   `data-krt-draft-edited` on a trusted edit instead of the unsaved mark; only the drafts read it,
   so the leave warning and live sync stay as they are. A reload closes the dialog, so the page
-  shows the offer at the top of its content (`kernel/fragments/draft-offer :: draftDialogOffer`)
+  shows the offer below its page head and the tabs after it, where it shows its other notices (at
+  the top of a page without a page head; `kernel/fragments/draft-offer :: draftDialogOffer`)
   and names the dialog; restore clicks the same opener, so the page opens and primes the dialog as
   it always does, and writes the draft once the dialog is open and done loading: a dialog that
   loads what it shows after it opened carries `aria-busy="true"` until it has, as the material
@@ -3326,7 +3327,10 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   `reveal` the form: the job-order create switches to the order kind of the offered draft, and the
   mission templates page opens its blank editor, hidden until then.
 - **Offer and restore.** A pristine form with a stored draft of its schema version shows the
-  offer (`.alert.alert-info`, no native dialog): *Wiederherstellen* / *Verwerfen*. Restore rebuilds
+  offer (`.alert.alert-info`, no native dialog): *Wiederherstellen* / *Verwerfen*. Following the
+  design system's action hierarchy, *Wiederherstellen* is an outline button (`.btn-outline`) with
+  the `reset` icon and *Verwerfen* a ghost text button, so the form's own filled CTA stays its one
+  primary action. Restore rebuilds
   the rows, writes the values and raises `input` and `change` on each, which arms the
   unsaved-changes guard and updates the derived displays; the adapter's optional `finish` then
   completes what those announcements reset. A draft of another version is dropped.
