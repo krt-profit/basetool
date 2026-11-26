@@ -20,6 +20,9 @@ reads the latest published design system (ADR-0259). It leaves the checkout alon
 fails, when it has local changes, or when it holds commits that are not on `origin/main`.
 `.gitmodules` sets `ignore = all`: the moved submodule stays out of `git status` and `git add -A`,
 and the recorded pin moves only on purpose (`git add --force .claude/skills/das-kartell-design`).
+`git diff --cached` hides the staged pin as well; check it with
+`git diff --cached --ignore-submodules=none` or `git ls-files -s .claude/skills/das-kartell-design`
+before you commit.
 The hook is cross-platform via two self-guarding entries that dispatch on `command -v
 pwsh`: Windows runs [`.claude/hooks/ensure-design-system.ps1`](../../.claude/hooks/ensure-design-system.ps1),
 Linux/macOS/CI run the portable

@@ -743,6 +743,25 @@
             white-space: normal;
             overflow-wrap: break-word;
         }
+
+        /* The label keeps the column's width beside the chevron; every chip sits under it. */
+        .tree-name:has(> .tree-chevron) {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            row-gap: var(--space-1);
+        }
+
+        .tree-name:has(> .tree-chevron) > :not(.tree-chevron) {
+            grid-column: 2;
+        }
+
+        .tree-name:has(> .tree-chevron) > :not(.tree-chevron, .tree-label) {
+            justify-self: start;
+        }
+
+        .tree-name:has(> .tree-chevron) > .chip {
+            white-space: normal;
+        }
     }
 
     .tree-chevron {

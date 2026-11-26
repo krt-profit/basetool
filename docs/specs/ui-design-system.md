@@ -873,7 +873,12 @@ a geometric check had no rule for:
   an item, never before the next one. A count beside a name (`(1)`) never wraps on its own.
 - **A tree table fits the touch classes.** Up to 1024px or on a coarse pointer a `.tree-table`
   takes no more width than its columns' minimum and a row's name wraps instead of truncating, so
-  the first column and its chips never slide out of the scroll area. When a heading wraps, every
+  the first column and its chips never slide out of the scroll area. There the name keeps its
+  column's width beside the chevron and every chip of the name cell (Gestohlen, Niedrig, Umzug
+  ausstehend, an item's chips) sits under it, so no word of the name breaks. A chip there that is
+  wider than the column wraps between its words, and a context cell that holds a badge, a name and
+  a chip wraps the chip onto the next line, so no chip reaches into the next column. When a
+  heading wraps, every
   cell of the head row stretches to the tallest one and centres its text, so the head's background
   and underline run level across all columns.
 - **A chip never shrinks below its text.** In a flex row whose children may shrink, the chip
@@ -995,9 +1000,12 @@ page and class and a per-page `patterns:` line in the report) ·
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
 `PAGES` nor `NOT_PAGES`, so a page added next month is swept on the day it is added — and it runs
 in `check`, not in the stack-bound `e2e` suite) · `LagerTreeDisclosureE2eTest` (the tree
-chevron's overlay and row height on the tablet and phone class, and its focus ring) + code/design
+chevron's overlay and row height on the tablet and phone class, and its focus ring) ·
+`LagerTreeNameChipE2eTest` (no name word breaks and no chip leaves its cell or covers the name, on
+the phone, tablet and desktop class) + code/design
 review for the rest · **Code:** `static/css/kernel/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
-`.tree-chevron`, `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
+`.tree-chevron`, `.tree-name`, `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
+`static/css/inventory/inventory-lager.css` (`.lager-cell-context`),
 `static/css/bank/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personalinventory/personal-inventory.css`
 (`.master-row`), `static/js/kernel/sidebar.js`
 (`--krt-footer-height`).
