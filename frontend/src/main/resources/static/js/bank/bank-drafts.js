@@ -26,9 +26,14 @@ const SPLIT_TOGGLE = '[data-role="bank-split-toggle"]';
 /**
  * Registers the drafts of the bank's create dialogs (REQ-FE-041): the movement and the org-unit
  * request dialog set their type, account and split toggle first, because those enable the rows a
- * draft's values go into.
+ * draft's values go into; the account create sets its type first, which offers the org units that
+ * type may own.
  */
 export function initBankDrafts() {
+    registerDraftAdapter(
+        'bank-account-create',
+        leadingControlsAdapter(['[data-role="bank-account-type"]']),
+    );
     registerDraftAdapter(
         'bank-movement',
         leadingControlsAdapter([

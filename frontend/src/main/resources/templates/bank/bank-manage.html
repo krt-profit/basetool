@@ -255,7 +255,7 @@
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-create-account-modal', titleKey='bank.modal.createAccount.title', body=~{::bank-create-account-modal-body})}">
         <th:block th:ref="bank-create-account-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
-                  data-endpoint="/api/proxy/bank/accounts" data-method="POST">
+                  data-endpoint="/api/proxy/bank/accounts" data-method="POST" data-krt-draft="bank-account-create" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                     <div class="bank-form-row">
                         <label for="bank-create-name" th:text="#{bank.field.accountName}">Kontoname</label>
@@ -459,7 +459,7 @@
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-holder-transfer-modal', titleKey='bank.modal.holderTransfer.title', body=~{::bank-holder-transfer-modal-body})}">
         <th:block th:ref="bank-holder-transfer-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
-                  data-endpoint="/api/proxy/bank/holders/transfer" data-method="POST">
+                  data-endpoint="/api/proxy/bank/holders/transfer" data-method="POST" data-krt-draft="bank-holder-transfer" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                     <p class="bank-field-hint" th:text="#{bank.modal.holderTransfer.hint}">Verschiebt Verwahrung zwischen Haltern, ohne ein Konto zu ber&uuml;hren. Der Quell-Halter darf dabei ins Minus gehen.</p>
                     <div class="bank-form-row">

@@ -158,7 +158,7 @@
         <th:block th:ref="bank-grant-create-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
                   data-livesync="bank/grants"
-                  data-endpoint="/api/proxy/bank/grants" data-method="POST">
+                  data-endpoint="/api/proxy/bank/grants" data-method="POST" data-krt-draft="bank-grant" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                     <p class="bank-field-hint" th:text="#{bank.modal.grant.hint}">Die Berechtigung wirkt, sobald der Nutzer die Rolle &quot;Bank Employee&quot; hat.</p>
                     <div class="bank-form-row">

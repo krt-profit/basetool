@@ -3204,7 +3204,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   `job-order-item-handover`) and the add-ship dialog of the own and the member hangar
   (`hangar-ship`, `member-hangar-ship`, only while it adds a ship) and the add-entry dialog of the
   personal inventory, own and admin (`personal-inventory-entry`, only while it adds an entry), and
-  the operation create (`operation-create`); the further create dialogs of #3747 follow one by one.
+  the operation create (`operation-create`) and the bank management's account create
+  (`bank-account-create`), holder transfer (`bank-holder-transfer`) and grant (`bank-grant`).
 - **Dialog forms.** A form in a dialog (`.krt-modal-overlay`) opts in the same way and needs no
   offer of its own. Its draft also records the opener whose click last opened the dialog (a
   button, a `data-modal-id` or a `data-trigger` control), as a hash of the opener's id, which a page script
@@ -3229,7 +3230,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   and edits turns its draft off while it edits (`setDraftKey`). Controls that switch others on,
   such as the bank dialogs' type, account and split toggle, are set first by
   `leadingControlsAdapter` (`krt-draft-lead.js`, registered in `bank/bank-drafts.js`), so the
-  values go into enabled fields; the supply need's adapter (`supply/supply-needs.js`) sets its job
+  values go into enabled fields, as is the account create's type, which offers the org units that type
+  may own; the supply need's adapter (`supply/supply-needs.js`) sets its job
   order again after the restored unit reset it. The mission's unit dialog sets its ship type first
   (`mission/mission-detail-actions.js`); its finance dialog keeps the income or expense choice of
   its segmented control, and its participant dialog keeps the typed name with the picked member,
@@ -3362,6 +3364,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 - [x] The personal inventory's add-entry dialog comes back with its picked location, and the save
   removes the draft.
 - [x] The operation create dialog comes back with its fields, and the save removes the draft.
+- [x] The bank's account create comes back with its type and org unit, and the save removes the draft;
+  the holder transfer comes back with both holders.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3379,7 +3383,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `RefineryOrderEditDraftE2eTest`, `MissionEditDraftE2eTest`, `MemberEditDraftE2eTest`,
 `ProfileDraftE2eTest`, `BankDialogDraftE2eTest`, `SupplyDialogDraftE2eTest`,
 `PurchasingDialogDraftE2eTest`, `MissionDialogDraftE2eTest`, `JobOrderHandoverDraftE2eTest`,
-`HangarDialogDraftE2eTest`, `PersonalInventoryDialogDraftE2eTest`, `OperationDialogDraftE2eTest`,
+`HangarDialogDraftE2eTest`, `PersonalInventoryDialogDraftE2eTest`, `OperationDialogDraftE2eTest`, `BankManageDialogDraftE2eTest`,
 `MessageBundleConsistencyTest` ·
 **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`, `krt-draft-snapshot.js`,
 `krt-draft-rows.js`, `krt-draft-flags.js`, `krt-draft-dialog.js`, `krt-draft-lead.js`,
@@ -3404,6 +3408,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `joborder/orders-detail.html`, `kernel/unsaved-changes.js` (`releaseUnsavedChanges`),
 `hangar/hangar.js`, `hangar/member-hangar.js`, `hangar/hangar.html`, `hangar/member-hangar.html`,
 `personalinventory/personal-inventory.js`, `personalinventory/personal-inventory.html`,
-`personalinventory/admin/personal-inventory.html`, `operation/operations-index.html` ·
+`personalinventory/admin/personal-inventory.html`, `operation/operations-index.html`,
+`bank/bank-manage.html`, `bank/bank-grants.html` ·
 **ADR:** ADR-0411 · **Related:** REQ-FE-014, REQ-FE-024,
 REQ-FE-040, REQ-REFINERY-029
