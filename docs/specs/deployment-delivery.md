@@ -927,13 +927,18 @@ rather than falling back to trusting an unverified image. A single break-glass o
 blocking every deploy; it is logged loudly on every skipped verification.
 
 **Version compatibility.** cosign is not backward-compatible across majors: cosign 3.x verifies
-both 2.x and 3.x keyless signatures, but cosign 2.x **cannot** verify 3.x signatures. The CI signs
-with the cosign that `sigstore/cosign-installer` pins (currently 3.0.6 via `@v4.1.2`), so the host
-cosign must be **≥ that version and never a lower major** — otherwise the fail-closed gate blocks
-every deploy. The host tracks the current 3.x release (3.1.3); when the CI installer pin is bumped,
-the host is kept ≥ it. The host binary is also kept current for its **own** advisories, not only for
-signature compatibility: cosign ≤ 3.1.2 carries GHSA-fx35-mq7g-6g98, an identity-pinning bypass that
-reaches `verify-blob` only and therefore never exposed this OCI-image gate.
+both 2.x and 3.x keyless signatures, but cosign 2.x **cannot** verify 3.x signatures. The CI and
+the host therefore run **one** pinned cosign release: `release-images.yml` and the
+`retag-verified-digest` action pass it to `sigstore/cosign-installer` as `cosign-release`, the host
+role installs the same release by sha256, and a bump moves all three together
+([`dependency-pins.md`](../dependency-pins.md)). The host must never run a lower major than the CI
+signs with — otherwise the fail-closed gate blocks every deploy. Since 3.1.6, `cosign verify`
+accepts a new-format bundle only with the predicate type `cosign sign` writes
+(`https://sigstore.dev/cosign/sign/v1`), which every 3.x signature of this pipeline carries, so
+another attestation by the same identity never counts as a signature. The binary is also kept
+current for its **own** advisories, not only for signature compatibility: cosign ≤ 3.1.2 carries
+GHSA-fx35-mq7g-6g98, an identity-pinning bypass that reaches `verify-blob` only and therefore never
+exposed this OCI-image gate.
 
 **A transient failure is not a supply-chain alarm.** Verification is a network round-trip — it
 fetches the signature layer from GHCR and reaches the Sigstore roots — so it fails for the same
@@ -979,13 +984,15 @@ on a genuinely bad signature, which still aborts fail-closed.
 - [ ] `release-images.yml` signs nothing unless the run's ref is `refs/heads/main` or a
   `vMAJOR.MINOR.PATCH` tag whose commit is an ancestor of `main` (`ref-guard` job, which every
   signing job depends on).
-- [ ] The host `cosign` is a major **≥** the cosign the CI signs with (`cosign-installer` pin, 3.x);
-  a host on cosign 2.x cannot verify the 3.x signatures and is a mis-bootstrap, not a supported mode.
+- [ ] The host role and the CI install the same pinned cosign release (`COSIGN_RELEASE`, 3.x), and
+  the host never runs a lower major than the CI signs with; a host on cosign 2.x cannot verify the
+  3.x signatures and is a mis-bootstrap, not a supported mode.
 
 **Enforced by:** `scripts/deploy.sh` (`verify_signature`, `verify_digest_or_die`, cosign pre-flight)
 · `scripts/deploy.test.sh` (signature-gate self-tests, including the anchored identity) ·
 `.github/workflows/promote.yml` (pinned identity) · `scripts/check-cosign-identity.py` (repo-lint:
-every copy anchored and identical) · `.github/workflows/release-images.yml` (`ref-guard`) ·
+every copy anchored and identical) · `.github/workflows/release-images.yml` (`ref-guard`,
+`COSIGN_RELEASE`) · `.github/actions/retag-verified-digest` (`cosign-release`) ·
 `ansible/roles/basetool_host/tasks/15-cosign.yml` · **Runbook:** `docs/deployment.md` → *Signature verification (cosign)* · **Decision:** ADR-0075
 
 ### REQ-OPS-016 — Deploy host runtime hardening
@@ -2729,7 +2736,7 @@ that has no entry at all, before it is used.
   version-pinned only. Each requirement file is compiled from the `<name>.in` beside it and keeps
   uv's header, from which Dependabot's `uv` entry takes `--universal` and the Python version when
   it recompiles the file; Dependabot's npm entry covers the markdownlint lockfile. The pins it
-  cannot see (tool binaries in workflow `env`, the Redoc bundle, cosign's installer default, the
+  cannot see (tool binaries in workflow `env`, the Redoc bundle, the cosign release, the
   lokitool archive and its runner image, the collections) are listed in [`dependency-pins.md`](../dependency-pins.md)
   with how each one moves.
 - **`-sources.jar`, `-javadoc.jar` and the Gradle distribution's `gradle-<version>-src.zip` are

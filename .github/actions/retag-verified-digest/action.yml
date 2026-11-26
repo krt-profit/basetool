@@ -40,6 +40,8 @@ runs:
   steps:
     - name: Install cosign
       uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532
+      with:
+        cosign-release: v3.1.6
 
     - name: Resolve source digest
       id: resolve

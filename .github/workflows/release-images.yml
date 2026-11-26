@@ -16,6 +16,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
   TRIVY_VERSION: v0.76.2
+  COSIGN_RELEASE: v3.1.6
 
 jobs:
   ref-guard:
@@ -99,6 +100,8 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532
+        with:
+          cosign-release: ${{ env.COSIGN_RELEASE }}
 
       - name: Decide
         id: decide
@@ -497,6 +500,8 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532
+        with:
+          cosign-release: ${{ env.COSIGN_RELEASE }}
 
       - name: Sign image (keyless / OIDC)
         env:
@@ -671,6 +676,8 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532
+        with:
+          cosign-release: ${{ env.COSIGN_RELEASE }}
 
       - name: Sign config bundle (keyless / OIDC)
         env:
@@ -854,6 +861,8 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532
+        with:
+          cosign-release: ${{ env.COSIGN_RELEASE }}
 
       - name: Sign keycloak-spi bundle (keyless / OIDC)
         env:
