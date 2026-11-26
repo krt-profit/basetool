@@ -281,6 +281,19 @@ check_mode() {
       exit 1
     }
 
+  local fonts
+  fonts="$(awk '/location \^~ \/maintenance\/fonts\/ \{/,/\}/' "${dump}")"
+  grep -qE '^[[:space:]]*root[[:space:]]+/usr/share/nginx/html;' <<<"${fonts}" \
+    || {
+      echo "FAIL: ${mode}: the maintenance page's fonts are not served from disk"
+      exit 1
+    }
+  grep -q 'proxy_pass' <<<"${fonts}" \
+    && {
+      echo "FAIL: ${mode}: the maintenance page's fonts are proxied, so they fail while the applications are down"
+      exit 1
+    }
+
   local gtls='include /etc/nginx/edge/include/upstream-grafana-tls.conf;'
   if [[ "${grafana_verify}" == "on" ]]; then
     grep -qF "${gtls}" "${dump}" \
