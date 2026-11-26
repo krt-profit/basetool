@@ -176,6 +176,7 @@
       "kernel/krt-filter-panel.js",
       "kernel/krt-focus.js",
       "kernel/krt-frequent.js",
+      "kernel/krt-hint-bubble.js",
       "kernel/krt-hooks.js",
       "kernel/krt-html.js",
       "kernel/krt-i18n.js",

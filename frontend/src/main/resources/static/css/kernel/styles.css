@@ -6264,14 +6264,14 @@
     }
 
     .scu-hint__bubble {
-        position: absolute;
-        bottom: calc(100% + 0.5rem);
-        left: 50%;
+        position: fixed;
+        top: var(--hint-top, 0);
+        left: var(--hint-left, 0);
         z-index: var(--z-hint);
         width: max-content;
         max-width: min(17rem, 78vw);
         padding: var(--space-2) 0.6rem;
-        transform: translateX(calc(-50% + var(--hint-shift, 0px))) scale(0);
+        transform: scale(0);
         background: var(--surface-panel);
         border: 1px solid var(--color-primary);
         box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 30%, transparent);
@@ -6298,7 +6298,7 @@
     .scu-hint:focus-within .scu-hint__bubble {
         opacity: 1;
         visibility: visible;
-        transform: translateX(calc(-50% + var(--hint-shift, 0px)));
+        transform: none;
         transition:
             opacity 0.2s ease,
             visibility 0.2s ease;
@@ -6308,10 +6308,17 @@
         content: '';
         position: absolute;
         top: 100%;
-        left: calc(50% - var(--hint-shift, 0px));
+        left: var(--hint-arrow-x, 50%);
         border: 0.3rem solid transparent;
         border-top-color: var(--color-primary);
         transform: translateX(-50%);
+    }
+
+    .scu-hint__bubble--below::after {
+        top: auto;
+        bottom: 100%;
+        border-top-color: transparent;
+        border-bottom-color: var(--color-primary);
     }
 
     .import-extract-bar {
