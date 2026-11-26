@@ -1,5 +1,10 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
-import { clearAllUnsaved, clearUnsaved, markUnsaved } from '/js/kernel/krt-unsaved-marks.js';
+import {
+    clearAllUnsaved,
+    clearUnsaved,
+    keepAsDraft,
+    markUnsaved,
+} from '/js/kernel/krt-unsaved-marks.js';
 
 let isDirty = false;
 
@@ -10,6 +15,17 @@ let isDirty = false;
 export function resetUnsavedChanges() {
     isDirty = false;
     clearAllUnsaved();
+}
+
+/**
+ * Clears the unsaved-changes guard for a dialog closed without saving and keeps its form's draft
+ * (REQ-FE-041): the form's unsaved mark becomes its draft mark, and the marks of other forms stay.
+ *
+ * @param {HTMLFormElement} form the closed dialog's form
+ */
+export function releaseUnsavedChanges(form) {
+    isDirty = false;
+    keepAsDraft(form);
 }
 
 /**

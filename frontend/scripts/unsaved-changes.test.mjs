@@ -91,6 +91,7 @@ class FakeForm extends FakeElement {
 function harness(forms) {
     const listeners = {};
     const dispatched = [];
+    const details = [];
     const context = vm.createContext({
         Element: FakeElement,
         HTMLFormElement: FakeForm,
@@ -106,6 +107,7 @@ function harness(forms) {
             },
             dispatchEvent(event) {
                 dispatched.push(event.type);
+                details.push(event.detail);
                 return true;
             },
             getElementById: () => null,
@@ -125,8 +127,10 @@ function harness(forms) {
     return {
         fire,
         dispatched,
+        details,
         isDirty: () => context.hasUnsavedChanges(),
         reset: () => context.resetUnsavedChanges(),
+        release: (form) => context.releaseUnsavedChanges(form),
     };
 }
 
@@ -190,6 +194,33 @@ test('resetting the guard also clears the draft mark of an untracked dialog form
     h.reset();
     assert.equal(dialogForm.hasAttribute('data-krt-draft-edited'), false);
     assert.deepEqual(h.dispatched, ['krt:unsaved-cleared']);
+});
+
+test('releasing a closed dialog form hands its mark to the draft mark and keeps the draft', () => {
+    const form = new FakeForm();
+    form.setAttribute('data-krt-draft', 'hangar-ship');
+    const other = new FakeForm();
+    const h = harness([form, other]);
+    h.fire('input', new FakeElement(form));
+    h.fire('input', new FakeElement(other));
+    h.release(form);
+    assert.equal(h.isDirty(), false);
+    assert.equal(form.hasAttribute(MARK), false);
+    assert.equal(form.hasAttribute('data-krt-draft-edited'), true);
+    assert.equal(other.hasAttribute(MARK), true);
+    assert.deepEqual(h.dispatched, ['krt:unsaved-cleared']);
+    assert.equal(h.details[0].draftKept, true);
+    assert.equal(h.details[0].form, form);
+});
+
+test('releasing a closed dialog form that keeps no draft clears its marks', () => {
+    const form = new FakeForm();
+    const h = harness([form]);
+    h.fire('input', new FakeElement(form));
+    h.release(form);
+    assert.equal(form.hasAttribute(MARK), false);
+    assert.equal(form.hasAttribute('data-krt-draft-edited'), false);
+    assert.equal(h.details[0].draftKept, undefined);
 });
 
 if (failures > 0) {

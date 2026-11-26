@@ -18,7 +18,8 @@
  */
 
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
-import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { releaseUnsavedChanges, resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { setDraftKey } from '/js/kernel/krt-drafts.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { bindShipTypePicker } from '/js/hangar/ship-type-picker.js';
@@ -33,6 +34,9 @@ import {
 import { bindOriginField, bulkChangeOrigin } from '/js/hangar/ship-origin.js';
 
 const RESULTS = '#member-hangar-results';
+
+/** The draft key of the ship dialog while it adds a ship (REQ-FE-041). */
+const SHIP_DRAFT_KEY = 'member-hangar-ship';
 
 /**
  * Wires the admin member hangar: the add, edit and delete dialogs (REQ-HANGAR-011), the unit
@@ -161,7 +165,14 @@ function initMemberHangar() {
         if (visible) select.value = '';
     }
 
+    /** Closes the ship dialog without saving; a new ship's input stays as its draft. */
     function closeShipModal() {
+        releaseUnsavedChanges(shipForm);
+        krtModal.close(shipModal);
+    }
+
+    /** Closes the ship dialog after a save, which clears its unsaved input and its draft. */
+    function closeSavedShipModal() {
         resetUnsavedChanges();
         krtModal.close(shipModal);
     }
@@ -211,6 +222,7 @@ function initMemberHangar() {
      * @param {HTMLElement} btn the add button
      */
     function openAdd(btn) {
+        setDraftKey(shipForm, SHIP_DRAFT_KEY);
         modalTitle.textContent = shipForm.getAttribute('data-title-add');
         assignFormAction(
             shipForm,
@@ -234,6 +246,7 @@ function initMemberHangar() {
      * @param {HTMLElement} btn the row's edit button
      */
     function openEdit(btn) {
+        setDraftKey(shipForm, null);
         const action = btn.getAttribute('data-action') || '';
         modalTitle.textContent = shipForm.getAttribute('data-title-edit');
         assignFormAction(shipForm, safeSameOriginUrl(action, shipForm.action));
@@ -295,7 +308,7 @@ function initMemberHangar() {
                 successMessage: message(isUpdate ? 'updateSuccess' : 'addSuccess'),
                 errorMessage: message(isUpdate ? 'updateError' : 'addError'),
                 onSuccess() {
-                    closeShipModal();
+                    closeSavedShipModal();
                     afterWrite();
                 },
             })
@@ -319,7 +332,7 @@ function initMemberHangar() {
                 errorMessage: message('deleteError'),
                 onSuccess() {
                     krtModal.close(confirmModal);
-                    closeShipModal();
+                    closeSavedShipModal();
                     afterWrite();
                 },
             })

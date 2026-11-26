@@ -1202,6 +1202,24 @@ test('a saved dialog form loses its mark and its draft', () => {
     assert.equal(h.stored(), null);
 });
 
+test('a tracked dialog form closed without saving keeps its draft under the draft mark', () => {
+    const dom = page();
+    inDialog(dom);
+    const h = harness({}, dom);
+    h.controls.note.value = 'typed';
+    h.form.setAttribute('data-krt-unsaved', '');
+    h.edit(h.controls.note);
+    h.flushTimers();
+    h.context.keepAsDraft(h.form);
+    assert.ok(!h.form.hasAttribute('data-krt-unsaved'));
+    assert.ok(h.form.hasAttribute('data-krt-draft-edited'));
+    assert.equal(h.stored().snapshot.fields.note, 'typed');
+    h.controls.note.value = 'typed on';
+    h.edit(h.controls.note);
+    h.flushTimers();
+    assert.equal(h.stored().snapshot.fields.note, 'typed on');
+});
+
 test('a discard on the page drops a dialog draft and leaves the dialog closed', () => {
     const dom = page();
     const dialog = inDialog(dom);

@@ -517,8 +517,10 @@ function initKrtDrafts() {
     });
 
     document.addEventListener(UNSAVED_CLEARED_EVENT, (event) => {
-        const detail = /** @type {CustomEvent<{form?: HTMLFormElement} | null>} */ (event).detail;
-        const form = detail && detail.form ? detail.form : null;
+        const detail =
+            /** @type {CustomEvent<{form?: HTMLFormElement, draftKept?: boolean} | null>} */ (event)
+                .detail;
+        const form = detail && detail.form && !detail.draftKept ? detail.form : null;
         if (form && form.matches(DRAFT_FORM_SELECTOR)) {
             forget(stateOf(form, scope));
         }

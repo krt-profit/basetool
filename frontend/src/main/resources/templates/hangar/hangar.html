@@ -315,7 +315,7 @@
     <th:block th:if="${mineTab}">
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='ship-modal', titleKey='hangar.ship.modal_title', variant='krt-modal--wide', titleId='modal-title', closeTrigger='', closeClass='close-ship-modal', body=~{::ship-modal-body})}">
         <th:block th:ref="ship-modal-body">
-            <form id="ship-form" data-testid="hangar-ship-form" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}" method="post" th:object="${shipForm}" th:action="${modalAction != null} ? ${modalAction} : @{/hangar}">
+            <form id="ship-form" data-testid="hangar-ship-form" data-krt-draft="hangar-ship" data-krt-draft-version="1" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}" method="post" th:object="${shipForm}" th:action="${modalAction != null} ? ${modalAction} : @{/hangar}">
                 <input type="hidden" id="ship-version" name="version" th:value="*{version}">
                 <div class="krt-modal-body">
                 <div class="form-group">
