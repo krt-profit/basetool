@@ -2089,10 +2089,14 @@ fetch at the terminals: a quiet extra beside the Lager's job, which stays managi
   the mean across the buying terminals rounded `HALF_UP` to two decimals like the material page's
   „Ø Verkauf"; **Bestpreis** (`HIGHEST`); or **Minimalpreis** (`LOWEST`), each with the terminal
   first by name on a tie. The choice lives in `member_sale_value_setting` (one row per member, its
-  own optimistic-lock version, absent = average, deleted with the member, part of the data export,
-  left behind on an account merge), behind `GET`/`PUT
-  /api/v1/inventory/my-inventory/sale-price-basis` (caller from the JWT, `409` on a stale version).
-  The profile saves it in place like its other sections.
+  own optimistic-lock version, absent = average, deleted with the member, left behind on an account
+  merge), behind `GET`/`PUT /api/v1/inventory/my-inventory/sale-price-basis` (OpenAPI domain
+  `inventory`, caller from the JWT, `409` on a stale version). The profile saves it in place like
+  its other sections.
+- **Data export.** The choice is the export section `salePriceBasis` (`ART_15_20`, the member chose
+  it; read right after the Lager entries, no free text, nothing scrubbed), named in the PDF
+  inventory by its `pdf.export.section.salePriceBasis` label in all three backend bundles
+  (REQ-SEC-058).
 - **Value per group.** The personal grouped listing (`GET /api/v1/inventory/my-inventory/grouped`,
   material catalog) gives each `SCU` material group with a priced material a `saleValue`: the basis,
   its price per SCU, the terminal (none for the average), the number of buying terminals, the amount
@@ -2142,6 +2146,9 @@ fetch at the terminals: a quiet extra beside the Lager's job, which stays managi
 - [x] A member without a choice values at the average; the profile reads, saves in place and
   relays a stale version as a conflict. *`MemberSaleValueSettingsTest`,
   `MySalePriceBasisControllerTest`, `ProfileSalePriceBasisMvcTest`.*
+- [x] The data export carries the choice as its own section, pinned in the committed catalogue, and
+  the PDF names it by its label. *`DataExportEndStateTest`, `PersonalDataExportCatalogueTest`,
+  `DataExportPdfSectionLabelCoverageTest`.*
 - [x] The value line sits on priced group rows only with a tooltip of its basis, the sum row totals
   the shown groups, explains the basis, names unpriced materials and unvalued stolen stock, marks an
   active filter and is absent without a valued group. *`InventorySaleValueRenderTest`,
@@ -2158,13 +2165,16 @@ fetch at the terminals: a quiet extra beside the Lager's job, which stays managi
 `ProfileSalePriceBasisMvcTest`, `InventorySaleValueRenderTest`, `LagerSaleValueSummaryTest`,
 `InventorySaleSliceQueryDataTest`, `InventorySelectionValuationTest`,
 `MySelectionSaleValueControllerTest`, `InventoryBackendClientTest`, `AuthorizationMatrixTest`,
-`DataExportEndStateTest`, `UserReassignmentOrderTest`, `DtoOpenApiContractTest` · **Code:**
+`DataExportEndStateTest`, `PersonalDataExportCatalogueTest`,
+`DataExportPdfSectionLabelCoverageTest`, `ApiDomainsMatchTheDomainMapTest`,
+`UserReassignmentOrderTest`, `DtoOpenApiContractTest` · **Code:**
 `catalogue/api/MaterialSalePrices`, `MaterialSaleQuote`,
 `catalogue/internal/MaterialSalePriceService`, `MaterialPriceRepository#findSaleRows`,
 `inventory/internal/InventorySaleValuation`, `InventorySelectionValuation`,
 `InventorySaleSliceQueries#findSaleSlices`, `MemberSaleValueSettings` (table
-`member_sale_value_setting`, migration `V453`), `inventory/web/MySalePriceBasisController`,
-`MySelectionSaleValueController`, `InventoryAggregationService#getMyAggregatedInventory`; frontend
+`member_sale_value_setting`, migration `V453`), `InventoryExportSections`,
+`inventory/web/MySalePriceBasisController`, `MySelectionSaleValueController`,
+`InventoryAggregationService#getMyAggregatedInventory`; frontend
 `inventory/web/LagerSaleValueSummary`, `LagerSelectionSaleValueController`,
 `ProfileSalePriceBasisController`, `ProfileSalePriceBasisProxyController`,
 `SalePriceBasisPreferenceReader`, `templates/inventory/inventory-my.html`,
