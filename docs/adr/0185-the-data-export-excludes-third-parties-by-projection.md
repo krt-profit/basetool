@@ -2,6 +2,7 @@
 
 - **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-17 (`f8b6c19ae`, PR #1920: `DataExportScrubCoverageTest`).
 - **Date:** 2026-09-15
+- **Amended:** 2026-11-26 — the section marker is the data subject's right, `right` in the JSON, and follows the lawful basis and who provided the rows ([ADR-0414](0414-the-portability-marker-follows-the-lawful-basis-and-who-provided-the-rows.md))
 - **Deciders:** @greluc (the export itself and the anonymisation requirement as decision 7 during
   the cloud session; the admin variant and the PDF's depth on 2026-09-15)
 - **Related:** spec `REQ-SEC-058` (new) ·

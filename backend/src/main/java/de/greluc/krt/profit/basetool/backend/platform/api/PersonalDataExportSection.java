@@ -25,6 +25,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -41,13 +43,13 @@ import org.jetbrains.annotations.Unmodifiable;
  */
 public interface PersonalDataExportSection {
 
-  /** The legal basis a section is exported under. */
-  enum LegalBasis {
+  /** The data subject's right a section is exported under. */
+  enum Right {
 
-    /** Covered by the right of access only. */
+    /** The right of access of Art. 15 only. */
     ART_15,
 
-    /** Covered by access and portable under Art. 20. */
+    /** The right of access and data portability of Art. 20: data the member provided. */
     ART_15_20
   }
 
@@ -56,34 +58,42 @@ public interface PersonalDataExportSection {
    * docs/privacy/processing-activities.md}) a section belongs to; it fixes purpose and lawful
    * basis.
    */
+  @Getter
+  @RequiredArgsConstructor
   enum Activity {
 
     /** A1: the member account, sign-in and admission. */
-    ACCOUNT,
+    ACCOUNT(true),
 
     /** A2: missions, operations, warehouse, orders, refinery, hangar, inventory and market. */
-    OPERATIONS,
+    OPERATIONS(true),
 
-    /** A3: the bank's ledger and its records. */
-    BANKING,
+    /** A3: the bank's ledger and its records, on Art. 6(1)(f) only. */
+    BANKING(false),
 
-    /** A4: the activity audit trails. */
-    AUDIT,
+    /** A4: the activity audit trails, on Art. 6(1)(f) only. */
+    AUDIT(false),
 
     /** A5: notifications. */
-    NOTIFICATIONS,
+    NOTIFICATIONS(true),
 
     /** A6: acceptance of the terms of use. */
-    TERMS,
+    TERMS(true),
 
-    /** A9: handling data-subject requests. */
-    DATA_SUBJECT_REQUESTS,
+    /** A9: handling data-subject requests, on Art. 6(1)(c) only. */
+    DATA_SUBJECT_REQUESTS(false),
 
     /** A11: connected applications. */
-    CONNECTED_APPLICATIONS,
+    CONNECTED_APPLICATIONS(true),
 
     /** A12: material purchasing from external partners. */
-    PURCHASING
+    PURCHASING(true);
+
+    /**
+     * Whether the activity's lawful basis includes consent or a contract (Art. 6(1)(a) or (b)), the
+     * condition of Art. 20(1)(a) for data portability.
+     */
+    private final boolean portable;
   }
 
   /**
@@ -180,6 +190,18 @@ public interface PersonalDataExportSection {
       }
       sources = Set.copyOf(sources);
     }
+
+    /**
+     * Tells whether rows of this processing can be portable under Art. 20: the activity rests on
+     * consent or a contract, and the member provided the rows, by themselves or through their
+     * connected application.
+     *
+     * @return {@code true} when a section of this processing may be marked {@link Right#ART_15_20}
+     */
+    public boolean allowsPortability() {
+      return activity.isPortable()
+          && (sources.contains(Source.MEMBER) || sources.contains(Source.CONNECTED_APPLICATION));
+    }
   }
 
   /**
@@ -188,8 +210,8 @@ public interface PersonalDataExportSection {
    * @param position where the section sits in the export, ascending and unique across modules
    * @param key the stable machine key, also the JSON property name and the suffix of the {@code
    *     pdf.export.section.*} label key
-   * @param legalBasis why the member may receive it
-   * @param rationale one sentence on why the section has this legal basis; not serialised
+   * @param right the right the member receives it under
+   * @param rationale one sentence on why the section carries this right; not serialised
    * @param sql the statement, selecting the member's rows through {@code :userId}
    * @param scrubbedColumns the selected columns passed through the handle scrubber
    * @param unscrubbedPersonColumns the selected person-name columns left as they are, each with the
@@ -200,7 +222,7 @@ public interface PersonalDataExportSection {
   record Section(
       int position,
       @NotNull String key,
-      @NotNull LegalBasis legalBasis,
+      @NotNull Right right,
       @NotNull String rationale,
       @NotNull String sql,
       @NotNull @Unmodifiable Set<String> scrubbedColumns,
@@ -218,17 +240,17 @@ public interface PersonalDataExportSection {
      *
      * @param position where the section sits in the export
      * @param key the stable machine key
-     * @param legalBasis why the member may receive it
-     * @param rationale why the section has this legal basis
+     * @param right the right the member receives it under
+     * @param rationale why the section carries this right
      * @param sql the statement
      */
     public Section(
         int position,
         @NotNull String key,
-        @NotNull LegalBasis legalBasis,
+        @NotNull Right right,
         @NotNull String rationale,
         @NotNull String sql) {
-      this(position, key, legalBasis, rationale, sql, Set.of(), Map.of(), null);
+      this(position, key, right, rationale, sql, Set.of(), Map.of(), null);
     }
 
     /**
@@ -241,7 +263,7 @@ public interface PersonalDataExportSection {
       Set<String> all = new HashSet<>(scrubbedColumns);
       all.addAll(List.of(columns));
       return new Section(
-          position, key, legalBasis, rationale, sql, all, unscrubbedPersonColumns, processing);
+          position, key, right, rationale, sql, all, unscrubbedPersonColumns, processing);
     }
 
     /**
@@ -254,8 +276,7 @@ public interface PersonalDataExportSection {
     public @NotNull Section keeping(@NotNull String column, @NotNull String reason) {
       Map<String, String> all = new HashMap<>(unscrubbedPersonColumns);
       all.put(column, reason);
-      return new Section(
-          position, key, legalBasis, rationale, sql, scrubbedColumns, all, processing);
+      return new Section(position, key, right, rationale, sql, scrubbedColumns, all, processing);
     }
 
     /**
@@ -275,7 +296,7 @@ public interface PersonalDataExportSection {
       return new Section(
           position,
           key,
-          legalBasis,
+          right,
           rationale,
           sql,
           scrubbedColumns,

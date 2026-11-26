@@ -36,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
-import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserAccountMergeService;
@@ -426,7 +426,7 @@ class GdprParticipantCoverageTest {
         new Section(
                 9000,
                 "g11Planted",
-                LegalBasis.ART_15,
+                Right.ART_15,
                 "A planted section that exports the planted member column.",
                 "SELECT member_id FROM g11_planted WHERE member_id = :userId")
             .processedAs(

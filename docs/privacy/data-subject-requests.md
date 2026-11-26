@@ -190,9 +190,15 @@ means, on the basis of consent or contract (Art. 6(1)(a)/(b)). It does **not** c
 the organisation or retained under legitimate interest — so the audit trail, the bank ledger, the
 handle snapshots and the approval records are outside it.
 
-The export marks each section with its basis so the portable subset is identifiable without
-re-deriving it. The format is machine-readable JSON, which satisfies "structured, commonly used and
-machine-readable".
+The export marks each section with the right it is exported under, so the portable subset is
+identifiable without re-deriving it.
+
+A section is marked portable only when two things hold: its activity rests on consent or a contract,
+and the member provided its rows, themselves or through their connected application (ADR-0414).
+That rules out the bank's sections, the audit trails and the erasure requests. It also rules out
+the account's status (rank, join date, approval, Discord data) and the aUEC money sections, where
+other members' records sit beside the member's own. The whole export is machine-readable JSON,
+which satisfies "structured, commonly used and machine-readable".
 
 ### Art. 21 — Objection
 

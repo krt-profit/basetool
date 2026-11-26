@@ -29,7 +29,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRows;
 import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRowsMover;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource;
-import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserReassignmentParticipant.Moved;
 import java.util.List;
@@ -121,13 +121,8 @@ class PurchasingParticipantsTest {
             "purchasingDealTranches");
     assertThat(sections).extracting(Section::position).containsExactly(490, 491, 492, 493, 494);
     assertThat(sections)
-        .extracting(Section::legalBasis)
-        .containsExactly(
-            LegalBasis.ART_15_20,
-            LegalBasis.ART_15_20,
-            LegalBasis.ART_15,
-            LegalBasis.ART_15,
-            LegalBasis.ART_15);
+        .extracting(Section::right)
+        .containsExactly(Right.ART_15_20, Right.ART_15, Right.ART_15, Right.ART_15, Right.ART_15);
     assertThat(sections.subList(2, 5))
         .allSatisfy(section -> assertThat(section.sql()).contains("d.delegate_user_id = :userId"));
   }

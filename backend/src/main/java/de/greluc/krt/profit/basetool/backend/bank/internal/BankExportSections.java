@@ -19,8 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15;
-import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15_20;
+import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right.ART_15;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
 import java.util.List;
@@ -198,10 +197,11 @@ public class BankExportSections implements PersonalDataExportSection {
     return new Section(
             400,
             "bankRequestsRaised",
-            ART_15_20,
+            ART_15,
             "Raised by the member, including their own justification and note, the accounts and"
                 + " approval terms that applied and the connected application they raised it"
-                + " through. The deciding bank employee is not named.",
+                + " through. The deciding bank employee is not named. Kept as the bank's records"
+                + " under Art. 6(1)(f), so not portable under Art. 20.",
             """
             SELECT r.type, r.amount, a.account_no, a.name AS account,
                    ta.account_no AS target_account_no, ta.name AS target_account,

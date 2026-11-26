@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.internal;
 
-import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15;
+import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right.ART_15;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
 import java.util.List;

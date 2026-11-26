@@ -24,9 +24,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Activity;
-import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Processing;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Retention;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Source;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
@@ -46,7 +46,7 @@ class PersonalDataExportRegistryTest {
     return new Section(
         position,
         key,
-        LegalBasis.ART_15,
+        Right.ART_15,
         "A section of the test registry.",
         "SELECT 1 FROM app_user WHERE id = :userId");
   }
@@ -70,6 +70,57 @@ class PersonalDataExportRegistryTest {
     assertThat(declared.processing())
         .isEqualTo(
             new Processing(Activity.ACCOUNT, Retention.ACCOUNT_LIFETIME, Set.of(Source.MEMBER)));
+  }
+
+  @Test
+  void aPortableSectionOfAnActivityWithoutConsentOrContractIsRefused() {
+    Section bank =
+        portable(10, "bank")
+            .processedAs(Activity.BANKING, Retention.ACCOUNT_LIFETIME, Source.MEMBER);
+    PersonalDataExportSection participant = () -> List.of(bank);
+
+    assertThatThrownBy(() -> new PersonalDataExportRegistry(List.of(participant)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("bank is marked portable");
+  }
+
+  @Test
+  void aPortableSectionWhoseRowsOthersRecordedIsRefused() {
+    Section assigned =
+        portable(10, "assigned")
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS);
+    PersonalDataExportSection participant = () -> List.of(assigned);
+
+    assertThatThrownBy(() -> new PersonalDataExportRegistry(List.of(participant)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("assigned is marked portable");
+  }
+
+  @Test
+  void aPortableSectionTheMemberOrTheirApplicationProvidedIsAccepted() {
+    Section entered =
+        portable(10, "entered")
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER);
+    Section synced =
+        portable(20, "synced")
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS,
+                Retention.CONNECTION,
+                Source.CONNECTED_APPLICATION,
+                Source.SYSTEM);
+
+    assertThat(new PersonalDataExportRegistry(List.of(() -> List.of(entered, synced))).sections())
+        .extracting(Section::key)
+        .containsExactly("entered", "synced");
+  }
+
+  private static Section portable(int position, String key) {
+    return new Section(
+        position,
+        key,
+        Right.ART_15_20,
+        "A portable section of the test registry.",
+        "SELECT 1 FROM app_user WHERE id = :userId");
   }
 
   @Test

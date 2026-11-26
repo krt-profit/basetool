@@ -140,7 +140,7 @@ class DataExportScrubCoverageTest {
   }
 
   @Test
-  void everySectionStatesWhyItCarriesItsLegalBasis() {
+  void everySectionStatesWhyItCarriesItsRight() {
     assertThat(ExportSectionDeclarations.inReadingOrder())
         .allSatisfy(section ->
             assertThat(section.rationale())
@@ -151,10 +151,10 @@ class DataExportScrubCoverageTest {
   }
 
   @Test
-  void everySectionCarriesALegalBasisAndAStatementOverTheSubject() {
+  void everySectionCarriesARightAndAStatementOverTheSubject() {
     assertThat(ExportSectionDeclarations.inReadingOrder())
         .allSatisfy(section -> {
-          assertThat(section.legalBasis()).as("legal basis of " + section.key()).isNotNull();
+          assertThat(section.right()).as("legal basis of " + section.key()).isNotNull();
           assertThat(section.sql())
               .as("statement of " + section.key())
               .containsIgnoringCase(":userId");

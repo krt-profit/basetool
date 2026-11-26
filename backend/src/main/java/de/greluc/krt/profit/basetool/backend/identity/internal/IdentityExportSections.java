@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
-import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15;
-import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15_20;
+import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right.ART_15;
+import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right.ART_15_20;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
 import java.util.List;
@@ -28,8 +28,9 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The identity's part of the Art. 15 / Art. 20 data export: the member's account, home-location
- * setting, consents, registration decisions, erasure requests and realm roles (REQ-SEC-058).
+ * The identity's part of the Art. 15 / Art. 20 data export: the member's account and its status,
+ * home-location setting, consents, registration decisions, erasure requests and realm roles
+ * (REQ-SEC-058).
  */
 @Component
 public class IdentityExportSections implements PersonalDataExportSection {
@@ -41,20 +42,15 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 10,
                 "account",
                 ART_15_20,
-                "Provided at registration and on the profile page.",
+                "Provided by the member at registration, taken over from their Discord sign-in, or"
+                    + " entered on the profile page.",
                 """
-                SELECT id, username, display_name, email, description, user_rank, join_date,
-                       discord_user_id, discord_guild_nickname, rsi_handle, approval_status,
-                       approved_at, in_keycloak, enabled_in_keycloak, keycloak_absent_since,
-                       last_read_announcement_id, created_at, updated_at
+                SELECT id, username, display_name, email, description, rsi_handle, created_at,
+                       updated_at
                 FROM app_user WHERE id = :userId
                 """)
             .processedAs(
-                Activity.ACCOUNT,
-                Retention.ACCOUNT_LIFETIME,
-                Source.MEMBER,
-                Source.OTHER_MEMBERS,
-                Source.DISCORD)
+                Activity.ACCOUNT, Retention.ACCOUNT_LIFETIME, Source.MEMBER, Source.DISCORD)
             .scrubbing("description")
             .keeping(
                 "username",
@@ -65,8 +61,26 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 "email",
                 "A structured identifier, and the subject's own. A three-character handle occurring"
                     + " inside a local part would have made the address unusable.")
-            .keeping("discord_guild_nickname", "The subject's own nickname; see account.username.")
             .keeping("rsi_handle", "The subject's own RSI handle; see account.username."),
+        new Section(
+                12,
+                "accountStatus",
+                ART_15,
+                "Set by the organisation, taken over from Discord at each sign-in or kept by the"
+                    + " tool; not data the member provided.",
+                """
+                SELECT user_rank, join_date, approval_status, approved_at, discord_user_id,
+                       discord_guild_nickname, in_keycloak, enabled_in_keycloak,
+                       keycloak_absent_since, last_read_announcement_id
+                FROM app_user WHERE id = :userId
+                """)
+            .processedAs(
+                Activity.ACCOUNT,
+                Retention.ACCOUNT_LIFETIME,
+                Source.OTHER_MEMBERS,
+                Source.DISCORD,
+                Source.SYSTEM)
+            .keeping("discord_guild_nickname", "The subject's own nickname; see account.username."),
         new Section(
                 15,
                 "homeLocationPreference",

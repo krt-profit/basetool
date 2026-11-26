@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.architecture.DomainMap;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
-import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import java.io.IOException;
@@ -81,7 +81,7 @@ class PersonalDataExportOwnershipTest {
         new Section(
             9000,
             "planted",
-            LegalBasis.ART_15,
+            Right.ART_15,
             "A planted section that filters a bank table from the mission module.",
             """
             SELECT b.note FROM mission m CROSS JOIN bank_booking_request b
@@ -102,7 +102,7 @@ class PersonalDataExportOwnershipTest {
         new Section(
             9001,
             "keyless",
-            LegalBasis.ART_15,
+            Right.ART_15,
             "A planted section that filters nothing by the member.",
             "SELECT name FROM mission");
 

@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
-import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import java.math.BigDecimal;
@@ -99,8 +99,8 @@ class DataExportParticipantSectionsIntegrationTest {
         .rows();
   }
 
-  private static @NotNull String legalBasis(@NotNull String key) {
-    return ExportSectionDeclarations.section(key).legalBasis().name();
+  private static @NotNull String right(@NotNull String key) {
+    return ExportSectionDeclarations.section(key).right().name();
   }
 
   private @NotNull UUID mission(@NotNull String name, @Nullable UUID partyLead) {
@@ -180,7 +180,7 @@ class DataExportParticipantSectionsIntegrationTest {
         .containsEntry("code", "ZZZ_EXPORT_ROLE")
         .containsEntry("role", "Zzz Export Role")
         .doesNotContainKey("description");
-    assertThat(legalBasis("realmRoles")).isEqualTo(LegalBasis.ART_15.name());
+    assertThat(right("realmRoles")).isEqualTo(Right.ART_15.name());
   }
 
   @Test
@@ -265,7 +265,7 @@ class DataExportParticipantSectionsIntegrationTest {
         .containsEntry("request_kind", "ITEM")
         .containsEntry("item_name", "Zzz Probe-Item")
         .doesNotContainKeys("remark", "owner_id");
-    assertThat(legalBasis("marketRequestInterests")).isEqualTo(LegalBasis.ART_15_20.name());
+    assertThat(right("marketRequestInterests")).isEqualTo(Right.ART_15_20.name());
   }
 
   @Test

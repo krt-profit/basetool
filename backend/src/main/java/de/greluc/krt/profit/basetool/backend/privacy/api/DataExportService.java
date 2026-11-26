@@ -75,7 +75,7 @@ public class DataExportService {
    * One section of an assembled export.
    *
    * @param key the stable machine key, also the label key
-   * @param legalBasis {@code ART_15} or {@code ART_15_20}
+   * @param right {@code ART_15} or {@code ART_15_20}
    * @param activity the processing activity the rows belong to, a key of {@link
    *     DataExportInformation#activities()}
    * @param retention how long the rows are kept, a key of {@link DataExportInformation#retention()}
@@ -85,7 +85,7 @@ public class DataExportService {
    */
   public record ExportSection(
       String key,
-      String legalBasis,
+      String right,
       String activity,
       String retention,
       List<String> sources,
@@ -181,7 +181,7 @@ public class DataExportService {
       sections.add(
           new ExportSection(
               section.key(),
-              section.legalBasis().name(),
+              section.right().name(),
               processing.activity().name(),
               processing.retention().name(),
               processing.sources().stream().sorted().map(Source::name).toList(),
