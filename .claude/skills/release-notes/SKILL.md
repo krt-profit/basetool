@@ -101,6 +101,12 @@ nebeneinander: den relevanten Changelog-Ausschnitt (den `[Unreleased]`-Block
 reichhaltigsten Beschreibungen) und das nach Commit-Typ sortierte Git-Log (das
 das Zeitfenster sauber abgrenzt).
 
+Zum Fenster gehört ein Versionsabschnitt, dessen Tag **nach dem Startpunkt und
+spätestens am Endpunkt** liegt. Liegen Tag und Grenze auf derselben Historie,
+entscheidet die Git-Abstammung; sonst entscheidet das Commit-Datum des Tags — bei
+einer Datumsgrenze ebenso wie bei Tags, die nach einer Umschreibung von `main` auf
+keiner Linie mit dem Startpunkt mehr liegen (alle Tags bis `v1.24.0`).
+
 ```bash
 # Normalfall ohne Startpunkt — setzt am lokalen Fortschrittsmarker fort:
 python .claude/skills/release-notes/scripts/gather_changes.py

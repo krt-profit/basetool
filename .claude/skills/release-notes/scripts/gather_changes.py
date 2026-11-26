@@ -28,6 +28,9 @@ import subprocess
 import sys
 import tempfile
 
+import release_state
+import release_window
+
 for _stream in (sys.stdout, sys.stderr):
     with contextlib.suppress(AttributeError, ValueError):
         _stream.reconfigure(encoding="utf-8")
@@ -73,7 +76,7 @@ def run_git(repo: str, args: list[str]) -> str:
     return result.stdout
 
 
-VERSION_HEADER_RE = re.compile(r"^## \[v(\d+)\.(\d+)\.(\d+)\].* - (\d{4}-\d{2}-\d{2})\s*$")
+VERSION_HEADER_RE = re.compile(r"^## \[(v\d+\.\d+\.\d+)\]")
 UNRELEASED_HEADER_RE = re.compile(r"^## .*unreleased", re.IGNORECASE)
 VERSION_REF_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
@@ -99,58 +102,17 @@ def version_ref_key(value: str) -> tuple[int, int, int] | None:
     return tuple(int(part) for part in match.groups()) if match else None  # type: ignore[return-value]
 
 
-def select_changelog(
-    changelog_path: str, since: str, until: str, exclude_tags: set[str] | None = None
-) -> str:
-    """Return ``[Unreleased]`` plus every version section inside the window.
-
-    A tag ``since`` keeps strictly newer versions, a date ``since`` keeps sections
-    dated on or after it; ``until`` bounds both the same way. For a commit ``since``,
-    sections whose tag is not in ``exclude_tags`` are kept; without ``exclude_tags``
-    only ``[Unreleased]`` is returned.
-    """
+def select_changelog(changelog_path: str, window_tags: set[str]) -> str:
+    """Return ``[Unreleased]`` plus every version section whose tag is in ``window_tags``."""
     if not os.path.isfile(changelog_path):
         return f"(no CHANGELOG.md found at {changelog_path})"
     with open(changelog_path, encoding="utf-8") as handle:
         lines = handle.read().splitlines()
 
-    since_ver = version_ref_key(since)
-    until_ver = version_ref_key(until) if until and until != "HEAD" else None
-    since_date = (
-        since.replace("T", " ")[:10]
-        if (DATE_ONLY_RE.match(since) or DATE_TIME_RE.match(since))
-        else None
-    )
-    until_date = (
-        until.replace("T", " ")[:10]
-        if until and (DATE_ONLY_RE.match(until) or DATE_TIME_RE.match(until))
-        else None
-    )
-
     out: list[str] = []
     for header, body in iter_level2_blocks(lines):
-        if UNRELEASED_HEADER_RE.match(header):
-            out.append(header)
-            out.extend(body)
-            continue
         match = VERSION_HEADER_RE.match(header)
-        if not match:
-            continue
-        ver = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
-        date = match.group(4)
-        if since_ver is not None:
-            keep = ver > since_ver and (until_ver is None or ver <= until_ver)
-        elif since_date is not None:
-            keep = date >= since_date and (until_date is None or date <= until_date)
-        elif exclude_tags is not None:
-            keep = (
-                f"v{ver[0]}.{ver[1]}.{ver[2]}" not in exclude_tags
-                and (until_ver is None or ver <= until_ver)
-                and (until_date is None or date <= until_date)
-            )
-        else:
-            keep = False
-        if keep:
+        if UNRELEASED_HEADER_RE.match(header) or (match and match.group(1) in window_tags):
             out.append(header)
             out.extend(body)
     return "\n".join(out).strip() or "(no [Unreleased] or in-window version sections)"
@@ -275,6 +237,28 @@ def window_end_commit(repo: str, until: str) -> str:
     return run_git(repo, ["rev-list", "-1", f"--until={bound}", "HEAD"]).strip() or "HEAD"
 
 
+def window_bound(repo: str, value: str, *, end: bool) -> release_window.Bound:
+    """Build the window's start bound from ``value``, or with ``end`` its end bound.
+
+    A date or date+time becomes a moment as :func:`as_git_date` normalises it; anything
+    else is a ref, empty meaning ``HEAD``.
+    """
+    moment = as_git_date(value, end=end)
+    if moment is None:
+        return release_window.ref_bound(repo, value or "HEAD")
+    return release_window.moment_bound(repo, moment, inclusive=end)
+
+
+def tags_in_window(repo: str, since: str, until: str) -> set[str]:
+    """Return the version tags after ``since`` and at or before ``until``; exit on a bad bound."""
+    try:
+        start = window_bound(repo, since, end=False)
+        end = window_bound(repo, until, end=True)
+    except ValueError as exc:
+        sys.exit(f"error: {exc}")
+    return release_window.window_version_tags(repo, start, end)
+
+
 def newest_release_tag(repo: str, until: str) -> str | None:
     """Return the highest well-formed ``vN.N.N`` tag reachable at the window end, or ``None``."""
     out = run_git(repo, ["tag", "--merged", window_end_commit(repo, until)])
@@ -299,17 +283,7 @@ def suggested_subtitle(repo: str, until: str, log: str) -> str | None:
 TRACK_CMD = ".claude/skills/release-notes/scripts/track_release_notes.py"
 
 
-def load_state_module():
-    """Import the sibling ``release_state`` helper, or return ``None`` if absent."""
-    try:
-        import release_state
-
-        return release_state
-    except ImportError:
-        return None
-
-
-def resolve_since(repo: str, arg_since: str | None, state):
+def resolve_since(repo: str, arg_since: str | None):
     """Resolve the effective start point and resume context.
 
     Returns ``(since, resumed, anchor_desc)``. An explicit ``arg_since`` is used
@@ -318,26 +292,21 @@ def resolve_since(repo: str, arg_since: str | None, state):
     """
     if arg_since is not None:
         return arg_since, False, None
-    if state is None:
-        sys.exit(
-            "error: no --since given and the release_state.py tracking helper "
-            "is missing next to this script."
-        )
-    covered = (state.read_state(repo) or {}).get("last_covered") or {}
+    covered = (release_state.read_state(repo) or {}).get("last_covered") or {}
     sha = covered.get("sha")
     if not sha:
         sys.stderr.write(
             "no start point given and no local tracking pointer yet "
-            f"({state.STATE_FILENAME} absent).\n"
-            f"  looked in: {state.state_path(repo)}\n"
+            f"({release_state.STATE_FILENAME} absent).\n"
+            f"  looked in: {release_state.state_path(repo)}\n"
             "  -> Ask the user once for a start point (date or tag) and re-run with "
             "--since,\n"
             f"     then create the pointer after writing the notes:  python {TRACK_CMD} --set\n"
         )
         sys.exit(2)
-    if not state.commit_exists(repo, sha):
+    if not release_state.commit_exists(repo, sha):
         sys.stderr.write(
-            f"the tracking pointer ({state.STATE_FILENAME}) points at {sha[:12]}, which is "
+            f"the tracking pointer ({release_state.STATE_FILENAME}) points at {sha[:12]}, which is "
             "not in this repository\n  (history rewrite or fresh clone?). Ask the user for "
             f"a start point, re-run with --since,\n  then re-set the pointer:  python {TRACK_CMD} --set\n"
         )
@@ -346,10 +315,10 @@ def resolve_since(repo: str, arg_since: str | None, state):
     return sha, True, f"{anchor} (covered through {covered.get('date', '?')})"
 
 
-def selftest() -> int:
-    """Check that the fragments at the window end appear and README and later ones do not.
+def selftest_git(repo: str, *args: str, date: str | None = None) -> str:
+    """Run git in the self-test repository ``repo`` as a throwaway, unsigned identity.
 
-    :return: 0 when every check passed, 1 otherwise.
+    ``date`` sets the author and committer date of what the command creates.
     """
     env = dict(
         os.environ,
@@ -360,39 +329,118 @@ def selftest() -> int:
         GIT_CONFIG_NOSYSTEM="1",
         GIT_CONFIG_GLOBAL=os.devnull,
     )
+    if date is not None:
+        env.update(GIT_AUTHOR_DATE=date, GIT_COMMITTER_DATE=date)
+    return subprocess.run(
+        ["git", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", *args],
+        cwd=repo,
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout
 
-    def git(repo: str, *args: str) -> str:
-        return subprocess.run(
-            ["git", "-c", "commit.gpgsign=false", *args],
-            cwd=repo,
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=True,
-        ).stdout
 
-    def write(repo: str, path: str, text: str) -> None:
-        os.makedirs(os.path.dirname(os.path.join(repo, path)), exist_ok=True)
-        with open(os.path.join(repo, path), "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
+def selftest_write(repo: str, path: str, text: str) -> None:
+    """Write ``text`` with LF line endings to ``path`` inside ``repo``, creating its directory."""
+    os.makedirs(os.path.dirname(os.path.join(repo, path)), exist_ok=True)
+    with open(os.path.join(repo, path), "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
 
+
+def check_fragments(repo: str) -> list[str]:
+    """Return the failures of the fragment check in the empty repository ``repo``.
+
+    The fragments at the window end must appear; the README and later fragments must not.
+    """
+    selftest_git(repo, "init", "-q", "-b", "main")
+    selftest_write(repo, "changelog.d/README.md", "# Changelog fragments\n")
+    selftest_write(repo, "changelog.d/suche.md", "### Fixed\n\n- **Suche.** Behoben.\n")
+    selftest_git(repo, "add", "-A")
+    selftest_git(repo, "commit", "-q", "-m", "fix: suche")
+    end = selftest_git(repo, "rev-parse", "HEAD").strip()
+    selftest_write(repo, "changelog.d/spaeter.md", "### Added\n\n- **Später.** Nach dem Fenster.\n")
+    selftest_git(repo, "add", "-A")
+    selftest_git(repo, "commit", "-q", "-m", "feat: spaeter")
+    shown = unreleased_fragments(repo, end)
     failures = []
-    with tempfile.TemporaryDirectory(prefix="gather-selftest-") as repo:
-        git(repo, "init", "-q", "-b", "main")
-        write(repo, "changelog.d/README.md", "# Changelog fragments\n")
-        write(repo, "changelog.d/suche.md", "### Fixed\n\n- **Suche.** Behoben.\n")
-        git(repo, "add", "-A")
-        git(repo, "commit", "-q", "-m", "fix: suche")
-        end = git(repo, "rev-parse", "HEAD").strip()
-        write(repo, "changelog.d/spaeter.md", "### Added\n\n- **Später.** Nach dem Fenster.\n")
-        git(repo, "add", "-A")
-        git(repo, "commit", "-q", "-m", "feat: spaeter")
-        shown = unreleased_fragments(repo, end)
-        if "changelog.d/suche.md" not in shown or "- **Suche.** Behoben." not in shown:
-            failures.append(f"the fragment at the window end is missing:\n{shown}")
-        if "README" in shown or "Später" in shown:
-            failures.append(f"the README or a later fragment was shown:\n{shown}")
+    if "changelog.d/suche.md" not in shown or "- **Suche.** Behoben." not in shown:
+        failures.append(f"the fragment at the window end is missing:\n{shown}")
+    if "README" in shown or "Später" in shown:
+        failures.append(f"the README or a later fragment was shown:\n{shown}")
+    return failures
+
+
+WINDOW_SELFTEST_LINES: dict[str, list[tuple[str, str]]] = {
+    "old": [("v1.0.0", "2026-01-01T10:00:00"), ("v1.1.0", "2026-01-02T10:00:00")],
+    "main": [
+        ("v1.2.0", "2026-01-03T10:00:00"),
+        ("v1.3.0", "2026-01-04T10:00:00"),
+        ("v1.4.0", "2026-01-05T10:00:00"),
+        ("v1.5.0", "2026-01-06T10:00:00"),
+    ],
+    "side": [("v1.3.1", "2026-01-04T12:00:00"), ("v1.5.1", "2026-01-07T10:00:00")],
+}
+"""Release tags per root line of history: ``old`` is a history that ``main`` rewrote, so no
+tag of ``old`` is an ancestor of any ``main`` commit, and ``side`` is unrelated to both."""
+
+WINDOW_SELFTEST_EXPECTED = {"v1.3.0", "v1.3.1", "v1.4.0"}
+"""The tags after ``v1.2.0`` and at or before ``v1.4.0``, by ancestry or by commit time."""
+
+
+def check_window(repo: str) -> list[str]:
+    """Return the failures of the window check in the empty repository ``repo``.
+
+    Builds :data:`WINDOW_SELFTEST_LINES` with lightweight tags on ``old`` and ``main`` and
+    annotated ones, tagged later than their commits, on ``side``; then the window from
+    ``v1.2.0`` to ``v1.4.0``, given as tags, as commits or as dates, must print exactly the
+    sections of :data:`WINDOW_SELFTEST_EXPECTED`.
+    """
+    selftest_git(repo, "init", "-q")
+    sections = ["# Changelog", "", "## [Unreleased]", ""]
+    for line, releases in WINDOW_SELFTEST_LINES.items():
+        selftest_git(repo, "symbolic-ref", "HEAD", f"refs/heads/{line}")
+        for tag, date in releases:
+            selftest_git(repo, "commit", "-q", "--allow-empty", "-m", tag, date=date)
+            if line == "side":
+                selftest_git(repo, "tag", "-a", tag, "-m", tag)
+            else:
+                selftest_git(repo, "tag", tag)
+            sections += [f"## [{tag}](https://example.invalid/{tag}) - {date[:10]}", "", f"- {tag}"]
+    changelog = os.path.join(repo, "CHANGELOG.md")
+    selftest_write(repo, "CHANGELOG.md", "\n".join(sections) + "\n")
+    start, end = (
+        selftest_git(repo, "rev-parse", f"{tag}^{{commit}}").strip() for tag in ("v1.2.0", "v1.4.0")
+    )
+    windows = {
+        "tags": ("v1.2.0", "v1.4.0"),
+        "commits": (start, end),
+        "dates": ("2026-01-04", "2026-01-05"),
+    }
+    failures = []
+    for label, (since, until) in windows.items():
+        shown = select_changelog(changelog, tags_in_window(repo, since, until))
+        printed = {
+            match.group(1) for match in map(VERSION_HEADER_RE.match, shown.splitlines()) if match
+        }
+        if printed != WINDOW_SELFTEST_EXPECTED:
+            failures.append(
+                f"the window given as {label} printed {sorted(printed)}, "
+                f"expected {sorted(WINDOW_SELFTEST_EXPECTED)}"
+            )
+    return failures
+
+
+def selftest() -> int:
+    """Run the fragment and window checks, each in a fresh temporary repository.
+
+    :return: 0 when every check passed, 1 otherwise.
+    """
+    failures = []
+    for check in (check_fragments, check_window):
+        with tempfile.TemporaryDirectory(prefix="gather-selftest-") as repo:
+            failures += check(repo)
     for failure in failures:
         print(f"SELFTEST FAIL: {failure}")
     if failures:
@@ -431,14 +479,7 @@ def main() -> None:
     if not os.path.exists(os.path.join(repo, ".git")):
         sys.exit(f"error: {repo} is not a git repository")
 
-    state = load_state_module()
-    since, resumed, anchor_desc = resolve_since(repo, args.since, state)
-
-    since_is_ref = as_git_date(since) is None and version_ref_key(since) is None
-    exclude_tags = None
-    if since_is_ref and state is not None and state.commit_exists(repo, since):
-        exclude_tags = state.merged_version_tags(repo, since)
-
+    since, resumed, anchor_desc = resolve_since(repo, args.since)
     log = collect_commits(repo, since, args.until)
     shown_since = f"{since[:12]} [tracked]" if resumed else since
 
@@ -459,15 +500,20 @@ def main() -> None:
         "See SKILL.md 'Ausgabeformat'."
     )
     if resumed:
-        print(f"RESUMED from local pointer {state.STATE_FILENAME}: {anchor_desc}")
+        print(f"RESUMED from local pointer {release_state.STATE_FILENAME}: {anchor_desc}")
     print("=" * 78)
 
     print("\n### SOURCE 1 -- CHANGELOG.md: [Unreleased] + version sections in range")
-    print("# Reconciled changelogs carry dated '## [vX.Y.Z] - DATE' sections; the")
-    print("#   in-window ones are printed below (richest descriptions). [Unreleased]")
-    print("#   then holds only not-yet-released entries. A legacy all-in-[Unreleased]")
-    print("#   changelog prints whole. Cross-check the git log for the exact boundary.\n")
-    print(select_changelog(os.path.join(repo, "CHANGELOG.md"), since, args.until, exclude_tags))
+    print("# Reconciled changelogs carry dated '## [vX.Y.Z] - DATE' sections; those whose")
+    print("#   tag lies after the start and at or before the end are printed below")
+    print("#   (richest descriptions). [Unreleased] then holds only not-yet-released")
+    print("#   entries. A legacy all-in-[Unreleased] changelog prints whole. Cross-check")
+    print("#   the git log for the exact boundary.\n")
+    print(
+        select_changelog(
+            os.path.join(repo, "CHANGELOG.md"), tags_in_window(repo, since, args.until)
+        )
+    )
 
     print("\n### SOURCE 1b -- changelog.d/: fragments merged but not yet in a release section")
     print("# Each fragment is one '### <section>' with its items; release-prepare folds them")
