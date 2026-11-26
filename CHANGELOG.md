@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [v1.27.1](https://github.com/krt-profit/basetool/releases/tag/v1.27.1) - 2026-11-26
+
+### Added
+
+- **Mein Lager.** Sind Einträge markiert – einzeln, ein ganzes Material oder über „Alle
+  markieren“ –, zeigt die Summenzeile den geschätzten Verkaufswert nur dieser Auswahl
+  („Geschätzter Verkaufswert (Auswahl)“). Ohne Markierung steht dort wieder der Wert der Ansicht.
+
+### Fixed
+
+- **Hinweise („?").** Die Hinweis-Blase wird nicht mehr am Rand einer Tabelle oder eines Dialogs
+  abgeschnitten, etwa beim geschätzten Verkaufswert in „Mein Lager"; ist oben kein Platz, öffnet sie
+  sich unter dem Fragezeichen.
+
+- **Datenexport.** Das PDF nennt den Abschnitt mit deiner Preisbasis für den Verkaufswert im Lager
+  beim Namen statt mit seinem internen Schlüssel.
+
+- **Lager.** Auf dem Handy und Tablet zerbricht der Ort eines gestohlenen Stacks neben dem Chip
+  „Gestohlen" nicht mehr in einzelne Buchstaben, und kein Chip ragt mehr in die Nachbarspalte:
+  Chips stehen dort unter dem Namen.
+
 ## [v1.27.0](https://github.com/krt-profit/basetool/releases/tag/v1.27.0) - 2026-11-26
 
 ### Added
