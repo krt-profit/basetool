@@ -305,6 +305,7 @@ function initProfile() {
                         entry.form,
                         versionInput ? Number(versionInput.value) : 0,
                     ),
+                    submitter: control(entry.form, 'button[type="submit"]'),
                     toast: i === dirty.length - 1,
                     successMessage: i18n.saved,
                     errorMessage: i18n.error,

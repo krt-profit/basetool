@@ -291,6 +291,7 @@ async function writeLayout(extra = []) {
                 version: versionOf(element.dataset, 'version'),
             }),
             serialize: WRITE_LOCK,
+            submitter: false,
             toast: false,
             errorMessage: element.dataset.saveError,
             onError: (status) => {
@@ -455,8 +456,10 @@ function optionValue(form, name) {
  * A conflict or a vanished instance drops the change and re-reads the board.
  *
  * @param {HTMLFormElement} form the options form
+ * @param {HTMLElement | null} submitter the button that submitted the form, held for the options write
+ *     after an awaited layout write
  */
-async function saveOptions(form) {
+async function saveOptions(form, submitter) {
     const item = optionsItem;
     if (!item) return;
     if (!item.dataset.widgetId && !(await writeLayout())) return;
@@ -466,6 +469,7 @@ async function saveOptions(form) {
         krtFetch.write({
             method: 'PUT',
             url: `/dashboard/${mode()}/widgets/${item.dataset.widgetId}/options`,
+            submitter,
             payload: () => ({
                 orgUnitId: optionValue(form, 'unit'),
                 days: days === null ? null : Number(days),
@@ -528,7 +532,10 @@ export function initDashboardEdit() {
     krtEvents.on('click', 'dashboard-options', openOptions);
     krtEvents.on('submit', 'dashboard-options-form', (form, event) => {
         event.preventDefault();
-        saveOptions(/** @type {HTMLFormElement} */ (form));
+        saveOptions(
+            /** @type {HTMLFormElement} */ (form),
+            /** @type {HTMLElement | null} */ (/** @type {SubmitEvent} */ (event).submitter),
+        );
     });
     krtEvents.on('click', 'dashboard-reset', () => krtModal.open(RESET_MODAL));
     krtEvents.on('click', 'dashboard-reset-confirm', resetToDefault);

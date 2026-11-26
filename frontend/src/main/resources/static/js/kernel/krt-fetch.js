@@ -534,20 +534,30 @@ async function getJson(url, opts) {
  * }} SwapContainer
  */
 
-/** @type {Element | null} */
+/**
+ * The control that submitted a form in the current task, for the write a submit listener starts
+ * without naming its submitter (REQ-FE-024).
+ *
+ * @type {Element | null}
+ */
 let pendingSubmitter = null;
 document.addEventListener(
     'submit',
     (e) => {
         const form = /** @type {HTMLFormElement | null} */ (e.target);
-        pendingSubmitter =
+        const submitter =
             /** @type {SubmitEvent} */ (e).submitter ||
             (form && form.querySelector
                 ? form.querySelector('button[type="submit"], input[type="submit"]')
                 : null);
-        Promise.resolve().then(() => {
-            pendingSubmitter = null;
-        });
+        pendingSubmitter = submitter;
+        // A browser-dispatched submit runs a microtask checkpoint after each listener, so the
+        // submitter is kept until the task ends, when every listener of this submit has run.
+        setTimeout(() => {
+            if (pendingSubmitter === submitter) {
+                pendingSubmitter = null;
+            }
+        }, 0);
     },
     true,
 );
@@ -559,7 +569,8 @@ function consumePendingSubmitter() {
 }
 
 /**
- * Defaults the options' submitter to the control that submitted the form and disables it.
+ * Defaults the options' submitter to the control that submitted the form in this task and
+ * disables it; an explicit `false` takes none.
  *
  * @param {KrtSendOpts} opts the request options, updated in place
  */
