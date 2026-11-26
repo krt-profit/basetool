@@ -108,14 +108,28 @@ class PurchasingParticipantsTest {
   }
 
   @Test
-  void theExportHasTheDealsAndTheAppointmentsOfTheMember() {
+  void theExportHasTheDealsTheirFollowUpsAndTheAppointmentsOfTheMember() {
     List<Section> sections = new PurchasingExportSections().sections();
 
     assertThat(sections)
         .extracting(Section::key)
-        .containsExactly("purchasingDeals", "purchasingAppointments");
-    assertThat(sections).extracting(Section::position).containsExactly(490, 491);
-    assertThat(sections).extracting(Section::legalBasis).containsOnly(LegalBasis.ART_15_20);
+        .containsExactly(
+            "purchasingDeals",
+            "purchasingAppointments",
+            "purchasingDealDeliveries",
+            "purchasingDealSettlements",
+            "purchasingDealTranches");
+    assertThat(sections).extracting(Section::position).containsExactly(490, 491, 492, 493, 494);
+    assertThat(sections)
+        .extracting(Section::legalBasis)
+        .containsExactly(
+            LegalBasis.ART_15_20,
+            LegalBasis.ART_15_20,
+            LegalBasis.ART_15,
+            LegalBasis.ART_15,
+            LegalBasis.ART_15);
+    assertThat(sections.subList(2, 5))
+        .allSatisfy(section -> assertThat(section.sql()).contains("d.delegate_user_id = :userId"));
   }
 
   @Test
@@ -134,10 +148,10 @@ class PurchasingParticipantsTest {
   }
 
   @Test
-  void theCatalogueEntryOfADealIsDeclaredAsNoPerson() {
+  void theCatalogueEntryAndTheUnitOfADealAreDeclaredAsNoPerson() {
     Section deals = new PurchasingExportSections().sections().get(0);
 
-    assertThat(deals.unscrubbedPersonColumns()).containsOnlyKeys("entry");
+    assertThat(deals.unscrubbedPersonColumns()).containsOnlyKeys("entry", "raising_unit");
     assertThat(deals.scrubbedColumns()).isEmpty();
   }
 

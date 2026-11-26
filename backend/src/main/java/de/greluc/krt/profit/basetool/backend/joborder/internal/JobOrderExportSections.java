@@ -69,43 +69,12 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                 ART_15_20,
                 "The member's own assignment note.",
                 """
-                SELECT o.display_id, o.type, o.status, a.note, a.created_at
+                SELECT o.display_id, o.type, o.status, a.note, a.created_at, a.updated_at
                 FROM job_order_assignees a JOIN job_order o ON o.id = a.job_order_id
                 WHERE a.user_id = :userId ORDER BY a.created_at
                 """)
             .scrubbing("note"),
-        new Section(
-                300,
-                "materialClaims",
-                ART_15_20,
-                "Promises last recorded by the member, with directly linked contribution facts.",
-                """
-                SELECT o.display_id AS job_order, m.name AS material, c.amount,
-                       t.code AS quality_requirement, c.created_at, c.ended_at,
-                       c.credited_amount, c.changes,
-                       COALESCE((SELECT jsonb_agg(jsonb_build_object(
-                         'id', p.id, 'creditedAmount', p.amount, 'evidence', p.evidence,
-                         'quantityAmount', CASE WHEN p.evidence = 'OBSERVED'
-                           THEN p.quantity_amount END,
-                         'suppliedQuality', CASE WHEN p.supplied_quality_known
-                           THEN p.supplied_quality END,
-                         'minimumSuppliedQuality', p.supplied_quality,
-                         'factChanges', p.fact_history,
-                         'createdAt', p.created_at) ORDER BY p.created_at, p.id)
-                         FROM material_provision_credit p
-                         WHERE p.job_order_id = c.job_order_id AND p.claim_id = c.id),
-                         '[]'::jsonb) AS provisions
-                FROM material_claim c
-                  LEFT JOIN job_order o ON o.id = c.job_order_id
-                  LEFT JOIN material m ON m.id = c.material_id
-                  LEFT JOIN quality_tier t ON t.id = c.quality_tier_id
-                WHERE c.claimed_by_user_id = :userId ORDER BY c.created_at
-                """)
-            .keeping(
-                "job_order",
-                "job_order.display_id, a number rather than a name. The order's handle column is"
-                    + " deliberately not selected by any section, being an external contact's name"
-                    + " the scrubber cannot see."),
+        materialClaims(),
         new Section(
             305,
             "jobOrderMoneyHolders",
@@ -123,8 +92,10 @@ public class JobOrderExportSections implements PersonalDataExportSection {
             "Provisions and movements the member recorded or directly participated in.",
             """
             SELECT o.display_id AS job_order, p.operation_id, p.holder_id, p.kind,
-                   CAST(p.amount AS text) AS amount, p.bank_handling, p.recorded_at,
-                   CAST(p.fee AS text) AS fee, CAST(p.new_provision AS text) AS new_provision
+                   p.selection_kind, CAST(p.amount AS text) AS amount, p.bank_handling,
+                   p.recorded_at, p.effective_at, CAST(p.fee_rate AS text) AS fee_rate,
+                   CAST(p.fee AS text) AS fee, CAST(p.new_provision AS text) AS new_provision,
+                   p.patch_change_id IS NOT NULL AS recorded_by_patch_change
             FROM job_order_money_operation p
             JOIN job_order o ON o.id = p.order_id
             """
@@ -153,7 +124,7 @@ public class JobOrderExportSections implements PersonalDataExportSection {
             "The member's recorded changes to requested net aUEC amounts.",
             """
             SELECT o.display_id AS job_order, CAST(t.previous_target AS text) AS previous_target,
-                   CAST(t.target AS text) AS target, t.recorded_at
+                   CAST(t.target AS text) AS target, t.client_id, t.recorded_at
             FROM job_order_money_target_change t JOIN job_order o ON o.id = t.order_id
             WHERE t.actor_id = :userId ORDER BY t.recorded_at, t.id
             """),
@@ -186,7 +157,8 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                    CAST(c.previous_provision AS text) AS previous_provision,
                    CAST(c.provision AS text) AS provision, CAST(c.previous_fee AS text) AS previous_fee,
                    CAST(c.fee AS text) AS fee, CAST(c.previous_credit AS text) AS previous_credit,
-                   CAST(c.credit AS text) AS credit, correction.recorded_at
+                   CAST(c.credit AS text) AS credit, c.attribution_removed,
+                   c.remove_attribution_requested, correction.recorded_at
             FROM job_order_money_correction_entry c
             JOIN job_order o ON o.id = c.order_id
             JOIN job_order_money_operation correction
@@ -212,6 +184,47 @@ public class JobOrderExportSections implements PersonalDataExportSection {
             """));
   }
 
+  private static Section materialClaims() {
+    return new Section(
+            300,
+            "materialClaims",
+            ART_15_20,
+            "Promises last recorded by the member, with directly linked contribution facts.",
+            """
+            SELECT o.display_id AS job_order, m.name AS material, c.amount,
+                   t.code AS quality_requirement, u.name AS claiming_unit, c.created_at,
+                   c.updated_at, c.ended_at, c.credited_amount, c.changes,
+                   COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                     'id', p.id, 'creditedAmount', p.amount, 'evidence', p.evidence,
+                     'quantityAmount', CASE WHEN p.evidence = 'OBSERVED'
+                       THEN p.quantity_amount END,
+                     'suppliedQuality', CASE WHEN p.supplied_quality_known
+                       THEN p.supplied_quality END,
+                     'minimumSuppliedQuality', p.supplied_quality,
+                     'factChanges', p.fact_history,
+                     'createdAt', p.created_at) ORDER BY p.created_at, p.id)
+                     FROM material_provision_credit p
+                     WHERE p.job_order_id = c.job_order_id AND p.claim_id = c.id),
+                     '[]'::jsonb) AS provisions
+            FROM material_claim c
+              LEFT JOIN job_order o ON o.id = c.job_order_id
+              LEFT JOIN material m ON m.id = c.material_id
+              LEFT JOIN quality_tier t ON t.id = c.quality_tier_id
+              LEFT JOIN org_unit u ON u.id = c.claiming_org_unit_id
+            WHERE c.claimed_by_user_id = :userId ORDER BY c.created_at
+            """)
+        .keeping(
+            "material",
+            "material.name: a commodity from the synced catalogue. Flagged because the statement"
+                + " also reads org_unit, whose name column is a person-name surface.")
+        .keeping("claiming_unit", "org_unit.name; see orgUnitMemberships.org_unit.")
+        .keeping(
+            "job_order",
+            "job_order.display_id, a number rather than a name. The order's handle column is"
+                + " deliberately not selected by any section, being an external contact's name"
+                + " the scrubber cannot see.");
+  }
+
   private static Section linkedMoneyAttempts() {
     return new Section(
         313,
@@ -220,8 +233,11 @@ public class JobOrderExportSections implements PersonalDataExportSection {
         "Bank-linked monetary attempts the member recorded, decided or directly participated in.",
         """
             SELECT o.display_id AS job_order, a.operation_id, a.revision, a.kind, a.state,
-                   a.active, CAST(a.amount AS text) AS amount, CAST(a.provision AS text) AS new_provision,
-                   CAST(a.actual_fee AS text) AS fee, a.fee_funding, a.actual_payment,
+                   a.active, a.selection_kind, a.bank_type, CAST(a.amount AS text) AS amount,
+                   CAST(a.provision AS text) AS new_provision, CAST(a.rate AS text) AS fee_rate,
+                   CAST(a.actual_fee AS text) AS fee, a.fee_funding,
+                   CAST(a.source_binding AS text) AS source_binding, a.actual_payment,
+                   a.cancelled_by_patch_change IS NOT NULL AS cancelled_by_patch_change,
                    a.submitted_at, a.updated_at
             FROM job_order_linked_money_attempt a JOIN job_order o ON o.id = a.order_id
             LEFT JOIN job_order_money_holder h ON h.id = a.holder_id

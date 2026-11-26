@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
+import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15;
 import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15_20;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
@@ -27,8 +28,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The blueprint's part of the Art. 15 / Art. 20 data export: the member's personal blueprints
- * (REQ-SEC-058).
+ * The blueprint's part of the Art. 15 / Art. 20 data export: the member's personal blueprints, the
+ * import names their imports taught and their sharing choice (REQ-SEC-058).
  */
 @Component
 public class PersonalBlueprintExportSections implements PersonalDataExportSection {
@@ -42,8 +43,23 @@ public class PersonalBlueprintExportSections implements PersonalDataExportSectio
                 ART_15_20,
                 "Entered by the member.",
                 """
-                SELECT product_name, acquired_at, note, created_at
+                SELECT product_name, acquired_at, note, source, source_client_id, created_at,
+                       updated_at
                 FROM personal_blueprint WHERE owner_user_id = :userId ORDER BY created_at
+                """)
+            .scrubbing("note"),
+        new Section(
+                195,
+                "blueprintImportNames",
+                ART_15,
+                "Learned when one of the member's blueprint imports named a blueprint by a foreign"
+                    + " name; the name serves every later import and records the account that"
+                    + " taught it.",
+                """
+                SELECT source_system, external_name, product_key, product_name, note, created_at,
+                       updated_at
+                FROM blueprint_external_alias WHERE created_by = CAST(:userId AS VARCHAR)
+                ORDER BY created_at
                 """)
             .scrubbing("note"),
         new Section(

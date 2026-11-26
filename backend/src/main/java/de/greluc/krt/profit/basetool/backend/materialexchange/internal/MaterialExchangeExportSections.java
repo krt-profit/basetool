@@ -42,21 +42,28 @@ public class MaterialExchangeExportSections implements PersonalDataExportSection
                 ART_15_20,
                 "Posted by the member, including their own remark.",
                 """
-                SELECT offer_kind, item_name, offered_amount, remark, status, released_at, created_at
-                FROM material_exchange_offer WHERE owner_id = :userId ORDER BY created_at
+                SELECT x.offer_kind, x.item_name, x.item_quantity, x.offered_amount, x.remark,
+                       o.name AS org_unit, x.status, x.released_at, x.created_at, x.updated_at
+                FROM material_exchange_offer x LEFT JOIN org_unit o ON o.id = x.owning_org_unit_id
+                WHERE x.owner_id = :userId ORDER BY x.created_at
                 """)
-            .scrubbing("remark"),
+            .scrubbing("remark")
+            .keeping("org_unit", "org_unit.name; see orgUnitMemberships.org_unit."),
         new Section(
                 320,
                 "marketRequests",
                 ART_15_20,
                 "Posted by the member, including their own remark.",
                 """
-                SELECT request_kind, item_name, requested_amount, min_quality, remark, status,
-                       posted_at, created_at
-                FROM material_exchange_request WHERE owner_id = :userId ORDER BY created_at
+                SELECT x.request_kind, x.item_name, x.item_quantity, x.requested_amount,
+                       x.min_quality, x.remark, o.name AS org_unit, x.status, x.posted_at,
+                       x.created_at, x.updated_at
+                FROM material_exchange_request x
+                  LEFT JOIN org_unit o ON o.id = x.owning_org_unit_id
+                WHERE x.owner_id = :userId ORDER BY x.created_at
                 """)
-            .scrubbing("remark"),
+            .scrubbing("remark")
+            .keeping("org_unit", "org_unit.name; see orgUnitMemberships.org_unit."),
         new Section(
             330,
             "marketInterests",
@@ -64,7 +71,7 @@ public class MaterialExchangeExportSections implements PersonalDataExportSection
             "Interest the member registered. The offering member is not named, being the"
                 + " counterparty.",
             """
-            SELECT o.item_name, o.offer_kind, i.created_at
+            SELECT o.item_name, o.offer_kind, i.created_at, i.updated_at
             FROM material_exchange_interest i JOIN material_exchange_offer o ON o.id = i.offer_id
             WHERE i.interested_user_id = :userId ORDER BY i.created_at
             """),
@@ -75,7 +82,7 @@ public class MaterialExchangeExportSections implements PersonalDataExportSection
             "Interest the member registered in a request. The requesting member is not named,"
                 + " being the counterparty.",
             """
-            SELECT r.request_kind, r.item_name, m.name AS material, i.created_at
+            SELECT r.request_kind, r.item_name, m.name AS material, i.created_at, i.updated_at
             FROM material_exchange_request_interest i
               JOIN material_exchange_request r ON r.id = i.request_id
               LEFT JOIN material m ON m.id = r.requested_material_id

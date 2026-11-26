@@ -5090,6 +5090,36 @@ member's side of the request, with the third party's prose scrubbed and their id
 The staff note and the reject reason are the bank's internal text about another member's request,
 and stay out as they do for `bankRequestsRaised`.
 
+**Every column of the member's tables and every table hanging off them has a decision**
+([ADR-0412](../adr/0412-the-data-export-decides-every-column-of-the-members-tables.md),
+`PersonalDataExportColumnCoverageTest`). A member table is a table a section filters by `:userId`
+— a text column through `CAST(:userId AS VARCHAR)` — except the role-holder aggregates `org_unit`,
+`mission` and `job_order`, plus every table that holds a foreign key to a member table and that a
+section reads. Each column of a member table is read by a section, as PostgreSQL resolves the
+statement, or listed in `COLUMNS_NOT_EXPORTED` with its reason; each child table of a member table
+is read or listed in `CHILD_TABLES_NOT_EXPORTED`. Row ids and lock counters need no entry, and the
+children of `app_user` are decided by REQ-DATA-021. An exclusion names another person who acted on
+the row, a name typed for somebody without an account, free text another person wrote, an internal
+link or a count over all members.
+
+Beyond the sections above, the export therefore carries:
+
+| Section | Rows | Selected |
+|---|---|---|
+| `refineryOrderGoods` | ores of the member's refinery orders | ore and yield material, quantities, quality |
+| `warehouseReservations` | reservations of the member's warehouse rows | kind, material or item, order number or mission (scrubbed), amount, delivered |
+| `missionCrewAssignments` | crew places of the member's participations | mission and unit (scrubbed), ship type, crew functions |
+| `missionFinanceEntries` | finance entries of the member's participations | mission (scrubbed), income or expense, amount, note (scrubbed) |
+| `operationPayouts` | payout records keyed by the member's id as text | operation (scrubbed), paid out and when, settlement fee rate; not the officer |
+| `purchasingDealDeliveries`, `purchasingDealSettlements`, `purchasingDealTranches` | children of the member's deals as delegate | amounts, coded reasons, states, whether the member recorded the row; not the accepting member |
+| `bankCustodianPostings` | postings onto the member's custodian registration | booking type, amount, when |
+| `blueprintImportNames`, `materialImportNames` | aliases whose `created_by` holds the member's id as text | the foreign name, the mapped blueprint or material, the note (scrubbed) |
+
+and the existing sections select the hangar's pledge details and origin, the amount of a booking per
+account (`postings`), the accounts and approval terms of the member's own booking requests, the
+item and unit of a warehouse row, the Kommando group of a membership, the account's state in the
+sign-in service, the functions and units of a mission participation and each row's last change.
+
 **Every section is marked with its legal basis**, so the portable subset is identifiable without
 re-deriving it:
 
@@ -5275,6 +5305,10 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
   and their identity unselected.
 - [x] Every section has a `pdf.export.section.*` label in all three backend bundles, so the PDF
   inventory never prints a raw key.
+- [x] Every column of a member table and every child table of a member table is read by a section
+  or listed with its reason; an exclusion that no longer holds fails; a planted column on `ship`
+  and a planted child table of `ship`, created in a rolled-back transaction, are reported
+  (ADR-0412).
 
 > [!warning] Corrected 2026-10-03 — four inventory rows printed their key
 > `exchangeChanges`, `exchangeJournal`, `exchangeBulkUndoSkips` and `exchangeShipLinks` shipped
@@ -5287,14 +5321,16 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 `DataExportScrubCoverageTest`, `DataExportPdfFieldLabelCoverageTest`,
 `DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`, `HandleScrubberTest`,
 `DataExportControllerSecurityTest`, `PersonalDataExportCatalogueTest`,
-`DataExportEndStateTest`, `PersonalDataExportOwnershipTest`, `PersonalDataExportRegistryTest` ·
+`DataExportEndStateTest`, `PersonalDataExportOwnershipTest`, `PersonalDataExportRegistryTest`,
+`PersonalDataExportColumnCoverageTest` ·
 **Code:** `platform/api/PersonalDataExportSection`, `privacy/internal/PersonalDataExportRegistry`,
 the `*ExportSections` of the modules, `kernel/HandleScrubber`, `privacy/api/DataExportService`, `privacy/api/DataExportReportService`,
 `privacy/api/DataExportPdfFormat`, `privacy/web/DataExportController`,
 `privacy/web/AdminDataExportController`, frontend `identity/web/DataExportProxyController`,
 `templates/identity/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
 links, beside the separate deletion card) · **Decision:**
-[ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
+[ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md),
+[ADR-0412](../adr/0412-the-data-export-decides-every-column-of-the-members-tables.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
 #### Amendment (ADR-0298)

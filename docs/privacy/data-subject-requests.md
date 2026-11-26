@@ -67,6 +67,12 @@ The aUEC export sections contain the member's holder links and related identity 
 requester designations, recorded target changes and money operations or corrections that they
 recorded or participated in. They include exact amounts, timestamps and order references.
 
+Every column of the member's tables, and every table hanging off them, is either in the export or
+listed with its reason in `PersonalDataExportColumnCoverageTest` (ADR-0412). When a requester asks
+why something is not in their copy, that list is the answer: another person who acted on the row,
+a name typed for somebody without an account, free text another person wrote, an internal link or
+a count over all members.
+
 > [!warning] "Nothing was removed" does not mean "nothing to look for" — corrected 2026-09-16
 > This section used to say that when the document reports no removals, there is nothing to read
 > through. **That is wrong, and it is the read-through that would have suffered.** The flag reports

@@ -29,7 +29,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * The mission's part of the Art. 15 / Art. 20 data export: the missions the member owns, joined,
- * manages, leads or is responsible in (REQ-SEC-058).
+ * crews, manages, leads or is responsible in, and the finance entries of their participations
+ * (REQ-SEC-058).
  */
 @Component
 public class MissionExportSections implements PersonalDataExportSection {
@@ -52,15 +53,72 @@ public class MissionExportSections implements PersonalDataExportSection {
                 240,
                 "missionParticipations",
                 ART_15_20,
-                "The member's own sign-up and comment. Other participants of the same mission are"
-                    + " not included: they are other people.",
+                "The member's own sign-up and comment, with the functions and units it was made"
+                    + " for. Other participants of the same mission are not included: they are"
+                    + " other people.",
                 """
                 SELECT m.name AS mission, p.comment, p.payout_preference,
-                       p.is_mission_lead_participant, p.start_time, p.end_time, p.created_at
-                FROM mission_participant p JOIN mission m ON m.id = p.mission_id
+                       p.is_mission_lead_participant, dj.name AS desired_job_type,
+                       pj.name AS planned_job_type, sq.name AS squadron, units.org_units,
+                       p.start_time, p.end_time, p.created_at, p.updated_at
+                FROM mission_participant p
+                  JOIN mission m ON m.id = p.mission_id
+                  LEFT JOIN job_type dj ON dj.id = p.desired_mission_job_type_id
+                  LEFT JOIN job_type pj ON pj.id = p.planned_task_job_type_id
+                  LEFT JOIN org_unit sq ON sq.id = p.squadron_id
+                  LEFT JOIN LATERAL (
+                    SELECT string_agg(o.name, ', ' ORDER BY o.name) AS org_units
+                    FROM mission_participant_org_unit po JOIN org_unit o ON o.id = po.org_unit_id
+                    WHERE po.mission_participant_id = p.id
+                  ) units ON TRUE
                 WHERE p.user_id = :userId ORDER BY p.created_at
                 """)
-            .scrubbing("mission", "comment"),
+            .scrubbing("mission", "comment")
+            .keeping(
+                "desired_job_type",
+                "job_type.name: a mission function from the organisation's catalogue. Flagged"
+                    + " because the statement also reads mission, whose name column is scrubbed.")
+            .keeping(
+                "planned_job_type", "job_type.name; see missionParticipations.desired_job_type.")
+            .keeping("squadron", "org_unit.name; see orgUnitMemberships.org_unit."),
+        new Section(
+                242,
+                "missionCrewAssignments",
+                ART_15,
+                "A place in the crew of a mission unit and the crew functions, assigned by the"
+                    + " mission's organisers. The unit's note and ship are not included; see"
+                    + " missionUnitResponsibilities.",
+                """
+                SELECT m.name AS mission, u.name AS unit, t.name AS ship_type, jobs.job_types,
+                       c.created_at, c.updated_at
+                FROM mission_crew c
+                  JOIN mission_participant p ON p.id = c.mission_participant_id
+                  JOIN mission_unit u ON u.id = c.mission_ship_id
+                  JOIN mission m ON m.id = p.mission_id
+                  LEFT JOIN ship_type t ON t.id = u.ship_type_id
+                  LEFT JOIN LATERAL (
+                    SELECT string_agg(j.name, ', ' ORDER BY j.name) AS job_types
+                    FROM mission_crew_job_types cj JOIN job_type j ON j.id = cj.job_type_id
+                    WHERE cj.mission_crew_id = c.id
+                  ) jobs ON TRUE
+                WHERE p.user_id = :userId ORDER BY c.created_at
+                """)
+            .scrubbing("mission", "unit")
+            .keeping("ship_type", "ship_type.name; see missionUnitResponsibilities.ship_type."),
+        new Section(
+                244,
+                "missionFinanceEntries",
+                ART_15,
+                "Income and expenses booked to the member's participation, by the member or by an"
+                    + " officer of the mission's unit; the note is scrubbed like other free text.",
+                """
+                SELECT m.name AS mission, e.type, e.amount, e.note, e.created_at, e.updated_at
+                FROM mission_finance_entry e
+                  JOIN mission_participant p ON p.id = e.mission_participant_id
+                  JOIN mission m ON m.id = e.mission_id
+                WHERE p.user_id = :userId ORDER BY e.created_at
+                """)
+            .scrubbing("mission", "note"),
         new Section(
                 250,
                 "missionsManaged",
@@ -91,7 +149,7 @@ public class MissionExportSections implements PersonalDataExportSection {
                     + " and possibly another member's ship.",
                 """
                 SELECT m.name AS mission, u.name AS unit, t.name AS ship_type, u.high_value_unit,
-                       u.created_at
+                       u.frequency, u.created_at, u.updated_at
                 FROM mission_unit u
                   JOIN mission m ON m.id = u.mission_id
                   LEFT JOIN ship_type t ON t.id = u.ship_type_id

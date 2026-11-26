@@ -850,6 +850,7 @@ class ProfitHierarchyNoticeIntegrationTest {
         .map(row -> {
           Map<String, Object> facts = new java.util.HashMap<>(row);
           facts.remove("ended_at");
+          facts.remove("updated_at");
           facts.remove("amount");
           facts.remove("changes");
           return facts;

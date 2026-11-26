@@ -20,6 +20,10 @@
       "rsi_handle" : null,
       "approval_status" : "ACTIVE",
       "approved_at" : null,
+      "in_keycloak" : false,
+      "enabled_in_keycloak" : true,
+      "keycloak_absent_since" : null,
+      "last_read_announcement_id" : null,
       "created_at" : "<instant>",
       "updated_at" : "<instant>"
     } ],
@@ -29,6 +33,7 @@
     "legalBasis" : "ART_15_20",
     "rows" : [ {
       "home_location" : "Zzz Export Hub",
+      "created_at" : "<instant>",
       "updated_at" : "<instant>"
     } ],
     "truncated" : false
@@ -46,7 +51,8 @@
     "rows" : [ {
       "decision" : "APPROVED",
       "reason" : "Freigabe nach Absprache mit #OTHER_MEMBER#",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -57,6 +63,7 @@
       "erase_history_requested" : false,
       "decision_note" : null,
       "created_at" : "<instant>",
+      "updated_at" : "<instant>",
       "decided_at" : null
     } ],
     "truncated" : false
@@ -68,9 +75,12 @@
       "shorthand" : "IRI",
       "kind" : "SQUADRON",
       "role" : "MEMBER",
+      "kommando_group" : null,
       "is_logistician" : false,
       "is_mission_manager" : false,
-      "joined_at" : "<instant>"
+      "joined_at" : "<instant>",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -100,8 +110,27 @@
       "stolen" : false,
       "note" : "Lager von ZzzExportSubjectZzz fuer #OTHER_MEMBER#",
       "material" : "Zzz Export Ore",
+      "item" : null,
       "location" : "Zzz Export Hub",
-      "created_at" : "<instant>"
+      "org_unit" : "IRIDIUM",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "warehouseReservations",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "reservation_kind" : "JOB_ORDER",
+      "material" : "Zzz Export Ore",
+      "item" : null,
+      "job_order" : <n>,
+      "mission" : null,
+      "donation_created_at" : null,
+      "amount" : 5.0,
+      "delivered" : false,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -122,7 +151,18 @@
       "insurance" : "LTI",
       "fitted" : false,
       "location" : "Zzz Export Hub",
-      "created_at" : "<instant>"
+      "org_unit" : null,
+      "origin" : "UNKNOWN",
+      "origin_locked" : false,
+      "production_status" : null,
+      "pledge_id" : null,
+      "pledge_date" : null,
+      "pledge_cost" : null,
+      "pledge_cost_currency" : null,
+      "meltable" : null,
+      "giftable" : null,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -144,9 +184,12 @@
       "client_id" : "zzz-export-client",
       "client" : "Zzz Export Client",
       "label" : "Rechner von #OTHER_MEMBER#",
+      "key_thumbprint" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       "first_seen_at" : "<instant>",
       "last_seen_at" : "<instant>",
-      "revoked_at" : null
+      "revoked_at" : null,
+      "created_at" : "<instant>",
+      "updated_at" : null
     } ],
     "truncated" : false
   }, {
@@ -164,32 +207,47 @@
     "rows" : [ {
       "resource" : "STOCK",
       "entity_key" : "m:<uuid>|l:<uuid>|q:500|s:0",
+      "org_unit" : null,
       "source_channel" : "system",
       "source_client" : null,
+      "source_installation" : null,
+      "source_patch_change" : false,
       "changed_at" : "<instant>"
     }, {
       "resource" : "SHIP",
       "entity_key" : "<uuid>",
+      "org_unit" : null,
       "source_channel" : "system",
       "source_client" : null,
+      "source_installation" : null,
+      "source_patch_change" : false,
       "changed_at" : "<instant>"
     }, {
       "resource" : "BLUEPRINT",
       "entity_key" : "export-ZzzExportSubjectZzz",
+      "org_unit" : null,
       "source_channel" : "system",
       "source_client" : null,
+      "source_installation" : null,
+      "source_patch_change" : false,
       "changed_at" : "<instant>"
     }, {
       "resource" : "REFINERY_ORDER",
       "entity_key" : "<uuid>",
+      "org_unit" : null,
       "source_channel" : "system",
       "source_client" : null,
+      "source_installation" : null,
+      "source_patch_change" : false,
       "changed_at" : "<instant>"
     }, {
       "resource" : "BANK_REQUEST",
       "entity_key" : "<uuid>",
+      "org_unit" : null,
       "source_channel" : "system",
       "source_client" : null,
+      "source_installation" : null,
+      "source_patch_change" : false,
       "changed_at" : "<instant>"
     } ],
     "truncated" : false
@@ -198,9 +256,11 @@
     "legalBasis" : "ART_15",
     "rows" : [ {
       "client_id" : "zzz-export-client",
+      "installation_key" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       "resource" : "STOCK",
       "entity_key" : "stock-1",
       "action" : "STOCK_SET_QUANTITY",
+      "removal" : false,
       "before_state" : "{\"von\":\"#OTHER_MEMBER#\"}",
       "after_state" : "{\"an\":\"#OTHER_MEMBER#\"}",
       "recorded_at" : "<instant>",
@@ -213,9 +273,14 @@
     "rows" : [ {
       "run_id" : "<uuid>",
       "client_id" : "zzz-export-client",
+      "installation_key" : null,
+      "run_resource" : null,
+      "since" : "<instant>",
+      "run_status" : "COMPLETED",
       "resource" : "STOCK",
       "reason" : "GONE",
-      "started_at" : "<instant>"
+      "started_at" : "<instant>",
+      "finished_at" : null
     } ],
     "truncated" : false
   }, {
@@ -223,6 +288,7 @@
     "legalBasis" : "ART_15",
     "rows" : [ {
       "client_id" : "zzz-export-client",
+      "installation_key" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       "external_id" : "ext-1",
       "ship_id" : "<uuid>",
       "created_at" : "<instant>"
@@ -235,7 +301,8 @@
       "client_id" : "zzz-export-client",
       "client_key" : "key-1",
       "refinery_order_id" : "<uuid>",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "retired_at" : null
     } ],
     "truncated" : false
   }, {
@@ -255,7 +322,8 @@
       "quantity" : 1,
       "location_name_snapshot" : "Export City",
       "note" : "Uebergabe an #OTHER_MEMBER# erledigt",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -265,7 +333,38 @@
       "product_name" : "Export Product",
       "acquired_at" : null,
       "note" : "Plan von #OTHER_MEMBER#",
-      "created_at" : "<instant>"
+      "source" : null,
+      "source_client_id" : null,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "blueprintImportNames",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "source_system" : "SCMDB",
+      "external_name" : "Fremdname von ZzzExportSubjectZzz",
+      "product_key" : "export-ZzzExportSubjectZzz",
+      "product_name" : "Export Product",
+      "note" : "Gelernt mit #OTHER_MEMBER#",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "materialImportNames",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "material" : "Zzz Export Ore",
+      "source_system" : "UEX",
+      "external_name" : "Erzname von ZzzExportSubjectZzz",
+      "external_key" : null,
+      "external_uuid" : null,
+      "external_code" : null,
+      "note" : "Angelegt mit #OTHER_MEMBER#",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -275,9 +374,13 @@
       "type" : "JOB_ORDER_CREATED",
       "entity_type" : null,
       "params" : "{\"actor\":\"#OTHER_MEMBER#\"}",
+      "org_unit_name" : null,
+      "org_unit_kind" : null,
+      "role_audience" : "DIRECT",
       "is_read" : false,
       "read_at" : null,
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -285,7 +388,8 @@
     "legalBasis" : "ART_15_20",
     "rows" : [ {
       "notification_type" : "JOB_ORDER_CREATED",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -293,7 +397,12 @@
     "legalBasis" : "ART_15",
     "rows" : [ {
       "rule" : "Regel fuer #OTHER_MEMBER#",
-      "kind" : "SPECIFIC_USER"
+      "kind" : "SPECIFIC_USER",
+      "role_code" : null,
+      "org_relative_role" : null,
+      "context_role" : null,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -317,9 +426,38 @@
       "comment" : "Dabei mit #OTHER_MEMBER#",
       "payout_preference" : "PERSONAL",
       "is_mission_lead_participant" : false,
+      "desired_job_type" : null,
+      "planned_job_type" : null,
+      "squadron" : null,
+      "org_units" : null,
       "start_time" : null,
       "end_time" : null,
-      "created_at" : null
+      "created_at" : null,
+      "updated_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "missionCrewAssignments",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "mission" : "Konvoi mit #OTHER_MEMBER#",
+      "unit" : "Hornet von #OTHER_MEMBER#",
+      "ship_type" : "Zzz Export Hull",
+      "job_types" : null,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "missionFinanceEntries",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "mission" : "Konvoi mit #OTHER_MEMBER#",
+      "type" : "EXPENSE",
+      "amount" : 250.0000,
+      "note" : "Treibstoff mit #OTHER_MEMBER#",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -341,6 +479,19 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "operationPayouts",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "operation" : "Operation mit #OTHER_MEMBER#",
+      "paid_out" : true,
+      "paid_out_at" : "<instant>",
+      "settlement_fee_rate" : null,
+      "settlement_calculated_at" : null,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "missionUnitResponsibilities",
     "legalBasis" : "ART_15",
     "rows" : [ {
@@ -348,7 +499,9 @@
       "unit" : "Hornet von #OTHER_MEMBER#",
       "ship_type" : "Zzz Export Hull",
       "high_value_unit" : true,
-      "created_at" : null
+      "frequency" : null,
+      "created_at" : null,
+      "updated_at" : null
     } ],
     "truncated" : false
   }, {
@@ -358,10 +511,18 @@
       "status" : "OPEN",
       "started_at" : null,
       "duration_minutes" : 60,
+      "refining_method" : null,
       "expenses" : 100.0,
+      "other_expenses" : null,
       "ore_sales" : null,
       "location" : "Zzz Export Hub",
+      "org_unit" : null,
+      "mission" : null,
+      "stored_at" : null,
+      "ready_notified_at" : null,
+      "canceled_by_patch_change" : false,
       "created_at" : "<instant>",
+      "updated_at" : "<instant>",
       "created_source" : "WEB",
       "created_client" : null,
       "last_change_source" : "WEB",
@@ -372,6 +533,20 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "refineryOrderGoods",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "order_started_at" : null,
+      "input_material" : "Zzz Export Ore",
+      "input_quantity" : 120,
+      "quality" : 700,
+      "output_material" : "Zzz Export Ore",
+      "output_quantity" : 90,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "jobOrderAssignments",
     "legalBasis" : "ART_15_20",
     "rows" : [ {
@@ -379,7 +554,8 @@
       "type" : "MATERIAL",
       "status" : "OPEN",
       "note" : "Uebernommen von #OTHER_MEMBER#",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -390,7 +566,9 @@
       "material" : "Zzz Export Ore",
       "amount" : 5.0,
       "quality_requirement" : "GOOD",
+      "claiming_unit" : "IRIDIUM",
       "created_at" : "<instant>",
+      "updated_at" : "<instant>",
       "ended_at" : null,
       "credited_amount" : 0.0,
       "changes" : "[]",
@@ -414,31 +592,43 @@
       "operation_id" : "<uuid>",
       "holder_id" : "<uuid>",
       "kind" : "PROVISION",
+      "selection_kind" : "ACCOUNTLESS",
       "amount" : "17",
       "bank_handling" : false,
       "recorded_at" : "<instant>",
+      "effective_at" : null,
+      "fee_rate" : null,
       "fee" : null,
-      "new_provision" : null
+      "new_provision" : null,
+      "recorded_by_patch_change" : false
     }, {
       "job_order" : <n>,
       "operation_id" : "<uuid>",
       "holder_id" : "<uuid>",
       "kind" : "PURPOSE_HANDOVER",
+      "selection_kind" : "EXISTING",
       "amount" : "3",
       "bank_handling" : false,
       "recorded_at" : "<instant>",
+      "effective_at" : null,
+      "fee_rate" : "0",
       "fee" : "0",
-      "new_provision" : "0"
+      "new_provision" : "0",
+      "recorded_by_patch_change" : false
     }, {
       "job_order" : <n>,
       "operation_id" : "<uuid>",
       "holder_id" : "<uuid>",
       "kind" : "CORRECTION",
+      "selection_kind" : "EXISTING",
       "amount" : "0",
       "bank_handling" : false,
       "recorded_at" : "<instant>",
+      "effective_at" : null,
+      "fee_rate" : null,
       "fee" : null,
-      "new_provision" : null
+      "new_provision" : null,
+      "recorded_by_patch_change" : false
     } ],
     "truncated" : false
   }, {
@@ -460,6 +650,7 @@
       "job_order" : <n>,
       "previous_target" : "85",
       "target" : "80",
+      "client_id" : null,
       "recorded_at" : "<instant>"
     } ],
     "truncated" : false
@@ -482,11 +673,14 @@
     "rows" : [ {
       "offer_kind" : "ITEM",
       "item_name" : "Zzz Angebot",
+      "item_quantity" : 3,
       "offered_amount" : null,
       "remark" : "Abholung bei #OTHER_MEMBER#",
+      "org_unit" : null,
       "status" : "ACTIVE",
       "released_at" : "<instant>",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -504,6 +698,8 @@
       "fee" : "0",
       "previous_credit" : null,
       "credit" : null,
+      "attribution_removed" : false,
+      "remove_attribution_requested" : false,
       "recorded_at" : "<instant>"
     } ],
     "truncated" : false
@@ -517,11 +713,16 @@
       "kind" : "PROVISION",
       "state" : "WAITING",
       "active" : true,
+      "selection_kind" : "EXISTING",
+      "bank_type" : "DEPOSIT",
       "amount" : "21",
       "new_provision" : "21",
+      "fee_rate" : "0.005",
       "fee" : "0",
       "fee_funding" : "DEPOSITOR",
+      "source_binding" : "0",
       "actual_payment" : true,
+      "cancelled_by_patch_change" : false,
       "submitted_at" : "<instant>",
       "updated_at" : "<instant>"
     } ],
@@ -541,12 +742,15 @@
     "rows" : [ {
       "request_kind" : "ITEM",
       "item_name" : "Zzz Gesuch",
+      "item_quantity" : 2,
       "requested_amount" : null,
       "min_quality" : null,
       "remark" : "Melden bei #OTHER_MEMBER#",
+      "org_unit" : null,
       "status" : "ACTIVE",
       "posted_at" : "<instant>",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -555,7 +759,8 @@
     "rows" : [ {
       "item_name" : "Zzz Fremdes Angebot",
       "offer_kind" : "ITEM",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -565,7 +770,8 @@
       "request_kind" : "ITEM",
       "item_name" : "Zzz Fremdes Gesuch",
       "material" : null,
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -575,7 +781,8 @@
       "handle" : "ZzzExportSubjectZzz",
       "active" : true,
       "role_managed" : false,
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -584,7 +791,8 @@
     "rows" : [ {
       "account_no" : "ZZZ-EXPORT-1",
       "account" : "Kasse von #OTHER_MEMBER#",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -596,7 +804,8 @@
       "can_deposit" : true,
       "can_withdraw" : false,
       "can_transfer" : true,
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -606,7 +815,8 @@
       "account_no" : "ZZZ-EXPORT-1",
       "account" : "Kasse von #OTHER_MEMBER#",
       "limit_amount" : 5000.0000,
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -617,7 +827,11 @@
       "note" : "Einzahlung von #OTHER_MEMBER#",
       "justification" : "Abgesprochen mit ZzzExportExternalZzz",
       "transfer_fee" : 0.0000,
-      "created_at" : "<instant>"
+      "counterparty_org_unit_name" : null,
+      "reverses_booking" : false,
+      "created_at" : "<instant>",
+      "effective_at" : null,
+      "postings" : "[{\"amount\": 1500.0000, \"accountNo\": \"ZZZ-EXPORT-1\"}]"
     } ],
     "truncated" : false
   }, {
@@ -626,11 +840,26 @@
     "rows" : [ {
       "type" : "DEPOSIT",
       "amount" : 1500.0000,
+      "account_no" : "ZZZ-EXPORT-1",
+      "account" : "Kasse von #OTHER_MEMBER#",
+      "target_account_no" : null,
+      "target_account" : null,
+      "counterparty_org_unit_name" : null,
       "note" : "Einzahlung von #OTHER_MEMBER#",
       "justification" : "Abgesprochen mit #OTHER_MEMBER#",
+      "purpose_kind" : null,
+      "split_enabled" : false,
+      "split_percent" : null,
+      "applicable_limit" : null,
+      "requires_owner_approval" : false,
+      "required_approver" : null,
+      "owner_approval_granted" : false,
+      "owner_approval_granted_at" : null,
       "status" : "PENDING",
+      "cancelled_by_patch_change" : false,
       "client_id" : null,
       "created_at" : "<instant>",
+      "updated_at" : "<instant>",
       "decided_at" : null
     } ],
     "truncated" : false
@@ -640,6 +869,8 @@
     "rows" : [ {
       "type" : "DEPOSIT",
       "amount" : 1500.0000,
+      "account_no" : "ZZZ-EXPORT-1",
+      "account" : "Kasse von #OTHER_MEMBER#",
       "note" : "Einzahlung von #OTHER_MEMBER#",
       "justification" : "Abgesprochen mit #OTHER_MEMBER#",
       "status" : "PENDING",
@@ -666,9 +897,21 @@
     "legalBasis" : "ART_15",
     "rows" : [ {
       "amount" : 6000000.0000,
+      "account_no" : "ZZZ-EXPORT-1",
+      "account" : "Kasse von #OTHER_MEMBER#",
       "authorised_at" : "<instant>",
       "member_authorised" : false,
       "member_is_custodian" : true
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankCustodianPostings",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "type" : "DEPOSIT",
+      "amount" : 1500.0000,
+      "created_at" : "<instant>",
+      "effective_at" : null
     } ],
     "truncated" : false
   }, {
@@ -696,6 +939,7 @@
     "rows" : [ {
       "occurred_at" : "<instant>",
       "event_type" : "ACCOUNT_CREATED",
+      "account_no" : null,
       "client_id" : null
     } ],
     "truncated" : false
@@ -704,7 +948,8 @@
     "legalBasis" : "ART_15",
     "rows" : [ {
       "occurred_at" : "<instant>",
-      "event_type" : "ACCOUNT_CREATED"
+      "event_type" : "ACCOUNT_CREATED",
+      "account_no" : null
     } ],
     "truncated" : false
   }, {
@@ -741,11 +986,14 @@
     "legalBasis" : "ART_15_20",
     "rows" : [ {
       "created_at" : "<instant>",
+      "updated_at" : "<instant>",
       "status" : "RECEIVED",
       "entry" : "Zzz Export Ore",
       "quality" : 500,
       "pledged_amount" : 4.0,
       "received_amount" : 4.0,
+      "received_at" : null,
+      "withdrawn_by_patch_change" : false,
       "receiving_unit" : "IRIDIUM"
     } ],
     "truncated" : false
@@ -753,14 +1001,22 @@
     "key" : "purchasingDeals",
     "legalBasis" : "ART_15_20",
     "rows" : [ {
+      "deal_no" : <n>,
       "created_at" : "<instant>",
+      "updated_at" : "<instant>",
       "status" : "SETTLED",
       "entry" : "Zzz Export Ore",
+      "quality_tier" : null,
       "amount" : 4.0,
       "unit_price" : 100,
       "total" : 400,
       "payment_model" : "ADVANCE",
-      "risk_class" : "A"
+      "risk_class" : "A",
+      "escort_wish" : false,
+      "raising_unit" : "IRIDIUM",
+      "delivery_closed" : false,
+      "settlement_due_at" : null,
+      "overdue_notified_at" : null
     } ],
     "truncated" : false
   }, {
@@ -770,7 +1026,56 @@
       "appointed_at" : "<instant>",
       "valid_until" : null,
       "monthly_limit" : null,
-      "revoked_at" : null
+      "revoked_at" : null,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingDealDeliveries",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "deal_no" : <n>,
+      "amount" : 4.0,
+      "location" : "Zzz Export Hub",
+      "status" : "PARTIALLY_ACCEPTED",
+      "accepted_amount" : 3.0,
+      "rejected_amount" : 1.0,
+      "reject_reason" : "DAMAGED",
+      "measured_quality" : 500,
+      "accepted_at" : "<instant>",
+      "recorded_by_member" : true,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingDealSettlements",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "deal_no" : <n>,
+      "money_received" : 400,
+      "money_paid" : 300,
+      "remainder" : 100,
+      "loss_amount" : 100,
+      "loss_reason" : "QUALITY",
+      "settled_at" : "<instant>",
+      "recorded_by_member" : true,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingDealTranches",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "deal_no" : <n>,
+      "kind" : "ADVANCE",
+      "amount" : 300,
+      "state" : "CONFIRMED",
+      "decided_at" : "<instant>",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -786,6 +1091,17 @@
       "org_unit_id" : null,
       "range_days" : 7,
       "row_count" : 5,
+      "status_filter" : null
+    }, {
+      "preference_section" : "dashboardCustomised",
+      "position" : 0,
+      "entry_key" : "true",
+      "dashboard_mode" : "MEMBER",
+      "widget_type" : null,
+      "column_side" : null,
+      "org_unit_id" : null,
+      "range_days" : null,
+      "row_count" : null,
       "status_filter" : null
     }, {
       "preference_section" : "desktopMode",

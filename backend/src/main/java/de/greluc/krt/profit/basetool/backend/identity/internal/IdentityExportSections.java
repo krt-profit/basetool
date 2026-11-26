@@ -44,7 +44,9 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 "Provided at registration and on the profile page.",
                 """
                 SELECT id, username, display_name, email, description, user_rank, join_date,
-                       discord_user_id, discord_guild_nickname, rsi_handle, approval_status, approved_at, created_at, updated_at
+                       discord_user_id, discord_guild_nickname, rsi_handle, approval_status,
+                       approved_at, in_keycloak, enabled_in_keycloak, keycloak_absent_since,
+                       last_read_announcement_id, created_at, updated_at
                 FROM app_user WHERE id = :userId
                 """)
             .scrubbing("description")
@@ -65,7 +67,7 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 ART_15_20,
                 "Chosen on the profile page or set by the member's latest patch-change relocation.",
                 """
-                SELECT l.name AS home_location, h.updated_at
+                SELECT l.name AS home_location, h.created_at, h.updated_at
                 FROM member_home_location h LEFT JOIN location l ON l.id = h.location_id
                 WHERE h.user_id = :userId
                 """)
@@ -86,7 +88,7 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 "An assessment of the member by an administrator; the deciding administrator is not"
                     + " named, being a third party.",
                 """
-                SELECT decision, reason, created_at
+                SELECT decision, reason, created_at, updated_at
                 FROM user_approval_event WHERE user_id = :userId ORDER BY created_at
                 """)
             .scrubbing("reason"),
@@ -96,7 +98,8 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 ART_15,
                 "The member's own erasure requests and their outcome.",
                 """
-                SELECT status, erase_history_requested, decision_note, created_at, decided_at
+                SELECT status, erase_history_requested, decision_note, created_at, updated_at,
+                       decided_at
                 FROM deletion_request WHERE user_id = :userId ORDER BY created_at
                 """)
             .scrubbing("decision_note"),

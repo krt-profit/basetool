@@ -42,8 +42,10 @@ public class SupplyExportSections implements PersonalDataExportSection {
                 ART_15_20,
                 "Entered by the member.",
                 """
-                SELECT d.created_at, d.status, COALESCE(m.name, g.name) AS entry, d.quality,
-                       d.pledged_amount, d.received_amount, u.name AS receiving_unit
+                SELECT d.created_at, d.updated_at, d.status, COALESCE(m.name, g.name) AS entry,
+                       d.quality, d.pledged_amount, d.received_amount, d.received_at,
+                       d.withdrawn_by_patch_change IS NOT NULL AS withdrawn_by_patch_change,
+                       u.name AS receiving_unit
                 FROM supply_donation d
                   LEFT JOIN material m ON m.id = d.material_id
                   LEFT JOIN game_item g ON g.id = d.game_item_id

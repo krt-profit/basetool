@@ -140,6 +140,8 @@ class DataExportEndStateTest {
   private Material material;
   private ShipType shipType;
   private Ship ship;
+  private InventoryItem subjectItem;
+  private RefineryOrder subjectRefineryOrder;
 
   @Test
   void aMemberWithRowsInEveryStoreExportsTheCommittedDocument() throws IOException {
@@ -153,6 +155,7 @@ class DataExportEndStateTest {
     seedMarket();
     seedBank();
     seedAudit();
+    seedImportNamesAndPayouts();
     entityManager.flush();
     entityManager.clear();
 
@@ -181,6 +184,7 @@ class DataExportEndStateTest {
         .replaceAll("\\d{4}-\\d{2}-\\d{2}T[0-9:.]+Z", "<instant>")
         .replaceAll("\"display_id\" : \\d+", "\"display_id\" : <n>")
         .replaceAll("\"job_order\" : \\d+", "\"job_order\" : <n>")
+        .replaceAll("\"deal_no\" : \\d+", "\"deal_no\" : <n>")
         .replace("\r\n", "\n");
   }
 
@@ -306,7 +310,10 @@ class DataExportEndStateTest {
       item.setQuality(500);
       item.setAmount(40.0);
       item.setNote("Lager von " + owner.getUsername() + " fuer " + OTHER);
-      inventoryItemRepository.save(item);
+      InventoryItem savedItem = inventoryItemRepository.save(item);
+      if (owner == subject) {
+        subjectItem = savedItem;
+      }
       Ship owned = new Ship();
       owned.setName("Schiff von " + owner.getUsername() + " und " + OTHER);
       owned.setShipType(shipType);
@@ -384,21 +391,84 @@ class DataExportEndStateTest {
             + " VALUES (?, 'ORG', 'Zzz Export Partner', 'OTHER', 'OTHER', 'ACTIVE')",
         partner);
     for (User owner : new User[] {subject, other}) {
+      UUID deal = UUID.randomUUID();
       jdbc.update(
           "INSERT INTO purchasing_deal (id, need_id, raising_org_unit_id, partner_id,"
               + " delegate_user_id, material_id, amount, unit_price, total, payment_model,"
               + " risk_class, status) VALUES (?, ?, ?, ?, ?, ?, 4, 100, 400, 'ADVANCE', 'A',"
               + " 'SETTLED')",
-          UUID.randomUUID(),
+          deal,
           UUID.randomUUID(),
           squadron.getId(),
           partner,
           owner.getId(),
           material.getId());
+      seedDealFollowUps(deal, owner);
       jdbc.update(
           "INSERT INTO purchasing_delegate (id, user_id, appointed_at) VALUES (?, ?, now())",
           UUID.randomUUID(),
           owner.getId());
+    }
+  }
+
+  private void seedDealFollowUps(UUID deal, User delegate) {
+    User acceptor = delegate == subject ? other : subject;
+    jdbc.update(
+        "INSERT INTO purchasing_deal_delivery (id, deal_id, amount, location_id, recorded_by,"
+            + " status, accepted_amount, rejected_amount, reject_reason, measured_quality,"
+            + " accepted_by, accepted_at) VALUES (?, ?, 4, ?, ?, 'PARTIALLY_ACCEPTED', 3, 1,"
+            + " 'DAMAGED', 500, ?, now())",
+        UUID.randomUUID(),
+        deal,
+        location.getId(),
+        delegate.getId(),
+        acceptor.getId());
+    jdbc.update(
+        "INSERT INTO purchasing_deal_settlement (id, deal_id, money_received, money_paid,"
+            + " remainder, loss_amount, loss_reason, recorded_by, settled_at)"
+            + " VALUES (?, ?, 400, 300, 100, 100, 'QUALITY', ?, now())",
+        UUID.randomUUID(),
+        deal,
+        delegate.getId());
+    jdbc.update(
+        "INSERT INTO purchasing_deal_tranche (id, deal_id, kind, amount, state, decided_at)"
+            + " VALUES (?, ?, 'ADVANCE', 300, 'CONFIRMED', now())",
+        UUID.randomUUID(),
+        deal);
+  }
+
+  private void seedImportNamesAndPayouts() {
+    entityManager.flush();
+    UUID operation = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO operation (id, name, status) VALUES (?, ?, 'COMPLETED')",
+        operation,
+        "Operation mit " + OTHER);
+    for (User member : new User[] {subject, other}) {
+      jdbc.update(
+          "INSERT INTO operation_payout_status (id, operation_id, participant_key, paid_out,"
+              + " paid_out_at, paid_out_by_user_id) VALUES (?, ?, ?, TRUE, now(), ?)",
+          UUID.randomUUID(),
+          operation,
+          member.getId().toString(),
+          (member == subject ? other : subject).getId());
+      jdbc.update(
+          "INSERT INTO blueprint_external_alias (id, source_system, external_name, product_key,"
+              + " product_name, note, created_by) VALUES (?, 'SCMDB', ?, ?, 'Export Product', ?,"
+              + " ?)",
+          UUID.randomUUID(),
+          "Fremdname von " + member.getUsername(),
+          "export-" + member.getUsername(),
+          "Gelernt mit " + OTHER,
+          member.getId().toString());
+      jdbc.update(
+          "INSERT INTO material_external_alias (id, material_id, source_system, external_name,"
+              + " note, created_by) VALUES (?, ?, 'UEX', ?, ?, ?)",
+          UUID.randomUUID(),
+          material.getId(),
+          "Erzname von " + member.getUsername(),
+          "Angelegt mit " + OTHER,
+          member.getId().toString());
     }
   }
 
@@ -510,10 +580,11 @@ class DataExportEndStateTest {
         subject.getId(),
         "Absprache mit " + EXTERNAL + " und " + OTHER,
         "Treffpunkt " + OTHER);
+    UUID participation = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO mission_participant (id, mission_id, user_id, comment, payout_preference)"
             + " VALUES (?, ?, ?, ?, 'PERSONAL')",
-        UUID.randomUUID(),
+        participation,
         owned,
         subject.getId(),
         "Dabei mit " + OTHER);
@@ -537,15 +608,30 @@ class DataExportEndStateTest {
         "INSERT INTO mission_managers (mission_id, user_id) VALUES (?, ?)", owned, subject.getId());
     jdbc.update(
         "INSERT INTO mission_managers (mission_id, user_id) VALUES (?, ?)", owned, other.getId());
+    UUID unit = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO mission_unit (id, mission_id, name, high_value_unit, version,"
             + " responsible_user_id, ship_type_id, note) VALUES (?, ?, ?, TRUE, 0, ?, ?, ?)",
-        UUID.randomUUID(),
+        unit,
         owned,
         "Hornet von " + OTHER,
         subject.getId(),
         shipType.getId(),
         "Absprache mit " + HIDDEN);
+    jdbc.update(
+        "INSERT INTO mission_crew (id, version, created_at, updated_at, mission_ship_id,"
+            + " mission_participant_id) VALUES (?, 0, now(), now(), ?, ?)",
+        UUID.randomUUID(),
+        unit,
+        participation);
+    jdbc.update(
+        "INSERT INTO mission_finance_entry (id, version, created_at, updated_at, note, type,"
+            + " amount, mission_id, mission_participant_id)"
+            + " VALUES (?, 0, now(), now(), ?, 'EXPENSE', 250, ?, ?)",
+        UUID.randomUUID(),
+        "Treibstoff mit " + OTHER,
+        owned,
+        participation);
     jdbc.update(
         "INSERT INTO mission_unit (id, mission_id, name, high_value_unit, version,"
             + " responsible_user_id) VALUES (?, ?, 'Fremde Einheit', FALSE, 0, ?)",
@@ -568,11 +654,29 @@ class DataExportEndStateTest {
       order.setLocation(location);
       order.setDurationMinutes(60L);
       order.setExpenses(100.0);
-      refineryOrderRepository.save(order);
+      RefineryOrder savedOrder = refineryOrderRepository.save(order);
+      if (owner == subject) {
+        subjectRefineryOrder = savedOrder;
+      }
     }
     JobOrder jobOrder = jobOrder("export-subject");
     JobOrder otherOrder = jobOrder("export-other");
     entityManager.flush();
+    jdbc.update(
+        "INSERT INTO refinery_good (id, version, created_at, updated_at, input_quantity,"
+            + " refinery_order_id, input_material_id, output_material_id, output_quantity,"
+            + " quality) VALUES (?, 0, now(), now(), 120, ?, ?, ?, 90, 700)",
+        UUID.randomUUID(),
+        subjectRefineryOrder.getId(),
+        material.getId(),
+        material.getId());
+    jdbc.update(
+        "INSERT INTO inventory_item_job_order_allocation (id, inventory_item_id, job_order_id,"
+            + " amount, delivered, created_at, updated_at) VALUES (?, ?, ?, 5, FALSE, now(),"
+            + " now())",
+        UUID.randomUUID(),
+        subjectItem.getId(),
+        jobOrder.getId());
     jdbc.update(
         "INSERT INTO job_order_assignees (id, job_order_id, user_id, note) VALUES (?, ?, ?, ?)",
         UUID.randomUUID(),
@@ -887,16 +991,29 @@ class DataExportEndStateTest {
         UUID.randomUUID(),
         account,
         subject.getId());
+    UUID transaction = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO bank_transaction (id, type, initiated_by, note, justification,"
             + " counterparty_user_id, counterparty_handle, created_at)"
             + " VALUES (?, 'DEPOSIT', ?, ?, ?, ?, ?, now())",
-        UUID.randomUUID(),
+        transaction,
         other.getId(),
         "Einzahlung von " + OTHER,
         "Abgesprochen mit " + EXTERNAL,
         subject.getId(),
         SUBJECT);
+    jdbc.update(
+        "INSERT INTO bank_posting (id, transaction_id, account_id, amount, created_at)"
+            + " VALUES (?, ?, ?, 1500, now())",
+        UUID.randomUUID(),
+        transaction,
+        account);
+    jdbc.update(
+        "INSERT INTO bank_holder_posting (id, transaction_id, holder_id, amount, created_at)"
+            + " VALUES (?, ?, ?, 1500, now())",
+        UUID.randomUUID(),
+        transaction,
+        holder);
     bookingRequest(account, subject, other);
     bookingRequest(account, other, subject);
     jdbc.update(
