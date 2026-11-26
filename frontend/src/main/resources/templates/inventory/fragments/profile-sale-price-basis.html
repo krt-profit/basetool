@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<form th:fragment="section(position)" id="profile-sale-price-form" th:action="@{/profile/sale-price-basis}" method="post"
+      th:object="${profileSalePriceBasisForm}" th:data-section-name="#{profile.salePriceBasis.label}"
+      data-krt-draft="profile-sale-price-basis" data-krt-draft-version="1" data-testid="profile-sale-price-form">
+    <th:block th:replace="~{kernel/fragments/draft-offer :: draftOffer}" />
+    <input type="hidden" name="version" th:field="*{version}" data-krt-draft-base>
+    <fieldset class="form-section" id="profile-section-sale-price">
+        <legend class="form-section__head" th:text="${position} + ' · ' + #{profile.salePriceBasis.label}">7 · Verkaufswert im Lager</legend>
+        <div class="form-group">
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='salePriceBasis', labelKey='profile.salePriceBasis.label',
+                selected=*{salePriceBasis}, variant='krt-segmented--block',
+                options=${ {{value: 'AVERAGE', labelKey: 'profile.salePriceBasis.option.AVERAGE'},
+                            {value: 'HIGHEST', labelKey: 'profile.salePriceBasis.option.HIGHEST'},
+                            {value: 'LOWEST', labelKey: 'profile.salePriceBasis.option.LOWEST'}} })}"></th:block>
+            <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.salePriceBasis.hint}">Mit diesem Terminalpreis sch&auml;tzt &bdquo;Mein Lager&ldquo; den Verkaufswert deiner Materialien.</span></p>
+        </div>
+        <noscript>
+            <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.salePriceBasis.save}">Speichern</button>
+        </noscript>
+    </fieldset>
+</form>
+</body>
+</html>

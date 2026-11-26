@@ -38,6 +38,8 @@ import java.util.Objects;
  * @param maxQuality highest quality across the stacks, or {@code null}
  * @param stacks the per-stock-identity stacks of this group
  * @param lowStock whether a minimum stock level of this material or game item is low (REQ-INV-068)
+ * @param saleValue the estimated sale value of a priced "Mein Lager" material group, or {@code
+ *     null} (REQ-INV-072)
  */
 @DtoMirror
 public record GroupedInventoryDto(
@@ -47,10 +49,11 @@ public record GroupedInventoryDto(
     Double averageQuality,
     Integer maxQuality,
     List<InventoryStackDto> stacks,
-    boolean lowStock) {
+    boolean lowStock,
+    InventorySaleValueDto saleValue) {
 
   /**
-   * Creates a group that no low level marks.
+   * Creates a group that no low level marks and that carries no sale value.
    *
    * @param material the grouping material, or {@code null} for a game-item group
    * @param gameItem the grouping game item, or {@code null} for a material group
@@ -66,7 +69,7 @@ public record GroupedInventoryDto(
       Double averageQuality,
       Integer maxQuality,
       List<InventoryStackDto> stacks) {
-    this(material, gameItem, totalAmount, averageQuality, maxQuality, stacks, false);
+    this(material, gameItem, totalAmount, averageQuality, maxQuality, stacks, false, null);
   }
 
   /**

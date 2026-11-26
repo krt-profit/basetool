@@ -38,6 +38,8 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileDescriptionF
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDescriptionRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
+import de.greluc.krt.profit.basetool.frontend.inventory.web.SalePriceBasisPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
@@ -96,6 +98,7 @@ class ProfileControllerTest {
             new NotificationBackendClient(backendApiClient),
             new ExchangeBackendClient(backendApiClient),
             new HomeLocationPreferenceReader(identityClient),
+            new SalePriceBasisPreferenceReader(new InventoryBackendClient(backendApiClient)),
             messageSource);
     ReflectionTestUtils.setField(controller, "issuerUri", "https://kc.example.com/realms/basetool");
   }

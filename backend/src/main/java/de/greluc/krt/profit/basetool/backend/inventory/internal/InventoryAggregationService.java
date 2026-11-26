@@ -73,6 +73,7 @@ public class InventoryAggregationService {
   private final InventoryItemViewRepository inventoryItemViewRepository;
   private final StockLevelService stockLevelService;
   private final InventoryRelocationMarks relocationMarks;
+  private final InventorySaleValuation saleValuation;
 
   /**
    * Sums the caller's own stock into one SCU total per material and quality for the blueprint
@@ -264,7 +265,8 @@ public class InventoryAggregationService {
   /**
    * Aggregates the user's material stock into the Material to Stack shape of the {@code /grouped}
    * view, applying the material, location, quality, job-order, mission, personal and stolen filters
-   * of {@code filter} (REQ-INV-040, REQ-INV-053).
+   * of {@code filter} (REQ-INV-040, REQ-INV-053); each priced SCU material group carries its
+   * estimated sale value at the member's price basis (REQ-INV-072).
    *
    * @param userId owner id
    * @param filter the Lager filters; a contradictory flag pair answers empty
@@ -294,7 +296,7 @@ public class InventoryAggregationService {
             filter.stolenOnly(),
             filter.nonStolenOnly());
 
-    return buildGroupedFromStacks(stacks, Set.of());
+    return saleValuation.valued(buildGroupedFromStacks(stacks, Set.of()), user.getId());
   }
 
   /**

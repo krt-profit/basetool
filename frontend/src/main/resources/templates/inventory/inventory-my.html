@@ -251,9 +251,19 @@
                                 <span class="tree-gauge-track"><span th:attr="data-krtm-width=${group.averageQuality != null ? group.averageQuality.intValue() / 10 : 0}"></span></span>
                             </span>
                         </div>
-                        <div class="tree-cell tree-cell--num tree-amount" th:switch="${group.material.quantityType}">
+                        <div class="tree-cell tree-cell--num tree-amount">
+                            <th:block th:switch="${group.material.quantityType}">
                             <span th:case="'PIECE'"><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
                             <span th:case="*"><span th:text="${group.totalAmount != null ? #numbers.formatDecimal(group.totalAmount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
+                            </th:block>
+                            <span th:if="${group.saleValue != null and group.saleValue.value.signum() > 0}"
+                                  th:with="sv=${group.saleValue},
+                                      svPrice=${@moneyFormat.price(sv.pricePerScu, #locale)},
+                                      svBasis=#{__${'inventory.saleValue.rowTitle.' + group.saleValue.basis}__(${svPrice}, ${sv.terminalName == null ? sv.terminalCount : sv.terminalName})},
+                                      svTitle=${sv.excludesStolen()}
+                                          ? ${svBasis} + ' ' + #{inventory.saleValue.rowStolen(${#numbers.formatDecimal(sv.unvaluedStolenAmount, 1, 'DEFAULT', 3, 'DEFAULT')})}
+                                          : ${svBasis}"
+                                  class="tree-value" data-testid="lager-sale-value" th:title="${svTitle}"><span th:text="#{inventory.saleValue.approx}">&asymp;</span> <span class="tree-value-num" th:text="${#numbers.formatInteger(@moneyFormat.round(sv.value), 1, 'DEFAULT')}">324.675</span> <span th:text="#{inventory.saleValue.unit}">aUEC</span></span>
                         </div>
                         <div class="tree-cell lager-cell-select">
                             <input type="checkbox" class="item-checkbox group-select-all" th:data-material-id="${group.material.id}" th:title="#{inventory.bulk.checkout.select.all}" th:aria-label="#{inventory.bulk.checkout.select.all}" data-trigger="inv-my-toggle-group-cb">
@@ -297,6 +307,23 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div th:if="${saleValueSummary != null}" class="tree-row tree-row--total" data-testid="lager-sale-value-total"
+                     th:with="totalHintKey=${'inventory.saleValue.hint.' + saleValueSummary.basis()}">
+                    <div class="tree-cell tree-total-label">
+                        <span th:text="${saleValueSummary.filtered()} ? #{inventory.saleValue.totalFiltered} : #{inventory.saleValue.total}">Gesch&auml;tzter Verkaufswert</span>
+                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint(${totalHintKey})}"></th:block>
+                    </div>
+                    <div class="tree-cell tree-total-notes">
+                        <span th:if="${saleValueSummary.unpricedMaterials() == 1}" class="tree-total-note" th:text="#{inventory.saleValue.unpriced.one}">1 Material ohne Terminalpreis</span>
+                        <span th:if="${saleValueSummary.unpricedMaterials() > 1}" class="tree-total-note" th:text="#{inventory.saleValue.unpriced.many(${saleValueSummary.unpricedMaterials()})}">2 Materialien ohne Terminalpreis</span>
+                        <span th:if="${saleValueSummary.stolenExcluded()}" class="tree-total-note" th:text="#{inventory.saleValue.stolenExcluded}">Gestohlene Best&auml;nde nicht bewertet</span>
+                    </div>
+                    <div class="tree-cell tree-cell--num tree-amount tree-total-amount" th:title="#{__${totalHintKey}__}">
+                        <span class="tree-total-value" th:text="|#{inventory.saleValue.approx} ${#numbers.formatInteger(@moneyFormat.round(saleValueSummary.total()), 1, 'DEFAULT')}|">&asymp; 926.827</span>
+                        <span class="tree-unit" th:text="#{inventory.saleValue.unit}">aUEC</span>
                     </div>
                 </div>
 

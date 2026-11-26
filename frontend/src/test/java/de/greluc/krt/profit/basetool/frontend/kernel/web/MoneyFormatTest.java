@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -58,6 +59,13 @@ class MoneyFormatTest {
     assertEquals(new BigDecimal("2"), moneyFormat.round(new BigDecimal("1.51")));
     assertEquals(new BigDecimal("3"), moneyFormat.round(new BigDecimal("2.99")));
     assertEquals(new BigDecimal("1500001"), moneyFormat.round(new BigDecimal("1500000.51")));
+  }
+
+  @Test
+  void price_groupsDigitsAndKeepsAtMostTwoDecimalsHalfUp() {
+    assertEquals("2.700", MoneyFormat.price(new BigDecimal("2700"), Locale.GERMAN));
+    assertEquals("1,63", MoneyFormat.price(new BigDecimal("1.625"), Locale.GERMAN));
+    assertEquals("12,345.5", MoneyFormat.price(new BigDecimal("12345.50"), Locale.ENGLISH));
   }
 
   @Test

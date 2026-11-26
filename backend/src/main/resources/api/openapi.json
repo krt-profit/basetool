@@ -26220,6 +26220,231 @@
         "x-domain" : "inventory"
       }
     },
+    "/api/v1/inventory/my-inventory/sale-price-basis" : {
+      "get" : {
+        "description" : "The terminal price the caller's Mein Lager values the own materials at: AVERAGE (the default), HIGHEST or LOWEST, with the setting's optimistic-lock version.",
+        "operationId" : "getMySalePriceBasis",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MySalePriceBasisResponse"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Read the own Mein Lager price basis",
+        "tags" : [ "identity" ],
+        "x-domain" : "identity"
+      },
+      "put" : {
+        "operationId" : "updateMySalePriceBasis",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MySalePriceBasisRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MySalePriceBasisResponse"
+                }
+              }
+            },
+            "description" : "Set"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Set the own Mein Lager price basis",
+        "tags" : [ "identity" ],
+        "x-domain" : "identity"
+      }
+    },
     "/api/v1/inventory/my-inventory/stack/entries" : {
       "get" : {
         "operationId" : "getMyStackEntries",
@@ -95244,6 +95469,9 @@
             "type" : "integer",
             "format" : "int32"
           },
+          "saleValue" : {
+            "$ref" : "#/components/schemas/InventorySaleValueDto"
+          },
           "stacks" : {
             "type" : "array",
             "items" : {
@@ -96029,6 +96257,32 @@
           }
         },
         "required" : [ "id", "version" ]
+      },
+      "InventorySaleValueDto" : {
+        "type" : "object",
+        "properties" : {
+          "basis" : {
+            "type" : "string",
+            "enum" : [ "AVERAGE", "HIGHEST", "LOWEST" ]
+          },
+          "pricePerScu" : {
+            "type" : "number"
+          },
+          "terminalCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "terminalName" : {
+            "type" : "string"
+          },
+          "unvaluedStolenAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "value" : {
+            "type" : "number"
+          }
+        }
       },
       "InventoryStackDto" : {
         "type" : "object",
@@ -101169,6 +101423,33 @@
         "properties" : {
           "rsiHandle" : {
             "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "MySalePriceBasisRequest" : {
+        "type" : "object",
+        "properties" : {
+          "salePriceBasis" : {
+            "type" : "string",
+            "enum" : [ "AVERAGE", "HIGHEST", "LOWEST" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "salePriceBasis", "version" ]
+      },
+      "MySalePriceBasisResponse" : {
+        "type" : "object",
+        "properties" : {
+          "salePriceBasis" : {
+            "type" : "string",
+            "enum" : [ "AVERAGE", "HIGHEST", "LOWEST" ]
           },
           "version" : {
             "type" : "integer",

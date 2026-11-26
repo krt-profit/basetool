@@ -21,10 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.MoneyFormat;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -404,13 +403,6 @@ public final class MaterialTerminalPrices {
    */
   @NotNull
   private static String format(@Nullable BigDecimal price) {
-    if (price == null) {
-      return NO_VALUE;
-    }
-    DecimalFormat format =
-        new DecimalFormat(
-            "#,##0.##", DecimalFormatSymbols.getInstance(LocaleContextHolder.getLocale()));
-    format.setRoundingMode(RoundingMode.HALF_UP);
-    return format.format(price);
+    return price == null ? NO_VALUE : MoneyFormat.price(price, LocaleContextHolder.getLocale());
   }
 }

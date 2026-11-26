@@ -39,6 +39,9 @@ import org.jetbrains.annotations.Nullable;
  * @param stacks the per-stock-identity stacks of this group
  * @param lowStock whether a minimum stock level of this material or game item is low in the
  *     caller's scope (REQ-INV-068)
+ * @param saleValue the estimated sale value of a material group of the personal listing, or {@code
+ *     null} for a game-item group, a {@code PIECE} material, a material no terminal buys and every
+ *     squadron-wide group (REQ-INV-072)
  */
 public record GroupedInventoryDto(
     @Nullable MaterialReferenceDto material,
@@ -47,10 +50,11 @@ public record GroupedInventoryDto(
     @Nullable Double averageQuality,
     @Nullable Integer maxQuality,
     List<InventoryStackDto> stacks,
-    boolean lowStock) {
+    boolean lowStock,
+    @Nullable InventorySaleValueDto saleValue) {
 
   /**
-   * Creates a group that no low level marks.
+   * Creates a group that no low level marks and that carries no sale value.
    *
    * @param material the grouping material, or {@code null} for a game-item group
    * @param gameItem the grouping game item, or {@code null} for a material group
@@ -66,7 +70,7 @@ public record GroupedInventoryDto(
       @Nullable Double averageQuality,
       @Nullable Integer maxQuality,
       List<InventoryStackDto> stacks) {
-    this(material, gameItem, totalAmount, averageQuality, maxQuality, stacks, false);
+    this(material, gameItem, totalAmount, averageQuality, maxQuality, stacks, false, null);
   }
 
   /**
@@ -77,6 +81,17 @@ public record GroupedInventoryDto(
    */
   public GroupedInventoryDto withLowStock(boolean low) {
     return new GroupedInventoryDto(
-        material, gameItem, totalAmount, averageQuality, maxQuality, stacks, low);
+        material, gameItem, totalAmount, averageQuality, maxQuality, stacks, low, saleValue);
+  }
+
+  /**
+   * Returns this group carrying the given sale value.
+   *
+   * @param value the estimated sale value, or {@code null} for none
+   * @return the valued group
+   */
+  public GroupedInventoryDto withSaleValue(@Nullable InventorySaleValueDto value) {
+    return new GroupedInventoryDto(
+        material, gameItem, totalAmount, averageQuality, maxQuality, stacks, lowStock, value);
   }
 }

@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSaleRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
@@ -49,9 +50,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Verifies {@link MaterialPriceRepository#findMatrixItems} against PostgreSQL: the four optional
- * filters, their intersection and the base predicates (REQ-UI-014), and the UEX update time of
- * {@link MaterialPriceRepository#findPricesByMaterialId} (REQ-UI-015). Fixtures use unique names;
- * each test rolls back.
+ * filters, their intersection and the base predicates (REQ-UI-014), the UEX update time of {@link
+ * MaterialPriceRepository#findPricesByMaterialId} (REQ-UI-015) and the buying terminals of {@link
+ * MaterialPriceRepository#findSaleRows} (REQ-INV-072). Fixtures use unique names; each test rolls
+ * back.
  */
 @SpringBootTest
 @Transactional
@@ -301,6 +303,38 @@ class MaterialMatrixQueryDataTest {
         .containsExactly(
             tuple(buyOnly.getId(), BigDecimal.valueOf(50), null),
             tuple(sellOnly.getId(), null, BigDecimal.valueOf(100)));
+  }
+
+  @Test
+  void saleRows_keepThePositiveSalePricesAtVisibleTerminals_byTerminalName() {
+    String prefix = "SaleRows-" + uid + "-";
+    Material priced = persistMaterial(prefix + "priced");
+    Material nonPositive = persistMaterial(prefix + "nonpositive");
+    Material hiddenOnly = persistMaterial(prefix + "hidden");
+    Material notAsked = persistMaterial(prefix + "notasked");
+    Terminal bravo = persistTerminal(prefix + "Bravo", stanton, false, false, false);
+    Terminal alpha = persistTerminal(prefix + "Alpha", stanton, false, false, false);
+    Terminal charlie = persistTerminal(prefix + "Charlie", stanton, false, false, false);
+    Terminal hidden = persistTerminal(prefix + "Hidden", stanton, false, false, true);
+    persistSellPrice(priced, bravo, 300);
+    persistSellPrice(priced, alpha, 250);
+    persistBuyPrice(priced, charlie, 100);
+    persistSellPrice(priced, hidden, 999);
+    persistPrice(nonPositive, alpha, BigDecimal.TEN, BigDecimal.ZERO);
+    persistPrice(nonPositive, bravo, null, BigDecimal.ONE.negate());
+    persistSellPrice(hiddenOnly, hidden, 500);
+    persistSellPrice(notAsked, alpha, 700);
+
+    List<MaterialSaleRow> rows =
+        materialPriceRepository.findSaleRows(
+            List.of(priced.getId(), nonPositive.getId(), hiddenOnly.getId()));
+
+    assertThat(rows)
+        .extracting(
+            MaterialSaleRow::materialId, MaterialSaleRow::terminalName, MaterialSaleRow::priceSell)
+        .containsExactly(
+            tuple(priced.getId(), prefix + "Alpha", BigDecimal.valueOf(250)),
+            tuple(priced.getId(), prefix + "Bravo", BigDecimal.valueOf(300)));
   }
 
   private Material persistMaterial(String name) {

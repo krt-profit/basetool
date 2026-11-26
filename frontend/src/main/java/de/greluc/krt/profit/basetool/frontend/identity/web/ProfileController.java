@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.ProfilePayoutPrefer
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileRsiHandleForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDescriptionRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.web.SalePriceBasisPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PayoutPreference;
@@ -78,7 +79,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Controller of the user profile page ({@code /profile}) and its editable fields: description,
  * display name, default payout preference, blueprint sharing, the name withholding from connected
- * applications and, saved by {@link ProfileHomeLocationController}, the home location.
+ * applications and, saved by their own controllers, the home location and the "Mein Lager" price
+ * basis.
  *
  * <p>Renders from token claims overlaid with {@code /api/v1/users/me}, and still renders from the
  * token alone when the backend is unreachable.
@@ -101,6 +103,9 @@ public class ProfileController {
 
   /** Reads the member's home-location setting and the curated home locations. */
   private final HomeLocationPreferenceReader homeLocationReader;
+
+  /** Reads the member's "Mein Lager" price basis, saved by its own controllers. */
+  private final SalePriceBasisPreferenceReader salePriceBasisReader;
 
   private final MessageSource messageSource;
 
@@ -255,6 +260,9 @@ public class ProfileController {
     }
 
     addHomeLocationSection(model);
+    if (!model.containsAttribute("profileSalePriceBasisForm")) {
+      model.addAttribute("profileSalePriceBasisForm", salePriceBasisReader.profileForm());
+    }
     return "identity/profile";
   }
 

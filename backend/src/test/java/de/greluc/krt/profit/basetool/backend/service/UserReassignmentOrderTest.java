@@ -54,7 +54,7 @@ class UserReassignmentOrderTest {
    */
   private static final List<String> EXPECTED =
       List.of(
-          "10:InventoryUserReassignment|inventory_item.user_id|",
+          "10:InventoryUserReassignment|inventory_item.user_id|member_sale_value_setting.user_id",
           "20:HangarUserReassignment|ship.owner_id|",
           "30:RefineryUserReassignment|refinery_order.owner_id|",
           "40:PersonalInventoryUserReassignment|personal_inventory_item.owner_user_id|",
@@ -146,7 +146,7 @@ class UserReassignmentOrderTest {
   void noColumnIsDeclaredTwice() {
     List<String> all = new ArrayList<>(mergeService.followedColumns());
     all.addAll(mergeService.staysWithTheAct());
-    assertThat(all).doesNotHaveDuplicates().hasSize(92);
+    assertThat(all).doesNotHaveDuplicates().hasSize(93);
   }
 
   private static List<String> describe(List<UserReassignmentParticipant> participants) {

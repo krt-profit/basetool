@@ -41,6 +41,8 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPoolC
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryMergeCandidatesDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.MySalePriceBasisRequest;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.MySalePriceBasisResponse;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -77,6 +79,10 @@ public class InventoryBackendClient {
 
   /** The backend path that clears the global inventory. */
   private static final String DELETE_ALL_URI = "/api/v1/inventory/all";
+
+  /** The backend path of the caller's "Mein Lager" price basis (REQ-INV-072). */
+  private static final String SALE_PRICE_BASIS_PATH =
+      "/api/v1/inventory/my-inventory/sale-price-basis";
 
   private static final ParameterizedTypeReference<PageResponse<AggregatedInventoryDto>>
       AGGREGATED_INVENTORY_PAGE = new ParameterizedTypeReference<>() {};
@@ -227,6 +233,27 @@ public class InventoryBackendClient {
   public List<UUID> myEntryIds(@NotNull LagerQuery query) {
     return backendApiClient.get(
         backendUri("/api/v1/inventory/my-inventory/entry-ids", query), UUID_LIST);
+  }
+
+  /**
+   * Reads the caller's "Mein Lager" price basis with the setting's version (REQ-INV-072).
+   *
+   * @return the basis, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public MySalePriceBasisResponse mySalePriceBasis() {
+    return backendApiClient.get(SALE_PRICE_BASIS_PATH, MySalePriceBasisResponse.class);
+  }
+
+  /**
+   * Saves the caller's "Mein Lager" price basis (REQ-INV-072).
+   *
+   * @param request the basis and the version the page last read
+   * @return the stored basis and the new version, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public MySalePriceBasisResponse updateMySalePriceBasis(@NotNull MySalePriceBasisRequest request) {
+    return backendApiClient.put(SALE_PRICE_BASIS_PATH, request, MySalePriceBasisResponse.class);
   }
 
   /**

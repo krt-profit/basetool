@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.Locale;
 import org.jetbrains.annotations.NotNull;
@@ -35,6 +37,25 @@ import org.springframework.stereotype.Component;
  */
 @Component("moneyFormat")
 public class MoneyFormat {
+
+  /** Pattern of a UEX price: grouped digits and at most two decimals. */
+  private static final String PRICE_PATTERN = "#,##0.##";
+
+  /**
+   * Formats a UEX price with the separators of the given language and at most two decimals,
+   * rounding {@link RoundingMode#HALF_UP}, the way the price matrix shows it.
+   *
+   * @param value the price
+   * @param locale the display language
+   * @return the localized price
+   */
+  @NotNull
+  public static String price(@NotNull BigDecimal value, @NotNull Locale locale) {
+    DecimalFormat format =
+        new DecimalFormat(PRICE_PATTERN, DecimalFormatSymbols.getInstance(locale));
+    format.setRoundingMode(RoundingMode.HALF_UP);
+    return format.format(value);
+  }
 
   /**
    * Groups canonical whole-aUEC digits without rounding.

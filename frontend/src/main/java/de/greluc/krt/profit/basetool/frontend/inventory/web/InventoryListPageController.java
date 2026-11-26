@@ -86,7 +86,8 @@ public class InventoryListPageController {
   /**
    * Renders the personal inventory list ({@code /inventory?storage=my}) with URL-driven filters.
    * {@code view=items} shows the game-item tree (REQ-INV-030); filter options list only items and
-   * locations in stock in the caller's scope (REQ-INV-040).
+   * locations in stock in the caller's scope (REQ-INV-040); the material tree closes with the
+   * estimated sale value of the shown groups (REQ-INV-072).
    *
    * @param query the Lager filters bound from the query string
    * @param fragment when true, return the {@code inventoryTableFragment} fragment
@@ -135,6 +136,8 @@ public class InventoryListPageController {
             () -> inventoryClient.grouped(InventoryBackendClient.Listing.MY, query));
 
     model.addAttribute("groupedItems", groupedItems);
+    model.addAttribute(
+        "saleValueSummary", LagerSaleValueSummary.of(groupedItems, query.anyActive()));
     model.addAttribute("items", new ArrayList<>());
     model.addAttribute("materials", catalogs.materials());
     model.addAttribute(

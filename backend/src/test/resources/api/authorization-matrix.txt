@@ -238,6 +238,8 @@ GET /api/v1/inventory/merge-candidates | InventoryItemController#getMergeCandida
 GET /api/v1/inventory/my-inventory | InventoryItemController#getMyInventory | pre=isAuthenticated() | url=/api/v1/inventory/my-inventory -> authenticated
 GET /api/v1/inventory/my-inventory/entry-ids | InventoryItemController#getMyEntryIds | pre=isAuthenticated() | url=/api/v1/inventory/my-inventory/** -> authenticated
 GET /api/v1/inventory/my-inventory/grouped | InventoryItemController#getMyGroupedInventory | pre=isAuthenticated() | url=/api/v1/inventory/my-inventory/** -> authenticated
+GET /api/v1/inventory/my-inventory/sale-price-basis | MySalePriceBasisController#getMySalePriceBasis | pre=isAuthenticated() | url=/api/v1/inventory/my-inventory/** -> authenticated
+PUT /api/v1/inventory/my-inventory/sale-price-basis | MySalePriceBasisController#updateMySalePriceBasis | pre=isAuthenticated() | url=/api/v1/inventory/my-inventory/** -> authenticated
 GET /api/v1/inventory/my-inventory/stack/entries | InventoryItemController#getMyStackEntries | pre=isAuthenticated() | url=/api/v1/inventory/my-inventory/** -> authenticated
 GET /api/v1/inventory/stock-levels | StockLevelController#listStockLevels | pre=hasAnyRole('ADMIN','LOGISTICIAN','KRT_MEMBER') | url=/api/v1/inventory/** -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_LOGISTICIAN)
 POST /api/v1/inventory/stock-levels | StockLevelController#createStockLevel | pre=isAuthenticated() and @stockLevelAccessPolicy.canMaintainStockLevelsOf(#request.orgUnitId()) | url=/api/v1/inventory/** -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_LOGISTICIAN)

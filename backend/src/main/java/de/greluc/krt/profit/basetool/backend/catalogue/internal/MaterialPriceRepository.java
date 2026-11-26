@@ -134,6 +134,28 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
       @Param("materialId") UUID materialId);
 
   /**
+   * Returns every non-hidden terminal that buys one of the given materials at a positive price,
+   * ordered by terminal name: the terminal set of the material overview and the material page.
+   *
+   * @param materialIds the materials to price; never empty, since an empty {@code IN} list is not
+   *     portable
+   * @return one row per (material, buying terminal)
+   */
+  @Query(
+      """
+          SELECT new de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSaleRow(
+              p.material.id, t.name, p.priceSell
+          )
+          FROM MaterialPrice p
+          JOIN p.terminal t
+          WHERE p.material.id IN :materialIds
+          AND p.priceSell > 0
+          AND (t.hidden = false OR t.hidden IS NULL)
+          ORDER BY t.name ASC
+      """)
+  List<MaterialSaleRow> findSaleRows(@Param("materialIds") Collection<UUID> materialIds);
+
+  /**
    * Returns flattened material/terminal/price rows for the trade-matrix view, excluding hidden
    * terminals and terminals with neither a buy nor a sell price.
    *

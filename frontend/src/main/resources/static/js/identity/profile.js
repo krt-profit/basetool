@@ -124,6 +124,14 @@ function initProfile() {
                 return { homeLocationId: select && select.value ? select.value : null, version };
             },
         },
+        {
+            formId: 'profile-sale-price-form',
+            ownVersion: true,
+            payload(form, version) {
+                const checked = control(form, 'input[name="salePriceBasis"]:checked');
+                return { salePriceBasis: checked ? checked.value : null, version };
+            },
+        },
     ];
 
     const settings = document.getElementById('profile-settings');
