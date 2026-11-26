@@ -2,6 +2,270 @@
 
 ## [Unreleased]
 
+## [v1.27.0](https://github.com/krt-profit/basetool/releases/tag/v1.27.0) - 2026-11-26
+
+### Added
+
+- **Aufträge im Datenaustausch.** Admins schalten auf der Seite „Verbundene Anwendungen" Aufträge
+  und getrennt davon Auftragsänderungen für verbundene Anwendungen ein oder aus. Beide sind zunächst
+  ausgeschaltet: Anwendungen lesen und ändern Aufträge erst, wenn die Administration sie freigibt.
+
+- **Verbundene Anwendungen.** Eine zugelassene Anwendung kann mit der neuen Fähigkeit „Aufträge der
+  eigenen Einheiten und eigene Bearbeitungen lesen" die Aufträge der Einheiten lesen, denen du direkt
+  angehörst, und die Aufträge, die du bearbeitest – mit Fortschritt, Kontakt, Kommentar und den
+  Namen der Bearbeiter, nie mit Haltern, Beträgen pro Person oder Bankdaten. Wer seinen Namen
+  zurückhält, fehlt bei den Bearbeitern.
+
+- **Verbundene Anwendungen.** Eine Anwendung mit „Aufträge der eigenen Einheiten und eigene
+  Bearbeitungen lesen" hält deine Auftragsliste nach dem ersten Abruf aktuell, ohne sie jedes Mal
+  ganz neu zu laden. Ein Auftrag, den du nicht mehr siehst – weil keine deiner Einheiten mehr
+  beteiligt ist, du eine Einheit verlassen hast oder er gelöscht wurde –, verschwindet aus ihr, ohne
+  dass sie erfährt, warum oder durch wen.
+
+- **Verbundene Anwendungen.** Mit der neuen Fähigkeit „Als Logistiker aUEC-Aufträge anlegen,
+  stornieren und ändern" kann eine zugelassene Anwendung für dich aUEC-Aufträge im Namen einer
+  Einheit anlegen, der du direkt angehörst und deren Logistiker du bist; zuständig ist eine
+  Profit-Einheit. Ein solcher Auftrag läuft wie ein im Basetool angelegter – mit denselben Prüfungen
+  und Benachrichtigungen –, und Geld bewegt sich weiter nur im Basetool.
+
+- **Administration.** Das Audit-Log führt das Anlegen und Stornieren eines Auftrags sowie die
+  Änderung seines Zielbetrags oder Kommentars über eine verbundene Anwendung als eigene
+  Ereignistypen, den Kommentar ohne Text, mit der Anwendung im Client-Filter.
+
+- **Aufträge.** Ein Auftrag, den eine verbundene Anwendung angelegt hat, trägt in der Übersicht
+  neben der Nummer und im Kopf der Detailseite den Hinweis „über <Anwendung>". Einträge im
+  Zielbetragsverlauf und der Kommentar zeigen dasselbe, solange sie zuletzt über eine Anwendung
+  kamen; ändert jemand den Kommentar im Basetool, verschwindet der Hinweis am Kommentar.
+
+- **Benachrichtigungen.** Die Benachrichtigungen über einen neuen, geänderten oder stornierten
+  Auftrag nennen die Anwendung, wenn die Änderung über eine verbundene Anwendung kam.
+
+- **Verbundene Anwendungen.** Eine zugelassene Anwendung kann für dich einen aUEC-Auftrag
+  stornieren, den eine Einheit beauftragt hat, der du direkt angehörst und deren Logistiker du bist –
+  solange er offen oder in Bearbeitung ist und noch kein Geld für ihn angenommen wurde. Die
+  Stornierung läuft wie im Basetool, die Benachrichtigung nennt die Anwendung; wieder öffnen lässt
+  sich der Auftrag nur im Basetool.
+
+- **Verbundene Anwendungen.** Eine zugelassene Anwendung kann für dich den Kommentar eines
+  aUEC-Auftrags ändern, den eine Einheit beauftragt hat, der du direkt angehörst und deren Logistiker
+  du bist – nicht bei einem stornierten Auftrag. Der Kontakt bleibt unberührt, der Kommentar zeigt
+  „über <Anwendung>", bis er im Basetool geändert wird, und die Benachrichtigung nennt die Anwendung.
+
+- **Verbundene Anwendungen.** Eine zugelassene Anwendung kann für dich den Zielbetrag eines aUEC-Auftrags
+  ändern, den eine Einheit beauftragt hat, der du direkt angehörst und deren Logistiker du bist –
+  höher oder niedriger, aber nur über dem bereits netto übergebenen Betrag, solange der Auftrag offen
+  oder in Bearbeitung ist. Der Verlauf und die Benachrichtigung nennen die Anwendung; abschließen
+  lässt sich der Auftrag weiterhin nur im Basetool.
+
+- **Verbundene Anwendungen.** VerseKit ist ab Basetool 1.27.0 für das Lesen deiner Aufträge und für das Anlegen, Stornieren und Ändern von aUEC-Aufträgen als Logistiker freigegeben. Die Aufträge erscheinen dort, sobald VerseKit sie einbaut und die Administration sie freischaltet.
+
+- **Übergaben.** Material- und Item-Übergaben halten fest, welches Mitglied der bearbeitenden
+  Einheit übergeben hat: Der Übergabe-Dialog bietet die aktiven Mitglieder der Einheit zur Auswahl
+  (vorbelegt mit dir), die Übergabetabellen zeigen eine Spalte „Übergebender" und das
+  Übergabeprotokoll-PDF eine Zeile „Übergebender (Handle)". Ältere Übergaben zeigen dort „-".
+
+- **Hinweis während eines Updates.** Ist das Basetool während eines Updates kurz nicht erreichbar,
+  zeigt jede offene Seite einen Hinweis: Deine Eingaben bleiben auf der Seite, bitte nicht neu laden.
+  Sobald das Basetool wieder antwortet, sagt der Hinweis, dass du jetzt speichern kannst. Statt
+  „Speichern fehlgeschlagen“ erscheint in dieser Zeit nur dieser Hinweis.
+
+- **Raffinerieaufträge.** Ungespeicherte Eingaben beim Anlegen eines Raffinerieauftrags bleiben im
+  Tab erhalten: Nach einem Neuladen oder einer erneuten Anmeldung bietet das Formular sie zum
+  Wiederherstellen an, Materialzeilen eingeschlossen. Schließt du den Tab, sind sie weg.
+
+- **Warenaufträge.** Ungespeicherte Eingaben beim Anlegen eines Material-, Item- oder
+  aUEC-Auftrags bleiben im Tab erhalten: Nach einem Neuladen bietet das Formular sie zum
+  Wiederherstellen an, mit allen Zeilen und im richtigen Auftragstyp.
+
+- **Einsätze.** Ungespeicherte Eingaben beim Anlegen eines Einsatzes bleiben im Tab erhalten: Nach
+  einem Neuladen bietet das Formular sie zum Wiederherstellen an, mit Terminen, Zielen, Ablauf,
+  Einheiten, Frequenzen und der gewählten Vorlage.
+
+- **Lager.** Ungespeicherte Eingaben beim Einbuchen ins eigene oder ins globale Lager bleiben im Tab
+  erhalten: Nach einem Neuladen bietet das Formular sie zum Wiederherstellen an, mit Material- oder
+  Gegenstandsmodus und den Zuordnungen zu Aufträgen und Einsätzen.
+
+- **Einsätze.** Ungespeicherte Eingaben beim Anlegen einer Missionsvorlage bleiben im Tab erhalten:
+  Nach einem Neuladen öffnet sich der Vorlagen-Editor und bietet sie zum Wiederherstellen an, mit
+  den gewählten Bestandteilen, Zielen, Ablauf, Einheiten und Frequenzen.
+
+- **Raffinerie.** Ungespeicherte Änderungen an einem bestehenden Raffinerie-Auftrag bleiben im Tab
+  erhalten und werden nach einem Neuladen angeboten. Hat jemand den Auftrag inzwischen geändert,
+  sagt das Angebot es, und Speichern lehnt überschneidende Änderungen ab, statt sie zu
+  überschreiben.
+
+- **Einsätze.** Ungespeicherte Änderungen beim Bearbeiten eines Einsatzes bleiben im Tab erhalten:
+  Nach einem Neuladen öffnet sich der Bearbeiten-Bereich und bietet sie an. Hat jemand den Einsatz
+  inzwischen geändert, sagt das Angebot es; Änderungen an einem anderen Abschnitt bleiben beide
+  erhalten, überschneidende lehnt das Speichern ab.
+
+- **Mitglieder (Admin).** Ungespeicherte Änderungen beim Bearbeiten eines Mitglieds bleiben im Tab
+  erhalten und werden nach einem Neuladen angeboten. Hat jemand das Mitglied inzwischen gespeichert,
+  sagt das Angebot es, und Speichern lehnt die wiederhergestellten Änderungen ab, statt seine zu
+  überschreiben.
+
+- **Profil.** Ungespeicherte Änderungen in den Abschnitten des Profils bleiben im Tab erhalten und
+  werden nach einem Neuladen je Abschnitt angeboten. Hat sich ein Abschnitt inzwischen geändert,
+  sagt das Angebot es, und Speichern lehnt die wiederhergestellte Änderung ab, statt etwas zu
+  überschreiben.
+
+- **Bank.** Ein halb ausgefüllter Dialog „Kontobewegung“ oder ein Antrag einer Org-Einheit bleibt im
+  Tab erhalten, auch nach dem Schließen. Nach einem Neuladen bietet die Seite ihn oben an;
+  „Wiederherstellen“ öffnet den Dialog wieder und füllt ihn aus.
+
+- **Versorgung.** Ein halb ausgefüllter Bedarf, eine Spende, eine Spende aus dem Lager oder eine
+  erfasste Spende bleibt im Tab erhalten. Nach einem Neuladen bietet die Seite die Eingaben oben an;
+  „Wiederherstellen“ öffnet den Dialog wieder und füllt ihn aus.
+
+- **Ankauf.** Ein halb ausgefüllter neuer Partner oder ein neues Geschäft bleibt im Tab erhalten.
+  Nach einem Neuladen bietet die Seite die Eingaben oben an; „Wiederherstellen“ öffnet den Dialog
+  wieder und füllt ihn aus.
+
+- **Einsätze.** Ein halb ausgefüllter neuer Teilnehmer, eine neue Einheit oder ein neuer
+  Finanzeintrag bleibt im Tab erhalten. Nach einem Neuladen bietet die Seite die Eingaben oben an;
+  „Wiederherstellen“ öffnet den Dialog wieder und füllt ihn aus.
+
+- **Aufträge.** Eine halb ausgefüllte Übergabe von Material oder Items bleibt im Tab erhalten. Nach
+  einem Neuladen bietet die Seite sie oben an; „Wiederherstellen“ öffnet den Dialog wieder und füllt
+  ihn samt der Materialzeilen aus, sobald der Bestand geladen ist.
+
+- **Hangar.** Ein halb ausgefülltes neues Schiff bleibt im Tab erhalten, auch wenn du den Dialog
+  schließt. Nach einem Neuladen bietet die Seite die Eingaben oben an; „Wiederherstellen“ öffnet den
+  Dialog wieder und füllt ihn aus.
+
+- **Operationen.** Eine halb ausgefüllte neue Operation bleibt im Tab erhalten. Nach einem Neuladen
+  bietet die Seite die Eingaben oben an; „Wiederherstellen“ öffnet den Dialog wieder und füllt ihn
+  aus.
+
+- **Mein Inventar.** Ein halb ausgefüllter neuer Eintrag bleibt im Tab erhalten, samt gewähltem Ort.
+  Nach einem Neuladen bietet die Seite die Eingaben oben an; „Wiederherstellen“ öffnet den Dialog
+  wieder und füllt ihn aus.
+
+- **Kartellbank.** Auch ein halb ausgefülltes neues Konto, eine Halter-Umbuchung und eine neue
+  Berechtigung bleiben im Tab erhalten. Nach einem Neuladen bietet die Seite die Eingaben oben an;
+  „Wiederherstellen“ öffnet den Dialog wieder und füllt ihn aus.
+
+- **Neue Version.** Nach einem Update zeigt eine offene Seite „Das Basetool wurde aktualisiert“ mit
+  dem Knopf „Neu laden“. Du speicherst wie gewohnt zu Ende und lädst die Seite neu, wenn du fertig
+  bist; von selbst lädt sie nicht neu.
+
+- **Mein Lager.** Die Materialansicht zeigt unter der Menge, was ein Material an den Terminals
+  ungefähr einbringen würde, und schließt mit dem geschätzten Gesamtwert der angezeigten
+  Materialien. Im Profil wählst du, ob dafür der Durchschnitts-, der Best- oder der Minimalpreis
+  gilt (Standard: Durchschnitt); gestohlene Bestände und Materialien in Stück werden nicht bewertet.
+
+### Changed
+
+- **Benachrichtigungen zu Auftragsänderungen.** Eine neue Meldung „Auftrag vom Auftraggeber
+  geändert" oder „von der zuständigen Einheit geändert" ersetzt deine ältere ungelesene Meldung
+  derselben Art zum selben Auftrag; gelesene bleiben stehen. Viele Änderungen hintereinander füllen
+  den Posteingang so nicht mehr.
+
+- **Aufträge.** Eine verbundene Anwendung kann den Kommentar eines Auftrags ändern, ohne mit einer
+  gleichzeitigen Änderung des Ansprechpartners im Basetool zusammenzustoßen. Ein veraltetes
+  Bearbeitungsformular überschreibt weder Kommentar noch Ansprechpartner unbemerkt.
+
+- **Freigabe per E-Mail.** Über die Freigabe oder Ablehnung einer Registrierung kommt eine E-Mail an
+  die Adresse im Konto. Die Seite „Freigabe ausstehend" sagt das jetzt auch, statt auf eine fehlende
+  Nachricht hinzuweisen.
+
+- **Verbundene Anwendungen.** Die Datenschutzerklärung nennt, was eine Anwendung über Aufträge
+  erhält und ändern darf, was das Basetool dazu speichert und dass Auftragsänderungen nicht
+  zurückgenommen werden. Die Seite „Änderungen zurücknehmen" sagt, dass du einen stornierten Auftrag,
+  Zielbetrag und Kommentar im Basetool zurücksetzt.
+
+- **Profil.** Der Hinweis zu „Meinen Namen nicht an verbundene Anwendungen weitergeben" sagt, dass
+  dein Name dann auch bei den Bearbeitern von Aufträgen fehlt.
+
+- **Administration.** Das Zurücknehmen für alle Mitglieder weist darauf hin, dass Bankanträge und
+  Aufträge nicht zurückgenommen werden und die Änderungen einer Anwendung im Audit-Log über den
+  Client-Filter zu finden sind.
+
+- **PDF-Exporte.** Kontoauszüge, 3-Monats-Report, Audit-Logs, Übergabeprotokolle und die
+  Datenauskunft sind jetzt archivtaugliche PDF/A-4-Dateien (PDF 2.0). Der PDF-Betrachter zeigt
+  den Dokumenttitel statt des Dateinamens, und alle Schriften sind eingebettet.
+
+- **Ankauf-Bericht als CSV.** Die Datei trennt Felder jetzt nach RFC 4180 mit Komma statt
+  Semikolon und beendet Zeilen mit CRLF. Beim Import in eine Tabellenkalkulation das Komma als
+  Trennzeichen wählen.
+
+- **Downloads.** Alle Dateidownloads melden sich dem Browser als normaler Anhang
+  (`Content-Disposition: attachment`).
+
+- **Barrierefreie PDFs.** Kontoauszüge, 3-Monats-Report, Audit-Logs, Übergabeprotokolle und die
+  Datenauskunft sind jetzt getaggte PDF/UA-2-Dateien nach Well-Tagged PDF: Screenreader erkennen
+  Überschriften, Tabellenköpfe und Zellen, und das Diagramm des Kontostandverlaufs hat eine
+  Textbeschreibung. Das Aussehen bleibt gleich, die Dateien sind komprimiert und deutlich kleiner.
+
+- **Kürzere Unterbrechung bei Updates.** Beim Neustart während eines Updates startet das Frontend
+  jetzt vor dem Ingest-Gateway, das es nicht braucht. Die Wartungsseite verschwindet dadurch rund
+  30 Sekunden früher, und sie lädt sich alle 10 statt alle 30 Sekunden neu.
+
+- **Noch kürzere Unterbrechung bei Updates.** Ein Update startet die Anmeldung (Keycloak) nur noch
+  neu, wenn sich ihre Erweiterung wirklich geändert hat. Bei den meisten Updates ist die
+  Wartungsseite dadurch rund 30 Sekunden kürzer zu sehen.
+
+- **Kürzere Unterbrechung bei Updates.** Frontend und Backend schließen beim Herunterfahren zuerst
+  die offenen Live-Benachrichtigungs-Verbindungen und müssen nicht mehr jeweils 20 Sekunden auf sie
+  warten. Die Wartungsseite ist dadurch bei jedem Update rund 40 Sekunden kürzer zu sehen; die
+  Glocke verbindet sich danach von selbst neu.
+
+- **Keine nächtliche Wartungsseite mehr.** Die tägliche Sicherung um 05:15 Uhr (Sommerzeit 06:15 Uhr)
+  läuft jetzt bei laufendem Basetool. Die rund zwei Minuten Wartungsseite, in denen auch der
+  Desktop-Extractor nichts hochladen konnte, entfallen.
+
+- **Live-Aktualisierung.** Ein Bereich mit ungespeicherten Eingaben wird beim Wiederverbinden nach
+  einem Update nicht mehr neu geladen, auch wenn du gerade woanders bist. Er wartet hinter dem
+  Hinweis „Aktualisierungen verfügbar" und aktualisiert sich, sobald du speicherst oder verwirfst.
+
+- **Ungespeicherte Eingaben wiederherstellen.** „Wiederherstellen“ ist jetzt ein umrandeter Knopf mit
+  Symbol, damit „Speichern“ der einzige gefüllte Hauptknopf des Formulars bleibt. Das Angebot zu
+  einem Dialog steht unter dem Seitenkopf, wo die Seite auch ihre anderen Hinweise zeigt.
+
+- **Wartungsseite.** Die Seite, die während eines Updates erscheint, nutzt jetzt wie das Basetool die
+  Schrift Lato. Der Edge liefert sie selbst aus, sodass sie auch lädt, solange die Anwendung neu
+  startet.
+
+### Fixed
+
+- **Aufträge.** Ein neuer Material- oder Item-Auftrag erscheint auch im offenen Materialbedarf ohne
+  Neuladen. Die Auftragsübersicht erfährt von jedem neuen Auftrag über den Server, egal über welchen
+  Weg er angelegt wurde.
+
+- **Datenschutzerklärung.** Lange Links wie die Adresse des Beschwerdeformulars brechen am Handy
+  innerhalb der Karte um, statt sie seitlich scrollen zu lassen.
+
+- **Live-Aktualisierung.** Ein Klick geht nicht mehr verloren, wenn ein Bereich genau während des
+  Drückens neu geladen wird, etwa „Geld bewegen" kurz nach einer eigenen Buchung im Auftrag. Der
+  Bereich aktualisiert sich jetzt erst, nachdem der Klick angekommen ist.
+
+- **PDF-Zeiten.** Übergabeprotokolle, Kontoauszüge, der 3-Monats-Report und die Audit-Log-PDFs
+  zeigen Uhrzeiten in deiner Zeitzone statt in UTC; die Website und das PDF nennen damit
+  dieselbe Uhrzeit. Ein Übergabeprotokoll ohne bekannte Zeitzone kennzeichnet die Uhrzeit als
+  „UTC" statt als „Lokalzeit".
+
+- **Live-Aktualisierung.** Wer scrollt, während ein Bereich nach dem Speichern oder durch die
+  Änderung eines anderen Mitglieds neu geladen wird, wird nicht mehr an die alte Stelle
+  zurückgeworfen; ein Tipp oder Klick in diesem Moment geht nicht mehr ins Leere.
+
+- **Speichern per Formular.** Bei Formularen, die ohne Neuladen speichern, ist der Speichern-Knopf
+  jetzt auch dort während des Speicherns gesperrt, wo er es bisher nicht war, und nach dem Speichern
+  gilt das Formular als gespeichert. Live-Aktualisierungen und wiederherstellbare Entwürfe warten
+  dann nicht mehr auf Eingaben, die längst gespeichert sind.
+
+### Security
+
+- **Verbundene Anwendungen.** Eine Anwendung ändert das Org-Lager einer Einheit für dich nur noch,
+  wenn du der Einheit direkt angehörst und ihr Logistiker bist, wie bei Mitgliederliste und
+  Zuordnungszielen. Logistiker eines Bereichs oder der Organisationsleitung zu sein reicht für eine
+  Einheit darunter nicht mehr, auch nicht zum Zurücknehmen solcher Änderungen.
+
+- **Verbundene Anwendungen.** Für die Einträge im Org-Lager, das Schreiben dort, das Zurücknehmen
+  solcher Änderungen und die Auftragsdetails im Bedarf zählt nur deine eigene Mitgliedschaft in der
+  Einheit: ihr Logistiker-Haken oder ein Leitungsrang dort. Logistiker eines Bereichs oder der
+  Organisationsleitung zu sein reicht für eine Einheit darunter nicht mehr, auch wenn du ihr als
+  einfaches Mitglied angehörst.
+
 ## [v1.26.7](https://github.com/krt-profit/basetool/releases/tag/v1.26.7) - 2026-11-22
 
 ### Added
