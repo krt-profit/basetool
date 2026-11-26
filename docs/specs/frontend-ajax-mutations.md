@@ -78,15 +78,17 @@ which is not a success-path reload but a freshness guarantee for a document the 
 its back/forward cache — and (3) the context reload of REQ-ORG-032: a tab of the same browser that
 still shows another active org unit than the one just chosen reloads, after asking through a KRT
 dialog when it holds unsaved input. It is not a success-path reload of the acting tab either; the
-acting tab switches by its own navigation.
+acting tab switches by its own navigation. (4) The reload a member asks for with *Neu laden* on the notice
+of a new version (REQ-FE-042); the page never reloads by itself after a release.
 
 **Acceptance**
 
 - [ ] After the action, the URL and document are unchanged and the affected node(s) reflect the new
   state (badges, totals and status cells re-derived in the success handler, not by a reload).
 - [ ] No `location.reload()` runs on the success path; the only success-path-adjacent reloads are a
-  user-accepted optimistic-lock confirm, the bfcache history-restore refresh (REQ-FE-008) and the
-  context reload of another tab (REQ-ORG-032).
+  user-accepted optimistic-lock confirm, the bfcache history-restore refresh (REQ-FE-008), the
+  context reload of another tab (REQ-ORG-032) and the reload a member asks for after a release
+  (REQ-FE-042).
 - [ ] Derived UI that lives **outside** the swapped fragment is refreshed too — an emptied list
   restores its "no entries" placeholder, and a count or server-derived value shown in a separate
   modal/header reflects the new state (when a fragment swap cannot cover it, the handler patches it
@@ -3423,3 +3425,49 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `bank/bank-manage.html`, `bank/bank-grants.html` ·
 **ADR:** ADR-0411 · **Related:** REQ-FE-014, REQ-FE-024,
 REQ-FE-040, REQ-REFINERY-029
+
+### REQ-FE-042 — An open page offers a reload once a release replaced its version
+
+A release replaces the frontend while pages stay open. An open page keeps the scripts it loaded
+(content-hashed, immutable module URLs, REQ-FE-035) and goes on pulling markup and JSON of the new
+version into them through fragment swaps, section refreshes and writes, which can break where the
+two versions disagree. The page notices the new version and offers a reload; it never reloads by
+itself (issue #3736, option 2).
+
+- **The version.** The frontend sends the running version — the build's `version`, or `dev`
+  without build info (`AppVersion`) — with every answer as `X-Basetool-Version`
+  (`AppVersionHeaderFilter`: pages, fragments, JSON and static files alike). A layout page names
+  the version it was rendered with in `<meta name="krt-app-version">`.
+- **The check.** Every answer `krtFetch` reads or writes, and the answer of the maintenance probe
+  (REQ-FE-040), goes past `servesAnotherVersion` (`krt-app-version.js`): an answer whose version
+  differs from the page's, both known, means a release replaced the page's version. A page without
+  the meta tag, or an answer without the header, offers nothing.
+- **The notice.** The maintenance banner (REQ-FE-040) shows a third state, *updated*: "Das
+  Basetool wurde aktualisiert. Du kannst wie gewohnt speichern; lade die Seite neu, wenn du fertig
+  bist." in the info tint, with *Neu laden* (an outline button with the `reset` icon, the notice's
+  one suggested action) and the close button. When the answer that ends a restart window comes
+  from another version, it takes the place of the *back* notice; otherwise it appears with the
+  first answer of the new version. It stays until the member reloads or closes it; once closed, it
+  does not come back on that page.
+- **No automatic reload.** A reload the page started by itself would drop state that lives outside
+  forms: the scroll position, an open dialog, filters and search text that are not in the URL. The
+  member reloads when done; a drafted form comes back through REQ-FE-041.
+
+**Acceptance**
+
+- [x] Every answer of the frontend carries `X-Basetool-Version` with the running version, `dev`
+  without build info (`AppVersionHeaderFilterTest`).
+- [x] An answer from another version shows the notice with *Neu laden*, which reloads the page; the
+  same version, a missing header or a page without a version show nothing; a closed notice stays
+  closed (`krt-maintenance.test.mjs`, `AppVersionNoticeE2eTest`).
+- [x] A restart window that ends on another version shows the notice instead of the back notice,
+  and nothing hides it by itself.
+- [ ] On production, an open page shows the notice after the next release.
+
+**Enforced by:** `scripts/krt-maintenance.test.mjs` (`:frontend:testMaintenanceJs`),
+`AppVersionHeaderFilterTest`, `AppVersionAdviceTest`, `AppVersionNoticeE2eTest`,
+`MessageBundleConsistencyTest` · **Code:** `kernel/layout/AppVersion`,
+`kernel/layout/AppVersionAdvice`, `kernel/web/AppVersionHeaderFilter`,
+`kernel/fragments/head.html` (the meta tag and the texts), `static/js/kernel/krt-app-version.js`,
+`krt-maintenance.js` (`offerReload`, the *updated* state), `static/css/kernel/styles.css` ·
+**Related:** REQ-FE-001, REQ-FE-035, REQ-FE-040, REQ-FE-041

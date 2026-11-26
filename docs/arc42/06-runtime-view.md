@@ -134,7 +134,9 @@ itself changes only through the Ansible role, which never delivers):
    a release is one restart window in which each unit restarts once, and one gate covers images,
    units and JAR. The edge is the exception: it starts first, and a re-defined edge is restarted on
    its own before the stop, so the maintenance page answers through the whole window
-   (`REQ-OPS-061`, ADR-0397). A unit the release retires is stopped inside that window, never before the pull,
+   (`REQ-OPS-061`, ADR-0397). Open pages show the maintenance notice through the window, and a page
+   rendered by the old version offers a reload once the new one answers (`REQ-FE-040`,
+   `REQ-FE-042`). A unit the release retires is stopped inside that window, never before the pull,
    and the stack it starts is the units the host has, so a renamed unit rolls forward and back by
    name (`REQ-OPS-004`). A failed gate rolls all of them back together; the log names what the release
    changed and what did not come up, because a single gate cannot tell a bad JAR from a bad image.

@@ -19,7 +19,8 @@
 
 /**
  * Regression tests for the client side of the restart window (REQ-FE-040): the maintenance banner
- * and its probe, the transport's calls into it, and the error toast it silences. Each part runs in
+ * and its probe, the transport's calls into it, and the error toast it silences; and of a release that
+ * replaced the page's version, which the banner offers to reload (REQ-FE-042). Each part runs in
  * a vm context with a fake page, a scripted fetch and a recording clock.
  */
 
@@ -68,8 +69,9 @@ async function test(name, fn) {
  * Builds a page with a fake body, a scripted fetch and a recording clock, and loads the module.
  *
  * @param {Array<unknown>} answers what each fetch answers, a Response or a function returning one
+ * @param {{pageVersion?: string}} [options] the version the page names in its meta tag, if any
  */
-function page(answers = []) {
+function page(answers = [], options = {}) {
     const timers = [];
     const elements = new Map();
     const body = {
@@ -87,6 +89,12 @@ function page(answers = []) {
                 this.listeners[type] = fn;
             },
         };
+        const reloadButton = {
+            listeners: {},
+            addEventListener(type, fn) {
+                this.listeners[type] = fn;
+            },
+        };
         return {
             tag,
             id: '',
@@ -95,11 +103,18 @@ function page(answers = []) {
             attributes: {},
             markup: null,
             button,
+            reloadButton,
             setAttribute(name, value) {
                 this.attributes[name] = value;
             },
             querySelector(selector) {
-                return selector === 'button' ? button : null;
+                if (selector === '.krt-maintenance-banner__close') {
+                    return button;
+                }
+                if (selector === '.krt-maintenance-banner__reload') {
+                    return this.dataset.state === 'updated' ? reloadButton : null;
+                }
+                return null;
             },
             remove() {
                 elements.delete(this.id);
@@ -116,7 +131,20 @@ function page(answers = []) {
         Promise,
         Response,
         Headers,
-        document: { getElementById: (id) => elements.get(id) || null, createElement },
+        document: {
+            getElementById: (id) => elements.get(id) || null,
+            createElement,
+            querySelector: (selector) =>
+                selector === 'meta[name="krt-app-version"]' && options.pageVersion
+                    ? { getAttribute: () => options.pageVersion }
+                    : null,
+        },
+        location: {
+            reloads: 0,
+            reload() {
+                this.reloads += 1;
+            },
+        },
         fetch(url, init) {
             fetches.push({ url, init });
             const next = answers.shift();
@@ -125,7 +153,13 @@ function page(answers = []) {
     };
     context.window = context;
     context.layer = body;
-    context.krtMaintenanceI18n = { unreachable: 'DOWN', back: 'BACK', dismiss: 'CLOSE' };
+    context.krtMaintenanceI18n = {
+        unreachable: 'DOWN',
+        back: 'BACK',
+        dismiss: 'CLOSE',
+        updated: 'UPDATED',
+        reload: 'RELOAD',
+    };
     context.setTimeout = (fn, ms) => {
         const timer = { fn, ms, live: true };
         timers.push(timer);
@@ -143,6 +177,7 @@ function page(answers = []) {
         banner: () => elements.get('krt-maintenance-banner') || null,
         live: () => timers.filter((t) => t.live),
         fetches,
+        reloads: () => context.location.reloads,
         /** Fires a timer and waits for the work it started. */
         async fire(timer) {
             timer.live = false;
@@ -292,6 +327,77 @@ await test('a failure while the back notice shows turns it back and cancels the 
 
     assert.equal(hide.live, false);
     assert.equal(p.banner().dataset.state, 'down');
+});
+
+const NEXT_VERSION = { 'X-Basetool-Version': '1.1.0' };
+
+await test('an answer from another version offers a reload that stays until the member acts', () => {
+    const p = page([], { pageVersion: '1.0.0' });
+
+    assert.equal(p.maintenance.observe(reply(200, NEXT_VERSION)), false);
+
+    const banner = p.banner();
+    assert.equal(banner.dataset.state, 'updated');
+    assert.ok(banner.markup.values.includes('UPDATED'));
+    assert.equal(p.live().length, 0, 'the notice never hides itself');
+    banner.reloadButton.listeners.click();
+    assert.equal(p.reloads(), 1);
+});
+
+await test('the same version, a missing header or a page without a version offer nothing', () => {
+    const p = page([], { pageVersion: '1.0.0' });
+    p.maintenance.observe(reply(200, { 'X-Basetool-Version': '1.0.0' }));
+    p.maintenance.observe(reply(200));
+    assert.equal(p.banner(), null);
+
+    const unnamed = page();
+    unnamed.maintenance.observe(reply(200, NEXT_VERSION));
+    assert.equal(unnamed.banner(), null);
+});
+
+await test('a closed notice of a new version stays closed on this page', () => {
+    const p = page([], { pageVersion: '1.0.0' });
+    p.maintenance.observe(reply(200, NEXT_VERSION));
+
+    p.banner().button.listeners.click();
+    p.maintenance.observe(reply(200, NEXT_VERSION));
+
+    assert.equal(p.banner(), null);
+    assert.equal(p.reloads(), 0);
+});
+
+await test('a window that ends on another version offers the reload instead of the back notice', async () => {
+    const p = page([reply(200, NEXT_VERSION)], { pageVersion: '1.0.0' });
+    p.maintenance.enter();
+
+    await p.fire(p.live()[0]);
+
+    assert.equal(p.maintenance.isActive(), false);
+    assert.equal(p.banner().dataset.state, 'updated');
+    assert.equal(p.live().length, 0);
+});
+
+await test('a transport answer from another version ends the mode with the reload offer', () => {
+    const p = page([], { pageVersion: '1.0.0' });
+    p.maintenance.enter();
+
+    p.maintenance.observe(reply(201, NEXT_VERSION));
+
+    assert.equal(p.maintenance.isActive(), false);
+    assert.equal(p.banner().dataset.state, 'updated');
+    assert.equal(p.live().length, 0, 'the probe is cancelled and nothing hides the notice');
+});
+
+await test('a later answer from another version turns the back notice into the reload offer', () => {
+    const p = page([], { pageVersion: '1.0.0' });
+    p.maintenance.enter();
+    p.maintenance.observe(reply(200, { 'X-Basetool-Version': '1.0.0' }));
+    const hide = p.live()[0];
+
+    p.maintenance.observe(reply(200, NEXT_VERSION));
+
+    assert.equal(hide.live, false);
+    assert.equal(p.banner().dataset.state, 'updated');
 });
 
 /**

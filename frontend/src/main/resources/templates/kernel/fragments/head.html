@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta th:if="${csrfTokenValue != null}" name="_csrf" th:content="${csrfTokenValue}"/>
     <meta th:if="${csrfHeaderName != null}" name="_csrf_header" th:content="${csrfHeaderName}"/>
+    <meta th:if="${appVersion != null}" name="krt-app-version" th:content="${appVersion}"/>
     <meta th:each="sectionKeys : ${@liveSyncSectionKeys.byTopicClass()}" name="krt-live-sync-sections"
           th:attr="data-topic-class=${sectionKeys.key}" th:content="${sectionKeys.value}"/>
     <link rel="icon" type="image/svg+xml" th:href="@{/logos/basetool-favicon.svg}">
@@ -89,7 +90,9 @@
         window.krtMaintenanceI18n = {
             unreachable: /*[[#{frontend.maintenance.unreachable}]]*/ 'The Basetool cannot be reached right now.',
             back: /*[[#{frontend.maintenance.back}]]*/ 'The Basetool answers again. You can save now.',
-            dismiss: /*[[#{frontend.maintenance.dismiss}]]*/ 'Close notice'
+            dismiss: /*[[#{frontend.maintenance.dismiss}]]*/ 'Close notice',
+            updated: /*[[#{frontend.maintenance.updated}]]*/ 'The Basetool was updated. Reload the page when you are done.',
+            reload: /*[[#{frontend.maintenance.reload}]]*/ 'Reload'
         };
     </script>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
